@@ -4,11 +4,21 @@ import {
   join,
   resolve,
 } from "node:path";
-import * as Schema from "effect/Schema";
+import { create } from "@bufbuild/protobuf";
+import {
+  type Project as ProjectMessage,
+  ProjectService,
+  UpdateProjectSettingsRequestSchema,
+} from "@briar/contracts/gen/briar/app/v1/project_pb";
 import {
   isRepositoryWorkflowPending,
   repositoryWorkflowPendingStageId,
 } from "../src/lib/auto-hunt-contract";
+import {
+  projectRoleFromProto,
+  requiredMessage,
+} from "../src/lib/app-rpc/mappers";
+import { workflowToProto } from "../src/lib/app-rpc/project-configuration-mappers";
 import {
   projectWorktreeRoot,
   resolveBaseRef,
@@ -25,7 +35,6 @@ import {
   required,
   loadConfig,
   saveConfig,
-  request,
   login,
   gitValue,
   currentRepositoryPath,
@@ -34,7 +43,11 @@ import {
   worktreesEnabled,
   currentProject,
 } from "./command-support";
-import { HttpRequestError } from "./execution-metrics-upload";
+import {
+  fetchProjects,
+  isUnauthenticatedConnectError,
+} from "./app-connect-client";
+import { createAuthenticatedConnectClient } from "./connect-client";
 import {
   configWithRemoteProjectSettings,
   type FetchRemoteProjectSettings,
@@ -43,33 +56,16 @@ import {
   remoteWorkflowState,
 } from "./project-settings-sync";
 
-const ProjectListResponse = Schema.Struct({
-  projects: Schema.Array(Schema.Struct({
-    id: Schema.String,
-    name: Schema.String,
-    organizationId: Schema.String,
-    organizationName: Schema.String,
-    role: Schema.Literals([
-      "owner",
-      "co-owner",
-      "developer",
-      "editor",
-      "viewer",
-    ]),
-  })),
-}).annotate({
-  parseOptions: { onExcessProperty: "preserve" },
-});
-
-const decodeProjectListResponse = Schema.decodeUnknownSync(ProjectListResponse);
-
 export type ProjectListDependencies = {
   loadAuthentication: () => Promise<{
     apiUrl: string;
     userToken?: string;
   }>;
   environmentToken: () => string | undefined;
-  fetchProjects: (apiUrl: string, userToken: string) => Promise<unknown>;
+  fetchProjects: (
+    apiUrl: string,
+    userToken: string,
+  ) => Promise<ProjectMessage[]>;
   jsonOutput: () => boolean;
   writeOutput: (output: string) => void;
 };
@@ -77,8 +73,7 @@ export type ProjectListDependencies = {
 const defaultProjectListDependencies: ProjectListDependencies = {
   loadAuthentication: loadConfig,
   environmentToken: () => process.env.BRIAR_USER_TOKEN,
-  fetchProjects: (apiUrl, userToken) =>
-    request<unknown>(apiUrl, "/projects", userToken),
+  fetchProjects,
   jsonOutput: () => has("--json"),
   writeOutput: console.log,
 };
@@ -96,11 +91,11 @@ async function listProjectsCommand(
     );
   }
 
-  let response: unknown;
+  let response: ProjectMessage[];
   try {
     response = await resolved.fetchProjects(authentication.apiUrl, userToken);
   } catch (error) {
-    if (error instanceof HttpRequestError && error.status === 401) {
+    if (isUnauthenticatedConnectError(error)) {
       throw new Error(
         "Briar 로그인이 만료되었거나 유효하지 않습니다. `briar login`을 다시 실행하세요.",
       );
@@ -108,12 +103,12 @@ async function listProjectsCommand(
     throw error;
   }
 
-  const projects = decodeProjectListResponse(response).projects.map((project) => ({
+  const projects = response.map((project) => ({
     id: project.id,
     name: project.name,
     organizationId: project.organizationId,
     organizationName: project.organizationName,
-    role: project.role,
+    role: projectRoleFromProto(project.role),
   }));
   if (resolved.jsonOutput()) {
     resolved.writeOutput(JSON.stringify({ projects }, null, 2));
@@ -140,17 +135,16 @@ async function createProject() {
   if (!config.userToken) throw new Error("먼저 `briar login`을 실행하세요.");
   const repositoryPath = await currentRepositoryPath();
   const name = value("--name") ?? basename(repositoryPath);
-  const result = await request<{
-    project: { id: string; name: string };
-    agentToken: string;
-  }>(config.apiUrl, "/projects", config.userToken, {
-    method: "POST",
-    body: JSON.stringify({ name }),
-  });
+  const result = await createAuthenticatedConnectClient(
+    ProjectService,
+    config.apiUrl,
+    config.userToken,
+  ).createProject({ name });
+  const createdProject = requiredMessage(result.project, "createProject.project");
   config.projects = [
-    ...config.projects.filter((project) => project.id !== result.project.id),
+    ...config.projects.filter((project) => project.id !== createdProject.id),
     {
-      id: result.project.id,
+      id: createdProject.id,
       repositoryPath,
       repositoryRemote: gitValue(["remote", "get-url", "origin"]) ?? undefined,
       agentToken: result.agentToken,
@@ -158,8 +152,8 @@ async function createProject() {
     },
   ];
   await saveConfig(config);
-  console.log(`프로젝트 ${result.project.name}을 연결했습니다.`);
-  console.log(`Project ID: ${result.project.id}`);
+  console.log(`프로젝트 ${createdProject.name}을 연결했습니다.`);
+  console.log(`Project ID: ${createdProject.id}`);
 }
 
 async function connectProject() {
@@ -340,20 +334,24 @@ async function configureProject() {
   await saveConfig(config);
 
   if (config.userToken) {
-    await request(config.apiUrl, `/projects/${project.id}/settings`, config.userToken, {
-      method: "PUT",
-      body: JSON.stringify({
-        velenOrg: velenOrg ?? null,
-        dataSource: nextAutoHunt.dataSource ?? null,
+    await createAuthenticatedConnectClient(
+      ProjectService,
+      config.apiUrl,
+      config.userToken,
+    ).updateProjectSettings(
+      create(UpdateProjectSettingsRequestSchema, {
+        projectId: project.id,
+        velenOrg: velenOrg ?? undefined,
+        dataSource: nextAutoHunt.dataSource,
         linear: {
           enabled: nextAutoHunt.linear?.enabled ?? false,
-          source: nextAutoHunt.linear?.source ?? null,
-          teamKey: nextAutoHunt.linear?.teamKey ?? null,
+          source: nextAutoHunt.linear?.source,
+          teamKey: nextAutoHunt.linear?.teamKey,
         },
-        githubRepository: nextAutoHunt.githubRepository ?? null,
-        workflow: nextAutoHunt.workflow,
+        githubRepository: nextAutoHunt.githubRepository,
+        workflow: workflowToProto(nextAutoHunt.workflow),
       }),
-    });
+    );
   }
   console.log(
     JSON.stringify({
@@ -407,7 +405,7 @@ type ProjectDoctorWorkflowSync = {
 const unavailableWorkflowSync = (
   error: unknown,
 ): ProjectDoctorWorkflowSync => {
-  if (error instanceof HttpRequestError && error.status === 401) {
+  if (isUnauthenticatedConnectError(error)) {
     return {
       status: "session_unavailable",
       source: "server",

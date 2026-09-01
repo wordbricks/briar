@@ -1,0 +1,77 @@
+syntax = "proto3";
+
+package briar.types.v1;
+
+import "briar/types/v1/provider.proto";
+
+option swift_prefix = "BriarTypes_";
+
+message AgentEffortCapability {
+  string id = 1;
+  string label = 2;
+  optional string description = 3;
+  optional bool is_default = 4;
+}
+
+message AgentModelCapability {
+  string id = 1;
+  string label = 2;
+  optional bool is_default = 3;
+  optional string default_effort_id = 4;
+  repeated AgentEffortCapability efforts = 5;
+}
+
+message AgentProviderCapability {
+  AgentProvider provider = 1;
+  repeated AgentModelCapability models = 2;
+  repeated AgentEffortCapability default_efforts = 3;
+  bool allow_custom_models = 4;
+  optional string error = 5;
+}
+
+message RemoteUpdateCapability {
+  bool supported = 1;
+  optional uint32 protocol = 2;
+}
+
+message AgentProviderHealth {
+  AgentProvider provider = 1;
+  bool installed = 2;
+  bool authenticated = 3;
+  bool healthy = 4;
+  optional string reason = 5;
+  bool usage_exhausted = 6;
+  optional double max_used_percent = 7;
+}
+
+message WorkflowRequirementHealth {
+  string id = 1;
+  bool healthy = 2;
+  optional string detail = 3;
+}
+
+message WorkerCapabilities {
+  repeated AgentProviderCapability provider_capabilities = 1;
+  optional RemoteUpdateCapability remote_updates = 2;
+  bool worktrees = 3;
+  reserved 4;
+  reserved "organization_agent_context_protocol";
+  repeated WorkflowRequirementHealth workflow_requirements = 5;
+  optional uint32 dm_memory_protocol = 6;
+  optional uint32 dm_memory_learning_requests = 7;
+  optional DmMemoryLearningCapability dm_memory_learning = 8;
+}
+
+message DmMemoryLearningCapability {
+  uint32 protocol = 1;
+  string transport = 2;
+}
+
+message WorkerRuntimeAdvertisement {
+  AgentProvider agent_provider = 1;
+  reserved 2;
+  reserved "providers";
+  repeated AgentProviderHealth provider_health = 3;
+  WorkerCapabilities capabilities = 4;
+  map<string, string> versions = 5;
+}

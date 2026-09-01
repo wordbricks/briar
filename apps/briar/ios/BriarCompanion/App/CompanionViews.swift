@@ -1,3 +1,4 @@
+import BriarContracts
 import SwiftUI
 
 func issueProposalAcceptanceSystemImage(
@@ -27,15 +28,17 @@ struct CompanionShellView: View {
     @ObservedObject var channels: ChannelsStore
     let issueConversationView: IssueConversationViewTracker
 
-    let projects: [ProjectsResponse.Project]
+    let projects: [Project]
     var planningProjects: [PlanningProject] = []
     var selectedPlanningProjectID: UUID? = nil
-    let project: ProjectsResponse.Project
+    let project: Project
     let snapshot: DashboardSnapshot?
     let errorMessage: String?
     let token: String
-    let api: any MobileAPIClientProtocol
-    let user: CurrentUserResponse.User?
+    let api: any AuthenticatedDownloadClientProtocol
+    let services: AuthenticatedMobileServices
+    let realtimeClient: (any MobileRealtimeClientProtocol)?
+    let user: CurrentUser?
     let refresh: () async -> Void
     let ensureIssueAvailable: (UUID, UUID) async -> Bool
     let selectProject: (UUID) -> Void
@@ -78,7 +81,7 @@ struct CompanionShellView: View {
                     providers: snapshot?.organizationProviders ?? [],
                     workers: snapshot?.workers ?? [],
                     onIssueOpen: { projectID, runID, sourceIsCurrent in
-                        await navigation.openIssueWhenAvailable(
+                        _ = await navigation.openIssueWhenAvailable(
                             projectID: projectID,
                             runID: runID,
                             ensureAvailable: { targetProjectID, targetRunID in
@@ -108,7 +111,7 @@ struct CompanionShellView: View {
                             refresh: refresh,
                             onTasksOpen: { navigation.selectedTab = .tasks },
                             onIssueOpen: { projectID, runID, sourceIsCurrent in
-                                await navigation.openIssueWhenAvailable(
+                                _ = await navigation.openIssueWhenAvailable(
                                     projectID: projectID,
                                     runID: runID,
                                     ensureAvailable: {
@@ -131,6 +134,8 @@ struct CompanionShellView: View {
                             project: project,
                             token: token,
                             api: api,
+                            services: services,
+                            realtimeClient: realtimeClient,
                             snapshot: snapshot,
                             issueConversationView: issueConversationView,
                             refreshDashboard: refresh,
@@ -155,6 +160,8 @@ struct CompanionShellView: View {
                     errorMessage: errorMessage,
                     token: token,
                     api: api,
+                    services: services,
+                    realtimeClient: realtimeClient,
                     currentUserID: user?.id,
                     issueConversationView: issueConversationView,
                     refresh: refresh,
@@ -190,7 +197,7 @@ struct CompanionShellView: View {
                     providers: snapshot?.organizationProviders ?? [],
                     workers: snapshot?.workers ?? [],
                     onIssueOpen: { projectID, runID, sourceIsCurrent in
-                        await navigation.openIssueWhenAvailable(
+                        _ = await navigation.openIssueWhenAvailable(
                             projectID: projectID,
                             runID: runID,
                             ensureAvailable: { targetProjectID, targetRunID in
@@ -219,6 +226,8 @@ struct CompanionShellView: View {
                                 project: project,
                                 token: token,
                                 api: api,
+                                services: services,
+                                realtimeClient: realtimeClient,
                                 snapshot: snapshot,
                                 issueConversationView: issueConversationView,
                                 refreshDashboard: refresh,
@@ -335,6 +344,8 @@ struct CompanionShellView: View {
                 issueKeyPrefix: project.effectiveIssueKeyPrefix,
                 token: token,
                 api: api,
+                services: services,
+                realtimeClient: realtimeClient,
                 projects: projects,
                 allRuns: snapshot?.runs ?? [],
                 projectAgents: agents.agents.filter { $0.projectId == project.id },
@@ -439,17 +450,26 @@ struct CompanionShellView: View {
                         },
                         id: \.id
                     ) { candidate in
-                        Menu("\(candidate.name) · \(candidate.organizationName)") {
-                            let childProjects = planningProjects.filter {
-                                $0.teamId == candidate.id && $0.status != .cancelled
-                            }
-                            if childProjects.isEmpty {
-                                Button(candidate.name) {
-                                    navigation.cancelPendingIssue()
-                                    selectProject(candidate.id)
-                                    selectPlanningProject(nil)
+                        let childProjects = planningProjects.filter {
+                            $0.teamId == candidate.id && $0.status != .cancelled
+                        }
+                        if childProjects.isEmpty {
+                            Button {
+                                navigation.cancelPendingIssue()
+                                selectProject(candidate.id)
+                                selectPlanningProject(nil)
+                            } label: {
+                                if candidate.id == project.id && selectedPlanningProjectID == nil {
+                                    Label(candidate.name, systemImage: "checkmark")
+                                } else {
+                                    Text(candidate.name)
                                 }
-                            } else {
+                            }
+                            .accessibilityIdentifier(
+                                "project-option-\(candidate.id.uuidString.lowercased())"
+                            )
+                        } else {
+                            Menu("\(candidate.name) · \(candidate.organizationName)") {
                                 ForEach(childProjects) { child in
                                     Button {
                                         navigation.cancelPendingIssue()
@@ -464,10 +484,10 @@ struct CompanionShellView: View {
                                     }
                                 }
                             }
+                            .accessibilityIdentifier(
+                                "project-option-\(candidate.id.uuidString.lowercased())"
+                            )
                         }
-                        .accessibilityIdentifier(
-                            "project-option-\(candidate.id.uuidString.lowercased())"
-                        )
                     }
                 } label: {
                     if dynamicTypeSize.isAccessibilitySize {
@@ -518,15 +538,17 @@ struct TaskListView: View {
     @State private var dispatchRun: DashboardRun?
     @StateObject private var mutations: IssueMutationStore
 
-    let project: ProjectsResponse.Project
-    let projects: [ProjectsResponse.Project]
+    let project: Project
+    let projects: [Project]
     let planningProjects: [PlanningProject]
     let selectedPlanningProjectID: UUID?
     let projectAgents: [ProjectAgent]
     let snapshot: DashboardSnapshot?
     let errorMessage: String?
     let token: String
-    let api: any MobileAPIClientProtocol
+    let api: any AuthenticatedDownloadClientProtocol
+    let services: AuthenticatedMobileServices
+    let realtimeClient: (any MobileRealtimeClientProtocol)?
     let currentUserID: String?
     let issueConversationView: IssueConversationViewTracker?
     let refresh: () async -> Void
@@ -536,15 +558,17 @@ struct TaskListView: View {
 
     @MainActor
     init(
-        project: ProjectsResponse.Project,
-        projects: [ProjectsResponse.Project] = [],
+        project: Project,
+        projects: [Project] = [],
         planningProjects: [PlanningProject] = [],
         selectedPlanningProjectID: UUID? = nil,
         projectAgents: [ProjectAgent] = [],
         snapshot: DashboardSnapshot?,
         errorMessage: String?,
         token: String,
-        api: any MobileAPIClientProtocol,
+        api: any AuthenticatedDownloadClientProtocol,
+        services: AuthenticatedMobileServices,
+        realtimeClient: (any MobileRealtimeClientProtocol)? = nil,
         currentUserID: String? = nil,
         issueConversationView: IssueConversationViewTracker? = nil,
         refresh: @escaping () async -> Void,
@@ -561,6 +585,8 @@ struct TaskListView: View {
         self.errorMessage = errorMessage
         self.token = token
         self.api = api
+        self.services = services
+        self.realtimeClient = realtimeClient
         self.currentUserID = currentUserID
         self.issueConversationView = issueConversationView
         self.refresh = refresh
@@ -568,10 +594,11 @@ struct TaskListView: View {
         self.onSkillSessionMaterialized = onSkillSessionMaterialized
         self.onSkillSessionOpen = onSkillSessionOpen
         _mutations = StateObject(wrappedValue: IssueMutationStore(
-            api: api,
+            preparedUploadClient: services.preparedUploadClient,
+            issueService: services.issue,
+            projectService: services.project,
             projectID: project.id,
-            issueProjectID: selectedPlanningProjectID,
-            token: token
+            planningProjectID: selectedPlanningProjectID
         ))
     }
 
@@ -634,6 +661,8 @@ struct TaskListView: View {
                                     issueKeyPrefix: project.effectiveIssueKeyPrefix,
                                     token: token,
                                     api: api,
+                                    services: services,
+                                    realtimeClient: realtimeClient,
                                     projects: projects,
                                     allRuns: snapshot?.runs ?? [],
                                     projectAgents: projectAgents,
@@ -684,7 +713,7 @@ struct TaskListView: View {
                                         Button {
                                             Task {
                                                 do {
-                                                    _ = try await mutations.moveIssueProject(
+                                                    try await mutations.moveIssueProject(
                                                         runID: run.id,
                                                         sourceProjectID: sourceProjectID,
                                                         targetProjectID: target.id
@@ -747,7 +776,6 @@ struct TaskListView: View {
                 members: snapshot?.members ?? [],
                 providers: snapshot?.organizationProviders ?? [],
                 capabilities: AgentProviderCapabilityCatalog(workers: snapshot?.workers ?? []),
-                defaultAssigneeUserId: currentUserID,
                 refresh: refresh
             )
         }
@@ -1246,7 +1274,7 @@ struct RunDetailView: View {
 
     private let projectID: UUID
     private let issueKeyPrefix: String
-    private let projects: [ProjectsResponse.Project]
+    private let projects: [Project]
     private let allRuns: [DashboardRun]
     private let projectAgents: [ProjectAgent]
     private let workers: [DashboardWorker]
@@ -1259,7 +1287,8 @@ struct RunDetailView: View {
     private let onSkillSessionMaterialized: SkillSessionMaterializedHandler
     private let onSkillSessionOpen: SkillSessionOpenHandler
     private let token: String
-    private let api: any MobileAPIClientProtocol
+    private let api: any AuthenticatedDownloadClientProtocol
+    private let dashboardService: any BriarAPI_DashboardServiceClientInterface
 
     private var issueMentionCandidates: [ChannelMentionTarget] {
         MessageMentions.issueCandidates(
@@ -1277,7 +1306,7 @@ struct RunDetailView: View {
         MessageMentions.issueHandles(members: members, agents: projectAgents)
     }
 
-    private var transferDestinations: [ProjectsResponse.Project] {
+    private var transferDestinations: [Project] {
         let currentOrganization = projects.first(where: { $0.id == projectID })?.organizationId
         return projects.filter { project in
             project.id != projectID &&
@@ -1307,8 +1336,10 @@ struct RunDetailView: View {
         projectID: UUID,
         issueKeyPrefix: String = "AH",
         token: String,
-        api: any MobileAPIClientProtocol,
-        projects: [ProjectsResponse.Project] = [],
+        api: any AuthenticatedDownloadClientProtocol,
+        services: AuthenticatedMobileServices,
+        realtimeClient: (any MobileRealtimeClientProtocol)? = nil,
+        projects: [Project] = [],
         allRuns: [DashboardRun] = [],
         projectAgents: [ProjectAgent] = [],
         workers: [DashboardWorker] = [],
@@ -1339,16 +1370,21 @@ struct RunDetailView: View {
         self.onSkillSessionOpen = onSkillSessionOpen
         self.token = token
         self.api = api
+        dashboardService = services.dashboard
         _detail = StateObject(wrappedValue: RunDetailStore(
             api: api,
             projectID: projectID,
             runID: run.id,
-            token: token
+            token: token,
+            dashboardService: services.dashboard,
+            issueService: services.issue,
+            realtime: realtimeClient
         ))
         _mutations = StateObject(wrappedValue: IssueMutationStore(
-            api: api,
-            projectID: projectID,
-            token: token
+            preparedUploadClient: services.preparedUploadClient,
+            issueService: services.issue,
+            projectService: services.project,
+            projectID: projectID
         ))
         _localStatus = State(initialValue: run.status)
         _localWorkflowStage = State(initialValue: run.workflowStage)
@@ -2918,11 +2954,13 @@ struct RunDetailView: View {
             }
         }
         do {
-            let snapshot: DashboardSnapshot = try await api.get(
-                MobileAPIContract.Endpoint.dashboard(projectID: proposal.projectId),
-                token: token,
-                as: DashboardSnapshot.self
-            )
+            let dashboard = dashboardService
+            var request = BriarAPI_GetDashboardRequest()
+            request.projectID = coreUUIDString(proposal.projectId)
+            let snapshot = try DashboardSnapshot(connectMessage: await dashboard.getDashboard(
+                request: request,
+                headers: [:]
+            ).briarValue())
             guard detail.executionProposalIsCurrent(context) else { return }
             _ = try validateIssueExecutionApproval(
                 snapshot: snapshot,
@@ -2948,11 +2986,13 @@ struct RunDetailView: View {
             return false
         }
         do {
-            let preflight: DashboardSnapshot = try await api.get(
-                MobileAPIContract.Endpoint.dashboard(projectID: proposal.projectId),
-                token: token,
-                as: DashboardSnapshot.self
-            )
+            let dashboard = dashboardService
+            var dashboardRequest = BriarAPI_GetDashboardRequest()
+            dashboardRequest.projectID = coreUUIDString(proposal.projectId)
+            let preflight = try DashboardSnapshot(connectMessage: await dashboard.getDashboard(
+                request: dashboardRequest,
+                headers: [:]
+            ).briarValue())
             guard detail.executionProposalIsCurrent(context) else { return false }
             _ = try validateIssueExecutionApproval(
                 snapshot: preflight,
@@ -2976,10 +3016,11 @@ struct RunDetailView: View {
                       request: request
                   )
             else { throw MobileAPIError.invalidResponse }
-            let acceptedSnapshot: DashboardSnapshot = try await api.get(
-                MobileAPIContract.Endpoint.dashboard(projectID: proposal.projectId),
-                token: token,
-                as: DashboardSnapshot.self
+            let acceptedSnapshot = try DashboardSnapshot(
+                connectMessage: await dashboard.getDashboard(
+                    request: dashboardRequest,
+                    headers: [:]
+                ).briarValue()
             )
             guard detail.executionProposalIsCurrent(context) else { return false }
             guard issueExecutionApprovalAcceptedStateMatches(
@@ -3016,11 +3057,13 @@ struct RunDetailView: View {
         }
 
         do {
-            let snapshot: DashboardSnapshot = try await api.get(
-                MobileAPIContract.Endpoint.dashboard(projectID: proposal.projectId),
-                token: token,
-                as: DashboardSnapshot.self
-            )
+            let dashboard = dashboardService
+            var request = BriarAPI_GetDashboardRequest()
+            request.projectID = coreUUIDString(proposal.projectId)
+            let snapshot = try DashboardSnapshot(connectMessage: await dashboard.getDashboard(
+                request: request,
+                headers: [:]
+            ).briarValue())
             guard detail.skillExecutionProposalIsCurrent(context) else { return }
             _ = try validateAgentSkillExecutionApproval(
                 snapshot: snapshot,
@@ -3047,11 +3090,13 @@ struct RunDetailView: View {
         ) else { return false }
 
         do {
-            let preflight: DashboardSnapshot = try await api.get(
-                MobileAPIContract.Endpoint.dashboard(projectID: proposal.projectId),
-                token: token,
-                as: DashboardSnapshot.self
-            )
+            let dashboard = dashboardService
+            var dashboardRequest = BriarAPI_GetDashboardRequest()
+            dashboardRequest.projectID = coreUUIDString(proposal.projectId)
+            let preflight = try DashboardSnapshot(connectMessage: await dashboard.getDashboard(
+                request: dashboardRequest,
+                headers: [:]
+            ).briarValue())
             guard detail.skillExecutionProposalIsCurrent(context) else { return false }
             _ = try validateAgentSkillExecutionApproval(
                 snapshot: preflight,
@@ -3291,11 +3336,10 @@ struct RunDetailView: View {
     private func toggleSubscription() async {
         guard currentUserID != nil else { return }
         do {
-            let response = try await mutations.setSubscription(
+            subscribers = try await mutations.setSubscription(
                 runID: run.id,
                 subscribed: !isSubscribed
             )
-            subscribers = response.subscribers
             actionError = nil
             await refresh()
         } catch {
@@ -3447,7 +3491,7 @@ struct RunDetailView: View {
         let payload = next ?? preferences
         guard payload.isValid else { return }
         do {
-            _ = try await mutations.savePreferences(runID: run.id, preferences: payload)
+            try await mutations.savePreferences(runID: run.id, preferences: payload)
             actionError = nil
             await refresh()
         } catch IssueMutationError.duplicateAction {
@@ -3592,7 +3636,7 @@ struct RunDetailView: View {
 
     private func transferIssue(to targetProjectID: UUID) async {
         do {
-            _ = try await mutations.transferIssue(
+            try await mutations.transferIssue(
                 runID: run.id,
                 targetProjectID: targetProjectID
             )

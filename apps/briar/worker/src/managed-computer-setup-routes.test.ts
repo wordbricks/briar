@@ -1,10 +1,21 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { Code, ConnectError, createClient } from "@connectrpc/connect";
+import { createConnectTransport } from "@connectrpc/connect-web";
+import {
+  FleetService,
+  ManagedComputerSetupSessionStatus,
+} from "@briar/contracts/gen/briar/app/v1/fleet_pb";
+import {
+  DashboardWorker_Readiness,
+} from "@briar/contracts/gen/briar/app/v1/dashboard_pb";
+import {
+  ManagedComputerSetupService,
+} from "@briar/contracts/gen/briar/worker/v1/managed_computer_setup_pb";
+import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
+import { env as cloudflareEnv } from "cloudflare:workers";
+import { beforeAll, describe, expect, it } from "vitest";
 import worker from "./index";
 import { sha256Hex } from "./managed-computer-crypto";
-import {
-  createIsolatedTestDatabase,
-  type IsolatedTestDatabase,
-} from "./test-helpers/d1";
+import { workerRuntimeFixture } from "./test-helpers/worker-runtime";
 
 const organizationId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const projectId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -18,15 +29,10 @@ const memberToken = "managed-setup-member-token";
 const machineToken = `briar_worker_${"m".repeat(43)}`;
 const now = "2026-08-24T00:00:00.000Z";
 
-describe("managed computer setup routes", () => {
-  let database: IsolatedTestDatabase;
-  let db: D1Database;
+describe("managed computer setup", () => {
+  const db = cloudflareEnv.DB;
 
   beforeAll(async () => {
-    database = await createIsolatedTestDatabase({
-      suite: "managed-computer-setup-routes",
-    });
-    db = database.db;
     await db.batch([
       db.prepare(
         `insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
@@ -124,8 +130,6 @@ describe("managed computer setup routes", () => {
     ]);
   }, 60_000);
 
-  afterAll(async () => database.dispose());
-
   const env = () => ({
     DB: db,
     BETTER_AUTH_SECRET: "briar-test-secret-that-is-at-least-32-characters",
@@ -134,62 +138,63 @@ describe("managed computer setup routes", () => {
     MANAGED_COMPUTER_ENROLLMENT_SECRET: "managed-setup-enrollment-secret",
   }) as never;
 
-  const request = (
-    pathname: string,
-    method: "GET" | "POST",
-    token: string,
-    body?: unknown,
-    requestId?: string,
-  ) => new Request(`https://briar.example${pathname}`, {
-    method,
-    headers: {
-      authorization: `Bearer ${token}`,
-      "content-type": "application/json",
-      ...(requestId ? { "idempotency-key": requestId } : {}),
-    },
-    body: body === undefined ? undefined : JSON.stringify(body),
+  const requestId = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+
+  const transport = () => createConnectTransport({
+    baseUrl: "https://briar.example",
+    fetch: async (input, init) =>
+      worker.fetch(new Request(input, { ...init, redirect: "manual" }), env()),
   });
 
-  const setupPath =
-    `/organizations/${organizationId}/managed-computers/${managedComputerId}/setup-sessions`;
-  const requestId = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+  const fleet = () => createClient(FleetService, transport());
+
+  const setup = () => createClient(ManagedComputerSetupService, transport());
+
+  const options = (token: string) => ({
+    headers: { authorization: `Bearer ${token}` },
+  });
+
+  const errorCode = async (operation: Promise<unknown>) => {
+    const error = await operation.catch((cause: unknown) => cause);
+    expect(error).toBeInstanceOf(ConnectError);
+    return (error as ConnectError).code;
+  };
+
+  const runtime = (
+    providers: ReadonlyArray<"codex" | "claude"> = ["codex", "claude"],
+  ) => workerRuntimeFixture({ providers });
 
   it("allows the requester to issue a hashed, idempotent setup ticket", async () => {
     const developerRequestId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
-    const developerTicket = await worker.fetch(request(
-      setupPath,
-      "POST",
-      memberToken,
-      { projectId, requestId: developerRequestId },
-      developerRequestId,
-    ), env());
-    expect(developerTicket.status).toBe(201);
+    const developerTicket = await fleet().createManagedComputerSetupSession(
+      {
+        organizationId,
+        managedComputerId,
+        projectId,
+        requestId: developerRequestId,
+      },
+      options(memberToken),
+    );
+    expect(developerTicket.session?.status).toBe(
+      ManagedComputerSetupSessionStatus.PENDING,
+    );
     await db.prepare(
       `delete from briar_managed_computer_setup_sessions where request_id = ?`,
     ).bind(developerRequestId).run();
 
-    const first = await worker.fetch(request(
-      setupPath,
-      "POST",
-      ownerToken,
-      { projectId, requestId },
-      requestId,
-    ), env());
-    expect(first.status).toBe(201);
-    expect(first.headers.get("cache-control")).toBe("private, no-store");
-    const firstPayload = await first.json() as {
-      setupToken: string;
-      duplicate: boolean;
-      session: { id: string; status: string };
-      socket: { url: string; protocol: string };
-      agentConnected: boolean;
-    };
+    const firstPayload = await fleet().createManagedComputerSetupSession(
+      { organizationId, managedComputerId, projectId, requestId },
+      options(ownerToken),
+    );
+    if (!firstPayload.session || !firstPayload.socket) {
+      throw new Error("FleetService setup session response is incomplete");
+    }
     expect(firstPayload).toMatchObject({
       duplicate: false,
-      session: { status: "pending" },
+      session: { status: ManagedComputerSetupSessionStatus.PENDING },
     });
     expect(firstPayload.setupToken).toMatch(/^briar_setup_[A-Za-z0-9_-]{43}$/u);
-    expect(firstPayload.socket).toEqual({
+    expect(firstPayload.socket).toMatchObject({
       url: `wss://briar.example/managed-computers/${managedComputerId}/setup-sessions/${firstPayload.session.id}/connect`,
       protocol: `briar-setup-v1.${firstPayload.setupToken}`,
     });
@@ -202,15 +207,10 @@ describe("managed computer setup routes", () => {
     expect(stored?.token_hash).toBe(await sha256Hex(firstPayload.setupToken));
     expect(stored?.token_hash).not.toContain(firstPayload.setupToken);
 
-    const replay = await worker.fetch(request(
-      setupPath,
-      "POST",
-      ownerToken,
-      { projectId, requestId },
-      requestId,
-    ), env());
-    expect(replay.status).toBe(200);
-    await expect(replay.json()).resolves.toMatchObject({
+    await expect(fleet().createManagedComputerSetupSession(
+      { organizationId, managedComputerId, projectId, requestId },
+      options(ownerToken),
+    )).resolves.toMatchObject({
       duplicate: true,
       setupToken: firstPayload.setupToken,
     });
@@ -218,94 +218,76 @@ describe("managed computer setup routes", () => {
 
   it("returns authoritative project context only to the enrolled computer", async () => {
     const contextRequestId = "ffffffff-ffff-4fff-8fff-ffffffffffff";
-    const ticket = await worker.fetch(request(
-      setupPath,
-      "POST",
-      ownerToken,
-      { projectId, requestId: contextRequestId },
-      contextRequestId,
-    ), env());
-    const { setupToken } = await ticket.json() as { setupToken: string };
-    const contextPath = `/managed-computers/${managedComputerId}/setup/context`;
+    const { setupToken } = await fleet().createManagedComputerSetupSession(
+      {
+        organizationId,
+        managedComputerId,
+        projectId,
+        requestId: contextRequestId,
+      },
+      options(ownerToken),
+    );
+    const client = setup();
+    expect(await errorCode(client.getManagedComputerSetupContext(
+      { managedComputerId, setupToken },
+      options(ownerToken),
+    ))).toBe(Code.Unauthenticated);
 
-    const userRejected = await worker.fetch(request(
-      contextPath,
-      "POST",
-      ownerToken,
-      { setupToken },
-    ), env());
-    expect(userRejected.status).toBe(401);
-
-    const context = await worker.fetch(request(
-      contextPath,
-      "POST",
-      machineToken,
-      { setupToken },
-    ), env());
-    expect(context.status).toBe(200);
-    expect(context.headers.get("cache-control")).toBe("private, no-store");
-    await expect(context.json()).resolves.toMatchObject({
+    let responseHeaders: Headers | undefined;
+    const context = await client.getManagedComputerSetupContext(
+      { managedComputerId, setupToken },
+      {
+        ...options(machineToken),
+        onHeader: (headers) => {
+          responseHeaders = headers;
+        },
+      },
+    );
+    expect(responseHeaders?.get("cache-control")).toBe("private, no-store");
+    expect(context).toMatchObject({
       session: { projectId },
       project: { id: projectId, name: "Managed project" },
-      settings: { githubRepository: null },
     });
+    expect(context.settings?.githubRepository).toBeUndefined();
   });
 
   it("binds the enrolled device once and starts fail-closed", async () => {
-    const ticket = await worker.fetch(request(
-      setupPath,
-      "POST",
-      ownerToken,
-      { projectId, requestId },
-      requestId,
-    ), env());
-    const { setupToken } = await ticket.json() as { setupToken: string };
-    const body = {
-      setupToken,
-      worker: {
-        agentProvider: "codex",
-        providers: ["codex", "claude"],
-        versions: { briar: "1.2.154", codex: "0.149.1" },
-      },
-    };
-    const userCredentialRejected = await worker.fetch(request(
-      `/managed-computers/${managedComputerId}/setup/bind`,
-      "POST",
-      ownerToken,
+    const { setupToken } = await fleet().createManagedComputerSetupSession(
+      { organizationId, managedComputerId, projectId, requestId },
+      options(ownerToken),
+    );
+    const client = setup();
+    const body = { managedComputerId, setupToken, runtime: runtime() };
+    expect(await errorCode(client.bindManagedComputerSetup(
       body,
-    ), env());
-    expect(userCredentialRejected.status).toBe(401);
+      options(ownerToken),
+    ))).toBe(Code.Unauthenticated);
 
-    const first = await worker.fetch(request(
-      `/managed-computers/${managedComputerId}/setup/bind`,
-      "POST",
-      machineToken,
-      body,
-    ), env());
-    const firstPayload = await first.json();
-    expect(first.status, JSON.stringify(firstPayload)).toBe(201);
-    expect(first.headers.get("cache-control")).toBe("private, no-store");
-    expect(firstPayload).toMatchObject({
+    let responseHeaders: Headers | undefined;
+    const first = await client.bindManagedComputerSetup(body, {
+      ...options(machineToken),
+      onHeader: (headers) => {
+        responseHeaders = headers;
+      },
+    });
+    expect(responseHeaders?.get("cache-control")).toBe("private, no-store");
+    expect(first).toMatchObject({
       managedComputerId,
       organizationId,
       projectId,
       deviceId,
       duplicate: false,
       worker: {
-        agentProvider: "codex",
+        agentProvider: AgentProvider.CODEX,
         acceptingWork: false,
-        readiness: "needs_attention",
+        readiness: DashboardWorker_Readiness.NEEDS_ATTENTION,
       },
     });
 
-    const replay = await worker.fetch(request(
-      `/managed-computers/${managedComputerId}/setup/bind`,
-      "POST",
-      machineToken,
+    await expect(client.bindManagedComputerSetup(
       body,
-    ), env());
-    expect(replay.status).toBe(200);
-    await expect(replay.json()).resolves.toMatchObject({ duplicate: true });
+      options(machineToken),
+    )).resolves.toMatchObject({ duplicate: true });
 
     await db.prepare(
       `update briar_execution_workers
@@ -313,25 +295,25 @@ describe("managed computer setup routes", () => {
        where device_id = ?`,
     ).bind(deviceId).run();
     const reconfigureRequestId = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
-    const reconfigureTicket = await worker.fetch(request(
-      setupPath,
-      "POST",
-      ownerToken,
-      { projectId, requestId: reconfigureRequestId },
-      reconfigureRequestId,
-    ), env());
-    const reconfigureSetupToken = (await reconfigureTicket.json() as {
-      setupToken: string;
-    }).setupToken;
-    const reconfigured = await worker.fetch(request(
-      `/managed-computers/${managedComputerId}/setup/bind`,
-      "POST",
-      machineToken,
+    const reconfigureSetupToken = (
+      await fleet().createManagedComputerSetupSession(
+        {
+          organizationId,
+          managedComputerId,
+          projectId,
+          requestId: reconfigureRequestId,
+        },
+        options(ownerToken),
+      )
+    ).setupToken;
+    await expect(client.bindManagedComputerSetup(
       { ...body, setupToken: reconfigureSetupToken },
-    ), env());
-    expect(reconfigured.status).toBe(201);
-    await expect(reconfigured.json()).resolves.toMatchObject({
-      worker: { acceptingWork: false, readiness: "needs_attention" },
+      options(machineToken),
+    )).resolves.toMatchObject({
+      worker: {
+        acceptingWork: false,
+        readiness: DashboardWorker_Readiness.NEEDS_ATTENTION,
+      },
     });
 
     const counts = await db.prepare(
@@ -341,16 +323,18 @@ describe("managed computer setup routes", () => {
     ).bind(deviceId).first<Record<string, number>>();
     expect(counts).toEqual({ sessions: 3, workers: 1 });
 
-    const status = await worker.fetch(request(
-      `/organizations/${organizationId}/managed-computers/${managedComputerId}/setup`,
-      "GET",
-      ownerToken,
-    ), env());
-    expect(status.status).toBe(200);
-    expect(status.headers.get("cache-control")).toBe("private, no-store");
-    await expect(status.json()).resolves.toMatchObject({
-      session: { projectId, status: "consumed" },
-      worker: { acceptingWork: false, readiness: "needs_attention" },
+    await expect(fleet().getManagedComputerSetupStatus(
+      { organizationId, managedComputerId },
+      options(ownerToken),
+    )).resolves.toMatchObject({
+      session: {
+        projectId,
+        status: ManagedComputerSetupSessionStatus.CONSUMED,
+      },
+      worker: {
+        acceptingWork: false,
+        readiness: DashboardWorker_Readiness.NEEDS_ATTENTION,
+      },
     });
   });
 
@@ -361,36 +345,29 @@ describe("managed computer setup routes", () => {
        where id = ?`,
     ).bind(now, now, managedComputerId).run();
     const addProjectRequestId = "77777777-7777-4777-8777-777777777777";
-    const ticket = await worker.fetch(request(
-      setupPath,
-      "POST",
-      ownerToken,
-      { projectId: secondProjectId, requestId: addProjectRequestId },
-      addProjectRequestId,
-    ), env());
-    expect(ticket.status).toBe(201);
-    const { setupToken } = await ticket.json() as { setupToken: string };
-
-    const binding = await worker.fetch(request(
-      `/managed-computers/${managedComputerId}/setup/bind`,
-      "POST",
-      machineToken,
+    const { setupToken } = await fleet().createManagedComputerSetupSession(
       {
-        setupToken,
-        worker: {
-          agentProvider: "codex",
-          providers: ["codex"],
-          versions: { briar: "1.2.154", codex: "0.149.1" },
-        },
+        organizationId,
+        managedComputerId,
+        projectId: secondProjectId,
+        requestId: addProjectRequestId,
       },
-    ), env());
-    expect(binding.status).toBe(201);
-    await expect(binding.json()).resolves.toMatchObject({
+      options(ownerToken),
+    );
+
+    await expect(setup().bindManagedComputerSetup(
+      {
+        managedComputerId,
+        setupToken,
+        runtime: runtime(["codex"]),
+      },
+      options(machineToken),
+    )).resolves.toMatchObject({
       projectId: secondProjectId,
       deviceId,
       worker: {
         acceptingWork: false,
-        readiness: "needs_attention",
+        readiness: DashboardWorker_Readiness.NEEDS_ATTENTION,
       },
     });
 

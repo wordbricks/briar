@@ -76,7 +76,7 @@ struct ChannelsHomeView: View {
 
     let activeProjectID: UUID?
     let currentUserID: String?
-    let projects: [ProjectsResponse.Project]
+    let projects: [Project]
     let providers: [AgentProvider]
     let workers: [DashboardWorker]
     let onIssueOpen: ChannelIssueOpenHandler
@@ -213,7 +213,7 @@ struct ProjectLobbySummary: Equatable {
 struct ProjectLobbyView: View {
     @AppStorage("companion-locale") private var localeRaw = CompanionLocale.ko.rawValue
 
-    let project: ProjectsResponse.Project
+    let project: Project
     let snapshot: DashboardSnapshot?
     let errorMessage: String?
     let refresh: () async -> Void
@@ -434,7 +434,7 @@ struct ChannelMessagesView: View {
 
     let channel: ChannelSummary
     let currentUserID: String?
-    let projects: [ProjectsResponse.Project]
+    let projects: [Project]
     let providers: [AgentProvider]
     let workers: [DashboardWorker]
     let onIssueOpen: ChannelIssueOpenHandler
@@ -930,7 +930,7 @@ struct ChannelThreadView: View {
     let parentMessageID: UUID
     var highlightMessageID: UUID? = nil
     let currentUserID: String?
-    let projects: [ProjectsResponse.Project]
+    let projects: [Project]
     let providers: [AgentProvider]
     let workers: [DashboardWorker]
     let onIssueOpen: ChannelIssueOpenHandler
@@ -1097,7 +1097,7 @@ private struct ChannelConversationView: View {
     let messages: [ChannelMessage]
     let onIssueOpen: ChannelIssueOpenHandler
     let parentMessageID: UUID?
-    let projects: [ProjectsResponse.Project]
+    let projects: [Project]
     let providers: [AgentProvider]
     let workers: [DashboardWorker]
     let onSkillSessionMaterialized: SkillSessionMaterializedHandler
@@ -1399,7 +1399,7 @@ private struct ChannelMessageRow: View {
     let onDelete: () async -> Void
     let onToggleReaction: (String) async -> Void
     let onOpenThread: (() -> Void)?
-    let projects: [ProjectsResponse.Project]
+    let projects: [Project]
     let providers: [AgentProvider]
     let workers: [DashboardWorker]
     var showsThreadSummary = false
@@ -1496,8 +1496,7 @@ private struct ChannelMessageRow: View {
                         .foregroundStyle(.secondary)
                         .padding(.top, 3)
                 }
-                if let proposal = message.proposal,
-                   proposal.actionType == .createIssue {
+                if let proposal = message.proposal {
                     ChannelProposalCard(
                         accepting: acceptingProposalID == proposal.id,
                         declining: decliningProposalID == proposal.id,
@@ -1528,7 +1527,7 @@ private struct ChannelMessageRow: View {
                     .padding(.top, 5)
                 }
                 if let proposal = message.executionProposal,
-                   message.proposal?.payload?.executeAfterCreate != true {
+                   message.proposal?.payload.executeAfterCreate != true {
                     ChannelExecutionProposalCard(
                         acceptanceInFlight: acceptingProposalID != nil ||
                             approvingExecutionProposalID != nil ||
@@ -2148,11 +2147,11 @@ private struct ChannelProposalCard: View {
         UUID
     ) async -> ChannelsStore.ExecutionApprovalContext?
     let openingExecution: Bool
-    let projects: [ProjectsResponse.Project]
+    let projects: [Project]
     let proposal: ChannelMessage.Proposal
     let workers: [DashboardWorker]
 
-    private var availableProjects: [ProjectsResponse.Project] {
+    private var availableProjects: [Project] {
         projects
             .filter { $0.organizationId == channel.organizationId }
             .sorted {
@@ -2176,7 +2175,7 @@ private struct ChannelProposalCard: View {
     }
 
     private var issueDescription: String? {
-        guard let rawDescription = proposal.payload?.issue?.description else { return nil }
+        guard let rawDescription = proposal.payload.issue?.description else { return nil }
         let description = rawDescription.trimmingCharacters(in: .whitespacesAndNewlines)
         return description.isEmpty ? nil : description
     }
@@ -2188,7 +2187,7 @@ private struct ChannelProposalCard: View {
     }
 
     private var requestsExecution: Bool {
-        proposal.payload?.executeAfterCreate == true
+        proposal.payload.executeAfterCreate
     }
 
     private var initialExecutionRequest: AcceptIssueExecutionProposalRequest? {
@@ -2206,8 +2205,8 @@ private struct ChannelProposalCard: View {
             acceptanceInFlight: acceptanceInFlight,
             channelArchived: channel.archivedAt != nil,
             targetProjectID: targetProjectID,
-            issue: proposal.payload?.issue,
-            batch: proposal.payload?.batch
+            issue: proposal.payload.issue,
+            batch: proposal.payload.batch
         )
     }
 
@@ -2235,7 +2234,7 @@ private struct ChannelProposalCard: View {
                 .foregroundStyle(.secondary)
             }
 
-            if let issue = proposal.payload?.issue {
+            if let issue = proposal.payload.issue {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(issue.title)
                         .font(.subheadline.weight(.semibold))
@@ -2284,7 +2283,7 @@ private struct ChannelProposalCard: View {
                 )
             }
 
-            if let batch = proposal.payload?.batch {
+            if let batch = proposal.payload.batch {
                 VStack(alignment: .leading, spacing: 7) {
                     Text(
                         String(
@@ -2343,7 +2342,7 @@ private struct ChannelProposalCard: View {
             }
             Label(
                 L10n.text(
-                    proposal.payload?.batch != nil
+                    proposal.payload.batch != nil
                         ? .channelIssueBatchSafety
                         : requestsExecution
                             ? .channelIssueCreationAndExecutionSafety
@@ -2406,8 +2405,8 @@ private struct ChannelProposalCard: View {
                             acceptanceInFlight: acceptanceInFlight,
                             channelArchived: channel.archivedAt != nil,
                             targetProjectID: targetProjectID,
-                            issue: proposal.payload?.issue,
-                            batch: proposal.payload?.batch
+                            issue: proposal.payload.issue,
+                            batch: proposal.payload.batch
                         )
                     )
                     .accessibilityIdentifier(
@@ -2469,14 +2468,14 @@ private struct ChannelProposalCard: View {
                         Task {
                             if let result = await onAccept(targetProjectID, nil),
                                result.executionProposal == nil,
-                               proposal.payload?.batch == nil {
+                               proposal.payload.batch == nil {
                                 await onIssueOpen(result.projectId, result.resultRunId)
                             }
                         }
                     } label: {
                         if accepting {
                             ProgressView().controlSize(.small)
-                        } else if let batch = proposal.payload?.batch {
+                        } else if let batch = proposal.payload.batch {
                             Text(
                                 String(
                                     format: L10n.text(
@@ -2516,7 +2515,7 @@ private struct ChannelProposalCard: View {
                 .controlSize(.small)
             }
             if proposal.status == .accepted,
-               proposal.payload?.batch == nil,
+               proposal.payload.batch == nil,
                let projectID = proposal.projectId,
                let runID = proposal.resultRunId {
                 Button(L10n.text(.channelViewIssue, locale: locale)) {
@@ -2538,7 +2537,7 @@ private struct ChannelProposalCard: View {
         }
         .sheet(item: $approvalContext) { context in
             ExecutionProposalApprovalSheet(
-                targetTitle: proposal.payload?.issue?.title ??
+                targetTitle: proposal.payload.issue?.title ??
                     L10n.text("새 이슈", locale: locale),
                 providers: context.snapshot.organizationProviders ?? [],
                 workers: context.snapshot.workers ?? [],
@@ -2606,7 +2605,7 @@ private struct ChannelExecutionProposalCard: View {
     ) async throws -> AcceptChannelExecutionProposalResponse
     let onIssueOpen: (UUID, UUID) async -> Void
     let onPrepare: () async -> ChannelsStore.ExecutionApprovalContext?
-    let projects: [ProjectsResponse.Project]
+    let projects: [Project]
     let proposal: IssueExecutionProposal
     let workers: [DashboardWorker]
 

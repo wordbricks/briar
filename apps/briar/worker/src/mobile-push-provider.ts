@@ -1,24 +1,17 @@
+import { toBinary } from "@bufbuild/protobuf";
+import {
+  type MobilePushNotificationTarget,
+  MobilePushNotificationTargetSchema,
+} from "@briar/contracts/gen/briar/app/v1/inbox_pb";
 import type {
   MobilePushRegistrationRow,
 } from "./mobile-push-repository";
-
-export type MobilePushTarget = {
-  messageId: string;
-  messageVersion: string;
-  notificationId: string;
-  projectId: string;
-  targetId: string;
-  kind: "issue" | "conversation" | "channel" | "session";
-  conversationMessageId?: string;
-  channelMessageId?: string;
-  rootMessageId?: string;
-};
 
 export type MobilePushContent = {
   title: string;
   body: string;
   collapseId: string;
-  target: MobilePushTarget;
+  target: MobilePushNotificationTarget;
 };
 
 export type MobilePushProviderResult =
@@ -51,6 +44,28 @@ function base64Url(bytes: Uint8Array) {
     .replaceAll("+", "-")
     .replaceAll("/", "_")
     .replace(/=+$/u, "");
+}
+
+function standardBase64(bytes: Uint8Array) {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+export function mobilePushTargetProtoBase64(
+  target: MobilePushNotificationTarget,
+) {
+  return standardBase64(
+    toBinary(MobilePushNotificationTargetSchema, target),
+  );
+}
+
+export function mobilePushTargetProviderData(
+  target: MobilePushNotificationTarget,
+) {
+  return {
+    briarInboxTargetProto: mobilePushTargetProtoBase64(target),
+  };
 }
 
 const encodeJson = (value: unknown) =>
@@ -147,7 +162,7 @@ async function sendApns(
           ...(registration.play_sound ? { sound: "default" } : {}),
           "thread-id": collapseId,
         },
-        briarInboxTarget: content.target,
+        ...mobilePushTargetProviderData(content.target),
       }),
     },
   );
@@ -243,7 +258,6 @@ async function sendFcm(
   if (!projectId || !credential) {
     return { outcome: "retry", reason: "fcm_not_configured" };
   }
-  const target = content.target;
   const collapseId = await normalizedMobilePushCollapseId(content.collapseId);
   const response = await fetch(
     `https://fcm.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/messages:send`,
@@ -257,17 +271,7 @@ async function sendFcm(
         message: {
           token: registration.token,
           notification: { title: content.title, body: content.body },
-          data: {
-            messageId: target.messageId,
-            messageVersion: target.messageVersion,
-            notificationId: target.notificationId,
-            projectId: target.projectId,
-            targetId: target.targetId,
-            kind: target.kind,
-            conversationMessageId: target.conversationMessageId ?? "",
-            channelMessageId: target.channelMessageId ?? "",
-            rootMessageId: target.rootMessageId ?? "",
-          },
+          data: mobilePushTargetProviderData(content.target),
           android: {
             priority: "high",
             notification: {

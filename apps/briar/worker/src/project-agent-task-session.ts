@@ -2,8 +2,11 @@ import {
   getProjectAgentSession,
   upsertProjectAgentSession,
 } from "./project-agent-session-repository";
-import type { ProjectAgentSessionRow } from "./project-agent-model";
 import { projectAgentSessionJson } from "./project-agent-session-json";
+import {
+  decodeStoredProjectAgentSessionPayload,
+  type StoredProjectAgentSessionPayload,
+} from "./project-request-contract";
 
 export const projectAgentTaskSessionEvent = (
   type: "started" | "completed" | "failed",
@@ -35,15 +38,9 @@ export async function syncProjectAgentTaskSession(
 ) {
   const current = await getProjectAgentSession(db, job.project_id, job.id);
   if (!current) return null;
-  let payload: Record<string, unknown>;
-  try {
-    payload = JSON.parse(current.payload_json) as Record<string, unknown>;
-  } catch {
-    payload = {};
-  }
-  const currentEvents = Array.isArray(payload.events) ? payload.events : [];
+  const payload = decodeStoredProjectAgentSessionPayload(current.payload_json);
   const terminal = job.status === "completed" || job.status === "failed";
-  const nextPayload = {
+  const nextPayload: StoredProjectAgentSessionPayload = {
     ...payload,
     status: job.status === "queued" || job.status === "running"
       ? "running"
@@ -56,7 +53,7 @@ export async function syncProjectAgentTaskSession(
     completedAt: terminal ? job.completed_at : null,
     updatedAt: job.updated_at,
     events: [
-      ...currentEvents,
+      ...payload.events,
       projectAgentTaskSessionEvent(
         terminal ? (job.status === "completed" ? "completed" : "failed") : "started",
         job.updated_at,
@@ -64,16 +61,10 @@ export async function syncProjectAgentTaskSession(
     ],
   };
   const updated = await upsertProjectAgentSession(db, {
-    project_id: current.project_id,
+    projectId: current.project_id,
     id: current.id,
-    agent_id: current.agent_id,
-    requested_by_user_id: current.requested_by_user_id,
-    status: nextPayload.status as ProjectAgentSessionRow["status"],
-    session_type: current.session_type,
-    payload_json: JSON.stringify(nextPayload),
-    started_at: current.started_at,
-    completed_at: nextPayload.completedAt as string | null,
-    updated_at: job.updated_at,
+    requestedByUserId: current.requested_by_user_id,
+    payload: nextPayload,
   }, job.updated_at);
   return updated ? projectAgentSessionJson(updated) : null;
 }

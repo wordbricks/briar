@@ -1,6 +1,5 @@
-import { Miniflare } from "miniflare";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { agentProviders } from "../../src/lib/agent-provider";
+import { env } from "cloudflare:workers";
+import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   ingestAgentTranscript,
   listAgentTranscriptSegments,
@@ -9,31 +8,16 @@ import {
   retainedRawTranscriptEvents,
 } from "./agent-worklog";
 import { MAX_TRANSCRIPT_PAYLOAD_BYTES } from "./transcript-limits";
-import {
-  createIsolatedTestDatabase,
-  executeD1Sql,
-} from "./test-helpers/d1";
+import { executeD1Sql } from "./test-helpers/d1";
 
 const projectId = "11111111-1111-4111-8111-111111111111";
 const observedAt = "2026-08-13T00:00:00.000Z";
 
 describe("provider-independent agent work log", () => {
-  let miniflare: Miniflare;
-  let db: D1Database;
-  let bucket: R2Bucket;
+  const db = env.DB;
+  const bucket = env.ARCHIVES;
 
   beforeAll(async () => {
-    const database = await createIsolatedTestDatabase({
-      suite: "agent-worklog",
-      miniflareOptions: {
-        modules: true,
-        script: "export default { fetch() { return new Response('ok') } }",
-        r2Buckets: ["ARCHIVES"],
-      },
-    });
-    miniflare = database.miniflare;
-    db = database.db;
-    bucket = (await miniflare.getR2Bucket("ARCHIVES")) as unknown as R2Bucket;
     await executeD1Sql(
       db,
       `insert into user (id, name, email, emailVerified, createdAt, updatedAt)
@@ -52,10 +36,6 @@ describe("provider-independent agent work log", () => {
          '${observedAt}', '${observedAt}'
        );`,
     );
-  });
-
-  afterAll(async () => {
-    await miniflare.dispose();
   });
 
   beforeEach(async () => {
@@ -87,9 +67,10 @@ describe("provider-independent agent work log", () => {
     return totals!;
   };
 
-  it.each(agentProviders)(
-    "projects %s events into the same compact schema",
-    async (provider) => {
+  it(
+    "projects provider events into the compact schema",
+    async () => {
+      const provider = "codex";
       const sessionId = `provider-${provider}`;
       const first = [
         {

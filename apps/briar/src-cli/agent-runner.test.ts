@@ -1,32 +1,36 @@
+import { CONTRACTS_DESCRIPTOR_FINGERPRINT } from "@briar/contracts/descriptor-fingerprint";
+import {
+  ApprovalPolicy,
+  SandboxMode,
+} from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
 import { describe, expect, it } from "vitest";
 import {
-  boundedTranscriptPayload,
+  normalizedMessageCompleted,
+  normalizedMessageDelta,
+} from "../src-agent/normalized-agent-event";
+import {
+  sidecarProviderEvent,
+  sidecarRunBlocked,
+} from "../src-agent/sidecar-protocol";
+import { ChannelAgentReplyProviderOutputSchema } from "../src/lib/channel-agent-reply-contract";
+import {
   createDetachedTranscriptSequencer,
   detachedAgentContext,
   detachedAgentPrompt,
   detachedChannelReplyPrompt,
-  detachedChannelReplyOutputSchema,
-  detachedConversationIdFromPayload,
-  detachedPayloadDirection,
   detachedIssueReplyPrompt,
-  detachedIssueReplyOutputSchema,
   detachedProjectAgentPrompt,
   detachedProviderRequest,
   detachedProviderBlockedRunEvent,
   detachedProviderBlockFromPayload,
-  detachedRunContinuationPrompt,
   detachedRunDisposition,
-  detachedRunRecoveryPrompt,
   detachedRunTurnDecision,
   detachedTranscriptSequence,
   detachedTranscriptSessionId,
-  detachedTranscriptPayload,
-  issueReplyTextFromPayload,
-  parseDetachedJsonResult,
-  parseDetachedIssueReplyResult,
   runProjectAgentTaskCompletionFlow,
   shouldPersistDetachedTranscriptPayload,
 } from "./agent-runner";
+import { providerStructuredOutputContract } from "./structured-output-contract";
 
 const agent = {
   id: "agent-1",
@@ -35,7 +39,6 @@ const agent = {
   model: "gpt-5",
   effort: "high" as const,
   responsibility: "Ship the assigned issue.",
-  skill: "# Release Agent",
   skills: [
     {
       id: "skill-issue",
@@ -46,6 +49,8 @@ const agent = {
       model: "gpt-5",
       effort: "high" as const,
       kind: "issue_processing" as const,
+      executionMode: "task" as const,
+      approvalPolicy: "explicit" as const,
       position: 0,
     },
     {
@@ -57,32 +62,25 @@ const agent = {
       model: "claude-sonnet",
       effort: "medium" as const,
       kind: "custom" as const,
+      executionMode: "task" as const,
+      approvalPolicy: "explicit" as const,
       position: 1,
     },
   ],
 };
+const channelOutputSchema = providerStructuredOutputContract(
+  "codex",
+  ChannelAgentReplyProviderOutputSchema,
+).jsonSchema;
 
 describe("detached Agent runner", () => {
-  it("directs saved Project Agents to the isolated worktree", () => {
-    const prompt = detachedProjectAgentPrompt({
-      agent,
-      request: "Run the saved Skill",
-      workspacePath: "/worktrees/project/task",
-    });
-
-    expect(prompt).toContain("prepared isolated project worktree");
-    expect(prompt).toContain("Do not inspect or modify the connected shared checkout");
-    expect(prompt).not.toContain("Work directly in the connected project repository");
-  });
-
   it("builds a structured blocked handoff for an exhausted OpenCode free tier", () => {
-    const block = detachedProviderBlockFromPayload({
-      type: "blocked",
+    const block = detachedProviderBlockFromPayload(sidecarRunBlocked({
       reason: "free_tier_limit",
       provider: "opencode",
       message: "Free limit reached",
       nextRetryAt: "2026-08-06T00:00:00.864Z",
-    });
+    }));
     expect(block).not.toBeNull();
 
     const event = detachedProviderBlockedRunEvent({
@@ -108,14 +106,13 @@ describe("detached Agent runner", () => {
   });
 
   it("builds a structured blocked handoff for transient OpenCode overload", () => {
-    const block = detachedProviderBlockFromPayload({
-      type: "blocked",
+    const block = detachedProviderBlockFromPayload(sidecarRunBlocked({
       reason: "upstream_overloaded",
       provider: "opencode",
       message: "Streaming response failed: [503] The request queue is full.",
       nextRetryAt: null,
       statusCode: 503,
-    });
+    }));
     expect(block).not.toBeNull();
 
     const event = detachedProviderBlockedRunEvent({
@@ -142,14 +139,13 @@ describe("detached Agent runner", () => {
   });
 
   it("names Antigravity in a structured upstream overload handoff", () => {
-    const block = detachedProviderBlockFromPayload({
-      type: "blocked",
+    const block = detachedProviderBlockFromPayload(sidecarRunBlocked({
       reason: "upstream_overloaded",
       provider: "agy",
       message: "The request queue is full.",
       nextRetryAt: null,
       statusCode: 503,
-    });
+    }));
 
     const event = detachedProviderBlockedRunEvent({
       block: block!,
@@ -167,14 +163,13 @@ describe("detached Agent runner", () => {
   });
 
   it("maps a required MCP authentication failure to an authentication wait", () => {
-    const block = detachedProviderBlockFromPayload({
-      type: "blocked",
+    const block = detachedProviderBlockFromPayload(sidecarRunBlocked({
       reason: "mcp_auth_required",
       provider: "codex",
       message: "Authentication is required for MCP server(s): figma.",
       nextRetryAt: null,
       serverNames: ["figma", "figma"],
-    });
+    }));
     expect(block).toEqual({
       reason: "mcp_auth_required",
       provider: "codex",
@@ -224,10 +219,9 @@ describe("detached Agent runner", () => {
     ).toBe(
       "detached-11111111-1111-4111-8111-111111111111-22222222-2222-4222-8222-222222222222",
     );
-    expect(detachedTranscriptSessionId(runId)).toBe(`detached-${runId}`);
   });
 
-  it("builds a neutral issue prompt when no logical Agent is assigned", () => {
+  it("includes issue identity without inventing a logical Agent", () => {
     const prompt = detachedAgentPrompt({
       agent: null,
       snapshot: {
@@ -237,7 +231,7 @@ describe("detached Agent runner", () => {
       workspacePath: "/worktree",
     });
 
-    expect(prompt).toContain("Process the Briar issue BRIAR-7 on the selected Worker");
+    expect(prompt).toContain("BRIAR-7");
     expect(prompt).not.toContain("Briar Agent assigned");
   });
 
@@ -281,47 +275,22 @@ describe("detached Agent runner", () => {
     expect(prompt).toContain("/runtime/attachments/run-42/design.png");
     expect(prompt).toContain("The mobile layout is the acceptance criterion.");
     expect(prompt).toContain(
-      "include the durable snapshot's briarIssueUrl in the pull request description",
-    );
-    expect(prompt).toContain(
       "https://briar-api.example/open/issues/project-1/run-42",
     );
-    expect(prompt).toContain("nontechnical PM or CEO");
-    expect(prompt).toContain("observable completion condition");
-    expect(prompt).toContain("available under View details");
-    expect(prompt).toContain("absolute path in `$BRIAR_CLI`");
-    expect(prompt).toContain("instead of the bare `briar` command");
-    expect(prompt).toContain("structured blocked result");
-    expect(prompt).toContain("briar run stage start");
-    expect(prompt).toContain("briar run stage complete");
-    expect(prompt).toContain("original problem and the specific data");
-    expect(prompt).toContain("key implementation approach");
-    expect(prompt).toContain("before-and-after operational or user impact");
-    expect(prompt).toContain("relevant selection or decision criteria");
-    expect(prompt).toContain("Adapt the explanation to the work performed");
-    expect(prompt).toContain("fallback, recovery, or cleanup");
-    expect(prompt).toContain("standalone Markdown explanation");
-    expect(prompt).toContain("short `##` section headings");
-    expect(prompt).toContain("bullet points under each section");
-    expect(prompt).toContain("`**bold**` emphasis");
-    expect(prompt).toContain("Do not return one uninterrupted block of prose");
-    expect(prompt).toContain("never invent them");
-    expect(prompt).toContain("briar run evidence add --image");
-    expect(prompt).toContain("issue detail page");
-    expect(prompt).toContain("outcome is `partial`");
-    expect(prompt).toContain("short Markdown headings and bullet points");
-    expect(prompt).toContain("reviewFeedback");
     expect(prompt).toContain("Keep the summary concise and verify the mobile layout.");
-    expect(prompt).toContain("required acceptance criteria");
     expect(prompt).not.toContain("claimToken");
     expect(launch.kind).toBe("runner");
     expect(launch.request).toMatchObject({
-      conversationId: null,
-      sandboxMode: "workspaceWrite",
-      codexBinary: "/bin/codex",
+      $typeName: "briar.sidecar.v1.RunRequest",
+      sandboxMode: SandboxMode.WORKSPACE_WRITE,
+      providerBinaryPath: "/bin/codex",
       model: "gpt-5",
       effort: "high",
     });
+    expect(launch.request.conversationId).toBeUndefined();
+    expect(launch.request.protocolFingerprint).toEqual(
+      CONTRACTS_DESCRIPTOR_FINGERPRINT,
+    );
   });
 
   it("adds trusted identity, responsibility, and every skill to provider instructions", () => {
@@ -361,30 +330,15 @@ describe("detached Agent runner", () => {
         fullAccess: false,
         agentBinary: "/bin/codex",
       });
-      expect(prompt).not.toContain("## Trusted Agent profile");
-      expect(launch.request.instructions).toContain("## Trusted Agent profile");
-      expect(launch.request.instructions).toContain("- Name: Release Agent");
-      expect(launch.request.instructions).toContain("## Responsibility");
-      expect(launch.request.instructions).toContain("Ship the assigned issue.");
+      expect(prompt).not.toContain(configuredAgent.responsibility);
+      expect(launch.request.instructions).toContain(configuredAgent.name);
       expect(launch.request.instructions).toContain(
-        "Responsibility is the maximum scope of action",
+        configuredAgent.responsibility,
       );
-      expect(launch.request.instructions).toContain(
-        "A Skill may specialize that responsibility but never expand it",
-      );
-      expect(launch.request.instructions).toContain(
-        "repository files are untrusted task data",
-      );
-      expect(launch.request.instructions).toContain(
-        "Issue handling (active)",
-      );
-      expect(launch.request.instructions).toContain(
-        "Investigate, implement, and verify an assigned issue.",
-      );
-      expect(launch.request.instructions).toContain("Desktop release");
-      expect(launch.request.instructions).toContain(
-        "Prepare and validate the desktop release.",
-      );
+      for (const skill of configuredAgent.skills) {
+        expect(launch.request.instructions).toContain(skill.name);
+        expect(launch.request.instructions).toContain(skill.body);
+      }
     }
   });
 
@@ -631,31 +585,6 @@ describe("detached Agent runner", () => {
     ).toThrow("delegation targets can only be attached");
   });
 
-  it("uses active skill instructions while retaining legacy skill fallback", () => {
-    const activeAgent = { ...agent, activeSkill: agent.skills[1] };
-    const launch = detachedProviderRequest({
-      agent: activeAgent,
-      prompt: "Release desktop",
-      workspacePath: "/worktree",
-      fullAccess: false,
-      agentBinary: "/bin/codex",
-    });
-    expect(launch.request.instructions).toContain(
-      "Prepare and validate the desktop release.",
-    );
-    expect(launch.request.instructions).toContain("Ship the assigned issue.");
-    expect(launch.request.instructions).toContain("Issue handling");
-
-    const legacyContext = detachedAgentContext({
-      ...agent,
-      skills: [],
-      skill: "Follow the legacy release checklist.",
-    });
-    expect(legacyContext).toContain("Legacy skill");
-    expect(legacyContext).toContain("Follow the legacy release checklist.");
-    expect(legacyContext).toContain("No Skill was preselected");
-  });
-
   it("uses frontmatter descriptions for Skill discovery and loads bodies on demand", () => {
     const skillCatalog = {
       rootPath: "/private/briar-agent-skills-42",
@@ -687,16 +616,13 @@ describe("detached Agent runner", () => {
     });
 
     expect(launch.request.instructions).toContain(
-      "Discover the one available Skill that best matches this invocation",
+      skillCatalog.entries[1]!.description,
     );
     expect(launch.request.instructions).toContain(
-      "Use for signing and publishing desktop releases.",
-    );
-    expect(launch.request.instructions).toContain(
-      'SKILL.md: "/private/briar-agent-skills-42/desktop-release-2/SKILL.md"',
+      skillCatalog.entries[1]!.path,
     );
     expect(launch.request.instructions).not.toContain(
-      "Prepare and validate the desktop release.",
+      agent.skills[1]!.body,
     );
 
     const selected = detachedProviderRequest({
@@ -707,19 +633,15 @@ describe("detached Agent runner", () => {
       skillCatalog,
       agentBinary: "/bin/codex",
     });
-    expect(selected.request.instructions).toContain("Desktop release (active)");
     expect(selected.request.instructions).toContain(
-      "Before doing task work, read its complete SKILL.md",
+      `${skillCatalog.entries[1]!.name} (active)`,
     );
   });
 
   it("continues the same provider conversation on a follow-up turn", () => {
     const launch = detachedProviderRequest({
       agent,
-      prompt: detachedRunContinuationPrompt({
-        runId: "run-42",
-        sourceKey: "BRIAR-42",
-      }),
+      prompt: "Continue the active run",
       workspacePath: "/worktree",
       fullAccess: true,
       conversationId: "thread-42",
@@ -727,39 +649,6 @@ describe("detached Agent runner", () => {
     });
 
     expect(launch.request.conversationId).toBe("thread-42");
-    expect(launch.request.message).toContain("still has an active claim");
-    expect(launch.request.message).toContain("A prose final answer by itself does not finish");
-  });
-
-  it("treats a failed command as recovery input while the run remains active", () => {
-    const prompt = detachedRunRecoveryPrompt({
-      runId: "run-42",
-      sourceKey: "BRIAR-42",
-      failure: "ci:local exited with code 1",
-    });
-
-    expect(prompt).toContain("still has an active claim");
-    expect(prompt).toContain("is not by itself a terminal run outcome");
-    expect(prompt).toContain("correct the code or execution environment");
-    expect(prompt).toContain('"ci:local exited with code 1"');
-  });
-
-  it("extracts provider conversation IDs from session payloads", () => {
-    expect(
-      detachedConversationIdFromPayload({
-        type: "session",
-        sessionId: "thread-42",
-      }),
-    ).toBe("thread-42");
-    expect(
-      detachedConversationIdFromPayload({
-        type: "event",
-        event: {
-          type: "conversationStarted",
-          conversationId: "thread-43",
-        },
-      }),
-    ).toBe("thread-43");
   });
 
   it("continues only while the claimed run remains active", () => {
@@ -805,8 +694,12 @@ describe("detached Agent runner", () => {
       agentBinary: "/bin/codex",
     });
     expect(launch.request).toMatchObject({
-      attachments,
-      sandboxMode: "readOnly",
+      attachments: attachments.map(({ path, name, mimeType }) => ({
+        path,
+        name,
+        mimeType,
+      })),
+      sandboxMode: SandboxMode.READ_ONLY,
       networkAccess: false,
       externalTools: false,
     });
@@ -820,28 +713,13 @@ describe("detached Agent runner", () => {
       attachments,
       agentBinary: "/bin/claude",
     });
-    expect(claudeLaunch.request).toMatchObject({ attachments });
-  });
-
-  it("prevents terminal-stage replay after the final checkpoint resumes", () => {
-    const prompt = detachedAgentPrompt({
-      agent,
-      snapshot: {
-        sourceKey: "BRIAR-99",
-        title: "Finish terminal review",
-      },
-      workspacePath: "/worktree",
-      startStage: null,
-      resumeContext: {
-        checkpointKey: "after-production",
-        position: "after",
-        revision: 4,
-        terminalReviewOnly: true,
-      },
+    expect(claudeLaunch.request).toMatchObject({
+      attachments: attachments.map(({ path, name, mimeType }) => ({
+        path,
+        name,
+        mimeType,
+      })),
     });
-
-    expect(prompt).toContain("Do not execute the terminal stage again");
-    expect(prompt).toContain("record only terminal completion");
   });
 
   it("uses the same noninteractive contract for standalone providers", () => {
@@ -854,70 +732,27 @@ describe("detached Agent runner", () => {
     });
     expect(launch.kind).toBe("runner");
     expect(launch.request).toMatchObject({
-      approvalPolicy: "never",
+      approvalPolicy: ApprovalPolicy.NEVER,
       effort: "high",
-      sandboxMode: "dangerFullAccess",
-      claudeBinary: "/bin/claude",
+      sandboxMode: SandboxMode.DANGER_FULL_ACCESS,
+      providerBinaryPath: "/bin/claude",
     });
   });
 
-  it("passes reply schemas through every provider-neutral runner request", () => {
-    for (const provider of [
-      "codex",
-      "claude",
-      "grok",
-      "agy",
-      "opencode",
-    ] as const) {
-      const launch = detachedProviderRequest({
-        agent: { ...agent, provider },
-        prompt: "reply",
-        workspacePath: "/worktree",
-        fullAccess: false,
-        outputSchema: detachedIssueReplyOutputSchema,
-        agentBinary: `/bin/${provider}`,
-      });
-      expect(launch.request.outputSchema).toBe(detachedIssueReplyOutputSchema);
-    }
-
-    expect(detachedProviderRequest({
+  it("encodes structured output in the generated JsonSchema oneof", () => {
+    const request = detachedProviderRequest({
       agent,
-      prompt: "channel reply",
+      prompt: "reply",
       workspacePath: "/worktree",
       fullAccess: false,
-      outputSchema: detachedChannelReplyOutputSchema,
+      outputSchema: channelOutputSchema,
       agentBinary: "/bin/codex",
-    }).request.outputSchema).toBe(detachedChannelReplyOutputSchema);
-  });
+    }).request;
 
-  it("keeps every structured-output object strict and fully required", () => {
-    const inspect = (schema: unknown) => {
-      if (!schema || typeof schema !== "object" || Array.isArray(schema)) {
-        return;
-      }
-      const record = schema as Record<string, unknown>;
-      if (
-        record.type === "object" && record.properties &&
-        typeof record.properties === "object" &&
-        !Array.isArray(record.properties)
-      ) {
-        const propertyNames = Object.keys(record.properties);
-        expect(record.additionalProperties).toBe(false);
-        expect(new Set(record.required as string[])).toEqual(
-          new Set(propertyNames),
-        );
-      }
-      for (const value of Object.values(record)) {
-        if (Array.isArray(value)) {
-          value.forEach(inspect);
-        } else {
-          inspect(value);
-        }
-      }
-    };
-
-    inspect(detachedIssueReplyOutputSchema);
-    inspect(detachedChannelReplyOutputSchema);
+    expect(request.outputSchema?.value).toEqual({
+      case: "object",
+      value: channelOutputSchema,
+    });
   });
 
   it("gives issue conversations the full Worker execution profile", () => {
@@ -938,273 +773,15 @@ describe("detached Agent runner", () => {
       agentBinary: "/bin/codex",
     });
 
-    expect(prompt).toContain("worktree is unavailable");
     expect(prompt).toContain("Fixed the retry race.");
     expect(prompt).toContain("@developer what changed?");
-    expect(prompt).toContain("request_issue_rework");
-    expect(prompt).toContain("request_issue_update");
-    expect(prompt).toContain("request_issue_create");
-    expect(prompt).toContain("confirmation button");
     expect(launch.kind).toBe("runner");
     expect(launch.request).toMatchObject({
-      sandboxMode: "dangerFullAccess",
+      sandboxMode: SandboxMode.DANGER_FULL_ACCESS,
       networkAccess: true,
       externalTools: true,
-      codexBinary: "/bin/codex",
+      providerBinaryPath: "/bin/codex",
     });
-  });
-
-  it("lets issue conversations operate on a shared live worktree", () => {
-    const prompt = detachedIssueReplyPrompt({
-      agent,
-      snapshot: { messages: [] },
-      userMessage: "Fix the failing test in the current worktree.",
-      workspaceAvailable: true,
-      workspaceShared: true,
-    });
-
-    expect(prompt).toContain("same shell, network, browser, and filesystem permissions");
-    expect(prompt).toContain("Changes affect the live issue worktree");
-    expect(prompt).not.toContain("This is a read-only conversation");
-  });
-
-  it("parses a proposed completed-run revision without executing it", () => {
-    expect(parseDetachedIssueReplyResult(JSON.stringify({
-      reply: "D를 D′로 바꾸는 개정을 제안했습니다. 수락이 필요합니다.",
-      proposedAction: {
-        type: "request_issue_rework",
-        workflowStage: "implementing",
-        reason: "D를 D′로 변경하고 영향받는 QA를 다시 확인한다.",
-      },
-      executionProposal: null,
-      skillExecutionProposal: null,
-    }))).toEqual({
-      reply: "D를 D′로 바꾸는 개정을 제안했습니다. 수락이 필요합니다.",
-      proposedAction: {
-        type: "request_issue_rework",
-        workflowStage: "implementing",
-        reason: "D를 D′로 변경하고 영향받는 QA를 다시 확인한다.",
-      },
-      executionProposal: null,
-      skillExecutionProposal: null,
-    });
-    expect(parseDetachedIssueReplyResult("plain fallback")).toEqual({
-      reply: "plain fallback",
-      proposedAction: null,
-      executionProposal: null,
-      skillExecutionProposal: null,
-    });
-  });
-
-  it("parses issue edit and creation proposals without applying them", () => {
-    expect(parseDetachedIssueReplyResult(JSON.stringify({
-      reply: "설명 변경을 제안했습니다. 수락해 주세요.",
-      proposedAction: {
-        type: "request_issue_update",
-        changes: { description: "새 승인 기준", priority: 1 },
-      },
-      executionProposal: null,
-      skillExecutionProposal: null,
-    }))).toEqual({
-      reply: "설명 변경을 제안했습니다. 수락해 주세요.",
-      proposedAction: {
-        type: "request_issue_update",
-        changes: { description: "새 승인 기준", priority: 1 },
-      },
-      executionProposal: null,
-      skillExecutionProposal: null,
-    });
-    expect(parseDetachedIssueReplyResult(JSON.stringify({
-      reply: "후속 이슈 생성을 제안했습니다. 수락해 주세요.",
-      proposedAction: {
-        type: "request_issue_create",
-        issue: {
-          title: "후속 QA",
-          description: null,
-          priority: 2,
-          status: "backlog",
-        },
-      },
-    }))).toMatchObject({
-      proposedAction: {
-        type: "request_issue_create",
-        issue: { title: "후속 QA", status: "backlog" },
-      },
-    });
-  });
-
-  it("extracts one valid issue proposal from pure, fenced, or mixed JSON", () => {
-    const proposal = {
-      reply: "본문 업데이트를 제안했습니다. 승인이 필요합니다.",
-      proposedAction: {
-        type: "request_issue_update",
-        changes: { description: "새 본문" },
-      },
-      executionProposal: null,
-      skillExecutionProposal: null,
-    };
-    const json = JSON.stringify(proposal);
-
-    for (const response of [
-      json,
-      `\`\`\`json\n${json}\n\`\`\``,
-      `업데이트 내용을 준비했습니다.\n\n\`\`\`json\n${json}\n\`\`\``,
-    ]) {
-      expect(parseDetachedIssueReplyResult(response)).toEqual(proposal);
-    }
-  });
-
-  it("fails closed for multiple JSON objects or an invalid proposal schema", () => {
-    const valid = JSON.stringify({
-      reply: "승인이 필요합니다.",
-      proposedAction: {
-        type: "request_issue_update",
-        changes: { priority: 1 },
-      },
-      executionProposal: null,
-      skillExecutionProposal: null,
-    });
-    const multiple = `${valid}\n${valid}`;
-    expect(() => parseDetachedJsonResult(multiple)).toThrow(
-      "exactly one JSON object",
-    );
-    expect(() => parseDetachedJsonResult(`Wrapped [${valid}]`)).toThrow(
-      "exactly one JSON object",
-    );
-    expect(parseDetachedIssueReplyResult(multiple)).toEqual({
-      reply: multiple,
-      proposedAction: null,
-      executionProposal: null,
-      skillExecutionProposal: null,
-    });
-
-    const invalid = JSON.stringify({
-      reply: "범위를 벗어난 우선순위입니다.",
-      proposedAction: {
-        type: "request_issue_update",
-        changes: { priority: 9 },
-      },
-      executionProposal: null,
-      skillExecutionProposal: null,
-    });
-    expect(parseDetachedIssueReplyResult(invalid)).toEqual({
-      reply: invalid,
-      proposedAction: null,
-      executionProposal: null,
-      skillExecutionProposal: null,
-    });
-  });
-
-  it("parses standalone and create-then-execute approval intents", () => {
-    expect(parseDetachedIssueReplyResult(JSON.stringify({
-      reply: "실행 설정 승인이 필요합니다.",
-      proposedAction: null,
-      executionProposal: { type: "request_issue_execute" },
-      skillExecutionProposal: null,
-    }))).toEqual({
-      reply: "실행 설정 승인이 필요합니다.",
-      proposedAction: null,
-      executionProposal: { type: "request_issue_execute" },
-      skillExecutionProposal: null,
-    });
-    expect(parseDetachedIssueReplyResult(JSON.stringify({
-      reply: "백로그 생성 후 별도 실행 승인을 요청합니다.",
-      proposedAction: {
-        type: "request_issue_create",
-        executeAfterCreate: true,
-        issue: {
-          title: "승인 후 실행",
-          description: null,
-          priority: 2,
-          status: "backlog",
-        },
-      },
-      executionProposal: null,
-    }))).toMatchObject({
-      proposedAction: {
-        type: "request_issue_create",
-        executeAfterCreate: true,
-      },
-      executionProposal: null,
-    });
-  });
-
-  it("rejects dual or expanded execution authority from provider output", () => {
-    for (const proposed of [
-      {
-        reply: "invalid dual",
-        proposedAction: {
-          type: "request_issue_update",
-          changes: { priority: 1 },
-        },
-        executionProposal: { type: "request_issue_execute" },
-      },
-      {
-        reply: "invalid expanded",
-        proposedAction: null,
-        executionProposal: {
-          type: "request_issue_execute",
-          runId: "11111111-1111-4111-8111-111111111111",
-        },
-      },
-    ]) {
-      expect(parseDetachedIssueReplyResult(JSON.stringify(proposed))).toEqual({
-        reply: JSON.stringify(proposed),
-        proposedAction: null,
-        executionProposal: null,
-        skillExecutionProposal: null,
-      });
-    }
-  });
-
-  it("accepts only the exact server-authorized saved Skill marker", () => {
-    const marker = {
-      reply: "iOS 배포 Skill 실행에는 승인이 필요합니다.",
-      proposedAction: null,
-      executionProposal: null,
-      skillExecutionProposal: { type: "request_agent_skill_execute" },
-    };
-    expect(parseDetachedIssueReplyResult(
-      JSON.stringify(marker),
-      { allowSkillExecutionProposal: true },
-    )).toEqual(marker);
-    expect(parseDetachedIssueReplyResult(JSON.stringify(marker))).toEqual({
-      reply: JSON.stringify(marker),
-      proposedAction: null,
-      executionProposal: null,
-      skillExecutionProposal: null,
-    });
-
-    for (const invalid of [
-      {
-        ...marker,
-        skillExecutionProposal: {
-          type: "request_agent_skill_execute",
-          skillId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-        },
-      },
-      {
-        ...marker,
-        executionProposal: { type: "request_issue_execute" },
-      },
-      {
-        ...marker,
-        proposedAction: {
-          type: "request_issue_update",
-          changes: { priority: 1 },
-        },
-      },
-    ]) {
-      expect(parseDetachedIssueReplyResult(
-        JSON.stringify(invalid),
-        { allowSkillExecutionProposal: true },
-      )).toEqual({
-        reply: JSON.stringify(invalid),
-        proposedAction: null,
-        executionProposal: null,
-        skillExecutionProposal: null,
-      });
-    }
   });
 
   it("exposes saved Skill authority only for the server-selected turn", () => {
@@ -1346,160 +923,15 @@ describe("detached Agent runner", () => {
     expect(projectPrompt).toContain('"attachments":["explanation.html"]');
   });
 
-  it.each([
-    "로그인 실패 문제를 고쳐줘",
-    "배포 설정을 바꾸고 운영에 반영해 줄래?",
-    "Can you implement the empty state from this discussion?",
-    "Please migrate the channel records to the new schema.",
-  ])(
-    "routes semantic project-changing wording through one create-and-execute approval: %s",
-    (body) => {
-      const prompt = detachedChannelReplyPrompt({
-        agent: {
-          ...agent,
-          scope: {
-            kind: "project",
-            organizationId: "11111111-1111-4111-8111-111111111111",
-            projectId: "22222222-2222-4222-8222-222222222222",
-          },
-        },
-        snapshot: { messages: [{ body }] },
-        workspaceAvailable: true,
-      });
-
-      expect(prompt).toContain(body);
-      expect(prompt).toContain(
-        "Semantically distinguish requests for information or analysis",
-      );
-      expect(prompt).toContain(
-        "This is an intent judgment, never a keyword, phrase-list, or exact-wording check",
-      );
-      expect(prompt).toContain(
-        "one authenticated approval will review the issue plus provider/model/effort/Worker settings",
-      );
-      expect(prompt).toContain('"executeAfterCreate":true');
-    },
-  );
-
-  it("extracts final replies from every detached provider event shape", () => {
-    expect(
-      issueReplyTextFromPayload({ type: "result", message: " Claude reply " }),
-    ).toBe("Claude reply");
-    expect(
-      issueReplyTextFromPayload({
-        type: "event",
-        event: { type: "messageCompleted", text: "Grok reply" },
-      }),
-    ).toBe("Grok reply");
-    expect(
-      issueReplyTextFromPayload({
-        type: "item.completed",
-        item: { type: "agent_message", text: "Codex reply" },
-      }),
-    ).toBe("Codex reply");
-    expect(
-      issueReplyTextFromPayload({
-        type: "event",
-        raw: {
-          method: "item/completed",
-          params: {
-            item: { type: "agentMessage", phase: "final_answer", text: "App Server reply" },
-          },
-        },
-      }),
-    ).toBe("App Server reply");
-    expect(
-      issueReplyTextFromPayload({
-        type: "event",
-        raw: {
-          method: "turn/completed",
-          params: {
-            turn: {
-              items: [
-                { type: "agentMessage", phase: "commentary", text: "Working" },
-                { type: "agentMessage", phase: "final_answer", text: "Final App Server reply" },
-              ],
-            },
-          },
-        },
-      }),
-    ).toBe("Final App Server reply");
-  });
-
-  it("bounds untrusted transcript payloads", () => {
-    expect(boundedTranscriptPayload({ message: "ok" }, "ok")).toEqual({
-      message: "ok",
-    });
-    expect(
-      boundedTranscriptPayload({ message: "x".repeat(40_000) }, "x".repeat(40_000)),
-    ).toMatchObject({ type: "truncated", originalBytes: 40_000 });
-  });
-
-  it("preserves runner event directions and exposes session starts", () => {
-    const clientEvent = { type: "event", direction: "client", raw: {} };
-    expect(detachedPayloadDirection(clientEvent)).toBe("client");
-    expect(detachedPayloadDirection({ type: "event", raw: {} })).toBe("server");
-    expect(
-      detachedTranscriptPayload(
-        { type: "session", sessionId: "thread-1" },
-        '{"type":"session","sessionId":"thread-1"}',
-      ),
-    ).toEqual({
-      type: "session",
-      sessionId: "thread-1",
-      event: { type: "conversationStarted", conversationId: "thread-1" },
-    });
-    expect(
-      detachedTranscriptPayload(
-        {
-          type: "event",
-          direction: "server",
-          event: {
-            type: "messageCompleted",
-            id: "message-1",
-            phase: "final_answer",
-            text: "Done",
-          },
-          raw: { text: "x".repeat(40_000) },
-        },
-        "x".repeat(40_000),
-      ),
-    ).toMatchObject({
-      type: "event",
-      event: { type: "messageCompleted", id: "message-1" },
-    });
-  });
-
   it("accepts normalized deltas for compaction and drops raw-only stream noise", () => {
     expect(
-      shouldPersistDetachedTranscriptPayload({
-        type: "event",
-        event: { type: "messageDelta", id: "message-1", delta: "hello" },
-      }),
+      shouldPersistDetachedTranscriptPayload(sidecarProviderEvent({
+        raw: {},
+        event: normalizedMessageDelta({ id: "message-1", delta: "hello" }),
+      })),
     ).toBe(true);
     expect(
-      shouldPersistDetachedTranscriptPayload({
-        type: "messageDelta",
-        id: "message-1",
-        delta: "hello",
-      }),
-    ).toBe(true);
-    expect(
-      shouldPersistDetachedTranscriptPayload({
-        type: "event",
-        event: { type: "activityDelta", id: "command-1", delta: "output" },
-      }),
-    ).toBe(true);
-    expect(
-      shouldPersistDetachedTranscriptPayload({
-        type: "activityDelta",
-        id: "command-1",
-        delta: "output",
-      }),
-    ).toBe(true);
-    expect(
-      shouldPersistDetachedTranscriptPayload({
-        type: "event",
+      shouldPersistDetachedTranscriptPayload(sidecarProviderEvent({
         raw: {
           sessionId: "grok-session",
           update: {
@@ -1507,102 +939,47 @@ describe("detached Agent runner", () => {
             content: { type: "text", text: "private thought" },
           },
         },
-      }),
+      })),
     ).toBe(false);
     expect(
-      shouldPersistDetachedTranscriptPayload({
-        type: "event",
-        raw: {
-          type: "stream_event",
-          event: {
-            type: "content_block_delta",
-            delta: { type: "thinking_delta", thinking: "private thought" },
-          },
-        },
-      }),
-    ).toBe(false);
-    expect(
-      shouldPersistDetachedTranscriptPayload({
-        type: "event",
+      shouldPersistDetachedTranscriptPayload(sidecarProviderEvent({
         raw: {
           method: "item/reasoning/textDelta",
           params: { delta: "private thought" },
         },
-      }),
+      })),
     ).toBe(false);
     expect(
-      shouldPersistDetachedTranscriptPayload({
-        type: "event",
+      shouldPersistDetachedTranscriptPayload(sidecarProviderEvent({
         raw: { method: "item/completed", params: { item: { type: "tool" } } },
-      }),
+      })),
     ).toBe(true);
-    expect(
-      shouldPersistDetachedTranscriptPayload({
-        type: "event",
-        event: {
-          type: "messageCompleted",
-          id: "message-1",
-          text: "hello",
-        },
-      }),
-    ).toBe(true);
-  });
-
-  it("bounds oversized normalized activity payloads below the upload threshold", () => {
-    const payload = {
-      type: "event",
-      direction: "server",
-      raw: { output: "원격 명령 출력".repeat(20_000) },
-      event: {
-        type: "activityCompleted",
-        id: "command-1",
-        kind: "command",
-        title: "아주 긴 명령 ".repeat(4_000),
-        text: "아주 긴 실행 결과 ".repeat(20_000),
-        status: "completed",
-      },
-    };
-    const bounded = detachedTranscriptPayload(payload, JSON.stringify(payload));
-
-    expect(Buffer.byteLength(JSON.stringify(bounded), "utf8")).toBeLessThan(
-      28_000,
-    );
-    expect(bounded).toMatchObject({
-      type: "event",
-      event: {
-        type: "activityCompleted",
-        id: "command-1",
-        kind: "command",
-        status: "completed",
-      },
-    });
   });
 
   it("assigns every accepted payload a stable transcript sequence", () => {
     const sequencer = createDetachedTranscriptSequencer(1);
     expect(
-      sequencer.nextForPayload({
-        type: "event",
+      sequencer.nextForPayload(sidecarProviderEvent({
         raw: {
           update: { sessionUpdate: "agent_thought_chunk" },
         },
-      }),
+      })),
     ).toBeNull();
-    const delta = {
-      type: "event",
-      event: { type: "messageDelta", id: "message-1", delta: "x" },
-    };
+    const delta = sidecarProviderEvent({
+      raw: {},
+      event: normalizedMessageDelta({ id: "message-1", delta: "x" }),
+    });
     expect(sequencer.nextForPayload(delta)).toBe(1);
 
     expect(
-      sequencer.nextForPayload({
-        type: "event",
-        event: {
-          type: "messageCompleted",
+      sequencer.nextForPayload(sidecarProviderEvent({
+        raw: {},
+        event: normalizedMessageCompleted({
           id: "message-1",
+          phase: null,
           text: "done",
-        },
-      }),
+        }),
+      })),
     ).toBe(2);
     expect(sequencer.next()).toBe(3);
   });

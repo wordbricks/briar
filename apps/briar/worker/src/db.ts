@@ -22,17 +22,11 @@ export {
 export type { AgentSkillExecutionRealtimeOutboxRow } from "./agent-skill-execution-realtime-outbox-repository";
 
 export {
-  channelApprovalTablesAvailable,
   isChannelApprovedIssue,
 } from "./channel-issue-approval-repository";
 
 export { pruneExpiredDashboardChanges } from "./dashboard-maintenance-repository";
 export type { DashboardChangePruneResult } from "./dashboard-maintenance-repository";
-
-export {
-  issueExecutionApprovalTablesAvailable,
-  agentSkillExecutionApprovalTablesAvailable,
-} from "./execution-approval-schema-repository";
 
 export {
   createGithubOAuthState,
@@ -147,9 +141,6 @@ export type { IssueAgentReplyJobRow } from "./issue-agent-reply-repository";
 
 export {
   createIssueAttachments,
-  deleteIssueAttachments,
-  issueAttachmentObjectKeysInUse,
-  updateIssueWithAttachmentMetadata,
   listIssueAttachments,
   listIssueAttachmentsByRunIds,
   getIssueAttachment,
@@ -225,7 +216,6 @@ export type {
 } from "./issue-notification-repository";
 
 export {
-  rollbackNewAppIssue,
   updateIssue,
   updateIssueExecutionPreferences,
   updateIssueCheckpoints,
@@ -257,7 +247,6 @@ export {
   updateOrganization,
   updateOrganizationLogo,
   isOrganizationHandleAvailable,
-  addOrganizationMember,
   createOrganizationInvitation,
   revokeOrganizationInvitation,
   acceptOrganizationInvitation,
@@ -364,13 +353,11 @@ export {
   listRunEvidenceImages,
   listAllRunEvidenceImages,
   listEvidenceImagesForEvidence,
-  createRunEvidenceImages,
   getRunEvidenceImage,
 } from "./run-evidence-repository";
 export type {
   RunEvidenceRow,
   RunEvidenceImageRow,
-  RunEvidenceImageInput,
 } from "./run-evidence-repository";
 
 export { listRunStageRevisions } from "./run-stage-revision-repository";

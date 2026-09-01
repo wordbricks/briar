@@ -3,6 +3,17 @@ import { createHash } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fromJsonString } from "@bufbuild/protobuf";
+import type { Client } from "@connectrpc/connect";
+import {
+  GitHubPullRequestState,
+  GitHubPullRequestSchema,
+  type GitHubPullRequest,
+} from "@briar/contracts/gen/briar/app/v1/github_pb";
+import {
+  MergeBatchValidationFailureCode,
+  WorkerQueueService,
+} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import * as Schema from "effect/Schema";
 import {
   MERGE_QUEUE_GITHUB_STATUS_CONTEXT,
@@ -12,10 +23,9 @@ import {
   MERGE_QUEUE_VALIDATION_MAX_COMMANDS,
   MERGE_QUEUE_VALIDATION_SOURCE_REF_PREFIX,
 } from "../src/lib/merge-queue-validation-contract";
-import {
-  decodeClaimedMergeBatch,
-  type ClaimedMergeBatch,
-} from "./worker-claim-contract";
+import type { ClaimedMergeBatch } from "./worker-queue-contract";
+import { workClaimIdentityToProto } from "./worker-queue-client";
+import type { MergeQueueProfile } from "../src/types";
 
 export type MergeQueueCommandResult = {
   exitCode: number;
@@ -35,10 +45,16 @@ export type MergeQueueCommandRunner = (
   options: MergeQueueCommandOptions,
 ) => MergeQueueCommandResult;
 
-export type MergeBatchApi = <T = unknown>(
-  path: string,
-  init: { method: "POST"; body: string },
-) => Promise<T>;
+type MergeBatchReportingClient = Pick<
+  Client<typeof WorkerQueueService>,
+  | "recordMergeBatchCandidateEnqueued"
+  | "recordMergeBatchAuthority"
+  | "recordMergeBatchValidation"
+  | "completeMergeBatchPublication"
+  | "blockMergeBatch"
+>;
+
+export type MergeBatchRpc = MergeBatchReportingClient;
 
 export class MergeQueueInfrastructureError extends Error {
   constructor(message: string, options?: ErrorOptions) {
@@ -96,37 +112,6 @@ const GitObjectId = Schema.String.check(
   Schema.isPattern(/^[0-9a-f]{40}$/u),
 );
 const PositiveInteger = Schema.Int.check(Schema.isGreaterThan(0));
-const GraphQlError = Schema.Struct({ message: Schema.String });
-const GraphQlErrors = Schema.optional(Schema.mutable(Schema.Array(GraphQlError)));
-
-const PullRequestSchema = Schema.Struct({
-  id: Schema.NonEmptyString,
-  databaseId: PositiveInteger,
-  number: PositiveInteger,
-  state: Schema.String,
-  isDraft: Schema.Boolean,
-  headRefOid: GitObjectId,
-  baseRefName: Schema.String,
-  baseRefOid: GitObjectId,
-});
-
-const RepositoryIdentity = {
-  databaseId: PositiveInteger,
-  nameWithOwner: Schema.NonEmptyString,
-} as const;
-
-const PullRequestQueryResponse = Schema.Struct({
-  data: Schema.NullOr(Schema.Struct({
-    repository: Schema.NullOr(Schema.Struct({
-      ...RepositoryIdentity,
-      pullRequest: Schema.NullOr(PullRequestSchema),
-    })),
-  })),
-  errors: GraphQlErrors,
-});
-const decodePullRequestQueryResponse = Schema.decodeUnknownSync(
-  PullRequestQueryResponse,
-);
 
 const RepositoryMergeMethodsResponse = Schema.Struct({
   allow_merge_commit: Schema.Boolean,
@@ -146,49 +131,6 @@ const decodePullRequestMergeResponse = Schema.decodeUnknownSync(
   PullRequestMergeResponse,
 );
 
-const MergeBatchClaimResponse = Schema.Struct({
-  work: Schema.NullOr(Schema.Unknown),
-  retryAfterMs: Schema.optional(Schema.Int.check(
-    Schema.isGreaterThanOrEqualTo(0),
-  )),
-});
-const decodeMergeBatchClaimResponse = Schema.decodeUnknownSync(
-  MergeBatchClaimResponse,
-);
-
-const PULL_REQUEST_QUERY = `query BriarMergePullRequest(
-  $owner: String!, $name: String!, $number: Int!
-) {
-  repository(owner: $owner, name: $name) {
-    databaseId
-    nameWithOwner
-    pullRequest(number: $number) {
-      id
-      databaseId
-      number
-      state
-      isDraft
-      headRefOid
-      baseRefName
-      baseRefOid
-    }
-  }
-}`;
-
-type GraphQlVariable = readonly [string, string | number | boolean | null];
-
-function repositoryTarget(repository: string) {
-  const match = repository.match(
-    /^([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)$/u,
-  );
-  if (!match) {
-    throw new MergeQueueAuthorityError(
-      "Merge batch repository must be an exact owner/name",
-    );
-  }
-  return { owner: match[1], name: match[2] };
-}
-
 function commandFailure(name: string, result: MergeQueueCommandResult): never {
   throw new MergeQueueInfrastructureError(
     `${name} failed: ${result.stderr.trim() || `exit ${result.exitCode}`}`,
@@ -197,63 +139,40 @@ function commandFailure(name: string, result: MergeQueueCommandResult): never {
 
 const briarGithubCommand = () => ["briar", "github"];
 
-function runGraphQl<T>(
+function readPullRequest(
   repositoryPath: string,
-  query: string,
-  variables: readonly GraphQlVariable[],
-  decode: (input: unknown) => T,
+  pullRequestNumber: number,
   run: MergeQueueCommandRunner,
   name: string,
-): T {
-  const variableObject = Object.fromEntries(
-    variables.filter((entry) => entry[1] !== null),
-  );
+): GitHubPullRequest {
   const command = [
     ...briarGithubCommand(),
-    "graphql",
-    "--query",
-    query,
-    "--variables-json",
-    JSON.stringify(variableObject),
+    "pr",
+    "view",
+    "--number",
+    String(pullRequestNumber),
   ];
   const result = run(command, localOptions(repositoryPath));
   if (result.exitCode !== 0) commandFailure(name, result);
-  let parsed: unknown;
   try {
-    parsed = JSON.parse(result.stdout);
+    return fromJsonString(GitHubPullRequestSchema, result.stdout);
   } catch (cause) {
     throw new MergeQueueInfrastructureError(
-      `${name} returned invalid JSON`,
+      `${name} returned invalid GitHubPullRequest ProtoJSON`,
       { cause },
     );
   }
-  try {
-    return decode(parsed);
-  } catch (cause) {
-    throw new MergeQueueInfrastructureError(
-      `${name} returned an invalid response`,
-      { cause },
-    );
-  }
-}
-
-function assertNoGraphQlErrors(
-  errors: readonly { readonly message: string }[] | undefined,
-  name: string,
-) {
-  if (!errors || errors.length === 0) return;
-  throw new MergeQueueInfrastructureError(
-    `${name} was rejected: ${errors.map((error) => error.message).join("; ").slice(0, 1_000)}`,
-  );
 }
 
 function assertRepositoryIdentity(
-  repository: { readonly databaseId: number; readonly nameWithOwner: string },
+  pullRequest: GitHubPullRequest,
   claim: Pick<ClaimedMergeBatch, "repository" | "repositoryId">,
 ) {
+  const identity = pullRequest.identity;
   if (
-    repository.databaseId !== claim.repositoryId ||
-    repository.nameWithOwner.toLowerCase() !== claim.repository.toLowerCase()
+    !identity ||
+    identity.repositoryId !== BigInt(claim.repositoryId) ||
+    pullRequest.repository.toLowerCase() !== claim.repository.toLowerCase()
   ) {
     throw new MergeQueueAuthorityError(
       "GitHub repository identity does not match the sealed merge batch",
@@ -264,17 +183,20 @@ function assertRepositoryIdentity(
 type MergeBatchMember = ClaimedMergeBatch["members"][number];
 
 function assertPullRequestIdentity(
-  pullRequest: typeof PullRequestSchema.Type,
+  pullRequest: GitHubPullRequest,
   member: MergeBatchMember,
 ) {
+  const identity = pullRequest.identity;
   if (
-    pullRequest.id !== member.pullRequestNodeId ||
-    pullRequest.databaseId !== member.pullRequestId ||
-    pullRequest.number !== member.pullRequestNumber ||
-    pullRequest.headRefOid !== member.headSha ||
-    pullRequest.baseRefName !== "main" ||
-    pullRequest.state !== "OPEN" ||
-    pullRequest.isDraft
+    !identity ||
+    identity.pullRequestNodeId !== member.pullRequestNodeId ||
+    identity.pullRequestId !== BigInt(member.pullRequestId) ||
+    identity.pullRequestNumber !== BigInt(member.pullRequestNumber) ||
+    pullRequest.headSha !== member.headSha ||
+    pullRequest.baseRef !== "main" ||
+    pullRequest.state !== GitHubPullRequestState.OPEN ||
+    pullRequest.draft ||
+    pullRequest.merged
   ) {
     throw new MergeQueueAuthorityError(
       `Pull request #${member.pullRequestNumber} no longer matches its sealed OPEN, non-draft identity`,
@@ -288,108 +210,26 @@ function inspectPullRequest(
   repositoryPath: string,
   run: MergeQueueCommandRunner,
 ) {
-  const target = repositoryTarget(claim.repository);
-  const response = runGraphQl(
+  const pullRequest = readPullRequest(
     repositoryPath,
-    PULL_REQUEST_QUERY,
-    [
-      ["owner", target.owner],
-      ["name", target.name],
-      ["number", member.pullRequestNumber],
-    ],
-    decodePullRequestQueryResponse,
+    member.pullRequestNumber,
     run,
     `GitHub pull request #${member.pullRequestNumber} readback`,
   );
-  assertNoGraphQlErrors(response.errors,
-    `GitHub pull request #${member.pullRequestNumber} readback`);
-  const repository = response.data?.repository;
-  const pullRequest = repository?.pullRequest;
-  if (!repository || !pullRequest) {
-    throw new MergeQueueAuthorityError(
-      `Pull request #${member.pullRequestNumber} does not exist`,
-    );
-  }
-  assertRepositoryIdentity(repository, claim);
+  assertRepositoryIdentity(pullRequest, claim);
   assertPullRequestIdentity(pullRequest, member);
   return pullRequest;
 }
 
-function commonClaimBody(
+function commonClaimRequest(
   claim: ClaimedMergeBatch,
   workerId: string,
 ) {
   return {
     projectId: claim.projectId,
     workerId,
-    claimToken: claim.claimToken,
+    work: workClaimIdentityToProto(claim),
   };
-}
-
-async function postClaimAction<T>(
-  api: MergeBatchApi,
-  claim: ClaimedMergeBatch,
-  action: string,
-  body: Readonly<Record<string, unknown>>,
-) {
-  return api<T>(`/merge-batch-claims/${claim.workId}/${action}`, {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-}
-
-export async function claimMergeBatchIfReady(input: {
-  api: MergeBatchApi;
-  projectId: string;
-  workerId: string;
-  claimedBy: string;
-  repliesOnly: boolean;
-}): Promise<ClaimedMergeBatch | null> {
-  if (input.repliesOnly) return null;
-  const raw = await input.api<unknown>("/merge-batch-claims", {
-    method: "POST",
-    body: JSON.stringify({
-      projectId: input.projectId,
-      workerId: input.workerId,
-      claimedBy: input.claimedBy,
-    }),
-  });
-  let response: typeof MergeBatchClaimResponse.Type;
-  try {
-    response = decodeMergeBatchClaimResponse(raw);
-  } catch (cause) {
-    throw new MergeQueueInfrastructureError(
-      "Merge batch claim response was invalid",
-      { cause },
-    );
-  }
-  return response.work === null ? null : decodeClaimedMergeBatch(response.work);
-}
-
-export async function renewMergeBatchClaim(
-  api: MergeBatchApi,
-  claim: ClaimedMergeBatch,
-  workerId: string,
-) {
-  await postClaimAction(
-    api,
-    claim,
-    "lease",
-    commonClaimBody(claim, workerId),
-  );
-}
-
-export async function releaseMergeBatchClaim(
-  api: MergeBatchApi,
-  claim: ClaimedMergeBatch,
-  workerId: string,
-) {
-  await postClaimAction(
-    api,
-    claim,
-    "release",
-    commonClaimBody(claim, workerId),
-  );
 }
 
 async function enqueueMember(
@@ -403,18 +243,13 @@ async function enqueueMember(
     input.runCommand,
   );
   const queueEntryId = `briar:${input.claim.workId}:${member.ordinal}`;
-  await postClaimAction(
-    input.api,
-    input.claim,
-    "enqueued",
-    {
-      ...commonClaimBody(input.claim, input.workerId),
-      candidateId: member.id,
-      expectedHeadSha: member.headSha,
-      expectedBaseSha: member.baseSha,
-      queueEntryId,
-    },
-  );
+  await input.rpc.recordMergeBatchCandidateEnqueued({
+    ...commonClaimRequest(input.claim, input.workerId),
+    candidateId: member.id,
+    expectedHeadSha: member.headSha,
+    expectedBaseSha: member.baseSha,
+    queueEntryId,
+  });
 }
 
 async function enqueueMergeBatch(input: NormalizedMergeBatchExecutionInput) {
@@ -568,17 +403,12 @@ async function establishTailAuthority(input: NormalizedMergeBatchExecutionInput)
       `${integrationSha}:${integrationRef}`,
     ], 120_000);
   }
-  await postClaimAction(
-    input.api,
-    input.claim,
-    "authority",
-    {
-      ...commonClaimBody(input.claim, input.workerId),
-      integrationRef,
-      integrationSha,
-      baseSha,
-    },
-  );
+  await input.rpc.recordMergeBatchAuthority({
+    ...commonClaimRequest(input.claim, input.workerId),
+    integrationRef,
+    integrationSha,
+    baseSha,
+  });
 }
 
 function runGitCommand(
@@ -735,16 +565,20 @@ async function validateMergeBatch(input: NormalizedMergeBatchExecutionInput) {
     logSha256: createHash("sha256").update(combinedLog).digest("hex"),
     logTruncated: bounded.truncated,
   }];
-  await postClaimAction(
-    input.api,
-    input.claim,
-    "validation",
-    {
-      ...commonClaimBody(input.claim, input.workerId),
-      mergeGroupSha: exact.headSha,
-      validationResults,
+  await input.rpc.recordMergeBatchValidation({
+    ...commonClaimRequest(input.claim, input.workerId),
+    mergeGroupSha: exact.headSha,
+    validationResults: {
+      results: validationResults.map((result) => ({
+        ...result,
+        failureCode: result.failureCode === "ci_failed"
+          ? MergeBatchValidationFailureCode.CI_FAILED
+          : result.failureCode === "output_limit"
+            ? MergeBatchValidationFailureCode.OUTPUT_LIMIT
+            : undefined,
+      })),
     },
-  );
+  });
 }
 
 function assertPublishAuthorityValues(claim: ClaimedMergeBatch) {
@@ -859,7 +693,7 @@ function repositoryMergeMethod(input: NormalizedMergeBatchExecutionInput) {
 }
 
 async function reFencePublication(input: NormalizedMergeBatchExecutionInput) {
-  await renewMergeBatchClaim(input.api, input.claim, input.workerId);
+  await input.renewLease();
   const authority = assertPublishAuthorityValues(input.claim);
   const mergedCount = mergedPrefixLength(input.claim);
   for (const member of input.claim.members) {
@@ -887,7 +721,7 @@ async function mergeBatchPullRequests(
     index += 1
   ) {
     if (input.signal.aborted) throw input.signal.reason;
-    await renewMergeBatchClaim(input.api, input.claim, input.workerId);
+    await input.renewLease();
     const member = input.claim.members[index];
     inspectPullRequest(
       input.claim,
@@ -983,7 +817,7 @@ async function publishMergeBatch(input: NormalizedMergeBatchExecutionInput) {
         );
       }
       if (renewBeforeEach) {
-        await renewMergeBatchClaim(input.api, input.claim, input.workerId);
+        await input.renewLease();
       }
       publishStatus(input, authority.mergeGroupSha, result);
     }
@@ -993,29 +827,19 @@ async function publishMergeBatch(input: NormalizedMergeBatchExecutionInput) {
     // can never merge a pull request. Keep the lease live before every status.
     const authority = assertPublishAuthorityValues(input.claim);
     await publishProofStatuses(authority, true);
-    await postClaimAction(
-      input.api,
-      input.claim,
-      "published",
-      {
-        ...commonClaimBody(input.claim, input.workerId),
-        mergeGroupSha: authority.mergeGroupSha,
-      },
-    );
+    await input.rpc.completeMergeBatchPublication({
+      ...commonClaimRequest(input.claim, input.workerId),
+      mergeGroupSha: authority.mergeGroupSha,
+    });
     return;
   }
   const authority = await reFencePublication(input);
   await publishProofStatuses(authority, false);
   await mergeBatchPullRequests(input, authority);
-  await postClaimAction(
-    input.api,
-    input.claim,
-    "published",
-    {
-      ...commonClaimBody(input.claim, input.workerId),
-      mergeGroupSha: authority.mergeGroupSha,
-    },
-  );
+  await input.rpc.completeMergeBatchPublication({
+    ...commonClaimRequest(input.claim, input.workerId),
+    mergeGroupSha: authority.mergeGroupSha,
+  });
 }
 
 function blockCode(claim: ClaimedMergeBatch) {
@@ -1035,16 +859,11 @@ async function drainMergeBatch(
   input: NormalizedMergeBatchExecutionInput,
   failure?: { code: string; detail: string },
 ) {
-  await postClaimAction(
-    input.api,
-    input.claim,
-    "block",
-    {
-      ...commonClaimBody(input.claim, input.workerId),
-      code: failure?.code ?? blockCode(input.claim),
-      detail: (failure?.detail ?? blockDetail(input.claim)).slice(0, 4_000),
-    },
-  );
+  await input.rpc.blockMergeBatch({
+    ...commonClaimRequest(input.claim, input.workerId),
+    code: failure?.code ?? blockCode(input.claim),
+    detail: (failure?.detail ?? blockDetail(input.claim)).slice(0, 4_000),
+  });
 }
 
 export type MergeBatchExecutionInput = {
@@ -1052,7 +871,9 @@ export type MergeBatchExecutionInput = {
   workerId: string;
   repositoryPath: string;
   signal: AbortSignal;
-  api: MergeBatchApi;
+  rpc: MergeBatchRpc;
+  renewLease: () => Promise<void>;
+  releaseLease: () => Promise<void>;
   runCommand?: MergeQueueCommandRunner;
 };
 
@@ -1072,15 +893,15 @@ export async function executeClaimedMergeBatch(
     switch (input.claim.phase) {
       case "enqueue":
         await enqueueMergeBatch(input);
-        await releaseMergeBatchClaim(input.api, input.claim, input.workerId);
+        await input.releaseLease();
         return;
       case "tail_authority":
         await establishTailAuthority(input);
-        await releaseMergeBatchClaim(input.api, input.claim, input.workerId);
+        await input.releaseLease();
         return;
       case "validate":
         await validateMergeBatch(input);
-        await releaseMergeBatchClaim(input.api, input.claim, input.workerId);
+        await input.releaseLease();
         return;
       case "publish":
         await publishMergeBatch(input);
@@ -1094,7 +915,7 @@ export async function executeClaimedMergeBatch(
     // must not race this retry release with a second protocol.
     if (input.signal.aborted) throw error;
     try {
-      await releaseMergeBatchClaim(input.api, input.claim, input.workerId);
+      await input.releaseLease();
     } catch (releaseError) {
       throw new AggregateError(
         [error, releaseError],
@@ -1103,44 +924,6 @@ export async function executeClaimedMergeBatch(
     }
     throw error;
   }
-}
-
-const MergeQueueProfileSchema = Schema.Struct({
-  projectId: Schema.String.check(Schema.isUUID()),
-  repositoryId: PositiveInteger,
-  repository: Schema.String.check(
-    Schema.isPattern(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u),
-  ),
-  baseBranch: Schema.Literal("main"),
-  enabled: Schema.Boolean,
-  readinessStageId: Schema.String.check(
-    Schema.isPattern(/^[a-z][a-z0-9_-]{0,63}$/u),
-  ),
-  validationCommands: Schema.mutable(Schema.Array(
-    Schema.String.check(Schema.isLengthBetween(1, 500)),
-  )).check(Schema.isLengthBetween(1, MERGE_QUEUE_VALIDATION_MAX_COMMANDS)),
-  quietWindowMs: Schema.Int.check(
-    Schema.isGreaterThanOrEqualTo(1_000),
-    Schema.isLessThanOrEqualTo(300_000),
-  ),
-  maxBatchSize: Schema.Int.check(
-    Schema.isGreaterThanOrEqualTo(1),
-    Schema.isLessThanOrEqualTo(5),
-  ),
-  updatedAt: Schema.String,
-});
-
-export type MergeQueueProfile = typeof MergeQueueProfileSchema.Type;
-
-const MergeQueueProfileResponse = Schema.Struct({
-  profile: Schema.NullOr(MergeQueueProfileSchema),
-});
-const decodeMergeQueueProfileResponse = Schema.decodeUnknownSync(
-  MergeQueueProfileResponse,
-);
-
-export function mergeQueueProfileFromResponse(input: unknown) {
-  return decodeMergeQueueProfileResponse(input).profile;
 }
 
 const GithubRepositoryResponse = Schema.Struct({

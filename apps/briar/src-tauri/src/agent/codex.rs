@@ -26,7 +26,7 @@ const TURN_REQUEST_ID: u64 = 3;
 const MODEL_LIST_REQUEST_ID: u64 = 4;
 pub(crate) const MAX_AUTO_HUNT_ISSUES: usize = 10;
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ProjectAutoHuntIssueAttachment {
     pub(crate) id: String,
@@ -40,7 +40,7 @@ pub(crate) struct ProjectAutoHuntIssueAttachment {
     pub(crate) download_error: Option<String>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ProjectAutoHuntIssueMessageAuthor {
     pub(crate) id: Option<String>,
@@ -48,7 +48,7 @@ pub(crate) struct ProjectAutoHuntIssueMessageAuthor {
     pub(crate) provider: Option<AgentProviderKind>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ProjectAutoHuntIssueMessage {
     pub(crate) id: String,
@@ -59,26 +59,27 @@ pub(crate) struct ProjectAutoHuntIssueMessage {
     pub(crate) updated_at: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ProjectAutoHuntIssue {
     pub(crate) run_id: String,
     pub(crate) run_number: u64,
     pub(crate) source_key: String,
     pub(crate) title: String,
-    #[serde(default, alias = "description")]
+    #[serde(default)]
     pub(crate) issue_description: Option<String>,
     #[serde(default)]
     pub(crate) priority: Option<u8>,
     #[serde(default)]
+    #[specta(type = Option<crate::ipc::JsonValue>)]
     pub(crate) context: Option<Value>,
     #[serde(default)]
     pub(crate) attachments: Vec<ProjectAutoHuntIssueAttachment>,
-    #[serde(default, alias = "messages")]
+    #[serde(default)]
     pub(crate) conversation: Vec<ProjectAutoHuntIssueMessage>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ProjectAutoHuntRequest {
     pub(crate) session_id: String,
@@ -96,7 +97,7 @@ pub(crate) struct ProjectAutoHuntRequest {
     pub(crate) issues: Vec<ProjectAutoHuntIssue>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ProjectAgentRunRequest {
     pub(crate) session_id: String,
@@ -117,7 +118,7 @@ pub(crate) struct ProjectAgentRunRequest {
     pub(crate) resume_after_update: bool,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ProjectAgentRunSnapshot {
     pub(crate) run_id: String,
@@ -130,7 +131,7 @@ pub(crate) struct ProjectAgentRunSnapshot {
     pub(crate) updated_at: String,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum ProjectAgentRunAction {
     Respond,
@@ -156,7 +157,7 @@ struct ProjectAgentHostToolCall {
     arguments: Value,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum AgentResultOutcome {
     Completed,
@@ -165,7 +166,7 @@ pub(crate) enum AgentResultOutcome {
     Failed,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum AgentResultImportance {
     Routine,
@@ -173,7 +174,7 @@ pub(crate) enum AgentResultImportance {
     Critical,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum AgentResultUrgency {
     Normal,
@@ -181,7 +182,7 @@ pub(crate) enum AgentResultUrgency {
     Immediate,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum AgentResultImpact {
     Issue,
@@ -189,7 +190,7 @@ pub(crate) enum AgentResultImpact {
     Organization,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct StructuredAgentResult {
     pub(crate) summary: String,
@@ -202,7 +203,7 @@ pub(crate) struct StructuredAgentResult {
     pub(crate) due_at: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ProjectAgentRunResponse {
     pub(crate) conversation_id: String,
@@ -580,7 +581,7 @@ fn write_cli_wrapper(
         .map_err(|error| format!("{name} CLI 래퍼를 만들지 못했습니다: {error}"))
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ProjectAutoHuntIssueResult {
     pub(crate) source_key: String,
@@ -589,14 +590,14 @@ pub(crate) struct ProjectAutoHuntIssueResult {
     pub(crate) summary: String,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ProjectAutoHuntResult {
     pub(crate) summary: String,
     pub(crate) issues: Vec<ProjectAutoHuntIssueResult>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ProjectAutoHuntResponse {
     pub(crate) dispatch_group_id: String,
@@ -606,7 +607,7 @@ pub(crate) struct ProjectAutoHuntResponse {
     pub(crate) result: ProjectAutoHuntResult,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ProjectAutoHuntWorkerResponse {
     pub(crate) session_id: String,
@@ -616,7 +617,7 @@ pub(crate) struct ProjectAutoHuntWorkerResponse {
     pub(crate) workspace_root: Option<String>,
     pub(crate) outcome: String,
     pub(crate) summary: String,
-    pub(crate) evidence: Vec<Value>,
+    pub(crate) evidence: Vec<crate::auto_hunt_dispatch::AutoHuntRunEvidence>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -2073,9 +2074,6 @@ fn approval_decision(method: &str, approved: bool) -> Option<Value> {
         "item/commandExecution/requestApproval" | "item/fileChange/requestApproval" => {
             Some(json!({ "decision": if approved { "accept" } else { "decline" } }))
         }
-        "execCommandApproval" | "applyPatchApproval" => {
-            Some(json!({ "decision": if approved { "approved" } else { "denied" } }))
-        }
         _ => None,
     }
 }
@@ -2776,11 +2774,24 @@ mod tests {
                 workspace_root: Some("/worktree".to_string()),
                 outcome: "completed".to_string(),
                 summary: "done".to_string(),
-                evidence: vec![json!({
-                    "stage": "local_qa",
-                    "type": "local_ci",
-                    "status": "passed"
-                })],
+                evidence: vec![crate::auto_hunt_dispatch::AutoHuntRunEvidence {
+                    key: "local-ci".to_string(),
+                    attempt: 1,
+                    revision: 1,
+                    stage: "local_qa".to_string(),
+                    evidence_type: "local_ci".to_string(),
+                    status: crate::auto_hunt_dispatch::AutoHuntRunEvidenceStatus::Passed,
+                    detail: None,
+                    command: None,
+                    url: None,
+                    metadata: None,
+                    actor: "test".to_string(),
+                    observed_at: "2026-01-01T00:00:00Z".to_string(),
+                    recorded_at: "2026-01-01T00:00:01Z".to_string(),
+                    images: Vec::new(),
+                    required_revision: 1,
+                    canonical: true,
+                }],
             }],
             &|_, _| false,
         )
@@ -3294,11 +3305,6 @@ printf '%s\n' '{"method":"turn/completed","params":{"threadId":"thread-1","turn"
             "method": "item/commandExecution/requestApproval",
             "params": { "command": "git status" }
         });
-        let legacy = json!({
-            "id": 10,
-            "method": "applyPatchApproval",
-            "params": { "reason": "update a file" }
-        });
         let unknown = json!({
             "id": 11,
             "method": "item/tool/requestUserInput",
@@ -3312,10 +3318,6 @@ printf '%s\n' '{"method":"turn/completed","params":{"threadId":"thread-1","turn"
         assert_eq!(
             approval_decision(approved["method"].as_str().unwrap(), false).unwrap()["decision"],
             "decline"
-        );
-        assert_eq!(
-            approval_decision(legacy["method"].as_str().unwrap(), true).unwrap()["decision"],
-            "approved"
         );
         assert!(approval_decision(unknown["method"].as_str().unwrap(), true).is_none());
     }

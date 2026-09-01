@@ -5,12 +5,14 @@ Worker must not download every retained project record before starting a reply.
 
 ## Turn flow
 
-1. The Worker downloads `organization-context/manifest`. The manifest contains
+1. The Worker calls the generated
+   `OrganizationAgentContextService.GetManifest` client. The manifest contains
    project identity, resource counts, and resource revisions only.
 2. The read-only Agent inspects the local manifest. It either returns a normal
    channel reply or a strict `contextRequests` object.
-3. The Worker posts those requests to `organization-context/lookup` with its
-   Worker credential and the active channel reply claim token.
+3. The Worker calls `OrganizationAgentContextService.Lookup` with its Worker
+   credential and an `OrganizationAgentContextClaim` containing the active
+   channel reply capability.
 4. Briar revalidates the organization, claim, Worker, and every project ID,
    writes the bounded results into the private invocation directory, and
    continues the same provider conversation.
@@ -38,14 +40,15 @@ budget.
 ## Revisions and caching
 
 The manifest revision hashes project identities plus per-resource counts and
-latest update timestamps. The endpoint returns a private ETag. Workers retain a
-small in-memory manifest cache and use `If-None-Match`; a `304` response rebuilds
+latest update timestamps. Workers retain a small in-memory manifest cache and
+send its revision as `known_revision`. `GetManifest` returns a protobuf `oneof`:
+either the new manifest or an `unchanged` result that lets the Worker rebuild
 the new claim-scoped local manifest from the immutable cached index. Detailed
 lookup files are deduplicated within an invocation.
 
-The legacy paginated collection endpoints remain available for rolling-upgrade
-compatibility with older Workers. New Workers use only the manifest and lookup
-endpoints for Organization Agent replies.
+There is no REST/ETag negotiation or legacy paginated context protocol. Method,
+scope, request, response, and unchanged-result semantics all come from the
+generated Worker contract.
 
 ## Operational checks
 
@@ -53,7 +56,6 @@ endpoints for Organization Agent replies.
   request.
 - A single-project question must not load another project's detail.
 - Listing archived sessions must not read R2 objects.
-- Repeating an identical lookup in one invocation must not make another HTTP
-  request.
+- Repeating an identical lookup in one invocation must not make another RPC.
 - An expired claim, mismatched Worker, or cross-organization project ID must be
   rejected before any detail is returned.

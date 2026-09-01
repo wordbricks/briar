@@ -1,5 +1,3 @@
-import { issueExecutionApprovalTablesAvailable } from "./execution-approval-schema-repository";
-
 export type IssueActionProposalRow = {
   id: string;
   project_id: string;
@@ -37,15 +35,9 @@ export async function createIssueActionProposal(
     createdAt: string;
   },
 ) {
-  const executionApprovalsAvailable =
-    await issueExecutionApprovalTablesAvailable(db);
-  if (input.executeAfterCreate && !executionApprovalsAvailable) {
-    throw new Error("issue execution approval schema is unavailable");
-  }
   return await db
     .prepare(
-      executionApprovalsAvailable
-        ? `insert into briar_issue_action_proposals (
+      `insert into briar_issue_action_proposals (
          id, project_id, conversation_run_id, trigger_message_id,
          reply_message_id, action_type, payload_json,
          expected_run_updated_at, execute_after_create,
@@ -57,49 +49,22 @@ export async function createIssueActionProposal(
        from briar_hunt_runs run
        where run.id = ? and run.project_id = ?
        on conflict (project_id, trigger_message_id) do nothing
-       returning *`
-        : `insert into briar_issue_action_proposals (
-         id, project_id, conversation_run_id, trigger_message_id,
-         reply_message_id, action_type, payload_json,
-         expected_run_updated_at, created_at, updated_at
-       )
-       select ?, run.project_id, run.id, ?, ?, ?, ?,
-              case when ? = 'request_issue_update' then run.updated_at else null end,
-              ?, ?
-       from briar_hunt_runs run
-       where run.id = ? and run.project_id = ?
-       on conflict (project_id, trigger_message_id) do nothing
        returning *`,
     )
-    .bind(...(
-      executionApprovalsAvailable
-        ? [
-            input.id,
-            input.triggerMessageId,
-            input.replyMessageId,
-            input.actionType,
-            input.payloadJson,
-            input.actionType,
-            input.executeAfterCreate ? 1 : 0,
-            input.executionProposalId ?? null,
-            input.createdAt,
-            input.createdAt,
-            input.conversationRunId,
-            input.projectId,
-          ]
-        : [
-            input.id,
-            input.triggerMessageId,
-            input.replyMessageId,
-            input.actionType,
-            input.payloadJson,
-            input.actionType,
-            input.createdAt,
-            input.createdAt,
-            input.conversationRunId,
-            input.projectId,
-          ]
-    ))
+    .bind(
+      input.id,
+      input.triggerMessageId,
+      input.replyMessageId,
+      input.actionType,
+      input.payloadJson,
+      input.actionType,
+      input.executeAfterCreate ? 1 : 0,
+      input.executionProposalId ?? null,
+      input.createdAt,
+      input.createdAt,
+      input.conversationRunId,
+      input.projectId,
+    )
     .first<IssueActionProposalRow>();
 }
 

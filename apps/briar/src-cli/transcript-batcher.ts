@@ -1,8 +1,17 @@
-export type TranscriptBatchEvent = {
-  sequence: number;
-  direction: "client" | "server";
-  payload: unknown;
-};
+import {
+  create,
+  toBinary,
+} from "@bufbuild/protobuf";
+import {
+  AgentTranscriptEventSchema,
+  type AgentTranscriptEvent,
+} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
+import {
+  NormalizedAgentEventSchema,
+} from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
+
+/** The generated Worker contract remains authoritative throughout batching. */
+export type TranscriptBatchEvent = AgentTranscriptEvent;
 
 type TranscriptBatcherOptions = {
   send: (events: TranscriptBatchEvent[]) => Promise<void>;
@@ -25,65 +34,30 @@ export const TRANSCRIPT_BATCH_FLUSH_INTERVAL_MS = 500;
 export const TRANSCRIPT_BATCH_MAX_BUFFER_MS = 5_000;
 export const TRANSCRIPT_COMPACTED_DELTA_MAX_BYTES = 30 * 1024;
 
-type TranscriptPayloadRecord = Record<string, unknown>;
-
 type DeltaDescriptor = {
   type: "messageDelta" | "activityDelta";
   id: string;
   delta: string;
-  normalized: TranscriptPayloadRecord;
-  nested: boolean;
-  firstSequence: number;
+  firstSequence: bigint;
   eventCount: number;
-};
-
-const payloadRecord = (value: unknown): TranscriptPayloadRecord | null =>
-  value && typeof value === "object" && !Array.isArray(value)
-    ? (value as TranscriptPayloadRecord)
-    : null;
-
-const normalizedPayload = (payload: unknown) => {
-  const envelope = payloadRecord(payload);
-  if (!envelope) return null;
-  const nested = envelope.type === "event";
-  const normalized = nested ? payloadRecord(envelope.event) : envelope;
-  return normalized ? { envelope, normalized, nested } : null;
-};
-
-const compactionRecord = (payload: TranscriptPayloadRecord) => {
-  const value = payloadRecord(payload.archiveCompaction);
-  return value?.kind === "delta" &&
-      Number.isSafeInteger(value.firstSequence) &&
-      Number.isSafeInteger(value.eventCount)
-    ? {
-        firstSequence: value.firstSequence as number,
-        eventCount: value.eventCount as number,
-      }
-    : null;
 };
 
 const deltaDescriptor = (
   event: TranscriptBatchEvent,
 ): DeltaDescriptor | null => {
-  const payload = normalizedPayload(event.payload);
-  if (!payload) return null;
-  const type = payload.normalized.type;
-  if (type !== "messageDelta" && type !== "activityDelta") return null;
+  const normalized = event.normalized?.event;
   if (
-    typeof payload.normalized.id !== "string" ||
-    typeof payload.normalized.delta !== "string"
+    normalized?.case !== "messageDelta" &&
+    normalized?.case !== "activityDelta"
   ) {
     return null;
   }
-  const compacted = compactionRecord(payload.envelope);
   return {
-    type,
-    id: payload.normalized.id,
-    delta: payload.normalized.delta,
-    normalized: payload.normalized,
-    nested: payload.nested,
-    firstSequence: compacted?.firstSequence ?? event.sequence,
-    eventCount: compacted?.eventCount ?? 1,
+    type: normalized.case,
+    id: normalized.value.id,
+    delta: normalized.value.delta,
+    firstSequence: event.archiveCompaction?.firstSequence ?? event.sequence,
+    eventCount: event.archiveCompaction?.representedEventCount ?? 1,
   };
 };
 
@@ -92,55 +66,54 @@ const compactedDeltaEvent = (
   descriptor: DeltaDescriptor,
   input: {
     delta: string;
-    firstSequence: number;
+    firstSequence: bigint;
     eventCount: number;
   },
-): TranscriptBatchEvent => {
-  const envelope = payloadRecord(event.payload)!;
-  const normalized = { ...descriptor.normalized, delta: input.delta };
-  const archiveCompaction = {
-    kind: "delta",
-    firstSequence: input.firstSequence,
-    eventCount: input.eventCount,
-  } as const;
-  return {
-    ...event,
-    payload: descriptor.nested
-      ? {
-          type: "event",
-          ...(envelope.direction === "client" ? { direction: "client" } : {}),
-          event: normalized,
-          archiveCompaction,
-        }
-      : { ...normalized, archiveCompaction },
-  };
-};
+): TranscriptBatchEvent =>
+  create(AgentTranscriptEventSchema, {
+    sequence: event.sequence,
+    direction: event.direction,
+    normalized: create(NormalizedAgentEventSchema, {
+      event: descriptor.type === "messageDelta"
+        ? {
+            case: "messageDelta",
+            value: { id: descriptor.id, delta: input.delta },
+          }
+        : {
+            case: "activityDelta",
+            value: { id: descriptor.id, delta: input.delta },
+          },
+    }),
+    archiveCompaction: {
+      firstSequence: input.firstSequence,
+      representedEventCount: input.eventCount,
+    },
+  });
 
 const snapshotDescriptor = (event: TranscriptBatchEvent) => {
-  const payload = normalizedPayload(event.payload);
-  if (!payload) return null;
-  const type = payload.normalized.type;
+  const normalized = event.normalized?.event;
   if (
-    type !== "messageStarted" && type !== "messageCompleted" &&
-    type !== "activityStarted" && type !== "activityCompleted"
+    normalized?.case !== "messageStarted" &&
+    normalized?.case !== "messageCompleted" &&
+    normalized?.case !== "activityStarted" &&
+    normalized?.case !== "activityCompleted"
   ) {
     return null;
   }
+  const text = normalized.value.text;
   if (
-    typeof payload.normalized.id !== "string" ||
-    typeof payload.normalized.text !== "string" ||
-    !payload.normalized.text ||
-    payload.normalized.text.includes("… truncated …") ||
-    payload.normalized.text.includes("… output truncated …")
+    !text ||
+    text.includes("… truncated …") ||
+    text.includes("… output truncated …")
   ) {
     return null;
   }
   return {
-    deltaType: type.startsWith("message")
+    deltaType: normalized.case.startsWith("message")
       ? "messageDelta" as const
       : "activityDelta" as const,
-    id: payload.normalized.id,
-    text: payload.normalized.text,
+    id: normalized.value.id,
+    text,
   };
 };
 
@@ -196,7 +169,7 @@ export function compactTranscriptBatch(
     eventCount: previousDescriptor.eventCount + descriptor.eventCount,
   });
   if (
-    Buffer.byteLength(JSON.stringify(merged.payload), "utf8") >
+    toBinary(AgentTranscriptEventSchema, merged).byteLength >
       TRANSCRIPT_COMPACTED_DELTA_MAX_BYTES
   ) {
     return [...events, compacted];
@@ -204,14 +177,14 @@ export function compactTranscriptBatch(
   return [...events.slice(0, -1), merged];
 }
 
-const immediatePayloadTypes = new Set([
+const immediateSidecarPayloads = new Set([
   "approval",
   "blocked",
   "error",
   "result",
 ]);
 
-const immediateNormalizedEventTypes = new Set([
+const immediateNormalizedEvents = new Set([
   "activityCompleted",
   "activityStarted",
   "conversationStarted",
@@ -224,24 +197,15 @@ const immediateNormalizedEventTypes = new Set([
 export function transcriptEventRequiresImmediateFlush(
   event: TranscriptBatchEvent,
 ) {
-  if (!event.payload || typeof event.payload !== "object") return false;
-  const payload = event.payload as Record<string, unknown>;
-  if (
-    typeof payload.type === "string" &&
-    immediatePayloadTypes.has(payload.type)
-  ) {
+  const normalizedCase = event.normalized?.event.case;
+  if (normalizedCase && immediateNormalizedEvents.has(normalizedCase)) {
     return true;
   }
-  if (
-    payload.type !== "event" ||
-    !payload.event ||
-    typeof payload.event !== "object"
-  ) {
-    return false;
-  }
-  const normalizedType = (payload.event as Record<string, unknown>).type;
-  return typeof normalizedType === "string" &&
-    immediateNormalizedEventTypes.has(normalizedType);
+  const raw = event.rawPayload;
+  if (raw?.kind.case !== "structValue") return false;
+  return Object.keys(raw.kind.value.fields).some((key) =>
+    immediateSidecarPayloads.has(key)
+  );
 }
 
 /**
@@ -334,7 +298,11 @@ export class TranscriptBatcher {
 
   private measureBytes(events: TranscriptBatchEvent[]) {
     return this.options.measureBytes?.(events) ??
-      Buffer.byteLength(JSON.stringify(events), "utf8");
+      events.reduce(
+        (total, event) =>
+          total + toBinary(AgentTranscriptEventSchema, event).byteLength,
+        0,
+      );
   }
 
   private async deliver(batch: TranscriptBatchEvent[]): Promise<void> {

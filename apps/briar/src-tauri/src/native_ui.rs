@@ -1,4 +1,6 @@
 use super::*;
+#[cfg(all(desktop, not(target_os = "macos")))]
+use tauri_specta::Event as _;
 
 #[cfg(any(target_os = "macos", test))]
 pub(super) fn launch_intro_bounds(
@@ -56,6 +58,7 @@ pub(super) fn main_window_state_flags() -> tauri_plugin_window_state::StateFlags
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) fn show_inbox_notification(
     app: tauri::AppHandle,
     title: String,
@@ -123,7 +126,7 @@ pub(super) fn show_inbox_notification(
                         let _ = main.unminimize();
                         let _ = main.set_focus();
                     }
-                    let _ = app.emit(INBOX_NOTIFICATION_OPEN_EVENT, target);
+                    let _ = target.emit(&app);
                 })
             {
                 eprintln!("Inbox notification response failed: {error}");
@@ -139,6 +142,7 @@ pub(super) fn show_inbox_notification(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn request_inbox_notification_permission() -> Result<bool, String> {
     #[cfg(target_os = "macos")]
     {
@@ -149,16 +153,19 @@ pub(super) async fn request_inbox_notification_permission() -> Result<bool, Stri
 }
 
 #[tauri::command]
-pub(super) async fn inbox_notification_permission_status() -> Result<String, String> {
+#[specta::specta]
+pub(super) async fn inbox_notification_permission_status(
+) -> Result<InboxNotificationPermissionStatus, String> {
     #[cfg(target_os = "macos")]
     {
         macos_inbox_notifications::permission_status().await
     }
     #[cfg(not(target_os = "macos"))]
-    Ok("unsupported".to_string())
+    Ok(InboxNotificationPermissionStatus::Unsupported)
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) fn open_inbox_notification_settings(app: tauri::AppHandle) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
@@ -177,6 +184,7 @@ pub(super) fn open_inbox_notification_settings(app: tauri::AppHandle) -> Result<
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) fn drain_pending_inbox_notification_opens(
     state: tauri::State<'_, PendingInboxNotificationOpens>,
 ) -> Vec<InboxNotificationTarget> {
@@ -184,6 +192,7 @@ pub(super) fn drain_pending_inbox_notification_opens(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) fn set_main_window_onboarding_mode(
     app: tauri::AppHandle,
     compact: bool,
@@ -225,6 +234,7 @@ pub(super) fn display_main_window(app: &AppHandle, focus: bool) -> Result<(), St
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) fn show_main_window(app: tauri::AppHandle) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
@@ -238,13 +248,14 @@ pub(super) fn show_main_window(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) fn sync_status_tray(
     app: tauri::AppHandle,
-    snapshot: StatusTraySnapshotCommand,
+    snapshot: StatusTraySnapshot,
 ) -> Result<(), String> {
     #[cfg(all(desktop, target_os = "macos"))]
     {
-        status_tray::sync_snapshot(&app, snapshot.into())
+        status_tray::sync_snapshot(&app, snapshot)
     }
     #[cfg(not(all(desktop, target_os = "macos")))]
     {
@@ -253,61 +264,50 @@ pub(super) fn sync_status_tray(
     }
 }
 
-/// Command payload shared with the frontend; converted to the tray module type
-/// only on macOS desktop where the tray is installed.
-#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+/// Canonical status tray snapshot shared by the frontend command and the
+/// macOS renderer.
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize, specta::Type, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub(super) struct StatusTraySnapshotCommand {
+pub(super) struct StatusTraySnapshot {
     pub(super) running_label: String,
     pub(super) empty_label: String,
     pub(super) open_label: String,
     pub(super) quit_label: String,
-    #[serde(default = "default_status_tray_more_label")]
     pub(super) more_label: String,
-    #[serde(default)]
-    pub(super) items: Vec<StatusTrayRunItemCommand>,
+    pub(super) items: Vec<StatusTrayRunItem>,
 }
 
-pub(super) fn default_status_tray_more_label() -> String {
+fn default_status_tray_more_label() -> String {
     "+{count} more in Briar".to_string()
 }
 
-#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct StatusTrayRunItemCommand {
-    pub(super) project_id: String,
-    pub(super) run_id: String,
-    pub(super) title: String,
-    pub(super) status_label: String,
-    #[serde(default)]
-    pub(super) project_name: String,
-}
-
-#[cfg(all(desktop, target_os = "macos"))]
-impl From<StatusTraySnapshotCommand> for status_tray::StatusTraySnapshot {
-    fn from(value: StatusTraySnapshotCommand) -> Self {
+impl Default for StatusTraySnapshot {
+    fn default() -> Self {
         Self {
-            running_label: value.running_label,
-            empty_label: value.empty_label,
-            open_label: value.open_label,
-            quit_label: value.quit_label,
-            more_label: value.more_label,
-            items: value
-                .items
-                .into_iter()
-                .map(|item| status_tray::StatusTrayRunItem {
-                    project_id: item.project_id,
-                    run_id: item.run_id,
-                    title: item.title,
-                    status_label: item.status_label,
-                    project_name: item.project_name,
-                })
-                .collect(),
+            running_label: "Running".to_string(),
+            empty_label: "No running issues".to_string(),
+            open_label: "Open Briar".to_string(),
+            quit_label: "Quit Briar".to_string(),
+            more_label: default_status_tray_more_label(),
+            items: Vec::new(),
         }
     }
 }
 
+#[derive(
+    Clone, Debug, Default, serde::Deserialize, serde::Serialize, specta::Type, PartialEq, Eq,
+)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct StatusTrayRunItem {
+    pub(super) project_id: String,
+    pub(super) run_id: String,
+    pub(super) title: String,
+    pub(super) status_label: String,
+    pub(super) project_name: String,
+}
+
 #[tauri::command]
+#[specta::specta]
 pub(super) fn reveal_main_window(app: tauri::AppHandle) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
@@ -321,6 +321,7 @@ pub(super) fn reveal_main_window(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) fn finish_launch_intro(app: tauri::AppHandle) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
@@ -337,6 +338,7 @@ pub(super) fn finish_launch_intro(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) fn prepare_launch_intro(app: tauri::AppHandle) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
@@ -432,11 +434,6 @@ pub(super) const APP_SETTINGS_MENU_ID: &str = "app:settings";
 #[cfg(target_os = "macos")]
 pub(super) const APP_UPDATE_MENU_ID: &str = "app:update";
 #[cfg(target_os = "macos")]
-pub(super) const APP_SETTINGS_MENU_EVENT: &str = "app-menu-settings";
-#[cfg(target_os = "macos")]
-pub(super) const APP_UPDATE_MENU_EVENT: &str = "app-menu-update";
-
-#[cfg(target_os = "macos")]
 pub(super) fn app_update_menu_label(update_available: bool) -> &'static str {
     if update_available {
         "Update Briar…"
@@ -446,6 +443,7 @@ pub(super) fn app_update_menu_label(update_available: bool) -> &'static str {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) fn sync_app_update_menu(
     app: tauri::AppHandle,
     update_available: bool,
@@ -690,6 +688,7 @@ pub(crate) fn request_exit_confirmation(app: &AppHandle) {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) fn arm_macos_password_editor(webview: tauri::Webview) {
     #[cfg(target_os = "macos")]
     if webview.window().label() == "main" {

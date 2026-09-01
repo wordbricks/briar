@@ -18,8 +18,15 @@ const selectedChannel: ChannelSummary = {
   archivedAt: null,
   memberCount: 0,
   agentCount: 0,
+  kind: "channel",
+  createdByUserId: null,
   createdAt: "2026-08-01T00:00:00.000Z",
   updatedAt: "2026-08-01T00:00:00.000Z",
+  lastMessageAt: null,
+  lastMessagePreview: null,
+  lastReadAt: null,
+  hasUnread: false,
+  dmParticipants: [],
 };
 
 const secondChannel: ChannelSummary = {
@@ -41,16 +48,117 @@ const virtualMessage = (channelId: string, index: number): ChannelMessage => ({
     image: null,
   },
   body: `메시지 ${index}`,
+  blocks: [],
   mentionedUserIds: [],
   mentionedAgentIds: [],
   attachments: [],
   reactions: [],
   replyCount: 0,
   lastReplyAt: null,
+  replyAuthors: [],
+  subscribers: [],
   document: null,
   proposal: null,
   executionProposal: null,
+  skillExecutionProposal: null,
   createdAt: `2026-08-01T00:${String(index).padStart(2, "0")}:00.000Z`,
+});
+
+const channelSummaryWire = (channel: ChannelSummary) => ({
+  id: channel.id,
+  organizationId: channel.organizationId,
+  slug: channel.slug,
+  name: channel.name,
+  topic: channel.topic ?? undefined,
+  visibility: 1,
+  defaultProjectId: channel.defaultProjectId ?? undefined,
+  memberCount: channel.memberCount,
+  agentCount: channel.agentCount,
+  createdAt: channel.createdAt,
+  updatedAt: channel.updatedAt,
+  kind: 1,
+  hasUnread: channel.hasUnread,
+  directMessageParticipants: channel.dmParticipants.map((participant) => ({
+    kind: participant.type === "user" ? 1 : 2,
+    id: participant.id,
+    name: participant.name,
+    image: participant.image ?? undefined,
+  })),
+});
+
+const channelMessageAuthorWire = (author: ChannelMessage["author"]) => {
+  switch (author.type) {
+    case "user":
+      return {
+        user: {
+          id: author.id,
+          name: author.name,
+          email: author.email,
+          image: author.image ?? undefined,
+        },
+      };
+    case "agent":
+      return {
+        agent: {
+          id: author.id ?? undefined,
+          name: author.name,
+          image: author.image ?? undefined,
+        },
+      };
+    case "webhook":
+      return {
+        webhook: {
+          id: author.id ?? undefined,
+          name: author.name,
+        },
+      };
+  }
+};
+
+const channelMessageWire = (message: ChannelMessage) => ({
+  id: message.id,
+  channelId: message.channelId,
+  parentMessageId: message.parentMessageId ?? undefined,
+  body: message.body,
+  blocks: [],
+  author: channelMessageAuthorWire(message.author),
+  mentionedUserIds: message.mentionedUserIds,
+  mentionedAgentIds: message.mentionedAgentIds,
+  attachments: [],
+  reactions: [],
+  replyCount: message.replyCount,
+  lastReplyAt: message.lastReplyAt ?? undefined,
+  replyAuthors: [],
+  subscribers: [],
+  createdAt: message.createdAt,
+});
+
+const jsonResponse = (body: unknown) => new Response(JSON.stringify(body), {
+  headers: { "Content-Type": "application/json" },
+});
+
+const requestUrl = (input: RequestInfo | URL) =>
+  input instanceof Request ? input.url : String(input);
+
+const requestBodyText = async (
+  input: RequestInfo | URL,
+  init?: RequestInit,
+) => input instanceof Request
+  ? input.clone().text()
+  : typeof init?.body === "string"
+  ? init.body
+  : init?.body
+  ? new Response(init.body).text()
+  : "";
+
+const createChannelFetch = (
+  resolve: (method: string, body: string) => unknown,
+) => vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+  const match = requestUrl(input).match(
+    /\/briar\.app\.v1\.ChannelService\/([A-Za-z]+)$/u,
+  );
+  if (!match) return jsonResponse({ url: "ws://realtime.test/socket" });
+  return jsonResponse(await resolve(match[1], await requestBodyText(input, init)));
 });
 
 describe("Channels", () => {
@@ -68,21 +176,15 @@ describe("Channels", () => {
         disconnect() {}
       },
       WebSocket: FakeWebSocket,
-      fetch: vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
-        const body = init?.method === "POST"
-          ? { url: "ws://realtime.test/socket" }
-          : {
-              channel: selectedChannel,
-              members: [],
-              agents: [],
-              messages: [],
-              agentReplies: [],
-              nextCursor: null,
-            };
-        return new Response(JSON.stringify(body), {
-          headers: { "Content-Type": "application/json" },
-        });
-      }),
+      fetch: createChannelFetch((method) => method === "GetChannel"
+        ? {
+            channel: channelSummaryWire(selectedChannel),
+            members: [],
+            agents: [],
+            messages: [],
+            agentReplies: [],
+          }
+        : {}),
     });
     window.localStorage.setItem("briar.locale.v1", "en");
   });
@@ -133,35 +235,24 @@ describe("Channels", () => {
       virtualMessage(selectedChannel.id, index + 20));
     const earlierMessages = Array.from({ length: 20 }, (_, index) =>
       virtualMessage(selectedChannel.id, index));
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      if (init?.method === "POST") {
-        return new Response(JSON.stringify({
-          url: "ws://realtime.test/socket",
-        }), {
-          headers: { "Content-Type": "application/json" },
-        });
+    const listMessageBodies: string[] = [];
+    vi.stubGlobal("fetch", createChannelFetch((method, body) => {
+      if (method === "ListChannelMessages") {
+        listMessageBodies.push(body);
+        return { messages: earlierMessages.map(channelMessageWire) };
       }
-      if (url.includes("/messages?")) {
-        return new Response(JSON.stringify({
-          messages: earlierMessages,
-          nextCursor: null,
-        }), {
-          headers: { "Content-Type": "application/json" },
-        });
+      if (method === "GetChannel") {
+        return {
+          channel: channelSummaryWire(selectedChannel),
+          members: [],
+          agents: [],
+          messages: initialMessages.map(channelMessageWire),
+          agentReplies: [],
+          nextCursor: "older-cursor",
+        };
       }
-      return new Response(JSON.stringify({
-        channel: selectedChannel,
-        members: [],
-        agents: [],
-        messages: initialMessages,
-        agentReplies: [],
-        nextCursor: "older-cursor",
-      }), {
-        headers: { "Content-Type": "application/json" },
-      });
-    });
-    vi.stubGlobal("fetch", fetchMock);
+      return {};
+    }));
     const requestAnimationFrame = vi
       .spyOn(window, "requestAnimationFrame")
       .mockImplementation((callback) => {
@@ -211,8 +302,8 @@ describe("Channels", () => {
       await Promise.resolve();
     });
 
-    expect(fetchMock.mock.calls.some(([input]) =>
-      String(input).includes("cursor=older-cursor"))).toBe(true);
+    expect(listMessageBodies.some((body) =>
+      body.includes('"cursor":"older-cursor"'))).toBe(true);
     expect(container.textContent).toContain("메시지 0");
     expect(container.textContent).toContain("메시지 39");
 
@@ -233,48 +324,31 @@ describe("Channels", () => {
         image: null,
       },
       body: "Inbox에서 연 채널 메시지",
+      blocks: [],
       mentionedUserIds: [],
       mentionedAgentIds: [],
       attachments: [],
       reactions: [],
       replyCount: 0,
       lastReplyAt: null,
+      replyAuthors: [],
+      subscribers: [],
       document: null,
       proposal: null,
       executionProposal: null,
+      skillExecutionProposal: null,
       createdAt: "2026-08-15T00:00:00.000Z",
     };
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-        const url = String(input);
-        if (init?.method === "POST") {
-          return new Response(JSON.stringify({
-            url: "ws://realtime.test/socket",
-          }), {
-            headers: { "Content-Type": "application/json" },
-          });
-        }
-        if (url.endsWith("/organizations/org-1/channels")) {
-          return new Response(JSON.stringify({
-            channels: [selectedChannel],
-            cursor: 1,
-          }), {
-            headers: { "Content-Type": "application/json" },
-          });
-        }
-        return new Response(JSON.stringify({
-          channel: selectedChannel,
-          members: [],
-          agents: [],
-          messages: [message],
-          agentReplies: [],
-          nextCursor: null,
-        }), {
-          headers: { "Content-Type": "application/json" },
-        });
-      }),
-    );
+    vi.stubGlobal("fetch", createChannelFetch((method) =>
+      method === "GetChannel"
+        ? {
+            channel: channelSummaryWire(selectedChannel),
+            members: [],
+            agents: [],
+            messages: [channelMessageWire(message)],
+            agentReplies: [],
+          }
+        : {}));
     const requestAnimationFrame = vi
       .spyOn(window, "requestAnimationFrame")
       .mockImplementation((callback) => {
@@ -335,15 +409,19 @@ describe("Channels", () => {
         image: null,
       },
       body: "스레드 원본",
+      blocks: [],
       mentionedUserIds: [],
       mentionedAgentIds: [],
       attachments: [],
       reactions: [],
       replyCount: 1,
       lastReplyAt: "2026-08-15T00:01:00.000Z",
+      replyAuthors: [],
+      subscribers: [],
       document: null,
       proposal: null,
       executionProposal: null,
+      skillExecutionProposal: null,
       createdAt: "2026-08-15T00:00:00.000Z",
     };
     const replyMessage: ChannelMessage = {
@@ -355,38 +433,25 @@ describe("Channels", () => {
       lastReplyAt: null,
       createdAt: "2026-08-15T00:01:00.000Z",
     };
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-        const url = String(input);
-        if (init?.method === "POST") {
-          return new Response(JSON.stringify({
-            url: "ws://realtime.test/socket",
-          }), {
-            headers: { "Content-Type": "application/json" },
-          });
-        }
-        if (url.endsWith("/organizations/org-1/channels")) {
-          return new Response(JSON.stringify({
-            channels: [selectedChannel],
-            cursor: 1,
-          }), {
-            headers: { "Content-Type": "application/json" },
-          });
-        }
-        const isThreadRequest = url.includes("/messages?parentMessageId=");
-        return new Response(JSON.stringify({
-          channel: selectedChannel,
+    vi.stubGlobal("fetch", createChannelFetch((method, body) => {
+      if (method === "ListChannelMessages") {
+        return {
+          messages: body.includes(rootMessage.id)
+            ? [rootMessage, replyMessage].map(channelMessageWire)
+            : [],
+        };
+      }
+      if (method === "GetChannel") {
+        return {
+          channel: channelSummaryWire(selectedChannel),
           members: [],
           agents: [],
-          messages: isThreadRequest ? [rootMessage, replyMessage] : [],
+          messages: [],
           agentReplies: [],
-          nextCursor: null,
-        }), {
-          headers: { "Content-Type": "application/json" },
-        });
-      }),
-    );
+        };
+      }
+      return {};
+    }));
     const requestAnimationFrame = vi
       .spyOn(window, "requestAnimationFrame")
       .mockImplementation((callback) => {
@@ -461,32 +526,20 @@ describe("Channels", () => {
       }
     }
     Object.assign(globalThis, { ResizeObserver: TrackingResizeObserver });
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-        if (init?.method === "POST") {
-          return new Response(JSON.stringify({
-            url: "ws://realtime.test/socket",
-          }), {
-            headers: { "Content-Type": "application/json" },
-          });
-        }
-        const channel = String(input).includes(`/channels/${secondChannel.id}`)
-          ? secondChannel
-          : selectedChannel;
-        return new Response(JSON.stringify({
-          channel,
-          members: [],
-          agents: [],
-          messages: Array.from({ length: 45 }, (_, index) =>
-            virtualMessage(channel.id, index)),
-          agentReplies: [],
-          nextCursor: null,
-        }), {
-          headers: { "Content-Type": "application/json" },
-        });
-      }),
-    );
+    vi.stubGlobal("fetch", createChannelFetch((method, body) => {
+      if (method !== "GetChannel") return {};
+      const channel = body.includes(secondChannel.id)
+        ? secondChannel
+        : selectedChannel;
+      return {
+        channel: channelSummaryWire(channel),
+        members: [],
+        agents: [],
+        messages: Array.from({ length: 45 }, (_, index) =>
+          channelMessageWire(virtualMessage(channel.id, index))),
+        agentReplies: [],
+      };
+    }));
     const view = createReactTestRoot({ attachToDocument: true });
     const render = (activeChannelId: string) => (
       <I18nProvider>

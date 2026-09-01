@@ -1,3 +1,4 @@
+import BriarContracts
 import Foundation
 import SwiftUI
 
@@ -8,11 +9,9 @@ struct OrganizationSummary: Identifiable, Equatable, Sendable {
 
 @MainActor
 final class CompanionStore: ObservableObject {
-    @Published private(set) var user: CurrentUserResponse.User?
+    @Published private(set) var user: CurrentUser?
     @Published private(set) var organizations: [OrganizationSummary] = []
-    @Published private(set) var projects: [ProjectsResponse.Project] = []
-    @Published private(set) var workspaces: [WorkspacesResponse.Workspace] = []
-    @Published private(set) var teams: [WorkspaceTeamsResponse.Team] = []
+    @Published private(set) var projects: [Project] = []
     @Published private(set) var planningProjects: [PlanningProject] = []
     @Published var selectedProjectID: UUID? {
         didSet {
@@ -23,14 +22,12 @@ final class CompanionStore: ObservableObject {
         }
     }
     @Published var selectedPlanningProjectID: UUID? {
-        didSet {
-            persistSelectedPlanningProjectID()
-        }
+        didSet { persistSelectedPlanningProjectID() }
     }
     @Published private(set) var loading = false
     @Published private(set) var errorMessage: String?
 
-    private let api: any MobileAPIClientProtocol
+    private let servicesFactory: any AuthenticatedMobileServicesFactory
     private let defaults: UserDefaults
     private var activeToken: String?
     private var sessionGeneration = 0
@@ -45,8 +42,11 @@ final class CompanionStore: ObservableObject {
         "companion.selectedPlanningProjectID.\(userID)"
     }
 
-    init(api: any MobileAPIClientProtocol, defaults: UserDefaults = .standard) {
-        self.api = api
+    init(
+        servicesFactory: any AuthenticatedMobileServicesFactory,
+        defaults: UserDefaults = .standard
+    ) {
+        self.servicesFactory = servicesFactory
         self.defaults = defaults
     }
 
@@ -67,44 +67,40 @@ final class CompanionStore: ObservableObject {
             }
         }
         do {
-            async let userResponse: CurrentUserResponse = api.send(
-                MobileAPIContract.Endpoint.currentUser,
-                method: "GET",
-                token: token,
-                body: nil,
-                as: CurrentUserResponse.self
+            let services = servicesFactory.authenticatedServices(token: token)
+            let account = services.account
+            let project = services.project
+            async let userResponse = account.getCurrentUser(
+                request: BriarAPI_GetCurrentUserRequest(),
+                headers: [:]
             )
-            async let projectResponse: ProjectsResponse = api.send(
-                MobileAPIContract.Endpoint.projects,
-                method: "GET",
-                token: token,
-                body: nil,
-                as: ProjectsResponse.self
+            async let projectResponse = project.listProjects(
+                request: BriarAPI_ListProjectsRequest(),
+                headers: [:]
             )
-            let (loadedUser, loadedProjects) = try await (userResponse, projectResponse)
+            let (accountResponse, loadedProjects) = await (userResponse, projectResponse)
+            let loadedUser = try CurrentUser(connectMessage: accountResponse.briarValue())
+            let projects = try loadedProjects.briarValue().projects.map(Project.init(connectMessage:))
             guard
                 activeToken == token,
                 expectedGeneration == sessionGeneration,
                 expectedLoadRevision == loadRevision
             else { throw CancellationError() }
-            user = loadedUser.user
+            user = loadedUser
             if expectedCatalogRevision == projectCatalogRevision {
-                applyProjectCatalog(loadedProjects.projects)
+                applyProjectCatalog(projects)
+                try await loadPlanningProjects(using: project)
             }
             let currentProjects = expectedCatalogRevision == projectCatalogRevision
-                ? loadedProjects.projects
+                ? projects
                 : projects
             let storedProjectID = Self.storedProjectID(
-                for: loadedUser.user.id,
+                for: loadedUser.id,
                 in: currentProjects,
                 defaults: defaults
             )
             selectedProjectID = storedProjectID ?? Self.defaultProjectID(for: currentProjects)
-            if loadedProjects.projects.contains(where: {
-                $0.workspaceId != nil || $0.teamId != nil
-            }) {
-                try? await loadHierarchy(token: token)
-            }
+            restorePlanningProjectSelection()
             errorMessage = nil
         } catch {
             if activeToken == token,
@@ -129,19 +125,19 @@ final class CompanionStore: ObservableObject {
         projectCatalogRevision &+= 1
         let expectedCatalogRevision = projectCatalogRevision
         do {
-            let response: ProjectsResponse = try await api.send(
-                MobileAPIContract.Endpoint.projects,
-                method: "GET",
-                token: token,
-                body: nil,
-                as: ProjectsResponse.self
+            let project = servicesFactory.authenticatedServices(token: token).project
+            let response = await project.listProjects(
+                request: BriarAPI_ListProjectsRequest(),
+                headers: [:]
             )
+            let projects = try response.briarValue().projects.map(Project.init(connectMessage:))
             guard
                 activeToken == token,
                 expectedGeneration == sessionGeneration,
                 expectedCatalogRevision == projectCatalogRevision
             else { throw CancellationError() }
-            applyProjectCatalog(response.projects)
+            applyProjectCatalog(projects)
+            try await loadPlanningProjects(using: project)
             if let selectedProjectID,
                !projects.contains(where: { $0.id == selectedProjectID }) {
                 self.selectedProjectID = Self.defaultProjectID(for: projects)
@@ -167,8 +163,6 @@ final class CompanionStore: ObservableObject {
         user = nil
         organizations = []
         projects = []
-        workspaces = []
-        teams = []
         planningProjects = []
         selectedProjectID = nil
         selectedPlanningProjectID = nil
@@ -176,7 +170,7 @@ final class CompanionStore: ObservableObject {
         errorMessage = nil
     }
 
-    private func applyProjectCatalog(_ nextProjects: [ProjectsResponse.Project]) {
+    private func applyProjectCatalog(_ nextProjects: [Project]) {
         projects = nextProjects
         organizations = Dictionary(
             grouping: nextProjects,
@@ -188,7 +182,7 @@ final class CompanionStore: ObservableObject {
 
     private static func storedProjectID(
         for userID: String,
-        in projects: [ProjectsResponse.Project],
+        in projects: [Project],
         defaults: UserDefaults
     ) -> UUID? {
         guard let raw = defaults.string(forKey: selectedProjectKey(for: userID)),
@@ -199,7 +193,7 @@ final class CompanionStore: ObservableObject {
         return stored
     }
 
-    static func defaultProjectID(for projects: [ProjectsResponse.Project]) -> UUID? {
+    static func defaultProjectID(for projects: [Project]) -> UUID? {
         // The API returns projects grouped by organization; the first project is
         // the first project of the first organization, matching the web client.
         projects.first?.id
@@ -226,65 +220,47 @@ final class CompanionStore: ObservableObject {
         status: PlanningProjectStatus = .planned
     ) async throws -> PlanningProject {
         guard let token = activeToken else { throw CancellationError() }
-        let response: PlanningProjectResponse = try await api.send(
-            MobileAPIContract.Endpoint.teamProjects(teamID: teamID),
-            method: "POST",
-            token: token,
-            body: PlanningProjectCreateRequest(
-                name: name,
-                description: description,
-                status: status
-            ),
-            as: PlanningProjectResponse.self
-        )
-        planningProjects.append(response.project)
-        planningProjects.sort {
-            $0.teamId.uuidString == $1.teamId.uuidString
-                ? ($0.sortOrder, $0.name) < ($1.sortOrder, $1.name)
-                : $0.teamId.uuidString < $1.teamId.uuidString
-        }
-        selectPlanningProject(response.project.id)
-        return response.project
+        var request = BriarAPI_CreatePlanningProjectRequest()
+        request.teamID = coreUUIDString(teamID)
+        request.name = name
+        if let description { request.description_p = description }
+        request.status = planningProjectStatusMessage(status)
+        let response = await servicesFactory.authenticatedServices(token: token).project
+            .createPlanningProject(request: request, headers: [:])
+        let message = try response.briarValue()
+        guard message.hasProject else { throw MobileAPIError.invalidResponse }
+        let project = try PlanningProject(connectMessage: message.project)
+        planningProjects.append(project)
+        sortPlanningProjects()
+        selectPlanningProject(project.id)
+        return project
     }
 
-    private func loadHierarchy(token: String) async throws {
-        let workspaceResponse: WorkspacesResponse = try await api.send(
-            MobileAPIContract.Endpoint.workspaces,
-            method: "GET",
-            token: token,
-            body: nil,
-            as: WorkspacesResponse.self
-        )
-        var loadedTeams: [WorkspaceTeamsResponse.Team] = []
-        var loadedPlanningProjects: [PlanningProject] = []
-        for workspace in workspaceResponse.workspaces {
-            let teamResponse: WorkspaceTeamsResponse = try await api.send(
-                MobileAPIContract.Endpoint.workspaceTeams(workspaceID: workspace.id),
-                method: "GET",
-                token: token,
-                body: nil,
-                as: WorkspaceTeamsResponse.self
+    private func loadPlanningProjects(
+        using service: any BriarAPI_ProjectServiceClientInterface
+    ) async throws {
+        var loaded: [PlanningProject] = []
+        for team in projects {
+            var request = BriarAPI_ListTeamPlanningProjectsRequest()
+            request.teamID = coreUUIDString(team.id)
+            let response = await service.listTeamPlanningProjects(
+                request: request,
+                headers: [:]
             )
-            loadedTeams.append(contentsOf: teamResponse.teams)
-            for team in teamResponse.teams {
-                let projectResponse: TeamProjectsResponse = try await api.send(
-                    MobileAPIContract.Endpoint.teamProjects(teamID: team.id),
-                    method: "GET",
-                    token: token,
-                    body: nil,
-                    as: TeamProjectsResponse.self
-                )
-                loadedPlanningProjects.append(contentsOf: projectResponse.projects)
-            }
+            loaded.append(contentsOf: try response.briarValue().projects.map(
+                PlanningProject.init(connectMessage:)
+            ))
         }
-        workspaces = workspaceResponse.workspaces
-        teams = loadedTeams
-        planningProjects = loadedPlanningProjects.sorted {
-            $0.teamId.uuidString == $1.teamId.uuidString
+        planningProjects = loaded
+        sortPlanningProjects()
+    }
+
+    private func sortPlanningProjects() {
+        planningProjects.sort {
+            $0.teamId == $1.teamId
                 ? ($0.sortOrder, $0.name) < ($1.sortOrder, $1.name)
                 : $0.teamId.uuidString < $1.teamId.uuidString
         }
-        restorePlanningProjectSelection()
     }
 
     private func restorePlanningProjectSelection() {
@@ -306,11 +282,12 @@ final class CompanionStore: ObservableObject {
             selectedPlanningProjectID = nil
             return
         }
-        guard selectedPlanningProjectID.flatMap({ selectedID in
-            planningProjects.first(where: {
-                $0.id == selectedID && $0.teamId == teamID
-            })
-        }) == nil else { return }
+        if let selectedPlanningProjectID,
+           planningProjects.contains(where: {
+               $0.id == selectedPlanningProjectID && $0.teamId == teamID
+           }) {
+            return
+        }
         selectedPlanningProjectID = planningProjects.first(where: {
             $0.teamId == teamID && $0.isDefault
         })?.id ?? planningProjects.first(where: { $0.teamId == teamID })?.id
@@ -354,7 +331,8 @@ final class DashboardStore: ObservableObject {
     @Published private(set) var isRefreshing = false
     @Published private(set) var errorMessage: String?
 
-    private let api: any MobileAPIClientProtocol
+    private let dashboardServiceForToken:
+        @Sendable (String) -> any BriarAPI_DashboardServiceClientInterface
     private let pollInterval: Duration
     private var projectID: UUID?
     private var token: String?
@@ -364,8 +342,21 @@ final class DashboardStore: ObservableObject {
     private var refreshTaskForcesSnapshot = false
     private var pollingTask: Task<Void, Never>?
 
-    init(api: any MobileAPIClientProtocol, pollInterval: Duration = .seconds(15)) {
-        self.api = api
+    init(
+        servicesFactory: any AuthenticatedMobileServicesFactory,
+        pollInterval: Duration = .seconds(15)
+    ) {
+        dashboardServiceForToken = { token in
+            servicesFactory.authenticatedServices(token: token).dashboard
+        }
+        self.pollInterval = pollInterval
+    }
+
+    init(
+        dashboardService: any BriarAPI_DashboardServiceClientInterface,
+        pollInterval: Duration = .seconds(15)
+    ) {
+        dashboardServiceForToken = { _ in dashboardService }
         self.pollInterval = pollInterval
     }
 
@@ -407,12 +398,12 @@ final class DashboardStore: ObservableObject {
         refreshRevision &+= 1
         let expectedRefreshRevision = refreshRevision
         let current = snapshot
-        let task = Task { [api] in
+        let task = Task { [dashboardServiceForToken] in
             do {
+                let dashboard = dashboardServiceForToken(token)
                 let loaded = try await Self.load(
-                    api: api,
+                    dashboard: dashboard,
                     projectID: projectID,
-                    token: token,
                     current: current,
                     forceSnapshot: forceSnapshot
                 )
@@ -488,50 +479,43 @@ final class DashboardStore: ObservableObject {
     }
 
     private static func load(
-        api: any MobileAPIClientProtocol,
+        dashboard: any BriarAPI_DashboardServiceClientInterface,
         projectID: UUID,
-        token: String,
         current: DashboardSnapshot?,
         forceSnapshot: Bool
     ) async throws -> DashboardSnapshot {
         guard !forceSnapshot, var merged = current, var cursor = current?.cursor else {
-            return try await api.send(
-                MobileAPIContract.Endpoint.dashboard(projectID: projectID),
-                method: "GET",
-                token: token,
-                body: nil,
-                as: DashboardSnapshot.self
-            )
+            var request = BriarAPI_GetDashboardRequest()
+            request.projectID = coreUUIDString(projectID)
+            let response = await dashboard.getDashboard(request: request, headers: [:])
+            return try DashboardSnapshot(connectMessage: response.briarValue())
         }
         for _ in 0..<20 {
-            do {
-                let delta: DashboardDelta = try await api.send(
-                    MobileAPIContract.Endpoint.dashboardDelta(projectID: projectID, cursor: cursor),
-                    method: "GET",
-                    token: token,
-                    body: nil,
-                    as: DashboardDelta.self
+            guard let wireCursor = UInt64(exactly: cursor),
+                  wireCursor <= 9_007_199_254_740_991
+            else { throw MobileAPIError.invalidRequest }
+            var request = BriarAPI_SyncDashboardRequest()
+            request.projectID = coreUUIDString(projectID)
+            request.cursor = wireCursor
+            let response = await dashboard.syncDashboard(request: request, headers: [:])
+            let delta = try DashboardDelta(connectMessage: response.briarValue())
+            if delta.reset {
+                var replacementRequest = BriarAPI_GetDashboardRequest()
+                replacementRequest.projectID = coreUUIDString(projectID)
+                let replacement = await dashboard.getDashboard(
+                    request: replacementRequest,
+                    headers: [:]
                 )
-                merged = DashboardMerge.apply(delta, to: merged)
-                cursor = delta.cursor
-                if !delta.hasMore { return merged }
-            } catch let MobileAPIError.httpStatus(status, _) where status == 410 {
-                return try await api.send(
-                    MobileAPIContract.Endpoint.dashboard(projectID: projectID),
-                    method: "GET",
-                    token: token,
-                    body: nil,
-                    as: DashboardSnapshot.self
-                )
+                return try DashboardSnapshot(connectMessage: replacement.briarValue())
             }
+            merged = DashboardMerge.apply(delta, to: merged)
+            cursor = delta.cursor
+            if !delta.hasMore { return merged }
         }
-        return try await api.send(
-            MobileAPIContract.Endpoint.dashboard(projectID: projectID),
-            method: "GET",
-            token: token,
-            body: nil,
-            as: DashboardSnapshot.self
-        )
+        var request = BriarAPI_GetDashboardRequest()
+        request.projectID = coreUUIDString(projectID)
+        let response = await dashboard.getDashboard(request: request, headers: [:])
+        return try DashboardSnapshot(connectMessage: response.briarValue())
     }
 }
 
@@ -563,7 +547,9 @@ final class RunDetailStore: ObservableObject {
     @Published private(set) var loading = false
     @Published private(set) var errorMessage: String?
 
-    private let api: any MobileAPIClientProtocol
+    private let api: any AuthenticatedDownloadClientProtocol
+    private let dashboardService: any BriarAPI_DashboardServiceClientInterface
+    private let issueService: any BriarAPI_IssueServiceClientInterface
     private let realtime: (any MobileRealtimeClientProtocol)?
     private let projectID: UUID
     private let runID: UUID
@@ -584,13 +570,18 @@ final class RunDetailStore: ObservableObject {
     private static let maxConversationDeltaPagesPerSync = 20
 
     init(
-        api: any MobileAPIClientProtocol,
+        api: any AuthenticatedDownloadClientProtocol,
         projectID: UUID,
         runID: UUID,
-        token: String
+        token: String,
+        dashboardService: any BriarAPI_DashboardServiceClientInterface,
+        issueService: any BriarAPI_IssueServiceClientInterface,
+        realtime: (any MobileRealtimeClientProtocol)? = nil
     ) {
         self.api = api
-        self.realtime = api as? any MobileRealtimeClientProtocol
+        self.dashboardService = dashboardService
+        self.issueService = issueService
+        self.realtime = realtime
         self.projectID = projectID
         self.runID = runID
         self.token = token
@@ -611,34 +602,46 @@ final class RunDetailStore: ObservableObject {
         repeat {
             authoritativeReloadPending = false
             do {
-                async let eventResponse: RunEventsResponse = api.send(
-                    MobileAPIContract.Endpoint.runEvents(projectID: projectID, runID: runID),
-                    method: "GET",
-                    token: token,
-                    body: nil,
-                    as: RunEventsResponse.self
+                var eventRequest = BriarAPI_ListRunEventsRequest()
+                eventRequest.projectID = coreUUIDString(projectID)
+                eventRequest.runID = coreUUIDString(runID)
+                async let eventResponse = dashboardService.listRunEvents(
+                    request: eventRequest,
+                    headers: [:]
                 )
-                async let messageResponse: IssueMessagesResponse = api.send(
-                    MobileAPIContract.Endpoint.runMessages(projectID: projectID, runID: runID),
-                    method: "GET",
-                    token: token,
-                    body: nil,
-                    as: IssueMessagesResponse.self
+                var messageRequest = BriarAPI_ListIssueMessagesRequest()
+                messageRequest.projectID = coreUUIDString(projectID)
+                messageRequest.runID = coreUUIDString(runID)
+                async let messageResponse = issueService.listIssueMessages(
+                    request: messageRequest,
+                    headers: [:]
                 )
-                async let evidenceResponse: RunEvidenceResponse = api.send(
-                    MobileAPIContract.Endpoint.runEvidence(projectID: projectID, runID: runID),
-                    method: "GET",
-                    token: token,
-                    body: nil,
-                    as: RunEvidenceResponse.self
+                var evidenceRequest = BriarAPI_ListRunEvidenceRequest()
+                evidenceRequest.projectID = coreUUIDString(projectID)
+                evidenceRequest.runID = coreUUIDString(runID)
+                async let evidenceResponse = issueService.listRunEvidence(
+                    request: evidenceRequest,
+                    headers: [:]
                 )
-                let loaded = try await (eventResponse, messageResponse, evidenceResponse)
+                let loaded = await (eventResponse, messageResponse, evidenceResponse)
                 guard expectedLifecycleRevision == lifecycleRevision else { return }
-                events = loaded.0.events
-                let stabilizedMessages = preservingLocallyAcceptedSkillExecutionProposals(
-                    in: loaded.1.messages
+                events = try loaded.0.briarValue().events.map(RunEvent.init(connectMessage:))
+                let messageSnapshot = try IssueMessagesResponse(
+                    connectMessage: loaded.1.briarValue()
                 )
-                conversationCursor = loaded.1.cursor
+                let evidenceMessage = try loaded.2.briarValue()
+                guard try issueUUID(evidenceMessage.runID) == runID else {
+                    throw MobileAPIError.invalidResponse
+                }
+                _ = try issueSafeInt(evidenceMessage.attempt)
+                _ = try issueSafeInt(evidenceMessage.revision)
+                let evidenceSnapshot = try evidenceMessage.evidence.map(
+                    RunEvidence.init(connectMessage:)
+                )
+                let stabilizedMessages = preservingLocallyAcceptedSkillExecutionProposals(
+                    in: messageSnapshot.messages
+                )
+                conversationCursor = messageSnapshot.cursor
                 reconcileExecutionProposals(stabilizedMessages, authoritative: true)
                 let incomingIDs = Set(stabilizedMessages.map(\.id))
                 let pending = messages.filter {
@@ -650,8 +653,8 @@ final class RunDetailStore: ObservableObject {
                     if $0.createdAt != $1.createdAt { return $0.createdAt < $1.createdAt }
                     return $0.id.uuidString < $1.id.uuidString
                 }
-                agentReplies = loaded.1.agentReplies
-                evidence = loaded.2.evidence
+                agentReplies = messageSnapshot.agentReplies
+                evidence = evidenceSnapshot
                 errorMessage = nil
             } catch {
                 guard expectedLifecycleRevision == lifecycleRevision else { return }
@@ -708,20 +711,35 @@ final class RunDetailStore: ObservableObject {
                 guard expectedLifecycleRevision == lifecycleRevision,
                       let cursor = conversationCursor
                 else { return }
-                let delta: IssueMessagesDeltaResponse = try await api.send(
-                    MobileAPIContract.Endpoint.runMessagesDelta(
-                        projectID: projectID,
-                        runID: runID,
-                        cursor: cursor
-                    ),
-                    method: "GET",
-                    token: token,
-                    body: nil,
-                    as: IssueMessagesDeltaResponse.self
+                guard let wireCursor = UInt64(exactly: cursor),
+                      wireCursor <= 9_007_199_254_740_991
+                else { throw MobileAPIError.invalidRequest }
+                var request = BriarAPI_SyncIssueMessagesRequest()
+                request.projectID = coreUUIDString(projectID)
+                request.runID = coreUUIDString(runID)
+                request.cursor = wireCursor
+                let response = await issueService.syncIssueMessages(
+                    request: request,
+                    headers: [:]
+                )
+                let delta = try IssueMessagesDeltaResponse(
+                    connectMessage: response.briarValue()
                 )
                 guard expectedLifecycleRevision == lifecycleRevision else { return }
                 conversationCursor = delta.cursor
-                if delta.changed {
+                if delta.reset {
+                    let snapshot = delta.messages ?? []
+                    reconcileExecutionProposals(snapshot, authoritative: true)
+                    optimisticMessageIDs = []
+                    messages = snapshot.sorted {
+                        if $0.createdAt != $1.createdAt { return $0.createdAt < $1.createdAt }
+                        return $0.id.uuidString < $1.id.uuidString
+                    }
+                    agentReplies = delta.agentReplies ?? []
+                    activityExpiryTask?.cancel()
+                    activityExpiryTask = nil
+                    activityFrames = [:]
+                } else if delta.changed {
                     if let deltaMessages = delta.messages {
                         appendMessages(deltaMessages)
                     }
@@ -824,16 +842,13 @@ final class RunDetailStore: ObservableObject {
                 guard let self, expectedGeneration == self.activityGeneration else { return }
                 do {
                     let events = realtime.issueActivityEvents(
-                        MobileAPIContract.Endpoint.issueActivityEvents(
-                            projectID: self.projectID,
-                            runID: self.runID
-                        ),
+                        projectID: self.projectID,
+                        runID: self.runID,
                         token: self.token
                     )
                     for try await frame in events {
                         guard !Task.isCancelled,
                               expectedGeneration == self.activityGeneration,
-                              frame.version == 1,
                               frame.projectId == self.projectID,
                               frame.runId == self.runID
                         else { return }

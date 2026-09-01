@@ -121,10 +121,8 @@ export type ClaimedProjectAgentTaskRow = ProjectAgentTaskJobRow & {
   agent_model: string | null;
   agent_effort: AgentSkillEffort | null;
   agent_responsibility: string;
-  agent_skill: string;
   selected_skill_id: string;
   selected_skill_name: string;
-  selected_skill_instructions: string;
   agent_skills: AgentSkillRow[];
 };
 
@@ -136,7 +134,6 @@ export type ProjectAgentScheduleRow = {
   agent_provider: ProjectAgentProvider;
   name: string;
   recurrence: ProjectAgentScheduleRecurrence;
-  frequency: ProjectAgentScheduleRecurrence | null;
   time_of_day: string;
   day_of_week: number | null;
   interval_value: number;

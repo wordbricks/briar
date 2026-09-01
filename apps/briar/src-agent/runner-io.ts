@@ -1,14 +1,21 @@
-import { createInterface } from "node:readline";
-import * as Option from "effect/Option";
+import { sizeDelimitedDecodeStream } from "@bufbuild/protobuf/wire";
+import { ParentToRunnerSchema } from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
 import * as Result from "effect/Result";
-import type { SchemaError } from "effect/Schema";
 import {
-  decodeApprovalResponse,
-  decodeApprovalResponseEnvelope,
-  isRunRequestEnvelope,
-} from "./runner-control-message";
-
-type RunRequest = { type: "run" };
+  decodeSidecarRunRequest,
+  encodeSidecarRunnerOutput,
+  sidecarApprovalRequest,
+  sidecarProviderEvent,
+  sidecarRunBlocked,
+  sidecarRunError,
+  sidecarRunResult,
+  sidecarSessionStarted,
+  type SidecarApprovalInput,
+  type SidecarBlockedInput,
+  type SidecarProviderEventInput,
+  type SidecarResultInput,
+} from "./sidecar-protocol";
+import { decodeRunnerRequest, type RunnerRequest } from "./runner-request";
 
 type PendingApproval = {
   abort?: () => void;
@@ -16,35 +23,43 @@ type PendingApproval = {
   resolve: (approved: boolean) => void;
 };
 
-export type RunnerIoOptions<Request> = {
-  closeError: string;
-  decodeRequest: (input: unknown) => Result.Result<Request, SchemaError>;
-  input?: NodeJS.ReadableStream;
-  onClose?: () => void;
-  output?: Pick<NodeJS.WritableStream, "write">;
+type RunnerInput = AsyncIterable<Uint8Array> & {
+  destroy?: () => void;
 };
 
+export type RunnerIoOptions = {
+  closeError: string;
+  input?: RunnerInput;
+  onClose?: () => void;
+  output?: Pick<NodeJS.WritableStream, "write">;
+  terminate?: (error: Error) => void;
+};
+
+const maxSidecarFrameBytes = 16 * 1024 * 1024;
+
 /**
- * Owns the JSON-lines control channel shared by the bundled agent runners.
- * Exactly one run request is accepted; approval responses remain available
- * until the input closes, at which point every pending approval is denied.
+ * Owns the size-delimited protobuf control channel shared by the bundled
+ * agent runners. Stdout contains frames only; diagnostics belong on stderr.
  */
-export function createRunnerIo<Request extends RunRequest, Output>({
+export function createRunnerIo({
   closeError,
-  decodeRequest,
   input = process.stdin,
   onClose,
   output = process.stdout,
-}: RunnerIoOptions<Request>) {
-  const lines = createInterface({ input, crlfDelay: Infinity });
-  let resolveRequest: ((request: Request) => void) | undefined;
+  terminate = () => process.exit(1),
+}: RunnerIoOptions) {
+  let resolveRequest: ((request: RunnerRequest) => void) | undefined;
   let rejectRequest: ((error: Error) => void) | undefined;
-  const request = new Promise<Request>((resolve, reject) => {
+  const request = new Promise<RunnerRequest>((resolve, reject) => {
     resolveRequest = resolve;
     rejectRequest = reject;
   });
   const approvals = new Map<string, PendingApproval>();
   let closed = false;
+  let locallyClosed = false;
+  let runReceived = false;
+  let terminalEmitted = false;
+  let protocolFailed = false;
 
   function settleApproval(id: string, approved: boolean) {
     const pending = approvals.get(id);
@@ -56,53 +71,101 @@ export function createRunnerIo<Request extends RunRequest, Output>({
     pending.resolve(approved);
   }
 
-  lines.on("line", (line) => {
-    let message: unknown;
-    try {
-      message = JSON.parse(line);
-    } catch (caught) {
-      rejectRequest?.(
-        caught instanceof Error ? caught : new Error(String(caught)),
-      );
-      return;
-    }
-
-    const approval = decodeApprovalResponse(message);
-    if (Option.isSome(approval)) {
-      settleApproval(approval.value.id, approval.value.approved);
-      return;
-    }
-
-    const approvalEnvelope = decodeApprovalResponseEnvelope(message);
-    if (Option.isSome(approvalEnvelope)) {
-      // A parent sends exactly one response for each approval. Deny a matching
-      // malformed response so the runner cannot approve it or wait forever.
-      settleApproval(approvalEnvelope.value.id, false);
-      return;
-    }
-    if (!isRunRequestEnvelope(message)) return;
-
-    const decoded = decodeRequest(message);
-    if (Result.isFailure(decoded)) {
-      rejectRequest?.(decoded.failure);
-    } else {
-      resolveRequest?.(decoded.success);
-    }
-    resolveRequest = undefined;
-    rejectRequest = undefined;
-  });
-
-  lines.on("close", () => {
+  function settleClosed() {
+    if (closed) return;
     closed = true;
     rejectRequest?.(new Error(closeError));
     rejectRequest = undefined;
     resolveRequest = undefined;
     for (const id of approvals.keys()) settleApproval(id, false);
     onClose?.();
-  });
+  }
 
-  function emit(value: Output) {
-    output.write(`${JSON.stringify(value)}\n`);
+  function failProtocol(caught: unknown): never {
+    const error = caught instanceof Error ? caught : new Error(String(caught));
+    if (!protocolFailed) {
+      protocolFailed = true;
+      rejectRequest?.(error);
+      process.stderr.write(`[briar.runner] ${error.message}\n`);
+      input.destroy?.();
+      settleClosed();
+      terminate(error);
+    }
+    throw error;
+  }
+
+  void (async () => {
+    try {
+      for await (const message of sizeDelimitedDecodeStream(
+        ParentToRunnerSchema,
+        input,
+        { readMaxBytes: maxSidecarFrameBytes },
+      )) {
+        if (message.payload.case === "approvalResponse") {
+          if (!runReceived) {
+            failProtocol(
+              new Error("An approval response cannot precede the run request."),
+            );
+          }
+          if (!approvals.has(message.payload.value.id)) {
+            failProtocol(new Error(
+              `Unknown sidecar approval response id: ${message.payload.value.id}`,
+            ));
+          }
+          settleApproval(
+            message.payload.value.id,
+            message.payload.value.approved,
+          );
+          continue;
+        }
+        if (message.payload.case !== "run") {
+          throw new Error("Sidecar input frame does not contain a payload.");
+        }
+        if (runReceived) {
+          throw new Error("The sidecar parent sent more than one run request.");
+        }
+        runReceived = true;
+        const decoded = decodeRunnerRequest(decodeSidecarRunRequest(message));
+        if (Result.isFailure(decoded)) {
+          throw decoded.failure;
+        }
+        resolveRequest?.(decoded.success);
+        resolveRequest = undefined;
+        rejectRequest = undefined;
+      }
+      if (!locallyClosed && !terminalEmitted) {
+        failProtocol(new Error("Sidecar input closed before terminal output."));
+      }
+    } catch (caught) {
+      if (!locallyClosed && !protocolFailed) {
+        try {
+          failProtocol(caught);
+        } catch {
+          // The channel is already closed and the runner termination hook ran.
+        }
+      }
+    } finally {
+      settleClosed();
+    }
+  })();
+
+  function emitFrame(value: Parameters<typeof encodeSidecarRunnerOutput>[0]) {
+    if (closed) {
+      throw new Error("Cannot emit a sidecar frame after the channel closed.");
+    }
+    if (terminalEmitted) {
+      return failProtocol(
+        new Error("Cannot emit a sidecar frame after terminal output."),
+      );
+    }
+    output.write(encodeSidecarRunnerOutput(value));
+    if (
+      value.payload.case === "result" ||
+      value.payload.case === "blocked" ||
+      value.payload.case === "error"
+    ) {
+      terminalEmitted = true;
+    }
   }
 
   function waitForApproval(id: string, signal?: AbortSignal) {
@@ -125,10 +188,24 @@ export function createRunnerIo<Request extends RunRequest, Output>({
 
   return {
     close: () => {
-      closed = true;
-      lines.close();
+      locallyClosed = true;
+      input.destroy?.();
+      settleClosed();
     },
-    emit,
+    emit: {
+      frame: emitFrame,
+      session: (sessionId: string) =>
+        emitFrame(sidecarSessionStarted(sessionId)),
+      event: (input: SidecarProviderEventInput) =>
+        emitFrame(sidecarProviderEvent(input)),
+      approval: (input: SidecarApprovalInput) =>
+        emitFrame(sidecarApprovalRequest(input)),
+      result: (input: SidecarResultInput) =>
+        emitFrame(sidecarRunResult(input)),
+      blocked: (input: SidecarBlockedInput) =>
+        emitFrame(sidecarRunBlocked(input)),
+      error: (message: string) => emitFrame(sidecarRunError(message)),
+    },
     request,
     waitForApproval,
   };

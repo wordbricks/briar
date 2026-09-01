@@ -60,12 +60,14 @@ import {
   managedComputerSetupCommand,
   managedComputerStatusCommand,
   managedComputerSyncCommand,
+  managedComputerWorkerUpdateFailCommand,
+  managedComputerWorkerUpdateStatusCommand,
   managedComputerWorkerSupervisor,
 } from "./managed-computer-commands";
+import { managedComputerEnrollCommand } from "./managed-computer-enrollment";
 import {
   githubCommitStatusCommand,
   githubCredentialCommand,
-  githubGraphqlCommand,
   githubPullRequestCreateCommand,
   githubPullRequestEditCommand,
   githubPullRequestMergeCommand,
@@ -93,6 +95,9 @@ const optionalIntegers = (...names: ReadonlyArray<string>) =>
   Object.fromEntries(
     names.map((name) => [name, Flag.integer(name).pipe(Flag.optional)]),
   );
+
+const requiredIntegers = (...names: ReadonlyArray<string>) =>
+  Object.fromEntries(names.map((name) => [name, Flag.integer(name)]));
 
 const switches = (...names: ReadonlyArray<string>) =>
   Object.fromEntries(
@@ -463,7 +468,9 @@ const eventFlags = {
     "source-created-at",
     "context-json",
     "status-detail",
+    "structured-result",
     "structured-result-file",
+    "structured-result-proto-json",
   ),
   ...optionalIntegers("priority"),
   ...repeatedStrings("pull-request-url"),
@@ -549,8 +556,9 @@ const runCommand = Command.make("run").pipe(
     leaf(
       "resume",
       {
-        ...optionalStrings("run", "checkpoint", "request-id"),
-        ...optionalIntegers("attempt", "revision"),
+        ...requiredStrings("checkpoint"),
+        ...requiredIntegers("attempt", "revision"),
+        ...optionalStrings("run", "request-id"),
       },
       resumeRun,
       "Resume a paused run",
@@ -640,6 +648,12 @@ const managedComputerCommand = Command.make("managed-computer").pipe(
   Command.withDescription("Set up and inspect this Briar managed computer"),
   Command.withSubcommands([
     leaf(
+      "enroll",
+      {},
+      managedComputerEnrollCommand,
+      "Enroll this managed computer from its instance identity proof",
+    ).pipe(Command.unlisted),
+    leaf(
       "setup",
       {
         ...requiredStrings("project", "repository"),
@@ -670,6 +684,24 @@ const managedComputerCommand = Command.make("managed-computer").pipe(
       {},
       managedComputerWorkerSupervisor,
       "Run managed project workers",
+    ).pipe(Command.unlisted),
+    leaf(
+      "worker-update-status",
+      {
+        ...requiredStrings("worker", "request-id", "target-version"),
+        ...optionalStrings("credential-file"),
+      },
+      managedComputerWorkerUpdateStatusCommand,
+      "Read a managed Worker update handoff",
+    ).pipe(Command.unlisted),
+    leaf(
+      "worker-update-fail",
+      {
+        ...requiredStrings("worker", "request-id", "error"),
+        ...optionalStrings("credential-file"),
+      },
+      managedComputerWorkerUpdateFailCommand,
+      "Report a managed Worker update failure",
     ).pipe(Command.unlisted),
   ]),
 );
@@ -755,15 +787,6 @@ const githubCommand = Command.make("github").pipe(
       githubRepositoryCommand,
       "Inspect the project's authoritative GitHub repository",
     ),
-    leaf(
-      "graphql",
-      {
-        ...requiredStrings("query"),
-        ...optionalStrings("variables-json"),
-      },
-      githubGraphqlCommand,
-      "Run a project-scoped GitHub GraphQL request",
-    ).pipe(Command.unlisted),
     Command.make(
       "credential",
       { operation: Argument.string("operation") },

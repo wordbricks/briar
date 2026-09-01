@@ -1,10 +1,10 @@
-import { invoke } from "@tauri-apps/api/core";
 import { isMacDesktopTauri } from "./platform";
+import { commands, events } from "../generated/tauri";
 
-export const APP_MENU_SETTINGS_EVENT = "app-menu-settings";
-export const APP_MENU_UPDATE_EVENT = "app-menu-update";
-
-function listenForAppMenuEvent(eventName: string, onSelect: () => void) {
+function listenForAppMenuEvent(
+  listen: (onSelect: () => void) => Promise<() => void>,
+  onSelect: () => void,
+) {
   if (typeof window === "undefined" || !isMacDesktopTauri()) {
     return () => undefined;
   }
@@ -12,11 +12,8 @@ function listenForAppMenuEvent(eventName: string, onSelect: () => void) {
   let cancelled = false;
   let unlisten: (() => void) | undefined;
 
-  void import("@tauri-apps/api/event")
-    .then(({ listen }) => {
-      if (cancelled) return;
-      return listen(eventName, onSelect);
-    })
+  void Promise.resolve()
+    .then(() => (cancelled ? undefined : listen(onSelect)))
     .then((dispose) => {
       if (!dispose) return;
       if (cancelled) {
@@ -36,14 +33,20 @@ function listenForAppMenuEvent(eventName: string, onSelect: () => void) {
 }
 
 export function listenForAppMenuSettings(onSelect: () => void) {
-  return listenForAppMenuEvent(APP_MENU_SETTINGS_EVENT, onSelect);
+  return listenForAppMenuEvent(
+    (callback) => events.appMenuSettings.listen(callback),
+    onSelect,
+  );
 }
 
 export function listenForAppMenuUpdate(onSelect: () => void) {
-  return listenForAppMenuEvent(APP_MENU_UPDATE_EVENT, onSelect);
+  return listenForAppMenuEvent(
+    (callback) => events.appMenuUpdate.listen(callback),
+    onSelect,
+  );
 }
 
 export async function syncAppUpdateMenu(updateAvailable: boolean) {
   if (typeof window === "undefined" || !isMacDesktopTauri()) return;
-  await invoke("sync_app_update_menu", { updateAvailable });
+  await commands.syncAppUpdateMenu(updateAvailable);
 }

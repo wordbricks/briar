@@ -1,4 +1,11 @@
-import type { ChannelLinkPreview } from "../../src/lib/channels-contract";
+export type ChannelLinkPreview = {
+  readonly url: string;
+  readonly title: string | null;
+  readonly description: string | null;
+  readonly imageUrl: string | null;
+  readonly faviconUrl: string | null;
+  readonly siteName: string | null;
+};
 
 const maxUrlLength = 2_048;
 const maxHtmlBytes = 256 * 1_024;

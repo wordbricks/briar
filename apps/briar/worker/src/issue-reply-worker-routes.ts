@@ -1,116 +1,48 @@
-import { ChannelAgentActivityPublishInput } from "../../src/lib/channel-agent-activity";
-import { issueAttachmentMarkdown } from "../../src/lib/issue-markdown";
 import { workLogEntryTranscriptEvent } from "./agent-worklog";
 import { readLatestWorkLogForRunWithArchive } from "./agent-worklog-service";
 import {
   agentSkillJson,
 } from "./agent-skills";
-import {
-  prepareStoredAttachments,
-  uploadStoredAttachments,
-} from "./attachment-storage";
-import { publishIssueActivity } from "./channel-activity-realtime";
-import { verifyIssueActivityPublishToken } from "./channel-activity-ticket";
 import { sha256 } from "./crypto-digest";
 import { dashboardEventJson, dashboardRunJson } from "./dashboard-json";
 import {
-  agentSkillExecutionApprovalTablesAvailable,
   claimNextIssueAgentReply,
-  completeIssueAgentReplyOutput,
-  failIssueAgentReply,
-  getClaimedIssueAgentReply,
   getHuntRunForProject,
   getProjectAgent,
-  issueExecutionApprovalTablesAvailable,
   listHuntRunEvents,
-  listIssueActionProposals,
-  listIssueAgentSkillExecutionProposals,
   listIssueAttachments,
-  listIssueExecutionProposals,
-  listIssueReworkProposals,
   listRunEvidence,
-  renewIssueAgentReplyLease,
-  type AgentSkillExecutionProposalRow,
-  type IssueExecutionProposalRow,
 } from "./db";
-import {
-  issueReplyExecutionConfig,
-  legacyAgentSkillInstructions,
-} from "./agent-execution-config";
-import { HttpError, json } from "./http-response";
-import {
-  deleteUnreferencedUploadedIssueObjects,
-} from "./issue-attachment-service";
-import {
-  claimConversationJson,
-  issueAgentReplyJson,
-  issueMessageJson,
-  type IssueProposalRow,
-} from "./issue-conversation-json";
+import { issueReplyExecutionConfig } from "./agent-execution-config";
+import { HttpError } from "./http-response";
+import { claimConversationJson } from "./issue-conversation-json";
 import { listIssueMessagesWithArchive } from "./issue-conversation-service";
-import { decodeIssueAgentReplyLease } from "./issue-request-contract";
-import {
-  readIssueReplyCompleteRequest,
-  readJson,
-} from "./request-readers";
-import { decodeRequestSync } from "./request-schema";
 import {
   issueActivityCredential,
-  issueActivityFrame,
-  scheduleIssueActivityClear,
   scheduleProjectRealtimePublish,
 } from "./realtime-scheduling";
-import {
-  type AuthenticatedWorkerProject,
-  requireWorkerProjectBinding,
-} from "./worker-route-auth";
-import { decodeIssueReplyClaimInput } from "./worker-request-contract";
+import { type AuthenticatedWorkerProject } from "./worker-route-auth";
 import { latestExecutionWorkerUpdateHandoff } from "./worker-update-repository";
 import {
-  executionWorkerProviders,
+  executionWorkerRuntime,
   leaseExpiryFrom,
   WORKER_STALE_AFTER_MS,
   workerStateAt,
 } from "./workers";
 
-const decodeChannelAgentActivityPublishInput = decodeRequestSync(
-  ChannelAgentActivityPublishInput,
-);
-
-export async function handleIssueReplyWorkerRoute(input: {
-  request: Request;
-  url: URL;
+export async function claimNextIssueReplyWork(input: {
+  projectId: string;
   db: D1Database;
-  attachmentsBucket: R2Bucket;
   env: Env;
   context?: ExecutionContext;
-  authenticatedWorker?: AuthenticatedWorkerProject;
-  claimInput?: ReturnType<typeof decodeIssueReplyClaimInput>;
-}): Promise<Response | undefined> {
+  authenticatedWorker: AuthenticatedWorkerProject;
+}) {
   const {
-    request,
-    url,
     db,
-    attachmentsBucket,
     env,
     context,
-    authenticatedWorker: preauthenticatedWorker,
-    claimInput,
+    authenticatedWorker,
   } = input;
-
-  if (
-    claimInput ||
-    (url.pathname === "/issue-reply-claims" && request.method === "POST")
-  ) {
-    const input = claimInput ??
-      decodeIssueReplyClaimInput(await readJson(request));
-    const authenticatedWorker = await requireWorkerProjectBinding(
-      db,
-      request,
-      input.projectId,
-      input.workerId,
-      preauthenticatedWorker,
-    );
     const observedAt = new Date().toISOString();
     if (
       workerStateAt(
@@ -123,11 +55,10 @@ export async function handleIssueReplyWorkerRoute(input: {
     ) {
       throw new HttpError(409, "Worker is not ready to claim replies");
     }
-    const providers = executionWorkerProviders(authenticatedWorker.binding);
-    const defaultProvider = providers.includes(
-      authenticatedWorker.binding.agent_provider,
-    )
-      ? authenticatedWorker.binding.agent_provider
+    const runtime = executionWorkerRuntime(authenticatedWorker.binding);
+    const providers = runtime.providers;
+    const defaultProvider = providers.includes(runtime.agentProvider)
+      ? runtime.agentProvider
       : providers[0];
     if (!defaultProvider) {
       throw new HttpError(409, "Worker has no available reply provider");
@@ -136,7 +67,6 @@ export async function handleIssueReplyWorkerRoute(input: {
     const job = await claimNextIssueAgentReply(db, input.projectId, {
       workerId: authenticatedWorker.binding.id,
       agentProvider: defaultProvider,
-      agentProviders: providers,
       claimTokenHash: await sha256(claimToken),
       claimedAt: observedAt,
       leaseExpiresAt: leaseExpiryFrom(observedAt),
@@ -144,7 +74,7 @@ export async function handleIssueReplyWorkerRoute(input: {
         Date.parse(observedAt) - WORKER_STALE_AFTER_MS,
       ).toISOString(),
     });
-    if (!job) return json({ work: null });
+    if (!job) return null;
     scheduleProjectRealtimePublish(env, db, input.projectId, context);
 
     const [run, events, attachments, messages, evidence, transcript] =
@@ -246,9 +176,8 @@ export async function handleIssueReplyWorkerRoute(input: {
       workType: "issueReply",
       workId: job.id,
     });
-    return json({
-      work: {
-        workType: "issueReply",
+    return {
+        workType: "issueReply" as const,
         workId: job.id,
         runId: run.id,
         sourceKey: `${run.source_key}:reply:${job.trigger_message_id}`,
@@ -280,10 +209,6 @@ export async function handleIssueReplyWorkerRoute(input: {
               model: replyExecution.model,
               effort: replyExecution.effort,
               responsibility: agent.responsibility,
-              skill: legacyAgentSkillInstructions(
-                activeSkill,
-                agent.skill_markdown,
-              ),
               skills: agent.skills.map(agentSkillJson),
             }
           : null,
@@ -307,21 +232,6 @@ export async function handleIssueReplyWorkerRoute(input: {
           run: {
             ...dashboardRunJson(run, attachments),
             events: events.map((event) => dashboardEventJson(event)),
-            // Workers from before first-class Agent Skills ignore work.agent,
-            // but retain arbitrary fields inside snapshot.run. Keep the saved
-            // profile here as read-only context during a rolling upgrade.
-            agentProfile: agent
-              ? {
-                  id: agent.id,
-                  name: agent.name,
-                  responsibility: agent.responsibility,
-                  skill: legacyAgentSkillInstructions(
-                    activeSkill,
-                    agent.skill_markdown,
-                  ),
-                  skills: agent.skills.map(agentSkillJson),
-                }
-              : null,
           },
           messages: claimConversationJson(messages, attachments),
           agentTranscript:
@@ -350,294 +260,5 @@ export async function handleIssueReplyWorkerRoute(input: {
             observedAt: item.observed_at,
           })),
         },
-      },
-    });
-  }
-
-
-  const issueReplyActivityMatch = url.pathname.match(
-    /^\/issue-reply-claims\/([0-9a-f-]+)\/activity$/u,
-  );
-  if (issueReplyActivityMatch && request.method === "POST") {
-    const token = request.headers.get("X-Briar-Channel-Activity-Token") ?? "";
-    const verified = await verifyIssueActivityPublishToken(
-      env.BETTER_AUTH_SECRET,
-      token,
-      issueReplyActivityMatch[1],
-    );
-    if (!verified) {
-      throw new HttpError(401, "Invalid or expired activity token");
-    }
-    const input = decodeChannelAgentActivityPublishInput(
-      await readJson(request),
-    );
-    const frame = issueActivityFrame(
-      {
-        id: verified.replyJobId,
-        project_id: verified.projectId,
-        run_id: verified.runId,
-        trigger_message_id: verified.triggerMessageId,
-        parent_message_id: verified.parentMessageId,
-        attempts: verified.attempt,
-      },
-      input,
-    );
-    await publishIssueActivity(env, verified.organizationId, frame);
-    return new Response(null, { status: 204 });
-  }
-
-  const issueReplyClaimMatch = url.pathname.match(
-    /^\/issue-reply-claims\/([0-9a-f-]+)\/(lease|complete)$/u,
-  );
-  if (issueReplyClaimMatch && request.method === "POST") {
-    if (issueReplyClaimMatch[2] === "lease") {
-      const input = decodeIssueAgentReplyLease(await readJson(request));
-      const worker = await requireWorkerProjectBinding(
-        db,
-        request,
-        input.projectId,
-        input.workerId,
-      );
-      const observedAt = new Date().toISOString();
-      const renewed = await renewIssueAgentReplyLease(
-        db,
-        input.projectId,
-        issueReplyClaimMatch[1],
-        {
-          workerId: worker.binding.id,
-          claimTokenHash: await sha256(input.claimToken),
-          leaseExpiresAt: leaseExpiryFrom(observedAt),
-          updatedAt: observedAt,
-        },
-      );
-      if (!renewed) throw new HttpError(409, "Reply claim is no longer active");
-      const activity = env.CHANNEL_ACTIVITY_REALTIME
-        ? await issueActivityCredential(
-            env,
-            worker.principal.organizationId,
-            renewed,
-            {
-              workerId: worker.binding.id,
-              deviceId: worker.principal.deviceId,
-            },
-          )
-        : null;
-      return json({ leaseExpiresAt: renewed.lease_expires_at, activity });
-    }
-
-    const { input, attachments } = await readIssueReplyCompleteRequest(request);
-    if (
-      (input.executionProposal ||
-        (input.proposedAction?.type === "request_issue_create" &&
-          input.proposedAction.executeAfterCreate)) &&
-      !(await issueExecutionApprovalTablesAvailable(db))
-    ) {
-      throw new HttpError(
-        503,
-        "Issue execution approval is not available during this upgrade",
-        "ISSUE_EXECUTION_APPROVAL_UNAVAILABLE",
-      );
-    }
-    if (
-      input.skillExecutionProposal &&
-      !(await agentSkillExecutionApprovalTablesAvailable(db))
-    ) {
-      throw new HttpError(
-        503,
-        "Agent Skill execution approval is not available during this upgrade",
-        "AGENT_SKILL_EXECUTION_APPROVAL_UNAVAILABLE",
-      );
-    }
-    const worker = await requireWorkerProjectBinding(
-      db,
-      request,
-      input.projectId,
-      input.workerId,
-    );
-    const claimTokenHash = await sha256(input.claimToken);
-    const observedAt = new Date().toISOString();
-    const job = await getClaimedIssueAgentReply(
-      db,
-      input.projectId,
-      issueReplyClaimMatch[1],
-      { workerId: worker.binding.id, claimTokenHash, observedAt },
-    );
-    if (!job) throw new HttpError(409, "Reply claim is no longer active");
-    if (input.error) {
-      const failed = await failIssueAgentReply(
-        db,
-        input.projectId,
-        job.id,
-        {
-          workerId: worker.binding.id,
-          claimTokenHash,
-          error: input.error,
-          updatedAt: observedAt,
-        },
-      );
-      if (!failed) throw new HttpError(409, "Reply claim is no longer active");
-      scheduleProjectRealtimePublish(env, db, input.projectId, context);
-      scheduleIssueActivityClear(
-        env,
-        worker.principal.organizationId,
-        failed,
-        context,
-      );
-      return json({ agentReply: issueAgentReplyJson(failed) });
-    }
-    if (
-      input.skillExecutionProposal &&
-      (!job.skill_id || job.selected_skill_id_snapshot !== job.skill_id)
-    ) {
-      throw new HttpError(
-        409,
-        "Agent Skill execution requires the server-selected Skill",
-        "ISSUE_SKILL_EXECUTION_PROPOSAL_STALE",
-      );
-    }
-
-    const storedAttachments = prepareStoredAttachments(attachments, () => {
-      const id = crypto.randomUUID();
-      return {
-        id,
-        object_key: `issue-attachments/${input.projectId}/${job.run_id}/${id}`,
-      };
-    });
-    const completedAt = new Date().toISOString();
-    const replyBody = [
-      input.body!,
-      ...storedAttachments.map((attachment) =>
-        issueAttachmentMarkdown(attachment.id, attachment.filename)
-      ),
-    ].filter(Boolean).join("\n\n");
-    const uploadedKeys: string[] = [];
-    const discardUploadedReplyAttachments = () =>
-      deleteUnreferencedUploadedIssueObjects(
-        db,
-        attachmentsBucket,
-        uploadedKeys,
-      );
-    let completed: Awaited<ReturnType<typeof completeIssueAgentReplyOutput>> =
-      null;
-    try {
-      await uploadStoredAttachments(
-        attachmentsBucket,
-        storedAttachments,
-        uploadedKeys,
-        (attachment) => ({
-          attachmentId: attachment.id,
-          projectId: input.projectId,
-          runId: job.run_id,
-          messageId: job.reply_message_id,
-        }),
-      );
-      completed = await completeIssueAgentReplyOutput(
-        db,
-        input.projectId,
-        job.id,
-        {
-          workerId: worker.binding.id,
-          claimTokenHash,
-          completedAt,
-          output: {
-            body: replyBody,
-            proposedAction: input.proposedAction ?? null,
-            executionProposal: Boolean(input.executionProposal),
-            skillExecutionProposal: Boolean(input.skillExecutionProposal),
-            attachments: storedAttachments.map(
-              ({ file: _file, ...attachment }) => attachment,
-            ),
-          },
-        },
-      );
-    } catch (error) {
-      await discardUploadedReplyAttachments().catch(() => undefined);
-      throw error;
-    }
-    if (!completed) {
-      await discardUploadedReplyAttachments().catch(() => undefined);
-      throw new HttpError(409, "Reply claim is no longer active");
-    }
-    scheduleProjectRealtimePublish(env, db, input.projectId, context);
-    scheduleIssueActivityClear(
-      env,
-      worker.principal.organizationId,
-      completed,
-      context,
-    );
-    const [
-      messages,
-      reworkProposals,
-      actionProposals,
-      executionProposals,
-      skillExecutionProposals,
-    ] =
-      await Promise.all([
-        listIssueMessagesWithArchive(
-          db,
-          env.ARCHIVES,
-          input.projectId,
-          job.run_id,
-        ),
-        listIssueReworkProposals(db, input.projectId, job.run_id),
-        listIssueActionProposals(db, input.projectId, job.run_id),
-        listIssueExecutionProposals(db, input.projectId, job.run_id),
-        listIssueAgentSkillExecutionProposals(
-          db,
-          input.projectId,
-          job.run_id,
-        ),
-      ]);
-    const reply = messages.find(
-      (message) => message.id === job.reply_message_id,
-    ) ?? null;
-    if (!reply) throw new HttpError(409, "Agent reply could not be persisted");
-    const proposal: IssueProposalRow | null =
-      reworkProposals.find(
-        (candidate) => candidate.trigger_message_id === job.trigger_message_id,
-      ) ?? actionProposals.find(
-        (candidate) => candidate.trigger_message_id === job.trigger_message_id,
-      ) ?? null;
-    const executionProposal: IssueExecutionProposalRow | null =
-      executionProposals.find(
-        (candidate) => candidate.trigger_message_id === job.trigger_message_id,
-      ) ?? null;
-    const skillExecutionProposal: AgentSkillExecutionProposalRow | null =
-      skillExecutionProposals.find(
-        (candidate) => candidate.trigger_message_id === job.trigger_message_id,
-      ) ?? null;
-    return json({
-      agentReply: issueAgentReplyJson(completed),
-      message: issueMessageJson(
-        reply,
-        storedAttachments.map(({ file: _file, ...attachment }) => ({
-          ...attachment,
-          project_id: input.projectId,
-          run_id: job.run_id,
-          created_at: completedAt,
-        })),
-        proposal,
-        executionProposal,
-        skillExecutionProposal,
-      ),
-    });
-  }
-
-
-  return undefined;
-}
-
-export async function claimNextIssueReplyWork(input: {
-  request: Request;
-  url: URL;
-  claimInput: ReturnType<typeof decodeIssueReplyClaimInput>;
-  db: D1Database;
-  attachmentsBucket: R2Bucket;
-  env: Env;
-  context?: ExecutionContext;
-  authenticatedWorker: AuthenticatedWorkerProject;
-}): Promise<Response> {
-  const response = await handleIssueReplyWorkerRoute(input);
-  if (!response) throw new Error("Issue reply claim route did not respond");
-  return response;
+    };
 }

@@ -1,11 +1,11 @@
 import {
+  decodeAutoHuntWorkflowCheckpointsJson,
+  encodeAutoHuntWorkflowCheckpointsJson,
   workflowWithAdditionalCheckpoints,
   type AutoHuntRunStatus,
-  type AutoHuntWorkflowCheckpoint,
 } from "../../src/lib/auto-hunt-contract";
 
 import {
-  channelApprovalTablesAvailable,
   isChannelApprovedIssue,
 } from "./channel-issue-approval-repository";
 import {
@@ -16,7 +16,6 @@ import {
 import { type HuntRunRow } from "./hunt-run-model";
 import { getHuntRunForProject } from "./hunt-run-repository";
 import {
-  repairTransferredIssueRelations,
   transferredIssueRelationStatements,
 } from "./issue-transfer-relations";
 import { getProjectSettings } from "./project-settings-repository";
@@ -39,72 +38,34 @@ const isActivelyClaimedRun = (run: HuntRunRow, observedAt: string) =>
     run.lease_expires_at > observedAt
   );
 
-const channelIssueTransferRecovery = async (
+const completedChannelIssueTransferExists = async (
   db: D1Database,
   input: {
     sourceProjectId: string;
-    targetProjectId: string;
     run: Pick<HuntRunRow, "id" | "source_key">;
   },
-) => {
-  if (!(await channelApprovalTablesAvailable(db))) return null;
-  const approval = await db
+) => Boolean(await db
     .prepare(
-      `select approval.project_id
+      `select 1 as transferred
        from briar_channel_issue_approval_audit approval
        where approval.run_id = ? and approval.issue_source_key = ?
-         and approval.result_verification in ('atomic', 'legacy_authorized')
+         and approval.project_id = ?
+         and approval.result_verification = 'atomic'
+         and exists (
+           select 1 from briar_dashboard_changes tombstone
+           where tombstone.project_id = ? and tombstone.entity_type = 'run'
+             and tombstone.entity_id = approval.run_id
+             and tombstone.operation = 'delete'
+         )
        limit 1`,
     )
     .bind(
       input.run.id,
       input.run.source_key,
-    )
-    .first<{ project_id: string }>();
-  if (!approval) return null;
-  if (approval.project_id === input.sourceProjectId) return "repair" as const;
-  const sourceTombstone = await db
-    .prepare(
-      `select 1 as transferred
-       from briar_dashboard_changes
-       where project_id = ? and entity_type = 'run' and entity_id = ?
-         and operation = 'delete'
-       limit 1`,
-    )
-    .bind(input.sourceProjectId, input.run.id)
-    .first<{ transferred: number }>();
-  if (sourceTombstone) return "complete" as const;
-  const durableTransfer = await db
-    .prepare(
-      `select 1 as transferred
-       from briar_channel_issue_transfer_reconciliation transfer
-       where transfer.run_id = ? and transfer.source_project_id = ?
-         and transfer.target_project_id = ?
-       limit 1`,
-    )
-    .bind(
-      input.run.id,
       input.sourceProjectId,
-      input.targetProjectId,
+      input.sourceProjectId,
     )
-    .first<{ transferred: number }>();
-  if (durableTransfer) return "repair" as const;
-  // If an older transfer crashed after moving the run but before its relation
-  // batch, a durable source-project dispatch still proves the A -> B provenance
-  // needed to finish the tombstone and child-row repair.
-  const sourceDispatch = await db
-    .prepare(
-      `select 1 as dispatched
-       from briar_execution_audit_events execution
-       where execution.run_id = ? and execution.project_id = ?
-         and execution.action in ('dispatched', 'reassigned')
-         and execution.request_id is not null
-       limit 1`,
-    )
-    .bind(input.run.id, input.sourceProjectId)
-    .first<{ dispatched: number }>();
-  return sourceDispatch ? "repair" as const : null;
-};
+    .first<{ transferred: number }>());
 
 /**
  * Move an issue (hunt run) and its project-scoped children to another project
@@ -139,21 +100,13 @@ export async function transferIssue(
     );
     if (!alreadyMoved) return "not_found";
     // A target row alone is not transfer provenance: it may have always
-    // belonged to that project. Only a channel approval whose immutable audit
-    // points back to the requested source may repair a partial transfer.
-    const recovery = await channelIssueTransferRecovery(db, {
+    // belonged to that project. The source tombstone proves an atomic transfer
+    // committed before a retry lost its response.
+    const completedTransfer = await completedChannelIssueTransferExists(db, {
       sourceProjectId: input.sourceProjectId,
-      targetProjectId: input.targetProjectId,
       run: alreadyMoved,
     });
-    if (!recovery) return "not_found";
-    if (recovery === "repair") {
-      await repairTransferredIssueRelations(db, {
-        ...input,
-        resetExecutionApproval: true,
-      });
-    }
-    return "transferred";
+    return completedTransfer ? "transferred" : "not_found";
   }
   if (isActivelyClaimedRun(run, input.observedAt)) return "active";
   const verifiedArchive = await db
@@ -167,14 +120,8 @@ export async function transferIssue(
     .first<{ archiving: number }>();
   if (verifiedArchive) return "archive_in_progress";
   const channelApprovedIssue = await isChannelApprovedIssue(db, run);
-  const executionProposalTable = await db
-    .prepare(
-      `select 1 as available from sqlite_master
-       where type = 'table' and name = 'briar_issue_execution_proposals'`,
-    )
-    .first<{ available: number }>();
   const conversationalExecutionApproved = Boolean(
-    executionProposalTable && run.dispatch_request_id && await db
+    run.dispatch_request_id && await db
       .prepare(
         `select 1 as approved
          where exists (
@@ -236,7 +183,7 @@ export async function transferIssue(
     ),
   );
   const compatibleIssueCheckpoints = adoptTargetWorkflow && !fullAuto
-    ? (JSON.parse(run.issue_checkpoints_json || "[]") as AutoHuntWorkflowCheckpoint[])
+    ? decodeAutoHuntWorkflowCheckpointsJson(run.issue_checkpoints_json)
         .filter(
           (checkpoint) =>
             targetStageIds.has(checkpoint.stage) &&
@@ -334,7 +281,7 @@ export async function transferIssue(
       refreshWorkflow,
       targetWorkflowJson,
       refreshWorkflow,
-      stableJson(compatibleIssueCheckpoints),
+      encodeAutoHuntWorkflowCheckpointsJson(compatibleIssueCheckpoints),
       resetExecutionApproval ? 1 : 0,
       resetExecutionApproval ? 1 : 0,
       resetExecutionApproval ? 1 : 0,
@@ -348,10 +295,7 @@ export async function transferIssue(
     transferResults = await db.batch([
       ...(issueKeyAliasesAvailable ? [preserveSourceIssueKey] : []),
       moveStatement,
-      ...await transferredIssueRelationStatements(db, {
-        ...input,
-        resetExecutionApproval,
-      }),
+      ...transferredIssueRelationStatements(db, input),
     ]);
   } catch (error) {
     if (

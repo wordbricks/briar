@@ -1,5 +1,5 @@
-import { Miniflare } from "miniflare";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { env } from "cloudflare:workers";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import {
   claimSlackEvent,
   completeSlackEvent,
@@ -14,24 +14,15 @@ import {
 } from "./db";
 import { processSlackRevocationQueue } from "./slack-revocations";
 import { encryptSlackToken } from "./slack";
-import {
-  createIsolatedTestDatabase,
-  executeD1Sql,
-} from "./test-helpers/d1";
+import { executeD1Sql } from "./test-helpers/d1";
 
 describe("Slack D1 integration", () => {
-  let miniflare: Miniflare;
-  let db: D1Database;
+  const db = env.DB;
   const organizationId = "11111111-1111-4111-8111-111111111111";
   const firstProjectId = "22222222-2222-4222-8222-222222222222";
   const secondProjectId = "33333333-3333-4333-8333-333333333333";
 
   beforeAll(async () => {
-    const database = await createIsolatedTestDatabase({
-      suite: "slack-db",
-    });
-    miniflare = database.miniflare;
-    db = database.db;
     const now = "2026-07-29T00:00:00.000Z";
     await executeD1Sql(
       db,
@@ -66,10 +57,6 @@ describe("Slack D1 integration", () => {
       );
       `,
     );
-  });
-
-  afterAll(async () => {
-    await miniflare.dispose();
   });
 
   it("consumes OAuth state exactly once", async () => {

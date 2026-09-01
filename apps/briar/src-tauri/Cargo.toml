@@ -6,6 +6,9 @@ authors = ["Wordbricks"]
 license = "Apache-2.0"
 edition = "2021"
 
+[lints.clippy]
+disallowed_methods = "deny"
+
 [lib]
 name = "briar_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
@@ -15,18 +18,27 @@ tauri-build = { version = "2.5.2", features = [] }
 
 [dependencies]
 base64 = "0.23"
+briar-contracts = { path = "../../../packages/contracts/rust", features = ["client-tls"] }
+buffa = { version = "=0.9.1", features = ["json"] }
 chrono = "0.4"
+connectrpc = { version = "=0.9.0", default-features = false, features = ["json"] }
 dirs = "6.0.0"
 serde = { version = "1", features = ["derive"] }
+serde_ignored = "0.1.10"
 serde_json = "1"
+specta = { version = "=2.0.0-rc.25", features = ["derive"] }
+specta-typescript = "=0.0.12"
+tauri-specta = { version = "=2.0.0-rc.25", features = ["derive", "typescript"] }
 reqwest = { version = "0.13", default-features = false, features = ["json", "rustls-no-provider"] }
 rustls = { version = "0.23", default-features = false, features = ["ring"] }
+rustls-platform-verifier = "=0.7.0"
 sha2 = "0.11"
 tauri = { version = "2.11.5", features = ["macos-private-api", "tray-icon", "image-png"] }
 tauri-plugin-dialog = "2.7.2"
 tauri-plugin-deep-link = "2.4.9"
 tauri-plugin-opener = "2.5.4"
 tempfile = "3.27.0"
+uuid = "1.24.0"
 which = "8.0.0"
 tauri-plugin-notification = "2.3.3"
 

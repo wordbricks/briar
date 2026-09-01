@@ -17,8 +17,8 @@ import {
   recommendedInboxNotificationPreferences,
   requestInboxNotificationPermission,
   writeInboxNotificationPreferences,
-  type InboxNotificationPermissionStatus,
 } from "../lib/inbox-notifications";
+import type { InboxNotificationPermissionStatus } from "../generated/tauri";
 import { LoginScreen, type LoginMethod } from "./LoginScreen";
 
 type Step = "welcome" | "login" | "notifications";

@@ -5,7 +5,7 @@ export async function readVerifiedSlackBody(request: Request, env: Env) {
   if (!env.SLACK_SIGNING_SECRET?.trim()) {
     throw new HttpError(503, "Slack integration is not configured");
   }
-  const rawBody = await request.text();
+  const rawBody = new TextDecoder().decode(await request.arrayBuffer());
   if (
     !(await verifySlackRequest(
       rawBody,

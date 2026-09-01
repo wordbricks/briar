@@ -1,72 +1,21 @@
-import * as Schema from "effect/Schema";
 import type { JsonRpcMessage } from "./json-rpc-message";
 import {
-  normalizedActivityText,
-  normalizedActivityTitle,
-  type AgentActivityKind,
-  type AgentActivityStatus,
-  type NormalizedAgentEvent,
-} from "./normalized-agent-event";
-import {
-  commonRunnerRequestFields,
-  runnerRequestDecoderOptions,
-} from "./runner-request";
-
-export type {
   AgentActivityKind,
   AgentActivityStatus,
-  NormalizedAgentEvent,
+  type NormalizedAgentEvent,
+} from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
+import {
+  normalizedActivityCompleted,
+  normalizedActivityDelta,
+  normalizedActivityStarted,
+  normalizedActivityText,
+  normalizedActivityTitle,
+  normalizedMessageCompleted,
+  normalizedMessageDelta,
+  normalizedMessageStarted,
+  normalizedTurnCompleted,
 } from "./normalized-agent-event";
-
-export const CodexRunnerRequest = Schema.Struct({
-  ...commonRunnerRequestFields,
-  effort: Schema.optional(Schema.NullOr(Schema.String)),
-  externalTools: Schema.optional(Schema.Boolean),
-  codexBinary: Schema.String,
-});
-
-export type CodexRunnerRequest = typeof CodexRunnerRequest.Type;
-
-export const decodeCodexRunnerRequest = Schema.decodeUnknownResult(
-  CodexRunnerRequest,
-  runnerRequestDecoderOptions,
-);
-
-export type CodexRunnerOutput =
-  | {
-      type: "session";
-      sessionId: string;
-    }
-  | {
-      type: "event";
-      direction: "client" | "server";
-      raw: CodexRpcMessage;
-      event?: NormalizedAgentEvent;
-    }
-  | {
-      type: "approval";
-      id: string;
-      toolName: string;
-      input: Record<string, unknown>;
-      title?: string;
-    }
-  | {
-      type: "result";
-      sessionId: string;
-      message: string;
-    }
-  | {
-      type: "blocked";
-      reason: "mcp_auth_required";
-      provider: "codex";
-      message: string;
-      serverNames: string[];
-      nextRetryAt: null;
-    }
-  | {
-      type: "error";
-      message: string;
-    };
+import type { RunnerRequest } from "./runner-request";
 
 export type CodexRpcMessage = JsonRpcMessage;
 
@@ -142,8 +91,6 @@ const APPS_INSTALLED_REQUEST_ID = 6;
 const approvalMethods = new Set([
   "item/commandExecution/requestApproval",
   "item/fileChange/requestApproval",
-  "execCommandApproval",
-  "applyPatchApproval",
 ]);
 
 export function createCodexAppServerState(
@@ -167,7 +114,7 @@ export function createCodexAppServerState(
 }
 
 export function codexAppServerArgs(
-  request: Pick<CodexRunnerRequest, "networkAccess" | "externalTools">,
+  request: Pick<RunnerRequest, "networkAccess" | "externalTools">,
   browserAutomationProvider?: string,
 ): string[] {
   const argumentsList = ["app-server", "--listen", "stdio://"];
@@ -272,7 +219,7 @@ export function codexInitializedNotification(): CodexRpcMessage {
 }
 
 export function codexConfigReadRequest(
-  request: Pick<CodexRunnerRequest, "workspaceRoot">,
+  request: Pick<RunnerRequest, "workspaceRoot">,
 ): CodexRpcMessage {
   return {
     method: "config/read",
@@ -299,7 +246,7 @@ export function codexAppsInstalledRequest(): CodexRpcMessage {
 
 interface CodexThreadParams {
   cwd: string;
-  approvalPolicy: CodexRunnerRequest["approvalPolicy"];
+  approvalPolicy: RunnerRequest["approvalPolicy"];
   sandbox?: ReturnType<typeof sandboxModeValue>;
   config?: NonNullable<ReturnType<typeof codexMcpSessionConfig>>;
   developerInstructions?: string;
@@ -307,7 +254,7 @@ interface CodexThreadParams {
 }
 
 export function codexThreadRequest(
-  request: CodexRunnerRequest,
+  request: RunnerRequest,
   isolation: CodexMcpIsolation = emptyCodexMcpIsolation(),
 ): CodexRpcMessage {
   const params: CodexThreadParams = {
@@ -336,18 +283,18 @@ export function codexThreadRequest(
 interface CodexTurnParams {
   threadId: string;
   cwd: string;
-  approvalPolicy: CodexRunnerRequest["approvalPolicy"];
+  approvalPolicy: RunnerRequest["approvalPolicy"];
   input: Array<
     | { type: "text"; text: string }
     | { type: "localImage"; path: string }
   >;
-  outputSchema?: NonNullable<CodexRunnerRequest["outputSchema"]>;
+  outputSchema?: NonNullable<RunnerRequest["outputSchema"]>;
   model?: string;
   effort?: string;
 }
 
 export function codexTurnRequest(
-  request: CodexRunnerRequest,
+  request: RunnerRequest,
   threadId: string,
 ): CodexRpcMessage {
   const params: CodexTurnParams = {
@@ -387,44 +334,44 @@ export function normalizeCodexAppServerMessage(
       (params.failureReason === "reauthenticationRequired"
         ? "Authentication is required."
         : "The MCP connection failed during startup.");
-    return {
-      type: "activityCompleted",
+    return normalizedActivityCompleted({
       id: `mcp-startup:${name}`,
-      kind: "tool",
+      kind: AgentActivityKind.TOOL,
       title: normalizedActivityTitle(`${name} MCP unavailable`),
       text: normalizedActivityText(detail),
-      status: "failed",
-    };
+      status: AgentActivityStatus.FAILED,
+    });
   }
 
   if (method === "item/started" || method === "item/completed") {
     const item = asRecord(params.item);
     if (item?.type === "agentMessage" && typeof item.id === "string") {
-      return {
-        type: method === "item/started" ? "messageStarted" : "messageCompleted",
+      const input = {
         id: item.id,
         phase: typeof item.phase === "string" ? item.phase : null,
         text: typeof item.text === "string" ? item.text : "",
       };
+      return method === "item/started"
+        ? normalizedMessageStarted(input)
+        : normalizedMessageCompleted(input);
     }
     if (!item) return undefined;
     const activity = codexActivity(item);
     if (!activity) return undefined;
     if (method === "item/started") {
-      return { type: "activityStarted", ...activity };
+      return normalizedActivityStarted(activity);
     }
-    return {
-      type: "activityCompleted",
+    return normalizedActivityCompleted({
       ...activity,
       status: codexActivityStatus(item),
-    };
+    });
   }
 
   if (method === "item/agentMessage/delta") {
     const id = typeof params.itemId === "string" ? params.itemId : undefined;
     const delta = typeof params.delta === "string" ? params.delta : undefined;
     return id && delta !== undefined
-      ? { type: "messageDelta", id, delta }
+      ? normalizedMessageDelta({ id, delta })
       : undefined;
   }
 
@@ -437,14 +384,14 @@ export function normalizeCodexAppServerMessage(
     const id = typeof params.itemId === "string" ? params.itemId : undefined;
     const delta = firstText(params.delta, params.output, params.message);
     return id && delta !== undefined
-      ? { type: "activityDelta", id, delta: normalizedActivityText(delta) }
+      ? normalizedActivityDelta({ id, delta: normalizedActivityText(delta) })
       : undefined;
   }
 
   if (method === "turn/completed") {
     const turn = asRecord(params.turn);
     return typeof turn?.status === "string"
-      ? { type: "turnCompleted", status: turn.status }
+      ? normalizedTurnCompleted(turn.status)
       : undefined;
   }
   return undefined;
@@ -470,9 +417,9 @@ function codexActivity(item: Record<string, unknown> | null): {
 }
 
 function codexActivityKind(type: string): AgentActivityKind | null {
-  if (type === "commandExecution") return "command";
-  if (type === "fileChange") return "fileChange";
-  if (type === "webSearch") return "webSearch";
+  if (type === "commandExecution") return AgentActivityKind.COMMAND;
+  if (type === "fileChange") return AgentActivityKind.FILE_CHANGE;
+  if (type === "webSearch") return AgentActivityKind.WEB_SEARCH;
   if (
     type === "mcpToolCall" ||
     type === "dynamicToolCall" ||
@@ -480,7 +427,7 @@ function codexActivityKind(type: string): AgentActivityKind | null {
     type === "collabAgentToolCall" ||
     type === "imageView"
   ) {
-    return "tool";
+    return AgentActivityKind.TOOL;
   }
   return null;
 }
@@ -549,7 +496,7 @@ function codexActivityStatus(
     status === "aborted" ||
     status === "interrupted"
   ) {
-    return "cancelled";
+    return AgentActivityStatus.CANCELLED;
   }
   if (
     status === "failed" ||
@@ -558,9 +505,9 @@ function codexActivityStatus(
     item.error != null ||
     (typeof item.exitCode === "number" && item.exitCode !== 0)
   ) {
-    return "failed";
+    return AgentActivityStatus.FAILED;
   }
-  return "completed";
+  return AgentActivityStatus.COMPLETED;
 }
 
 export function codexApprovalRequest(message: CodexRpcMessage): {
@@ -626,7 +573,7 @@ export function codexServerRequestResponse(
 
 export function consumeCodexAppServerMessage(
   state: CodexAppServerState,
-  request: CodexRunnerRequest,
+  request: RunnerRequest,
   message: CodexRpcMessage,
 ): CodexAppServerTransition {
   captureCodexMcpMessage(state, message);
@@ -637,26 +584,6 @@ export function consumeCodexAppServerMessage(
 
   if (message.id !== undefined && message.id !== null) {
     if (message.error) {
-      // Config and capability discovery are observational. Older App Server
-      // builds may not implement these RPCs, and discovery must never prevent
-      // the actual thread from running.
-      if (
-        message.id === CONFIG_REQUEST_ID ||
-        message.id === MODEL_LIST_REQUEST_ID
-      ) {
-        state.phase = "readingApps";
-        return {
-          outgoing: [codexAppsInstalledRequest()],
-          completed: false,
-        };
-      }
-      if (message.id === APPS_INSTALLED_REQUEST_ID) {
-        state.phase = "startingThread";
-        return {
-          outgoing: [codexThreadRequest(request, state.isolation)],
-          completed: false,
-        };
-      }
       throw new Error(
         message.error.message?.trim() ||
           "Codex App Server returned an RPC error.",
@@ -878,7 +805,7 @@ function captureCodexMcpItem(
   ) {
     state.mcpFailures.set(serverName, { ...existing, required: true });
   }
-  if (codexActivityStatus(item) !== "failed") return;
+  if (codexActivityStatus(item) !== AgentActivityStatus.FAILED) return;
   const detail = codexActivityText(item).trim() || "MCP tool call failed.";
   state.mcpFailures.set(serverName, {
     serverName,
@@ -1117,7 +1044,7 @@ export function codexFinalMessage(state: CodexAppServerState): string | null {
 }
 
 function sandboxModeValue(
-  mode: CodexRunnerRequest["sandboxMode"],
+  mode: RunnerRequest["sandboxMode"],
 ): "read-only" | "workspace-write" | "danger-full-access" {
   if (mode === "readOnly") return "read-only";
   if (mode === "dangerFullAccess") return "danger-full-access";
@@ -1144,9 +1071,6 @@ function approvalDecision(
     method === "item/fileChange/requestApproval"
   ) {
     return { decision: approved ? "accept" : "decline" };
-  }
-  if (method === "execCommandApproval" || method === "applyPatchApproval") {
-    return { decision: approved ? "approved" : "denied" };
   }
   return null;
 }

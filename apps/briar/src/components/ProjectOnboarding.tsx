@@ -31,12 +31,14 @@ import { ApiError, apiErrorIssueMessages } from "../lib/api";
 import {
   preflightThenCreateProject,
   type LocalAutoHuntConfig,
-  type LocalProjectConnectionPreflight,
-  type LovableRepositoryCompatibility,
-  type PreparedProjectRepository,
-  type RepositoryReadiness,
-  type WorkflowRequirementHealth,
 } from "../lib/project-connection";
+import type {
+  LocalProjectConnectionPreflight,
+  LovableRepositoryCompatibility,
+  PreparedProjectRepository,
+  RepositoryReadiness,
+  WorkflowRequirementHealth,
+} from "../generated/tauri";
 import {
   isRepositoryWorkflowPending,
   repositoryWorkflowBootstrap,

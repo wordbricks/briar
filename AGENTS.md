@@ -24,6 +24,15 @@ hosting provider for production web deployments. Build and test the landing
 site from the merged `main` branch, then deploy the generated vinext Worker
 with Wrangler while preserving its `ASSETS` and `IMAGES` bindings.
 
+## Source Code Reference
+
+Use `opensrc path` inside other commands to read source:
+
+\`\`\`bash
+rg "pattern" $(opensrc path <package>)
+cat $(opensrc path <package>)/path/to/file
+\`\`\`
+
 ## Learning more about Effect
 
 This repository uses the Effect TypeScript library.

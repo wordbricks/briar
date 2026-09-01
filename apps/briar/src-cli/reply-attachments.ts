@@ -1,28 +1,11 @@
 import { access, readFile, stat } from "node:fs/promises";
 import { basename, isAbsolute, resolve } from "node:path";
-import * as Schema from "effect/Schema";
 import {
   agentReplyAttachmentMimeTypeFromName,
   normalizeAgentReplyAttachmentFile,
   validateAgentReplyAttachments,
 } from "../src/lib/agent-reply-attachments";
 import { isPathWithinRoot } from "./worktree";
-
-const maxReplyAttachmentPathLength = 4096;
-
-const ReplyAttachmentPaths = Schema.mutable(
-  Schema.Array(
-    Schema.Trim.check(
-      Schema.isLengthBetween(1, maxReplyAttachmentPathLength),
-    ),
-  ),
-).check(Schema.isMaxLength(5));
-
-const decodeAttachmentPaths = Schema.decodeUnknownSync(ReplyAttachmentPaths);
-
-export function decodeReplyAttachmentPaths(value: unknown): string[] {
-  return decodeAttachmentPaths(value ?? []);
-}
 
 export function validateReplyAttachments(
   attachments: readonly File[],
@@ -32,19 +15,6 @@ export function validateReplyAttachments(
   const validationError = validateAgentReplyAttachments(normalized);
   if (validationError) throw new Error(validationError);
   return normalized;
-}
-
-export function replyCompleteRequestBody(input: {
-  payload: Record<string, unknown>;
-  attachments: readonly File[];
-}) {
-  if (input.attachments.length === 0) return JSON.stringify(input.payload);
-  const form = new FormData();
-  form.append("complete", JSON.stringify(input.payload));
-  for (const file of input.attachments) {
-    form.append("attachments", file, file.name);
-  }
-  return form;
 }
 
 /**

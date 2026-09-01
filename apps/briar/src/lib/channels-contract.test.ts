@@ -6,10 +6,11 @@ import {
   channelMessageBlocksFallback,
   channelMessageInputSchema,
   channelProposalAcceptInputSchema,
+  channelProposalPayloadSchema,
   channelReplyContextMessageJson,
   channelReplyCompletionSchema,
   channelAgentSkillInputSchema,
-  channelWebhookInputSchema,
+  channelStoredProposalPayloadSchema,
   organizationAgentInputSchema,
   type ChannelMessage,
 } from "./channels-contract";
@@ -41,6 +42,8 @@ describe("Agent input limits", () => {
     model: null,
     effort: null,
     kind: "custom" as const,
+    executionMode: "task" as const,
+    approvalPolicy: "explicit" as const,
     position: index,
   });
 
@@ -81,31 +84,6 @@ describe("Agent input limits", () => {
     })).toBe(false);
   });
 
-  it("normalizes the legacy combined Skill field into description and body", () => {
-    expect(decode(channelAgentSkillInputSchema, {
-      name: "Release",
-      instructions: "Publish and verify the release.",
-      provider: "codex",
-      model: null,
-      effort: null,
-      kind: "custom",
-      position: 0,
-    })).toMatchObject({
-      name: "Release",
-      description: "Publish and verify the release.",
-      body: "Publish and verify the release.",
-      executionMode: "task",
-      approvalPolicy: "explicit",
-    });
-    expect(decode(channelAgentSkillInputSchema, {
-      ...skill(0),
-      executionMode: "conversation",
-      approvalPolicy: "invoke_is_consent",
-    })).toMatchObject({
-      executionMode: "conversation",
-      approvalPolicy: "invoke_is_consent",
-    });
-  });
 });
 
 describe("channel message contract", () => {
@@ -193,6 +171,7 @@ describe("channel message contract", () => {
         email: "jay@example.com",
         image: "data:image/png;base64,another-avatar",
       }],
+      subscribers: [],
       document: null,
       proposal: null,
       executionProposal: null,
@@ -224,8 +203,6 @@ describe("channel message contract", () => {
 
 describe("channel webhook contract", () => {
   it("trims bounded names and message fields without accepting extra input", () => {
-    expect(decode(channelWebhookInputSchema, { name: " Deploy notifier " }))
-      .toEqual({ name: "Deploy notifier" });
     expect(decode(channelIncomingWebhookMessageSchema, {
       text: " Deployment complete ",
       eventId: " deploy-42 ",
@@ -278,54 +255,52 @@ describe("channel webhook contract", () => {
 });
 
 describe("channel reply completion contract", () => {
-  it("keeps delegation null for rolling-compatible ordinary replies", () => {
-    expect(decode(channelReplyCompletionSchema, {
-      body: "Answer",
-      document: null,
-      issueProposal: null,
-    })).toEqual({
-      body: "Answer",
-      document: null,
-      issueProposal: null,
-      issueBatchProposal: null,
-      executionProposal: null,
-      skillExecutionProposal: null,
-      delegation: null,
-    });
+  const completion = (
+    body: string,
+    overrides: Record<string, unknown> = {},
+  ) => ({
+    body,
+    document: null,
+    issueProposal: null,
+    issueBatchProposal: null,
+    executionProposal: null,
+    skillExecutionProposal: null,
+    delegation: null,
+    ...overrides,
   });
 
   it("accepts only an isolated saved Skill execution marker", () => {
-    expect(decode(channelReplyCompletionSchema, {
-      body: "I matched the release Skill and prepared an approval.",
-      document: null,
-      issueProposal: null,
-      skillExecutionProposal: { type: "request_agent_skill_execute" },
-    })).toMatchObject({
+    expect(decode(channelReplyCompletionSchema, completion(
+      "I matched the release Skill and prepared an approval.",
+      {
+        skillExecutionProposal: { type: "request_agent_skill_execute" },
+      },
+    ))).toMatchObject({
       skillExecutionProposal: { type: "request_agent_skill_execute" },
       executionProposal: null,
       delegation: null,
     });
 
-    expect(accepts(channelReplyCompletionSchema, {
-      body: "Unsafe combined proposal",
-      document: null,
-      issueProposal: null,
-      executionProposal: { projectId, runId: projectId },
-      skillExecutionProposal: { type: "request_agent_skill_execute" },
-    })).toBe(false);
+    expect(accepts(channelReplyCompletionSchema, completion(
+      "Unsafe combined proposal",
+      {
+        executionProposal: { projectId, runId: projectId },
+        skillExecutionProposal: { type: "request_agent_skill_execute" },
+      },
+    ))).toBe(false);
   });
 
   it("accepts one bounded structured Project Agent delegation", () => {
-    expect(decode(channelReplyCompletionSchema, {
-      body: "I asked the project Agent to inspect the repository.",
-      document: null,
-      issueProposal: null,
-      delegation: {
-        projectId,
-        agentId,
-        request: "  Which module owns authentication?  ",
+    expect(decode(channelReplyCompletionSchema, completion(
+      "I asked the project Agent to inspect the repository.",
+      {
+        delegation: {
+          projectId,
+          agentId,
+          request: "  Which module owns authentication?  ",
+        },
       },
-    })).toMatchObject({
+    ))).toMatchObject({
       delegation: {
         projectId,
         agentId,
@@ -335,55 +310,31 @@ describe("channel reply completion contract", () => {
   });
 
   it("does not combine a delegation with an artifact or accept extra authority", () => {
-    const combined = accepts(channelReplyCompletionSchema, {
-      body: "Delegating and proposing.",
-      document: {
-        title: "Plan",
-        markdown: "# Plan",
-        projectId,
+    const combined = accepts(channelReplyCompletionSchema, completion(
+      "Delegating and proposing.",
+      {
+        document: {
+          title: "Plan",
+          markdown: "# Plan",
+          projectId,
+        },
+        delegation: { projectId, agentId, request: "Inspect it." },
       },
-      issueProposal: null,
-      delegation: { projectId, agentId, request: "Inspect it." },
-    });
+    ));
     expect(combined).toBe(false);
 
-    const expanded = accepts(channelReplyCompletionSchema, {
-      body: "Delegating.",
-      document: null,
-      issueProposal: null,
-      delegation: {
-        projectId,
-        agentId,
-        request: "Inspect it.",
-        provider: "codex",
-      },
-    });
-    expect(expanded).toBe(false);
-  });
-
-  it("only lets new issue proposals request backlog creation", () => {
-    const proposal = {
-      body: "Create this after approval.",
-      document: null,
-      delegation: null,
-      issueProposal: {
-        projectId,
-        issue: {
-          title: "Safe proposal",
-          description: null,
-          priority: null,
-          status: "backlog",
+    const expanded = accepts(channelReplyCompletionSchema, completion(
+      "Delegating.",
+      {
+        delegation: {
+          projectId,
+          agentId,
+          request: "Inspect it.",
+          provider: "codex",
         },
       },
-    };
-    expect(accepts(channelReplyCompletionSchema, proposal)).toBe(true);
-    expect(accepts(channelReplyCompletionSchema, {
-      ...proposal,
-      issueProposal: {
-        ...proposal.issueProposal,
-        issue: { ...proposal.issueProposal.issue, status: "queued" },
-      },
-    })).toBe(false);
+    ));
+    expect(expanded).toBe(false);
   });
 
   it("accepts bounded acyclic issue batches and rejects invalid graphs", () => {
@@ -391,48 +342,42 @@ describe("channel reply completion contract", () => {
       title,
       description: null,
       priority: 2,
-      status: "backlog" as const,
     });
-    const proposal = {
-      body: "Create the related backlog issues together.",
-      document: null,
-      issueProposal: null,
+    const batch = {
+      items: [
+        { key: "api", issue: issue("Build API") },
+        { key: "ui", issue: issue("Build UI") },
+      ],
+      dependencies: [
+        { prerequisiteKey: "api", dependentKey: "ui" },
+      ],
+    };
+    const proposal = completion("Create the related backlog issues together.", {
       issueBatchProposal: {
         projectId,
-        batch: {
-          items: [
-            { key: "api", issue: issue("Build API") },
-            { key: "ui", issue: issue("Build UI") },
-          ],
-          dependencies: [
-            { prerequisiteKey: "api", dependentKey: "ui" },
-          ],
-        },
+        batch,
       },
-      executionProposal: null,
-      skillExecutionProposal: null,
-      delegation: null,
-    };
+    });
     expect(accepts(channelReplyCompletionSchema, proposal)).toBe(true);
 
     const invalidBatches = [
       {
-        ...proposal.issueBatchProposal.batch,
+        ...batch,
         items: [
           { key: "same", issue: issue("A") },
           { key: "same", issue: issue("B") },
         ],
       },
       {
-        ...proposal.issueBatchProposal.batch,
+        ...batch,
         dependencies: [{ prerequisiteKey: "missing", dependentKey: "ui" }],
       },
       {
-        ...proposal.issueBatchProposal.batch,
+        ...batch,
         dependencies: [{ prerequisiteKey: "api", dependentKey: "api" }],
       },
       {
-        ...proposal.issueBatchProposal.batch,
+        ...batch,
         dependencies: [
           { prerequisiteKey: "api", dependentKey: "ui" },
           { prerequisiteKey: "ui", dependentKey: "api" },
@@ -452,5 +397,21 @@ describe("channel reply completion contract", () => {
         issueBatchProposal: { projectId, batch },
       })).toBe(false);
     }
+  });
+
+  it("keeps stored payloads exact and derives public execution metadata", () => {
+    const stored = {
+      issue: {
+        title: "Build the API",
+        description: null,
+        priority: 2,
+      },
+    };
+    const projected = { ...stored, executeAfterCreate: true };
+
+    expect(accepts(channelStoredProposalPayloadSchema, stored)).toBe(true);
+    expect(accepts(channelStoredProposalPayloadSchema, projected)).toBe(false);
+    expect(accepts(channelProposalPayloadSchema, stored)).toBe(false);
+    expect(accepts(channelProposalPayloadSchema, projected)).toBe(true);
   });
 });

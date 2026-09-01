@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { AgentActivityKind } from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
 
 import {
   agyArgs,
@@ -9,17 +10,18 @@ import {
   createAgyEventState,
   mapEffortToAgy,
   normalizeAgyEvent,
-  type AgyRunnerRequest,
 } from "./agy-runner-lib";
+import type { RunnerRequest } from "./runner-request";
 
-const request = (overrides: Partial<AgyRunnerRequest> = {}): AgyRunnerRequest => ({
-  type: "run",
+const request = (overrides: Partial<RunnerRequest> = {}): RunnerRequest => ({
   message: "Fix the tests",
   workspaceRoot: "/repo",
   approvalPolicy: "never",
   sandboxMode: "workspaceWrite",
   networkAccess: false,
-  agyBinary: "/bin/agy",
+  attachments: [],
+  additionalDirectories: [],
+  providerBinaryPath: "/bin/agy",
   ...overrides,
 });
 
@@ -77,7 +79,9 @@ describe("Antigravity runner helpers", () => {
         step_type: "agent_response",
         text_delta: "Hello",
       },
-    }, state)).toMatchObject([{ type: "messageStarted", text: "Hello" }]);
+    }, state)).toMatchObject([{
+      event: { case: "messageStarted", value: { text: "Hello" } },
+    }]);
     expect(normalizeAgyEvent({
       event: "step_update",
       step_update: {
@@ -87,13 +91,20 @@ describe("Antigravity runner helpers", () => {
         step_type: "agent_response",
         text_delta: " world",
       },
-    }, state)).toMatchObject([{ type: "messageDelta", delta: " world" }]);
+    }, state)).toMatchObject([{
+      event: { case: "messageDelta", value: { delta: " world" } },
+    }]);
     expect(normalizeAgyEvent({
       event: "result",
       result: { conversation_id: "conversation-1", response: "Hello world" },
     }, state)).toMatchObject([
-      { type: "messageCompleted", text: "Hello world" },
-      { type: "turnCompleted", status: "completed" },
+      {
+        event: {
+          case: "messageCompleted",
+          value: { text: "Hello world" },
+        },
+      },
+      { event: { case: "turnCompleted", value: { status: "completed" } } },
     ]);
   });
 
@@ -108,7 +119,12 @@ describe("Antigravity runner helpers", () => {
         tool_info: { name: "run_command", parameters: { CommandLine: "bun test" } },
       },
     }, createAgyEventState());
-    expect(events).toMatchObject([{ type: "activityStarted", id: "agy-step-3", kind: "command" }]);
+    expect(events).toMatchObject([{
+      event: {
+        case: "activityStarted",
+        value: { id: "agy-step-3", kind: AgentActivityKind.COMMAND },
+      },
+    }]);
     expect(agyBlockedRetry("RESOURCE_EXHAUSTED: quota reached")).toMatchObject({
       reason: "usage_exhausted",
       provider: "agy",

@@ -25,6 +25,7 @@ describe("channel activity credentials", () => {
     attempt: 2,
     workerId: "worker-a",
     deviceId: "device-a",
+    claimTokenHash: "a".repeat(64),
   };
 
   it("authenticates a reply-scoped publish token", async () => {

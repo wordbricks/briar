@@ -22,7 +22,6 @@ import {
   slackEventClaimTtlMs,
   slackHelpMessage,
 } from "./slack";
-import { handleSlackCommandForm } from "./slack-app-routes";
 import { readVerifiedSlackBody } from "./slack-request";
 
 type SlackAppMentionEvent = {
@@ -277,15 +276,6 @@ async function handleSlackEventRequest(
   ctx?: ExecutionContext,
 ) {
   const rawBody = await readVerifiedSlackBody(request, env);
-  if (
-    request.headers
-      .get("content-type")
-      ?.toLowerCase()
-      .startsWith("application/x-www-form-urlencoded")
-  ) {
-    return handleSlackCommandForm(new URLSearchParams(rawBody), env, ctx);
-  }
-
   let payload: unknown;
   try {
     payload = JSON.parse(rawBody);

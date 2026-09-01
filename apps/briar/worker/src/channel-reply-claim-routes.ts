@@ -1,17 +1,17 @@
-import { bindDmMemoryReplyClaim, excludeForgottenDmSources, supportsDmMemory } from "./dm-memory-claim";
-import { requireDmMemoryReplyFence } from "./dm-memory-reply-fence";
-import { dmLearningPolicy, supportsDmMemoryLearningRequests } from "./dm-memory-learning-policy";
-import { decodeOrganizationAgentContextDescriptor } from "../../src/lib/organization-agent-context-contract";
+import { channelReplyAttachmentPath } from "../../src/lib/channel-reply-attachment-path";
 import { channelReplyContextMessageJson } from "../../src/lib/channels-contract";
 import { agentReplyDisplayParentMessageId } from "../../src/lib/issue-reply-decision";
+import {
+  bindDmMemoryReplyClaim,
+  excludeForgottenDmSources,
+} from "./dm-memory-claim";
+import { requireDmMemoryReplyFence } from "./dm-memory-reply-fence";
+import { dmLearningPolicy } from "./dm-memory-learning-policy";
 import {
   agentSkillJson,
   hydrateAgentSkills,
 } from "./agent-skills";
-import { legacyAgentSkillInstructions } from "./agent-execution-config";
-import { decodeChannelReplyClaimInput } from "./channel-route-decoders";
 import {
-  channelExecutionProposalTablesAvailable,
   claimNextChannelAgentReply,
   failChannelReply,
   getChannelAgentReplyJob,
@@ -24,40 +24,31 @@ import {
   snapshotChannelReplyExecutionTargets,
 } from "./channels";
 import { sha256 } from "./crypto-digest";
-import { HttpError, json } from "./http-response";
+import { HttpError } from "./http-response";
 import { getOrganizationAgent } from "./organization-agents";
-import { readJson } from "./request-readers";
 import {
   channelActivityCredential,
   scheduleChannelRealtimePublish,
 } from "./realtime-scheduling";
 import {
-  executionWorkerBindingById,
-  executionWorkerProviders,
-  executionWorkerSupportsOrganizationAgentContext,
+  executionWorkerRuntime,
   leaseExpiryFrom,
   workerStateAt,
 } from "./workers";
-import { requireWorkerOrganization } from "./worker-route-auth";
 import { latestExecutionWorkerUpdateHandoff } from "./worker-update-repository";
+import type { AuthenticatedWorkerProject } from "./worker-route-auth";
 
 const DM_REPLY_CONTEXT_MESSAGE_LIMIT = 10;
 const DM_REPLY_CONTEXT_MAX_AGE_MS = 5 * 24 * 60 * 60 * 1_000;
 
-export type AuthenticatedChannelWorkerProject = {
-  principal: Awaited<ReturnType<typeof requireWorkerOrganization>>;
-  binding: NonNullable<
-    Awaited<ReturnType<typeof executionWorkerBindingById>>
-  >;
-};
+export type AuthenticatedChannelWorkerProject = AuthenticatedWorkerProject;
 
 export type ClaimNextChannelReplyWorkInput = {
-  request: Request;
-  input: ReturnType<typeof decodeChannelReplyClaimInput>;
+  input: { organizationId: string; workerId: string };
   db: D1Database;
   env: Env;
   context?: ExecutionContext;
-  authenticatedWorker?: AuthenticatedChannelWorkerProject;
+  authenticatedWorker: AuthenticatedChannelWorkerProject;
 };
 
 /**
@@ -67,17 +58,15 @@ export type ClaimNextChannelReplyWorkInput = {
  */
 export async function claimNextChannelReplyWork(
   claimInput: ClaimNextChannelReplyWorkInput,
-): Promise<Response> {
-  const { request, input, db, env, context, authenticatedWorker } = claimInput;
-  const principal = authenticatedWorker?.principal ??
-    await requireWorkerOrganization(db, request, input.organizationId);
+){
+  const { input, db, env, context, authenticatedWorker } = claimInput;
+  const principal = authenticatedWorker.principal;
   if (principal.organizationId !== input.organizationId) {
     throw new HttpError(403, "Worker is not enabled for this organization");
   }
   // Readiness and provider health still come from a project binding, which
   // every registered device has. Eligibility per job is enforced in the claim.
-  const binding = authenticatedWorker?.binding ??
-    await executionWorkerBindingById(db, principal.deviceId, input.workerId);
+  const binding = authenticatedWorker.binding;
   if (!binding || binding.id !== input.workerId || binding.state === "disabled") {
     throw new HttpError(403, "Worker is not enabled for this organization");
   }
@@ -95,8 +84,8 @@ export async function claimNextChannelReplyWork(
   ) {
     throw new HttpError(409, "Worker is not ready to claim replies");
   }
-  const providers = executionWorkerProviders(binding);
-  if (providers.length === 0) {
+  const runtime = executionWorkerRuntime(binding);
+  if (runtime.providers.length === 0) {
     throw new HttpError(409, "Worker has no available reply provider");
   }
   const claimToken = `briar_channel_claim_${
@@ -106,16 +95,12 @@ export async function claimNextChannelReplyWork(
   const job = await claimNextChannelAgentReply(db, input.organizationId, {
     deviceId: principal.deviceId,
     workerId: binding.id,
-    providers,
-    workerAgentProvider: binding.agent_provider,
-    workerCapabilitiesJson: binding.capabilities_json,
-    supportsOrganizationAgentContext:
-      executionWorkerSupportsOrganizationAgentContext(binding),
+    runtime,
     claimTokenHash,
     claimedAt: observedAt,
     leaseExpiresAt: leaseExpiryFrom(observedAt),
   });
-  if (!job) return json({ work: null });
+  if (!job) return null;
   scheduleChannelRealtimePublish(env, db, input.organizationId, context);
   try {
     if (job.claimed_worker_id !== binding.id) {
@@ -246,8 +231,7 @@ export async function claimNextChannelReplyWork(
     if (job.project_id !== null && !project) {
       throw new HttpError(409, "Reply job lost its project context");
     }
-    const executionTargets = job.project_id &&
-        await channelExecutionProposalTablesAvailable(db)
+    const executionTargets = job.project_id
       ? await snapshotChannelReplyExecutionTargets(db, {
           jobId: job.id,
           deviceId: principal.deviceId,
@@ -325,14 +309,20 @@ export async function claimNextChannelReplyWork(
             : []
         )
       : [];
-    const memoryBinding = channel.kind === "dm" ? await bindDmMemoryReplyClaim(db, {
-      jobId: job.id, claimTokenHash, supportsMemory: supportsDmMemory(binding.capabilities_json),
-      enabled: String(env.DM_MEMORY_RETRIEVAL_ENABLED) === "true",
-    }) : null;
+    const memoryBinding = channel.kind === "dm"
+      ? await bindDmMemoryReplyClaim(db, {
+          jobId: job.id,
+          claimTokenHash,
+          supportsMemory: runtime.proto.capabilities?.dmMemoryProtocol === 1,
+          enabled: String(env.DM_MEMORY_RETRIEVAL_ENABLED) === "true",
+        })
+      : null;
     const safeMessages = channel.kind === "dm"
-      ? await excludeForgottenDmSources(db, channel.id, messages) : messages;
+      ? await excludeForgottenDmSources(db, channel.id, messages)
+      : messages;
     const currentSession = memoryBinding
-      ? await getChannelReplySession(db, job.channel_reply_session.id) : job.channel_reply_session;
+      ? await getChannelReplySession(db, job.channel_reply_session.id)
+      : job.channel_reply_session;
     await requireDmMemoryReplyFence(db, job.id);
     const activity = env.CHANNEL_ACTIVITY_REALTIME
       ? await channelActivityCredential(env, job, {
@@ -345,9 +335,8 @@ export async function claimNextChannelReplyWork(
       workType: "channelReply",
       workId: job.id,
     });
-    return json({
-      work: {
-        workType: "channelReply",
+    return {
+        workType: "channelReply" as const,
         workId: job.id,
         organizationId: job.organization_id,
         channelId: job.channel_id,
@@ -392,10 +381,6 @@ export async function claimNextChannelReplyWork(
           model: replyModel,
           effort: replyEffort,
           responsibility: agent.responsibility,
-          skill: legacyAgentSkillInstructions(
-            activeSkill,
-            agent.skill_markdown ?? agent.responsibility,
-          ),
           skills: agent.skills.map(agentSkillJson),
         },
         claimToken,
@@ -404,9 +389,10 @@ export async function claimNextChannelReplyWork(
         activity,
         handoffContext: memoryBinding ? null : handoffContext,
         memory: memoryBinding?.memory ?? null,
-        ...(supportsDmMemoryLearningRequests(binding.capabilities_json) ? {
-          memoryLearning: { enabled: memoryBinding !== null && dmLearningPolicy(env, job.organization_id) !== null },
-        } : {}),
+        memoryLearningEnabled:
+          runtime.proto.capabilities?.dmMemoryLearningRequests === 1 &&
+          memoryBinding !== null &&
+          dmLearningPolicy(env, job.organization_id) !== null,
         session: {
           id: job.channel_reply_session.id,
           threadId: job.channel_reply_session.thread_root_message_id,
@@ -415,13 +401,23 @@ export async function claimNextChannelReplyWork(
           claimReason: job.session_claim_reason,
         },
         organizationContext: agent.project_id === null
-          ? decodeOrganizationAgentContextDescriptor({
-              schemaVersion: 1,
-              snapshotAt: job.claimed_at,
-            })
+          ? { snapshotAt: job.claimed_at }
           : null,
         delegation,
         delegationTargets,
+        triggerAttachments: (triggerMessage?.attachments ?? []).map(
+          (attachment) => ({
+            id: attachment.id,
+            filename: attachment.filename,
+            contentType: attachment.contentType,
+            byteSize: attachment.byteSize,
+            url: channelReplyAttachmentPath({
+              organizationId: job.organization_id,
+              workId: job.id,
+              attachmentId: attachment.id,
+            }),
+          }),
+        ),
         snapshot: {
           channel: {
             id: channel.id,
@@ -434,14 +430,9 @@ export async function claimNextChannelReplyWork(
             id: agent.id,
             name: agent.name,
             responsibility: agent.responsibility,
-            skill: legacyAgentSkillInstructions(
-              activeSkill,
-              agent.skill_markdown ?? agent.responsibility,
-            ),
             provider: job.agent_provider,
             model: replyModel,
             effort: replyEffort,
-            skills: agent.skills.map(agentSkillJson),
             projectId: agent.project_id,
           },
           project: project ? { id: project.id, name: project.name } : null,
@@ -457,8 +448,7 @@ export async function claimNextChannelReplyWork(
           })),
           messages: safeMessages.map(channelReplyContextMessageJson),
         },
-      },
-    });
+    };
   } catch (error) {
     await failChannelReply(db, {
       jobId: job.id,
@@ -471,31 +461,4 @@ export async function claimNextChannelReplyWork(
     scheduleChannelRealtimePublish(env, db, input.organizationId, context);
     throw error;
   }
-}
-
-export type ChannelReplyClaimRouteInput = {
-  request: Request;
-  url: URL;
-  db: D1Database;
-  env: Env;
-  context?: ExecutionContext;
-  authenticatedWorker?: AuthenticatedChannelWorkerProject;
-};
-
-export async function handleChannelReplyClaimRoute(
-  routeInput: ChannelReplyClaimRouteInput,
-): Promise<Response | undefined> {
-  const { request, url, db, env, context, authenticatedWorker } = routeInput;
-  if (url.pathname !== "/channel-reply-claims" || request.method !== "POST") {
-    return undefined;
-  }
-  const input = decodeChannelReplyClaimInput(await readJson(request));
-  return claimNextChannelReplyWork({
-    request,
-    input,
-    db,
-    env,
-    context,
-    authenticatedWorker,
-  });
 }

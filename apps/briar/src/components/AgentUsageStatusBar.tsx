@@ -17,15 +17,17 @@ import {
   quotaUsageProviders,
   recordAgentUsageSnapshot,
   tightestUsageWindow,
-  type AgentUsageProvider,
-  type AgentUsageSnapshot,
-  type AgentUsageWindow,
 } from "../lib/agent-usage";
 import {
   defaultAppProviderSettings,
   loadAppProviderSettings,
-  type AppProviderSettings,
 } from "../lib/project-llm";
+import type {
+  AgentUsageSnapshot,
+  AgentUsageWindow,
+  AppProviderSettings,
+  ProviderUsage,
+} from "../generated/tauri";
 import { AgentProviderIcon } from "./AgentIcons";
 import {
   StatusPanel,
@@ -41,7 +43,7 @@ type UsageMode = "detailed" | "compact";
 function ProviderIcon({
   provider,
 }: {
-  provider: AgentUsageProvider["provider"];
+  provider: ProviderUsage["provider"];
 }) {
   return (
     <span
@@ -60,7 +62,7 @@ function ProviderIcon({
   );
 }
 
-function providerName(provider: AgentUsageProvider["provider"]) {
+function providerName(provider: ProviderUsage["provider"]) {
   return quotaUsageProviderLabel(provider);
 }
 
@@ -117,7 +119,7 @@ function UsageMeter({
   );
 }
 
-function ProviderReset({ provider }: { provider: AgentUsageProvider }) {
+function ProviderReset({ provider }: { provider: ProviderUsage }) {
   const { t } = useI18n();
   const reset = [provider.session, provider.weekly, provider.monthly]
     .map((window) => window?.resetsAt ?? null)
@@ -148,7 +150,7 @@ function ProviderRow({
 }: {
   mode: UsageMode;
   onOpen: () => void;
-  provider: AgentUsageProvider;
+  provider: ProviderUsage;
 }) {
   const windows = [provider.session, provider.weekly, provider.monthly].filter(
     (window): window is AgentUsageWindow => window !== null,
@@ -200,7 +202,7 @@ function ProviderDetails({
 }: {
   onBack: () => void;
   onManageAccount: () => void;
-  provider: AgentUsageProvider;
+  provider: ProviderUsage;
 }) {
   const { localeTag, t } = useI18n();
   const windows = [provider.session, provider.weekly, provider.monthly].filter(
@@ -308,7 +310,7 @@ function ProviderDetails({
   );
 }
 
-function StatusProvider({ provider }: { provider: AgentUsageProvider }) {
+function StatusProvider({ provider }: { provider: ProviderUsage }) {
   const { t } = useI18n();
   const window = tightestUsageWindow(provider);
   const name = providerName(provider.provider);
@@ -365,7 +367,7 @@ export function AgentUsageStatusBar({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [mode, setMode] = useState<UsageMode>("detailed");
   const [selectedProvider, setSelectedProvider] = useState<
-    AgentUsageProvider["provider"] | null
+    ProviderUsage["provider"] | null
   >(null);
 
   const refresh = useCallback(() => {

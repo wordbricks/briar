@@ -1,12 +1,6 @@
 import * as Schema from "effect/Schema";
-import {
-  AgentProviderCapabilityCatalog,
-  ModelEffort,
-} from "../../src/lib/agent-provider-contract";
-import {
-  agentProviders,
-  type AgentProvider,
-} from "../../src/lib/agent-provider";
+import { ModelEffort } from "../../src/lib/agent-provider-contract";
+import { agentProviders } from "../../src/lib/agent-provider";
 import { StructuredAgentResult } from "../../src/lib/agent-result";
 import {
   isWorkerEmoji,
@@ -25,109 +19,10 @@ import {
 } from "./schema-codecs";
 import { decodeRequestSync } from "./request-schema";
 
-export const ClaimInput = strictSchema(Schema.Struct({
-  claimedBy: trimmedText(1, 128),
-  workerId: Schema.optional(trimmedText(1, 128)),
-  projectId: Schema.optional(UuidString),
-  runId: Schema.optional(UuidString),
-}));
-
 export const WorkerClaimInput = strictSchema(Schema.Struct({
   claimedBy: trimmedText(1, 128),
   workerId: trimmedText(1, 128),
   projectId: UuidString,
-}));
-
-export const IssueReplyClaimInput = strictSchema(Schema.Struct({
-  claimedBy: trimmedText(1, 128),
-  workerId: trimmedText(1, 128),
-  projectId: UuidString,
-}));
-
-const ProviderHealth = strictSchema(Schema.Struct({
-  installed: Schema.Boolean,
-  authenticated: Schema.Boolean,
-  healthy: Schema.Boolean,
-  reason: Schema.optional(
-    Schema.NullOr(Schema.Trim.check(Schema.isMaxLength(64))),
-  ),
-  usageExhausted: Schema.optional(Schema.Boolean),
-  maxUsedPercent: Schema.optional(Schema.NullOr(
-    Schema.Finite.check(
-      Schema.isGreaterThanOrEqualTo(0),
-      Schema.isLessThanOrEqualTo(100),
-    ),
-  )),
-}));
-
-const ProviderHealthFields = {
-  codex: ProviderHealth,
-  claude: ProviderHealth,
-  cursor: ProviderHealth,
-  grok: ProviderHealth,
-  agy: ProviderHealth,
-  opencode: ProviderHealth,
-  openrouter: ProviderHealth,
-} satisfies Record<AgentProvider, typeof ProviderHealth>;
-
-const ProviderHealthMap = strictSchema(Schema.Struct(ProviderHealthFields));
-
-const Versions = Schema.Record(
-  Schema.String,
-  Schema.String.check(Schema.isMaxLength(64)),
-).check(
-  Schema.makeFilter((versions) =>
-    Object.keys(versions)
-      .filter((key) => key.length > 64)
-      .map((key) => ({
-        path: [key],
-        issue: "Version keys must contain at most 64 characters",
-      }))
-  ),
-);
-
-const WorkerRegistrationFields = {
-  label: trimmedText(1, 100),
-  deviceIdentity: Schema.String.check(
-    Schema.isPattern(/^briar_device_[0-9a-f]{64}$/u),
-  ),
-  agentProvider: Schema.Literals(agentProviders),
-  providers: Schema.optional(
-    mutableArray(Schema.Literals(agentProviders)).check(
-      Schema.isMaxLength(agentProviders.length),
-    ),
-  ),
-  providerHealth: Schema.optional(ProviderHealthMap),
-  providerCapabilities: Schema.optional(AgentProviderCapabilityCatalog),
-  maxConcurrentSessions: Schema.optional(
-    integerBetween(1, MAX_WORKER_CONCURRENT_SESSIONS),
-  ),
-  versions: defaulted(Versions, {}),
-} as const;
-
-const WorkerRuntimeMetadataFields = {
-  agentProvider: WorkerRegistrationFields.agentProvider,
-  providers: WorkerRegistrationFields.providers,
-  providerHealth: WorkerRegistrationFields.providerHealth,
-  providerCapabilities: WorkerRegistrationFields.providerCapabilities,
-  versions: WorkerRegistrationFields.versions,
-} as const;
-
-export const WorkerRuntimeMetadata = strictSchema(Schema.Struct(
-  WorkerRuntimeMetadataFields,
-));
-
-export const WorkerRegister = strictSchema(Schema.Struct(
-  WorkerRegistrationFields,
-));
-
-export const WorkerBind = strictSchema(Schema.Struct({
-  deviceIdentity: WorkerRegistrationFields.deviceIdentity,
-  ...WorkerRuntimeMetadataFields,
-}));
-
-export const WorkerConcurrency = strictSchema(Schema.Struct({
-  maxConcurrentSessions: integerBetween(1, MAX_WORKER_CONCURRENT_SESSIONS),
 }));
 
 const WorkerIcon = Schema.Union([
@@ -174,30 +69,6 @@ export const ExecutionWorkerPolicy = strictSchema(Schema.Struct({
   ),
 }));
 
-const WorkerHeartbeatCapabilities = Schema.StructWithRest(
-  Schema.Struct({
-    providerCapabilities: Schema.optional(AgentProviderCapabilityCatalog),
-  }),
-  [Schema.Record(Schema.String, Schema.Unknown)],
-);
-
-export const WorkerHeartbeat = strictSchema(Schema.Struct({
-  versions: Schema.optional(Versions),
-  refreshMaintenance: Schema.optional(Schema.Boolean),
-  acceptingWork: Schema.optional(Schema.Boolean),
-  readinessState: Schema.optional(
-    Schema.Literals(["ready", "busy", "needs_attention"]),
-  ),
-  readinessDetail: Schema.optional(
-    Schema.NullOr(Schema.Trim.check(Schema.isMaxLength(500))),
-  ),
-  capabilities: Schema.optional(WorkerHeartbeatCapabilities),
-}));
-
-export const WorkerLabel = strictSchema(Schema.Struct({
-  label: trimmedText(1, 100),
-}));
-
 export const DispatchRun = strictSchema(Schema.Struct({
   agentId: Schema.optional(Schema.NullOr(UuidString)),
   provider: Schema.optional(Schema.Literals(agentProviders)),
@@ -227,11 +98,6 @@ export const DispatchRun = strictSchema(Schema.Struct({
     return issues.length > 0 ? issues : undefined;
   }),
 ));
-
-export const LeaseRenew = strictSchema(Schema.Struct({
-  claimToken: trimmedText(1, 200),
-  projectId: Schema.optional(UuidString),
-}));
 
 export const ProjectAgentScheduleClaimToken = Schema.Trim.check(
   Schema.isPattern(/^briar_schedule_claim_[0-9a-f]{64}$/u),
@@ -293,22 +159,12 @@ export const ProjectAgentScheduleRunCompletion = strictSchema(Schema.Struct({
   }),
 ));
 
-export const decodeClaimInput = decodeRequestSync(ClaimInput);
 export const decodeWorkerClaimInput = decodeRequestSync(WorkerClaimInput);
-export const decodeIssueReplyClaimInput = decodeRequestSync(
-  IssueReplyClaimInput,
-);
-export const decodeWorkerRegister = decodeRequestSync(WorkerRegister);
-export const decodeWorkerBind = decodeRequestSync(WorkerBind);
-export const decodeWorkerConcurrency = decodeRequestSync(WorkerConcurrency);
 export const decodeWorkerSettings = decodeRequestSync(WorkerSettings);
 export const decodeExecutionWorkerPolicy = decodeRequestSync(
   ExecutionWorkerPolicy,
 );
-export const decodeWorkerHeartbeat = decodeRequestSync(WorkerHeartbeat);
-export const decodeWorkerLabel = decodeRequestSync(WorkerLabel);
 export const decodeDispatchRun = decodeRequestSync(DispatchRun);
-export const decodeLeaseRenew = decodeRequestSync(LeaseRenew);
 export const decodeProjectAgentScheduleRunRenew = decodeRequestSync(
   ProjectAgentScheduleRunRenew,
 );

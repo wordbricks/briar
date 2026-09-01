@@ -1,6 +1,12 @@
 import { getMobilePlatform } from "./platform";
 
-export const appIconNames = ["purple", "gray", "pink", "green"] as const;
+export const appIconNames = [
+  "purple",
+  "gray",
+  "pink",
+  "green",
+] as const;
+
 export type AppIconName = (typeof appIconNames)[number];
 
 const storageKey = "briar.app-icon.v1";

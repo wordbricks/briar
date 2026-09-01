@@ -181,8 +181,17 @@ export const decodeAgentExecutionMetrics = Schema.decodeUnknownSync(
   strictAgentExecutionSchemaOptions,
 );
 
-export const decodeAgentExecutionMetricsOption = Schema.decodeUnknownOption(
+const AgentExecutionMetricsJson = Schema.fromJsonString(
   AgentExecutionMetrics,
+);
+
+export const decodeAgentExecutionMetricsJson = Schema.decodeUnknownSync(
+  AgentExecutionMetricsJson,
+  strictAgentExecutionSchemaOptions,
+);
+
+export const encodeAgentExecutionMetricsJson = Schema.encodeSync(
+  AgentExecutionMetricsJson,
   strictAgentExecutionSchemaOptions,
 );
 

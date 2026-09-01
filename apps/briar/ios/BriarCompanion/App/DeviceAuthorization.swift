@@ -70,19 +70,13 @@ final class ASWebAuthenticationPresenter: NSObject, WebAuthenticationPresenting,
 }
 
 struct DeviceAuthorizationService: Sendable {
-    let api: any MobileAPIClientProtocol
+    let client: any DeviceAuthorizationClientProtocol
 
     @MainActor
     func authorize(using presenter: any WebAuthenticationPresenting) async throws -> String {
-        let code: DeviceCodeResponse = try await api.send(
-            MobileAPIContract.Endpoint.deviceCode,
-            method: "POST",
-            token: nil,
-            body: DeviceCodeRequest(),
-            as: DeviceCodeResponse.self
-        )
+        let code = try await client.requestDeviceCode()
         guard var components = URLComponents(
-            url: code.verificationURIComplete ?? code.verificationURI,
+            url: code.verificationURIComplete,
             resolvingAgainstBaseURL: false
         ) else { throw DeviceAuthorizationError.invalidCallback }
         var queryItems = components.queryItems ?? []
@@ -96,31 +90,23 @@ struct DeviceAuthorizationService: Sendable {
         return try await poll(code)
     }
 
-    private func poll(_ code: DeviceCodeResponse) async throws -> String {
+    private func poll(_ code: DeviceAuthorizationCode) async throws -> String {
         let clock = ContinuousClock()
         let startedAt = clock.now
-        let expiresAfter = Duration.seconds(code.expiresIn ?? 600)
-        var interval = max(code.interval ?? 5, 1)
+        let expiresAfter = Duration.seconds(code.expiresIn)
+        var interval = max(code.interval, 1)
         while clock.now - startedAt < expiresAfter {
-            do {
-                let response: DeviceTokenResponse = try await api.send(
-                    MobileAPIContract.Endpoint.deviceToken,
-                    method: "POST",
-                    token: nil,
-                    body: DeviceTokenRequest(deviceCode: code.deviceCode),
-                    as: DeviceTokenResponse.self
-                )
-                return response.accessToken
-            } catch let MobileAPIError.httpStatus(status, message) where status == 400 {
-                if message.contains("slow_down") {
-                    interval += 5
-                } else if message.contains("access_denied") {
-                    throw DeviceAuthorizationError.denied(message)
-                } else if message.contains("expired_token") {
-                    throw DeviceAuthorizationError.expired(message)
-                } else if !message.contains("authorization_pending") {
-                    throw MobileAPIError.httpStatus(status, message)
-                }
+            switch try await client.pollDeviceToken(deviceCode: code.deviceCode) {
+            case .authorized(let token):
+                return token.accessToken
+            case .authorizationPending:
+                break
+            case .slowDown:
+                interval += 5
+            case .accessDenied(let message):
+                throw DeviceAuthorizationError.denied(message)
+            case .expiredToken(let message):
+                throw DeviceAuthorizationError.expired(message)
             }
             try await Task.sleep(for: .seconds(interval))
         }

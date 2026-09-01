@@ -7,10 +7,10 @@ import {
   readAgentUsageHistory,
   recordAgentUsageSnapshot,
   tightestUsageWindow,
-  type AgentUsageProvider,
 } from "./agent-usage";
+import type { ProviderUsage } from "../generated/tauri";
 
-const provider: AgentUsageProvider = {
+const provider: ProviderUsage = {
   provider: "codex",
   status: "ok",
   session: {
@@ -25,6 +25,8 @@ const provider: AgentUsageProvider = {
   },
   monthly: null,
   planType: "plus",
+  accountLabel: null,
+  authenticated: true,
   updatedAt: 1,
   error: null,
 };
@@ -83,29 +85,6 @@ describe("agent usage presentation", () => {
 
     expect(readAgentUsageHistory()).toHaveLength(1);
     expect(readAgentUsageHistory()[0]?.updatedAt).toBe(62_000);
-    clearAgentUsageHistory();
-  });
-
-  it("fills missing quota providers when reading older snapshots", () => {
-    clearAgentUsageHistory();
-    window.localStorage.setItem(
-      "briar.agent-usage.history.v1",
-      JSON.stringify([
-        {
-          updatedAt: 70_000,
-          claude: { ...provider, provider: "claude" },
-          codex: provider,
-          grok: { ...provider, provider: "grok" },
-        },
-      ]),
-    );
-
-    const [restored] = readAgentUsageHistory();
-    expect(restored?.agy.provider).toBe("agy");
-    expect(restored?.opencode.provider).toBe("opencode");
-    expect(restored?.openrouter.provider).toBe("openrouter");
-    expect(restored?.cursor.provider).toBe("cursor");
-    expect(restored?.agy.status).toBe("unavailable");
     clearAgentUsageHistory();
   });
 });

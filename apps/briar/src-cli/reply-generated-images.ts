@@ -1,6 +1,8 @@
 import { Buffer } from "node:buffer";
+import type { RunnerToParent } from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
+import { sidecarProviderRaw } from "../src-agent/sidecar-protocol";
 
 const preserveExcessProperties = {
   onExcessProperty: "preserve",
@@ -42,7 +44,15 @@ export class ReplyGeneratedImageCollector {
   readonly #files: File[] = [];
 
   observePayload(payload: unknown) {
-    const decoded = decodeCompletedImageGeneration(payload);
+    const projected =
+      payload && typeof payload === "object" && "$typeName" in payload &&
+        payload.$typeName === "briar.sidecar.v1.RunnerToParent"
+        ? {
+            type: "event",
+            raw: sidecarProviderRaw(payload as RunnerToParent),
+          }
+        : payload;
+    const decoded = decodeCompletedImageGeneration(projected);
     if (Option.isNone(decoded)) return;
     const image = decodedGeneratedImage(decoded.value.raw.params.item.result);
     const extension = image.contentType === "image/jpeg"

@@ -1,9 +1,10 @@
 import * as Option from "effect/Option";
 import {
-  decodeIssueAgentActivityFrameOption,
+  agentReplyActivityDomainFrameOption,
   type IssueAgentActivityFrame,
 } from "./channel-agent-activity";
 import { AgentActivityRealtimeTransport } from "./agent-activity-realtime";
+import { createIssueActivityTicket } from "./app-rpc/realtime";
 
 export class IssueActivityRealtimeTransport
   extends AgentActivityRealtimeTransport<IssueAgentActivityFrame> {
@@ -12,22 +13,31 @@ export class IssueActivityRealtimeTransport
       token: string;
       projectId: string;
       runId: string;
-      fetch?: typeof fetch;
+      createTicket?: (signal: AbortSignal) => Promise<string>;
       createWebSocket?: (url: string) => WebSocket;
     },
   ) {
     super({
-      token: input.token,
+      createTicket: input.createTicket ?? ((signal) =>
+        createIssueActivityTicket(
+          input.token,
+          input.projectId,
+          input.runId,
+          signal,
+        )),
       adapter: {
         label: "Issue",
-        ticketPath: `/projects/${input.projectId}/runs/${input.runId}/` +
-          "agent-activity-events",
-        decodeFrame: (value) =>
-          Option.getOrNull(decodeIssueAgentActivityFrameOption(value)),
         matchesScope: (frame) =>
-          frame.projectId === input.projectId && frame.runId === input.runId,
+          frame.scope.case === "issue" &&
+          frame.scope.value.projectId === input.projectId &&
+          frame.scope.value.runId === input.runId,
+        projectFrame: (message) => {
+          const frame = Option.getOrNull(
+            agentReplyActivityDomainFrameOption(message),
+          );
+          return frame && "projectId" in frame ? frame : null;
+        },
       },
-      fetch: input.fetch,
       createWebSocket: input.createWebSocket,
     });
   }

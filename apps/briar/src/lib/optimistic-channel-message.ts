@@ -34,6 +34,7 @@ export function createOptimisticChannelMessage(input: {
       image: member?.image ?? null,
     },
     body: input.body,
+    blocks: [],
     mentionedUserIds: input.mentions.flatMap((mention) =>
       mention.type === "user" ? [mention.id] : []
     ),
@@ -50,6 +51,8 @@ export function createOptimisticChannelMessage(input: {
     reactions: [],
     replyCount: 0,
     lastReplyAt: null,
+    replyAuthors: [],
+    subscribers: [],
     document: null,
     proposal: null,
     executionProposal: null,

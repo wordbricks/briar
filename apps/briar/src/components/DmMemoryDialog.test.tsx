@@ -1,11 +1,9 @@
 /** @vitest-environment jsdom */
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import * as Schema from "effect/Schema";
-import fixtures from "../../../../packages/mobile-contracts/fixtures/companion-v1.json";
 import { I18nProvider } from "../i18n";
 import { createReactTestRoot, type ReactTestRoot } from "../test/react";
-import { DmMemoryDocumentDetail, DmMemoryPage } from "../lib/dm-memory-contract";
+import type { DmMemoryDocumentDetail, DmMemoryPage } from "../lib/dm-memory-contract";
 import type { DmMemoryClient } from "../lib/api/dm-memory";
 import { DmMemoryDialog } from "./DmMemoryDialog";
 
@@ -18,8 +16,48 @@ describe("DM memory management", () => {
     settings: vi.fn<DmMemoryClient["settings"]>(), export: vi.fn<DmMemoryClient["export"]>(),
     retryLearning: vi.fn<DmMemoryClient["retryLearning"]>(),
   } satisfies DmMemoryClient;
-  const page = Schema.decodeUnknownSync(DmMemoryPage)(fixtures.operations.listDmMemory.response);
-  const detail = Schema.decodeUnknownSync(DmMemoryDocumentDetail)(fixtures.operations.getDmMemoryDocument.response.document);
+  const spaceId = "99999999-9999-4999-8999-999999999999";
+  const channelId = "12121212-1212-4212-8212-121212121212";
+  const detail: DmMemoryDocumentDetail = {
+    id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    memorySpaceId: spaceId,
+    kind: "observation",
+    title: "Synthetic memory",
+    version: 1,
+    status: "active",
+    conflicted: false,
+    memoryClass: "profile",
+    evidenceType: "explicit_user",
+    protectedByUser: true,
+    sourceLanguage: "ko",
+    observedAt: null,
+    validUntil: null,
+    createdAt: "2026-09-01T00:00:00.000Z",
+    updatedAt: "2026-09-01T00:00:00.000Z",
+    indexState: "pending",
+    body: "설명은 결론부터 짧게 제시한다.",
+    sources: [{ type: "user_edit_event", id: "fixture-edit", version: 1 }],
+  };
+  const page: DmMemoryPage = {
+    eligible: true,
+    capabilities: { recall: false, automaticLearning: false },
+    spaces: [{
+      id: spaceId,
+      channelId,
+      agentId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      rosterEpoch: 1,
+      status: "active",
+      useEnabled: true,
+      autoEnabled: false,
+      memoryRevision: 1,
+      revocationEpoch: 0,
+      createdAt: "2026-09-01T00:00:00.000Z",
+      updatedAt: "2026-09-01T00:00:00.000Z",
+    }],
+    selectedSpaceId: spaceId,
+    documents: [detail],
+    nextCursor: null,
+  };
   const scope = { token: "test", organizationId: "22222222-2222-4222-8222-222222222222", channelId: page.spaces[0].channelId };
   const dialog = () => document.querySelector('[role="dialog"]')!;
   const button = (label: string) => [...dialog().querySelectorAll("button")]
@@ -31,7 +69,12 @@ describe("DM memory management", () => {
     client.get.mockResolvedValue(detail);
     root = createReactTestRoot({ attachToDocument: true });
   });
-  afterEach(async () => { await root.cleanup(); });
+  afterEach(async () => {
+    await root.cleanup();
+    // Radix FocusScope restores focus on the next task after unmount. Let that
+    // task finish while this file's jsdom Event constructors are still active.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
   const render = () => root.render(<I18nProvider><DmMemoryDialog client={client} scope={scope} onClose={() => {}} /></I18nProvider>);
   async function edit() {
     const entry = [...dialog().querySelectorAll("button")].find((node) => node.textContent?.includes(detail.title))!;

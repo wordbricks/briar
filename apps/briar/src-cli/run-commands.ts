@@ -3,32 +3,53 @@ import {
   basename,
   resolve,
 } from "node:path";
-import { decodeStructuredAgentResult } from "../src/lib/agent-result";
+import {
+  create,
+  type JsonObject,
+  toJsonString,
+} from "@bufbuild/protobuf";
+import { timestampFromDate } from "@bufbuild/protobuf/wkt";
+import {
+  CancelRunResponseSchema,
+  CreateIssueResponseSchema,
+  UpdateIssueResponseSchema,
+  type UpdateIssueResponse,
+  IssueService,
+  ListRunEvidenceResponseSchema,
+  RunEvidence_Status,
+  ReworkRunResponseSchema,
+  ResumeRunResponseSchema,
+  RetryRunResponseSchema,
+  SetIssueDependencyResponseSchema,
+} from "@briar/contracts/gen/briar/app/v1/issue_pb";
+import { IssueDifficulty, RunStatus } from "@briar/contracts/gen/briar/app/v1/common_pb";
+import { DashboardService } from "@briar/contracts/gen/briar/app/v1/dashboard_pb";
+import { ProjectService } from "@briar/contracts/gen/briar/app/v1/project_pb";
+import {
+  RecordRunEvidenceRequestSchema,
+  RecordRunEvidenceResponseSchema,
+  RecordRunEventResponseSchema,
+  ListProjectChannelMessagesResponseSchema,
+  RunSourceIdentitySchema,
+  TransitionWorkflowStageRequest_Action,
+  TransitionWorkflowStageResponse_Outcome,
+  TransitionWorkflowStageResponseSchema,
+} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
+import type {
+  GitHubPullRequestIdentity,
+} from "@briar/contracts/gen/briar/types/v1/github_identity_pb";
 import { validateEvidenceImages } from "../src/lib/evidence-images";
 import {
   briarIssueUrl,
   ensureBriarIssueLinkInGithubPullRequest,
 } from "./github-pr";
 import {
-  decodeChannelMessagesInput,
   decodeCreateIssueInput,
   decodeIssueUpdateChanges,
-  decodeIssueUpdateDashboardRuns,
-  decodeIssueUpdateInput,
-  decodeRunEvidenceInput,
   decodeUuid,
   decodeWorkflowStageId,
-  validateRecoveryRunInput,
-  validateResumeRunInput,
-  validateReworkRunInput,
-  validateRunEventInput,
-  validateWorkflowTransitionInput,
 } from "./command-contract";
-import {
-  type Config,
-  type ProjectConfig,
-} from "./config-contract";
-import { HttpRequestError } from "./execution-metrics-upload";
+import type { Config, ProjectConfig } from "./config-contract";
 import {
   executionToken,
   values,
@@ -37,12 +58,23 @@ import {
   required,
   loadConfig,
   saveConfig,
-  request,
   login,
   gitValue,
   currentRepositoryPath,
   currentProject,
 } from "./command-support";
+import {
+  createAuthenticatedWorkerExecutionClient,
+} from "./worker-queue-client";
+import {
+  issueWorkClaimIdentityToProto,
+  workerRunEventRequest,
+  workerRunEventStatus,
+  workerRunSource,
+} from "./run-event-proto";
+import { createAuthenticatedConnectClient } from "./connect-client";
+import { decodeRunStructuredResult } from "./run-structured-result";
+import { uploadPreparedFiles } from "../src/lib/upload-client";
 
 async function optionalText(valueFlag: string, fileFlag: string) {
   const path = value(fileFlag);
@@ -52,25 +84,9 @@ async function optionalText(valueFlag: string, fileFlag: string) {
 
 export async function resolveIssueCreationProjectId(input: {
   configuredProjectId?: string;
-  teamId: string;
   loadProjects: () => Promise<Array<{ id: string; isDefault: boolean }>>;
 }) {
-  let projects: Array<{ id: string; isDefault: boolean }>;
-  try {
-    projects = await input.loadProjects();
-  } catch (error) {
-    if (
-      !input.configuredProjectId &&
-      error instanceof HttpRequestError &&
-      error.status === 404
-    ) {
-      // A new CLI may briefly talk to a pre-hierarchy Worker during rollout.
-      // The saved legacy Project ID is the promoted Team ID, so its existing
-      // issue-create endpoint remains the only safe compatibility target.
-      return input.teamId;
-    }
-    throw error;
-  }
+  const projects = await input.loadProjects();
   if (
     input.configuredProjectId &&
     !projects.some((candidate) => candidate.id === input.configuredProjectId)
@@ -81,29 +97,80 @@ export async function resolveIssueCreationProjectId(input: {
     projects.find((candidate) => candidate.isDefault)?.id ??
     (projects.length === 1 ? projects[0]?.id : undefined);
   if (!projectId) {
-    throw new Error(
-      "--project <id>를 지정하거나 Team의 기본 Project를 설정하세요.",
-    );
+    throw new Error("--project <id>를 지정하거나 Team의 기본 Project를 설정하세요.");
   }
   return projectId;
 }
 
+const jsonObject = (value: string, label: string): JsonObject => {
+  const parsed: unknown = JSON.parse(value);
+  if (
+    typeof parsed !== "object" ||
+    parsed === null ||
+    Array.isArray(parsed)
+  ) {
+    throw new Error(`${label} must be a JSON object`);
+  }
+  return parsed as JsonObject;
+};
+
+const runEvidenceStatus = (value: string): RunEvidence_Status => {
+  switch (value) {
+    case "pending":
+      return RunEvidence_Status.PENDING;
+    case "passed":
+      return RunEvidence_Status.PASSED;
+    case "failed":
+      return RunEvidence_Status.FAILED;
+    case "skipped":
+      return RunEvidence_Status.SKIPPED;
+    default:
+      throw new Error(
+        "--status must be one of: pending, passed, failed, skipped",
+      );
+  }
+};
+
+const evidenceTimestamp = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error("--observed-at must be an ISO date-time");
+  }
+  return timestampFromDate(date);
+};
+
+const activeIssueWork = (
+  project: Awaited<ReturnType<typeof currentProject>>,
+  runId: string,
+) => {
+  const claim = project.activeClaim;
+  if (claim?.runId !== runId || !claim.token) {
+    throw new Error("This run requires its active issue claim");
+  }
+  return issueWorkClaimIdentityToProto(runId, claim.token);
+};
+
+const positiveIntegerFlag = (flag: string) => {
+  const parsed = Number(required(flag));
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    throw new Error(`${flag} must be a positive integer`);
+  }
+  return parsed;
+};
+
 async function createIssueCommand() {
   const config = await loadConfig();
-  const userToken = config.userToken;
-  if (!userToken) throw new Error("먼저 `briar login`을 실행하세요.");
+  if (!config.userToken) throw new Error("먼저 `briar login`을 실행하세요.");
   const project = await currentProject(config);
-  const configuredPlanningProjectId = value("--project")?.trim();
+  const projectClient = createAuthenticatedConnectClient(
+    ProjectService,
+    config.apiUrl,
+    config.userToken,
+  );
   const planningProjectId = await resolveIssueCreationProjectId({
-    configuredProjectId: configuredPlanningProjectId,
-    teamId: project.id,
-    loadProjects: async () => (await request<{
-      projects: Array<{ id: string; isDefault: boolean }>;
-    }>(
-      config.apiUrl,
-      `/teams/${encodeURIComponent(project.id)}/projects`,
-      userToken,
-    )).projects,
+    configuredProjectId: value("--project")?.trim(),
+    loadProjects: async () =>
+      (await projectClient.listTeamPlanningProjects({ teamId: project.id })).projects,
   });
   const priorityValue = value("--priority");
   const input = decodeCreateIssueInput({
@@ -112,19 +179,22 @@ async function createIssueCommand() {
     priority: priorityValue === undefined ? null : Number(priorityValue),
     status: value("--status") ?? "queued",
   });
-  const result = await request<{
-    runId: string;
-    sourceKey: string;
-    stage: "queued";
-    status: "backlog" | "queued";
-    attachments: unknown[];
-  }>(
+  const result = await createAuthenticatedConnectClient(
+    IssueService,
     config.apiUrl,
-    `/projects/${encodeURIComponent(planningProjectId)}/issues`,
-    userToken,
-    { method: "POST", body: JSON.stringify(input) },
+    config.userToken,
+  ).createIssue(
+    {
+      projectId: planningProjectId,
+      title: input.title,
+      description: input.description ?? undefined,
+      priority: input.priority ?? undefined,
+      status: input.status === "backlog"
+        ? RunStatus.BACKLOG
+        : RunStatus.QUEUED,
+    },
   );
-  console.log(JSON.stringify(result));
+  console.log(toJsonString(CreateIssueResponseSchema, result));
 }
 
 export type IssueUpdateCommandInput = {
@@ -141,23 +211,85 @@ export type IssueUpdateCommandInput = {
   clearAssignee: boolean;
 };
 
+type IssueUpdateState = {
+  title: string;
+  description: string | null;
+  priority: number | null;
+  difficulty: "easy" | "normal" | "hard" | null;
+  assigneeUserId: string | null;
+};
+
 export type IssueUpdateCommandDependencies = {
   loadConfig: () => Promise<Config>;
   currentProject: (config: Config) => Promise<ProjectConfig>;
-  request: <T>(
-    apiUrl: string,
-    path: string,
-    token: string | null,
-    init?: RequestInit,
-  ) => Promise<T>;
+  loadRun: (config: Config, project: ProjectConfig, runId: string) => Promise<IssueUpdateState | undefined>;
+  updateRun: (
+    config: Config,
+    project: ProjectConfig,
+    runId: string,
+    input: IssueUpdateState,
+  ) => Promise<UpdateIssueResponse>;
   readFile: (path: string, encoding: "utf8") => Promise<string>;
   writeLine: (line: string) => void;
+};
+
+const difficultyFromProto = (value: IssueDifficulty) => {
+  switch (value) {
+    case IssueDifficulty.EASY: return "easy" as const;
+    case IssueDifficulty.NORMAL: return "normal" as const;
+    case IssueDifficulty.HARD: return "hard" as const;
+    default: return null;
+  }
+};
+
+const difficultyToProto = (value: IssueUpdateState["difficulty"]) => {
+  switch (value) {
+    case "easy": return IssueDifficulty.EASY;
+    case "normal": return IssueDifficulty.NORMAL;
+    case "hard": return IssueDifficulty.HARD;
+    case null: return undefined;
+  }
 };
 
 const defaultIssueUpdateCommandDependencies: IssueUpdateCommandDependencies = {
   loadConfig,
   currentProject,
-  request,
+  loadRun: async (config, project, runId) => {
+    if (!config.userToken) return undefined;
+    const response = await createAuthenticatedConnectClient(
+      DashboardService,
+      config.apiUrl,
+      config.userToken,
+    ).getDashboard({ projectId: project.id });
+    const run = response.runs.find((candidate) => candidate.id === runId);
+    return run && {
+      title: run.title,
+      description: run.issueDescription ?? null,
+      priority: run.priority ?? null,
+      difficulty: difficultyFromProto(run.difficulty ?? IssueDifficulty.UNSPECIFIED),
+      assigneeUserId: run.assigneeUserId ?? null,
+    };
+  },
+  updateRun: async (config, project, runId, input) => {
+    if (!config.userToken) throw new Error("먼저 `briar login`을 실행하세요.");
+    return createAuthenticatedConnectClient(
+      IssueService,
+      config.apiUrl,
+      config.userToken,
+    ).updateIssue({
+      projectId: project.id,
+      runId,
+      title: input.title,
+      description: input.description ?? undefined,
+      priority: input.priority ?? undefined,
+      difficulty: difficultyToProto(input.difficulty),
+      assigneeUpdate: input.assigneeUserId === null
+        ? { case: "clearAssignee", value: {} }
+        : { case: "assigneeUserId", value: input.assigneeUserId },
+      requestId: crypto.randomUUID(),
+      attachments: [],
+    });
+  },
   readFile,
   writeLine: (line) => console.log(line),
 };
@@ -175,11 +307,9 @@ function assertExclusiveIssueUpdateFlags(
 
 async function updateIssueCommand(
   command: IssueUpdateCommandInput,
-  dependencies: IssueUpdateCommandDependencies =
-    defaultIssueUpdateCommandDependencies,
+  dependencies: IssueUpdateCommandDependencies = defaultIssueUpdateCommandDependencies,
 ) {
   const runId = decodeUuid(command.runId);
-
   if (command.description !== undefined && command.descriptionFile !== undefined) {
     throw new Error("Use only one of --description and --description-file");
   }
@@ -189,100 +319,34 @@ async function updateIssueCommand(
     "--description or --description-file",
     "--clear-description",
   );
-  assertExclusiveIssueUpdateFlags(
-    command.priority !== undefined,
-    command.clearPriority,
-    "--priority",
-    "--clear-priority",
-  );
-  assertExclusiveIssueUpdateFlags(
-    command.difficulty !== undefined,
-    command.clearDifficulty,
-    "--difficulty",
-    "--clear-difficulty",
-  );
-  assertExclusiveIssueUpdateFlags(
-    command.assigneeUserId !== undefined,
-    command.clearAssignee,
-    "--assignee-user-id",
-    "--clear-assignee",
-  );
+  assertExclusiveIssueUpdateFlags(command.priority !== undefined, command.clearPriority, "--priority", "--clear-priority");
+  assertExclusiveIssueUpdateFlags(command.difficulty !== undefined, command.clearDifficulty, "--difficulty", "--clear-difficulty");
+  assertExclusiveIssueUpdateFlags(command.assigneeUserId !== undefined, command.clearAssignee, "--assignee-user-id", "--clear-assignee");
 
   const changes = decodeIssueUpdateChanges({
     ...(command.title === undefined ? undefined : { title: command.title }),
     ...(command.clearDescription
       ? { description: null }
       : command.descriptionFile !== undefined
-        ? {
-            description: await dependencies.readFile(
-              resolve(command.descriptionFile),
-              "utf8",
-            ),
-          }
-        : command.description === undefined
-          ? undefined
-          : { description: command.description }),
-    ...(command.clearPriority
-      ? { priority: null }
-      : command.priority === undefined
-        ? undefined
-        : { priority: command.priority }),
-    ...(command.clearDifficulty
-      ? { difficulty: null }
-      : command.difficulty === undefined
-        ? undefined
-        : { difficulty: command.difficulty }),
-    ...(command.clearAssignee
-      ? { assigneeUserId: null }
-      : command.assigneeUserId === undefined
-        ? undefined
-        : { assigneeUserId: command.assigneeUserId }),
+      ? { description: await dependencies.readFile(resolve(command.descriptionFile), "utf8") }
+      : command.description === undefined ? undefined : { description: command.description }),
+    ...(command.clearPriority ? { priority: null } : command.priority === undefined ? undefined : { priority: command.priority }),
+    ...(command.clearDifficulty ? { difficulty: null } : command.difficulty === undefined ? undefined : { difficulty: command.difficulty }),
+    ...(command.clearAssignee ? { assigneeUserId: null } : command.assigneeUserId === undefined ? undefined : { assigneeUserId: command.assigneeUserId }),
   });
-
   const config = await dependencies.loadConfig();
   if (!config.userToken) throw new Error("먼저 `briar login`을 실행하세요.");
   const project = await dependencies.currentProject(config);
-
-  const dashboard = await dependencies.request<{ runs: unknown[] }>(
-    config.apiUrl,
-    `/projects/${encodeURIComponent(project.id)}/dashboard`,
-    config.userToken,
-  );
-  const current = decodeIssueUpdateDashboardRuns(dashboard.runs).find(
-    (run) => run.id === runId,
-  );
+  const current = await dependencies.loadRun(config, project, runId);
   if (!current) throw new Error(`이슈를 찾지 못했습니다: ${runId}`);
-
-  const input = decodeIssueUpdateInput({
+  const result = await dependencies.updateRun(config, project, runId, {
     title: changes.title ?? current.title,
-    description: changes.description === undefined
-      ? current.issueDescription
-      : changes.description,
-    priority: changes.priority === undefined
-      ? current.priority
-      : changes.priority,
-    difficulty: changes.difficulty === undefined
-      ? current.difficulty
-      : changes.difficulty,
-    assigneeUserId: changes.assigneeUserId === undefined
-      ? current.assigneeUserId
-      : changes.assigneeUserId,
+    description: changes.description === undefined ? current.description : changes.description,
+    priority: changes.priority === undefined ? current.priority : changes.priority,
+    difficulty: changes.difficulty === undefined ? current.difficulty : changes.difficulty,
+    assigneeUserId: changes.assigneeUserId === undefined ? current.assigneeUserId : changes.assigneeUserId,
   });
-  const result = await dependencies.request<{
-    runId: string;
-    title: string;
-    description: string | null;
-    priority: number | null;
-    difficulty: "easy" | "normal" | "hard" | null;
-    assigneeUserId: string | null;
-    attachments: unknown[];
-  }>(
-    config.apiUrl,
-    `/projects/${encodeURIComponent(project.id)}/runs/${encodeURIComponent(runId)}`,
-    config.userToken,
-    { method: "PATCH", body: JSON.stringify(input) },
-  );
-  dependencies.writeLine(JSON.stringify(result));
+  dependencies.writeLine(toJsonString(UpdateIssueResponseSchema, result));
 }
 
 async function changeIssueDependencyCommand(action: "add" | "remove") {
@@ -291,27 +355,19 @@ async function changeIssueDependencyCommand(action: "add" | "remove") {
   const project = await currentProject(config);
   const dependentRunId = decodeUuid(required("--dependent-run"));
   const prerequisiteRunId = decodeUuid(required("--prerequisite-run"));
-  const path =
-    `/projects/${encodeURIComponent(project.id)}` +
-    `/runs/${encodeURIComponent(dependentRunId)}` +
-    `/dependencies/${encodeURIComponent(prerequisiteRunId)}`;
-
-  if (action === "add") {
-    const result = await request<{
-      prerequisiteRunId: string;
-      dependentRunId: string;
-      outcome: "created" | "already_exists";
-    }>(config.apiUrl, path, config.userToken, { method: "PUT" });
-    console.log(JSON.stringify(result));
-    return;
-  }
-
-  await request<void>(config.apiUrl, path, config.userToken, {
-    method: "DELETE",
-  });
-  console.log(
-    JSON.stringify({ dependentRunId, prerequisiteRunId, outcome: "removed" }),
+  const result = await createAuthenticatedConnectClient(
+    IssueService,
+    config.apiUrl,
+    config.userToken,
+  ).setIssueDependency(
+    {
+      projectId: project.id,
+      runId: dependentRunId,
+      prerequisiteRunId,
+      enabled: action === "add",
+    },
   );
+  console.log(toJsonString(SetIssueDependencyResponseSchema, result));
 }
 
 const channelMessagesUsage = `Usage: briar channel messages --channel-id <uuid>
@@ -325,28 +381,26 @@ async function listChannelMessagesCommand() {
   }
   const config = await loadConfig();
   const project = await currentProject(config);
-  const input = decodeChannelMessagesInput({
-    channelId: required("--channel-id"),
-    limit: value("--limit") === undefined ? 50 : Number(value("--limit")),
-    cursor: value("--cursor") ?? null,
-    parentMessageId: value("--parent-message-id") ?? null,
-  });
-  const searchParams = new URLSearchParams({ limit: String(input.limit) });
-  if (input.cursor) searchParams.set("cursor", input.cursor);
-  if (input.parentMessageId) {
-    searchParams.set("parentMessageId", input.parentMessageId);
+  const limit = value("--limit") === undefined ? 50 : Number(value("--limit"));
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+    throw new Error("--limit must be an integer from 1 to 100");
   }
-  const result = await request<{
-    channel: unknown;
-    messages: unknown[];
-    nextCursor: string | null;
-  }>(
+  const cursor = value("--cursor");
+  const parentMessageId = value("--parent-message-id");
+  const executionRpc = createAuthenticatedWorkerExecutionClient(
     config.apiUrl,
-    `/projects/${encodeURIComponent(project.id)}` +
-      `/channels/${encodeURIComponent(input.channelId)}/messages?${searchParams}`,
     executionToken(project),
   );
-  console.log(JSON.stringify(result));
+  const result = await executionRpc.listProjectChannelMessages({
+    projectId: decodeUuid(project.id).toLowerCase(),
+    channelId: decodeUuid(required("--channel-id")).toLowerCase(),
+    cursor: cursor ? decodeUuid(cursor).toLowerCase() : undefined,
+    parentMessageId: parentMessageId
+      ? decodeUuid(parentMessageId).toLowerCase()
+      : undefined,
+    limit,
+  });
+  console.log(toJsonString(ListProjectChannelMessagesResponseSchema, result));
 }
 
 async function addRunEvent(forcedStatus?: string) {
@@ -371,18 +425,21 @@ async function addRunEvent(forcedStatus?: string) {
     "--structured-result",
     "--structured-result-file",
   );
-  const structuredResult = structuredResultValue
-    ? decodeStructuredAgentResult(JSON.parse(structuredResultValue))
-    : null;
-  const runId = value("--run") ?? project.activeClaim?.runId ?? null;
+  const structuredResult = decodeRunStructuredResult({
+    domainJson: structuredResultValue,
+    protoJson: value("--structured-result-proto-json") ?? null,
+  });
+  const runIdValue = value("--run") ?? project.activeClaim?.runId ?? null;
+  const runId = runIdValue ? decodeUuid(runIdValue).toLowerCase() : null;
   const sourceKey = value("--source-key") ?? project.activeClaim?.sourceKey ?? null;
   const title = value("--title");
+  const status = workerRunEventStatus(forcedStatus ?? value("--status"));
   const input = {
     runId,
     source: value("--source") ?? (runId ? null : "issue"),
     sourceKey,
     title: title ?? null,
-    status: forcedStatus ?? value("--status"),
+    status,
     workflowStage: value("--workflow-stage"),
     eventKey: required("--event-key"),
     occurredAt: value("--observed-at") ?? value("--occurred-at") ?? new Date().toISOString(),
@@ -411,7 +468,7 @@ async function addRunEvent(forcedStatus?: string) {
     pullRequestUrls: values("--pull-request-url"),
     targetSha: value("--target-sha") ?? null,
     sourceCreatedAt: value("--source-created-at") ?? null,
-    context: contextValue ? JSON.parse(contextValue) : null,
+    context: contextValue ? jsonObject(contextValue, "Run context") : null,
   };
   if (forcedStatus === "completed" && !input.structuredResult) {
     throw new Error(
@@ -447,24 +504,26 @@ async function addRunEvent(forcedStatus?: string) {
       "--status blocked requires humanActionRequired and an exact nextAction",
     );
   }
-  validateRunEventInput(input);
-  const result = await request<{
-    runId: string;
-    status: string;
-    workflowStage: string | null;
-    stage: string;
-  }>(
+  const target = runId
+    ? { case: "work" as const, value: activeIssueWork(project, runId) }
+    : {
+        case: "sourceIdentity" as const,
+        value: create(RunSourceIdentitySchema, {
+          source: workerRunSource(input.source ?? undefined),
+          sourceKey: sourceKey ?? required("--source-key"),
+          title: title ?? required("--title"),
+        }),
+      };
+  const executionRpc = createAuthenticatedWorkerExecutionClient(
     config.apiUrl,
-    "/run-events",
     agentToken,
-    {
-      method: "POST",
-      body: JSON.stringify(input),
-      headers:
-        project.activeClaim?.runId === input.runId && project.activeClaim.token
-          ? { "X-Briar-Claim-Token": project.activeClaim.token }
-          : undefined,
-    },
+  );
+  const result = await executionRpc.recordRunEvent(
+    workerRunEventRequest({
+      projectId: project.id,
+      target,
+      event: input,
+    }),
   );
   if (project.activeClaim?.runId === result.runId) {
     const terminal = ["completed", "cancelled", "blocked", "failed"].includes(
@@ -488,7 +547,7 @@ async function addRunEvent(forcedStatus?: string) {
     );
     await saveConfig(config);
   }
-  console.log(JSON.stringify(result));
+  console.log(toJsonString(RecordRunEventResponseSchema, result));
 }
 
 async function addRunEvidence() {
@@ -496,79 +555,99 @@ async function addRunEvidence() {
   const project = await currentProject(config);
   const runId = value("--run") ?? project.activeClaim?.runId;
   if (!runId) throw new Error("--run is required when there is no active claim");
+  const work = activeIssueWork(project, runId);
   const metadataValue = value("--metadata-json");
-  const input = {
-    evidenceKey: required("--key"),
-    stage: required("--stage"),
-    type: required("--type"),
-    status: required("--status"),
-    observedAt: value("--observed-at") ?? new Date().toISOString(),
-    actor: value("--actor") ?? "briar-workflow",
-    detail: await optionalText("--detail", "--detail-file"),
-    command: value("--command") ?? null,
-    url: value("--url") ?? null,
-    metadata: metadataValue ? JSON.parse(metadataValue) : null,
-  };
-  const parsed = decodeRunEvidenceInput(input);
+  const status = runEvidenceStatus(required("--status"));
+  const type = required("--type").trim();
+  const url = value("--url");
+  let metadata = metadataValue
+    ? jsonObject(metadataValue, "Evidence metadata")
+    : undefined;
+  let githubPullRequest: GitHubPullRequestIdentity | undefined;
   if (
-    parsed.type === "pull_request" &&
-    parsed.url &&
-    (parsed.status === "passed" || parsed.status === "pending")
+    type === "pull_request" &&
+    url &&
+    (status === RunEvidence_Status.PASSED ||
+      status === RunEvidence_Status.PENDING)
   ) {
     const github = await ensureBriarIssueLinkInGithubPullRequest({
       apiUrl: config.apiUrl,
       projectId: project.id,
       token: executionToken(project),
-      pullRequestUrl: parsed.url,
+      pullRequestUrl: url,
       issueUrl: briarIssueUrl(config.apiUrl, project.id, runId),
     });
-    parsed.metadata = {
-      ...(parsed.metadata ?? {}),
-      githubPullRequest: github.identity,
-    };
+    githubPullRequest = github.identity;
   }
+  const executionRpc = createAuthenticatedWorkerExecutionClient(
+    config.apiUrl,
+    executionToken(project),
+  );
   const imagePaths = values("--image").map((path) => resolve(path));
   const images = await Promise.all(
-    imagePaths.map(async (path) => {
+    imagePaths.map(async (path, index) => {
       const image = Bun.file(path);
       if (!(await image.exists())) {
         throw new Error(`Evidence image does not exist: ${path}`);
       }
-      return { image, name: basename(path) };
+      const name = basename(path);
+      return {
+        clientId: `image-${index}`,
+        file: new File([image], name, { type: image.type }),
+      };
     }),
   );
   const imageError = validateEvidenceImages(
-    images.map(({ image, name }) => ({
-      name,
-      size: image.size,
-      type: image.type,
+    images.map(({ file }) => ({
+      name: file.name,
+      size: file.size,
+      type: file.type,
     })),
   );
   if (imageError) throw new Error(imageError);
-  const body = images.length
-    ? (() => {
-        const form = new FormData();
-        form.append("evidence", JSON.stringify(parsed));
-        for (const { image, name } of images) {
-          form.append("images", image, name);
-        }
-        return form;
-      })()
-    : JSON.stringify(parsed);
-  const result = await request(
-    config.apiUrl,
-    `/runs/${runId}/evidence`,
-    executionToken(project),
+  const uploadIds = images.length === 0
+    ? []
+    : await executionRpc.prepareRunEvidenceImageUploads({
+        requestId: crypto.randomUUID(),
+        projectId: project.id,
+        work,
+        images: await Promise.all(images.map(async ({ clientId, file }) => ({
+          clientId,
+          filename: file.name,
+          contentType: file.type,
+          byteSize: BigInt(file.size),
+          sha256: new Uint8Array(
+            await crypto.subtle.digest("SHA-256", await file.arrayBuffer()),
+          ),
+        }))),
+      }).then((prepared) => uploadPreparedFiles({
+        apiUrl: config.apiUrl,
+        files: images,
+        uploads: prepared.uploads,
+        uploadId: (upload) => upload.reference?.uploadId,
+      }));
+  const result = await executionRpc.recordRunEvidence(create(
+    RecordRunEvidenceRequestSchema,
     {
-      method: "POST",
-      body,
-      headers:
-        project.activeClaim?.runId === runId && project.activeClaim.token
-          ? { "X-Briar-Claim-Token": project.activeClaim.token }
-          : undefined,
+      projectId: project.id,
+      work,
+      evidenceKey: required("--key"),
+      stage: required("--stage"),
+      type,
+      status,
+      observedAt: evidenceTimestamp(
+        value("--observed-at") ?? new Date().toISOString(),
+      ),
+      actor: value("--actor") ?? "briar-workflow",
+      detail: (await optionalText("--detail", "--detail-file")) ?? undefined,
+      command: value("--command"),
+      url,
+      metadata,
+      githubPullRequest,
+      images: uploadIds.map((uploadId) => ({ uploadId })),
     },
-  );
-  console.log(JSON.stringify(result));
+  ));
+  console.log(toJsonString(RecordRunEvidenceResponseSchema, result));
 }
 
 async function listCurrentRunEvidence() {
@@ -577,12 +656,15 @@ async function listCurrentRunEvidence() {
   const runId = value("--run") ?? project.activeClaim?.runId;
   if (!runId) throw new Error("--run is required when there is no active claim");
   decodeUuid(runId);
-  const result = await request(
+  const executionRpc = createAuthenticatedWorkerExecutionClient(
     config.apiUrl,
-    `/runs/${runId}/evidence`,
     executionToken(project),
   );
-  console.log(JSON.stringify(result));
+  const result = await executionRpc.listRunEvidence({
+    projectId: project.id,
+    runId,
+  });
+  console.log(toJsonString(ListRunEvidenceResponseSchema, result));
 }
 
 async function recoverRun(action: "retry" | "cancel") {
@@ -590,25 +672,21 @@ async function recoverRun(action: "retry" | "cancel") {
   const project = await currentProject(config);
   const runId = value("--run") ?? project.activeClaim?.runId;
   if (!runId) throw new Error("--run is required when there is no active claim");
-  const input = {
-    requestId: value("--request-id") ?? crypto.randomUUID(),
-    actor: value("--actor") ?? "briar-workflow",
-    reason: value("--reason") ?? null,
-  };
-  validateRecoveryRunInput(input);
-  decodeUuid(runId);
-  const result = await request<{
-    runId: string;
-    outcome: string;
-    attempt: number;
-    stage: string;
-  }>(
+  const canonicalRunId = decodeUuid(runId).toLowerCase();
+  const executionRpc = createAuthenticatedWorkerExecutionClient(
     config.apiUrl,
-    `/runs/${runId}/${action}`,
     executionToken(project),
-    { method: "POST", body: JSON.stringify(input) },
   );
-  if (project.activeClaim?.runId === runId) {
+  const input = {
+    projectId: project.id,
+    runId: canonicalRunId,
+    requestId: decodeUuid(value("--request-id") ?? crypto.randomUUID()),
+    reason: value("--reason"),
+  };
+  const result = action === "retry"
+    ? await executionRpc.retryRun(input)
+    : await executionRpc.cancelRun(input);
+  if (project.activeClaim?.runId === canonicalRunId) {
     // The server released this claim while queueing the new revision. Make the
     // current provider turn stop instead of continuing with a stale token.
     config.projects = config.projects.map((candidate) =>
@@ -618,7 +696,10 @@ async function recoverRun(action: "retry" | "cancel") {
     );
     await saveConfig(config);
   }
-  console.log(JSON.stringify(result));
+  console.log(toJsonString(
+    action === "retry" ? RetryRunResponseSchema : CancelRunResponseSchema,
+    result,
+  ));
 }
 
 async function reworkRun() {
@@ -626,27 +707,19 @@ async function reworkRun() {
   const project = await currentProject(config);
   const runId = value("--run") ?? project.activeClaim?.runId;
   if (!runId) throw new Error("--run is required when there is no active claim");
-  const input = {
-    requestId: value("--request-id") ?? crypto.randomUUID(),
-    actor: value("--actor") ?? "briar-workflow",
-    workflowStage: required("--to"),
-    reason: required("--reason"),
-  };
-  validateReworkRunInput(input);
-  decodeUuid(runId);
-  const result = await request<{
-    runId: string;
-    outcome: "reworked" | "already_reworked";
-    attempt: number;
-    revision: number;
-    workflowStage: string;
-  }>(
+  const canonicalRunId = decodeUuid(runId).toLowerCase();
+  const executionRpc = createAuthenticatedWorkerExecutionClient(
     config.apiUrl,
-    `/runs/${runId}/rework`,
     executionToken(project),
-    { method: "POST", body: JSON.stringify(input) },
   );
-  if (project.activeClaim?.runId === runId) {
+  const result = await executionRpc.reworkRun({
+    projectId: project.id,
+    runId: canonicalRunId,
+    requestId: decodeUuid(value("--request-id") ?? crypto.randomUUID()),
+    workflowStage: decodeWorkflowStageId(required("--to")),
+    reason: required("--reason"),
+  });
+  if (project.activeClaim?.runId === canonicalRunId) {
     config.projects = config.projects.map((candidate) =>
       candidate.id === project.id
         ? { ...candidate, activeClaim: undefined }
@@ -654,7 +727,7 @@ async function reworkRun() {
     );
     await saveConfig(config);
   }
-  console.log(JSON.stringify(result));
+  console.log(toJsonString(ReworkRunResponseSchema, result));
 }
 
 async function resumeRun() {
@@ -662,28 +735,20 @@ async function resumeRun() {
   const project = await currentProject(config);
   const runId = value("--run") ?? project.activeClaim?.runId;
   if (!runId) throw new Error("--run is required when there is no active claim");
-  const input = {
-    requestId: value("--request-id") ?? crypto.randomUUID(),
-    actor: value("--actor") ?? "briar-workflow",
-    checkpointKey: value("--checkpoint"),
-    attempt: value("--attempt") ? Number(value("--attempt")) : undefined,
-    revision: value("--revision") ? Number(value("--revision")) : undefined,
-  };
-  validateResumeRunInput(input);
-  decodeUuid(runId);
-  const result = await request<{
-    runId: string;
-    outcome: string;
-    workflowStage: string | null;
-    startStage: string | null;
-    terminalReviewOnly: boolean;
-  }>(
+  const canonicalRunId = decodeUuid(runId).toLowerCase();
+  const executionRpc = createAuthenticatedWorkerExecutionClient(
     config.apiUrl,
-    `/runs/${runId}/resume`,
     executionToken(project),
-    { method: "POST", body: JSON.stringify(input) },
   );
-  if (project.activeClaim?.runId === runId) {
+  const result = await executionRpc.resumeRun({
+    projectId: project.id,
+    runId: canonicalRunId,
+    requestId: decodeUuid(value("--request-id") ?? crypto.randomUUID()),
+    checkpointKey: decodeWorkflowStageId(required("--checkpoint")),
+    attempt: positiveIntegerFlag("--attempt"),
+    revision: positiveIntegerFlag("--revision"),
+  });
+  if (project.activeClaim?.runId === canonicalRunId) {
     config.projects = config.projects.map((candidate) =>
       candidate.id === project.id
         ? { ...candidate, activeClaim: undefined }
@@ -691,7 +756,7 @@ async function resumeRun() {
     );
     await saveConfig(config);
   }
-  console.log(JSON.stringify(result));
+  console.log(toJsonString(ResumeRunResponseSchema, result));
 }
 
 async function transitionWorkflowStage(action: "start" | "complete") {
@@ -699,43 +764,41 @@ async function transitionWorkflowStage(action: "start" | "complete") {
   const project = await currentProject(config);
   const runId = value("--run") ?? project.activeClaim?.runId;
   if (!runId) throw new Error("--run is required when there is no active claim");
-  const stage = required("--stage");
-  const input = {
-    requestId: value("--request-id") ?? crypto.randomUUID(),
-    actor: value("--actor") ?? "briar-workflow",
-    attempt: value("--attempt") ? Number(value("--attempt")) : undefined,
-    revision: value("--revision") ? Number(value("--revision")) : undefined,
+  const canonicalRunId = decodeUuid(runId).toLowerCase();
+  const stage = decodeWorkflowStageId(required("--stage"));
+  const requestId = decodeUuid(
+    value("--request-id") ?? crypto.randomUUID(),
+  );
+  const positiveOption = (flag: "--attempt" | "--revision") => {
+    const raw = value(flag);
+    if (raw === undefined) return undefined;
+    const parsed = Number(raw);
+    if (!Number.isInteger(parsed) || parsed < 1) {
+      throw new Error(`${flag} must be a positive integer`);
+    }
+    return parsed;
   };
-  validateWorkflowTransitionInput(input);
-  decodeUuid(runId);
-  decodeWorkflowStageId(stage);
-  const result = await request<{
-    runId: string;
-    requestId: string;
-    outcome: "started" | "completed" | "already_started" | "already_completed" | "paused";
-    attempt: number;
-    revision: number;
-    stage: string;
-    checkpoint: {
-      key: string;
-      stage: string;
-      position: "before" | "after";
-      revision: number;
-    } | null;
-  }>(
+  const executionRpc = createAuthenticatedWorkerExecutionClient(
     config.apiUrl,
-    `/runs/${runId}/stages/${stage}/${action}`,
     executionToken(project),
+  );
+  const result = await executionRpc.transitionWorkflowStage(
     {
-      method: "POST",
-      body: JSON.stringify(input),
-      headers:
-        project.activeClaim?.runId === runId && project.activeClaim.token
-          ? { "X-Briar-Claim-Token": project.activeClaim.token }
-          : undefined,
+      projectId: project.id,
+      work: activeIssueWork(project, canonicalRunId),
+      requestId,
+      stage,
+      action: action === "start"
+        ? TransitionWorkflowStageRequest_Action.START
+        : TransitionWorkflowStageRequest_Action.COMPLETE,
+      attempt: positiveOption("--attempt"),
+      revision: positiveOption("--revision"),
     },
   );
-  if (result.outcome === "paused" && project.activeClaim?.runId === runId) {
+  if (
+    result.outcome === TransitionWorkflowStageResponse_Outcome.PAUSED &&
+    project.activeClaim?.runId === canonicalRunId
+  ) {
     config.projects = config.projects.map((candidate) =>
       candidate.id === project.id
         ? { ...candidate, activeClaim: undefined }
@@ -743,7 +806,7 @@ async function transitionWorkflowStage(action: "start" | "complete") {
     );
     await saveConfig(config);
   }
-  console.log(JSON.stringify(result));
+  console.log(toJsonString(TransitionWorkflowStageResponseSchema, result));
 }
 
 export {

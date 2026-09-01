@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package briar.types.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option swift_prefix = "BriarTypes_";
+
+message WorkflowCheckpoint {
+  enum Position {
+    POSITION_UNSPECIFIED = 0;
+    POSITION_BEFORE = 1;
+    POSITION_AFTER = 2;
+  }
+
+  string key = 1;
+  string stage = 2;
+  string stage_label = 3;
+  Position position = 4;
+  uint32 attempt = 5;
+  uint32 revision = 6;
+  optional google.protobuf.Timestamp reached_at = 7;
+  optional string next_stage = 8;
+  optional string next_stage_label = 9;
+  bool terminal_review_only = 10;
+}
+
+message WorkflowStage {
+  string id = 1;
+  string label = 2;
+  bool required = 3;
+  repeated string evidence = 4;
+  repeated string checks = 5;
+}
+
+message AutoHuntWorkflow {
+  uint32 version = 1;
+  repeated WorkflowStage stages = 2;
+  repeated WorkflowRequirement requirements = 3;
+  WorkflowExecution execution = 4;
+  WorkflowCompletion completion = 5;
+}
+
+message WorkflowRequirement {
+  string id = 1;
+  string label = 2;
+  string kind = 3;
+  string tool = 4;
+  string reason = 5;
+}
+
+message WorkflowCheckpointSpec {
+  string key = 1;
+  string stage = 2;
+  WorkflowCheckpoint.Position position = 3;
+}
+
+message WorkflowExecution {
+  repeated WorkflowCheckpointSpec checkpoints = 1;
+}
+
+message WorkflowCompletion {
+  repeated string required_stages = 1;
+}
+
+message CheckpointBoundary {
+  string stage = 1;
+  string stage_label = 2;
+  WorkflowCheckpoint.Position position = 3;
+}
+
+message CheckpointPolicy {
+  repeated CheckpointBoundary available_boundaries = 1;
+  repeated WorkflowCheckpointSpec project_mandatory = 2;
+  repeated WorkflowCheckpointSpec user_defaults = 3;
+  repeated WorkflowCheckpointSpec effective = 4;
+  uint64 project_revision = 5;
+  uint64 user_revision = 6;
+}

@@ -40,6 +40,18 @@ const dashboardProps = {
     throw new Error("not implemented in this test");
   }
 };
+const emptyIssueMessageContract: Pick<
+  IssueMessage,
+  | "attachments"
+  | "proposedAction"
+  | "executionProposal"
+  | "skillExecutionProposal"
+> = {
+  attachments: [],
+  proposedAction: null,
+  executionProposal: null,
+  skillExecutionProposal: null,
+};
 const dashboardAgent: ProjectAgent = {
   id: "agent-1",
   projectId: demoDashboard.project.id,
@@ -103,6 +115,7 @@ function dashboardAgentSession(run: HuntRun, status: AutoHuntSession["status"] =
       summary: null
     }],
     startedAt: "2026-07-29T00:00:00.000Z",
+    updatedAt: status === "running" ? "2026-07-29T00:00:00.000Z" : "2026-07-29T00:10:00.000Z",
     completedAt: status === "running" ? null : "2026-07-29T00:10:00.000Z",
     conversationId: null,
     workspaceRoot: null,
@@ -132,6 +145,7 @@ describe("IssueConversation", () => {
   it("highlights and focuses the reply selected from Inbox", async () => {
     const run = demoDashboard.runs[0];
     const rootMessage: IssueMessage = {
+      ...emptyIssueMessageContract,
       id: "issue-root-message",
       runId: run.id,
       parentMessageId: null,
@@ -195,6 +209,7 @@ describe("IssueConversation", () => {
   it("keeps loaded messages visible when the run snapshot refreshes", async () => {
     const createdAt = new Date().toISOString();
     const loadedMessage: IssueMessage = {
+      ...emptyIssueMessageContract,
       id: "message-loaded",
       runId: demoDashboard.runs[0].id,
       parentMessageId: null,
@@ -231,10 +246,11 @@ describe("IssueConversation", () => {
     expect(container.querySelector(".issue-message-list")?.textContent).toContain(loadedMessage.body);
     await cleanup();
   });
-  it("uses Inbox conversation changes as a delta recovery signal", async () => {
+  it("uses Inbox conversation changes to replace reset snapshots", async () => {
     const run = demoDashboard.runs[0];
     const createdAt = "2026-08-15T00:00:00.000Z";
     const trigger: IssueMessage = {
+      ...emptyIssueMessageContract,
       id: "message-trigger",
       runId: run.id,
       parentMessageId: null,
@@ -282,19 +298,26 @@ describe("IssueConversation", () => {
       agentId: "agent-reviewer",
       agentName: "Reviewer"
     };
+    const staleMessage = {
+      ...trigger,
+      id: "stale-message",
+      body: "stale conversation state"
+    };
     const loadSnapshot = vi.spyOn(api, "loadIssueConversationSnapshot").mockResolvedValue({
       cursor: 7,
-      messages: [trigger],
+      messages: [trigger, staleMessage],
       agentReplies: [replyJob, reviewerReplyJob]
     });
     const loadDelta = vi.spyOn(api, "loadIssueConversationDelta").mockResolvedValueOnce({
       cursor: 7,
       hasMore: false,
-      changed: false
+      changed: false,
+      reset: false
     }).mockResolvedValueOnce({
       cursor: 8,
       hasMore: false,
       changed: true,
+      reset: true,
       messages: [trigger, reply],
       agentReplies: [replyJob, reviewerReplyJob].map(job => ({
         ...job,
@@ -341,6 +364,7 @@ describe("IssueConversation", () => {
     expect(container.textContent).toContain("Developer · 원인을 확인하고 있습니다.");
     expect(container.textContent).not.toContain("Briar · 원인을 확인하고 있습니다.");
     expect(container.textContent).toContain("Reviewer님이 답변을 작성하고 있습니다…");
+    expect(container.textContent).toContain(staleMessage.body);
     await act(async () => {
       root.render(renderPage("conversation:message-reply"));
       await Promise.resolve();
@@ -348,6 +372,7 @@ describe("IssueConversation", () => {
     });
     expect(loadDelta).toHaveBeenCalledTimes(2);
     expect(container.textContent).toContain(reply.body);
+    expect(container.textContent).not.toContain(staleMessage.body);
     expect(container.textContent).not.toContain("Agent가 답변을 작성하고 있습니다");
     await cleanup();
     createTransport.mockRestore();
@@ -371,6 +396,7 @@ describe("IssueConversation", () => {
     };
     const createdAt = "2026-08-11T00:00:00.000Z";
     const message: IssueMessage = {
+      ...emptyIssueMessageContract,
       id: "message-execution-proposal",
       runId: conversationRun.id,
       parentMessageId: null,
@@ -453,6 +479,7 @@ describe("IssueConversation", () => {
       delegatedByAgentName: null
     };
     const message: IssueMessage = {
+      ...emptyIssueMessageContract,
       id: "message-skill-approval",
       runId: run.id,
       parentMessageId: null,
@@ -525,6 +552,7 @@ describe("IssueConversation", () => {
     };
     const createdAt = "2026-08-11T00:00:00.000Z";
     const message: IssueMessage = {
+      ...emptyIssueMessageContract,
       id: "message-delayed-execution-proposal",
       runId: conversationRun.id,
       parentMessageId: null,
@@ -589,6 +617,7 @@ describe("IssueConversation", () => {
     const targetRun = demoDashboard.runs[0];
     const createdAt = "2026-08-11T00:00:00.000Z";
     const message: IssueMessage = {
+      ...emptyIssueMessageContract,
       id: "message-accepted-execution-proposal",
       runId: conversationRun.id,
       parentMessageId: null,
@@ -691,6 +720,7 @@ describe("IssueConversation", () => {
       type: "image/png"
     });
     const sentMessage: IssueMessage = {
+      ...emptyIssueMessageContract,
       id: "message-with-image",
       runId: demoDashboard.runs[0].id,
       parentMessageId: null,
@@ -753,6 +783,7 @@ describe("IssueConversation", () => {
   });
   it("renders replies flat and sends a reply to any message", async () => {
     const rootMessage: IssueMessage = {
+      ...emptyIssueMessageContract,
       id: "message-root",
       runId: demoDashboard.runs[0].id,
       parentMessageId: null,
@@ -845,6 +876,7 @@ describe("IssueConversation", () => {
   it("edits and deletes messages the current user authored", async () => {
     const createdAt = "2026-08-03T10:00:00.000Z";
     const rootMessage: IssueMessage = {
+      ...emptyIssueMessageContract,
       id: "message-root",
       runId: demoDashboard.runs[0].id,
       parentMessageId: null,
@@ -942,6 +974,7 @@ describe("IssueConversation", () => {
   it("hides edit and delete actions for messages the current user did not author", async () => {
     const createdAt = "2026-08-03T10:00:00.000Z";
     const agentMessage: IssueMessage = {
+      ...emptyIssueMessageContract,
       id: "message-agent",
       runId: demoDashboard.runs[0].id,
       parentMessageId: null,
@@ -987,6 +1020,7 @@ describe("IssueConversation", () => {
   it("keeps the conversation error alert when an agent reply fails", async () => {
     const createdAt = new Date().toISOString();
     const userMessage: IssueMessage = {
+      ...emptyIssueMessageContract,
       id: "message-reply-failed",
       runId: demoDashboard.runs[0].id,
       parentMessageId: null,
@@ -1093,6 +1127,7 @@ describe("IssueConversation", () => {
           sentInput = input;
           return {
             message: {
+              ...emptyIssueMessageContract,
               id: "member-mention",
               runId: demoDashboard.runs[0].id,
               parentMessageId: null,
@@ -1155,6 +1190,7 @@ describe("IssueConversation", () => {
 
   it("scrolls to the bottom and focuses the newly sent message when submitting input", async () => {
     const existingMessage: IssueMessage = {
+      ...emptyIssueMessageContract,
       id: "message-existing",
       runId: demoDashboard.runs[0].id,
       parentMessageId: null,
@@ -1171,6 +1207,7 @@ describe("IssueConversation", () => {
     };
     const onSendIssueMessage = vi.fn(async (input: { body: string; clientMessageId?: string }) => ({
       message: {
+        ...emptyIssueMessageContract,
         id: input.clientMessageId ?? "message-sent",
         runId: demoDashboard.runs[0].id,
         parentMessageId: null,
@@ -1235,6 +1272,7 @@ describe("IssueConversation", () => {
 
   it("scrolls to the bottom and focuses the sent message even when a highlighted message was active", async () => {
     const highlightedMessage: IssueMessage = {
+      ...emptyIssueMessageContract,
       id: "message-highlighted",
       runId: demoDashboard.runs[0].id,
       parentMessageId: null,
@@ -1251,6 +1289,7 @@ describe("IssueConversation", () => {
     };
     const onSendIssueMessage = vi.fn(async (input: { body: string; clientMessageId?: string }) => ({
       message: {
+        ...emptyIssueMessageContract,
         id: input.clientMessageId ?? "message-new",
         runId: demoDashboard.runs[0].id,
         parentMessageId: null,

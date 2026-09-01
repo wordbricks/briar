@@ -45,12 +45,6 @@ export type ChannelVisibility = (typeof channelVisibilities)[number];
 export const channelKinds = ["channel", "dm"] as const;
 export type ChannelKind = (typeof channelKinds)[number];
 
-export const channelActionTypes = [
-  "request_issue_create",
-  "request_plan_document",
-] as const;
-export type ChannelActionType = (typeof channelActionTypes)[number];
-
 export const channelReplyStatuses = [
   "queued",
   "running",
@@ -106,6 +100,19 @@ const between = (minimum: number, maximum: number) =>
     Schema.isGreaterThanOrEqualTo(minimum),
     Schema.isLessThanOrEqualTo(maximum),
   );
+const boundedTrimmedText = (minimum: number, maximum: number) =>
+  Schema.String.check(
+    Schema.isMinLength(minimum),
+    Schema.isMaxLength(maximum),
+  ).pipe(
+    Schema.decodeTo(
+      Schema.String.check(
+        Schema.isMinLength(minimum),
+        Schema.isMaxLength(maximum),
+      ),
+      SchemaTransformation.trim(),
+    ),
+  );
 
 const Lowercased = Schema.Trim.pipe(
   Schema.decode({
@@ -122,11 +129,13 @@ export const channelNameSchema = Schema.Trim.check(
   Schema.isLengthBetween(1, 100),
 );
 export const channelTopicSchema = Schema.Trim.check(Schema.isMaxLength(500));
-export const channelMessageBodySchema = Schema.Trim.check(
-  Schema.isLengthBetween(1, 10_000),
-);
+export const channelMessageBodySchema = boundedTrimmedText(1, 10_000);
 export const channelWebhookNameSchema = Schema.Trim.check(
   Schema.isLengthBetween(1, 100),
+);
+/** Better Auth user IDs are opaque rather than UUIDs. */
+export const channelUserIdSchema = Schema.String.check(
+  Schema.isLengthBetween(1, 64),
 );
 
 const channelBlockIdSchema = Schema.optional(
@@ -331,22 +340,14 @@ const channelAgentSkillInputSourceSchema = strict(Schema.Struct({
   body: Schema.optional(
     Schema.Trim.check(Schema.isMaxLength(agentSkillBodyMaxLength)),
   ),
-  // Accepted while older desktop builds still submit the former combined
-  // field. It is normalized into description/body and never persisted.
-  instructions: Schema.optional(
-    Schema.Trim.check(Schema.isMaxLength(agentSkillBodyMaxLength)),
-  ),
   provider: AgentProviderSchema,
   model: nullableDefault(
     Schema.Trim.check(Schema.isLengthBetween(1, 100)),
   ),
   effort: nullableDefault(ModelEffort),
   kind: defaulted(ChannelAgentSkillKindSchema, "custom"),
-  executionMode: defaulted(AgentSkillExecutionModeSchema, "task"),
-  approvalPolicy: defaulted(AgentSkillApprovalPolicySchema, "explicit"),
-  // Accepted only so clients from before Skill selection was explicit can
-  // roll forward without a hard API failure. It has no runtime meaning.
-  isDefault: Schema.optional(Schema.Boolean),
+  executionMode: AgentSkillExecutionModeSchema,
+  approvalPolicy: AgentSkillApprovalPolicySchema,
   position: defaulted(between(0, 999), 0),
 }));
 
@@ -372,11 +373,9 @@ export const channelAgentSkillInputSchema =
         decode: ({
           body,
           description,
-          instructions: legacyInstructions,
-          isDefault: _legacyDefault,
           ...skill
         }) => {
-          const normalizedBody = body || legacyInstructions || "";
+          const normalizedBody = body || "";
           return {
             ...skill,
             description: description ||
@@ -385,11 +384,7 @@ export const channelAgentSkillInputSchema =
             body: normalizedBody,
           };
         },
-        encode: (skill) => ({
-          ...skill,
-          instructions: undefined,
-          isDefault: undefined,
-        }),
+        encode: (skill) => skill,
       }),
     ),
   );
@@ -422,18 +417,10 @@ const canonicalUuidSchema = Uuid.pipe(
   }),
 );
 
-export const channelInputSchema = strict(Schema.Struct({
-  name: channelNameSchema,
-  slug: Schema.optional(channelSlugSchema),
-  topic: nullableDefault(channelTopicSchema),
-  visibility: defaulted(Schema.Literals(channelVisibilities), "public"),
-  defaultProjectId: nullableDefault(Uuid),
-}));
-
 export const directMessageInputSchema = strict(Schema.Struct({
   memberIds: defaultedWith(
     mutableArray(
-      Schema.String.check(Schema.isLengthBetween(1, 64)),
+      channelUserIdSchema,
     ).check(Schema.isMaxLength(20)),
     () => [],
   ),
@@ -452,14 +439,6 @@ export const directMessageInputSchema = strict(Schema.Struct({
   ),
 );
 
-export const channelUpdateInputSchema = strict(Schema.Struct({
-  name: Schema.optional(channelNameSchema),
-  topic: Schema.optional(Schema.NullOr(channelTopicSchema)),
-  visibility: Schema.optional(Schema.Literals(channelVisibilities)),
-  defaultProjectId: Schema.optional(Schema.NullOr(Uuid)),
-  archived: Schema.optional(Schema.Boolean),
-}));
-
 export const channelMessageInputSchema = strict(Schema.Struct({
   body: channelMessageBodySchema,
   clientMessageId: Schema.optional(canonicalUuidSchema),
@@ -476,10 +455,6 @@ export const channelMessageInputSchema = strict(Schema.Struct({
     () => [],
   ),
   preferredDeviceId: nullableDefault(canonicalUuidSchema),
-}));
-
-export const channelWebhookInputSchema = strict(Schema.Struct({
-  name: channelWebhookNameSchema,
 }));
 
 export const channelIncomingWebhookMessageSchema = strict(Schema.Struct({
@@ -544,10 +519,6 @@ export const organizationAgentInputSchema = strict(Schema.Struct({
   ),
 }));
 
-export const channelMemberInputSchema = strict(Schema.Struct({
-  role: defaulted(Schema.Literals(["owner", "member"]), "member"),
-}));
-
 export const channelExecutionProposalAcceptInputSchema = strict(Schema.Struct({
   provider: AgentProviderSchema,
   model: Schema.NullOr(
@@ -569,8 +540,7 @@ export const channelProposalAcceptInputSchema = strict(Schema.Struct({
 export type ChannelSummary = {
   id: string;
   organizationId: string;
-  /** Missing only on cached responses from clients predating direct messages. */
-  kind?: ChannelKind;
+  kind: ChannelKind;
   slug: string;
   name: string;
   topic: string | null;
@@ -579,14 +549,14 @@ export type ChannelSummary = {
   archivedAt: string | null;
   memberCount: number;
   agentCount: number;
-  createdByUserId?: string | null;
+  createdByUserId: string | null;
   createdAt: string;
   updatedAt: string;
-  lastMessageAt?: string | null;
-  lastMessagePreview?: string | null;
-  lastReadAt?: string | null;
-  hasUnread?: boolean;
-  dmParticipants?: DirectMessageParticipant[];
+  lastMessageAt: string | null;
+  lastMessagePreview: string | null;
+  lastReadAt: string | null;
+  hasUnread: boolean;
+  dmParticipants: DirectMessageParticipant[];
 };
 
 export type DirectMessageParticipant = {
@@ -691,19 +661,16 @@ export type ChannelMessageDocumentContent = ChannelMessageDocument & {
 
 export type ChannelMessageProposal = {
   id: string;
-  actionType: ChannelActionType;
   status: "pending" | "accepted" | "declined";
   projectId: string | null;
-  payload: unknown;
+  payload: typeof channelProposalPayloadSchema.Type;
   resultRunId: string | null;
-  /** Present for accepted batch proposals, ordered like the proposed items. */
-  resultItems?: ChannelIssueBatchResultItem[];
+  /** Ordered like the proposed items for an accepted batch; empty otherwise. */
+  resultItems: ChannelIssueBatchResultItem[];
 };
 
-export type ChannelIssueBatchResultItem = {
-  localKey: string;
-  runId: string;
-};
+export type ChannelIssueBatchResultItem =
+  typeof channelIssueBatchResultItemSchema.Type;
 
 export type ChannelExecutionProposal = {
   id: string;
@@ -800,8 +767,8 @@ export type ChannelMessage = {
   parentMessageId: string | null;
   author: ChannelMessageAuthor;
   body: string;
-  /** Slack-compatible presentation blocks; absent on older API responses. */
-  blocks?: ChannelMessageBlock[] | null;
+  /** Slack-compatible presentation blocks. */
+  blocks: ChannelMessageBlock[];
   mentionedUserIds: string[];
   mentionedAgentIds: string[];
   attachments: ChannelMessageAttachment[];
@@ -809,14 +776,13 @@ export type ChannelMessage = {
   replyCount: number;
   lastReplyAt: string | null;
   /** Up to three unique reply authors, ordered by their most recent reply. */
-  replyAuthors?: ChannelMessageAuthor[];
-  /** Present on thread roots. Older API responses omit the field. */
-  subscribers?: ChannelThreadSubscriber[];
+  replyAuthors: ChannelMessageAuthor[];
+  subscribers: ChannelThreadSubscriber[];
   document: ChannelMessageDocument | null;
   proposal: ChannelMessageProposal | null;
   executionProposal: ChannelExecutionProposal | null;
-  skillExecutionProposal?: ChannelSkillExecutionProposal | null;
-  /** Owner-authorized, immutable versions used in this answer. */
+  skillExecutionProposal: ChannelSkillExecutionProposal | null;
+  /** Owner-authorized immutable memory revisions used by this answer. */
   memoryCitations?: DmMemoryReference[];
   /** Client-only state while a newly sent message awaits its server response. */
   optimistic?: boolean;
@@ -915,7 +881,7 @@ export function channelReplyContextMessageJson(
     document: message.document,
     proposal: message.proposal,
     executionProposal: message.executionProposal,
-    skillExecutionProposal: message.skillExecutionProposal ?? null,
+    skillExecutionProposal: message.skillExecutionProposal,
     createdAt: message.createdAt,
   };
 }
@@ -949,6 +915,7 @@ export type ChannelAgentReply = {
 export type ChannelDelta = {
   cursor: number;
   hasMore: boolean;
+  reset: boolean;
   channels: ChannelSummary[];
   removedChannelIds: string[];
   messages: ChannelMessage[];
@@ -962,43 +929,56 @@ export type ChannelDelta = {
  * accept, matching the issue conversation rules in migration 0068.
  */
 const channelReplyDocumentSchema = strict(Schema.Struct({
-  title: Schema.Trim.check(Schema.isLengthBetween(1, 300)),
+  title: boundedTrimmedText(1, 300),
   markdown: Schema.String.check(Schema.isLengthBetween(1, 200_000)),
-  projectId: nullableDefault(Uuid),
+  projectId: Schema.NullOr(Uuid),
 }));
 
 const channelReplyIssueInputSchema = strict(Schema.Struct({
-  title: Schema.Trim.check(Schema.isLengthBetween(1, 300)),
+  title: boundedTrimmedText(1, 300),
   description: Schema.NullOr(
-    Schema.Trim.check(Schema.isMaxLength(100_000)),
+    boundedTrimmedText(0, 100_000),
   ),
   priority: Schema.NullOr(between(1, 4)),
-  status: Schema.Literal("backlog"),
 }));
 
 const channelReplyIssueProposalSchema = strict(Schema.Struct({
-  projectId: nullableDefault(Uuid),
-  executeAfterCreate: defaulted(Schema.Boolean, false),
+  projectId: Schema.NullOr(Uuid),
+  executeAfterCreate: Schema.Boolean,
   issue: channelReplyIssueInputSchema,
 }));
 
-const channelIssueBatchLocalKeySchema = Schema.Trim.check(
+const channelIssueBatchLocalKeyPattern = /^[A-Za-z0-9][A-Za-z0-9._-]*$/u;
+const channelIssueBatchLocalKeySchema = Schema.String.check(
   Schema.isLengthBetween(1, 64),
-  Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/u),
+  Schema.isPattern(channelIssueBatchLocalKeyPattern),
+).pipe(
+  Schema.decodeTo(
+    Schema.String.check(
+      Schema.isLengthBetween(1, 64),
+      Schema.isPattern(channelIssueBatchLocalKeyPattern),
+    ),
+    SchemaTransformation.trim(),
+  ),
 );
+
+export const channelIssueBatchResultItemSchema = strict(Schema.Struct({
+  localKey: Schema.Trimmed.check(
+    Schema.isLengthBetween(1, 64),
+    Schema.isPattern(channelIssueBatchLocalKeyPattern),
+  ),
+  runId: Uuid,
+}));
 
 const channelIssueBatchSchema = strict(Schema.Struct({
   items: mutableArray(strict(Schema.Struct({
     key: channelIssueBatchLocalKeySchema,
     issue: channelReplyIssueInputSchema,
   }))).check(Schema.isLengthBetween(1, 8)),
-  dependencies: defaultedWith(
-    mutableArray(strict(Schema.Struct({
-      prerequisiteKey: channelIssueBatchLocalKeySchema,
-      dependentKey: channelIssueBatchLocalKeySchema,
-    }))).check(Schema.isMaxLength(28)),
-    () => [],
-  ),
+  dependencies: mutableArray(strict(Schema.Struct({
+    prerequisiteKey: channelIssueBatchLocalKeySchema,
+    dependentKey: channelIssueBatchLocalKeySchema,
+  }))).check(Schema.isMaxLength(28)),
 })).check(
   Schema.makeFilter((batch) => {
     const issues: Array<Schema.FilterIssue> = [];
@@ -1080,7 +1060,7 @@ const channelIssueBatchSchema = strict(Schema.Struct({
 );
 
 const channelReplyIssueBatchProposalSchema = strict(Schema.Struct({
-  projectId: nullableDefault(Uuid),
+  projectId: Schema.NullOr(Uuid),
   batch: channelIssueBatchSchema,
 }));
 
@@ -1100,28 +1080,38 @@ const channelReplyDelegationSchema = strict(Schema.Struct({
 }));
 
 export const channelMemoryCitationSchema = strict(Schema.Struct({
-  documentId: Uuid, version: Schema.Int.check(Schema.isGreaterThan(0)),
+  documentId: Uuid,
+  version: Schema.Int.check(Schema.isGreaterThan(0)),
 }));
 
-export const channelReplyCompletionSchema = strict(Schema.Struct({
-  memorySaveRequest: Schema.optional(Schema.NullOr(strict(Schema.Struct({
-    documents: Schema.Array(channelMemoryCitationSchema).check(Schema.isMaxLength(10)),
-  })))),
-  memoryCitations: Schema.optional(Schema.NullOr(Schema.Array(channelMemoryCitationSchema).check(Schema.isMaxLength(10)))),
-  body: channelMessageBodySchema,
-  document: nullableDefault(channelReplyDocumentSchema),
-  issueProposal: nullableDefault(channelReplyIssueProposalSchema),
-  issueBatchProposal: nullableDefault(channelReplyIssueBatchProposalSchema),
-  executionProposal: nullableDefault(channelReplyExecutionProposalSchema),
-  skillExecutionProposal: nullableDefault(
+export const channelReplyCompletionFields = {
+  document: Schema.NullOr(channelReplyDocumentSchema),
+  issueProposal: Schema.NullOr(channelReplyIssueProposalSchema),
+  issueBatchProposal: Schema.NullOr(channelReplyIssueBatchProposalSchema),
+  executionProposal: Schema.NullOr(channelReplyExecutionProposalSchema),
+  skillExecutionProposal: Schema.NullOr(
     channelReplySkillExecutionProposalSchema,
   ),
-    /**
-     * Organization Agents can hand one repository-specific question to an
-     * eligible Project Agent. The server remains authoritative for the target
-     * organization, project, channel roster, and recursion boundary.
-     */
-  delegation: nullableDefault(channelReplyDelegationSchema),
+  delegation: Schema.NullOr(channelReplyDelegationSchema),
+} as const;
+
+export const channelMemorySaveRequestSchema = strict(Schema.Struct({
+    documents: Schema.Array(channelMemoryCitationSchema).check(
+      Schema.isMaxLength(10),
+    ),
+  }));
+
+export const channelReplyCompletionSchema = strict(Schema.Struct({
+  memorySaveRequest: Schema.optional(
+    Schema.NullOr(channelMemorySaveRequestSchema),
+  ),
+  memoryCitations: Schema.optional(
+    Schema.NullOr(
+      Schema.Array(channelMemoryCitationSchema).check(Schema.isMaxLength(10)),
+    ),
+  ),
+  body: channelMessageBodySchema,
+  ...channelReplyCompletionFields,
 }).check(
   Schema.makeFilter((reply) => {
     const issues: Array<Schema.FilterIssue> = [];
@@ -1165,60 +1155,30 @@ export const channelReplyCompletionSchema = strict(Schema.Struct({
   }),
 ));
 
-export const channelReplyClaimInputSchema = strict(Schema.Struct({
-  organizationId: Uuid,
-  workerId: Schema.Trim.check(Schema.isLengthBetween(1, 64)),
+export const channelStoredIssueProposalPayloadSchema = strict(Schema.Struct({
+  issue: channelReplyIssueInputSchema,
 }));
+export const channelStoredIssueBatchProposalPayloadSchema = strict(
+  Schema.Struct({ batch: channelIssueBatchSchema }),
+);
+export const channelStoredProposalPayloadSchema = Schema.Union([
+  channelStoredIssueProposalPayloadSchema,
+  channelStoredIssueBatchProposalPayloadSchema,
+]);
 
-export const channelReplyLeaseInputSchema = strict(Schema.Struct({
-  ...channelReplyClaimInputSchema.fields,
-  claimToken: Schema.Trim.check(Schema.isLengthBetween(1, 200)),
+export const channelIssueProposalPayloadSchema = strict(Schema.Struct({
+  ...channelStoredIssueProposalPayloadSchema.fields,
+  executeAfterCreate: Schema.Boolean,
 }));
-
-export const channelReplySessionCheckpointInputSchema = strict(Schema.Struct({
-  ...channelReplyLeaseInputSchema.fields,
-  conversationId: Schema.NullOr(
-    Schema.Trim.check(Schema.isLengthBetween(1, 1_024)),
-  ),
-}));
-
-export const channelReplyCompleteInputSchema = strict(Schema.Struct({
-  ...channelReplyLeaseInputSchema.fields,
-  conversationId: nullableDefault(
-    Schema.Trim.check(Schema.isLengthBetween(1, 1_024)),
-  ),
-  error: nullableDefault(
-    Schema.Trim.check(Schema.isLengthBetween(1, 4_000)),
-  ),
-  result: nullableDefault(channelReplyCompletionSchema),
-}).check(
-  Schema.makeFilter((input) =>
-    Boolean(input.error) !== Boolean(input.result) ||
-    "Provide either an error or a reply result"
-  ),
-));
-
-export const channelIssueProposalPayloadSchema = Schema.Struct({
-  issue: strict(Schema.Struct({
-    title: Schema.Trim.check(Schema.isLengthBetween(1, 300)),
-    description: Schema.NullOr(
-      Schema.Trim.check(Schema.isMaxLength(100_000)),
-    ),
-    priority: Schema.NullOr(between(1, 4)),
-      // Read compatibility for proposals persisted by pre-approval-boundary
-      // Workers. Acceptance always normalizes either value to backlog.
-    status: Schema.Literals(["backlog", "queued"]),
-  })),
-  executeAfterCreate: defaulted(Schema.Boolean, false),
-});
-export const decodeChannelIssueProposalPayloadOption =
-  Schema.decodeUnknownOption(channelIssueProposalPayloadSchema);
 
 export const channelIssueBatchProposalPayloadSchema = strict(Schema.Struct({
-  batch: channelIssueBatchSchema,
-  executeAfterCreate: defaulted(Schema.Literal(false), false),
+  ...channelStoredIssueBatchProposalPayloadSchema.fields,
+  executeAfterCreate: Schema.Literal(false),
 }));
 export type ChannelIssueBatchProposalPayload =
   typeof channelIssueBatchProposalPayloadSchema.Type;
-export const decodeChannelIssueBatchProposalPayloadOption =
-  Schema.decodeUnknownOption(channelIssueBatchProposalPayloadSchema);
+
+export const channelProposalPayloadSchema = Schema.Union([
+  channelIssueProposalPayloadSchema,
+  channelIssueBatchProposalPayloadSchema,
+]);

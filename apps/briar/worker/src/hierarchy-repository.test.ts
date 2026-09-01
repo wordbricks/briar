@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { Miniflare } from "miniflare";
+import { env } from "cloudflare:workers";
+import { beforeAll, describe, expect, it } from "vitest";
 import {
   createPlanningProject,
   getDefaultProjectForTeam,
@@ -12,13 +12,12 @@ import {
 } from "./hierarchy-repository";
 import { transferIssue } from "./issue-transfer-repository";
 import {
-  createIsolatedTestDatabase,
+  applyD1Migrations,
   executeD1Sql,
 } from "./test-helpers/d1";
 
 describe("Workspace Team Project Issue hierarchy", () => {
-  let miniflare: Miniflare;
-  let db: D1Database;
+  const db = env.DB;
   const workspaceId = "11111111-1111-4111-8111-111111111111";
   const ownerId = "22222222-2222-4222-8222-222222222222";
   const memberId = "33333333-3333-4333-8333-333333333333";
@@ -29,11 +28,7 @@ describe("Workspace Team Project Issue hierarchy", () => {
   const now = "2026-08-31T00:00:00.000Z";
 
   beforeAll(async () => {
-    const database = await createIsolatedTestDatabase({
-      suite: "workspace-team-project-issue-hierarchy",
-    });
-    miniflare = database.miniflare;
-    db = database.db;
+    await applyD1Migrations(db);
     await executeD1Sql(db, `
       insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
       values
@@ -68,10 +63,6 @@ describe("Workspace Team Project Issue hierarchy", () => {
         ('${teamBId}', '{"version":2,"stages":[{"id":"implementing","label":"Implement","required":true}],"execution":{"checkpoints":[]},"completion":{"requiredStages":["implementing"]}}', '[]',
          102, 'example/team-b', '${now}', '${now}');
     `);
-  });
-
-  afterAll(async () => {
-    await miniflare.dispose();
   });
 
   it("promotes the former Project identity and creates one General Project", async () => {

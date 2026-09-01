@@ -1,6 +1,3 @@
-import { scheduleDmMemoryActivityRevocations } from "./dm-memory-activity-revocations";
-import { handleDmMemoryClaimRoute } from "./dm-memory-claim-routes";
-import { handleDmMemoryLearningRoute } from "./dm-memory-learning-routes";
 import * as SchemaIssue from "effect/SchemaIssue";
 import {
   AutoHuntWorkflowValidationError,
@@ -12,96 +9,43 @@ import {
 import { requireSession } from "./session-auth";
 import { handleAccountRoute } from "./account-routes";
 import { handleIssueConversationRoute } from "./issue-conversation-routes";
-import { handleIssueCoreRoute } from "./issue-core-routes";
-import { handleIssueControlRoute } from "./issue-control-routes";
-import { handleIssueReplyWorkerRoute } from "./issue-reply-worker-routes";
-import { handleIssueProposalRoute } from "./issue-proposal-routes";
 import { handleChannelMessageRoute } from "./channel-message-routes";
 import { handleDmMemoryRoute } from "./dm-memory-routes";
-import { handleChannelOrganizationContextRoute } from "./channel-organization-context-routes";
-import { handleChannelProposalRoute } from "./channel-proposal-routes";
-import { handleChannelReplyClaimRoute } from "./channel-reply-claim-routes";
 import { handleChannelReplyResultRoute } from "./channel-reply-result-routes";
-import { handleChannelWebhookManagementRoute } from "./channel-webhook-management-routes";
 import { handleManagedComputerRoute } from "./managed-computer-routes";
-import { handleOrganizationChannelRoute } from "./organization-channel-routes";
-import { handleOrganizationWorkerRoute } from "./organization-worker-routes";
-import { handleOrganizationRoute } from "./organization-routes";
-import { handleHierarchyRoute } from "./hierarchy-routes";
 import { handleProjectAgentRoute } from "./project-agent-routes";
-import { handleProjectAgentSessionRoute } from "./project-agent-session-routes";
-import { handleProjectAgentTaskRoute } from "./project-agent-task-routes";
-import { handleProjectAgentTaskWorkerRoute } from "./project-agent-task-worker-routes";
-import { handleProjectCoreRoute } from "./project-core-routes";
-import { handleProjectGithubRoute } from "./project-github-routes";
-import { handleProjectLinearRoute } from "./project-linear-routes";
-import { handleProjectSettingsRoute } from "./project-settings-routes";
-import { handleProjectWorkerRoute } from "./project-worker-routes";
-import { handleQueueClaimRoute } from "./queue-claim-routes";
 import { handlePublicRoute } from "./public-routes";
 import { handleIncomingChannelWebhookRoute } from "./incoming-channel-webhook";
 import { handleRealtimeRoute } from "./realtime-routes";
+import { handleUploadRoute } from "./upload-route";
 import {
   requireAgentProject,
-  requireWorkerCredential,
   requireWorkerProjectBinding,
 } from "./worker-route-auth";
-import { handleMergeBatchRoute } from "./merge-batch-routes";
-import { handleRunAgentRoute } from "./run-agent-routes";
 import { handleRunEvidenceRoute } from "./run-evidence-routes";
-import { handleTranscriptRoute } from "./transcript-routes";
-import { handleExecutionWorkerRoute } from "./execution-worker-routes";
-import { handleWorkerClaimRoute } from "./worker-claim-routes";
-import {
-  handleGithubPublicRoute,
-  handleOrganizationGithubRoute,
-} from "./github-integration-routes";
-import { handleDashboardRoute } from "./dashboard-routes";
+import { handleGithubPublicRoute } from "./github-integration-routes";
 import {
   getProject,
 } from "./db";
-import {
-  TranscriptLimitError,
-  WorkerConflictError,
-} from "./workers";
+import { WorkerConflictError } from "./workers";
 import { WorkerLifecycleConflictError } from "./worker-lifecycle-repository";
-import { TranscriptRequestDecodeError } from "./transcript-request";
 import {
   RequestDecodeError,
 } from "./request-schema";
-import {
-  ProjectWorkflowInputError,
-} from "./run-request-contract";
 import { ManagedComputerServiceError } from "./managed-computer-service";
-import {
-  OrganizationAgentContextCursorError,
-  OrganizationAgentContextPageTooLargeError,
-} from "./organization-agent-context";
 import {
   agentSkillConflictMessage,
 } from "./agent-skills";
 import { handleScheduledTask } from "./scheduled-task";
-import {
-  handleOrganizationSlackRoute,
-  handleSlackAppPublicRoute,
-} from "./slack-app-routes";
+import { handleSlackAppPublicRoute } from "./slack-app-routes";
 import { handleSlackEventPublicRoute } from "./slack-event-routes";
-import { sha256 } from "./crypto-digest";
-import { handleProjectAgentScheduleRoute } from "./project-agent-schedule-routes";
 import {
   corsHeaders,
   HttpError,
   json,
 } from "./http-response";
-import {
-  channelMutationOrganization,
-  projectMutationProject,
-  projectScheduleClaimMutation,
-  scheduleAgentSkillExecutionRealtimeFlush,
-  scheduleChannelRealtimePublish,
-  scheduleInboxRealtimeFlush,
-  scheduleProjectRealtimePublish,
-} from "./realtime-scheduling";
+import { handleAppConnectRequest } from "./app-connect";
+import { scheduleAgentSkillExecutionRealtimeFlush } from "./realtime-scheduling";
 
 const formatSchemaIssue = SchemaIssue.makeFormatterStandardSchemaV1();
 const bearerToken = (request: Request) => {
@@ -131,31 +75,6 @@ async function requireRunExecutionProject(
     throw new HttpError(403, "Run is not assigned to this worker");
   }
   return run.project_id;
-}
-
-async function requireActiveWorkerRunClaim(
-  db: D1Database,
-  request: Request,
-  runId: string,
-) {
-  const projectId = await requireRunExecutionProject(db, request, runId);
-  const claimToken = request.headers.get("x-briar-claim-token");
-  if (!claimToken?.startsWith("briar_claim_")) {
-    throw new HttpError(409, "Active claim token is required");
-  }
-  const claimTokenHash = await sha256(claimToken);
-  const authenticatedAt = new Date().toISOString();
-  const active = await db
-    .prepare(
-      `select id from briar_hunt_runs
-       where id = ? and project_id = ? and claim_token_hash = ?
-         and lease_expires_at > ?
-         and status not in ('completed', 'cancelled', 'blocked', 'failed')`,
-    )
-    .bind(runId, projectId, claimTokenHash, authenticatedAt)
-    .first<{ id: string }>();
-  if (!active) throw new HttpError(409, "Issue processing claim token is no longer active");
-  return { projectId, claimTokenHash, authenticatedAt };
 }
 
 async function requireProjectAccess(
@@ -191,50 +110,37 @@ async function route(
     request,
     auth,
     db,
-    attachmentsBucket,
     env,
-    context,
   });
   if (accountResponse) return accountResponse;
 
   const managedComputerResponse = await handleManagedComputerRoute({
     request,
-    auth,
     db,
     env,
-    context,
   });
   if (managedComputerResponse !== undefined) return managedComputerResponse;
 
-  const hierarchyResponse = await handleHierarchyRoute({
-    request,
-    url,
-    auth,
-    db,
-  });
-  if (hierarchyResponse !== undefined) return hierarchyResponse;
-
-  const organizationResponse = await handleOrganizationRoute({
-    request,
-    url,
-    auth,
-    db,
-  });
-  if (organizationResponse !== undefined) return organizationResponse;
-
   const realtimeResponse = await handleRealtimeRoute({
     request,
-    auth,
     db,
     env,
   });
   if (realtimeResponse !== undefined) return realtimeResponse;
 
-  const memoryResponse = await handleDmMemoryRoute({ request, url, auth, db, env });
-  if (memoryResponse !== undefined) {
-    if (request.method !== "GET") scheduleDmMemoryActivityRevocations(db, env, context);
-    return memoryResponse;
+  const uploadResponse = await handleUploadRoute({
+    request,
+    url,
+    db,
+    bucket: attachmentsBucket,
+    signingSecret: env.BETTER_AUTH_SECRET,
+  });
+  if (uploadResponse !== undefined) {
+    return uploadResponse;
   }
+
+  const memoryResponse = await handleDmMemoryRoute({ request, url, auth, db });
+  if (memoryResponse !== undefined) return memoryResponse;
 
   const channelMessageResponse = await handleChannelMessageRoute({
     request,
@@ -245,127 +151,7 @@ async function route(
     env,
     context,
   });
-  if (channelMessageResponse !== undefined) {
-    if (request.method !== "GET") scheduleDmMemoryActivityRevocations(db, env, context);
-    return channelMessageResponse;
-  }
-
-  const organizationChannelResponse = await handleOrganizationChannelRoute({
-    request,
-    url,
-    auth,
-    db,
-    attachmentsBucket,
-    env,
-    context,
-  });
-  if (organizationChannelResponse !== undefined) {
-    return organizationChannelResponse;
-  }
-
-  const channelWebhookManagementResponse =
-    await handleChannelWebhookManagementRoute({
-      request,
-      url,
-      auth,
-      db,
-    });
-  if (channelWebhookManagementResponse !== undefined) {
-    return channelWebhookManagementResponse;
-  }
-
-  const channelProposalResponse = await handleChannelProposalRoute({
-    request,
-    url,
-    auth,
-    db,
-    env,
-  });
-  if (channelProposalResponse !== undefined) return channelProposalResponse;
-
-  const organizationWorkerResponse = await handleOrganizationWorkerRoute({
-    request,
-    url,
-    auth,
-    db,
-    env,
-  });
-  if (organizationWorkerResponse !== undefined) {
-    return organizationWorkerResponse;
-  }
-
-  const organizationGithubResponse = await handleOrganizationGithubRoute({
-    request,
-    url,
-    auth,
-    db,
-    env,
-  });
-  if (organizationGithubResponse !== undefined) {
-    return organizationGithubResponse;
-  }
-
-  const organizationSlackResponse = await handleOrganizationSlackRoute({
-    request,
-    url,
-    auth,
-    db,
-    env,
-    context,
-  });
-  if (organizationSlackResponse !== undefined) {
-    return organizationSlackResponse;
-  }
-
-  const projectCoreResponse = await handleProjectCoreRoute({
-    request,
-    url,
-    auth,
-    db,
-    attachmentsBucket,
-    env,
-    context,
-  });
-  if (projectCoreResponse !== undefined) return projectCoreResponse;
-
-  const projectGithubResponse = await handleProjectGithubRoute({
-    request,
-    url,
-    auth,
-    db,
-    env,
-  });
-  if (projectGithubResponse !== undefined) return projectGithubResponse;
-
-  const projectSettingsResponse = await handleProjectSettingsRoute({
-    request,
-    url,
-    auth,
-    db,
-  });
-  if (projectSettingsResponse !== undefined) return projectSettingsResponse;
-
-  const projectAgentTaskResponse = await handleProjectAgentTaskRoute({
-    request,
-    url,
-    auth,
-    db,
-    env,
-    context,
-  });
-  if (projectAgentTaskResponse !== undefined) return projectAgentTaskResponse;
-
-  const projectAgentSessionResponse = await handleProjectAgentSessionRoute({
-    request,
-    url,
-    auth,
-    db,
-    env,
-    context,
-  });
-  if (projectAgentSessionResponse !== undefined) {
-    return projectAgentSessionResponse;
-  }
+  if (channelMessageResponse !== undefined) return channelMessageResponse;
 
   const projectAgentResponse = await handleProjectAgentRoute({
     request,
@@ -375,33 +161,6 @@ async function route(
     attachmentsBucket,
   });
   if (projectAgentResponse !== undefined) return projectAgentResponse;
-
-  const projectAgentScheduleResponse =
-    await handleProjectAgentScheduleRoute({
-      request,
-      db,
-      env,
-      context,
-      requireSession: () => requireSession(auth, request),
-    });
-  if (projectAgentScheduleResponse) return projectAgentScheduleResponse;
-
-  const projectLinearResponse = await handleProjectLinearRoute({
-    request,
-    url,
-    auth,
-    db,
-  });
-  if (projectLinearResponse !== undefined) return projectLinearResponse;
-
-  const dashboardResponse = await handleDashboardRoute({
-    request,
-    url,
-    auth,
-    db,
-    archivesBucket: env.ARCHIVES,
-  });
-  if (dashboardResponse !== undefined) return dashboardResponse;
 
   const issueConversationResponse = await handleIssueConversationRoute({
     request,
@@ -417,16 +176,6 @@ async function route(
     return issueConversationResponse;
   }
 
-  const issueProposalResponse = await handleIssueProposalRoute({
-    request,
-    url,
-    auth,
-    db,
-    attachmentsBucket,
-    archivesBucket: env.ARCHIVES,
-  });
-  if (issueProposalResponse !== undefined) return issueProposalResponse;
-
   const runEvidenceResponse = await handleRunEvidenceRoute({
     request,
     url,
@@ -439,165 +188,15 @@ async function route(
   });
   if (runEvidenceResponse !== undefined) return runEvidenceResponse;
 
-  const issueCoreResponse = await handleIssueCoreRoute({
-    request,
-    url,
-    auth,
-    db,
-    attachmentsBucket,
-    archivesBucket: env.ARCHIVES,
-    context,
-  });
-  if (issueCoreResponse !== undefined) return issueCoreResponse;
-
-  const issueControlResponse = await handleIssueControlRoute({
-    request,
-    url,
-    auth,
-    db,
-    archivesBucket: env.ARCHIVES,
-  });
-  if (issueControlResponse !== undefined) return issueControlResponse;
-
-  const executionWorkerResponse = await handleExecutionWorkerRoute({
-    request,
-    url,
-    auth,
-    db,
-    env,
-    requireAgentProject: () => requireAgentProject(db, request),
-    requireWorkerCredential: () => requireWorkerCredential(db, request),
-    requireWorkerProjectBinding: (projectId) =>
-      requireWorkerProjectBinding(db, request, projectId),
-  });
-  if (executionWorkerResponse !== undefined) return executionWorkerResponse;
-
-  const transcriptResponse = await handleTranscriptRoute({
-    request,
-    url,
-    db,
-    env,
-    requireAgentProject: () => requireAgentProject(db, request),
-    requireWorkerProjectBinding: (projectId, workerId) =>
-      requireWorkerProjectBinding(db, request, projectId, workerId),
-    requireRunExecutionProject: (runId) =>
-      requireRunExecutionProject(db, request, runId),
-    requireProjectAccess: (projectId) =>
-      requireProjectAccess(auth, db, request, projectId),
-  });
-  if (transcriptResponse !== undefined) return transcriptResponse;
-
-  const projectWorkerResponse = await handleProjectWorkerRoute({
-    request,
-    url,
-    db,
-    requireProjectAccess: (projectId) =>
-      requireProjectAccess(auth, db, request, projectId),
-  });
-  if (projectWorkerResponse !== undefined) return projectWorkerResponse;
-
-  const mergeBatchResponse = await handleMergeBatchRoute({
-    request,
-    url,
-    db,
-    requireWorkerProjectBinding: (projectId, workerId) =>
-      requireWorkerProjectBinding(db, request, projectId, workerId),
-  });
-  if (mergeBatchResponse !== undefined) return mergeBatchResponse;
-
-  const workerClaimResponse = await handleWorkerClaimRoute({
-    request,
-    url,
-    db,
-    attachmentsBucket,
-    env,
-    context,
-  });
-  if (workerClaimResponse !== undefined) return workerClaimResponse;
-
-  const issueReplyWorkerResponse = await handleIssueReplyWorkerRoute({
-    request,
-    url,
-    db,
-    attachmentsBucket,
-    env,
-    context,
-  });
-  if (issueReplyWorkerResponse !== undefined) return issueReplyWorkerResponse;
-
-  const channelReplyClaimResponse = await handleChannelReplyClaimRoute({
-    request,
-    url,
-    db,
-    env,
-    context,
-  });
-  if (channelReplyClaimResponse !== undefined) {
-    return channelReplyClaimResponse;
-  }
-
-  const memoryClaimResponse = await handleDmMemoryClaimRoute({ request, url, db, env });
-  if (memoryClaimResponse !== undefined) return memoryClaimResponse;
-
-  const memoryLearningResponse = await handleDmMemoryLearningRoute({ request, url, db, env });
-  if (memoryLearningResponse !== undefined) return memoryLearningResponse;
-
-  const channelOrganizationContextResponse =
-    await handleChannelOrganizationContextRoute({
-      request,
-      url,
-      db,
-      env,
-    });
-  if (channelOrganizationContextResponse !== undefined) {
-    return channelOrganizationContextResponse;
-  }
-
   const channelReplyResultResponse = await handleChannelReplyResultRoute({
     request,
     url,
     db,
     attachmentsBucket,
-    env,
-    context,
   });
   if (channelReplyResultResponse !== undefined) {
     return channelReplyResultResponse;
   }
-
-  const projectAgentTaskWorkerResponse =
-    await handleProjectAgentTaskWorkerRoute({
-      request,
-      url,
-      db,
-      env,
-      context,
-    });
-  if (projectAgentTaskWorkerResponse !== undefined) {
-    return projectAgentTaskWorkerResponse;
-  }
-
-  const queueClaimResponse = await handleQueueClaimRoute({
-    request,
-    url,
-    db,
-    env,
-  });
-  if (queueClaimResponse !== undefined) return queueClaimResponse;
-
-  const runAgentResponse = await handleRunAgentRoute({
-    request,
-    url,
-    db,
-    attachmentsBucket,
-    env,
-    requireRunExecutionProject: (runId) =>
-      requireRunExecutionProject(db, request, runId),
-    requireActiveWorkerRunClaim: (runId) =>
-      requireActiveWorkerRunClaim(db, request, runId),
-    requireAgentProject: () => requireAgentProject(db, request),
-  });
-  if (runAgentResponse !== undefined) return runAgentResponse;
 
   throw new HttpError(404, "Not found");
 }
@@ -656,6 +255,17 @@ export default {
           ? `http://${url.host}`
           : url.origin;
       const auth = createAuth(env, authOrigin, ctx);
+      const connectResponse = await handleAppConnectRequest({
+        request,
+        auth,
+        env,
+        context: ctx,
+        requireRunExecutionProject: (runId) =>
+          requireRunExecutionProject(env.DB, request, runId),
+      });
+      // Connect uses POST for reads as well as writes. RPC implementations own
+      // their mutation-specific realtime scheduling.
+      if (connectResponse !== undefined) return connectResponse;
       const response = await route(
         request,
         auth,
@@ -664,36 +274,6 @@ export default {
         env,
         ctx,
       );
-      const organizationId = channelMutationOrganization(
-        url.pathname,
-        request.method,
-        response.status,
-      );
-      if (organizationId) {
-        scheduleChannelRealtimePublish(env, env.DB, organizationId, ctx);
-      }
-      const projectId = projectMutationProject(
-        url.pathname,
-        request.method,
-        response.status,
-      );
-      if (projectId) {
-        scheduleProjectRealtimePublish(env, env.DB, projectId, ctx);
-      }
-      const projectScheduleClaimHandled = projectScheduleClaimMutation(
-        url.pathname,
-        request.method,
-        response.status,
-      );
-      if (
-        !organizationId &&
-        !projectId &&
-        !projectScheduleClaimHandled &&
-        request.method !== "GET" &&
-        request.method !== "HEAD"
-      ) {
-        scheduleInboxRealtimeFlush(env, env.DB, ctx);
-      }
       return response;
     } catch (error) {
       const skillConflictMessage = agentSkillConflictMessage(error);
@@ -717,32 +297,10 @@ export default {
       if (error instanceof WorkerLifecycleConflictError) {
         return json({ message: error.message }, 409);
       }
-      if (error instanceof TranscriptLimitError) {
-        return json({ message: error.message }, 413);
-      }
-      if (error instanceof OrganizationAgentContextCursorError) {
-        return json({ message: error.message }, 400);
-      }
-      if (error instanceof OrganizationAgentContextPageTooLargeError) {
-        return json({ message: error.message }, 413);
-      }
-      if (error instanceof TranscriptRequestDecodeError) {
-        return json({
-          message: "Invalid request",
-          issues: formatSchemaIssue(error.cause.issue).issues,
-        }, 400);
-      }
       if (error instanceof RequestDecodeError) {
         return json({
           message: "Invalid request",
           issues: formatSchemaIssue(error.cause.issue).issues,
-        }, 400);
-      }
-      if (error instanceof ProjectWorkflowInputError) {
-        return json({
-          message: error.message,
-          code: error.code,
-          issues: error.issues,
         }, 400);
       }
       if (error instanceof AutoHuntWorkflowValidationError) {

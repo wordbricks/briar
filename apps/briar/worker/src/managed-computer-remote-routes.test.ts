@@ -1,13 +1,13 @@
 import * as Predicate from "effect/Predicate";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { Code, ConnectError, createClient } from "@connectrpc/connect";
+import { createConnectTransport } from "@connectrpc/connect-web";
+import { FleetService } from "@briar/contracts/gen/briar/app/v1/fleet_pb";
+import { env as cloudflareEnv } from "cloudflare:workers";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import worker from "./index";
 import { sha256Hex } from "./managed-computer-crypto";
 import { createPromotionalManagedComputer } from "./managed-computer-repository";
-import {
-  createIsolatedTestDatabase,
-  executeD1Sql,
-  type IsolatedTestDatabase,
-} from "./test-helpers/d1";
+import { executeD1Sql } from "./test-helpers/d1";
 
 const organizationId = "11111111-1111-4111-8111-111111111111";
 const computerId = "22222222-2222-4222-8222-222222222222";
@@ -20,8 +20,7 @@ const deviceId = `managed-${computerId}`;
 const now = "2026-08-22T00:00:00.000Z";
 
 describe("managed computer remote desktop routes", () => {
-  let database: IsolatedTestDatabase;
-  let db: D1Database;
+  const db = cloudflareEnv.DB;
   const relayFetch = vi.fn(async (input: RequestInfo | URL) => {
     const url = new URL(Predicate.isString(input) ? input : input.toString());
     if (url.pathname === "/status") {
@@ -31,10 +30,6 @@ describe("managed computer remote desktop routes", () => {
   });
 
   beforeAll(async () => {
-    database = await createIsolatedTestDatabase({
-      suite: "managed-computer-remote-routes",
-    });
-    db = database.db;
     await executeD1Sql(db, `
       insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
       values ('${ownerId}', 'Remote Owner', 'remote-owner@example.com', 1, '${now}', '${now}');
@@ -104,8 +99,6 @@ describe("managed computer remote desktop routes", () => {
     ]);
   }, 60_000);
 
-  afterAll(async () => database.dispose());
-
   const env = () => ({
     DB: db,
     BETTER_AUTH_SECRET: "briar-test-secret-that-is-at-least-32-characters",
@@ -119,63 +112,62 @@ describe("managed computer remote desktop routes", () => {
     },
   }) as never;
 
-  const createRequest = (
-    token: string,
-    requestId: string,
-    origin = "https://briar.example",
-    reconnectSessionId?: string,
-  ) => new Request(
-    `https://briar.example/organizations/${organizationId}/managed-computers/${computerId}/remote-sessions`,
-    {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${token}`,
-        "content-type": "application/json",
-        "idempotency-key": requestId,
-        origin,
-      },
-      body: JSON.stringify({
-        requestId,
-        ...(reconnectSessionId ? { reconnectSessionId } : {}),
-      }),
-    },
+  const fleet = () => createClient(
+    FleetService,
+    createConnectTransport({
+      baseUrl: "https://briar.example",
+      fetch: async (input, init) =>
+        worker.fetch(new Request(input, { ...init, redirect: "manual" }), env()),
+    }),
   );
 
+  const options = (token: string, origin?: string | null) => ({
+    headers: {
+      authorization: `Bearer ${token}`,
+      ...(origin ? { origin } : {}),
+    },
+  });
+
+  const createRemoteSession = (
+    token: string,
+    requestId: string,
+    origin: string | null = "https://briar.example",
+    reconnectSessionId?: string,
+  ) => fleet().createManagedComputerRemoteSession(
+    {
+      organizationId,
+      managedComputerId: computerId,
+      requestId,
+      reconnectSessionId,
+    },
+    options(token, origin),
+  );
+
+  const errorCode = async (operation: Promise<unknown>) => {
+    const error = await operation.catch((cause: unknown) => cause);
+    expect(error).toBeInstanceOf(ConnectError);
+    return (error as ConnectError).code;
+  };
+
   it("allows a developer but denies a cross-site origin", async () => {
-    const developerResponse = await worker.fetch(
-      createRequest(memberToken, "66666666-6666-4666-8666-666666666666"),
-      env(),
+    const developerSession = await createRemoteSession(
+      memberToken,
+      "66666666-6666-4666-8666-666666666666",
     );
-    expect(developerResponse.status).toBe(201);
-    const developerSession = await developerResponse.json<{
-      session: { id: string };
-    }>();
     await db.prepare(
       `update briar_managed_computer_remote_sessions
        set state = 'ended', ended_at = ?, updated_at = ? where id = ?`,
-    ).bind(now, now, developerSession.session.id).run();
-    const deniedOrigin = await worker.fetch(
-      createRequest(
+    ).bind(now, now, developerSession.session?.id).run();
+    expect(await errorCode(createRemoteSession(
         ownerToken,
         "77777777-7777-4777-8777-777777777777",
         "https://attacker.example",
-      ),
-      env(),
-    );
-    expect(deniedOrigin.status).toBe(403);
-    expect(await deniedOrigin.json()).toMatchObject({
-      code: "MANAGED_COMPUTER_REMOTE_ORIGIN_REJECTED",
-    });
-    const missingOrigin = createRequest(
+    ))).toBe(Code.PermissionDenied);
+    expect(await errorCode(createRemoteSession(
       ownerToken,
       "12121212-1212-4212-8212-121212121212",
-    );
-    missingOrigin.headers.delete("origin");
-    const deniedMissingOrigin = await worker.fetch(missingOrigin, env());
-    expect(deniedMissingOrigin.status).toBe(403);
-    expect(await deniedMissingOrigin.json()).toMatchObject({
-      code: "MANAGED_COMPUTER_REMOTE_ORIGIN_REJECTED",
-    });
+      null,
+    ))).toBe(Code.PermissionDenied);
     const audits = await db.prepare(
       `select reason_code from briar_managed_computer_remote_audit_events
        where action = 'connection_rejected' order by occurred_at, id`,
@@ -189,13 +181,10 @@ describe("managed computer remote desktop routes", () => {
 
   it("issues a short-lived protocol token without putting it in the URL", async () => {
     const requestId = "88888888-8888-4888-8888-888888888888";
-    const response = await worker.fetch(createRequest(ownerToken, requestId), env());
-    expect(response.status).toBe(201);
-    const payload = await response.json<{
-      session: { id: string; connectionGeneration: number };
-      socket: { url: string; protocol: string };
-      reconnected: boolean;
-    }>();
+    const payload = await createRemoteSession(ownerToken, requestId);
+    if (!payload.session || !payload.socket) {
+      throw new Error("FleetService remote session response is incomplete");
+    }
     expect(payload).toMatchObject({
       session: { connectionGeneration: 1 },
       reconnected: false,
@@ -236,20 +225,13 @@ describe("managed computer remote desktop routes", () => {
        set state = 'disconnected', disconnected_at = ?, updated_at = ?
        where id = ?`,
     ).bind(now, now, payload.session.id).run();
-    const recoveredResponse = await worker.fetch(
-      createRequest(
-        ownerToken,
-        "99999999-9999-4999-8999-999999999999",
-        "https://briar.example",
-        "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-      ),
-      env(),
+    const recoveredResponse = await createRemoteSession(
+      ownerToken,
+      "99999999-9999-4999-8999-999999999999",
+      "https://briar.example",
+      "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
     );
-    expect(recoveredResponse.status).toBe(201);
-    await expect(recoveredResponse.json<{
-      session: { id: string; connectionGeneration: number };
-      reconnected: boolean;
-    }>()).resolves.toMatchObject({
+    expect(recoveredResponse).toMatchObject({
       session: {
         id: payload.session.id,
         connectionGeneration: 2,
@@ -273,18 +255,13 @@ describe("managed computer remote desktop routes", () => {
   });
 
   it("ends control when the managed computer Worker credential is removed", async () => {
-    const remove = () => worker.fetch(new Request(
-      `https://briar.example/organizations/${organizationId}/workers/${deviceId}`,
-      {
-        method: "DELETE",
-        headers: {
-          authorization: `Bearer ${ownerToken}`,
-          "Idempotency-Key": `worker-deprovision:${deviceId}`,
-        },
-      },
-    ), env());
+    const remove = () => fleet().deleteExecutionWorker({
+      organizationId,
+      deviceId,
+      requestId: `worker-deprovision:${deviceId}`,
+    }, options(ownerToken));
     const response = await remove();
-    expect(response.status).toBe(204);
+    expect(response.deleted).toBe(true);
     expect(relayFetch).toHaveBeenCalledWith(
       "https://managed-computer-remote.internal/disconnect",
       { method: "POST" },
@@ -297,12 +274,12 @@ describe("managed computer remote desktop routes", () => {
       state: "ended",
       end_reason: "worker_credential_revoked",
     });
-    expect((await remove()).status).toBe(204);
+    await expect(remove()).resolves.toMatchObject({ deleted: true });
     await db.prepare(
       `update briar_execution_worker_lifecycle_events
        set outcome = 'started', completed_at = null where request_id = ?`,
     ).bind(`worker-deprovision:${deviceId}`).run();
-    expect((await remove()).status).toBe(204);
+    await expect(remove()).resolves.toMatchObject({ deleted: true });
     const lifecycle = await db.prepare(
       `select reason, outcome, attempt_count, hard_delete_rows_written,
               detail_json

@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package briar.app.v1;
+
+option swift_prefix = "BriarAPI_";
+
+// Issues the short-lived URL used to open an existing Briar WebSocket
+// transport. WebSocket frames remain protobuf messages defined in
+// briar.realtime.v1; this service only controls authenticated ticket issuance.
+service RealtimeService {
+  rpc CreateRealtimeTicket(CreateRealtimeTicketRequest) returns (CreateRealtimeTicketResponse);
+}
+
+message CreateRealtimeTicketRequest {
+  message OrganizationNotifications {
+    string organization_id = 1;
+  }
+
+  message IssueActivity {
+    string project_id = 1;
+    string run_id = 2;
+  }
+
+  message ChannelActivity {
+    string organization_id = 1;
+    string channel_id = 2;
+  }
+
+  oneof scope {
+    OrganizationNotifications organization_notifications = 1;
+    IssueActivity issue_activity = 2;
+    ChannelActivity channel_activity = 3;
+  }
+}
+
+message CreateRealtimeTicketResponse {
+  string url = 1;
+}

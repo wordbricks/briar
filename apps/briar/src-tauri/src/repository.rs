@@ -249,6 +249,7 @@ pub(super) fn repository_icon_data_url(root: &Path) -> Result<Option<String>, St
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn discover_repository_icon(
     app: tauri::AppHandle,
     repository_path: String,
@@ -359,9 +360,9 @@ pub(super) fn inspect_lovable_repository_compatibility_in(
         issues.push("The React dependency was not found.".to_string());
     }
     let stack = if dependencies.contains("@tanstack/react-start") {
-        Some("tanstack-start".to_string())
+        Some(LovableStack::TanstackStart)
     } else if dependencies.contains("vite") && has_react {
-        Some("vite-react".to_string())
+        Some(LovableStack::ViteReact)
     } else {
         issues.push("Neither TanStack Start nor React + Vite was detected.".to_string());
         None
@@ -500,7 +501,14 @@ pub(super) fn inspect_lovable_repository_compatibility_in(
     }
     let package_manager = declared_package_manager
         .or_else(|| package_manager_signals.iter().next().cloned())
-        .or_else(|| Some("npm".to_string()));
+        .or_else(|| Some("npm".to_string()))
+        .and_then(|manager| match manager.as_str() {
+            "bun" => Some(LovablePackageManager::Bun),
+            "npm" => Some(LovablePackageManager::Npm),
+            "pnpm" => Some(LovablePackageManager::Pnpm),
+            "yarn" => Some(LovablePackageManager::Yarn),
+            _ => None,
+        });
 
     LovableRepositoryCompatibility {
         compatible: issues.is_empty(),
@@ -512,6 +520,7 @@ pub(super) fn inspect_lovable_repository_compatibility_in(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn inspect_lovable_repository_compatibility(
     app: tauri::AppHandle,
     repository_path: String,
@@ -665,6 +674,7 @@ pub(super) fn inspect_repository_readiness_on(
         remote_reachable,
         push_access,
         requires_github,
+        github_repository_id: None,
         github_repository,
         gh_installed: false,
         gh_version: None,
@@ -682,10 +692,7 @@ pub(super) fn project_repository_readiness_at(
     project_id: &str,
     home: &Path,
 ) -> Result<RepositoryReadiness, String> {
-    let contents = fs::read_to_string(config_path)
-        .map_err(|error| format!("Briar 로컬 설정을 읽지 못했습니다: {error}"))?;
-    let config = serde_json::from_str::<CliConfig>(&contents)
-        .map_err(|error| format!("Briar 로컬 설정이 손상되었습니다: {error}"))?;
+    let config = read_cli_config(config_path)?;
     let project = config
         .projects
         .iter()
@@ -693,19 +700,26 @@ pub(super) fn project_repository_readiness_at(
         .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?;
     let workflow = project
         .auto_hunt
-        .as_ref()
-        .and_then(|auto_hunt| auto_hunt.workflow.as_ref())
-        .cloned()
+        .as_option()
+        .and_then(|auto_hunt| auto_hunt.workflow.as_option())
+        .map(workflow_from_proto)
+        .transpose()?
         .unwrap_or_else(repository_workflow_bootstrap);
     let runner = project_runner(&config, project_id, home)?;
-    Ok(inspect_repository_readiness_on(
+    let mut readiness = inspect_repository_readiness_on(
         runner.as_ref(),
         Path::new(&project.repository_path),
         &workflow,
-    ))
+    );
+    readiness.github_repository_id = project
+        .auto_hunt
+        .as_option()
+        .and_then(|auto_hunt| auto_hunt.github_repository_id);
+    Ok(readiness)
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn inspect_repository_readiness(
     app: tauri::AppHandle,
     repository_path: String,
@@ -725,6 +739,7 @@ pub(super) async fn inspect_repository_readiness(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn project_repository_readiness(
     app: tauri::AppHandle,
     project_id: String,
@@ -855,6 +870,7 @@ pub(super) fn inspect_velen_on(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn inspect_velen(
     app: tauri::AppHandle,
     org: Option<String>,
@@ -869,6 +885,7 @@ pub(super) async fn inspect_velen(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn validate_repository_path(
     app: tauri::AppHandle,
     path: String,
@@ -1165,6 +1182,7 @@ pub(super) fn prepare_project_repository_in(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn prepare_project_repository(
     app: tauri::AppHandle,
     project_id: String,
@@ -1303,7 +1321,7 @@ pub(super) fn create_project_workspace_in(
     })
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct CreatedProjectWorkspace {
     pub(super) repository_path: String,
@@ -1312,6 +1330,7 @@ pub(super) struct CreatedProjectWorkspace {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn create_project_workspace(
     app: tauri::AppHandle,
     name: String,

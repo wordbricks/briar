@@ -9,16 +9,24 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { dirname, join, resolve, sep } from "node:path";
-import * as Schema from "effect/Schema";
-import { channelReplyClaimTokenHeader } from "../src/lib/channels-contract";
 import {
-  decodeOrganizationAgentContextLookupResponse,
+  create,
+  equals,
+  toJson,
+} from "@bufbuild/protobuf";
+import { timestampDate, ValueSchema } from "@bufbuild/protobuf/wkt";
+import {
+  OrganizationAgentContextLookupSchema,
+  OrganizationAgentContextService,
+  type OrganizationAgentContextManifest,
+} from "@briar/contracts/gen/briar/worker/v1/organization_agent_context_pb";
+import type { Client } from "@connectrpc/connect";
+import {
   decodeOrganizationAgentContextManifest,
-  decodeOrganizationAgentContextResourcePage,
   type OrganizationAgentContextLookupRequest,
   type OrganizationAgentContextManifest as OrganizationAgentContextIndexManifest,
-  type OrganizationAgentContextResource,
 } from "../src/lib/organization-agent-context-contract";
+import { createAuthenticatedConnectClient } from "./connect-client";
 
 export const organizationAgentContextDirectoryName =
   ".briar-organization-context";
@@ -27,79 +35,6 @@ const organizationAgentWorkspacePattern =
   /^channel-[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const unownedWorkspaceGraceMs = 60 * 60 * 1_000;
 
-type ContextResource = OrganizationAgentContextResource;
-
-const preserveExcessProperties = {
-  onExcessProperty: "preserve",
-} as const;
-
-const passthrough = <S extends Schema.Top>(schema: S) =>
-  schema.annotate({ parseOptions: preserveExcessProperties });
-
-const ContextItemId = Schema.String.check(Schema.isLengthBetween(1, 128));
-
-const ProjectIdentity = passthrough(Schema.Struct({
-  id: Schema.mutableKey(Schema.String.check(Schema.isUUID())),
-}));
-
-const ContextItemIdentity = passthrough(Schema.Struct({
-  id: Schema.mutableKey(ContextItemId),
-}));
-
-const IssuePullRequestIdentity = passthrough(Schema.Struct({
-  issueId: Schema.mutableKey(ContextItemId),
-  position: Schema.mutableKey(
-    Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
-  ),
-}));
-
-const decodeProjectIdentity = Schema.decodeUnknownSync(ProjectIdentity);
-const decodeContextItemIdentity = Schema.decodeUnknownSync(ContextItemIdentity);
-const decodeIssuePullRequestIdentity = Schema.decodeUnknownSync(
-  IssuePullRequestIdentity,
-);
-
-export type OrganizationAgentContextManifest = {
-  schemaVersion: 1;
-  organizationId: string;
-  workId: string;
-  snapshotAt: string;
-  complete: true;
-  collections: {
-    projects: ContextCollectionManifest;
-    agents: ContextProjectCollectionManifest;
-    issues: ContextProjectCollectionManifest;
-    issuePullRequests: ContextProjectCollectionManifest;
-    agentSessions: ContextProjectCollectionManifest;
-  };
-  retention: {
-    agentSessions: string;
-  };
-  consistency: {
-    snapshot: string;
-  };
-};
-
-type ContextCollectionManifest = {
-  total: number;
-  pages: string[];
-};
-
-type ContextProjectCollectionManifest = {
-  total: number;
-  projects: Array<{
-    projectId: string;
-    total: number;
-    pages: string[];
-  }>;
-};
-
-type ContextFetcher = (
-  input: string | URL | Request,
-  init?: RequestInit,
-) => Promise<Response>;
-
-const defaultMaxPageBytes = 2 * 1024 * 1024;
 const defaultMaxContextBytes = 512 * 1024 * 1024;
 
 export function organizationAgentContextDirectory(workspacePath: string) {
@@ -220,286 +155,7 @@ const contextFilePath = (directory: string, relativePath: string) => {
   return target;
 };
 
-const boundedResponseText = async (
-  response: Response,
-  maxBytes: number,
-  resource: string,
-) => {
-  if (!response.body) return "";
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let total = 0;
-  let contents = "";
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.byteLength;
-    if (total > maxBytes) {
-      await reader.cancel();
-      throw new Error(`Organization Agent ${resource} context page is too large`);
-    }
-    contents += decoder.decode(value, { stream: true });
-  }
-  return contents + decoder.decode();
-};
-
-const relativePagePath = (
-  resource: ContextResource,
-  pageNumber: number,
-  projectId: string | null,
-) => {
-  const filename = `page-${String(pageNumber).padStart(6, "0")}.json`;
-  if (resource === "projects") return join("projects", filename);
-  if (!projectId) throw new Error(`${resource} context requires a project`);
-  return join("projects", projectId, resource, filename);
-};
-
-export async function downloadOrganizationAgentContext(input: {
-  apiUrl: string;
-  workerToken: string;
-  organizationId: string;
-  workId: string;
-  workerId: string;
-  claimToken: string;
-  snapshotAt: string;
-  workspacePath: string;
-  signal?: AbortSignal;
-  fetcher?: ContextFetcher;
-  pageLimit?: number;
-  maxPageBytes?: number;
-  maxContextBytes?: number;
-}) {
-  const directory = organizationAgentContextDirectory(input.workspacePath);
-  const fetcher = input.fetcher ?? fetch;
-  const pageLimit = input.pageLimit ?? 25;
-  if (!Number.isInteger(pageLimit) || pageLimit < 1 || pageLimit > 50) {
-    throw new Error("Organization context page limit is invalid");
-  }
-  const maxPageBytes = input.maxPageBytes ?? defaultMaxPageBytes;
-  const maxContextBytes = input.maxContextBytes ?? defaultMaxContextBytes;
-  let contextBytes = 0;
-
-  await cleanupOrganizationAgentContext(input.workspacePath);
-  await mkdir(directory, { recursive: true, mode: 0o700 });
-  await chmod(directory, 0o700);
-
-  const fetchCollection = async (
-    resource: ContextResource,
-    projectId: string | null,
-  ): Promise<ContextCollectionManifest & { projectIds: string[] }> => {
-    let cursor: string | null = null;
-    let expectedTotal: number | null = null;
-    let itemCount = 0;
-    let pageNumber = 0;
-    const seenCursors = new Set<string>();
-    const pages: string[] = [];
-    const projectIds: string[] = [];
-    const seenProjectIds = new Set<string>();
-    const seenItemIds = new Set<string>();
-
-    do {
-      input.signal?.throwIfAborted();
-      const query = new URLSearchParams({
-        workerId: input.workerId,
-        limit: String(pageLimit),
-      });
-      if (cursor) query.set("cursor", cursor);
-      const basePath =
-        `/organizations/${input.organizationId}/channel-reply-claims/${input.workId}/organization-context`;
-      const resourcePath = resource === "projects"
-        ? `${basePath}/projects`
-        : `${basePath}/projects/${projectId}/${resource}`;
-      const response = await fetcher(
-        `${input.apiUrl.replace(/\/$/u, "")}${resourcePath}?${query}`,
-        {
-          redirect: "error",
-          signal: input.signal,
-          headers: {
-            Accept: "application/json",
-            Authorization: `Bearer ${input.workerToken}`,
-            [channelReplyClaimTokenHeader]: input.claimToken,
-          },
-        },
-      );
-      if (!response.ok) {
-        throw new Error(
-          `Organization Agent ${resource} context download failed (${response.status})`,
-        );
-      }
-      const declaredLength = Number(response.headers.get("Content-Length"));
-      if (Number.isFinite(declaredLength) && declaredLength > maxPageBytes) {
-        throw new Error(`Organization Agent ${resource} context page is too large`);
-      }
-      const text = await boundedResponseText(response, maxPageBytes, resource);
-      const page = decodeOrganizationAgentContextResourcePage(
-        JSON.parse(text),
-      );
-      if (
-        page.organizationId !== input.organizationId ||
-        page.workId !== input.workId ||
-        page.resource !== resource ||
-        page.projectId !== projectId ||
-        page.snapshotAt !== input.snapshotAt
-      ) {
-        throw new Error(`Organization Agent ${resource} context scope changed`);
-      }
-      if (page.complete !== (page.nextCursor === null)) {
-        throw new Error(`Organization Agent ${resource} context page is incomplete`);
-      }
-      if (!page.complete && page.items.length === 0) {
-        throw new Error(`Organization Agent ${resource} context made no progress`);
-      }
-      if (expectedTotal === null) expectedTotal = page.total;
-      if (page.total !== expectedTotal) {
-        throw new Error(`Organization Agent ${resource} context total changed`);
-      }
-      itemCount += page.items.length;
-      if (itemCount > page.total) {
-        throw new Error(`Organization Agent ${resource} context exceeded its total`);
-      }
-      if (resource === "projects") {
-        for (const rawItem of page.items) {
-          const project = decodeProjectIdentity(rawItem);
-          if (seenProjectIds.has(project.id)) {
-            throw new Error("Organization Agent project context contains duplicates");
-          }
-          seenProjectIds.add(project.id);
-          projectIds.push(project.id);
-        }
-      } else {
-        for (const rawItem of page.items) {
-          const itemId = resource === "issue-pull-requests"
-            ? (() => {
-                const item = decodeIssuePullRequestIdentity(rawItem);
-                return `${item.issueId}:${item.position}`;
-              })()
-            : decodeContextItemIdentity(rawItem).id;
-          if (seenItemIds.has(itemId)) {
-            throw new Error(
-              `Organization Agent ${resource} context contains duplicates`,
-            );
-          }
-          seenItemIds.add(itemId);
-        }
-      }
-
-      pageNumber += 1;
-      const relativePath = relativePagePath(resource, pageNumber, projectId);
-      const absolutePath = contextFilePath(directory, relativePath);
-      await mkdir(dirname(absolutePath), { recursive: true, mode: 0o700 });
-      const serialized = encodedPage(page);
-      const serializedBytes = new TextEncoder().encode(serialized).byteLength;
-      contextBytes += serializedBytes;
-      if (contextBytes > maxContextBytes) {
-        throw new Error("Organization Agent context exceeds the local size limit");
-      }
-      await writeFile(absolutePath, serialized, { mode: 0o600 });
-      await chmod(absolutePath, 0o600);
-      pages.push(relativePath);
-
-      cursor = page.nextCursor;
-      if (cursor) {
-        if (seenCursors.has(cursor)) {
-          throw new Error(`Organization Agent ${resource} context cursor repeated`);
-        }
-        seenCursors.add(cursor);
-      }
-    } while (cursor !== null);
-
-    if (itemCount !== (expectedTotal ?? 0)) {
-      throw new Error(`Organization Agent ${resource} context is incomplete`);
-    }
-    return { total: itemCount, pages, projectIds };
-  };
-
-  try {
-    const projects = await fetchCollection("projects", null);
-    const agents: ContextProjectCollectionManifest = { total: 0, projects: [] };
-    const issues: ContextProjectCollectionManifest = { total: 0, projects: [] };
-    const issuePullRequests: ContextProjectCollectionManifest = {
-      total: 0,
-      projects: [],
-    };
-    const agentSessions: ContextProjectCollectionManifest = {
-      total: 0,
-      projects: [],
-    };
-    for (const projectId of projects.projectIds) {
-      const projectAgents = await fetchCollection("agents", projectId);
-      agents.total += projectAgents.total;
-      agents.projects.push({
-        projectId,
-        total: projectAgents.total,
-        pages: projectAgents.pages,
-      });
-      const projectIssues = await fetchCollection("issues", projectId);
-      issues.total += projectIssues.total;
-      issues.projects.push({
-        projectId,
-        total: projectIssues.total,
-        pages: projectIssues.pages,
-      });
-      const projectIssuePullRequests = await fetchCollection(
-        "issue-pull-requests",
-        projectId,
-      );
-      issuePullRequests.total += projectIssuePullRequests.total;
-      issuePullRequests.projects.push({
-        projectId,
-        total: projectIssuePullRequests.total,
-        pages: projectIssuePullRequests.pages,
-      });
-      const projectSessions = await fetchCollection(
-        "agent-sessions",
-        projectId,
-      );
-      agentSessions.total += projectSessions.total;
-      agentSessions.projects.push({
-        projectId,
-        total: projectSessions.total,
-        pages: projectSessions.pages,
-      });
-    }
-
-    const manifest: OrganizationAgentContextManifest = {
-      schemaVersion: 1,
-      organizationId: input.organizationId,
-      workId: input.workId,
-      snapshotAt: input.snapshotAt,
-      complete: true,
-      collections: {
-        projects: { total: projects.total, pages: projects.pages },
-        agents,
-        issues,
-        issuePullRequests,
-        agentSessions,
-      },
-      retention: {
-        agentSessions:
-          "Includes every hot or archived Project Agent session retained by Briar at snapshot time; sessions older than the configured retention period may already have expired.",
-      },
-      consistency: {
-        snapshot:
-          "Membership excludes records first visible after snapshotAt. Records deleted or expired before their collection is paged are no longer retained and therefore are not included.",
-      },
-    };
-    const temporaryManifestPath = join(directory, "manifest.partial.json");
-    const manifestPath = join(directory, "manifest.json");
-    await writeFile(temporaryManifestPath, encodedPage(manifest), {
-      mode: 0o600,
-    });
-    await chmod(temporaryManifestPath, 0o600);
-    await rename(temporaryManifestPath, manifestPath);
-    await chmod(manifestPath, 0o600);
-    return { directory, manifestPath, manifest };
-  } catch (error) {
-    await cleanupOrganizationAgentContext(input.workspacePath);
-    throw error;
-  }
-}
-
 type OrganizationContextManifestCacheEntry = {
-  etag: string;
   revision: string;
   projects: OrganizationAgentContextIndexManifest["projects"];
 };
@@ -526,6 +182,194 @@ const rememberOrganizationContextManifest = (
   }
 };
 
+export type OrganizationAgentContextClient = Pick<
+  Client<typeof OrganizationAgentContextService>,
+  "getManifest" | "lookup"
+>;
+
+const organizationContextClient = (input: {
+  apiUrl: string;
+  workerToken: string;
+  client?: OrganizationAgentContextClient;
+}) => input.client ?? createAuthenticatedConnectClient(
+  OrganizationAgentContextService,
+  input.apiUrl,
+  input.workerToken,
+  { binary: true },
+);
+
+const required = <T>(value: T | undefined, field: string): T => {
+  if (value === undefined) {
+    throw new Error(`Organization Agent context omitted ${field}`);
+  }
+  return value;
+};
+
+const isoTimestamp = (
+  value: Parameters<typeof timestampDate>[0] | undefined,
+  field: string,
+) => {
+  const date = timestampDate(required(value, field));
+  if (Number.isNaN(date.getTime())) {
+    throw new Error(`Organization Agent context returned invalid ${field}`);
+  }
+  return date.toISOString();
+};
+
+const optionalIsoTimestamp = (
+  value: Parameters<typeof timestampDate>[0] | undefined,
+  field: string,
+) => value === undefined ? null : isoTimestamp(value, field);
+
+const manifestFromProto = (
+  manifest: OrganizationAgentContextManifest,
+): OrganizationAgentContextIndexManifest =>
+  decodeOrganizationAgentContextManifest({
+    schemaVersion: 2,
+    organizationId: manifest.organizationId,
+    workId: manifest.workId,
+    snapshotAt: isoTimestamp(manifest.snapshotAt, "manifest.snapshot_at"),
+    revision: manifest.revision,
+    projects: manifest.projects.map((project) => {
+      const agents = required(project.agents, "manifest.projects.agents");
+      const issues = required(project.issues, "manifest.projects.issues");
+      const sessions = required(project.sessions, "manifest.projects.sessions");
+      return {
+        id: project.id,
+        name: project.name,
+        issueKeyPrefix: project.issueKeyPrefix,
+        createdAt: isoTimestamp(
+          project.createdAt,
+          "manifest.projects.created_at",
+        ),
+        updatedAt: isoTimestamp(
+          project.updatedAt,
+          "manifest.projects.updated_at",
+        ),
+        resources: {
+          settings: {
+            revision: optionalIsoTimestamp(
+              project.settingsRevision,
+              "manifest.projects.settings_revision",
+            ),
+          },
+          agents: {
+            count: agents.count,
+            revision: optionalIsoTimestamp(
+              agents.revision,
+              "manifest.projects.agents.revision",
+            ),
+          },
+          issues: {
+            count: issues.count,
+            openCount: issues.openCount,
+            pullRequestCount: issues.pullRequestCount,
+            revision: optionalIsoTimestamp(
+              issues.revision,
+              "manifest.projects.issues.revision",
+            ),
+          },
+          sessions: {
+            count: sessions.count,
+            archivedCount: sessions.archivedCount,
+            revision: optionalIsoTimestamp(
+              sessions.revision,
+              "manifest.projects.sessions.revision",
+            ),
+          },
+        },
+      };
+    }),
+    loadedQueries: [],
+  });
+
+export const organizationAgentContextLookupToProto = (
+  request: OrganizationAgentContextLookupRequest,
+) => {
+  if (request.resource === "project-settings") {
+    return create(OrganizationAgentContextLookupSchema, {
+      query: {
+        case: "projectSettings",
+        value: { projectId: request.projectId },
+      },
+    });
+  }
+  if (request.resource === "skills") {
+    return create(OrganizationAgentContextLookupSchema, {
+      query: {
+        case: "skills",
+        value: { projectId: request.projectId, ids: request.ids },
+      },
+    });
+  }
+  if (request.resource === "issue-pull-requests") {
+    return create(OrganizationAgentContextLookupSchema, {
+      query: {
+        case: "issuePullRequests",
+        value: {
+          projectId: request.projectId,
+          issueIds: request.issueIds,
+        },
+      },
+    });
+  }
+  if (request.resource === "agents") {
+    return request.detail === "summary"
+      ? create(OrganizationAgentContextLookupSchema, {
+          query: {
+            case: "agentSummaries",
+            value: {
+              projectId: request.projectId,
+              limit: request.limit,
+              cursor: request.cursor ?? undefined,
+            },
+          },
+        })
+      : create(OrganizationAgentContextLookupSchema, {
+          query: {
+            case: "agentDetails",
+            value: { projectId: request.projectId, ids: request.ids },
+          },
+        });
+  }
+  if (request.resource === "issues") {
+    return request.detail === "summary"
+      ? create(OrganizationAgentContextLookupSchema, {
+          query: {
+            case: "issueSummaries",
+            value: {
+              projectId: request.projectId,
+              limit: request.limit,
+              cursor: request.cursor ?? undefined,
+            },
+          },
+        })
+      : create(OrganizationAgentContextLookupSchema, {
+          query: {
+            case: "issueDetails",
+            value: { projectId: request.projectId, ids: request.ids },
+          },
+        });
+  }
+  return request.detail === "summary"
+    ? create(OrganizationAgentContextLookupSchema, {
+        query: {
+          case: "sessionSummaries",
+          value: {
+            projectId: request.projectId,
+            limit: request.limit,
+            cursor: request.cursor ?? undefined,
+          },
+        },
+      })
+    : create(OrganizationAgentContextLookupSchema, {
+        query: {
+          case: "sessionDetails",
+          value: { projectId: request.projectId, ids: request.ids },
+        },
+      });
+};
+
 /**
  * Prepares only the lightweight organization index. Detailed context remains
  * server-side until hydrateOrganizationAgentContext is called with a bounded,
@@ -541,72 +385,65 @@ export async function downloadOrganizationAgentContextManifest(input: {
   snapshotAt: string;
   workspacePath: string;
   signal?: AbortSignal;
-  fetcher?: ContextFetcher;
-  maxPageBytes?: number;
+  client?: OrganizationAgentContextClient;
 }) {
   const directory = organizationAgentContextDirectory(input.workspacePath);
-  const fetcher = input.fetcher ?? fetch;
   const cacheKey = `${input.apiUrl.replace(/\/$/u, "")}:${input.organizationId}`;
   const cached = organizationContextManifestCache.get(cacheKey);
+  const client = organizationContextClient(input);
   await cleanupOrganizationAgentContext(input.workspacePath);
   await mkdir(directory, { recursive: true, mode: 0o700 });
   await chmod(directory, 0o700);
   try {
-    const query = new URLSearchParams({ workerId: input.workerId });
-    const response = await fetcher(
-      `${input.apiUrl.replace(/\/$/u, "")}/organizations/${input.organizationId}/channel-reply-claims/${input.workId}/organization-context/manifest?${query}`,
+    const response = await client.getManifest(
       {
-        redirect: "error",
-        signal: input.signal,
-        headers: {
-          Accept: "application/json",
-          Authorization: `Bearer ${input.workerToken}`,
-          [channelReplyClaimTokenHeader]: input.claimToken,
-          ...(cached ? { "If-None-Match": cached.etag } : {}),
+        claim: {
+          organizationId: input.organizationId,
+          workId: input.workId,
+          workerId: input.workerId,
+          claimToken: input.claimToken,
         },
+        knownRevision: cached?.revision,
       },
+      { signal: input.signal },
     );
     let manifest: OrganizationAgentContextIndexManifest;
-    if (response.status === 304) {
+    if (response.result.case === "unchanged") {
       if (!cached) {
         throw new Error("Organization Agent manifest cache is missing");
       }
+      const unchanged = response.result.value;
+      const snapshotAt = isoTimestamp(
+        unchanged.snapshotAt,
+        "manifest.snapshot_at",
+      );
+      if (unchanged.revision !== cached.revision) {
+        throw new Error("Organization Agent manifest cache revision changed");
+      }
       manifest = decodeOrganizationAgentContextManifest({
         schemaVersion: 2,
-        organizationId: input.organizationId,
-        workId: input.workId,
-        snapshotAt: input.snapshotAt,
+        organizationId: unchanged.organizationId,
+        workId: unchanged.workId,
+        snapshotAt,
         revision: cached.revision,
         projects: cached.projects,
         loadedQueries: [],
       });
+    } else if (response.result.case === "manifest") {
+      manifest = manifestFromProto(response.result.value);
+      rememberOrganizationContextManifest(cacheKey, {
+        revision: manifest.revision,
+        projects: manifest.projects,
+      });
     } else {
-      if (!response.ok) {
-        throw new Error(
-          `Organization Agent manifest download failed (${response.status})`,
-        );
-      }
-      const text = await boundedResponseText(
-        response,
-        input.maxPageBytes ?? defaultMaxPageBytes,
-        "manifest",
-      );
-      manifest = decodeOrganizationAgentContextManifest(JSON.parse(text));
-      if (
-        manifest.organizationId !== input.organizationId ||
-        manifest.workId !== input.workId ||
-        manifest.snapshotAt !== input.snapshotAt
-      ) {
-        throw new Error("Organization Agent manifest scope changed");
-      }
-      const etag = response.headers.get("ETag");
-      if (etag) {
-        rememberOrganizationContextManifest(cacheKey, {
-          etag,
-          revision: manifest.revision,
-          projects: manifest.projects,
-        });
-      }
+      throw new Error("Organization Agent manifest response omitted its result");
+    }
+    if (
+      manifest.organizationId !== input.organizationId ||
+      manifest.workId !== input.workId ||
+      manifest.snapshotAt !== input.snapshotAt
+    ) {
+      throw new Error("Organization Agent manifest scope changed");
     }
     const manifestPath = join(directory, "manifest.json");
     await writeFile(manifestPath, encodedPage(manifest), { mode: 0o600 });
@@ -629,7 +466,7 @@ export async function hydrateOrganizationAgentContext(input: {
   workspacePath: string;
   requests: OrganizationAgentContextLookupRequest[];
   signal?: AbortSignal;
-  fetcher?: ContextFetcher;
+  client?: OrganizationAgentContextClient;
   maxContextBytes?: number;
 }) {
   const directory = organizationAgentContextDirectory(input.workspacePath);
@@ -651,50 +488,44 @@ export async function hydrateOrganizationAgentContext(input: {
     (request) => !loaded.has(JSON.stringify(request)),
   );
   if (requests.length === 0) return { manifestPath, manifest, loaded: 0 };
-  const fetcher = input.fetcher ?? fetch;
-  const response = await fetcher(
-    `${input.apiUrl.replace(/\/$/u, "")}/organizations/${input.organizationId}/channel-reply-claims/${input.workId}/organization-context/lookup`,
+  const queries = requests.map(organizationAgentContextLookupToProto);
+  const lookup = await organizationContextClient(input).lookup(
     {
-      method: "POST",
-      redirect: "error",
-      signal: input.signal,
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${input.workerToken}`,
-        [channelReplyClaimTokenHeader]: input.claimToken,
+      claim: {
+        organizationId: input.organizationId,
+        workId: input.workId,
+        workerId: input.workerId,
+        claimToken: input.claimToken,
       },
-      body: JSON.stringify({ workerId: input.workerId, requestId: crypto.randomUUID(), requests }),
+      queries,
+      requestId: crypto.randomUUID(),
     },
+    { signal: input.signal },
   );
-  if (!response.ok) {
-    throw new Error(
-      `Organization Agent context lookup failed (${response.status})`,
-    );
-  }
-  const text = await boundedResponseText(
-    response,
-    input.maxContextBytes ?? defaultMaxContextBytes,
-    "lookup",
-  );
-  const lookup = decodeOrganizationAgentContextLookupResponse(
-    JSON.parse(text),
+  const lookupSnapshotAt = isoTimestamp(
+    lookup.snapshotAt,
+    "lookup.snapshot_at",
   );
   if (
     lookup.organizationId !== input.organizationId ||
     lookup.workId !== input.workId ||
-    lookup.snapshotAt !== input.snapshotAt
+    lookupSnapshotAt !== input.snapshotAt
   ) {
     throw new Error("Organization Agent lookup scope changed");
   }
   if (
     lookup.results.length !== requests.length ||
     lookup.results.some((result, index) =>
-      JSON.stringify(result.request) !== JSON.stringify(requests[index])
+      !result.query ||
+      !equals(OrganizationAgentContextLookupSchema, result.query, queries[index])
     )
   ) {
     throw new Error("Organization Agent lookup response did not match its request");
   }
+  const results = lookup.results.map((result, index) => ({
+    request: requests[index],
+    data: toJson(ValueSchema, required(result.data, "lookup.results.data")),
+  }));
   const nextLoadedQueries = [...manifest.loadedQueries];
   let contextBytes = new TextEncoder().encode(encodedPage(manifest)).byteLength;
   for (const loadedQuery of manifest.loadedQueries) {
@@ -703,7 +534,7 @@ export async function hydrateOrganizationAgentContext(input: {
       await readFile(loadedPath, "utf8"),
     ).byteLength;
   }
-  for (const result of lookup.results) {
+  for (const result of results) {
     const relativePath = join(
       "lookups",
       `query-${String(nextLoadedQueries.length + 1).padStart(6, "0")}.json`,
@@ -733,6 +564,6 @@ export async function hydrateOrganizationAgentContext(input: {
   return {
     manifestPath,
     manifest: nextManifest,
-    loaded: lookup.results.length,
+    loaded: results.length,
   };
 }

@@ -1,5 +1,5 @@
-import { invoke } from "@tauri-apps/api/core";
 import { getMobilePlatform } from "./platform";
+import { commands } from "../generated/tauri";
 
 type AndroidBadgeBridge = {
   set: (count: number) => boolean;
@@ -31,6 +31,6 @@ export async function syncAppBadgeCount(count: number): Promise<void> {
   }
 
   if (window.__TAURI_INTERNALS__) {
-    await invoke("set_app_badge_count", { count: normalizedCount });
+    await commands.setAppBadgeCount(normalizedCount);
   }
 }

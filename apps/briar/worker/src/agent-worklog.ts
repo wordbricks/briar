@@ -790,20 +790,6 @@ export async function listAgentTranscriptSegments(
   return result.results ?? [];
 }
 
-export async function readRawTranscriptSegment(
-  bucket: R2Bucket,
-  segment: AgentTranscriptSegmentRow,
-) {
-  const object = await bucket.get(segment.object_key);
-  if (!object) return null;
-  return {
-    body: object.body,
-    contentType: object.httpMetadata?.contentType ?? "application/x-ndjson",
-    contentEncoding: object.httpMetadata?.contentEncoding ?? "gzip",
-    filename: `${segment.session_id}-${segment.first_sequence}-${segment.last_sequence}.jsonl.gz`,
-  };
-}
-
 export const workLogEntryTranscriptEvent = (entry: AgentWorkLogEntryRow) => {
   if (entry.entry_type === "message") {
     return {

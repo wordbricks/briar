@@ -6,7 +6,6 @@ import {
   type AgentSkillRow,
 } from "./agent-skills";
 
-import { agentSkillExecutionApprovalTablesAvailable } from "./execution-approval-schema-repository";
 import {
   type ClaimedProjectAgentTaskRow,
   type ProjectAgentProvider,
@@ -125,13 +124,11 @@ export async function claimNextProjectAgentTask(
   projectId: string,
   input: {
     workerId: string;
-    agentProviders: ProjectAgentProvider[];
     claimTokenHash: string;
     claimedAt: string;
     leaseExpiresAt: string;
   },
 ) {
-  const providerPlaceholders = input.agentProviders.map(() => "?").join(", ");
   // Migration 0092 is a deployment prerequisite, so this hot path never
   // probes schema metadata or drops the approval guard.
   const skillExecutionEligibility = `and (
@@ -165,7 +162,12 @@ export async function claimNextProjectAgentTask(
           and skill.id = job.skill_id
          where job.project_id = ?
            and job.preferred_worker_id = ?
-           and skill.provider in (${providerPlaceholders})
+           and exists (
+             select 1
+             from briar_execution_worker_healthy_providers healthy
+             where healthy.worker_id = ?
+               and healthy.provider = skill.provider
+           )
            ${skillExecutionEligibility}
            and exists (
              select 1
@@ -229,7 +231,7 @@ export async function claimNextProjectAgentTask(
       input.claimedAt,
       projectId,
       input.workerId,
-      ...input.agentProviders,
+      input.workerId,
       input.workerId,
       input.claimedAt,
       input.claimedAt,
@@ -316,10 +318,8 @@ export async function claimNextProjectAgentTask(
       agent_model: approval.model,
       agent_effort: approval.effort,
       agent_responsibility: approval.agent_responsibility,
-      agent_skill: approval.skill_instructions,
       selected_skill_id: approval.skill_id,
       selected_skill_name: approval.skill_name,
-      selected_skill_instructions: approval.skill_instructions,
       agent_skills: [approvedSkill],
     };
   }
@@ -328,10 +328,8 @@ export async function claimNextProjectAgentTask(
       `select job.*, agent.name as agent_name, skill.provider as agent_provider,
               skill.model as agent_model, skill.effort as agent_effort,
               agent.responsibility as agent_responsibility,
-              skill.body as agent_skill,
               skill.id as selected_skill_id,
-              skill.name as selected_skill_name,
-              skill.body as selected_skill_instructions
+              skill.name as selected_skill_name
        from briar_project_agent_task_jobs job
        join briar_project_agents agent on agent.id = job.agent_id
        join briar_agent_skills skill
@@ -404,18 +402,13 @@ export async function completeProjectAgentTaskWithReceipt(
     error?: string;
   },
 ) {
-  const approvalColumnsAvailable =
-    await agentSkillExecutionApprovalTablesAvailable(db);
-  const resultProjection = approvalColumnsAvailable
-    ? `result_summary = ?, result_conversation_id = ?,`
-    : "";
   const completionStatement = (receiptId: string | null) => db
     .prepare(
       `update briar_project_agent_task_jobs as task
        set status = case when ? is null then 'completed' else
          case when attempts >= 3 then 'failed' else 'queued' end end,
            error = ?,
-           ${resultProjection}
+           result_summary = ?, result_conversation_id = ?,
            claim_token_hash = null, claimed_worker_id = null,
            claimed_at = null, lease_expires_at = null,
            completed_at = case when ? is null then ? else
@@ -439,9 +432,8 @@ export async function completeProjectAgentTaskWithReceipt(
     .bind(
       input.error ?? null,
       input.error ?? null,
-      ...(approvalColumnsAvailable
-        ? [input.summary ?? null, input.conversationId ?? null]
-        : []),
+      input.summary ?? null,
+      input.conversationId ?? null,
       input.error ?? null,
       input.updatedAt,
       input.updatedAt,
@@ -452,11 +444,6 @@ export async function completeProjectAgentTaskWithReceipt(
       input.claimTokenHash,
       ...(receiptId ? [receiptId] : []),
     );
-  if (!approvalColumnsAvailable) {
-    const job = await completionStatement(null).first<ProjectAgentTaskJobRow>();
-    return job ? { job, receipt: null, replayed: false } : null;
-  }
-
   const summary = input.summary ?? null;
   const conversationId = input.conversationId ?? null;
   const error = input.error ?? null;

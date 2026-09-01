@@ -430,7 +430,7 @@ struct EditIssueSheet: View {
 
     private func save() async {
         do {
-            _ = try await mutations.updateIssue(runID: runID, draft: draft)
+            try await mutations.updateIssue(runID: runID, draft: draft)
             await refresh()
             dismiss()
         } catch {

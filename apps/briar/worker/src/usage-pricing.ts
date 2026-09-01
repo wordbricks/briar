@@ -150,60 +150,10 @@ type RunUsagePricingInput = Pick<
   | "output_tokens"
 >;
 
-export type RunUsagePricingFallback = {
-  agentProvider: OrganizationUsageRecordRow["agent_provider"];
-  model: string | null;
-  inputTokens: number | null;
-  cacheReadTokens: number | null;
-  cacheWriteTokens: number | null;
-  outputTokens: number | null;
-};
-
-const fallbackModelProvider = (
-  provider: RunUsagePricingFallback["agentProvider"],
-) => {
-  if (provider === "codex") return "openai";
-  if (provider === "claude") return "anthropic";
-  if (provider === "grok") return "xai";
-  if (provider === "agy") return "google";
-  return null;
-};
-
-const fallbackUsage = (
-  fallback: RunUsagePricingFallback,
-): RunUsagePricingInput => {
-  const cacheReadTokens = fallback.cacheReadTokens ?? 0;
-  const cacheWriteTokens = fallback.cacheWriteTokens ?? 0;
-  const inputIncludesCache =
-    fallback.agentProvider === "codex" || fallback.agentProvider === "grok";
-  return {
-    agent_provider: fallback.agentProvider,
-    model_provider: fallbackModelProvider(fallback.agentProvider),
-    model: fallback.model,
-    canonical_model: null,
-    uncached_input_tokens:
-      fallback.inputTokens === null
-        ? null
-        : inputIncludesCache
-          ? Math.max(
-              0,
-              fallback.inputTokens - cacheReadTokens - cacheWriteTokens,
-            )
-          : fallback.inputTokens,
-    cache_read_tokens: fallback.cacheReadTokens,
-    cache_write_tokens: fallback.cacheWriteTokens,
-    output_tokens: fallback.outputTokens,
-  };
-};
-
-/**
- * Reprice one run from immutable usage rows whenever the issue detail is read.
- * The execution summary is used only for older runs that predate the ledger.
- */
+/** Reprice one run from its immutable usage ledger whenever detail is read. */
 export function estimateRunExecutionCost(input: {
   usageRecords: readonly OrganizationUsageRecordRow[];
   loadedPricing: LoadedAgentUsagePricing;
-  fallback: RunUsagePricingFallback | null;
 }): AgentExecutionCostEstimate {
   const providerReportedModels = [...new Set(
     input.usageRecords.flatMap((record) => {
@@ -212,12 +162,7 @@ export function estimateRunExecutionCost(input: {
       return model ? [model] : [];
     }),
   )];
-  const records: readonly RunUsagePricingInput[] =
-    input.usageRecords.length > 0
-      ? input.usageRecords
-      : input.fallback
-        ? [fallbackUsage(input.fallback)]
-        : [];
+  const records: readonly RunUsagePricingInput[] = input.usageRecords;
   const unavailable = (
     reason: NonNullable<AgentExecutionCostEstimate["reason"]>,
   ): AgentExecutionCostEstimate => ({

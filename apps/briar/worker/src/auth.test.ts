@@ -1,3 +1,4 @@
+import { env as cloudflareEnv } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createAuth, handleAuthRequest } from "./auth";
 import {
@@ -5,10 +6,6 @@ import {
   type AuthEmailMessage,
   type AuthEmailSender,
 } from "./auth-email";
-import {
-  createIsolatedTestDatabase,
-  type IsolatedTestDatabase,
-} from "./test-helpers/d1";
 
 const apiOrigin = "https://briar-api.example";
 const secret = "test-secret-with-enough-entropy-for-email-otp";
@@ -31,15 +28,18 @@ const otpFrom = (message: AuthEmailMessage) => {
 };
 
 describe("email OTP authentication", () => {
-  let database: IsolatedTestDatabase;
-  let db: D1Database;
+  const db = cloudflareEnv.DB;
   let sender: FakeEmailSender;
   let backgroundTasks: Promise<unknown>[];
   let auth: ReturnType<typeof createAuth>;
 
   beforeEach(async () => {
-    database = await createIsolatedTestDatabase({ suite: "auth-email-otp" });
-    db = database.db;
+    await db.exec(`
+      delete from verification;
+      delete from session;
+      delete from account;
+      delete from briar_auth_email_rate_limits;
+    `);
     sender = new FakeEmailSender();
     backgroundTasks = [];
     const env = {
@@ -56,9 +56,8 @@ describe("email OTP authentication", () => {
     );
   }, 60_000);
 
-  afterEach(async () => {
+  afterEach(() => {
     vi.restoreAllMocks();
-    await database.dispose();
   });
 
   const post = async (

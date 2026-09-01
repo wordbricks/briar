@@ -18,9 +18,35 @@ const selectedChannel: ChannelSummary = {
   archivedAt: null,
   memberCount: 0,
   agentCount: 0,
+  kind: "channel",
+  createdByUserId: null,
   createdAt: "2026-08-01T00:00:00.000Z",
   updatedAt: "2026-08-01T00:00:00.000Z",
+  lastMessageAt: null,
+  lastMessagePreview: null,
+  lastReadAt: null,
+  hasUnread: false,
+  dmParticipants: [],
 };
+
+const channelSummaryWire = (channel: ChannelSummary) => ({
+  id: channel.id,
+  organizationId: channel.organizationId,
+  slug: channel.slug,
+  name: channel.name,
+  visibility: 1,
+  memberCount: channel.memberCount,
+  agentCount: channel.agentCount,
+  createdAt: channel.createdAt,
+  updatedAt: channel.updatedAt,
+  kind: 1,
+  hasUnread: channel.hasUnread,
+  directMessageParticipants: [],
+});
+
+const jsonResponse = (body: unknown) => new Response(JSON.stringify(body), {
+  headers: { "Content-Type": "application/json" },
+});
 
 describe("CompanionChannels", () => {
   beforeEach(() => {
@@ -32,33 +58,24 @@ describe("CompanionChannels", () => {
     Object.assign(globalThis, {
       IS_REACT_ACT_ENVIRONMENT: true,
       WebSocket: FakeWebSocket,
-      fetch: vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-        const url = String(input);
-        if (init?.method === "POST") {
-          return new Response(JSON.stringify({
-            url: "ws://realtime.test/socket",
-          }), {
-            headers: { "Content-Type": "application/json" },
+      fetch: vi.fn(async (input: RequestInfo | URL) => {
+        const url = input instanceof Request ? input.url : String(input);
+        if (url.endsWith("/briar.app.v1.ChannelService/ListChannels")) {
+          return jsonResponse({
+            channels: [channelSummaryWire(selectedChannel)],
+            cursor: "1",
           });
         }
-        if (/\/organizations\/org-1\/channels$/u.test(url)) {
-          return new Response(JSON.stringify({
-            channels: [selectedChannel],
-            cursor: 1,
-          }), {
-            headers: { "Content-Type": "application/json" },
-          });
-        }
-        return new Response(JSON.stringify({
-            channel: selectedChannel,
+        if (url.endsWith("/briar.app.v1.ChannelService/GetChannel")) {
+          return jsonResponse({
+            channel: channelSummaryWire(selectedChannel),
             members: [],
             agents: [],
             messages: [],
             agentReplies: [],
-            nextCursor: null,
-          }), {
-          headers: { "Content-Type": "application/json" },
-        });
+          });
+        }
+        return jsonResponse({ url: "ws://realtime.test/socket" });
       }),
     });
     window.localStorage.setItem("briar.locale.v1", "en");

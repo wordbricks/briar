@@ -17,27 +17,42 @@ afterEach(() => {
 describe("organization realtime transport", () => {
   it("shares one physical socket across channel, project, and Inbox consumers", async () => {
     const sockets: FakeWebSocket[] = [];
-    const fetchMock = vi.fn(async () => Response.json({
-      url: "wss://api.test/channel-events?ticket=signed",
-      expiresAt: "2026-08-12T00:00:00.000Z",
-    }));
-    vi.stubGlobal("fetch", fetchMock);
     vi.stubGlobal("WebSocket", class extends FakeWebSocket {
       constructor(_url: string) {
         super();
         sockets.push(this);
       }
     });
+    const createTicket = vi.fn(async () =>
+      "wss://api.test/channel-events?ticket=signed"
+    );
 
-    const channel = createChannelRealtimeTransport("token", "organization-1");
-    const project = createProjectRealtimeTransport("token", "organization-1");
-    const inbox = createInboxRealtimeTransport("token", "organization-1");
+    const channel = createChannelRealtimeTransport(
+      "token",
+      "organization-1",
+      createTicket,
+    );
+    const project = createProjectRealtimeTransport(
+      "token",
+      "organization-1",
+      createTicket,
+    );
+    const inbox = createInboxRealtimeTransport(
+      "token",
+      "organization-1",
+      createTicket,
+    );
     channel.start();
     project.start();
     inbox.start();
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(createTicket).toHaveBeenCalledOnce();
+    expect(createTicket).toHaveBeenCalledWith(
+      "token",
+      "organization-1",
+      expect.any(AbortSignal),
+    );
     expect(sockets).toHaveLength(1);
     channel.stop();
     expect(sockets[0]?.close).not.toHaveBeenCalled();

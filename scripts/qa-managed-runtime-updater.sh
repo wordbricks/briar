@@ -53,24 +53,6 @@ for argument in "$@"; do
 done
 url="${!#}"
 case "$url" in
-  */update-handoff/status*)
-    if [[ -e "$ACTIVATED_FILE" && "${FAIL_HEALTH:-}" != "1" ]]; then
-      jq -n \
-        --arg requestId "$REQUEST_ID" \
-        --arg targetVersion "$TARGET_VERSION" \
-        '{requestId: $requestId, targetVersion: $targetVersion, status: "completed", handoffState: "ready", activeWorkCount: 0, ready: true}' \
-        > "$output"
-    else
-      jq -n \
-        --arg requestId "$REQUEST_ID" \
-        --arg targetVersion "$TARGET_VERSION" \
-        '{requestId: $requestId, targetVersion: $targetVersion, status: "requested", handoffState: "ready", activeWorkCount: 0, ready: true}' \
-        > "$output"
-    fi
-    ;;
-  */update-handoff/fail)
-    : > "$output"
-    ;;
   *.tar.gz.sig)
     cp "$ARTIFACT_DIRECTORY/runtime.tar.gz.sig" "$output"
     ;;
@@ -79,6 +61,29 @@ case "$url" in
     ;;
   *)
     echo "unexpected curl URL: $url" >&2
+    exit 1
+    ;;
+esac
+EOF
+
+cat > "$fake_bin/briar-control" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+case " $* " in
+  *" managed-computer worker-update-status "*)
+    if [[ -e "$ACTIVATED_FILE" && "${FAIL_HEALTH:-}" != "1" ]]; then
+      echo completed
+    elif [[ -e "$ACTIVATED_FILE" ]]; then
+      echo pending
+    else
+      echo ready
+    fi
+    ;;
+  *" managed-computer worker-update-fail "*)
+    :
+    ;;
+  *)
+    echo "unexpected Briar control command: $*" >&2
     exit 1
     ;;
 esac
@@ -96,7 +101,9 @@ set -euo pipefail
 printf '%s\n' "$*" >> "$SYSTEMCTL_LOG"
 touch "$ACTIVATED_FILE"
 EOF
-chmod 0755 "$fake_bin/curl" "$fake_bin/minisign" "$fake_bin/systemctl"
+chmod 0755 \
+  "$fake_bin/briar-control" "$fake_bin/curl" "$fake_bin/minisign" \
+  "$fake_bin/systemctl"
 
 make_release() {
   local version="$1"
@@ -150,6 +157,7 @@ run_update() {
   BRIAR_RUNTIME_CREDENTIAL_FILE="$fixture/credential.json" \
   BRIAR_RUNTIME_UPDATE_PUBLIC_KEY="$fixture/runtime-updater.pub" \
   BRIAR_RUNTIME_CURL="$fake_bin/curl" \
+  BRIAR_RUNTIME_BRIAR="$fake_bin/briar-control" \
   BRIAR_RUNTIME_MINISIGN="$fake_bin/minisign" \
   BRIAR_RUNTIME_SYSTEMCTL="$fake_bin/systemctl" \
   BRIAR_RUNTIME_UPDATE_POLL_SECONDS=1 \

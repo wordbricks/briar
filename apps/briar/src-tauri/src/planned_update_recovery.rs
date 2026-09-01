@@ -12,7 +12,7 @@ const RECOVERY_VERSION: u8 = 1;
 const RECOVERY_MAX_AGE_MINUTES: i64 = 10;
 static STORE_LOCK: Mutex<()> = Mutex::new(());
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PlannedUpdateAgentRecovery {
     version: u8,
@@ -162,6 +162,7 @@ impl PlannedUpdateRecoveryStore {
         Ok(recoveries)
     }
 
+    #[cfg(desktop)]
     pub(crate) fn cleanup_unprepared(&self) -> Result<usize, String> {
         let _guard = store_lock()?;
         let marker_path = self.marker_path();

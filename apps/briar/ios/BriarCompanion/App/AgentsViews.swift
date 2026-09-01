@@ -4,9 +4,11 @@ struct AgentsHomeView<ToolbarContentType: ToolbarContent>: View {
     @Binding var path: NavigationPath
     @ObservedObject var agents: AgentsStore
     @ObservedObject var navigation: CompanionNavigationModel
-    let project: ProjectsResponse.Project
+    let project: Project
     let token: String
-    let api: any MobileAPIClientProtocol
+    let api: any AuthenticatedDownloadClientProtocol
+    let services: AuthenticatedMobileServices
+    let realtimeClient: (any MobileRealtimeClientProtocol)?
     let snapshot: DashboardSnapshot?
     let issueConversationView: IssueConversationViewTracker?
     let refreshDashboard: () async -> Void
@@ -114,6 +116,8 @@ struct AgentsHomeView<ToolbarContentType: ToolbarContent>: View {
                         project: project,
                         token: token,
                         api: api,
+                        services: services,
+                        realtimeClient: realtimeClient,
                         snapshot: snapshot,
                         issueConversationView: issueConversationView,
                         refreshDashboard: refreshDashboard,
@@ -591,17 +595,18 @@ private struct AgentRunSheet: View {
 
 func workerCanRunAgentSkill(_ worker: DashboardWorker, provider: AgentProvider) -> Bool {
     guard worker.readiness == "available", worker.acceptingWork else { return false }
-    let providers = worker.providers ?? worker.agentProvider.map { [$0] } ?? []
-    return providers.contains(provider)
+    return worker.providers.contains(provider)
 }
 
 struct SessionDetailView: View {
     let session: ProjectAgentSession
     let agent: ProjectAgent?
     let projectAgents: [ProjectAgent]
-    let project: ProjectsResponse.Project
+    let project: Project
     let token: String
-    let api: any MobileAPIClientProtocol
+    let api: any AuthenticatedDownloadClientProtocol
+    let services: AuthenticatedMobileServices
+    let realtimeClient: (any MobileRealtimeClientProtocol)?
     let snapshot: DashboardSnapshot?
     let issueConversationView: IssueConversationViewTracker?
     let refreshDashboard: () async -> Void
@@ -613,9 +618,11 @@ struct SessionDetailView: View {
         session: ProjectAgentSession,
         agent: ProjectAgent?,
         projectAgents: [ProjectAgent] = [],
-        project: ProjectsResponse.Project,
+        project: Project,
         token: String,
-        api: any MobileAPIClientProtocol,
+        api: any AuthenticatedDownloadClientProtocol,
+        services: AuthenticatedMobileServices,
+        realtimeClient: (any MobileRealtimeClientProtocol)? = nil,
         snapshot: DashboardSnapshot?,
         issueConversationView: IssueConversationViewTracker? = nil,
         refreshDashboard: @escaping () async -> Void,
@@ -629,6 +636,8 @@ struct SessionDetailView: View {
         self.project = project
         self.token = token
         self.api = api
+        self.services = services
+        self.realtimeClient = realtimeClient
         self.snapshot = snapshot
         self.issueConversationView = issueConversationView
         self.refreshDashboard = refreshDashboard
@@ -666,9 +675,7 @@ struct SessionDetailView: View {
                 if let trigger = session.trigger {
                     LabeledContent(L10n.text("트리거"), value: trigger.rawValue)
                 }
-                if let type = session.sessionType {
-                    LabeledContent(L10n.text("유형"), value: type.rawValue)
-                }
+                LabeledContent(L10n.text("유형"), value: session.sessionType.rawValue)
                 if let workerLabel = Self.workerLabel(
                     for: session,
                     workers: snapshot?.workers ?? []
@@ -707,6 +714,8 @@ struct SessionDetailView: View {
                                     issueKeyPrefix: project.effectiveIssueKeyPrefix,
                                     token: token,
                                     api: api,
+                                    services: services,
+                                    realtimeClient: realtimeClient,
                                     allRuns: snapshot?.runs ?? [],
                                     projectAgents: projectAgents,
                                     workers: snapshot?.workers ?? [],

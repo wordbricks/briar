@@ -297,7 +297,7 @@ export function RunPage({
   const [isSubmittingRework, setIsSubmittingRework] = useState(false);
   const [inlineTitle, setInlineTitle] = useState(run.title);
   const [inlineDescription, setInlineDescription] = useState(run.issueDescription ?? "");
-  const [inlineKeptAttachmentIds, setInlineKeptAttachmentIds] = useState<string[]>(() => (run.attachments ?? []).map(attachment => attachment.id));
+  const [inlineKeptAttachmentIds, setInlineKeptAttachmentIds] = useState<string[]>(() => run.attachments.map(attachment => attachment.id));
   const [inlineSaveStatus, setInlineSaveStatus] = useState<"saved" | "saving" | "failed">("saved");
   const inlineSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inlineSaveTaskRef = useRef<(() => void) | null>(null);
@@ -342,7 +342,7 @@ export function RunPage({
     runId: run.id,
     title: run.title.trim(),
     description: run.issueDescription?.trim() || null,
-    keptAttachmentIds: (run.attachments ?? []).map(attachment => attachment.id)
+    keptAttachmentIds: run.attachments.map(attachment => attachment.id)
   });
   inlineUpdateIssueRef.current = onUpdateIssue;
   const [activeDetailTab, setActiveDetailTab] = useState<IssueDetailTab>(() => initialDetailTab ?? defaultIssueDetailTab(run.status));
@@ -436,13 +436,13 @@ export function RunPage({
     inlineSaveTaskRef.current = null;
     setInlineTitle(run.title);
     setInlineDescription(run.issueDescription ?? "");
-    setInlineKeptAttachmentIds((run.attachments ?? []).map(attachment => attachment.id));
+    setInlineKeptAttachmentIds(run.attachments.map(attachment => attachment.id));
     setInlineSaveStatus("saved");
     lastSavedInlineIssueRef.current = {
       runId: run.id,
       title: run.title.trim(),
       description: run.issueDescription?.trim() || null,
-      keptAttachmentIds: (run.attachments ?? []).map(attachment => attachment.id)
+      keptAttachmentIds: run.attachments.map(attachment => attachment.id)
     };
     inlineSavePendingRef.current = {
       runId: run.id,
@@ -463,7 +463,7 @@ export function RunPage({
     }
     const nextTitle = run.title.trim();
     const nextDescription = run.issueDescription?.trim() || null;
-    const nextKeptAttachmentIds = (run.attachments ?? []).map(attachment => attachment.id);
+    const nextKeptAttachmentIds = run.attachments.map(attachment => attachment.id);
     lastSavedInlineIssueRef.current = {
       runId: run.id,
       title: nextTitle,
@@ -502,7 +502,7 @@ export function RunPage({
       }
       const update = inlineUpdateIssueRef.current;
       if (!update) return;
-      const runAttachmentIds = (run.attachments ?? []).map(attachment => attachment.id);
+      const runAttachmentIds = run.attachments.map(attachment => attachment.id);
       const attachmentsChanged = keptAttachmentIds.length !== runAttachmentIds.length || keptAttachmentIds.some((attachmentId, index) => attachmentId !== runAttachmentIds[index]);
       if (inlineSavePendingRef.current.runId === run.id) {
         inlineSavePendingRef.current.count += 1;
@@ -643,13 +643,13 @@ export function RunPage({
   const projectLabel = currentProject?.name ?? run.projectName ?? t("run.notSet");
   const canEditProject = Boolean(onMoveIssueProject && run.projectId && projectOptions.length > 1);
   const issueContent = run.issueDescription?.trim() || null;
-  const editableIssueAttachments = (run.attachments ?? []).filter(attachment => inlineKeptAttachmentIds.includes(attachment.id)).map(attachment => ({
+  const editableIssueAttachments = run.attachments.filter(attachment => inlineKeptAttachmentIds.includes(attachment.id)).map(attachment => ({
     attachment,
     reference: attachment.id,
     type: "existing" as const
   }));
-  const issueAttachmentsRef = useRef(run.attachments ?? []);
-  issueAttachmentsRef.current = run.attachments ?? [];
+  const issueAttachmentsRef = useRef(run.attachments);
+  issueAttachmentsRef.current = run.attachments;
   const renderIssueMarkdownImage = useCallback(({
     alt,
     src

@@ -517,8 +517,9 @@ MVP에 넣으면 검증 전에 비용이 커진다. 다만 "채팅이 느리다"
 - **Inbox**: `useInbox.ts`의 항목 종류에 `"channel"` 추가. 읽음 상태는
   `briar_inbox_read_states`가 계정 스코프라 메시지 ID만 넣으면 된다.
 - **모바일**: `AGENTS.md` 규칙상 iOS와 Android를 함께 변경해야 한다.
-  `apps/briar/worker/src/mobile-contract.ts`에 채널 스키마를 추가하고 MVP 모바일 범위는
-  읽기 + 스레드 답글 + 멘션으로 잡는다.
+  `packages/contracts/proto/briar/app/v1/channel.proto`의 생성 계약을 iOS와
+  Android/Web에서 함께 사용하고 MVP 모바일 범위는 읽기 + 스레드 답글 + 멘션으로
+  잡는다.
 
 ## 단계
 

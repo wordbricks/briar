@@ -1,0 +1,640 @@
+syntax = "proto3";
+
+package briar.app.v1;
+
+import "briar/app/v1/agent_transcript.proto";
+import "briar/app/v1/common.proto";
+import "briar/types/v1/provider.proto";
+import "briar/types/v1/workflow.proto";
+import "google/protobuf/timestamp.proto";
+
+option swift_prefix = "BriarAPI_";
+
+service AgentService {
+  rpc ListOrganizationAgents(ListOrganizationAgentsRequest) returns (ListOrganizationAgentsResponse);
+  rpc CreateOrganizationAgent(CreateOrganizationAgentRequest) returns (CreateOrganizationAgentResponse);
+  rpc UpdateOrganizationAgent(UpdateOrganizationAgentRequest) returns (UpdateOrganizationAgentResponse);
+  rpc DeleteOrganizationAgent(DeleteOrganizationAgentRequest) returns (DeleteOrganizationAgentResponse);
+  rpc ListProjectAgents(ListProjectAgentsRequest) returns (ListProjectAgentsResponse);
+  rpc CreateProjectAgent(CreateProjectAgentRequest) returns (CreateProjectAgentResponse);
+  rpc UpdateProjectAgent(UpdateProjectAgentRequest) returns (UpdateProjectAgentResponse);
+  rpc DeleteProjectAgent(DeleteProjectAgentRequest) returns (DeleteProjectAgentResponse);
+  rpc ListProjectAgentSchedules(ListProjectAgentSchedulesRequest) returns (ListProjectAgentSchedulesResponse);
+  rpc CreateProjectAgentSchedule(CreateProjectAgentScheduleRequest) returns (CreateProjectAgentScheduleResponse);
+  rpc UpdateProjectAgentSchedule(UpdateProjectAgentScheduleRequest) returns (UpdateProjectAgentScheduleResponse);
+  rpc DeleteProjectAgentSchedule(DeleteProjectAgentScheduleRequest) returns (DeleteProjectAgentScheduleResponse);
+  rpc ListProjectAgentScheduleRuns(ListProjectAgentScheduleRunsRequest) returns (ListProjectAgentScheduleRunsResponse);
+  rpc ClaimProjectAgentScheduleRun(ClaimProjectAgentScheduleRunRequest) returns (ClaimProjectAgentScheduleRunResponse);
+  rpc CompleteProjectAgentScheduleRun(CompleteProjectAgentScheduleRunRequest) returns (CompleteProjectAgentScheduleRunResponse);
+  rpc RenewProjectAgentScheduleRun(RenewProjectAgentScheduleRunRequest) returns (RenewProjectAgentScheduleRunResponse);
+  rpc ListProjectAgentSessions(ListProjectAgentSessionsRequest) returns (ListProjectAgentSessionsResponse);
+  rpc SyncProjectAgentSessions(SyncProjectAgentSessionsRequest) returns (SyncProjectAgentSessionsResponse);
+  rpc GetProjectAgentSession(GetProjectAgentSessionRequest) returns (GetProjectAgentSessionResponse);
+  rpc PutProjectAgentSession(PutProjectAgentSessionRequest) returns (PutProjectAgentSessionResponse);
+  rpc RunProjectAgentTask(RunProjectAgentTaskRequest) returns (RunProjectAgentTaskResponse);
+  rpc GetProjectAgentTranscript(GetProjectAgentTranscriptRequest) returns (GetProjectAgentTranscriptResponse);
+}
+
+message ListOrganizationAgentsRequest {
+  string organization_id = 1;
+}
+
+message ListOrganizationAgentsResponse {
+  repeated OrganizationAgent agents = 1;
+  bool can_manage = 2;
+}
+
+message CreateOrganizationAgentRequest {
+  string organization_id = 1;
+  string name = 2;
+  briar.types.v1.AgentProvider provider = 3;
+  optional string model = 4;
+  optional string description = 5;
+  string responsibility = 6;
+  optional string effort = 7;
+  repeated ProjectAgentSkillInput skills = 8;
+}
+
+message CreateOrganizationAgentResponse {
+  OrganizationAgent agent = 1;
+}
+
+message UpdateOrganizationAgentRequest {
+  string organization_id = 1;
+  string agent_id = 2;
+  string name = 3;
+  briar.types.v1.AgentProvider provider = 4;
+  optional string model = 5;
+  optional string description = 6;
+  string responsibility = 7;
+  optional string effort = 8;
+  repeated ProjectAgentSkillInput skills = 9;
+}
+
+message UpdateOrganizationAgentResponse {
+  OrganizationAgent agent = 1;
+}
+
+message DeleteOrganizationAgentRequest {
+  string organization_id = 1;
+  string agent_id = 2;
+}
+
+message DeleteOrganizationAgentResponse {
+  bool deleted = 1;
+}
+
+message ListProjectAgentsRequest {
+  reserved 2;
+
+  string project_id = 1;
+}
+
+message ListProjectAgentsResponse {
+  repeated ProjectAgent agents = 1;
+}
+
+message CreateProjectAgentRequest {
+  string project_id = 1;
+  optional string name = 2;
+  optional string avatar = 3;
+  briar.types.v1.AgentProvider provider = 4;
+  optional string model = 5;
+  optional string effort = 6;
+  optional string designated_worker_id = 7;
+  optional string description = 8;
+  string responsibility = 9;
+  repeated ProjectAgentSkillInput skills = 10;
+  string calendar_color = 11;
+}
+
+message CreateProjectAgentResponse {
+  ProjectAgent agent = 1;
+}
+
+message UpdateProjectAgentRequest {
+  message ClearAvatar {}
+  message ClearCodexPet {}
+  message ClearEffort {}
+  message ClearDesignatedWorker {}
+
+  string project_id = 1;
+  string agent_id = 2;
+  optional string name = 3;
+  oneof avatar_update {
+    string avatar = 4;
+    ClearAvatar clear_avatar = 5;
+  }
+  oneof codex_pet_update {
+    CodexPetSelection codex_pet = 6;
+    ClearCodexPet clear_codex_pet = 7;
+  }
+  briar.types.v1.AgentProvider provider = 8;
+  optional string model = 9;
+  oneof effort_update {
+    string effort = 10;
+    ClearEffort clear_effort = 11;
+  }
+  oneof designated_worker_update {
+    string designated_worker_id = 12;
+    ClearDesignatedWorker clear_designated_worker = 13;
+  }
+  optional string description = 14;
+  string responsibility = 15;
+  repeated ProjectAgentSkillInput skills = 16;
+  string calendar_color = 17;
+}
+
+message UpdateProjectAgentResponse {
+  ProjectAgent agent = 1;
+}
+
+message DeleteProjectAgentRequest {
+  string project_id = 1;
+  string agent_id = 2;
+}
+
+message DeleteProjectAgentResponse {
+  bool deleted = 1;
+}
+
+message ListProjectAgentSchedulesRequest {
+  string project_id = 1;
+}
+
+message ListProjectAgentSchedulesResponse {
+  repeated ProjectAgentSchedule schedules = 1;
+}
+
+message ProjectAgentScheduleWrite {
+  string agent_id = 1;
+  string name = 2;
+  ProjectAgentScheduleRecurrence recurrence = 3;
+  string time_of_day = 4;
+  optional uint32 day_of_week = 5;
+  optional uint32 interval_value = 6;
+  optional ProjectAgentScheduleIntervalUnit interval_unit = 7;
+  repeated uint32 days_of_week = 8;
+  optional ProjectAgentScheduleNotificationLevel notification_level = 9;
+  string time_zone = 10;
+}
+
+message CreateProjectAgentScheduleRequest {
+  string project_id = 1;
+  ProjectAgentScheduleWrite schedule = 2;
+}
+
+message CreateProjectAgentScheduleResponse {
+  ProjectAgentSchedule schedule = 1;
+}
+
+message UpdateProjectAgentScheduleRequest {
+  string project_id = 1;
+  string schedule_id = 2;
+  ProjectAgentScheduleWrite schedule = 3;
+}
+
+message UpdateProjectAgentScheduleResponse {
+  ProjectAgentSchedule schedule = 1;
+}
+
+message DeleteProjectAgentScheduleRequest {
+  string project_id = 1;
+  string schedule_id = 2;
+}
+
+message DeleteProjectAgentScheduleResponse {
+  bool deleted = 1;
+}
+
+message ListProjectAgentScheduleRunsRequest {
+  string project_id = 1;
+}
+
+message ListProjectAgentScheduleRunsResponse {
+  repeated ProjectAgentScheduleRun runs = 1;
+}
+
+message ClaimProjectAgentScheduleRunRequest {
+  repeated string project_ids = 1;
+}
+
+message ClaimProjectAgentScheduleRunResponse {
+  optional ClaimedProjectAgentScheduleRun claimed_run = 1;
+}
+
+message CompleteProjectAgentScheduleRunRequest {
+  message Completed {
+    string result_summary = 1;
+    StructuredRunResult structured_result = 2;
+  }
+
+  message Failed {
+    string error = 1;
+    StructuredRunResult structured_result = 2;
+  }
+
+  string project_id = 1;
+  string run_id = 2;
+  string claim_token = 3;
+  oneof outcome {
+    Completed completed = 4;
+    Failed failed = 5;
+  }
+}
+
+message CompleteProjectAgentScheduleRunResponse {
+  ProjectAgentScheduleRun run = 1;
+}
+
+message RenewProjectAgentScheduleRunRequest {
+  string project_id = 1;
+  string run_id = 2;
+  string claim_token = 3;
+}
+
+message RenewProjectAgentScheduleRunResponse {
+  google.protobuf.Timestamp lease_expires_at = 1;
+}
+
+message ListProjectAgentSessionsRequest {
+  string project_id = 1;
+}
+
+message ListProjectAgentSessionsResponse {
+  repeated ProjectAgentSession sessions = 1;
+}
+
+message SyncProjectAgentSessionsRequest {
+  string project_id = 1;
+  optional uint64 cursor = 2;
+}
+
+message SyncProjectAgentSessionsResponse {
+  uint64 cursor = 1;
+  bool has_more = 2;
+  bool reset = 3;
+  repeated ProjectAgentSession sessions = 4;
+  repeated string deleted_session_ids = 5;
+}
+
+message GetProjectAgentSessionRequest {
+  string project_id = 1;
+  string session_id = 2;
+}
+
+message GetProjectAgentSessionResponse {
+  ProjectAgentSession session = 1;
+}
+
+message PutProjectAgentSessionRequest {
+  string project_id = 1;
+  string session_id = 2;
+  string dispatch_group_id = 3;
+  optional string agent_id = 4;
+  optional string agent_name = 5;
+  optional string skill_id = 6;
+  ProjectAgentSessionType session_type = 7;
+  optional ProjectAgentSessionTrigger trigger = 8;
+  optional string schedule_id = 9;
+  optional string schedule_run_id = 10;
+  optional string parent_session_id = 11;
+  optional string request = 12;
+  repeated ProjectAgentSessionFollowUp follow_ups = 13;
+  ProjectAgentSessionStatus status = 14;
+  repeated ProjectAgentSessionIssue issues = 15;
+  google.protobuf.Timestamp started_at = 16;
+  optional google.protobuf.Timestamp completed_at = 17;
+  optional string conversation_id = 18;
+  optional string summary = 19;
+  optional string error = 20;
+  optional string requested_worker_id = 21;
+  optional string worker_id = 22;
+  repeated ProjectAgentSessionEvent events = 23;
+  google.protobuf.Timestamp updated_at = 24;
+}
+
+message PutProjectAgentSessionResponse {
+  ProjectAgentSession session = 1;
+}
+
+message RunProjectAgentTaskRequest {
+  string project_id = 1;
+  string agent_id = 2;
+  string skill_id = 3;
+  string request = 4;
+  string worker_id = 5;
+  string request_id = 6;
+}
+
+message RunProjectAgentTaskResponse {
+  ProjectAgentSession session = 1;
+}
+
+enum ProjectAgentScheduleRecurrence {
+  PROJECT_AGENT_SCHEDULE_RECURRENCE_UNSPECIFIED = 0;
+  PROJECT_AGENT_SCHEDULE_RECURRENCE_DAILY = 1;
+  PROJECT_AGENT_SCHEDULE_RECURRENCE_WEEKDAYS = 2;
+  PROJECT_AGENT_SCHEDULE_RECURRENCE_WEEKLY = 3;
+  PROJECT_AGENT_SCHEDULE_RECURRENCE_INTERVAL = 4;
+  PROJECT_AGENT_SCHEDULE_RECURRENCE_CUSTOM = 5;
+}
+
+enum ProjectAgentScheduleIntervalUnit {
+  PROJECT_AGENT_SCHEDULE_INTERVAL_UNIT_UNSPECIFIED = 0;
+  PROJECT_AGENT_SCHEDULE_INTERVAL_UNIT_MINUTE = 1;
+  PROJECT_AGENT_SCHEDULE_INTERVAL_UNIT_HOUR = 2;
+  PROJECT_AGENT_SCHEDULE_INTERVAL_UNIT_DAY = 3;
+  PROJECT_AGENT_SCHEDULE_INTERVAL_UNIT_WEEK = 4;
+}
+
+enum ProjectAgentScheduleNotificationLevel {
+  PROJECT_AGENT_SCHEDULE_NOTIFICATION_LEVEL_UNSPECIFIED = 0;
+  PROJECT_AGENT_SCHEDULE_NOTIFICATION_LEVEL_IMPORTANT_UPDATES = 1;
+  PROJECT_AGENT_SCHEDULE_NOTIFICATION_LEVEL_NONE = 2;
+}
+
+enum ProjectAgentScheduleRunStatus {
+  PROJECT_AGENT_SCHEDULE_RUN_STATUS_UNSPECIFIED = 0;
+  PROJECT_AGENT_SCHEDULE_RUN_STATUS_RUNNING = 1;
+  PROJECT_AGENT_SCHEDULE_RUN_STATUS_COMPLETED = 2;
+  PROJECT_AGENT_SCHEDULE_RUN_STATUS_FAILED = 3;
+}
+
+enum AgentSkillKind {
+  AGENT_SKILL_KIND_UNSPECIFIED = 0;
+  AGENT_SKILL_KIND_ISSUE_PROCESSING = 1;
+  AGENT_SKILL_KIND_CUSTOM = 2;
+}
+
+enum AgentSkillExecutionMode {
+  AGENT_SKILL_EXECUTION_MODE_UNSPECIFIED = 0;
+  AGENT_SKILL_EXECUTION_MODE_CONVERSATION = 1;
+  AGENT_SKILL_EXECUTION_MODE_TASK = 2;
+}
+
+enum AgentSkillApprovalPolicy {
+  AGENT_SKILL_APPROVAL_POLICY_UNSPECIFIED = 0;
+  AGENT_SKILL_APPROVAL_POLICY_INVOKE_IS_CONSENT = 1;
+  AGENT_SKILL_APPROVAL_POLICY_EXPLICIT = 2;
+}
+
+message ProjectAgentSkill {
+  string id = 1;
+  string agent_id = 2;
+  string name = 3;
+  string description = 4;
+  string body = 5;
+  briar.types.v1.AgentProvider provider = 6;
+  optional string model = 7;
+  optional string effort = 8;
+  AgentSkillKind kind = 9;
+  AgentSkillExecutionMode execution_mode = 10;
+  AgentSkillApprovalPolicy approval_policy = 11;
+  uint32 position = 12;
+  google.protobuf.Timestamp created_at = 13;
+  google.protobuf.Timestamp updated_at = 14;
+}
+
+message ProjectAgentSkillInput {
+  optional string id = 1;
+  string name = 2;
+  string description = 3;
+  string body = 4;
+  briar.types.v1.AgentProvider provider = 5;
+  optional string model = 6;
+  optional string effort = 7;
+  AgentSkillKind kind = 8;
+  AgentSkillExecutionMode execution_mode = 9;
+  AgentSkillApprovalPolicy approval_policy = 10;
+  uint32 position = 11;
+}
+
+message CodexPetSelection {
+  string slug = 1;
+}
+
+message CodexPet {
+  string slug = 1;
+  string name = 2;
+  optional string author = 3;
+  optional string license = 4;
+  optional uint32 sprite_version = 5;
+  optional string sprite_sheet_url = 6;
+}
+
+message ProjectAgent {
+  string id = 1;
+  string project_id = 2;
+  string name = 3;
+  optional string avatar = 4;
+  optional CodexPet codex_pet = 5;
+  briar.types.v1.AgentProvider provider = 6;
+  optional string model = 7;
+  optional string effort = 8;
+  optional string designated_worker_id = 9;
+  optional string designated_worker_label = 10;
+  optional string description = 11;
+  string responsibility = 12;
+  repeated ProjectAgentSkill skills = 13;
+  string calendar_color = 14;
+  google.protobuf.Timestamp created_at = 15;
+  google.protobuf.Timestamp updated_at = 16;
+  string skill = 17;
+}
+
+message OrganizationAgent {
+  string agent_id = 1;
+  string name = 2;
+  optional string avatar = 3;
+  briar.types.v1.AgentProvider provider = 4;
+  optional string model = 5;
+  optional string effort = 6;
+  optional string project_id = 7;
+  optional string project_name = 8;
+  optional string description = 9;
+  string responsibility = 10;
+  repeated ProjectAgentSkill skills = 11;
+  google.protobuf.Timestamp created_at = 12;
+}
+
+message ProjectAgentSchedule {
+  string id = 1;
+  string project_id = 2;
+  string agent_id = 3;
+  string agent_name = 4;
+  briar.types.v1.AgentProvider agent_provider = 5;
+  string name = 6;
+  ProjectAgentScheduleRecurrence recurrence = 7;
+  string time_of_day = 8;
+  optional uint32 day_of_week = 9;
+  uint32 interval_value = 10;
+  ProjectAgentScheduleIntervalUnit interval_unit = 11;
+  repeated uint32 days_of_week = 12;
+  ProjectAgentScheduleNotificationLevel notification_level = 13;
+  string time_zone = 14;
+  bool enabled = 15;
+  google.protobuf.Timestamp created_at = 16;
+  google.protobuf.Timestamp updated_at = 17;
+}
+
+message ProjectAgentScheduleRunAgent {
+  string id = 1;
+  string name = 2;
+  briar.types.v1.AgentProvider provider = 3;
+  optional string model = 4;
+  optional string effort = 5;
+  optional string description = 6;
+  string responsibility = 7;
+  string skill = 8;
+  repeated ProjectAgentSkill skills = 9;
+}
+
+message ProjectAgentScheduleRun {
+  string id = 1;
+  string project_id = 2;
+  string schedule_id = 3;
+  string schedule_name = 4;
+  ProjectAgentScheduleRunAgent agent = 5;
+  briar.types.v1.AutoHuntWorkflow workflow = 6;
+  ProjectAgentScheduleRunStatus status = 7;
+  google.protobuf.Timestamp scheduled_for = 8;
+  optional google.protobuf.Timestamp lease_expires_at = 9;
+  google.protobuf.Timestamp started_at = 10;
+  optional google.protobuf.Timestamp completed_at = 11;
+  optional string result_summary = 12;
+  optional StructuredRunResult structured_result = 13;
+  optional string error = 14;
+}
+
+message ClaimedProjectAgentScheduleRun {
+  ProjectAgentScheduleRun run = 1;
+  string claim_token = 2;
+}
+
+enum ProjectAgentSessionType {
+  PROJECT_AGENT_SESSION_TYPE_UNSPECIFIED = 0;
+  PROJECT_AGENT_SESSION_TYPE_TASK = 1;
+  PROJECT_AGENT_SESSION_TYPE_DISPATCH = 2;
+}
+
+enum ProjectAgentSessionTrigger {
+  PROJECT_AGENT_SESSION_TRIGGER_UNSPECIFIED = 0;
+  PROJECT_AGENT_SESSION_TRIGGER_MANUAL = 1;
+  PROJECT_AGENT_SESSION_TRIGGER_SCHEDULED = 2;
+}
+
+enum ProjectAgentSessionStatus {
+  PROJECT_AGENT_SESSION_STATUS_UNSPECIFIED = 0;
+  PROJECT_AGENT_SESSION_STATUS_RUNNING = 1;
+  PROJECT_AGENT_SESSION_STATUS_COMPLETED = 2;
+  PROJECT_AGENT_SESSION_STATUS_FAILED = 3;
+  PROJECT_AGENT_SESSION_STATUS_SKIPPED = 4;
+  PROJECT_AGENT_SESSION_STATUS_INTERRUPTED = 5;
+}
+
+enum ProjectAgentSessionIssueOutcome {
+  PROJECT_AGENT_SESSION_ISSUE_OUTCOME_UNSPECIFIED = 0;
+  PROJECT_AGENT_SESSION_ISSUE_OUTCOME_PENDING = 1;
+  PROJECT_AGENT_SESSION_ISSUE_OUTCOME_COMPLETED = 2;
+  PROJECT_AGENT_SESSION_ISSUE_OUTCOME_BLOCKED = 3;
+  PROJECT_AGENT_SESSION_ISSUE_OUTCOME_FAILED = 4;
+  PROJECT_AGENT_SESSION_ISSUE_OUTCOME_SKIPPED = 5;
+}
+
+enum ProjectAgentSessionEventType {
+  PROJECT_AGENT_SESSION_EVENT_TYPE_UNSPECIFIED = 0;
+  PROJECT_AGENT_SESSION_EVENT_TYPE_STARTED = 1;
+  PROJECT_AGENT_SESSION_EVENT_TYPE_COMPLETED = 2;
+  PROJECT_AGENT_SESSION_EVENT_TYPE_FAILED = 3;
+  PROJECT_AGENT_SESSION_EVENT_TYPE_SKIPPED = 4;
+  PROJECT_AGENT_SESSION_EVENT_TYPE_INTERRUPTED = 5;
+  PROJECT_AGENT_SESSION_EVENT_TYPE_STOPPED = 6;
+}
+
+message ProjectAgentSessionIssue {
+  string run_id = 1;
+  uint32 run_number = 2;
+  string source_key = 3;
+  string title = 4;
+  ProjectAgentSessionIssueOutcome outcome = 5;
+  optional string summary = 6;
+}
+
+message ProjectAgentSessionEvent {
+  string id = 1;
+  ProjectAgentSessionEventType type = 2;
+  google.protobuf.Timestamp occurred_at = 3;
+}
+
+message ProjectAgentSessionFollowUp {
+  string id = 1;
+  string message = 2;
+  google.protobuf.Timestamp sent_at = 3;
+}
+
+message ProjectAgentSession {
+  reserved 19, 26, 27, 30;
+  reserved "workspace_root", "dispatch_events", "workers", "detail_loaded";
+
+  string id = 1;
+  string project_id = 2;
+  string dispatch_group_id = 3;
+  optional string agent_id = 4;
+  optional string agent_name = 5;
+  optional string skill_id = 6;
+  ProjectAgentSessionType session_type = 7;
+  optional ProjectAgentSessionTrigger trigger = 8;
+  optional string schedule_id = 9;
+  optional string schedule_run_id = 10;
+  optional string parent_session_id = 11;
+  optional string request = 12;
+  repeated ProjectAgentSessionFollowUp follow_ups = 13;
+  ProjectAgentSessionStatus status = 14;
+  repeated ProjectAgentSessionIssue issues = 15;
+  google.protobuf.Timestamp started_at = 16;
+  optional google.protobuf.Timestamp completed_at = 17;
+  optional string conversation_id = 18;
+  optional string requested_worker_id = 20;
+  optional string worker_id = 21;
+  optional string requested_by_user_id = 22;
+  optional string summary = 23;
+  optional string error = 24;
+  repeated ProjectAgentSessionEvent events = 25;
+  google.protobuf.Timestamp updated_at = 28;
+  bool archived = 29;
+}
+
+enum AgentSkillExecutionStatus {
+  AGENT_SKILL_EXECUTION_STATUS_UNSPECIFIED = 0;
+  AGENT_SKILL_EXECUTION_STATUS_WAITING = 1;
+  AGENT_SKILL_EXECUTION_STATUS_RUNNING = 2;
+  AGENT_SKILL_EXECUTION_STATUS_COMPLETED = 3;
+  AGENT_SKILL_EXECUTION_STATUS_FAILED = 4;
+}
+
+message AgentSkillExecutionProposal {
+  string id = 1;
+  ProposalStatus status = 2;
+  string project_id = 3;
+  string agent_id = 4;
+  string agent_name = 5;
+  string skill_id = 6;
+  string skill_name = 7;
+  string request = 8;
+  briar.types.v1.AgentProvider provider = 9;
+  optional string model = 10;
+  optional string effort = 11;
+  AgentSkillExecutionMode execution_mode = 12;
+  AgentSkillApprovalPolicy approval_policy = 13;
+  AgentSkillExecutionStatus execution_status = 14;
+  google.protobuf.Timestamp created_at = 15;
+  optional google.protobuf.Timestamp accepted_at = 16;
+  optional string requested_worker_id = 17;
+  optional string requested_worker_label = 18;
+  optional string result_session_id = 19;
+  optional string result_message_id = 20;
+  optional string error = 21;
+  optional string delegated_by_agent_id = 22;
+  optional string delegated_by_agent_name = 23;
+}

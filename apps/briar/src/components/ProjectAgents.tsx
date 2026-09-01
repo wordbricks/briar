@@ -201,7 +201,7 @@ export function ProjectAgents({
     setIsLoading(true);
     setError(null);
     const load = token
-      ? loadProjectAgents(token, project.id, locale)
+      ? loadProjectAgents(token, project.id)
       : Promise.resolve(demoProjectAgents(project.id, locale));
     void load
       .then((nextAgents) => {
@@ -1337,8 +1337,6 @@ function localProjectAgentSkills(
       ...input,
       id: input.id ?? crypto.randomUUID(),
       agentId,
-      executionMode: input.executionMode ?? "task",
-      approvalPolicy: input.approvalPolicy ?? "explicit",
       position,
       createdAt: current?.createdAt ?? updatedAt,
       updatedAt,

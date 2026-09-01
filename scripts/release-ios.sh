@@ -172,6 +172,7 @@ common_build_settings=(
   INFOPLIST_KEY_CFBundleVersion="$build_number"
 )
 
+bun run contracts:check
 bun run ios:native:project
 xcodebuild \
   -project apps/briar/ios/BriarCompanion/BriarCompanion.xcodeproj \

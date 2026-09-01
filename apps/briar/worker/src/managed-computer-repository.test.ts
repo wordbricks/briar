@@ -1,4 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { env as cloudflareEnv } from "cloudflare:workers";
+import { beforeAll, describe, expect, it } from "vitest";
 import { sha256Hex } from "./managed-computer-crypto";
 import {
   beginManagedComputerRetirement,
@@ -11,25 +12,20 @@ import {
   startManagedComputerProvisioning,
 } from "./managed-computer-repository";
 import { recordWorkerHeartbeat } from "./workers";
+import { executeD1Sql } from "./test-helpers/d1";
 import {
-  createIsolatedTestDatabase,
-  executeD1Sql,
-  type IsolatedTestDatabase,
-} from "./test-helpers/d1";
+  workerRuntimeMetadataFixture,
+  workerRuntimeProtoJsonFixture,
+} from "./test-helpers/worker-runtime";
 
 const organizationId = "11111111-1111-4111-8111-111111111111";
 const userId = "pilot-owner";
 const observedAt = "2026-08-22T00:00:00.000Z";
 
 describe("managed computer repository", () => {
-  let database: IsolatedTestDatabase;
-  let db: D1Database;
+  const db = cloudflareEnv.DB;
 
   beforeAll(async () => {
-    database = await createIsolatedTestDatabase({
-      suite: "managed-computer-repository",
-    });
-    db = database.db;
     await executeD1Sql(db, `
       insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
       values ('${userId}', 'Pilot Owner', 'pilot@example.com', 1, '${observedAt}', '${observedAt}');
@@ -47,8 +43,6 @@ describe("managed computer repository", () => {
       ) values ('99999999-9999-4999-8999-999999999999', 'pilot-owner-2', 'owner', '${observedAt}', '${observedAt}');
     `);
   }, 30_000);
-
-  afterAll(async () => database.dispose());
 
   it("atomically approves an entitlement, one promotion use, one job, and one computer", async () => {
     const computer = await createPromotionalManagedComputer(db, {
@@ -401,12 +395,12 @@ describe("managed computer repository", () => {
       ).bind(deviceId, observedAt, computerId),
       db.prepare(
         `insert into briar_execution_workers (
-           id, project_id, device_id, label, host_fingerprint, agent_provider,
-           versions_json, capabilities_json, state, accepting_work,
+           id, project_id, device_id, label, host_fingerprint,
+           runtime_proto_json, state, accepting_work,
            readiness_state, readiness_detail, last_heartbeat_at, created_at,
            updated_at
          ) values (
-           ?, ?, ?, 'Retiring computer', ?, 'codex', '{}', '{}', 'online', 1,
+           ?, ?, ?, 'Retiring computer', ?, ?, 'online', 1,
            'ready', null, ?, ?, ?
          )`,
       ).bind(
@@ -414,6 +408,7 @@ describe("managed computer repository", () => {
         projectId,
         deviceId,
         "2".repeat(64),
+        workerRuntimeProtoJsonFixture(),
         observedAt,
         observedAt,
         observedAt,
@@ -437,6 +432,7 @@ describe("managed computer repository", () => {
 
     await recordWorkerHeartbeat(db, projectId, {
       workerId,
+      runtime: workerRuntimeMetadataFixture(),
       acceptingWork: true,
       readinessState: "ready",
       readinessDetail: "Ready again",

@@ -1,18 +1,21 @@
-import { briarApiUrl } from "./api-config";
+import * as Option from "effect/Option";
+import {
+  decodeAgentReplyActivityFrameBinaryOption,
+  type ValidatedAgentReplyActivityFrame,
+} from "./channel-agent-activity";
+import { isWebSocketUrl } from "./realtime-transport";
 
 type Listener<Frame> = (frame: Frame) => void;
 
 export type AgentActivityRealtimeAdapter<Frame> = {
   label: "Channel" | "Issue";
-  ticketPath: string;
-  decodeFrame: (value: unknown) => Frame | null;
-  matchesScope: (frame: Frame) => boolean;
+  matchesScope: (frame: ValidatedAgentReplyActivityFrame) => boolean;
+  projectFrame: (frame: ValidatedAgentReplyActivityFrame) => Frame | null;
 };
 
 export type AgentActivityRealtimeInput<Frame> = {
-  token: string;
   adapter: AgentActivityRealtimeAdapter<Frame>;
-  fetch?: typeof fetch;
+  createTicket: (signal: AbortSignal) => Promise<string>;
   createWebSocket?: (url: string) => WebSocket;
 };
 
@@ -21,6 +24,7 @@ export class AgentActivityRealtimeTransport<Frame> {
   private active = false;
   private generation = 0;
   private socket: WebSocket | null = null;
+  private ticketRequest: AbortController | null = null;
   private reconnectTimer: number | null = null;
   private reconnectDelayMs = 1_000;
 
@@ -41,6 +45,8 @@ export class AgentActivityRealtimeTransport<Frame> {
   stop() {
     this.active = false;
     this.generation += 1;
+    this.ticketRequest?.abort();
+    this.ticketRequest = null;
     if (this.reconnectTimer !== null) {
       window.clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -52,22 +58,11 @@ export class AgentActivityRealtimeTransport<Frame> {
 
   private async connect(generation: number) {
     const { adapter } = this.input;
+    const ticketRequest = new AbortController();
+    this.ticketRequest = ticketRequest;
     try {
-      const fetchImpl = this.input.fetch ?? fetch;
-      const response = await fetchImpl(`${briarApiUrl}${adapter.ticketPath}`, {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          Authorization: `Bearer ${this.input.token}`,
-        },
-      });
-      if (!response.ok) {
-        throw new Error(
-          `${adapter.label} activity ticket failed (${response.status})`,
-        );
-      }
-      const body = await response.json() as { url?: unknown };
-      if (typeof body.url !== "string" || !/^wss?:\/\//u.test(body.url)) {
+      const ticketUrl = await this.input.createTicket(ticketRequest.signal);
+      if (!isWebSocketUrl(ticketUrl)) {
         throw new Error(
           `${adapter.label} activity ticket returned an invalid URL`,
         );
@@ -75,7 +70,8 @@ export class AgentActivityRealtimeTransport<Frame> {
       if (!this.active || generation !== this.generation) return;
       const createSocket = this.input.createWebSocket ??
         ((url: string) => new WebSocket(url));
-      const socket = createSocket(body.url);
+      const socket = createSocket(ticketUrl);
+      socket.binaryType = "arraybuffer";
       this.socket = socket;
       let finished = false;
       const finish = () => {
@@ -91,15 +87,16 @@ export class AgentActivityRealtimeTransport<Frame> {
       });
       socket.addEventListener("message", (event) => {
         if (!this.active || generation !== this.generation) return;
-        let value: unknown;
-        try {
-          value = JSON.parse(typeof event.data === "string" ? event.data : "");
-        } catch {
-          return;
-        }
-        const parsed = adapter.decodeFrame(value);
-        if (parsed === null || !adapter.matchesScope(parsed)) return;
-        for (const listener of this.listeners) listener(parsed);
+        if (!(event.data instanceof ArrayBuffer)) return;
+        const message = Option.getOrNull(
+          decodeAgentReplyActivityFrameBinaryOption(
+            new Uint8Array(event.data),
+          ),
+        );
+        if (message === null || !adapter.matchesScope(message)) return;
+        const frame = adapter.projectFrame(message);
+        if (frame === null) return;
+        for (const listener of this.listeners) listener(frame);
       });
       socket.addEventListener("close", finish);
       socket.addEventListener("error", () => {
@@ -107,10 +104,11 @@ export class AgentActivityRealtimeTransport<Frame> {
         finish();
       });
     } catch (error) {
+      if (!this.active || generation !== this.generation) return;
       console.warn(`${adapter.label} activity socket disconnected`, error);
-      if (this.active && generation === this.generation) {
-        this.scheduleReconnect(generation);
-      }
+      this.scheduleReconnect(generation);
+    } finally {
+      if (this.ticketRequest === ticketRequest) this.ticketRequest = null;
     }
   }
 

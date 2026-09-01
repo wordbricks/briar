@@ -6,7 +6,3 @@ export function inboxSessionMessageVersion(
 ) {
   return `${inboxSessionVersionPrefix}${status}:${occurredAt}`;
 }
-
-export function isCanonicalInboxSessionVersion(version: string) {
-  return version.startsWith(inboxSessionVersionPrefix);
-}

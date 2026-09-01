@@ -78,6 +78,8 @@ const dependencies = (): ProjectAgentScheduleExecutionDependencies => ({
     message: "Responsibility complete.",
     maxIssues: null,
     workspaceRoot: "/repo",
+    targetRunIds: [],
+    retryReason: null,
     structuredResult: {
       summary: "Responsibility complete.",
       outcome: "completed",
@@ -189,6 +191,8 @@ describe("scheduled project agent execution", () => {
         message: `Responsibility returned ${outcome}.`,
         maxIssues: null,
         workspaceRoot: "/repo",
+        targetRunIds: [],
+        retryReason: null,
         structuredResult: {
           summary: `Responsibility returned ${outcome}.`,
           outcome,
@@ -244,6 +248,8 @@ describe("scheduled project agent execution", () => {
       message: "Dispatch the queued work.",
       maxIssues: 3,
       workspaceRoot: "/repo",
+      targetRunIds: [],
+      retryReason: null,
       structuredResult: null,
     });
 
@@ -354,6 +360,8 @@ describe("scheduled project agent execution", () => {
       message: "Dispatch the queued work.",
       maxIssues: null,
       workspaceRoot: "/repo",
+      targetRunIds: [],
+      retryReason: null,
       structuredResult: null,
     });
     vi.mocked(current.loadDashboard).mockResolvedValue({
@@ -392,6 +400,8 @@ describe("scheduled project agent execution", () => {
       message: "Dispatch the queued work.",
       maxIssues: null,
       workspaceRoot: "/repo",
+      targetRunIds: [],
+      retryReason: null,
       structuredResult: null,
     });
     vi.mocked(current.loadDashboard).mockResolvedValue({

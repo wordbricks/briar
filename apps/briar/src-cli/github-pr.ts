@@ -1,5 +1,12 @@
-import * as Schema from "effect/Schema";
-import { request } from "./command-support";
+import { create } from "@bufbuild/protobuf";
+import { ProjectGitHubService } from "@briar/contracts/gen/briar/app/v1/github_pb";
+import {
+  type GitHubPullRequestIdentity,
+  GitHubPullRequestIdentitySchema,
+} from "@briar/contracts/gen/briar/types/v1/github_identity_pb";
+import { githubPullRequestFromProto } from "../src/lib/app-rpc/github-mappers";
+import { requiredMessage } from "../src/lib/app-rpc/mappers";
+import { createAuthenticatedConnectClient } from "./connect-client";
 
 type GithubPullRequestTarget = {
   owner: string;
@@ -7,34 +14,23 @@ type GithubPullRequestTarget = {
   number: string;
 };
 
-export type GithubPullRequestIdentity = {
-  repositoryId: number;
+type GithubPullRequestInspection = {
+  identity: GitHubPullRequestIdentity;
   repository: string;
-  pullRequestId: number;
-  pullRequestNodeId: string;
-  pullRequestNumber: number;
+  body: string;
 };
 
-const GithubPullRequestInspectionResponse = Schema.Struct({
-  pullRequest: Schema.Struct({
-    repositoryId: Schema.Int.check(Schema.isGreaterThan(0)),
-    repository: Schema.String,
-    pullRequestId: Schema.Int.check(Schema.isGreaterThan(0)),
-    pullRequestNodeId: Schema.String.check(Schema.isMinLength(1)),
-    pullRequestNumber: Schema.Int.check(Schema.isGreaterThan(0)),
-    body: Schema.String,
-  }).annotate({ parseOptions: { onExcessProperty: "preserve" } }),
-}).annotate({ parseOptions: { onExcessProperty: "preserve" } });
-
-const decodeInspectionResponse = Schema.decodeUnknownSync(
-  GithubPullRequestInspectionResponse,
-  { errors: "all" },
-);
-
-export type GithubApiRequest = (
-  path: string,
-  init?: RequestInit,
-) => Promise<unknown>;
+export type GithubPullRequestApi = {
+  getPullRequest(input: {
+    projectId: string;
+    pullRequestNumber: bigint;
+  }): Promise<GithubPullRequestInspection>;
+  updatePullRequest(input: {
+    projectId: string;
+    pullRequestNumber: bigint;
+    body: string;
+  }): Promise<void>;
+};
 
 export function briarIssueUrl(
   apiUrl: string,
@@ -75,7 +71,7 @@ export function appendBriarIssueLink(body: string, issueUrl: string) {
 }
 
 function validateGithubPullRequestInspection(
-  value: typeof GithubPullRequestInspectionResponse.Type["pullRequest"],
+  value: GithubPullRequestInspection,
   target: GithubPullRequestTarget,
 ) {
   const repository = value.repository.trim().toLowerCase();
@@ -83,19 +79,38 @@ function validateGithubPullRequestInspection(
     `${target.owner}/${target.repository}`.toLowerCase();
   if (
     repository !== expectedRepository ||
-    value.pullRequestNumber !== Number(target.number)
+    value.identity.pullRequestNumber !== BigInt(target.number)
   ) {
     throw new Error("GitHub PR metadata response did not match the requested PR");
   }
   return {
     body: value.body,
-    repositoryId: value.repositoryId,
-    repository,
-    pullRequestId: value.pullRequestId,
-    pullRequestNodeId: value.pullRequestNodeId.trim(),
-    pullRequestNumber: value.pullRequestNumber,
+    identity: create(GitHubPullRequestIdentitySchema, {
+      ...value.identity,
+      pullRequestNodeId: value.identity.pullRequestNodeId.trim(),
+    }),
   };
 }
+
+const connectGithubPullRequestApi = (
+  apiUrl: string,
+  token: string,
+): GithubPullRequestApi => {
+  const client = createAuthenticatedConnectClient(
+    ProjectGitHubService,
+    apiUrl,
+    token,
+  );
+  return {
+    getPullRequest: async (input) => githubPullRequestFromProto(requiredMessage(
+      (await client.getGitHubPullRequest(input)).pullRequest,
+      "getGitHubPullRequest.pullRequest",
+    )),
+    updatePullRequest: async (input) => {
+      await client.updateGitHubPullRequest(input);
+    },
+  };
+};
 
 export async function ensureBriarIssueLinkInGithubPullRequest(
   input: {
@@ -105,16 +120,20 @@ export async function ensureBriarIssueLinkInGithubPullRequest(
     pullRequestUrl: string;
     issueUrl: string;
   },
-  send: GithubApiRequest = (path, init) =>
-    request(input.apiUrl, path, input.token, init),
+  api: GithubPullRequestApi = connectGithubPullRequestApi(
+    input.apiUrl,
+    input.token,
+  ),
 ) {
   const target = githubPullRequestTarget(input.pullRequestUrl);
   if (!target) return { updated: false, reason: "not_github" as const };
 
-  const endpoint = `/projects/${encodeURIComponent(input.projectId)}/github/pull-requests/${target.number}`;
-  const current = decodeInspectionResponse(await send(endpoint));
+  const pullRequestNumber = BigInt(target.number);
   const inspection = validateGithubPullRequestInspection(
-    current.pullRequest,
+    await api.getPullRequest({
+      projectId: input.projectId,
+      pullRequestNumber,
+    }),
     target,
   );
 
@@ -123,29 +142,18 @@ export async function ensureBriarIssueLinkInGithubPullRequest(
     return {
       updated: false,
       reason: "already_linked" as const,
-      identity: {
-        repositoryId: inspection.repositoryId,
-        repository: inspection.repository,
-        pullRequestId: inspection.pullRequestId,
-        pullRequestNodeId: inspection.pullRequestNodeId,
-        pullRequestNumber: inspection.pullRequestNumber,
-      },
+      identity: inspection.identity,
     };
   }
 
-  await send(endpoint, {
-    method: "PATCH",
-    body: JSON.stringify({ body }),
+  await api.updatePullRequest({
+    projectId: input.projectId,
+    pullRequestNumber,
+    body,
   });
   return {
     updated: true,
     reason: "linked" as const,
-    identity: {
-      repositoryId: inspection.repositoryId,
-      repository: inspection.repository,
-      pullRequestId: inspection.pullRequestId,
-      pullRequestNodeId: inspection.pullRequestNodeId,
-      pullRequestNumber: inspection.pullRequestNumber,
-    },
+    identity: inspection.identity,
   };
 }

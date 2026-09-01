@@ -34,6 +34,14 @@ const run = (
   startedAt: completedAt,
   updatedAt: completedAt,
   completedAt,
+  usageRecords: [{
+    uncachedInputTokens: null,
+    cacheReadTokens: null,
+    cacheWriteTokens: null,
+    outputTokens: null,
+    totalTokens: 120,
+    observedAt: completedAt,
+  }],
   ...overrides,
 });
 
@@ -88,18 +96,26 @@ describe("project usage summary", () => {
     });
   });
 
-  it("uses ledger rows without falling back to a lifetime metric total", () => {
+  it("uses ledger rows without falling back to execution metrics", () => {
     const now = Date.parse("2026-08-12T12:00:00.000Z");
     const summary = summarizeProjectUsage([
-      run("legacy", "2026-08-10T12:00:00.000Z"),
-      run("ledger", "2026-08-10T12:00:00.000Z", {
-        hasUsageLedger: true,
+      run("metrics-only", "2026-08-10T12:00:00.000Z", {
         usageRecords: [],
+      }),
+      run("ledger", "2026-08-10T12:00:00.000Z", {
+        usageRecords: [{
+          uncachedInputTokens: null,
+          cacheReadTokens: null,
+          cacheWriteTokens: null,
+          outputTokens: null,
+          totalTokens: 75,
+          observedAt: "2026-08-10T12:00:00.000Z",
+        }],
       }),
     ], "day", now);
 
     expect(summary).toMatchObject({
-      totalTokens: 120,
+      totalTokens: 75,
       trackedDurationMs: 2_000,
       observedRuns: 2,
       reportedRuns: 1,
@@ -116,6 +132,7 @@ describe("project usage summary", () => {
         claimedAt: null,
         claimAttempts: 0,
         workerId: null,
+        usageRecords: [],
       }),
     ], "day", now);
 
@@ -190,7 +207,6 @@ describe("project usage summary", () => {
         createdByName: "Ada",
         agentId: "agent-1",
         agentName: "Mango",
-        hasUsageLedger: true,
         usageRecords: [{
           uncachedInputTokens: null,
           cacheReadTokens: null,

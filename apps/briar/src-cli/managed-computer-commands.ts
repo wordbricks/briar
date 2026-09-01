@@ -1,5 +1,8 @@
 import { resolve } from "node:path";
 import {
+  ManagedComputerSetupService,
+} from "@briar/contracts/gen/briar/worker/v1/managed_computer_setup_pb";
+import {
   agentProviders,
   type AgentProvider,
 } from "../src/lib/agent-provider";
@@ -9,17 +12,17 @@ import {
   gitValueAt,
   loadConfig,
   login,
-  request,
   saveConfig,
   value,
 } from "./command-support";
+import { dashboardWorkerFromProto } from "../src/lib/app-rpc/fleet-mappers";
+import { requiredMessage } from "../src/lib/app-rpc/mappers";
 import {
   configuredManagedComputerCredentialPath,
   loadManagedComputerCredential,
 } from "./managed-computer-credential";
 import { discoverWorkerProviderCapabilities } from "./provider-capabilities";
 import {
-  healthyWorkerProviders,
   inspectWorkerProviderHealth,
 } from "./provider-health";
 import {
@@ -29,36 +32,18 @@ import {
   projectWithRemoteSettings,
   remoteWorkflowState,
 } from "./project-settings-sync";
+import {
+  createManagedComputerSetupSession,
+  fetchCurrentUser,
+  fetchManagedComputer,
+  fetchManagedComputerSetupStatus,
+} from "./app-connect-client";
+import { createAuthenticatedConnectClient } from "./connect-client";
+import {
+  createWorkerControlClient,
+  workerRuntimeToProto,
+} from "./worker-control-client";
 export { managedComputerWorkerSupervisor } from "./managed-computer-supervisor";
-
-type SetupSessionResponse = {
-  session: {
-    id: string;
-    managedComputerId: string;
-    organizationId: string;
-    projectId: string;
-    status: "pending" | "consumed";
-    expiresAt: string;
-  };
-  setupToken: string;
-  duplicate: boolean;
-};
-
-type SetupBindResponse = {
-  managedComputerId: string;
-  organizationId: string;
-  projectId: string;
-  deviceId: string;
-  worker: {
-    id: string;
-    label: string;
-    state: "online" | "stale" | "disabled";
-    maxConcurrentSessions: number;
-    acceptingWork: boolean;
-    readiness: string;
-  };
-  duplicate: boolean;
-};
 
 const sameOrigin = (left: string, right: string) => {
   try {
@@ -192,24 +177,22 @@ export async function managedComputerSetupCommand() {
   const { config, userToken } = await configForManagedComputer(
     credential.apiOrigin,
   );
-  const me = await request<{ user: { id: string; name: string; email: string } }>(
+  const user = await fetchCurrentUser(
     credential.apiOrigin,
-    "/me",
     userToken,
   );
-  const computer = await request<{
-    computer: { requesterUserId: string; state: string; deviceId: string | null };
-  }>(
+  const computer = await fetchManagedComputer(
     credential.apiOrigin,
-    `/organizations/${credential.organizationId}/managed-computers/${credential.managedComputerId}`,
     userToken,
+    credential.organizationId,
+    credential.managedComputerId,
   );
-  if (computer.computer.requesterUserId !== me.user.id) {
+  if (computer.requesterUserId !== user.id) {
     throw new Error(
       "Briar must be logged in as the user who owns this managed computer",
     );
   }
-  if (computer.computer.deviceId !== credential.deviceId) {
+  if (computer.deviceId !== credential.deviceId) {
     throw new Error("This managed computer enrollment does not match the API");
   }
 
@@ -242,34 +225,37 @@ export async function managedComputerSetupCommand() {
     { refresh: true },
   );
   const requestId = value("--request-id")?.trim() || crypto.randomUUID();
-  const setup = await request<SetupSessionResponse>(
+  const setup = await createManagedComputerSetupSession(
     credential.apiOrigin,
-    `/organizations/${credential.organizationId}/managed-computers/${credential.managedComputerId}/setup-sessions`,
     userToken,
-    {
-      method: "POST",
-      headers: { "Idempotency-Key": requestId },
-      body: JSON.stringify({ projectId, requestId }),
-    },
+    credential.organizationId,
+    credential.managedComputerId,
+    projectId,
+    requestId,
   );
-  const binding = await request<SetupBindResponse>(
+  const setupRpc = createAuthenticatedConnectClient(
+    ManagedComputerSetupService,
     credential.apiOrigin,
-    `/managed-computers/${credential.managedComputerId}/setup/bind`,
     credential.credential,
-    {
-      method: "POST",
-      body: JSON.stringify({
-        setupToken: setup.setupToken,
-        worker: {
-          agentProvider: provider,
-          providers: healthyWorkerProviders(providerHealth),
-          providerHealth,
-          providerCapabilities,
-          versions: { briar: cliVersion },
-        },
-      }),
-    },
+    { binary: true },
   );
+  const response = await setupRpc.bindManagedComputerSetup({
+    managedComputerId: credential.managedComputerId,
+    setupToken: setup.setupToken,
+    runtime: workerRuntimeToProto({
+      agentProvider: provider,
+      providerHealth,
+      providerCapabilities,
+      versions: { briar: cliVersion },
+      worktrees: true,
+    }),
+  });
+  const binding = {
+    ...response,
+    worker: dashboardWorkerFromProto(
+      requiredMessage(response.worker, "managedComputerSetup.worker"),
+    ),
+  };
   if (
     binding.managedComputerId !== credential.managedComputerId ||
     binding.organizationId !== credential.organizationId ||
@@ -289,7 +275,7 @@ export async function managedComputerSetupCommand() {
     repositoryPath,
     repositoryRemote,
     apiUrl: credential.apiOrigin,
-    llm: { provider },
+    llm: { provider, approvalPolicy: "never" },
     executionWorker: {
       deviceId: credential.deviceId,
       workerId: binding.worker.id,
@@ -317,7 +303,7 @@ export async function managedComputerSetupCommand() {
     deviceId: credential.deviceId,
     workerId: binding.worker.id,
     provider,
-    signedInAs: { name: me.user.name, email: me.user.email },
+    signedInAs: { name: user.name, email: user.email },
     readiness: binding.worker.readiness,
     duplicate: setup.duplicate || binding.duplicate,
   }));
@@ -328,10 +314,61 @@ export async function managedComputerStatusCommand() {
     credentialPathFromFlag(),
   );
   const { userToken } = await configForManagedComputer(credential.apiOrigin);
-  const status = await request(
+  const status = await fetchManagedComputerSetupStatus(
     credential.apiOrigin,
-    `/organizations/${credential.organizationId}/managed-computers/${credential.managedComputerId}/setup`,
     userToken,
+    credential.organizationId,
+    credential.managedComputerId,
   );
   console.log(JSON.stringify(status));
+}
+
+export async function managedComputerWorkerUpdateStatusCommand() {
+  const credential = await loadManagedComputerCredential(
+    credentialPathFromFlag(),
+  );
+  const workerId = value("--worker")?.trim();
+  const requestId = value("--request-id")?.trim();
+  const targetVersion = value("--target-version")?.trim();
+  if (!workerId || !requestId || !targetVersion) {
+    throw new Error("Worker update status requires worker, request ID, and target version");
+  }
+  const status = await createWorkerControlClient(
+    credential.apiOrigin,
+    credential.credential,
+  ).getUpdateHandoff(workerId, requestId);
+  if (
+    !status.update || status.update.id !== requestId ||
+    status.update.targetVersion !== targetVersion
+  ) {
+    throw new Error("Worker update status did not match the requested update");
+  }
+  if (status.update.status === "completed") {
+    console.log("completed");
+  } else if (
+    status.update.status === "cancelled" ||
+    status.update.handoffState === "failed"
+  ) {
+    console.log("failed");
+  } else if (status.ready && status.activeWorkCount === 0) {
+    console.log("ready");
+  } else {
+    console.log("pending");
+  }
+}
+
+export async function managedComputerWorkerUpdateFailCommand() {
+  const credential = await loadManagedComputerCredential(
+    credentialPathFromFlag(),
+  );
+  const workerId = value("--worker")?.trim();
+  const requestId = value("--request-id")?.trim();
+  const error = value("--error")?.trim();
+  if (!workerId || !requestId || !error) {
+    throw new Error("Worker update failure requires worker, request ID, and error");
+  }
+  await createWorkerControlClient(
+    credential.apiOrigin,
+    credential.credential,
+  ).failUpdateHandoff(workerId, requestId, error);
 }

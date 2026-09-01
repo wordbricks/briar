@@ -139,9 +139,6 @@ function promotionCampaigns(
 ): readonly ManagedComputerPromotionCampaign[] {
   const configured = value?.trim();
   if (!configured) return [];
-  if (!configured.startsWith("{")) {
-    return [{ id: "getbriar-pilot", code: configured }];
-  }
   let parsed: unknown;
   try {
     parsed = JSON.parse(configured) as unknown;

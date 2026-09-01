@@ -26,9 +26,11 @@ import {
   tightestUsageWindow,
   quotaUsageProviderLabel,
   quotaUsageProviders,
-  type AgentUsageProvider,
-  type AgentUsageSnapshot,
 } from "../lib/agent-usage";
+import type {
+  AgentUsageSnapshot,
+  ProviderUsage,
+} from "../generated/tauri";
 import {
   aggregateAgentUsageOverview,
   type UsageAttribution,
@@ -111,7 +113,7 @@ function modelSourceLabel(
 ) {
   if (source === "providerReported") return t("usage.modelSourceReported");
   if (source === "providerConfig") return t("usage.modelSourceProviderConfig");
-  if (source === "configuredFallback" || source === "legacyConfigured") {
+  if (source === "configuredFallback") {
     return t("usage.modelSourceConfigured");
   }
   return t("usage.modelSourceUnknown");
@@ -436,7 +438,7 @@ function DailyUsageChart({
   );
 }
 
-function ProviderLimitRow({ provider }: { provider: AgentUsageProvider }) {
+function ProviderLimitRow({ provider }: { provider: ProviderUsage }) {
   const { t } = useI18n();
   const window = tightestUsageWindow(provider);
   const percentage = window ? Math.round(window.usedPercent) : null;
@@ -1068,7 +1070,6 @@ export function AgentUsageSettings({
               {usageRunsLoaded
                 ? t("usage.ledgerCoverage", {
                     ledger: overview.ledgerRuns,
-                    legacy: overview.legacyRuns,
                     records: overview.usageRecords,
                   })
                 : unavailableMessage}

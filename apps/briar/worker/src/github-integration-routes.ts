@@ -1,5 +1,4 @@
 import * as SchemaIssue from "effect/SchemaIssue";
-import type { BriarAuth } from "./auth";
 import { hasOrganizationCapability } from "./organization-access";
 import { getOrganizationRole } from "./organization-repository";
 import {
@@ -9,11 +8,9 @@ import {
   consumeGithubInstallState,
   consumeGithubOAuthState,
   createGithubOAuthState,
-  disconnectGithubInstallation,
   disconnectGithubInstallationById,
   disconnectGithubInstallationsByAuthorizedUser,
   getGithubConnectionByInstallation,
-  getGithubConnectionForOrganization,
   listGithubConnectionRepositories,
   releaseGithubDelivery,
   syncGithubConnectionRepositories,
@@ -31,7 +28,12 @@ import {
   verifyGithubOAuthInstallation,
   verifyGitHubWebhook,
 } from "./github";
-import { corsHeaders, HttpError, json } from "./http-response";
+import {
+  githubCallbackOrigin,
+  githubConfigAvailable,
+  githubOAuthRedirectUri,
+} from "./github-integration-application";
+import { HttpError, json } from "./http-response";
 import {
   integrationHtml as html,
   noStoreRedirect,
@@ -44,45 +46,8 @@ import {
 import { reconcileMergeQueuePullRequest } from "./merge-queue-reconcile";
 import { RequestDecodeError } from "./request-schema";
 import { scheduleInboxRealtimeFlush } from "./realtime-scheduling";
-import { requireSession } from "./session-auth";
 
 const formatSchemaIssue = SchemaIssue.makeFormatterStandardSchemaV1();
-
-const githubCallbackOrigin = (env: Env) => {
-  const value = env.GITHUB_CALLBACK_ORIGIN?.trim();
-  if (!value) return null;
-  try {
-    const url = new URL(value);
-    const isLocalhost = url.hostname === "localhost" ||
-      url.hostname === "127.0.0.1" || url.hostname === "[::1]";
-    if (
-      (url.protocol !== "https:" && !(isLocalhost && url.protocol === "http:")) ||
-      url.username || url.password || url.search || url.hash ||
-      (url.pathname !== "/" && url.pathname !== "")
-    ) {
-      return null;
-    }
-    return url.origin;
-  } catch {
-    return null;
-  }
-};
-
-const githubConfigAvailable = (env: Env) =>
-  Boolean(
-    env.GITHUB_WEBHOOK_SECRET?.trim() &&
-      env.GITHUB_APP_ID?.trim() &&
-      env.GITHUB_APP_PRIVATE_KEY?.trim() &&
-      env.GITHUB_APP_CLIENT_ID?.trim() &&
-      env.GITHUB_APP_CLIENT_SECRET?.trim() &&
-      /^[a-z0-9](?:[a-z0-9-]{0,198}[a-z0-9])?$/u.test(
-        env.GITHUB_APP_SLUG?.trim() ?? "",
-      ) &&
-      githubCallbackOrigin(env),
-  );
-
-const githubOAuthRedirectUri = (origin: string) =>
-  `${origin}/github/oauth/callback`;
 
 async function readVerifiedGithubBody(request: Request, env: Env) {
   const maxBytes = 1_048_576;
@@ -554,112 +519,6 @@ async function handleGithubOAuthCallback(request: Request, env: Env) {
       502,
     );
   }
-}
-
-export async function handleOrganizationGithubRoute(input: {
-  request: Request;
-  url: URL;
-  auth: BriarAuth;
-  db: D1Database;
-  env: Env;
-}): Promise<Response | undefined> {
-  const { request, url, auth, db, env } = input;
-
-  const organizationGithubMatch = url.pathname.match(
-    /^\/organizations\/([0-9a-f-]+)\/integrations\/github$/u,
-  );
-  if (organizationGithubMatch && request.method === "GET") {
-    const session = await requireSession(auth, request);
-    const organizationId = organizationGithubMatch[1];
-    const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!hasOrganizationCapability(role, "organization:read")) {
-      throw new HttpError(404, "Organization not found");
-    }
-    const connection = await getGithubConnectionForOrganization(
-      db,
-      organizationId,
-    );
-    if (!connection) {
-      return json({
-        configured: githubConfigAvailable(env),
-        canManage: hasOrganizationCapability(role, "development:manage"),
-        connected: false,
-      });
-    }
-    const repositories = await listGithubConnectionRepositories(
-      db,
-      connection.installation_id,
-    );
-    return json({
-      configured: githubConfigAvailable(env),
-      canManage: hasOrganizationCapability(role, "development:manage"),
-      connected: true,
-      accountLogin: connection.account_login,
-      accountAvatarUrl: connection.account_avatar_url,
-      installationId: connection.installation_id,
-      repositories: repositories.map((repository) => ({
-        id: repository.repository_id,
-        owner: repository.owner,
-        name: repository.name,
-        fullName: repository.full_name,
-      })),
-      connectedAt: connection.connected_at,
-    });
-  }
-  if (organizationGithubMatch && request.method === "DELETE") {
-    const session = await requireSession(auth, request);
-    const organizationId = organizationGithubMatch[1];
-    const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!hasOrganizationCapability(role, "development:manage")) {
-      throw new HttpError(403, "Development management permission required");
-    }
-    await disconnectGithubInstallation(
-      db,
-      organizationId,
-      new Date().toISOString(),
-    );
-    return new Response(null, { status: 204, headers: corsHeaders });
-  }
-
-  const organizationGithubInstallMatch = url.pathname.match(
-    /^\/organizations\/([0-9a-f-]+)\/integrations\/github\/install-url$/u,
-  );
-  if (organizationGithubInstallMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    const organizationId = organizationGithubInstallMatch[1];
-    const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!hasOrganizationCapability(role, "development:manage")) {
-      throw new HttpError(403, "Development management permission required");
-    }
-    if (!githubConfigAvailable(env)) {
-      throw new HttpError(503, "GitHub integration is not configured");
-    }
-    if (await getGithubConnectionForOrganization(db, organizationId)) {
-      throw new HttpError(409, "GitHub integration is already connected");
-    }
-    const state = randomGithubOAuthToken();
-    const createdAt = new Date();
-    await createGithubOAuthState(db, {
-      stateHash: await githubSha256Hex(state),
-      organizationId,
-      userId: session.user.id,
-      // This verifier is never disclosed or exchanged. The setup callback
-      // consumes this state and rotates to a fresh state and PKCE verifier.
-      pkceVerifier: randomGithubOAuthToken(),
-      expiresAt: new Date(
-        createdAt.getTime() + githubOAuthStateTtlMs,
-      ).toISOString(),
-      createdAt: createdAt.toISOString(),
-    });
-    const installUrl = new URL(
-      `https://github.com/apps/${env.GITHUB_APP_SLUG!}/installations/new`,
-    );
-    installUrl.searchParams.set("state", state);
-    return json({ installUrl: installUrl.toString() }, 201);
-  }
-
-
-  return undefined;
 }
 
 export async function handleGithubPublicRoute(input: {

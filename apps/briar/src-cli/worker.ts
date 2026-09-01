@@ -45,12 +45,11 @@ export type ClaimedIssue = {
     model: string | null;
     effort: ModelEffort | null;
     responsibility: string;
-    skill: string;
   } | null;
 };
 
-export type WorkerClaimResult = {
-  work: ClaimedIssue | null;
+export type WorkerClaimResult<Issue extends ClaimedIssue = ClaimedIssue> = {
+  work: Issue | null;
   /** Server-provided lower bound for the next empty-queue poll. */
   retryAfterMs?: number;
 };
@@ -111,13 +110,13 @@ export const isReplyWork = (
   issue: Pick<ClaimedIssue, "workType">,
 ): boolean => issue.workType === "issueReply" || issue.workType === "channelReply";
 
-export type WorkerLoopDependencies = {
+export type WorkerLoopDependencies<Issue extends ClaimedIssue = ClaimedIssue> = {
   /** Claim the next queued work item, or report an empty queue. */
   claim: (
     options?: WorkerClaimOptions,
-  ) => Promise<ClaimedIssue | null | WorkerClaimResult>;
+  ) => Promise<Issue | null | WorkerClaimResult<Issue>>;
   /** Renew the lease of the run currently in flight. */
-  renewLease: (issue: ClaimedIssue) => Promise<void>;
+  renewLease: (issue: Issue) => Promise<void>;
   heartbeat: (
     readinessState?: "ready" | "busy",
   ) => Promise<{
@@ -127,13 +126,13 @@ export type WorkerLoopDependencies = {
   } | void>;
   /** Run the agent for one claimed issue. */
   runIssue: (
-    issue: ClaimedIssue,
+    issue: Issue,
     signal: AbortSignal,
     checkpoint: (value: WorkerExecutionCheckpoint) => void,
   ) => Promise<void>;
   /** Atomically release one claim to the next Worker after its provider stops. */
   handoff?: (
-    issue: ClaimedIssue,
+    issue: Issue,
     requestId: string,
     checkpoint: WorkerExecutionCheckpoint,
   ) => Promise<void>;
@@ -202,22 +201,15 @@ export function workerExecutionPath(
   return [localBin, ...paths].join(delimiter);
 }
 
-/**
- * Issue executions must never share a runtime directory. Keep the execution
- * identity in the leaf name instead of nesting it below the legacy run-id
- * directory: a still-running older CLI may recursively remove that legacy
- * directory during cleanup.
- */
+/** Issue executions must never share a runtime directory. */
 export function issueWorkerSessionDirectory(
   configDirectory: string,
-  issue: Pick<ClaimedIssue, "runId" | "executionId"> & { claimAttempts: number },
+  issue: Pick<ClaimedIssue, "runId"> & { executionId: string },
 ): string {
-  const executionIdentity = issue.executionId ??
-    `claim-${issue.claimAttempts}`;
   return join(
     configDirectory,
     "worker-sessions",
-    `${issue.runId}--${executionIdentity}`,
+    `${issue.runId}--${issue.executionId}`,
   );
 }
 
@@ -291,8 +283,8 @@ export function leaseRenewDelayMs(
  * Claim-run-report loop. All I/O is injected so the state machine is testable
  * without a server, an agent, or real time.
  */
-export async function runWorkerLoop(
-  dependencies: WorkerLoopDependencies,
+export async function runWorkerLoop<Issue extends ClaimedIssue>(
+  dependencies: WorkerLoopDependencies<Issue>,
   options: WorkerLoopOptions = {},
 ): Promise<WorkerLoopResult> {
   const maxIssues = options.once ? 1 : (options.maxIssues ?? Number.POSITIVE_INFINITY);
@@ -320,16 +312,16 @@ export async function runWorkerLoop(
   let nextHeartbeatAt = Number.NEGATIVE_INFINITY;
   const active = new Map<
     string,
-    Promise<{ issue: ClaimedIssue; error: unknown | null; handedOff: boolean }>
+    Promise<{ issue: Issue; error: unknown | null; handedOff: boolean }>
   >();
   const activeControllers = new Map<string, AbortController>();
   let activeSlotCount = 0;
   let updateDirective: WorkerLoopUpdateDirective | null = null;
   const serialTails = new Map<string, Promise<void>>();
-  const executionKey = (issue: ClaimedIssue) => issue.workType === "mergeBatch"
+  const executionKey = (issue: Issue) => issue.workType === "mergeBatch"
     ? `${issue.runId}:${issue.claimToken}`
     : issue.workId ?? issue.executionId ?? `${issue.runId}:${issue.claimToken}`;
-  const serialKey = (issue: ClaimedIssue) =>
+  const serialKey = (issue: Issue) =>
     !issue.workType || issue.workType === "issue" ||
         issue.workType === "mergeBatch"
       ? issue.runId
@@ -384,7 +376,7 @@ export async function runWorkerLoop(
     await reportState();
   };
 
-  const execute = async (issue: ClaimedIssue, waitForTurn: Promise<void>) => {
+  const execute = async (issue: Issue, waitForTurn: Promise<void>) => {
     const renewal = new AbortController();
     const execution = new AbortController();
     const key = executionKey(issue);
@@ -481,7 +473,7 @@ export async function runWorkerLoop(
     }
   };
 
-  const schedule = (issue: ClaimedIssue) => {
+  const schedule = (issue: Issue) => {
     const runKey = serialKey(issue);
     const previous = runKey
       ? (serialTails.get(runKey) ?? Promise.resolve())
@@ -654,9 +646,9 @@ const normalizeConcurrency = (value: number) =>
     ),
   );
 
-const isWorkerClaimResult = (
-  claim: ClaimedIssue | WorkerClaimResult | null,
-): claim is WorkerClaimResult => Boolean(claim && "work" in claim);
+const isWorkerClaimResult = <Issue extends ClaimedIssue>(
+  claim: Issue | WorkerClaimResult<Issue> | null,
+): claim is WorkerClaimResult<Issue> => Boolean(claim && "work" in claim);
 
 const describe = (error: unknown) =>
   error instanceof Error ? error.message : String(error);

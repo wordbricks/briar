@@ -34,7 +34,7 @@ export function resolveActiveAccountSelection(
     const project = projects.find((candidate) => candidate.id === lockedProjectId);
     return project
       ? {
-          activeOrganizationId: project.organizationId ?? null,
+          activeOrganizationId: project.organizationId,
           activeProjectId: project.id,
         }
       : { activeOrganizationId: null, activeProjectId: null };

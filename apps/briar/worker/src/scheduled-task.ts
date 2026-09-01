@@ -18,6 +18,7 @@ import {
 } from "./realtime-scheduling";
 import { processSlackRevocationQueue } from "./slack-revocations";
 import { cleanupExpiredChannelReplySessions } from "./channels";
+import { maintainUploadCleanup } from "./upload-repository";
 import { runDmMemoryMaintenance } from "./dm-memory-indexing";
 
 export type ScheduledTaskDependencies = {
@@ -31,6 +32,7 @@ export type ScheduledTaskDependencies = {
   reconcileDrainingManagedComputers: typeof reconcileDrainingManagedComputers;
   reconcileManagedComputers: typeof reconcileManagedComputers;
   cleanupExpiredChannelReplySessions: typeof cleanupExpiredChannelReplySessions;
+  maintainUploadCleanup: typeof maintainUploadCleanup;
   runDmMemoryMaintenance: typeof runDmMemoryMaintenance;
 };
 
@@ -49,6 +51,7 @@ const scheduledTaskDependencies: ScheduledTaskDependencies = {
   reconcileDrainingManagedComputers,
   reconcileManagedComputers,
   cleanupExpiredChannelReplySessions,
+  maintainUploadCleanup,
   runDmMemoryMaintenance,
 };
 const GITHUB_RECONCILIATION_CRON = "* * * * *";
@@ -128,7 +131,7 @@ export async function handleScheduledTask(
         }));
       }
       const [archive, expired, cleanup, slackRevocations, github, managedComputers,
-        channelReplySessions] =
+        channelReplySessions, uploads] =
         await Promise.all([
         dependencies.archiveCompletedLogs(env.DB, env.ARCHIVES, observedAt),
         dependencies.expireArchives(
@@ -147,6 +150,11 @@ export async function handleScheduledTask(
         dependencies.reconcileGithubMergedRuns(env.DB),
         dependencies.reconcileManagedComputers(env.DB, env, observedAt),
         dependencies.cleanupExpiredChannelReplySessions(env.DB, { observedAt }),
+        dependencies.maintainUploadCleanup(
+          env.DB,
+          env.ATTACHMENTS,
+          observedAt,
+        ),
       ]);
       await Promise.all([
         flushOrganizationInboxRealtimeOutbox(env, env.DB),
@@ -169,6 +177,7 @@ export async function handleScheduledTask(
           sessionId: session.id,
           reason: "ttl_expired",
         })),
+        uploads,
       }));
     } catch (error) {
       console.error(JSON.stringify({

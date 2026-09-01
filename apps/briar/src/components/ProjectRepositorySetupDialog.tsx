@@ -10,7 +10,7 @@ import {
 import { Spinner } from "./ui/spinner";
 import { useEffect, useRef } from "react";
 import { useI18n } from "../i18n";
-import type { RepositoryReadiness } from "../lib/project-connection";
+import type { RepositoryReadiness } from "../generated/tauri";
 import {
   isLocalProjectRepositoryReady,
   localProjectReadiness,

@@ -1,14 +1,22 @@
 import { Buffer } from "node:buffer";
 import { spawn } from "node:child_process";
 import { resolve } from "node:path";
-import { createInterface } from "node:readline";
+import { toBinary } from "@bufbuild/protobuf";
+import { sizeDelimitedDecodeStream } from "@bufbuild/protobuf/wire";
+import {
+  RunnerToParentSchema,
+  SandboxMode,
+  type RunnerToParent,
+} from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
 import type { AgentAttachment } from "../src-agent/runner-attachments";
+import {
+  encodeSidecarApprovalResponse,
+  encodeSidecarRunRequest,
+} from "../src-agent/sidecar-protocol";
 import type { JsonSchema } from "../src/lib/project-llm";
 import { agentProviderBinaryName } from "../src/lib/agent-provider";
 import {
-  detachedConversationIdFromPayload,
   detachedProviderRequest,
-  issueReplyTextFromPayload,
   type DetachedAgent,
   type DetachedDelegationTarget,
 } from "./agent-runner";
@@ -60,7 +68,7 @@ export type DetachedProviderTurnInput = {
   signal: AbortSignal;
   diagnosticContext?: DetachedProviderTurnDiagnosticContext;
   onDiagnostic?: (diagnostic: DetachedProviderTurnDiagnostic) => void;
-  onPayload?: (payload: unknown, rawLine: string) => void | Promise<void>;
+  onPayload?: (payload: RunnerToParent) => void | Promise<void>;
   onConversationId?: (conversationId: string) => void | Promise<void>;
 };
 
@@ -222,6 +230,7 @@ async function executeDetachedProviderTurn(
   skillCatalog: DetachedAgentSkillCatalog | null,
   diagnose: DiagnosticEmitter,
 ) {
+  const maxSidecarFrameBytes = 16 * 1024 * 1024;
   const runnerRequest = detachedProviderRequest({
     agent: input.agent,
     prompt: input.prompt,
@@ -237,8 +246,8 @@ async function executeDetachedProviderTurn(
     outputSchema: input.outputSchema ?? null,
     agentBinary,
   }).request;
-  const requestLine = `${JSON.stringify(runnerRequest)}\n`;
-  const requestBytes = Buffer.byteLength(requestLine, "utf8");
+  const requestFrame = encodeSidecarRunRequest(runnerRequest);
+  const requestBytes = requestFrame.byteLength;
   diagnose("runner.spawn_start", {
     runnerPath,
     workspacePath: input.workspacePath,
@@ -270,6 +279,7 @@ async function executeDetachedProviderTurn(
   let stderr = "";
   let runnerError: string | null = null;
   let completed = false;
+  let terminalOutputSeen = false;
   let resultText: string | null = null;
   let conversationId = input.conversationId ?? null;
   let outputCount = 0;
@@ -313,7 +323,7 @@ async function executeDetachedProviderTurn(
       runnerPid: child.pid ?? null,
       requestBytes,
     });
-    const accepted = child.stdin.write(requestLine, () => {
+    const accepted = child.stdin.write(requestFrame, () => {
       diagnose("runner.stdin_write_complete", {
         runnerPid: child.pid ?? null,
         requestBytes,
@@ -329,78 +339,63 @@ async function executeDetachedProviderTurn(
         diagnose("runner.stdin_drain", { runnerPid: child.pid ?? null });
       });
     }
-    const lines = createInterface({ input: child.stdout, crlfDelay: Infinity });
-    for await (const line of lines) {
-      if (!line.trim()) continue;
-      let payload: unknown = line;
-      try {
-        payload = JSON.parse(line);
-      } catch {
-        // Preserve plain provider output for caller diagnostics.
+    for await (const message of sizeDelimitedDecodeStream(
+      RunnerToParentSchema,
+      child.stdout,
+      { readMaxBytes: maxSidecarFrameBytes },
+    )) {
+      if (terminalOutputSeen) {
+        throw new Error("Agent runner emitted output after a terminal frame");
+      }
+      const payload = message.payload;
+      if (payload.case === undefined) {
+        throw new Error("Agent runner emitted an empty protobuf output frame");
       }
       outputCount += 1;
-      const payloadType =
-        payload && typeof payload === "object" && "type" in payload
-          ? String((payload as { type?: unknown }).type ?? "unknown")
-          : "text";
+      const payloadType = payload.case;
       diagnose("runner.stdout_payload", {
         runnerPid: child.pid ?? null,
         outputNumber: outputCount,
         payloadType,
-        bytes: Buffer.byteLength(line, "utf8"),
-        ...(payloadType === "error" &&
-        payload &&
-        typeof payload === "object" &&
-        "message" in payload
+        bytes: toBinary(RunnerToParentSchema, message).byteLength,
+        ...(payloadType === "error"
           ? {
-              error: redactDiagnosticText(
-                (payload as { message?: unknown }).message,
-              ),
+              error: redactDiagnosticText(payload.value.message),
             }
           : {}),
       });
-      const nextConversationId = detachedConversationIdFromPayload(payload);
-      if (nextConversationId && nextConversationId !== conversationId) {
-        conversationId = nextConversationId;
-        await input.onConversationId?.(nextConversationId);
-      }
-      const candidate = issueReplyTextFromPayload(payload);
-      if (candidate) resultText = candidate;
       if (
-        payload &&
-        typeof payload === "object" &&
-        "type" in payload &&
-        (payload as { type?: string }).type === "approval" &&
-        "id" in payload &&
-        typeof payload.id === "string"
+        payload.case === "sessionStarted" &&
+        payload.value.sessionId.trim() &&
+        payload.value.sessionId !== conversationId
       ) {
+        conversationId = payload.value.sessionId;
+        await input.onConversationId?.(payload.value.sessionId);
+      }
+      if (payload.case === "result") {
+        resultText = payload.value.message.trim() || null;
+      }
+      if (payload.case === "approval") {
         child.stdin.write(
-          `${JSON.stringify({
-            type: "approvalResponse",
-            id: payload.id,
-            approved: runnerRequest.sandboxMode !== "readOnly",
-          })}\n`,
+          encodeSidecarApprovalResponse(
+            payload.value.id,
+            runnerRequest.sandboxMode !== SandboxMode.READ_ONLY,
+          ),
         );
       }
-      if (
-        payload &&
-        typeof payload === "object" &&
-        "type" in payload &&
-        (payload as { type?: string }).type === "error"
-      ) {
-        runnerError = String(
-          (payload as { message?: unknown }).message ?? "Agent failed",
-        );
+      if (payload.case === "error") {
+        runnerError = payload.value.message || "Agent failed";
+        terminalOutputSeen = true;
       }
-      if (
-        payload &&
-        typeof payload === "object" &&
-        "type" in payload &&
-        (payload as { type?: string }).type === "result"
-      ) {
+      if (payload.case === "result") {
         completed = true;
+        terminalOutputSeen = true;
       }
-      await input.onPayload?.(payload, line);
+      if (payload.case === "blocked") terminalOutputSeen = true;
+      await input.onPayload?.(message);
+    }
+    if (!terminalOutputSeen) {
+      throw new Error("Agent runner stdout closed before terminal output");
     }
     const exitCode = await exitPromise;
     if (runnerStderrBuffer.trim()) {

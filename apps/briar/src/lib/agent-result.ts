@@ -56,12 +56,21 @@ export const StructuredAgentResult = Schema.Struct({
 
 export type StructuredAgentResult = typeof StructuredAgentResult.Type;
 
+const StructuredAgentResultJson = Schema.fromJsonString(
+  StructuredAgentResult,
+);
+
 export const decodeStructuredAgentResult = Schema.decodeUnknownSync(
   StructuredAgentResult,
   strictSchemaOptions,
 );
 
-export const decodeStructuredAgentResultOption = Schema.decodeUnknownOption(
-  StructuredAgentResult,
+export const decodeStructuredAgentResultJson = Schema.decodeUnknownSync(
+  StructuredAgentResultJson,
+  strictSchemaOptions,
+);
+
+export const encodeStructuredAgentResultJson = Schema.encodeSync(
+  StructuredAgentResultJson,
   strictSchemaOptions,
 );

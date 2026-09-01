@@ -31,6 +31,9 @@ const projects: Project[] = [
   {
     id: "project-1",
     name: "First project",
+    issueKeyPrefix: "FP",
+    scheduleTabEnabled: true,
+    icon: null,
     organizationId: "organization-1",
     organizationName: "First",
     role: "owner",
@@ -39,6 +42,9 @@ const projects: Project[] = [
   {
     id: "project-2",
     name: "Second project",
+    issueKeyPrefix: "SP",
+    scheduleTabEnabled: true,
+    icon: null,
     organizationId: "organization-2",
     organizationName: "Second",
     role: "developer",

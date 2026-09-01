@@ -1,7 +1,12 @@
 import * as Schema from "effect/Schema";
 import type { SessionUser } from "../../types";
 import { ApiResponseDecodeError } from "./errors";
-import { request } from "./request";
+import {
+  deleteCurrentUser,
+  getCurrentUser,
+  updateCurrentUserProfile,
+  type AccountProfileInput,
+} from "../app-rpc/account";
 
 const emailPattern =
   /^(?!\.)(?!.*\.\.)([A-Za-z0-9_'+\-\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}$/u;
@@ -14,25 +19,14 @@ export const SessionUserSchema = Schema.Struct({
   image: Schema.optional(Schema.NullOr(Schema.String)),
 });
 
-const SessionEnvelope = Schema.Struct({
-  user: SessionUserSchema,
-});
+export type UpdateAccountProfileInput = AccountProfileInput;
 
-export type UpdateAccountProfileInput = {
-  username: string | null;
-  name: string;
-  image: string | null;
-};
-
-async function requestDecoded<S extends Schema.ConstraintDecoder<unknown>>(
-  schema: S,
+async function decodeSessionUser(
+  user: SessionUser,
   path: string,
-  token: string,
-  init?: RequestInit,
-): Promise<S["Type"]> {
-  const body = await request<unknown>(path, token, init);
+): Promise<SessionUser> {
   try {
-    return await Schema.decodeUnknownPromise(schema)(body);
+    return await Schema.decodePromise(SessionUserSchema)(user);
   } catch (cause) {
     if (Schema.isSchemaError(cause)) {
       throw new ApiResponseDecodeError(path, cause);
@@ -42,27 +36,25 @@ async function requestDecoded<S extends Schema.ConstraintDecoder<unknown>>(
 }
 
 export async function loadSession(token: string): Promise<SessionUser> {
-  const result = await requestDecoded(SessionEnvelope, "/me", token);
-  return result.user;
+  return decodeSessionUser(
+    await getCurrentUser(token),
+    "/briar.app.v1.AccountService/GetCurrentUser",
+  );
 }
 
 export async function updateAccountProfile(
   token: string,
   input: UpdateAccountProfileInput,
 ): Promise<SessionUser> {
-  const result = await requestDecoded(SessionEnvelope, "/me", token, {
-    method: "PATCH",
-    body: JSON.stringify(input),
-  });
-  return result.user;
+  return decodeSessionUser(
+    await updateCurrentUserProfile(token, input),
+    "/briar.app.v1.AccountService/UpdateAccountProfile",
+  );
 }
 
 export async function deleteAccount(
   token: string,
   confirmation: string,
 ): Promise<void> {
-  await request<void>("/me", token, {
-    method: "DELETE",
-    body: JSON.stringify({ confirmation }),
-  });
+  await deleteCurrentUser(token, confirmation);
 }

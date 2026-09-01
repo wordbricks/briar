@@ -1,8 +1,14 @@
 /** @vitest-environment jsdom */
 
+import { create, toBinary } from "@bufbuild/protobuf";
+import {
+  MobilePushNotificationTargetSchema,
+  type MobilePushNotificationTarget,
+} from "@briar/contracts/gen/briar/app/v1/inbox_pb";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { InboxMessage } from "../hooks/useInbox";
 import {
+  decodeMobilePushNotificationOpen,
   inboxNotificationContent,
   inboxNotificationLabelKey,
   inboxNotificationTarget,
@@ -19,6 +25,16 @@ import {
   writeInboxNotificationPreferences,
   writeInboxNotificationSoundPreference,
 } from "./inbox-notifications";
+
+const mobilePushTargetBase64 = (
+  message: MobilePushNotificationTarget,
+) => {
+  const bytes = toBinary(
+    MobilePushNotificationTargetSchema,
+    message,
+  );
+  return btoa(String.fromCharCode(...bytes));
+};
 
 const message: InboxMessage = {
   id: "issue:run-1",
@@ -123,6 +139,104 @@ describe("inbox notification navigation", () => {
         },
       }),
     ).toEqual(target);
+  });
+
+  it("projects a generated remote push target into channel navigation", () => {
+    const projectId = "11111111-1111-4111-8111-111111111111";
+    const channelId = "22222222-2222-4222-8222-222222222222";
+    const channelMessageId = "33333333-3333-4333-8333-333333333333";
+    const rootMessageId = "44444444-4444-4444-8444-444444444444";
+    const encoded = mobilePushTargetBase64(
+      create(MobilePushNotificationTargetSchema, {
+        inboxMessageId: "channel:message-1",
+        inboxMessageVersion: "message-1",
+        notificationId: "channel:channel-1:root-1",
+        projectId,
+        targetId: channelId,
+        destination: {
+          case: "channel",
+          value: {
+            channelMessageId,
+            rootMessageId,
+          },
+        },
+      }),
+    );
+
+    expect(decodeMobilePushNotificationOpen(encoded)).toEqual({
+      target: {
+        messageId: "channel:message-1",
+        projectId,
+        targetId: channelId,
+        kind: "channel",
+        channelMessageId,
+        rootMessageId,
+      },
+      messageVersion: "message-1",
+      notificationId: "channel:channel-1:root-1",
+    });
+  });
+
+  it("rejects remote push targets with incomplete semantic data", () => {
+    const incompleteChannel = mobilePushTargetBase64(
+      create(MobilePushNotificationTargetSchema, {
+        inboxMessageId: "channel:message-1",
+        inboxMessageVersion: "message-1",
+        notificationId: "channel:channel-1:root-1",
+        projectId: "11111111-1111-4111-8111-111111111111",
+        targetId: "22222222-2222-4222-8222-222222222222",
+        destination: {
+          case: "channel",
+          value: {
+            channelMessageId: "33333333-3333-4333-8333-333333333333",
+            rootMessageId: "",
+          },
+        },
+      }),
+    );
+    const missingDestination = mobilePushTargetBase64(
+      create(MobilePushNotificationTargetSchema, {
+        inboxMessageId: "issue:run-1",
+        inboxMessageVersion: "event-1",
+        notificationId: "issue:run-1",
+        projectId: "11111111-1111-4111-8111-111111111111",
+        targetId: "55555555-5555-4555-8555-555555555555",
+      }),
+    );
+    const invalidProjectId = mobilePushTargetBase64(
+      create(MobilePushNotificationTargetSchema, {
+        inboxMessageId: "issue:run-1",
+        inboxMessageVersion: "event-1",
+        notificationId: "issue:run-1",
+        projectId: "not-a-uuid",
+        targetId: "55555555-5555-4555-8555-555555555555",
+        destination: { case: "issue", value: {} },
+      }),
+    );
+
+    expect(decodeMobilePushNotificationOpen(incompleteChannel)).toBeNull();
+    expect(decodeMobilePushNotificationOpen(missingDestination)).toBeNull();
+    expect(decodeMobilePushNotificationOpen(invalidProjectId)).toBeNull();
+  });
+
+  it("keeps session target ids opaque after validating the shared fields", () => {
+    const encoded = mobilePushTargetBase64(
+      create(MobilePushNotificationTargetSchema, {
+        inboxMessageId: "session:daily-summary",
+        inboxMessageVersion: "completed:2026-08-31T00:00:00.000Z",
+        notificationId: "session:daily-summary",
+        projectId: "11111111-1111-4111-8111-111111111111",
+        targetId: "daily-summary",
+        destination: { case: "session", value: {} },
+      }),
+    );
+
+    expect(decodeMobilePushNotificationOpen(encoded)?.target).toEqual({
+      messageId: "session:daily-summary",
+      projectId: "11111111-1111-4111-8111-111111111111",
+      targetId: "daily-summary",
+      kind: "session",
+    });
   });
 
   it("preserves channel message and thread context in notification targets", () => {

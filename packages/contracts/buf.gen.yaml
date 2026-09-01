@@ -1,0 +1,77 @@
+version: v2
+clean: true
+plugins:
+  - local:
+      - bash
+      - scripts/run-contract-generator.sh
+      - npm:@bufbuild/protoc-gen-es@2.14.0
+      - node_modules/@bufbuild/protoc-gen-es/bin/protoc-gen-es
+      - --bun
+    out: packages/contracts/src/gen
+    opt:
+      - target=ts
+  - local:
+      - bash
+      - scripts/run-contract-generator.sh
+      - spm:apple/swift-protobuf@1.38.1
+      - bin/protoc-gen-swift
+    out: packages/contracts/swift/Sources/BriarContracts
+    strategy: all
+    types:
+      - briar.app.v1
+      - briar.realtime.v1
+      - briar.types.v1
+    opt:
+      - Visibility=Public
+  - local:
+      - bash
+      - scripts/run-contract-generator.sh
+      - spm:connectrpc/connect-swift@1.2.3
+      - bin/protoc-gen-connect-swift
+    out: packages/contracts/swift/Sources/BriarContracts
+    strategy: all
+    types:
+      - briar.app.v1
+    opt:
+      - Visibility=Public
+      - GenerateAsyncMethods=true
+      - GenerateCallbackMethods=false
+  - local:
+      - bash
+      - scripts/run-contract-generator.sh
+      - spm:connectrpc/connect-swift@1.2.3
+      - bin/protoc-gen-connect-swift-mocks
+    out: packages/contracts/swift/Sources/BriarContractsMocks
+    strategy: all
+    types:
+      - briar.app.v1
+    opt:
+      - Visibility=Public
+      - GenerateAsyncMethods=true
+      - GenerateCallbackMethods=false
+      - ExtraModuleImports=BriarContracts
+  - local:
+      - bash
+      - scripts/run-contract-generator.sh
+      - cargo:protoc-gen-buffa@0.9.1
+      - bin/protoc-gen-buffa
+    out: packages/contracts/rust/src/gen/proto
+    strategy: all
+    opt:
+      - file_per_package=true
+      - views=true
+      - json=true
+  - local:
+      - bash
+      - scripts/run-contract-generator.sh
+      - cargo:connectrpc-codegen@0.9.0
+      - bin/protoc-gen-connect-rust
+    out: packages/contracts/rust/src/gen/connect
+    strategy: all
+    types:
+      - briar.app.v1
+      - briar.worker.v1
+    opt:
+      - file_per_package
+      - buffa_module=crate::proto
+      - gate_client_feature=client

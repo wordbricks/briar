@@ -8,7 +8,7 @@ struct DirectMessagesHomeView: View {
     @State private var showingComposer = false
 
     let currentUserID: String?
-    let projects: [ProjectsResponse.Project]
+    let projects: [Project]
     let providers: [AgentProvider]
     let workers: [DashboardWorker]
     let onIssueOpen: ChannelIssueOpenHandler

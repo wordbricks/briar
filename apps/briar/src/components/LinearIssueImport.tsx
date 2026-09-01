@@ -16,9 +16,9 @@ import {
   buildDefaultStatusMapping,
   canImportLinearIssues,
   isCompleteStatusMapping,
-  parsePlacementKey,
   placementKey,
   type LinearImportConnectResult,
+  type LinearImportPlacement,
   type LinearImportResult,
   type LinearImportStatesResult,
   type LinearStatusMapping,
@@ -70,7 +70,7 @@ export function LinearIssueImport({
   onImport: (input: {
     apiKey: string;
     teamIds: string[];
-    statusMapping: Record<string, string>;
+    statusMapping: LinearStatusMapping;
   }) => Promise<LinearImportResult>;
 }) {
   const { t } = useI18n();
@@ -94,18 +94,48 @@ export function LinearIssueImport({
   });
   const placementOptions = useMemo(() => {
     const stages = workflow?.stages ?? [];
-    return [
-      { label: t("status.backlog"), value: "status:backlog" },
-      { label: t("status.queued"), value: "status:queued" },
+    const options: Array<{
+      label: string;
+      placement: LinearImportPlacement;
+      value: string;
+    }> = [
+      {
+        label: t("status.backlog"),
+        placement: { status: "backlog", workflowStage: null },
+        value: "status:backlog",
+      },
+      {
+        label: t("status.queued"),
+        placement: { status: "queued", workflowStage: null },
+        value: "status:queued",
+      },
       ...stages.map((stage) => ({
         label: localizeStageLabel(t, stage.id, stage.label),
+        placement: { status: "running" as const, workflowStage: stage.id },
         value: `stage:${stage.id}`,
       })),
-      { label: t("status.blocked"), value: "status:blocked" },
-      { label: t("status.failed"), value: "status:failed" },
-      { label: t("status.completed"), value: "status:completed" },
-      { label: t("status.cancelled"), value: "status:cancelled" },
+      {
+        label: t("status.blocked"),
+        placement: { status: "blocked", workflowStage: null },
+        value: "status:blocked",
+      },
+      {
+        label: t("status.failed"),
+        placement: { status: "failed", workflowStage: null },
+        value: "status:failed",
+      },
+      {
+        label: t("status.completed"),
+        placement: { status: "completed", workflowStage: null },
+        value: "status:completed",
+      },
+      {
+        label: t("status.cancelled"),
+        placement: { status: "cancelled", workflowStage: null },
+        value: "status:cancelled",
+      },
     ];
+    return options;
   }, [t, workflow?.stages]);
 
   const mappingComplete = isCompleteStatusMapping(states, statusMapping);
@@ -190,14 +220,10 @@ export function LinearIssueImport({
     setBusy(true);
     setError(null);
     try {
-      const serialized: Record<string, string> = {};
-      for (const [stateId, placement] of Object.entries(statusMapping)) {
-        serialized[stateId] = placementKey(placement);
-      }
       const imported = await onImport({
         apiKey,
         teamIds: selectedTeamIds,
-        statusMapping: serialized,
+        statusMapping,
       });
       setResult(imported);
       setStep("done");
@@ -408,7 +434,9 @@ export function LinearIssueImport({
                       disabled={busy}
                       label={t("settings.linearImportBriarStatus")}
                       onValueChange={(next) => {
-                        const placement = parsePlacementKey(next);
+                        const placement = placementOptions.find(
+                          (option) => option.value === next,
+                        )?.placement;
                         if (!placement) return;
                         setStatusMapping((map) => ({
                           ...map,

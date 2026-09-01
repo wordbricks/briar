@@ -131,19 +131,8 @@ export const DmLearningProposalResult = Schema.Union([DmLearningCommitResult, st
   status: Schema.Literal("verifying"), proposalId: id, proposalHash: hash,
 }))]);
 export type DmLearningProposalResult = typeof DmLearningProposalResult.Type;
-export const dmMemoryLearningClaimTokenHeader = "x-briar-memory-claim-token";
-const requestFields = { workerId: Schema.String.check(Schema.isLengthBetween(1, 64)), inputHash: hash };
-export const DmLearningCallInput = strict(Schema.Struct({ ...requestFields, callId: id,
-  stage: Schema.Literals(["proposing", "verifying"]) }));
-export const DmLearningProposalInput = strict(Schema.Struct({ ...requestFields, callId: id,
-  proposal: DmLearningProposal, usage: DmLearningUsage }));
-export const DmLearningVerificationInput = strict(Schema.Struct({ ...requestFields, callId: id,
-  proposalId: id, proposalHash: hash, verification: DmLearningVerification, usage: DmLearningUsage }));
-export const DmLearningLeaseInput = strict(Schema.Struct(requestFields));
 export const dmLearningFailureCodes = ["invalid_proposal", "verification_rejected", "stale", "scope_revoked",
   "budget_exhausted", "model_unavailable", "model_timeout", "model_credentials", "model_configuration", "input_capacity"] as const;
-export const DmLearningFailureInput = strict(Schema.Struct({ ...requestFields, code: Schema.Literals(dmLearningFailureCodes),
-  callId: Schema.optional(id), usage: Schema.optional(DmLearningUsage) }));
 
 export const DmLearningInvocation = strict(Schema.Struct({
   callId: id, stage: Schema.Literals(["proposing", "verifying"]),

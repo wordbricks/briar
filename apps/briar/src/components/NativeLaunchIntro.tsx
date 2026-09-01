@@ -1,5 +1,5 @@
-import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useRef } from "react";
+import { commands } from "../generated/tauri";
 import {
   clearLaunchIntroPreview,
   isLaunchIntroPreview,
@@ -11,7 +11,7 @@ export function NativeLaunchIntro() {
   const isCompleting = useRef(false);
 
   const revealMainWindow = useCallback(() => {
-    void invoke("reveal_main_window").catch((error) => {
+    void commands.revealMainWindow().catch((error) => {
       console.error("Failed to reveal the Briar window", error);
     });
   }, []);
@@ -21,9 +21,9 @@ export function NativeLaunchIntro() {
     isCompleting.current = true;
     clearLaunchIntroPreview();
     markLaunchIntroSeen();
-    void invoke("finish_launch_intro").catch(async (error) => {
+    void commands.finishLaunchIntro().catch(async (error) => {
       console.error("Failed to finish the native launch intro", error);
-      await invoke("show_main_window").catch(() => undefined);
+      await commands.showMainWindow().catch(() => undefined);
     });
   }, []);
 

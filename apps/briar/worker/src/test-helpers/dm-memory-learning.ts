@@ -24,4 +24,3 @@ export function syntheticDmLearningChange(snapshot: DmLearningSnapshot, override
     memoryClass: "profile", evidenceType: "explicit_user", sourceLanguage: "ko", observedAt: snapshot.roots[0]!.observedAt,
     validUntil: null, conflicted: false, sourceRefs: snapshot.inputSources, ...overrides };
 }
-

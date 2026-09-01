@@ -1,16 +1,20 @@
 import { describe, expect, it } from "vitest";
 import {
+  normalizedMessageCompleted,
+  normalizedMessageStarted,
+  normalizedTurnCompleted,
+} from "./normalized-agent-event";
+import {
   buildCursorPromptParts,
   createCursorEventState,
   cursorPermissionDecisionResult,
   finalizeCursorMessage,
   normalizeCursorSessionUpdate,
   shouldAutoApproveCursorPermission,
-  type CursorRunnerRequest,
 } from "./cursor-runner-lib";
+import type { RunnerRequest } from "./runner-request";
 
-const request: CursorRunnerRequest = {
-  type: "run",
+const request: RunnerRequest = {
   message: "Inspect the repository",
   workspaceRoot: "/repo",
   model: "gpt-5.4-medium-fast[reasoning=medium]",
@@ -18,7 +22,9 @@ const request: CursorRunnerRequest = {
   approvalPolicy: "never",
   sandboxMode: "workspaceWrite",
   networkAccess: true,
-  cursorBinary: "/usr/local/bin/cursor-agent",
+  attachments: [],
+  additionalDirectories: [],
+  providerBinaryPath: "/usr/local/bin/cursor-agent",
 };
 
 describe("Cursor runner helpers", () => {
@@ -67,20 +73,18 @@ describe("Cursor runner helpers", () => {
         sessionUpdate: "agent_message_chunk",
         content: { type: "text", text: "Done" },
       },
-    }, state).events).toEqual([{
-      type: "messageStarted",
+    }, state).events).toEqual([normalizedMessageStarted({
       id: "cursor-session:assistant:1",
       phase: "commentary",
       text: "Done",
-    }]);
+    })]);
     expect(finalizeCursorMessage(state, "end_turn")).toEqual([
-      {
-        type: "messageCompleted",
+      normalizedMessageCompleted({
         id: "cursor-session:assistant:1",
         phase: "final",
         text: "Done",
-      },
-      { type: "turnCompleted", status: "completed" },
+      }),
+      normalizedTurnCompleted("completed"),
     ]);
   });
 });

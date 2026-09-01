@@ -37,10 +37,14 @@ export default defineConfig({
         "./src/test/cloudflare-workers-runtime.ts",
       ),
     },
+    include: [
+      "src/**/*.{test,spec}.{ts,tsx}",
+      "src-agent/**/*.{test,spec}.ts",
+      "src-cli/**/*.{test,spec}.ts",
+      // These tests require Node-only filesystem or VM APIs.
+      "worker/src/html-artifact-preview-shell.test.ts",
+    ],
     exclude: [...configDefaults.exclude, "**/.claude/worktrees/**"],
-    // D1 integration fixtures apply the complete migration history before
-    // seeding data; leave enough time for generated table-rebuild migrations.
-    hookTimeout: 60_000,
     maxWorkers: Number(process.env.VITEST_MAX_WORKERS ?? 4),
     setupFiles: ["./src/test/setup.ts"],
     testTimeout: 15_000,

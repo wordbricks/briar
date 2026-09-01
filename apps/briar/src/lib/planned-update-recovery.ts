@@ -1,46 +1,22 @@
-import type {
-  AgentProvider,
-  ModelEffort,
-  ProjectAgentRunInput,
-  ProjectAgentRunSnapshot,
-} from "./project-llm";
-
-export type PlannedUpdateAgentRecovery = {
-  version: number;
-  projectId: string;
-  startedAt: string;
-  request: {
-    sessionId: string;
-    agentId: string;
-    agentName: string;
-    agentProvider: AgentProvider;
-    agentModel: string | null;
-    agentEffort: ModelEffort | null;
-    responsibility: string;
-    skill: string;
-    message: string;
-    conversationId: string | null;
-    runs: ProjectAgentRunSnapshot[];
-  };
-};
+import type { ProjectAgentRunInput } from "./project-llm";
+import {
+  commands,
+  type PlannedUpdateAgentRecovery,
+} from "../generated/tauri";
 
 const isTauri = () =>
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 export async function prepareForAppUpdate(): Promise<number> {
   if (!isTauri()) return 0;
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<number>("prepare_for_app_update");
+  return commands.prepareForAppUpdate();
 }
 
 export async function takePlannedUpdateAgentRecoveries(): Promise<
   PlannedUpdateAgentRecovery[]
 > {
   if (!isTauri()) return [];
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<PlannedUpdateAgentRecovery[]>(
-    "take_planned_update_agent_recoveries",
-  );
+  return commands.takePlannedUpdateAgentRecoveries();
 }
 
 export function plannedUpdateContinuationMessage(originalRequest: string) {
@@ -62,7 +38,7 @@ export function recoveryAgent(
     name: recovery.request.agentName,
     provider: recovery.request.agentProvider,
     model: recovery.request.agentModel,
-    effort: recovery.request.agentEffort,
+    effort: recovery.request.agentEffort ?? null,
     responsibility: recovery.request.responsibility,
     skill: recovery.request.skill,
   };

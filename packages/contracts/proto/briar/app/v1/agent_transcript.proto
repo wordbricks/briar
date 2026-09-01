@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+package briar.app.v1;
+
+import "briar/types/v1/agent_event.proto";
+import "briar/types/v1/provider.proto";
+import "google/protobuf/timestamp.proto";
+
+option swift_prefix = "BriarAPI_";
+
+message GetProjectAgentTranscriptRequest {
+  string project_id = 1;
+
+  oneof selector {
+    string session_id = 2;
+    string latest_for_run_id = 3;
+  }
+}
+
+message GetProjectAgentTranscriptResponse {
+  ProjectAgentTranscriptSession session = 1;
+  repeated ProjectAgentWorkLogEntry entries = 2;
+}
+
+message ProjectAgentTranscriptSession {
+  string session_id = 1;
+  optional string run_id = 2;
+  optional string worker_id = 3;
+  briar.types.v1.AgentProvider agent_provider = 4;
+  google.protobuf.Timestamp started_at = 5;
+  google.protobuf.Timestamp last_event_at = 6;
+}
+
+enum ProjectAgentWorkLogEntryStatus {
+  PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_UNSPECIFIED = 0;
+  PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_WRITING = 1;
+  PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_COMPLETED = 2;
+  PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_FAILED = 3;
+  PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_CANCELLED = 4;
+  PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_INTERRUPTED = 5;
+}
+
+message ProjectAgentWorkLogEntry {
+  string entry_id = 1;
+  uint64 sequence = 2;
+  uint64 updated_sequence = 3;
+  ProjectAgentWorkLogEntryStatus status = 4;
+  google.protobuf.Timestamp started_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+  optional google.protobuf.Timestamp completed_at = 7;
+
+  oneof entry {
+    ProjectAgentWorkLogMessage message = 10;
+    ProjectAgentWorkLogActivity activity = 11;
+  }
+}
+
+message ProjectAgentWorkLogMessage {
+  optional string phase = 1;
+  string text = 2;
+}
+
+message ProjectAgentWorkLogActivity {
+  briar.types.v1.AgentActivityKind kind = 1;
+  string title = 2;
+  string text = 3;
+}

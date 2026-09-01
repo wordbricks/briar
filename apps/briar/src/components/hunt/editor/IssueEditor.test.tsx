@@ -109,6 +109,7 @@ function dashboardAgentSession(run: HuntRun, status: AutoHuntSession["status"] =
       summary: null
     }],
     startedAt: "2026-07-29T00:00:00.000Z",
+    updatedAt: status === "running" ? "2026-07-29T00:00:00.000Z" : "2026-07-29T00:10:00.000Z",
     completedAt: status === "running" ? null : "2026-07-29T00:10:00.000Z",
     conversationId: null,
     workspaceRoot: null,

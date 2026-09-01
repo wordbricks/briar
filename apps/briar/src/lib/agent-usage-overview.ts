@@ -13,9 +13,7 @@ import {
 export type UsageRangeDays = 7 | 30 | 90;
 
 export type UsageAttribution = AgentProvider | "unknown";
-export type UsageModelSource =
-  | AgentUsageRecord["modelSource"]
-  | "legacyConfigured";
+export type UsageModelSource = AgentUsageRecord["modelSource"];
 
 export type UsageTokenTotals = {
   totalTokens: number;
@@ -74,7 +72,6 @@ export type AgentUsageOverview = {
   actualModelRuns: number;
   configuredModelRuns: number;
   ledgerRuns: number;
-  legacyRuns: number;
   usageRecords: number;
   activeDays: number;
   providers: UsageBreakdownRow[];
@@ -191,7 +188,7 @@ const configuredAttribution = (
       provider: run.executionProvider,
       model: normalizedLabel(run.executionModel),
       modelProvider: null,
-      modelSource: "legacyConfigured",
+      modelSource: "configuredFallback",
     };
   }
   if (run.preferredProvider != null) {
@@ -199,7 +196,7 @@ const configuredAttribution = (
       provider: run.preferredProvider,
       model: normalizedLabel(run.preferredModel),
       modelProvider: null,
-      modelSource: "legacyConfigured",
+      modelSource: "configuredFallback",
     };
   }
   if (run.requestedProvider != null) {
@@ -207,14 +204,14 @@ const configuredAttribution = (
       provider: run.requestedProvider,
       model: normalizedLabel(run.requestedModel),
       modelProvider: null,
-      modelSource: "legacyConfigured",
+      modelSource: "configuredFallback",
     };
   }
   return {
     provider: "unknown",
     model: null,
     modelProvider: null,
-    modelSource: "legacyConfigured",
+    modelSource: "unknown",
   };
 };
 
@@ -245,50 +242,6 @@ const ledgerAttribution = (
     model: fallback.model,
     modelProvider: normalizedLabel(record.modelProvider),
     modelSource: fallback.model ? "configuredFallback" : "unknown",
-  };
-};
-
-const legacyRunUsage = (
-  run: AgentUsageOverviewRun,
-  provider: UsageAttribution,
-): RunUsage => {
-  const metrics = run.executionMetrics;
-  if (!metrics) return { ...emptyTokenTotals(), reported: false };
-
-  const reported = [
-    metrics.totalTokens,
-    metrics.inputTokens,
-    metrics.outputTokens,
-    metrics.cacheReadTokens,
-    metrics.cacheWriteTokens,
-    metrics.reasoningOutputTokens,
-  ].some(hasTokenCount);
-  if (!reported) return { ...emptyTokenTotals(), reported: false };
-
-  const inputTokens = finiteTokenCount(metrics.inputTokens);
-  const outputTokens = finiteTokenCount(metrics.outputTokens);
-  const cacheReadTokens = finiteTokenCount(metrics.cacheReadTokens);
-  const cacheWriteTokens = finiteTokenCount(metrics.cacheWriteTokens);
-  const reasoningTokens = finiteTokenCount(metrics.reasoningOutputTokens);
-  const derivedTotal =
-    provider === "claude"
-      ? inputTokens + outputTokens + cacheReadTokens + cacheWriteTokens
-      : inputTokens + outputTokens;
-
-  return {
-    totalTokens: hasTokenCount(metrics.totalTokens)
-      ? finiteTokenCount(metrics.totalTokens)
-      : derivedTotal,
-    inputTokens,
-    outputTokens,
-    cacheReadTokens,
-    cacheWriteTokens,
-    reasoningTokens,
-    uncachedInputTokens:
-      provider === "claude"
-        ? inputTokens
-        : Math.max(0, inputTokens - cacheReadTokens),
-    reported: true,
   };
 };
 
@@ -328,7 +281,6 @@ const sourceRank = {
   providerReported: 4,
   providerConfig: 3,
   configuredFallback: 2,
-  legacyConfigured: 2,
   unknown: 1,
 } satisfies Record<UsageModelSource, number>;
 
@@ -384,11 +336,7 @@ const usageIdentity = (record: {
   usageKey: string;
 }) => `${record.executionId}\u0000${record.usageKey}`;
 
-/**
- * Aggregates immutable usage and cost ledger rows first. The legacy
- * executionMetrics summary is used only for runs that have no usage ledger,
- * so a run is never counted twice during rolling upgrades.
- */
+/** Aggregates immutable usage and cost ledger rows. */
 export function aggregateAgentUsageOverview(
   runs: readonly AgentUsageOverviewRun[],
   days: UsageRangeDays,
@@ -445,7 +393,6 @@ export function aggregateAgentUsageOverview(
   let estimatedUsdTicks = 0;
   let unattributedUsdTicks = 0;
   let ledgerRuns = 0;
-  let legacyRuns = 0;
   let usageRecords = 0;
 
   const getProviderRow = (provider: UsageAttribution) => {
@@ -562,9 +509,7 @@ export function aggregateAgentUsageOverview(
 
     observedRunIds.add(run.id);
     const runProviders = new Set<UsageAttribution>();
-    const hasLedger = allUsageRecords.length > 0;
-
-    if (hasLedger) {
+    if (allUsageRecords.length > 0) {
       ledgerRuns += 1;
       if (windowUsageRecords.length > 0) reportedRunIds.add(run.id);
       usageRecords += windowUsageRecords.length;
@@ -596,27 +541,6 @@ export function aggregateAgentUsageOverview(
             point.totalTokens += usage.totalTokens;
             point.byProvider[attribution.provider].tokens += usage.totalTokens;
           }
-        }
-      }
-    } else if (runIsInWindow) {
-      const attribution = configuredAttribution(run);
-      const usage = legacyRunUsage(run, attribution.provider);
-      runProviders.add(attribution.provider);
-      const providerRow = getProviderRow(attribution.provider);
-      const modelRow = getModelRow(attribution);
-      addRunToRow(providerRow, run.id);
-      addRunToRow(modelRow, run.id);
-      if (usage.reported) {
-        legacyRuns += 1;
-        reportedRunIds.add(run.id);
-        if (attribution.model) configuredModelRunIds.add(run.id);
-        addUsage(totals, usage);
-        addUsage(providerRow, usage);
-        addUsage(modelRow, usage);
-        const point = dailyByKey.get(localDateKey(new Date(runTimestamp!)));
-        if (point) {
-          point.totalTokens += usage.totalTokens;
-          point.byProvider[attribution.provider].tokens += usage.totalTokens;
         }
       }
     }
@@ -703,7 +627,6 @@ export function aggregateAgentUsageOverview(
       (runId) => !actualModelRunIds.has(runId),
     ).length,
     ledgerRuns,
-    legacyRuns,
     usageRecords,
     activeDays: daily.filter((point) => point.runs > 0).length,
     providers: [...providerRows.values()]

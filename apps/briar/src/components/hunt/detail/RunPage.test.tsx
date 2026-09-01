@@ -41,6 +41,18 @@ const dashboardProps = {
     throw new Error("not implemented in this test");
   }
 };
+const emptyIssueMessageContract: Pick<
+  IssueMessage,
+  | "attachments"
+  | "proposedAction"
+  | "executionProposal"
+  | "skillExecutionProposal"
+> = {
+  attachments: [],
+  proposedAction: null,
+  executionProposal: null,
+  skillExecutionProposal: null,
+};
 const dashboardAgent: ProjectAgent = {
   id: "agent-1",
   projectId: demoDashboard.project.id,
@@ -146,6 +158,7 @@ function dashboardAgentSession(run: HuntRun, status: AutoHuntSession["status"] =
       summary: null
     }],
     startedAt: "2026-07-29T00:00:00.000Z",
+    updatedAt: status === "running" ? "2026-07-29T00:00:00.000Z" : "2026-07-29T00:10:00.000Z",
     completedAt: status === "running" ? null : "2026-07-29T00:10:00.000Z",
     conversationId: null,
     workspaceRoot: null,
@@ -1083,6 +1096,7 @@ describe("RunPage", () => {
   it("requires the user to accept a Project Agent rework proposal before revision", async () => {
     const proposalId = "abababab-abab-4bab-8bab-abababababab";
     const message: IssueMessage = {
+      ...emptyIssueMessageContract,
       id: "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd",
       runId: demoDashboard.runs[1].id,
       parentMessageId: null,
@@ -1157,6 +1171,7 @@ describe("RunPage", () => {
   it("requires acceptance before a Project Agent-created issue is persisted", async () => {
     const createdRunId = "30303030-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
     const message: IssueMessage = {
+      ...emptyIssueMessageContract,
       id: "10101010-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
       runId: demoDashboard.runs[1].id,
       parentMessageId: null,
@@ -1174,10 +1189,7 @@ describe("RunPage", () => {
         issue: {
           title: "후속 QA",
           description: "모바일 승인 흐름을 확인합니다.",
-          priority: 2,
-          // Older Agent replies can still carry queued. Approval semantics are
-          // nevertheless backlog-only and must be presented that way.
-          status: "queued"
+          priority: 2
         },
         status: "pending",
         acceptedAt: null,
@@ -1227,7 +1239,6 @@ describe("RunPage", () => {
     expect(container.textContent).toContain("후속 QA");
     expect(proposalCard?.textContent).toContain("백로그에만 생성");
     expect(proposalCard?.textContent).toContain("별도 승인 필요");
-    expect(proposalCard?.textContent).not.toContain("생성 상태: queued");
     expect(acceptButton?.textContent).toContain("수락하고 이슈 만들기");
     expect(acceptButton?.querySelector(".lucide-plus")).not.toBeNull();
     expect(onAccept).not.toHaveBeenCalled();
@@ -1279,6 +1290,7 @@ describe("RunPage", () => {
       delegatedByAgentName: null
     };
     const message: IssueMessage = {
+      ...emptyIssueMessageContract,
       id: "10101010-cccc-4ccc-8ccc-cccccccccccc",
       runId: conversationRun.id,
       parentMessageId: null,
@@ -1296,8 +1308,7 @@ describe("RunPage", () => {
         issue: {
           title: targetRun.title,
           description: "생성과 실행 경계를 분리합니다.",
-          priority: 2,
-          status: "backlog"
+          priority: 2
         },
         executeAfterCreate: true,
         status: "pending",
@@ -1315,6 +1326,7 @@ describe("RunPage", () => {
       resultRunId: targetRun.id
     };
     const materializedMessage: IssueMessage = {
+      ...emptyIssueMessageContract,
       ...message,
       proposedAction: acceptedCreate,
       executionProposal

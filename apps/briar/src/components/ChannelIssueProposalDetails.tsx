@@ -1,58 +1,31 @@
-import * as Option from "effect/Option";
 import { useState } from "react";
 import { useI18n } from "../i18n";
 import {
-  decodeChannelIssueBatchProposalPayloadOption,
-  decodeChannelIssueProposalPayloadOption,
   type ChannelMessageProposal,
 } from "../lib/channels-contract";
 
 export function channelIssueProposalDetails(
   proposal: ChannelMessageProposal | null | undefined,
 ) {
-  if (proposal?.actionType !== "request_issue_create") return null;
-  return Option.match(
-    decodeChannelIssueProposalPayloadOption(proposal.payload),
-    {
-      onNone: () => null,
-      onSome: (payload) => payload.issue,
-    },
-  );
+  return proposal && "issue" in proposal.payload
+    ? proposal.payload.issue
+    : null;
 }
 
 export function channelIssueBatchProposalDetails(
   proposal: ChannelMessageProposal | null | undefined,
 ) {
-  if (proposal?.actionType !== "request_issue_create") return null;
-  return Option.match(
-    decodeChannelIssueBatchProposalPayloadOption(proposal.payload),
-    {
-      onNone: () => null,
-      onSome: (payload) => payload.batch,
-    },
-  );
-}
-
-export function channelIssueProposalIsValid(
-  proposal: ChannelMessageProposal | null | undefined,
-) {
-  return Boolean(
-    channelIssueProposalDetails(proposal) ||
-      channelIssueBatchProposalDetails(proposal),
-  );
+  return proposal && "batch" in proposal.payload
+    ? proposal.payload.batch
+    : null;
 }
 
 export function channelIssueProposalRequestsExecution(
   proposal: ChannelMessageProposal | null | undefined,
 ) {
-  if (proposal?.actionType !== "request_issue_create") return false;
-  return Option.match(
-    decodeChannelIssueProposalPayloadOption(proposal.payload),
-    {
-      onNone: () => false,
-      onSome: (payload) => payload.executeAfterCreate,
-    },
-  );
+  return proposal && "issue" in proposal.payload
+    ? proposal.payload.executeAfterCreate
+    : false;
 }
 
 export function ChannelIssueProposalDetails({
@@ -75,7 +48,7 @@ export function ChannelIssueProposalDetails({
 
   if (batch) {
     const resultByKey = new Map(
-      (proposal.resultItems ?? []).map((item) => [item.localKey, item.runId]),
+      proposal.resultItems.map((item) => [item.localKey, item.runId]),
     );
     return (
       <div className="channel-proposal-details channel-batch-proposal-details">

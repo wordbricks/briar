@@ -1,50 +1,40 @@
 import { access, mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { create } from "@bufbuild/protobuf";
+import { QueuedAttachmentSchema } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { channelReplyClaimTokenHeader } from "../src/lib/channels-contract";
 import {
   channelReplyImageDirectory,
-  channelReplyImagesForTrigger,
+  channelReplyImages,
   cleanupChannelReplyImages,
   downloadChannelReplyImages,
 } from "./channel-reply-images";
 
-const triggerMessageId = "11111111-1111-4111-8111-111111111111";
 const attachmentId = "22222222-2222-4222-8222-222222222222";
 const workId = "33333333-3333-4333-8333-333333333333";
 const organizationId = "44444444-4444-4444-8444-444444444444";
 const imageBytes = new Uint8Array([137, 80, 78, 71]);
 const maxChannelReplyImageBytes = 20 * 1024 * 1024;
-const snapshot = {
-  snapshotVersion: 2,
-  messages: [
-    {
-      id: "55555555-5555-4555-8555-555555555555",
-      attachments: [
-        {
-          id: "66666666-6666-4666-8666-666666666666",
-          filename: "unrelated.mov",
-          contentType: "video/quicktime",
-          byteSize: imageBytes.byteLength,
-        },
-      ],
-    },
-    {
-      id: triggerMessageId,
-      body: "@briar inspect this",
-      attachments: [
-        {
-          id: attachmentId,
-          filename: "private screen.png",
-          contentType: "image/png",
-          byteSize: imageBytes.byteLength,
-          private: true,
-        },
-      ],
-    },
-  ],
-};
+const attachmentUrl =
+  `/organizations/${organizationId}/channel-reply-claims/${workId}/attachments/${attachmentId}`;
+
+const imageAttachment = (overrides: {
+  id?: string;
+  filename?: string;
+  contentType?: string;
+  byteSize?: number;
+  url?: string;
+} = {}) => create(QueuedAttachmentSchema, {
+  id: overrides.id ?? attachmentId,
+  filename: overrides.filename ?? "private screen.png",
+  contentType: overrides.contentType ?? "image/png",
+  byteSize: overrides.byteSize ?? imageBytes.byteLength,
+  url: overrides.url ?? attachmentUrl,
+});
+
+const triggerAttachments = () => [imageAttachment()];
 
 const temporaryDirectories: string[] = [];
 
@@ -63,56 +53,21 @@ afterEach(async () => {
 });
 
 describe("channel reply image inputs", () => {
-  it("selects mutable normalized images from a passthrough snapshot", () => {
-    const images = channelReplyImagesForTrigger(snapshot, triggerMessageId);
-
-    expect(images).toEqual([
-      {
-        id: attachmentId,
-        filename: "private screen.png",
-        contentType: "image/png",
-        byteSize: imageBytes.byteLength,
-      },
-    ]);
-    images[0]!.filename = "renamed.png";
-    images.push({
-      id: "77777777-7777-4777-8777-777777777777",
-      filename: "second.webp",
-      contentType: "image/webp",
-      byteSize: 1,
-    });
-    expect(images).toHaveLength(2);
-  });
-
-  it("rejects invalid image identities, sizes, and batch lengths", () => {
-    const trigger = snapshot.messages[1]!;
-    for (const attachment of [
-      { ...trigger.attachments[0], id: "not-a-uuid" },
-      { ...trigger.attachments[0], byteSize: 0 },
-      { ...trigger.attachments[0], byteSize: 1.5 },
-      { ...trigger.attachments[0], byteSize: maxChannelReplyImageBytes + 1 },
-    ]) {
-      expect(() =>
-        channelReplyImagesForTrigger({
-          messages: [{ ...trigger, attachments: [attachment] }],
-        }, triggerMessageId)
-      ).toThrow();
-    }
-
-    expect(() =>
-      channelReplyImagesForTrigger({
-        messages: [{
-          ...trigger,
-          attachments: Array.from(
-            { length: 6 },
-            (_, index) => ({
-              ...trigger.attachments[0],
-              id: `77777777-7777-4777-8777-${String(index).padStart(12, "0")}`,
-            }),
-          ),
-        }],
-      }, triggerMessageId)
-    ).toThrow();
+  it("enforces the bounded image policy on generated attachment metadata", () => {
+    const attachment = imageAttachment();
+    expect(channelReplyImages([attachment])).toEqual([attachment]);
+    expect(() => channelReplyImages([
+      imageAttachment({ contentType: "image/svg+xml" }),
+    ])).toThrow("unsupported");
+    expect(() => channelReplyImages([
+      imageAttachment({ byteSize: maxChannelReplyImageBytes + 1 }),
+    ])).toThrow("20MB");
+    expect(() => channelReplyImages(Array.from(
+      { length: 6 },
+      (_, index) => imageAttachment({
+        id: `77777777-7777-4777-8777-${String(index).padStart(12, "0")}`,
+      }),
+    ))).toThrow("최대 5개");
   });
 
   it("downloads a claimed image with Worker and claim credentials", async () => {
@@ -138,8 +93,7 @@ describe("channel reply image inputs", () => {
       organizationId,
       workId,
       claimToken: "briar_channel_claim_secret",
-      triggerMessageId,
-      snapshot,
+      triggerAttachments: triggerAttachments(),
       workspacePath,
       fetcher,
     });
@@ -160,6 +114,23 @@ describe("channel reply image inputs", () => {
     expect((await stat(downloaded.paths[0])).mode & 0o777).toBe(0o600);
   });
 
+  it("does not send claim credentials to a server-issued URL outside the claim", async () => {
+    const workspacePath = await temporaryWorkspace();
+    const fetcher = vi.fn();
+    await expect(downloadChannelReplyImages({
+      apiUrl: "https://api.example",
+      workerToken: "briar_worker_secret",
+      organizationId,
+      workId,
+      claimToken: "briar_channel_claim_secret",
+      triggerAttachments: [imageAttachment({ url: "https://evil.example/private.png" })],
+      workspacePath,
+      fetcher,
+    })).rejects.toThrow("outside the active claim scope");
+    expect(fetcher).not.toHaveBeenCalled();
+    await expect(access(channelReplyImageDirectory(workspacePath))).rejects.toThrow();
+  });
+
   it("removes a partial private download when validation fails", async () => {
     const workspacePath = await temporaryWorkspace();
     await expect(
@@ -169,8 +140,7 @@ describe("channel reply image inputs", () => {
         organizationId,
         workId,
         claimToken: "briar_channel_claim_secret",
-        triggerMessageId,
-        snapshot,
+        triggerAttachments: triggerAttachments(),
         workspacePath,
         fetcher: async () =>
           new Response(new Uint8Array([1]), {
@@ -191,8 +161,7 @@ describe("channel reply image inputs", () => {
       organizationId,
       workId,
       claimToken: "briar_channel_claim_secret",
-      triggerMessageId,
-      snapshot,
+      triggerAttachments: triggerAttachments(),
       workspacePath,
       fetcher,
     });
@@ -213,8 +182,7 @@ describe("channel reply image inputs", () => {
       organizationId,
       workId,
       claimToken: "briar_channel_claim_secret",
-      triggerMessageId,
-      snapshot,
+      triggerAttachments: triggerAttachments(),
       workspacePath,
       fetcher: async () =>
         new Response(imageBytes, { headers: { "Content-Type": "image/png" } }),

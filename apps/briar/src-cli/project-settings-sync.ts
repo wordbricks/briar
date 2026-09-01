@@ -1,38 +1,17 @@
-import * as Schema from "effect/Schema";
+import { DashboardService } from "@briar/contracts/gen/briar/app/v1/dashboard_pb";
 import { isRepositoryWorkflowPending } from "../src/lib/auto-hunt-contract";
+import { projectSettingsFromProto } from "../src/lib/app-rpc/project-configuration-mappers";
+import { requiredMessage } from "../src/lib/app-rpc/mappers";
+import type { ProjectSettings } from "../src/types";
 import {
   type Config,
   type ProjectConfig,
-  WorkflowConfig,
 } from "./config-contract";
-import { request } from "./command-support";
+import { createAuthenticatedConnectClient } from "./connect-client";
 
-const nullableString = Schema.NullOr(Schema.String);
-
-const ProjectSettingsResponse = Schema.Struct({
-  settings: Schema.Struct({
-    velenOrg: nullableString,
-    dataSource: nullableString,
-    linear: Schema.Struct({
-      enabled: Schema.Boolean,
-      source: nullableString,
-      teamKey: nullableString,
-    }),
-    githubRepository: nullableString,
-    githubRepositoryId: Schema.optional(Schema.NullOr(
-      Schema.Int.check(Schema.isGreaterThan(0)),
-    )),
-    workflow: WorkflowConfig,
-  }).annotate({ parseOptions: { onExcessProperty: "preserve" } }),
-}).annotate({ parseOptions: { onExcessProperty: "preserve" } });
-
-const decodeProjectSettingsResponse = Schema.decodeUnknownSync(
-  ProjectSettingsResponse,
-  { errors: "all" },
-);
-
-export type RemoteProjectSettings =
-  typeof ProjectSettingsResponse.Type["settings"];
+export type RemoteProjectSettings = Omit<ProjectSettings, "githubRepositoryId"> & {
+  readonly githubRepositoryId?: number | null;
+};
 
 export type FetchRemoteProjectSettings = (
   apiUrl: string,
@@ -45,12 +24,14 @@ export const fetchRemoteProjectSettings: FetchRemoteProjectSettings = async (
   projectId,
   userToken,
 ) => {
-  const response = await request<unknown>(
+  const response = await createAuthenticatedConnectClient(
+    DashboardService,
     apiUrl,
-    `/projects/${projectId}/settings`,
     userToken,
+  ).getDashboard({ projectId });
+  return projectSettingsFromProto(
+    requiredMessage(response.settings, "dashboard.settings"),
   );
-  return decodeProjectSettingsResponse(response).settings;
 };
 
 export function projectWithRemoteSettings(

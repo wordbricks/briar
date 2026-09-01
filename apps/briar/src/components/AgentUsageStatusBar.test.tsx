@@ -4,7 +4,7 @@ import { act } from "react";
 import { createReactTestRoot } from "../test/react";
 import { describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../i18n";
-import type { AgentUsageSnapshot } from "../lib/agent-usage";
+import type { AgentUsageSnapshot } from "../generated/tauri";
 import { defaultAppProviderSettings } from "../lib/project-llm";
 import { AgentUsageStatusBar } from "./AgentUsageStatusBar";
 
@@ -25,6 +25,8 @@ const snapshot: AgentUsageSnapshot = {
     },
     monthly: null,
     planType: null,
+    accountLabel: null,
+    authenticated: true,
     updatedAt: 1,
     error: null,
   },
@@ -43,6 +45,8 @@ const snapshot: AgentUsageSnapshot = {
     },
     monthly: null,
     planType: "plus",
+    accountLabel: null,
+    authenticated: true,
     updatedAt: 1,
     error: null,
   },
@@ -57,6 +61,8 @@ const snapshot: AgentUsageSnapshot = {
     },
     monthly: null,
     planType: "SuperGrok",
+    accountLabel: null,
+    authenticated: true,
     updatedAt: 1,
     error: null,
   },
@@ -71,6 +77,8 @@ const snapshot: AgentUsageSnapshot = {
     weekly: null,
     monthly: null,
     planType: null,
+    accountLabel: null,
+    authenticated: true,
     updatedAt: 1,
     error: null,
   },
@@ -81,6 +89,8 @@ const snapshot: AgentUsageSnapshot = {
     weekly: null,
     monthly: null,
     planType: null,
+    accountLabel: null,
+    authenticated: false,
     updatedAt: 1,
     error: null,
   },
@@ -91,6 +101,8 @@ const snapshot: AgentUsageSnapshot = {
     weekly: null,
     monthly: null,
     planType: null,
+    accountLabel: null,
+    authenticated: false,
     updatedAt: 1,
     error: null,
   },
@@ -105,6 +117,8 @@ const snapshot: AgentUsageSnapshot = {
       resetsAt: Date.now() + 12 * 86_400_000,
     },
     planType: "Pro",
+    accountLabel: null,
+    authenticated: true,
     updatedAt: 1,
     error: null,
   },

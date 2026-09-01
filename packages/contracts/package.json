@@ -1,0 +1,14 @@
+{
+  "name": "@briar/contracts",
+  "version": "0.0.0",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./descriptor-fingerprint": "./src/descriptor-fingerprint.ts",
+    "./gen/*": "./src/gen/*.ts"
+  },
+  "dependencies": {
+    "@bufbuild/protobuf": "catalog:"
+  }
+}

@@ -1,7 +1,5 @@
-import type {
-  ProjectAgentRunInput,
-  ProjectAgentRunResponse,
-} from "./project-llm";
+import type { ProjectAgentRunInput } from "./project-llm";
+import type { ProjectAgentRunResponse } from "../generated/tauri";
 import { projectAgentRunSnapshots } from "./project-llm";
 import type {
   DashboardPayload,

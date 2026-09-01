@@ -6,17 +6,6 @@ export type DmLearningEnvironment = {
   DM_MEMORY_LEARNING_POLICIES?: string;
 };
 const policies = Schema.Record(Schema.String.check(Schema.isUUID()), DmLearningPolicy);
-const workerCapability = Schema.Struct({ dmMemory: Schema.Struct({ protocol: Schema.Literal(1) }),
-  dmMemoryLearning: Schema.Struct({ protocol: Schema.Literal(1), transport: Schema.Literal("openrouter") }) });
-const requestCapability = Schema.Struct({ dmMemory: Schema.Struct({
-  protocol: Schema.Literal(1), learningRequests: Schema.Literal(1),
-}) });
-
-export function supportsDmMemoryLearningRequests(capabilitiesJson: string) {
-  try { return Schema.is(requestCapability)(JSON.parse(capabilitiesJson)); }
-  catch { return false; }
-}
-
 export function dmLearningPolicy(env: DmLearningEnvironment, organizationId: string): DmLearningPolicy | null {
   if (env.DM_MEMORY_LEARNING_ENABLED !== "true" || !env.DM_MEMORY_LEARNING_POLICIES) return null;
   try {
@@ -28,11 +17,6 @@ export function dmLearningPolicy(env: DmLearningEnvironment, organizationId: str
     }
     return policy;
   } catch { return null; }
-}
-
-export function supportsDmMemoryLearning(capabilitiesJson: string) {
-  try { return Schema.is(workerCapability)(JSON.parse(capabilitiesJson)); }
-  catch { return false; }
 }
 
 export { dmLearningCallReservation } from "../../src/lib/dm-memory-learning-prompts";

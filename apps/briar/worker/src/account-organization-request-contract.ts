@@ -86,12 +86,6 @@ export const InboxUnreadStateInput = strictSchema(Schema.Struct({
   messageId: InboxReadStateMessageId,
 }));
 
-export const ProjectAgentScheduleBatchClaim = strictSchema(Schema.Struct({
-  projectIds: Schema.mutable(Schema.Array(UuidString)).check(
-    Schema.isLengthBetween(1, 100),
-  ),
-}));
-
 export const AccountDeletionInput = strictSchema(Schema.Struct({
   confirmation: Email,
 }));
@@ -121,20 +115,13 @@ export const OrganizationLogoInput = strictSchema(Schema.Struct({
   ),
 }));
 
-export const OrganizationMemberInput = Schema.Struct({
-  email: Email,
-  role: defaulted(
-    Schema.Literals(["co-owner", "developer", "editor", "viewer"]),
-    "viewer",
-  ),
-});
+export const OrganizationInvitationToken = Schema.Trim.check(
+  Schema.isPattern(/^briar_invite_[0-9a-f]{64}$/u),
+);
 
 export const OrganizationInvitationInput = strictSchema(Schema.Struct({
   email: LowercaseEmail,
-  role: defaulted(
-    Schema.Literals(["co-owner", "developer", "editor", "viewer"]),
-    "viewer",
-  ),
+  role: Schema.Literals(["co-owner", "developer", "editor", "viewer"]),
   initialProjectId: UuidString,
 }));
 
@@ -159,9 +146,6 @@ export const decodeInboxReadStatesInput = decodeRequestSync(
 export const decodeInboxUnreadStateInput = decodeRequestSync(
   InboxUnreadStateInput,
 );
-export const decodeProjectAgentScheduleBatchClaim = decodeRequestSync(
-  ProjectAgentScheduleBatchClaim,
-);
 export const decodeAccountDeletionInput = decodeRequestSync(
   AccountDeletionInput,
 );
@@ -173,8 +157,8 @@ export const decodeOrganizationUpdateInput = decodeRequestSync(
 export const decodeOrganizationLogoInput = decodeRequestSync(
   OrganizationLogoInput,
 );
-export const decodeOrganizationMemberInput = decodeRequestSync(
-  OrganizationMemberInput,
+export const decodeOrganizationInvitationToken = decodeRequestSync(
+  OrganizationInvitationToken,
 );
 export const decodeOrganizationInvitationInput = decodeRequestSync(
   OrganizationInvitationInput,

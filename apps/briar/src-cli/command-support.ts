@@ -1,8 +1,10 @@
 import {
   chmod,
   mkdir,
+  open,
   readFile,
-  writeFile,
+  rename,
+  rm,
 } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import {
@@ -16,8 +18,10 @@ import {
 } from "node:path";
 import packageJson from "../../../package.json";
 import { type AgentProvider } from "../src/lib/agent-provider";
-import { type TranscriptBatchEvent } from "./transcript-batcher";
-import { HttpRequestError } from "./execution-metrics-upload";
+import {
+  createDeviceAuthorizationClient,
+  type DeviceAuthorizationClient,
+} from "../src/lib/device-authorization-client";
 import {
   defaultWorktreeRoot,
   samePath,
@@ -30,15 +34,16 @@ import {
 } from "./config-environment";
 import {
   configErrorLocations,
-  decodeConfig,
+  decodeConfigJson,
+  encodeConfigJson,
   type Config,
   type ProjectConfig,
 } from "./config-contract";
-import { httpErrorMessage } from "./command-contract";
 import {
   configuredManagedComputerCredentialPath,
   loadOptionalManagedComputerCredential,
 } from "./managed-computer-credential";
+import { fetchCurrentUser } from "./app-connect-client";
 
 const openRouterOpenCodeConfig = JSON.stringify({
   provider: {
@@ -135,15 +140,9 @@ async function loadConfig(): Promise<Config> {
     );
   }
 
-  let storedConfig: unknown;
-  try {
-    storedConfig = JSON.parse(contents);
-  } catch {
-    throw new Error("Briar 로컬 설정이 올바른 JSON이 아닙니다.");
-  }
   let config: Config;
   try {
-    config = decodeConfig(storedConfig);
+    config = decodeConfigJson(contents);
   } catch (error) {
     const locations = configErrorLocations(error);
     throw new Error(
@@ -173,49 +172,24 @@ async function saveConfig(config: Config) {
 async function saveConfigAt(directory: string, config: Config) {
   const path = join(directory, "config.json");
   await mkdir(directory, { recursive: true, mode: 0o700 });
-  await writeFile(path, `${JSON.stringify(config, null, 2)}\n`, {
-    mode: 0o600,
-  });
-  await chmod(path, 0o600);
+  await chmod(directory, 0o700);
+  const temporaryPath = join(
+    directory,
+    `.config.${process.pid}.${crypto.randomUUID()}.tmp`,
+  );
+  const file = await open(temporaryPath, "wx", 0o600);
+  try {
+    await file.writeFile(encodeConfigJson(config), "utf8");
+    await file.sync();
+    await file.close();
+    await rename(temporaryPath, path);
+    await chmod(path, 0o600);
+  } catch (error) {
+    await file.close().catch(() => undefined);
+    await rm(temporaryPath, { force: true }).catch(() => undefined);
+    throw error;
+  }
 }
-
-async function request<T>(
-  apiUrl: string,
-  path: string,
-  token: string | null,
-  init?: RequestInit,
-): Promise<T> {
-  const headers = new Headers(init?.headers);
-  if (!headers.has("Accept")) headers.set("Accept", "application/json");
-  if (!(init?.body instanceof FormData) && !headers.has("Content-Type")) {
-    headers.set("Content-Type", "application/json");
-  }
-  if (token && !headers.has("Authorization")) {
-    headers.set("Authorization", `Bearer ${token}`);
-  }
-  const response = await fetch(`${apiUrl.replace(/\/$/u, "")}${path}`, {
-    ...init,
-    headers,
-  });
-  const body: unknown = await response.json().catch(() => null);
-  if (!response.ok) {
-    throw new HttpRequestError(
-      httpErrorMessage(body) ||
-        `request failed (${response.status})`,
-      response.status,
-      body,
-    );
-  }
-  return body as T;
-}
-
-const serializeTranscriptRequest = (
-  envelope: Record<string, unknown>,
-  events: TranscriptBatchEvent[],
-) => JSON.stringify({ ...envelope, events });
-
-const isTranscriptPayloadTooLarge = (error: unknown) =>
-  error instanceof HttpRequestError && error.status === 413;
 
 type BrowserLaunchHandle = {
   exited: Promise<number | null>;
@@ -283,9 +257,12 @@ function openBrowser(url: string, dependencies: OpenBrowserDependencies = {}) {
 }
 
 type LoginDependencies = {
+  createDeviceAuthorizationClient: (
+    apiUrl: string,
+  ) => DeviceAuthorizationClient;
+  fetchCurrentUser: typeof fetchCurrentUser;
   loadConfig: typeof loadConfig;
   openBrowser: (url: string) => void;
-  request: typeof request;
   saveConfig: typeof saveConfig;
   sleep: (milliseconds: number) => Promise<void>;
   writeLine: (message: string) => void;
@@ -296,9 +273,10 @@ async function login(
   dependencyOverrides: Partial<LoginDependencies> = {},
 ) {
   const dependencies: LoginDependencies = {
+    createDeviceAuthorizationClient,
+    fetchCurrentUser,
     loadConfig,
     openBrowser,
-    request,
     saveConfig,
     sleep: (milliseconds) => Bun.sleep(milliseconds),
     writeLine: console.log,
@@ -314,61 +292,44 @@ async function login(
         : undefined,
     }
     : loaded;
-  const code = await dependencies.request<{
-    device_code: string;
-    user_code: string;
-    verification_uri: string;
-    verification_uri_complete?: string;
-    interval?: number;
-  }>(config.apiUrl, "/api/auth/device/code", null, {
-    method: "POST",
-    body: JSON.stringify({ client_id: "briar-cli", scope: "openid profile email" }),
-  });
-  dependencies.writeLine(`Briar 로그인 코드: ${code.user_code}`);
-  dependencies.writeLine("시스템 브라우저에서 로그인하고 기기 승인을 완료하세요.");
-  dependencies.openBrowser(
-    code.verification_uri_complete ?? code.verification_uri,
+  const deviceAuthorization = dependencies.createDeviceAuthorizationClient(
+    config.apiUrl,
   );
+  const code = await deviceAuthorization.requestCode({
+    clientId: "briar-cli",
+    scope: "openid profile email",
+  });
+  dependencies.writeLine(`Briar 로그인 코드: ${code.userCode}`);
+  dependencies.writeLine("시스템 브라우저에서 로그인하고 기기 승인을 완료하세요.");
+  dependencies.openBrowser(code.verificationUriComplete);
 
-  let interval = (code.interval ?? 5) * 1_000;
+  let interval = code.interval * 1_000;
   for (;;) {
     await dependencies.sleep(interval);
-    try {
-      const token = await dependencies.request<{ access_token?: string }>(
-        config.apiUrl,
-        "/api/auth/device/token",
-        null,
-        {
-          method: "POST",
-          body: JSON.stringify({
-            grant_type: "urn:ietf:params:oauth:grant-type:device_code",
-            device_code: code.device_code,
-            client_id: "briar-cli",
-          }),
-        },
-      );
-      if (!token.access_token) continue;
-      config.userToken = token.access_token;
-      await dependencies.saveConfig(config);
-      const me = await dependencies.request<{
-        user: { name: string; email: string };
-      }>(
-        config.apiUrl,
-        "/me",
-        token.access_token,
-      );
-      dependencies.writeLine(
-        `${me.user.name} (${me.user.email}) 계정으로 로그인했습니다.`,
-      );
-      return;
-    } catch (error) {
-      const message = error instanceof Error ? error.message.toLowerCase() : String(error);
-      if (message.includes("pending")) continue;
-      if (message.includes("slow")) {
+    const token = await deviceAuthorization.pollToken({
+      deviceCode: code.deviceCode,
+      clientId: "briar-cli",
+    });
+    switch (token.status) {
+      case "authorization_pending":
+        continue;
+      case "slow_down":
         interval += 5_000;
         continue;
-      }
-      throw error;
+      case "access_denied":
+      case "expired_token":
+        throw new Error(token.description);
+      case "authorized":
+        config.userToken = token.accessToken;
+        await dependencies.saveConfig(config);
+        const user = await dependencies.fetchCurrentUser(
+          config.apiUrl,
+          token.accessToken,
+        );
+        dependencies.writeLine(
+          `${user.name} (${user.email}) 계정으로 로그인했습니다.`,
+        );
+        return;
     }
   }
 }
@@ -492,9 +453,6 @@ export {
   loadConfig,
   saveConfig,
   saveConfigAt,
-  request,
-  serializeTranscriptRequest,
-  isTranscriptPayloadTooLarge,
   openBrowser,
   type LoginDependencies,
   login,

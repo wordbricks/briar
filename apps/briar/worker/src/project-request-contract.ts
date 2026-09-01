@@ -1,5 +1,4 @@
 import * as Schema from "effect/Schema";
-import * as SchemaGetter from "effect/SchemaGetter";
 import * as SchemaTransformation from "effect/SchemaTransformation";
 import { ModelEffort } from "../../src/lib/agent-provider-contract";
 import { agentProviders } from "../../src/lib/agent-provider";
@@ -30,45 +29,14 @@ import {
   mutableArray,
   NonNegativeSafeInteger,
   strictSchema,
+  strictSchemaOptions,
   trimmedText,
   UuidString,
 } from "./schema-codecs";
 import { decodeRequestSync } from "./request-schema";
 
-const projectImagePattern =
+const agentImagePattern =
   /^data:image\/(?:jpeg|png|webp);base64,[a-z0-9+/]+={0,2}$/iu;
-const maxProjectIconDataUrlLength = 400_000;
-
-export const ProjectInput = Schema.Struct({
-  name: trimmedText(1, 100),
-  organizationId: Schema.optional(UuidString),
-});
-
-export const ProjectIconInput = strictSchema(Schema.Struct({
-  icon: Schema.NullOr(
-    Schema.String.check(
-      Schema.isMaxLength(maxProjectIconDataUrlLength),
-      Schema.isPattern(projectImagePattern),
-    ),
-  ),
-}));
-
-const UppercaseTrimmed = Schema.Trim.pipe(
-  Schema.decode({
-    decode: SchemaGetter.transform((value) => value.toUpperCase()),
-    encode: SchemaGetter.transform((value) => value.toUpperCase()),
-  }),
-);
-
-export const ProjectIssueKeyPrefixInput = strictSchema(Schema.Struct({
-  issueKeyPrefix: UppercaseTrimmed.check(
-    Schema.isPattern(/^[A-Z0-9]{1,3}$/u),
-  ),
-}));
-
-export const ProjectTabsInput = strictSchema(Schema.Struct({
-  schedule: Schema.Boolean,
-}));
 
 export const ProjectTransferInput = Schema.Struct({
   targetProjectId: UuidString,
@@ -109,7 +77,7 @@ export const ProjectAgentInput = strictSchema(Schema.Struct({
   avatar: Schema.optional(Schema.NullOr(
     Schema.String.check(
       Schema.isMaxLength(400_000),
-      Schema.isPattern(projectImagePattern),
+      Schema.isPattern(agentImagePattern),
     ),
   )),
   codexPet: Schema.optional(Schema.NullOr(CodexPetSelection)),
@@ -162,7 +130,7 @@ const ProjectAgentSessionIssue = strictSchema(Schema.Struct({
 }));
 
 export const ProjectAgentSessionInput = strictSchema(Schema.Struct({
-  dispatchGroupId: Schema.String.check(Schema.isMaxLength(128)),
+  dispatchGroupId: Schema.String.check(Schema.isLengthBetween(1, 128)),
   agentId: Schema.NullOr(UuidString),
   agentName: Schema.optional(Schema.NullOr(trimmedText(1, 200))),
   skillId: Schema.optional(Schema.NullOr(UuidString)),
@@ -205,6 +173,128 @@ export const ProjectAgentSessionInput = strictSchema(Schema.Struct({
   updatedAt: IsoDateTimeWithOffset,
 }));
 
+/**
+ * Internal session snapshots may carry the server-owned requester binding used
+ * to verify approved Agent Skill executions. It is intentionally absent from
+ * the public write contract above, so clients cannot set it.
+ */
+export const StoredProjectAgentSessionPayload = strictSchema(Schema.Struct({
+  ...ProjectAgentSessionInput.fields,
+  requestedByUserId: Schema.optional(
+    Schema.NullOr(Schema.String.check(Schema.isMaxLength(128))),
+  ),
+}));
+
+export type StoredProjectAgentSessionPayload =
+  typeof StoredProjectAgentSessionPayload.Type;
+
+export const storedProjectAgentSessionPayloadMaxBytes = 1_048_576;
+export const storedProjectAgentSessionSummaryMaxBytes = 262_144;
+
+const boundedJsonString = (maximumBytes: number) =>
+  Schema.String.check(
+    Schema.makeFilter((value) =>
+      new TextEncoder().encode(value).byteLength <= maximumBytes ||
+      `JSON must contain at most ${maximumBytes} bytes`
+    ),
+  );
+
+const storedJson = <S extends Schema.Constraint>(
+  schema: S,
+  maximumBytes: number,
+) =>
+  boundedJsonString(maximumBytes).pipe(
+    Schema.decodeTo(schema, SchemaTransformation.fromJsonString()),
+  );
+
+const StoredProjectAgentSessionPayloadJson = storedJson(
+  StoredProjectAgentSessionPayload,
+  storedProjectAgentSessionPayloadMaxBytes,
+);
+
+export const decodeStoredProjectAgentSessionPayload =
+  Schema.decodeUnknownSync(
+    StoredProjectAgentSessionPayloadJson,
+    strictSchemaOptions,
+  );
+
+export const encodeStoredProjectAgentSessionPayload = Schema.encodeSync(
+  StoredProjectAgentSessionPayloadJson,
+  strictSchemaOptions,
+);
+
+const StoredProjectAgentSessionSummaryIssue = strictSchema(Schema.Struct({
+  runId: Schema.String.check(Schema.isLengthBetween(1, 128)),
+  runNumber: NonNegativeSafeInteger,
+  sourceKey: Schema.String.check(Schema.isLengthBetween(1, 500)),
+  title: Schema.String.check(Schema.isLengthBetween(1, 500)),
+  outcome: Schema.Literals([
+    "pending",
+    "completed",
+    "blocked",
+    "failed",
+    "skipped",
+  ]),
+  summary: Schema.Null,
+}));
+
+export const StoredProjectAgentSessionSummary = strictSchema(Schema.Struct({
+  dispatchGroupId: Schema.String.check(Schema.isLengthBetween(1, 128)),
+  agentId: Schema.NullOr(UuidString),
+  agentName: Schema.NullOr(trimmedText(1, 200)),
+  skillId: Schema.NullOr(UuidString),
+  sessionType: Schema.Literals(["task", "dispatch"]),
+  trigger: Schema.NullOr(Schema.Literals(["manual", "scheduled"])),
+  scheduleId: Schema.NullOr(Schema.String.check(Schema.isMaxLength(128))),
+  scheduleRunId: Schema.NullOr(
+    Schema.String.check(Schema.isMaxLength(128)),
+  ),
+  parentSessionId: Schema.NullOr(
+    Schema.String.check(Schema.isMaxLength(128)),
+  ),
+  requestedByUserId: Schema.NullOr(
+    Schema.String.check(Schema.isMaxLength(128)),
+  ),
+  request: Schema.NullOr(Schema.String.check(Schema.isMaxLength(500))),
+  status: Schema.Literals([
+    "running",
+    "completed",
+    "failed",
+    "skipped",
+    "interrupted",
+  ]),
+  issues: mutableArray(StoredProjectAgentSessionSummaryIssue).check(
+    Schema.isMaxLength(100),
+  ),
+  startedAt: IsoDateTimeWithOffset,
+  completedAt: Schema.NullOr(IsoDateTimeWithOffset),
+  summary: Schema.NullOr(Schema.String.check(Schema.isMaxLength(2_000))),
+  error: Schema.NullOr(Schema.String.check(Schema.isMaxLength(2_000))),
+  requestedWorkerId: Schema.NullOr(
+    Schema.String.check(Schema.isMaxLength(128)),
+  ),
+  workerId: Schema.NullOr(Schema.String.check(Schema.isMaxLength(128))),
+  updatedAt: IsoDateTimeWithOffset,
+}));
+
+export type StoredProjectAgentSessionSummary =
+  typeof StoredProjectAgentSessionSummary.Type;
+
+const StoredProjectAgentSessionSummaryJson = storedJson(
+  StoredProjectAgentSessionSummary,
+  storedProjectAgentSessionSummaryMaxBytes,
+);
+
+export const decodeStoredProjectAgentSessionSummary = Schema.decodeUnknownSync(
+  StoredProjectAgentSessionSummaryJson,
+  strictSchemaOptions,
+);
+
+export const encodeStoredProjectAgentSessionSummary = Schema.encodeSync(
+  StoredProjectAgentSessionSummaryJson,
+  strictSchemaOptions,
+);
+
 export const ProjectAgentTaskInput = strictSchema(Schema.Struct({
   agentId: UuidString,
   skillId: Schema.optional(Schema.NullOr(UuidString)),
@@ -213,37 +303,16 @@ export const ProjectAgentTaskInput = strictSchema(Schema.Struct({
   requestId: UuidString,
 }));
 
-export const ProjectAgentTaskClaimInput = strictSchema(Schema.Struct({
-  projectId: UuidString,
-  workerId: trimmedText(1, 128),
-}));
-
-const AgentTaskClaimToken = Schema.String.check(
-  Schema.isStartsWith("briar_agent_task_claim_"),
-);
-
-export const ProjectAgentTaskLease = strictSchema(Schema.Struct({
-  projectId: UuidString,
-  workerId: trimmedText(1, 128),
-  claimToken: AgentTaskClaimToken,
-}));
-
-export const ProjectAgentTaskCompletion = strictSchema(Schema.Struct({
-  projectId: UuidString,
-  workerId: trimmedText(1, 128),
-  claimToken: AgentTaskClaimToken,
-  summary: Schema.optional(trimmedText(1, 50_000)),
+export const ProjectAgentTaskSuccess = strictSchema(Schema.Struct({
+  summary: trimmedText(1, 50_000),
   conversationId: Schema.optional(
     Schema.NullOr(Schema.Trim.check(Schema.isMaxLength(128))),
   ),
-  error: Schema.optional(trimmedText(1, 20_000)),
-}).check(
-  Schema.makeFilter((input) =>
-    Boolean(input.summary) !== Boolean(input.error)
-      ? undefined
-      : "Provide exactly one of summary or error"
-  ),
-));
+}));
+
+export const ProjectAgentTaskFailure = strictSchema(Schema.Struct({
+  error: trimmedText(1, 20_000),
+}));
 
 const ScheduleSource = strictSchema(Schema.Struct({
   agentId: UuidString,
@@ -354,12 +423,6 @@ export const ProjectAgentScheduleInput = ScheduleSource.pipe(
   ),
 );
 
-export const decodeProjectInput = decodeRequestSync(ProjectInput);
-export const decodeProjectIconInput = decodeRequestSync(ProjectIconInput);
-export const decodeProjectIssueKeyPrefixInput = decodeRequestSync(
-  ProjectIssueKeyPrefixInput,
-);
-export const decodeProjectTabsInput = decodeRequestSync(ProjectTabsInput);
 export const decodeProjectTransferInput = decodeRequestSync(
   ProjectTransferInput,
 );
@@ -377,14 +440,11 @@ export const decodeProjectAgentSessionInput = decodeRequestSync(
 export const decodeProjectAgentTaskInput = decodeRequestSync(
   ProjectAgentTaskInput,
 );
-export const decodeProjectAgentTaskClaimInput = decodeRequestSync(
-  ProjectAgentTaskClaimInput,
+export const decodeProjectAgentTaskSuccess = decodeRequestSync(
+  ProjectAgentTaskSuccess,
 );
-export const decodeProjectAgentTaskLease = decodeRequestSync(
-  ProjectAgentTaskLease,
-);
-export const decodeProjectAgentTaskCompletion = decodeRequestSync(
-  ProjectAgentTaskCompletion,
+export const decodeProjectAgentTaskFailure = decodeRequestSync(
+  ProjectAgentTaskFailure,
 );
 export const decodeProjectAgentScheduleInput = decodeRequestSync(
   ProjectAgentScheduleInput,

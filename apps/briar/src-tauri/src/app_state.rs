@@ -5,21 +5,46 @@ pub(super) struct StoredSession {
     pub(super) token: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(
+    Clone, Debug, Deserialize, Eq, PartialEq, Serialize, specta::Type, tauri_specta::Event,
+)]
 #[serde(rename_all = "camelCase")]
+#[tauri_specta(event_name = "inbox-notification-open")]
 pub(super) struct InboxNotificationTarget {
     pub(super) message_id: String,
     pub(super) project_id: String,
     pub(super) target_id: String,
-    pub(super) kind: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(super) kind: InboxNotificationKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) conversation_message_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) channel_message_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) root_message_id: Option<String>,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub(super) enum InboxNotificationKind {
+    Issue,
+    Conversation,
+    Session,
+    Channel,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, specta::Type)]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+#[serde(rename_all = "snake_case")]
+pub(super) enum InboxNotificationPermissionStatus {
+    Authorized,
+    Denied,
+    NotDetermined,
+    Unsupported,
+}
+
+#[derive(Clone, Serialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
+#[tauri_specta(event_name = "project-llm-progress")]
 pub(super) struct ProjectLlmProgressPayload {
     pub(super) request_id: String,
     pub(super) project_id: String,
@@ -67,36 +92,12 @@ impl ExitConfirmationState {
     }
 }
 
-#[derive(Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct CliProject {
-    pub(super) id: String,
-    pub(super) repository_path: String,
-    /// API environment that issued this project's agent token. Legacy entries
-    /// omit it and remain readable until the next connection save.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) api_url: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) repository_remote: Option<String>,
-    pub(super) agent_token: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) llm: Option<agent::ProjectLlmSettings>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) auto_hunt: Option<StoredAutoHuntConfig>,
-    #[serde(flatten)]
-    pub(super) extra: BTreeMap<String, serde_json::Value>,
-}
-
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct AutoHuntConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) velen_org: Option<String>,
-    #[serde(
-        default,
-        alias = "velenDataSource",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) data_source: Option<String>,
     pub(super) linear_enabled: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -111,7 +112,7 @@ pub(super) struct AutoHuntConfig {
     pub(super) workflow: WorkflowConfig,
 }
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct WorkflowConfig {
     pub(super) version: u8,
@@ -124,7 +125,7 @@ pub(super) struct WorkflowConfig {
     pub(super) completion: WorkflowCompletionConfig,
 }
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct WorkflowRequirementConfig {
     pub(super) id: String,
@@ -134,7 +135,7 @@ pub(super) struct WorkflowRequirementConfig {
     pub(super) reason: String,
 }
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub(super) enum WorkflowRequirementKind {
     Executable,
@@ -144,7 +145,7 @@ pub(super) enum WorkflowRequirementKind {
     AndroidEmulator,
 }
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct WorkflowStageConfig {
     pub(super) id: String,
@@ -156,7 +157,7 @@ pub(super) struct WorkflowStageConfig {
     pub(super) checks: Vec<String>,
 }
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct WorkflowCheckpointConfig {
     pub(super) key: String,
@@ -164,35 +165,35 @@ pub(super) struct WorkflowCheckpointConfig {
     pub(super) position: WorkflowCheckpointPosition,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq, specta::Type)]
 #[serde(rename_all = "lowercase")]
 pub(super) enum WorkflowCheckpointPosition {
     Before,
     After,
 }
 
-#[derive(Clone, Default, Deserialize, Serialize)]
+#[derive(Clone, Default, Deserialize, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct WorkflowCompletionConfig {
     #[serde(default)]
     pub(super) required_stages: Vec<String>,
 }
 
-#[derive(Clone, Default, Deserialize, Serialize)]
+#[derive(Clone, Default, Deserialize, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct WorkflowExecutionConfig {
     #[serde(default)]
     pub(super) checkpoints: Vec<WorkflowCheckpointConfig>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct ConnectedLocalProject {
     pub(super) repository_path: String,
     pub(super) workflow: WorkflowConfig,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct LocalProjectConnectionPreflight {
     pub(super) repository_path: String,
@@ -224,41 +225,7 @@ pub(super) fn repository_workflow_bootstrap() -> WorkflowConfig {
     }
 }
 
-#[derive(Default, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct StoredAutoHuntConfig {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) velen_org: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) data_source: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) linear: Option<StoredLinearConfig>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) github_repository_id: Option<u64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) github_repository: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) workflow: Option<WorkflowConfig>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) worktrees: Option<StoredWorktreeConfig>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) sandbox: Option<StoredSandboxConfig>,
-    #[serde(flatten)]
-    pub(super) extra: BTreeMap<String, serde_json::Value>,
-}
-
-/// Auto Hunt filesystem access. Full access is the default; an explicit
-/// `fullAccess: false` confines writes to the checkout and worktree root.
-#[derive(Clone, Default, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct StoredSandboxConfig {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) full_access: Option<bool>,
-    #[serde(flatten)]
-    pub(super) extra: BTreeMap<String, serde_json::Value>,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct ProjectSandboxSettings {
     pub(super) full_access: bool,
@@ -270,65 +237,14 @@ impl Default for ProjectSandboxSettings {
     }
 }
 
-/// Per-issue worktree settings owned by the CLI (`briar project configure`).
-/// The app only reads them, to learn which directory agents must be able to
-/// write in.
-#[derive(Clone, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct StoredWorktreeConfig {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) enabled: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) root: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) branch_prefix: Option<String>,
-    #[serde(flatten)]
-    pub(super) extra: BTreeMap<String, serde_json::Value>,
-}
-
-#[derive(Clone, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct StoredLinearConfig {
-    pub(super) enabled: bool,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) source: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) team_key: Option<String>,
-    #[serde(flatten)]
-    pub(super) extra: BTreeMap<String, serde_json::Value>,
-}
-
-impl From<AutoHuntConfig> for StoredAutoHuntConfig {
-    fn from(config: AutoHuntConfig) -> Self {
-        Self {
-            velen_org: config.velen_org,
-            data_source: config.data_source,
-            linear: Some(StoredLinearConfig {
-                enabled: config.linear_enabled,
-                source: config.linear_source,
-                team_key: config.linear_team,
-                extra: BTreeMap::new(),
-            }),
-            github_repository_id: config.github_repository_id,
-            github_repository: config.github_repository,
-            workflow: Some(canonicalize_workflow(config.workflow)),
-            // Worktree and sandbox settings belong to the CLI; callers carry the
-            // stored values over instead of letting an app-side save erase them.
-            worktrees: None,
-            sandbox: None,
-            extra: BTreeMap::new(),
-        }
-    }
-}
-
-#[derive(Serialize)]
+#[derive(Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct VelenOrganization {
     pub(super) name: String,
     pub(super) slug: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct VelenSource {
     pub(super) source_key: String,
@@ -337,7 +253,7 @@ pub(super) struct VelenSource {
     pub(super) status: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct VelenInspection {
     pub(super) authenticated: bool,
@@ -347,7 +263,7 @@ pub(super) struct VelenInspection {
     pub(super) sources: Vec<VelenSource>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct OnboardingPrerequisiteStatus {
     pub(super) installed: bool,
@@ -355,7 +271,7 @@ pub(super) struct OnboardingPrerequisiteStatus {
     pub(super) authenticated: bool,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, specta::Type)]
 pub(super) struct OnboardingPrerequisites {
     pub(super) git: OnboardingPrerequisiteStatus,
     pub(super) codex: OnboardingPrerequisiteStatus,
@@ -367,7 +283,7 @@ pub(super) struct OnboardingPrerequisites {
     pub(super) openrouter: OnboardingPrerequisiteStatus,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct AgentProviderModel {
     pub(super) id: String,
@@ -377,7 +293,7 @@ pub(super) struct AgentProviderModel {
     pub(super) efforts: Vec<AgentProviderEffort>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct AgentProviderEffort {
     pub(super) id: String,
@@ -386,7 +302,7 @@ pub(super) struct AgentProviderEffort {
     pub(super) is_default: bool,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct AgentProviderModelCatalogEntry {
     pub(super) models: Vec<AgentProviderModel>,
@@ -395,7 +311,7 @@ pub(super) struct AgentProviderModelCatalogEntry {
     pub(super) error: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, specta::Type)]
 pub(super) struct AgentProviderModelCatalog {
     pub(super) codex: AgentProviderModelCatalogEntry,
     pub(super) claude: AgentProviderModelCatalogEntry,
@@ -406,7 +322,7 @@ pub(super) struct AgentProviderModelCatalog {
     pub(super) openrouter: AgentProviderModelCatalogEntry,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct OpenCodeTerminalPathStatus {
     pub(super) supported: bool,
@@ -415,7 +331,7 @@ pub(super) struct OpenCodeTerminalPathStatus {
     pub(super) config_path: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct AgentBrowserStatus {
     pub(super) supported: bool,
@@ -424,7 +340,7 @@ pub(super) struct AgentBrowserStatus {
     pub(super) version: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct EgoBrowserStatus {
     pub(super) supported: bool,
@@ -433,7 +349,7 @@ pub(super) struct EgoBrowserStatus {
     pub(super) version: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct AsideBrowserStatus {
     pub(super) supported: bool,
@@ -445,7 +361,7 @@ pub(super) struct AsideBrowserStatus {
     pub(super) version: Option<String>,
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct RepositoryReadiness {
     pub(super) repository_path: String,
@@ -456,6 +372,7 @@ pub(super) struct RepositoryReadiness {
     pub(super) remote_reachable: bool,
     pub(super) push_access: bool,
     pub(super) requires_github: bool,
+    pub(super) github_repository_id: Option<u64>,
     pub(super) github_repository: Option<String>,
     pub(super) gh_installed: bool,
     pub(super) gh_version: Option<String>,
@@ -467,7 +384,23 @@ pub(super) struct RepositoryReadiness {
     pub(super) issues: Vec<String>,
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, specta::Type)]
+#[serde(rename_all = "kebab-case")]
+pub(super) enum LovableStack {
+    TanstackStart,
+    ViteReact,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, specta::Type)]
+#[serde(rename_all = "lowercase")]
+pub(super) enum LovablePackageManager {
+    Bun,
+    Npm,
+    Pnpm,
+    Yarn,
+}
+
+#[derive(Clone, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct ProjectGithubCredential {
     pub(super) project: ProjectGithubCredentialProject,
@@ -477,14 +410,14 @@ pub(super) struct ProjectGithubCredential {
     pub(super) expires_at: String,
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct ProjectGithubCredentialProject {
     pub(super) id: String,
     pub(super) organization_id: String,
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct ProjectGithubCredentialRepository {
     pub(super) id: u64,
@@ -492,7 +425,7 @@ pub(super) struct ProjectGithubCredentialRepository {
     pub(super) clone_url: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct PreparedProjectRepository {
     pub(super) repository_path: String,
@@ -502,17 +435,17 @@ pub(super) struct PreparedProjectRepository {
     pub(super) completed_steps: Vec<String>,
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct LovableRepositoryCompatibility {
     pub(super) compatible: bool,
-    pub(super) stack: Option<String>,
-    pub(super) package_manager: Option<String>,
+    pub(super) stack: Option<LovableStack>,
+    pub(super) package_manager: Option<LovablePackageManager>,
     pub(super) scripts: Vec<String>,
     pub(super) issues: Vec<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct AutoHuntHealth {
     pub(super) project_id: String,
@@ -538,7 +471,7 @@ pub(super) struct AutoHuntHealth {
     pub(super) issues: Vec<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct WorkflowRequirementHealth {
     pub(super) id: String,
@@ -550,36 +483,7 @@ pub(super) struct WorkflowRequirementHealth {
     pub(super) detail: String,
 }
 
-#[derive(Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct CliConfig {
-    pub(super) api_url: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) user_token: Option<String>,
-    #[serde(default)]
-    pub(super) agent_providers: AppProviderSettings,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) openrouter_api_key: Option<String>,
-    #[serde(default)]
-    pub(super) app_settings: StoredAppRuntimeSettings,
-    #[serde(default)]
-    pub(super) projects: Vec<CliProject>,
-    #[serde(flatten)]
-    pub(super) extra: BTreeMap<String, serde_json::Value>,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct StoredExecutionWorker {
-    pub(super) worker_id: String,
-    pub(super) device_id: String,
-    #[serde(default)]
-    pub(super) organization_id: Option<String>,
-    pub(super) label: String,
-    pub(super) max_concurrent_sessions: u32,
-}
-
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Debug, PartialEq, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct LocalExecutionWorkerStatus {
     pub(super) project_id: String,
@@ -590,16 +494,7 @@ pub(super) struct LocalExecutionWorkerStatus {
     pub(super) max_concurrent_sessions: Option<u32>,
 }
 
-#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct StoredAppRuntimeSettings {
-    #[serde(default)]
-    pub(super) prevent_sleep_while_running: bool,
-    #[serde(default)]
-    pub(super) browser_automation_provider: BrowserAutomationProvider,
-}
-
-#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize, specta::Type)]
 #[serde(rename_all = "kebab-case")]
 pub(super) enum BrowserAutomationProvider {
     #[default]
@@ -608,27 +503,27 @@ pub(super) enum BrowserAutomationProvider {
     Aside,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct BrowserAutomationSettings {
     pub(super) provider: BrowserAutomationProvider,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct AppRuntimeSettings {
     pub(super) prevent_sleep_while_running: bool,
     pub(super) prevent_sleep_supported: bool,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct AppRuntimeSettingsUpdate {
     pub(super) prevent_sleep_while_running: bool,
 }
 
-impl From<StoredAppRuntimeSettings> for AppRuntimeSettings {
-    fn from(settings: StoredAppRuntimeSettings) -> Self {
+impl From<LocalAppSettings> for AppRuntimeSettings {
+    fn from(settings: LocalAppSettings) -> Self {
         Self {
             prevent_sleep_while_running: settings.prevent_sleep_while_running,
             prevent_sleep_supported: cfg!(target_os = "macos"),
@@ -785,71 +680,51 @@ impl Drop for SleepPreventionState {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct AppProviderSettings {
-    #[serde(default = "enabled_by_default")]
-    pub(super) codex: bool,
-    #[serde(default = "enabled_by_default")]
-    pub(super) claude: bool,
-    #[serde(default = "enabled_by_default")]
-    pub(super) cursor: bool,
-    #[serde(default = "enabled_by_default")]
-    pub(super) grok: bool,
-    #[serde(default = "enabled_by_default")]
-    pub(super) agy: bool,
-    #[serde(default = "enabled_by_default")]
-    pub(super) opencode: bool,
-    #[serde(default = "enabled_by_default")]
-    pub(super) openrouter: bool,
-}
-
-#[derive(Clone, Copy, Debug, Serialize)]
+#[derive(Clone, Copy, Debug, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct OpenRouterCredentialStatus {
     pub(super) configured: bool,
 }
 
-impl Default for AppProviderSettings {
-    fn default() -> Self {
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct AppProviderSettings {
+    pub(super) codex: bool,
+    pub(super) claude: bool,
+    pub(super) cursor: bool,
+    pub(super) grok: bool,
+    pub(super) agy: bool,
+    pub(super) opencode: bool,
+    pub(super) openrouter: bool,
+}
+
+impl From<LocalAgentProviderSettings> for AppProviderSettings {
+    fn from(settings: LocalAgentProviderSettings) -> Self {
         Self {
-            codex: true,
-            claude: true,
-            cursor: true,
-            grok: true,
-            agy: true,
-            opencode: true,
-            openrouter: true,
+            codex: settings.codex,
+            claude: settings.claude,
+            cursor: settings.cursor,
+            grok: settings.grok,
+            agy: settings.agy,
+            opencode: settings.opencode,
+            openrouter: settings.openrouter,
         }
     }
 }
 
-impl AppProviderSettings {
-    pub(super) fn is_enabled(self, provider: agent::AgentProviderKind) -> bool {
-        match provider {
-            agent::AgentProviderKind::Codex => self.codex,
-            agent::AgentProviderKind::Claude => self.claude,
-            agent::AgentProviderKind::Cursor => self.cursor,
-            agent::AgentProviderKind::Grok => self.grok,
-            agent::AgentProviderKind::Agy => self.agy,
-            agent::AgentProviderKind::Opencode => self.opencode,
-            agent::AgentProviderKind::Openrouter => self.openrouter,
+impl From<AppProviderSettings> for LocalAgentProviderSettings {
+    fn from(settings: AppProviderSettings) -> Self {
+        Self {
+            codex: settings.codex,
+            claude: settings.claude,
+            cursor: settings.cursor,
+            grok: settings.grok,
+            agy: settings.agy,
+            opencode: settings.opencode,
+            openrouter: settings.openrouter,
+            ..Default::default()
         }
     }
-
-    pub(super) fn any_enabled(self) -> bool {
-        self.codex
-            || self.claude
-            || self.cursor
-            || self.grok
-            || self.agy
-            || self.opencode
-            || self.openrouter
-    }
-}
-
-pub(super) fn enabled_by_default() -> bool {
-    true
 }
 
 pub(super) fn session_file_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -926,21 +801,25 @@ pub(super) fn clear_session_token_at(path: &Path) -> Result<(), String> {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) fn read_session_token(app: tauri::AppHandle) -> Result<Option<String>, String> {
     read_session_token_from(&session_file_path(&app)?)
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) fn write_session_token(app: tauri::AppHandle, token: String) -> Result<(), String> {
     write_session_token_to(&session_file_path(&app)?, token)
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) fn clear_session_token(app: tauri::AppHandle) -> Result<(), String> {
     clear_session_token_at(&session_file_path(&app)?)
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) fn set_app_badge_count(window: tauri::Window, count: u32) -> Result<(), String> {
     #[cfg(target_os = "android")]
     {

@@ -15,9 +15,9 @@ export const dmMemoryReplyFenceCurrent = (job: string) => `not exists (
         and space.agent_id = ${job}.agent_id and space.revocation_epoch = fence.revocation_epoch
         and (fence.protocol = 0 or exists (select 1 from briar_execution_workers binding
           where binding.id = ${job}.claimed_worker_id and binding.device_id = ${job}.claimed_device_id
-            and json_valid(binding.capabilities_json)
-            and json_type(binding.capabilities_json, '$.dmMemory.protocol') = 'integer'
-            and json_extract(binding.capabilities_json, '$.dmMemory.protocol') = 1))
+            and json_valid(binding.runtime_proto_json)
+            and json_type(binding.runtime_proto_json, '$.capabilities.dmMemoryProtocol') = 'integer'
+            and json_extract(binding.runtime_proto_json, '$.capabilities.dmMemoryProtocol') = 1))
         and not exists (select 1 from briar_dm_memory_documents expired
           join briar_dm_memory_revisions rev on rev.document_id = expired.id and rev.version = expired.current_version
           where expired.space_id = space.id and expired.status = 'active'

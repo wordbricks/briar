@@ -1,4 +1,7 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { env } from "cloudflare:workers";
+import { createClient, createRouterTransport } from "@connectrpc/connect";
+import { WorkerQueueService } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { runClaimedDmMemory } from "../../src-cli/dm-memory-learning";
 import { invokeDmLearningModel } from "../../src-cli/dm-memory-learning-model";
 import { createChannel, createChannelMessage } from "./channels";
@@ -9,24 +12,21 @@ import { scheduleDmLearningJobs } from "./dm-memory-learning-queue";
 import { retryDmLearningJob } from "./dm-memory-learning-retry";
 import { cleanupDmLearningPayloads, reapDmLearningClaims } from "./dm-memory-learning-maintenance";
 import { reserveDmLearningModelCall, submitDmLearningProposal, submitDmLearningVerification } from "./dm-memory-learning-model-calls";
-import { handleDmMemoryLearningRoute } from "./dm-memory-learning-routes";
-import { HttpError } from "./http-response";
 import { countExecutionWorkerDeviceSessions } from "./workers";
 import { reconcileDmMemory } from "./dm-memory-indexing";
 import { deleteDmMemory, getDmMemory, listDmMemories, saveDmMemory, updateDmMemorySettings } from "./dm-memory-repository";
 import { createOrganizationAgent } from "./organization-agents";
-import { createIsolatedTestDatabase } from "./test-helpers/d1";
 import { syntheticDmLearningChange, syntheticDmLearningPolicy } from "./test-helpers/dm-memory-learning";
+import { workerRuntimeProtoJsonFixture } from "./test-helpers/worker-runtime";
+import { createWorkerQueueService } from "./worker-connect-queue";
 
 describe("durable DM learning inputs and deletion", () => {
-  let db: D1Database, dispose: () => Promise<void>;
+  const db = env.DB;
   const organizationId = crypto.randomUUID(), userId = crypto.randomUUID(), agentId = crypto.randomUUID();
   const projectId = crypto.randomUUID(), workerId = crypto.randomUUID(), deviceId = crypto.randomUUID();
   const workerToken = `briar_worker_${crypto.randomUUID().replaceAll("-", "")}`;
   const now = "2026-09-01T00:00:00.000Z";
   beforeAll(async () => {
-    const database = await createIsolatedTestDatabase({ suite: "dm-memory-learning-storage" });
-    db = database.db; dispose = database.dispose;
     await db.batch([
       db.prepare(`insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
         values (?, 'Synthetic memory owner', ?, 1, ?, ?)`).bind(userId, `${userId}@example.com`, now, now),
@@ -42,18 +42,18 @@ describe("durable DM learning inputs and deletion", () => {
         values (?, ?, ?, 'Synthetic device', ?, 'online', ?, ?, ?)`)
         .bind(deviceId, organizationId, userId, "b".repeat(64), now, now, now),
       db.prepare(`insert into briar_execution_workers
-        (id, project_id, label, host_fingerprint, agent_provider, state, accepting_work, readiness_state,
-          capabilities_json, last_heartbeat_at, created_at, updated_at, device_id)
-        values (?, ?, 'Synthetic Worker', ?, 'claude', 'online', 1, 'ready', ?, ?, ?, ?, ?)`)
-        .bind(workerId, projectId, "c".repeat(64), JSON.stringify({ dmMemory: { protocol: 1 },
-          dmMemoryLearning: { protocol: 1, transport: "openrouter" }, providers: ["claude"] }), now, now, now, deviceId),
+        (id, project_id, label, host_fingerprint, runtime_proto_json, state, accepting_work, readiness_state,
+          last_heartbeat_at, created_at, updated_at, device_id)
+        values (?, ?, 'Synthetic Worker', ?, ?, 'online', 1, 'ready', ?, ?, ?, ?)`)
+        .bind(workerId, projectId, "c".repeat(64), workerRuntimeProtoJsonFixture({
+          agentProvider: "claude", providers: ["claude"], dmMemoryLearning: true,
+        }), now, now, now, deviceId),
     ]);
     await createOrganizationAgent(db, { id: agentId, organizationId, name: "Synthetic memory agent", provider: "claude",
       model: null, effort: null, responsibility: "Synthetic tests only", createdAt: now });
     await db.prepare(`insert into briar_execution_worker_credentials(device_id, token_hash, created_at) values (?, ?, ?)`)
       .bind(deviceId, await sha256(workerToken), now).run();
   }, 120_000);
-  afterAll(async () => { await dispose?.(); });
   beforeEach(async () => {
     await db.prepare(`update briar_dm_memory_jobs set status = 'failed'
       where kind in ('extract', 'explicit_request', 'consolidate') and status in ('pending', 'running', 'retry_wait')`).run();
@@ -62,7 +62,7 @@ describe("durable DM learning inputs and deletion", () => {
     memoryClass: "profile" as const, sourceLanguage: "en", observedAt: now, validUntil: null });
   async function fixture() {
     const channelId = crypto.randomUUID(), owner = { organizationId, channelId, userId };
-    await createChannel(db, { id: channelId, organizationId, kind: "dm", slug: channelId, name: "Synthetic DM",
+    await createChannel(db, { id: channelId, organizationId, kind: "dm", dmKey: null, slug: channelId, name: "Synthetic DM",
       visibility: "private", topic: null, defaultProjectId: null, createdByUserId: userId, agentIds: [agentId], createdAt: now });
     const saved = await saveDmMemory(db, owner, memory("Start with a conclusion."));
     const spaceId = (await getDmMemory(db, owner, saved.documentId!)).memorySpaceId;
@@ -291,27 +291,36 @@ describe("durable DM learning inputs and deletion", () => {
     expect((await db.prepare("select source_watermark from briar_dm_memory_learning_state where space_id = ?")
       .bind(f.spaceId).first<{ source_watermark: number }>())!.source_watermark).toBe(0);
   });
-  it("runs the CLI through authenticated API routes and two HTTP model calls, including a lost commit acknowledgement", async () => {
+  it("runs the CLI through generated Connect RPCs and replays a lost commit acknowledgement", async () => {
     const f = await claimedLearning();
     expect(await countExecutionWorkerDeviceSessions(db, deviceId, now)).toBe(1);
-    const env = Object.assign({ DB: db }, { DM_MEMORY_LEARNING_ENABLED: String("true"),
+    const learningEnv = Object.assign({ DB: db }, { DM_MEMORY_LEARNING_ENABLED: String("true"),
       DM_MEMORY_LEARNING_POLICIES: JSON.stringify({ [organizationId]: syntheticDmLearningPolicy }) }) as Env;
     let lostAcknowledgement = false;
-    const api = vi.fn<typeof fetch>().mockImplementation(async (url, init) => {
-      const request = new Request(url, init);
-      let response: Response | undefined;
-      try { response = await handleDmMemoryLearningRoute({ request, url: new URL(request.url), db, env }); }
-      catch (error) {
-        if (!(error instanceof HttpError)) throw error;
-        response = Response.json({ code: error.code, message: error.message }, { status: error.status });
-      }
-      if (!response) throw new Error("Synthetic route did not match");
-      if (request.url.endsWith("/verification") && response.ok && !lostAcknowledgement) {
-        lostAcknowledgement = true;
-        throw new TypeError("Synthetic connection closed after commit");
-      }
-      return response;
-    });
+    const rpc = createClient(WorkerQueueService, createRouterTransport((router) =>
+      router.service(WorkerQueueService, createWorkerQueueService({
+        request: new Request("https://synthetic.example", {
+          headers: { Authorization: `Bearer ${workerToken}` },
+        }),
+        db,
+        env: learningEnv,
+      }))
+    ));
+    const unstableRpc = {
+      reserveDmMemoryLearningCall: rpc.reserveDmMemoryLearningCall,
+      submitDmMemoryLearningProposal: rpc.submitDmMemoryLearningProposal,
+      failDmMemoryLearning: rpc.failDmMemoryLearning,
+      submitDmMemoryLearningVerification: async (
+        ...args: Parameters<typeof rpc.submitDmMemoryLearningVerification>
+      ) => {
+        const response = await rpc.submitDmMemoryLearningVerification(...args);
+        if (!lostAcknowledgement) {
+          lostAcknowledgement = true;
+          throw new TypeError("Synthetic connection closed after commit");
+        }
+        return response;
+      },
+    };
     const models = vi.fn<typeof invokeDmLearningModel>().mockImplementation(async (input) => invokeDmLearningModel({ ...input,
       fetcher: vi.fn<typeof fetch>().mockResolvedValue(Response.json({ model: input.invocation.model.model,
         choices: [{ finish_reason: "stop", message: { content: JSON.stringify(input.invocation.stage === "proposing" ? f.proposal
@@ -320,8 +329,8 @@ describe("durable DM learning inputs and deletion", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date(now));
     try {
-      const result = await runClaimedDmMemory({ apiUrl: "https://synthetic.example", workerToken, claim: f.claim,
-        signal: new AbortController().signal, apiKey: "synthetic-provider-key", fetcher: api, invoke: models });
+      const result = await runClaimedDmMemory({ rpc: unstableRpc, projectId, claim: f.claim,
+        signal: new AbortController().signal, apiKey: "synthetic-provider-key", invoke: models });
       expect(result.status).toBe("succeeded");
       expect(models).toHaveBeenCalledTimes(2);
       expect(lostAcknowledgement).toBe(true);

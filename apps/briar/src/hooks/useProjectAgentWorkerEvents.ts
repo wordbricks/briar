@@ -1,15 +1,29 @@
 import { useEffect, useState } from "react";
+import type {
+  GetProjectAgentTranscriptRequest,
+  GetProjectAgentTranscriptResponse,
+} from "@briar/contracts/gen/briar/app/v1/agent_transcript_pb";
+import { ProjectAgentWorkLogEntryStatus } from "@briar/contracts/gen/briar/app/v1/agent_transcript_pb";
+import { AgentActivityKind } from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
+import { loadProjectAgentTranscript } from "../lib/app-rpc/agent";
 import {
-  loadProjectAgentTranscript,
-  type ProjectAgentTranscript,
-} from "../lib/api";
+  agentProviderFromProto,
+  requiredMessage,
+  requiredTimestamp,
+  safeNumber,
+} from "../lib/app-rpc/mappers";
 import {
   mergeAutoHuntAppServerEvents,
-  type AutoHuntAgentEvent,
   type AutoHuntAppServerEvent,
 } from "../lib/auto-hunt-agent";
+import type { AgentEvent } from "../generated/tauri";
 
 const workerEventPollIntervalMs = 3_000;
+
+type TranscriptTarget = {
+  key: string;
+  selector: GetProjectAgentTranscriptRequest["selector"];
+};
 
 export function useProjectAgentWorkerEvents(
   token: string | null,
@@ -21,74 +35,48 @@ export function useProjectAgentWorkerEvents(
   const [events, setEvents] = useState<AutoHuntAppServerEvent[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const transcriptIds = [...new Set([
-    ...runIds.map((runId) => `detached-${runId}`),
-    ...sessionIds,
-  ])];
-  const transcriptKey = transcriptIds.join(":");
+  const transcriptTargets = [...new Map<string, TranscriptTarget>([
+    ...runIds.map((runId): [string, TranscriptTarget] => [
+      `run:${runId}`,
+      {
+        key: `run:${runId}`,
+        selector: { case: "latestForRunId", value: runId },
+      },
+    ]),
+    ...sessionIds.map((sessionId): [string, TranscriptTarget] => [
+      `session:${sessionId}`,
+      {
+        key: `session:${sessionId}`,
+        selector: { case: "sessionId", value: sessionId },
+      },
+    ]),
+  ]).values()];
+  const transcriptKey = transcriptTargets.map((target) => target.key).join(":");
 
   useEffect(() => {
     let active = true;
     let timer: number | null = null;
     let hasLoadedEvents = false;
-    const sequences = new Map<string, number>();
-    const receivedEventCounts = new Map<string, number>();
-    const activeSessionIds = new Map<string, string>();
     setEvents([]);
     setError(null);
-    setIsLoading(Boolean(token && transcriptIds.length));
-    if (!token || transcriptIds.length === 0) return;
+    setIsLoading(Boolean(token && transcriptTargets.length));
+    if (!token || transcriptTargets.length === 0) return;
 
     const refresh = async () => {
       const loaded = await Promise.allSettled(
-        transcriptIds.map(async (requestedSessionId) => {
-          const previousSessionId = activeSessionIds.get(requestedSessionId);
-          let transcript = await loadProjectAgentTranscript(
+        transcriptTargets.map(async (target) => {
+          const transcript = await loadProjectAgentTranscript(
             token,
             projectId,
-            requestedSessionId,
-            previousSessionId
-              ? (sequences.get(previousSessionId) ?? 0)
-              : 0,
+            target.selector,
           );
-          // The alias resolves to the newest execution-scoped session. When a
-          // retry or transfer creates a new session, its sequence starts over;
-          // reload from zero instead of applying the previous session cursor.
-          if (
-            previousSessionId &&
-            transcript.session.sessionId !== previousSessionId
-          ) {
-            transcript = await loadProjectAgentTranscript(
-              token,
-              projectId,
-              requestedSessionId,
-              0,
-            );
-          }
-          const sessionId = transcript.session.sessionId;
-          activeSessionIds.set(requestedSessionId, sessionId);
-          const receivedEventCount =
-            (receivedEventCounts.get(sessionId) ?? 0) + transcript.events.length;
-          receivedEventCounts.set(sessionId, receivedEventCount);
-          return {
-            events: transcriptEvents(transcript),
-            // Retry/resume claims deliberately use non-contiguous sequence
-            // ranges. Compare counts instead of the last sequence cursor when
-            // deciding whether another page remains.
-            hasMore: receivedEventCount < transcript.session.eventCount,
-          };
+          return projectAgentTranscriptEvents(transcript);
         }),
       );
       if (!active) return;
       const incoming = loaded.flatMap((result) =>
-        result.status === "fulfilled" ? result.value.events : []
+        result.status === "fulfilled" ? result.value : []
       );
-      for (const event of incoming) {
-        sequences.set(
-          event.sessionId,
-          Math.max(sequences.get(event.sessionId) ?? 0, event.sequence),
-        );
-      }
       if (incoming.length > 0) {
         hasLoadedEvents = true;
         setEvents((current) =>
@@ -109,14 +97,8 @@ export function useProjectAgentWorkerEvents(
         setError(null);
       }
       setIsLoading(false);
-      const hasMore = loaded.some((result) =>
-        result.status === "fulfilled" && result.value.hasMore
-      );
-      if (hasMore || live) {
-        timer = window.setTimeout(
-          refresh,
-          hasMore ? 0 : workerEventPollIntervalMs,
-        );
+      if (live) {
+        timer = window.setTimeout(refresh, workerEventPollIntervalMs);
       }
     };
 
@@ -130,123 +112,116 @@ export function useProjectAgentWorkerEvents(
   return { events, isLoading, error };
 }
 
-function transcriptEvents(
-  transcript: ProjectAgentTranscript,
+export function projectAgentTranscriptEvents(
+  transcript: GetProjectAgentTranscriptResponse,
 ): AutoHuntAppServerEvent[] {
-  return transcript.events.map((event) => {
-    const message = record(event.message) ?? { value: event.message };
+  const session = requiredMessage(transcript.session, "agentTranscript.session");
+  const provider = agentProviderFromProto(session.agentProvider);
+  return transcript.entries.map((entry) => {
+    const event = workLogEvent(entry, session.sessionId);
     return {
-      sessionId: transcript.session.sessionId,
-      sequence: event.sequence,
-      occurredAtMs: Date.parse(event.recordedAt),
-      direction: event.direction,
-      message,
-      provider: transcript.session.agentProvider,
-      event: normalizedAgentEvent(message.event, transcript.session.sessionId),
+      sessionId: session.sessionId,
+      sequence: safeNumber(entry.sequence, "agentTranscript.entry.sequence"),
+      occurredAtMs: Date.parse(
+        requiredTimestamp(entry.updatedAt, "agentTranscript.entry.updatedAt"),
+      ),
+      direction: "server" as const,
+      message: {
+        type: "worklog",
+        entryId: entry.entryId,
+        status: entry.status,
+      },
+      provider,
+      event,
     };
   });
 }
 
-function normalizedAgentEvent(
-  value: unknown,
+function workLogEvent(
+  entry: GetProjectAgentTranscriptResponse["entries"][number],
   sessionId: string,
-): AutoHuntAgentEvent | undefined {
-  const candidate = record(value);
-  if (!candidate || typeof candidate.type !== "string") return undefined;
-  if (
-    (candidate.type === "messageStarted" ||
-      candidate.type === "messageCompleted") &&
-    typeof candidate.id === "string" &&
-    typeof candidate.text === "string"
-  ) {
-    return {
-      type: candidate.type,
-      id: `${sessionId}:${candidate.id}`,
-      phase: typeof candidate.phase === "string" ? candidate.phase : null,
-      text: candidate.text,
-    };
-  }
-  if (
-    candidate.type === "messageDelta" &&
-    typeof candidate.id === "string" &&
-    typeof candidate.delta === "string"
-  ) {
-    return {
-      type: candidate.type,
-      id: `${sessionId}:${candidate.id}`,
-      delta: candidate.delta,
-    };
-  }
-  const normalizedActivityKind = activityKind(candidate.kind);
-  if (
-    (candidate.type === "activityStarted" ||
-      candidate.type === "activityCompleted") &&
-    typeof candidate.id === "string" &&
-    normalizedActivityKind &&
-    typeof candidate.title === "string" &&
-    typeof candidate.text === "string"
-  ) {
-    if (candidate.type === "activityStarted") {
+): AgentEvent {
+  const id = `${sessionId}:${entry.entryId}`;
+  switch (entry.entry.case) {
+    case "message":
       return {
-        type: candidate.type,
-        id: `${sessionId}:${candidate.id}`,
-        kind: normalizedActivityKind,
-        title: candidate.title,
-        text: candidate.text,
+        type: workLogEntryIsWriting(entry.status)
+          ? "messageStarted"
+          : "messageCompleted",
+        id,
+        phase: entry.entry.value.phase ?? null,
+        text: entry.entry.value.text,
+      };
+    case "activity": {
+      const kind = activityKind(entry.entry.value.kind);
+      if (entry.status === ProjectAgentWorkLogEntryStatus.WRITING) {
+        return {
+          type: "activityStarted",
+          id,
+          kind,
+          title: entry.entry.value.title,
+          text: entry.entry.value.text,
+        };
+      }
+      return {
+        type: "activityCompleted",
+        id,
+        kind,
+        title: entry.entry.value.title,
+        text: entry.entry.value.text,
+        status: activityStatus(entry.status),
       };
     }
-    const status = activityStatus(candidate.status);
-    if (!status) return undefined;
-    return {
-      type: candidate.type,
-      id: `${sessionId}:${candidate.id}`,
-      kind: normalizedActivityKind,
-      title: candidate.title,
-      text: candidate.text,
-      status,
-    };
+    default:
+      throw new Error("Agent transcript entry is missing its payload");
   }
-  if (
-    candidate.type === "activityDelta" &&
-    typeof candidate.id === "string" &&
-    typeof candidate.delta === "string"
-  ) {
-    return {
-      type: candidate.type,
-      id: `${sessionId}:${candidate.id}`,
-      delta: candidate.delta,
-    };
+}
+
+function workLogEntryIsWriting(
+  value: ProjectAgentWorkLogEntryStatus,
+): boolean {
+  switch (value) {
+    case ProjectAgentWorkLogEntryStatus.WRITING:
+      return true;
+    case ProjectAgentWorkLogEntryStatus.COMPLETED:
+    case ProjectAgentWorkLogEntryStatus.FAILED:
+    case ProjectAgentWorkLogEntryStatus.CANCELLED:
+    case ProjectAgentWorkLogEntryStatus.INTERRUPTED:
+      return false;
+    default:
+      throw new Error(`Unknown Agent transcript entry status: ${value}`);
   }
-  if (
-    candidate.type === "turnCompleted" &&
-    typeof candidate.status === "string"
-  ) {
-    return { type: candidate.type, status: candidate.status };
-  }
-  return undefined;
 }
 
 function activityKind(
-  value: unknown,
-): "command" | "fileChange" | "webSearch" | "tool" | null {
-  return value === "command" ||
-      value === "fileChange" ||
-      value === "webSearch" ||
-      value === "tool"
-    ? value
-    : null;
+  value: AgentActivityKind,
+): Extract<AgentEvent, { type: "activityStarted" }>["kind"] {
+  switch (value) {
+    case AgentActivityKind.COMMAND:
+      return "command";
+    case AgentActivityKind.FILE_CHANGE:
+      return "fileChange";
+    case AgentActivityKind.WEB_SEARCH:
+      return "webSearch";
+    case AgentActivityKind.TOOL:
+      return "tool";
+    default:
+      throw new Error(`Unknown Agent transcript activity kind: ${value}`);
+  }
 }
 
 function activityStatus(
-  value: unknown,
-): "completed" | "failed" | "cancelled" | null {
-  return value === "completed" || value === "failed" || value === "cancelled"
-    ? value
-    : null;
-}
-
-function record(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : null;
+  value: ProjectAgentWorkLogEntryStatus,
+): Extract<AgentEvent, { type: "activityCompleted" }>["status"] {
+  switch (value) {
+    case ProjectAgentWorkLogEntryStatus.COMPLETED:
+      return "completed";
+    case ProjectAgentWorkLogEntryStatus.FAILED:
+      return "failed";
+    case ProjectAgentWorkLogEntryStatus.CANCELLED:
+    case ProjectAgentWorkLogEntryStatus.INTERRUPTED:
+      return "cancelled";
+    default:
+      throw new Error(`Unknown terminal Agent transcript status: ${value}`);
+  }
 }

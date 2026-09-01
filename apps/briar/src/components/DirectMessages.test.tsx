@@ -3,42 +3,29 @@
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../i18n";
+import * as api from "../lib/api";
 import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { DirectMessages } from "./DirectMessages";
 
 describe("DirectMessages", () => {
   beforeEach(() => {
+    Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     window.localStorage.setItem("briar.locale.v1", "en");
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
-        const url = String(input);
-        if (url.endsWith("/members")) {
-          return new Response(JSON.stringify({
-            members: [{
-              userId: "user-1",
-              name: "Sam",
-              email: "sam@example.com",
-              image: null,
-              role: "owner",
-              createdAt: "2026-08-01T00:00:00.000Z",
-            }],
-          }), {
-            headers: { "Content-Type": "application/json" },
-          });
-        }
-        if (url.endsWith("/agents")) {
-          return new Response(JSON.stringify({ agents: [], canManage: false }), {
-            headers: { "Content-Type": "application/json" },
-          });
-        }
-        throw new Error(`Unexpected request: ${url}`);
-      }),
-    );
+    vi.spyOn(api, "listDirectMessageRecipients").mockResolvedValue({
+      members: [{
+        userId: "user-1",
+        name: "Sam",
+        email: "sam@example.com",
+        image: null,
+        role: "owner",
+        createdAt: "2026-08-01T00:00:00.000Z",
+        projectIds: [],
+      }],
+      agents: [],
+    });
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
 
@@ -59,12 +46,13 @@ describe("DirectMessages", () => {
         />
       </I18nProvider>,
     );
-    await act(async () => Promise.resolve());
-
-    const selfCandidate = [...container.querySelectorAll("button")].find(
-      (button) => button.textContent?.includes("Send to yourself"),
-    );
-    expect(selfCandidate).not.toBeUndefined();
+    let selfCandidate: HTMLButtonElement | undefined;
+    await vi.waitFor(() => {
+      selfCandidate = [...container.querySelectorAll("button")].find(
+        (button) => button.textContent?.includes("Send to yourself"),
+      );
+      expect(selfCandidate).not.toBeUndefined();
+    });
     expect(selfCandidate?.textContent).toContain("Personal notes conversation");
 
     await act(async () => selfCandidate?.click());

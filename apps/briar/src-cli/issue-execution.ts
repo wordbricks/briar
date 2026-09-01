@@ -1,11 +1,8 @@
-import { Buffer } from "node:buffer";
 import {
   readFile,
   rm,
 } from "node:fs/promises";
 import { join } from "node:path";
-import * as Option from "effect/Option";
-import * as Predicate from "effect/Predicate";
 import {
   agentExecutionCostRecordsFromObservations,
   agentExecutionMetrics,
@@ -18,26 +15,28 @@ import { type AgentProvider } from "../src/lib/agent-provider";
 import {
   createDetachedTranscriptSequencer,
   detachedAgentPrompt,
-  detachedPayloadDirection,
   detachedProviderBlockedRunEvent,
   detachedProviderBlockFromPayload,
   detachedRunContinuationPrompt,
   detachedRunDisposition,
   detachedRunRecoveryPrompt,
   detachedRunTurnDecision,
-  detachedTranscriptPayload,
   detachedTranscriptSessionId,
   type DetachedAgent,
 } from "./agent-runner";
 import { agentImageAttachments } from "../src-agent/runner-attachments";
+import { sidecarProviderRaw } from "../src-agent/sidecar-protocol";
 import {
   detachedProviderTurnFailure,
   logDetachedProviderTurnDiagnostic,
   runDetachedProviderTurn,
 } from "./detached-provider-turn";
-import { TranscriptBatcher } from "./transcript-batcher";
 import { ChannelActivityPublisher } from "./channel-activity-publisher";
-import { uploadExecutionMetricsWithCostCompatibility } from "./execution-metrics-upload";
+import {
+  createWorkerTranscriptBatcher,
+  reportIssueExecutionTelemetry,
+  transcriptEventFromSidecar,
+} from "./worker-transcript-client";
 import {
   errorDelayMs,
   issueWorkerSessionDirectory,
@@ -53,25 +52,20 @@ import {
 } from "./worktree";
 import { briarIssueUrl } from "./github-pr";
 import {
-  decodeConfig,
+  decodeConfigJson,
   type Config,
   type ProjectConfig,
 } from "./config-contract";
 import {
-  decodeDetachedAgentEffortOption,
-  decodeDetachedAgentSkillsOption,
   type ClaimedRun,
   type DetachedAgentClaim,
   type DetachedAgentSkill,
-} from "./worker-claim-contract";
+} from "./worker-queue-contract";
 import {
   providerExecutionEnvironment,
   configDirectory,
   value,
   saveConfigAt,
-  request,
-  serializeTranscriptRequest,
-  isTranscriptPayloadTooLarge,
   runGit,
   worktreeSettings,
 } from "./command-support";
@@ -79,6 +73,11 @@ import {
   downloadClaimAttachment,
   allocateClaimWorkspace,
 } from "./worktree-commands";
+import {
+  createAuthenticatedWorkerExecutionClient,
+  workClaimIdentityToProto,
+} from "./worker-queue-client";
+import { workerRunEventRequest } from "./run-event-proto";
 
 const activeReplyActivityPublishers = new Map<
   string,
@@ -119,38 +118,21 @@ function detachedReplyAgent(input: {
   effort?: ModelEffort | null;
   agent?: DetachedAgentClaim | null;
   activeSkill?: DetachedAgentSkill | null;
-  snapshot: Record<string, unknown>;
   fallbackName: string;
   scope?: DetachedAgent["scope"];
 }): DetachedAgent {
-  const snapshotAgent = Predicate.isObject(input.snapshot.agent)
-    ? input.snapshot.agent
-    : null;
-  const snapshotSkills = decodeDetachedAgentSkillsOption(snapshotAgent?.skills);
   const baseAgent = input.agent ?? {
-    id: typeof snapshotAgent?.id === "string" && snapshotAgent.id.trim()
-      ? snapshotAgent.id
-      : input.workId,
-    name: typeof snapshotAgent?.name === "string" && snapshotAgent.name.trim()
-      ? snapshotAgent.name
-      : input.fallbackName,
+    id: input.workId,
+    name: input.fallbackName,
     provider: input.provider,
     model: input.model,
-    effort:
-      typeof snapshotAgent?.effort === "string" &&
-        Option.isSome(decodeDetachedAgentEffortOption(snapshotAgent.effort))
-        ? snapshotAgent.effort
-        : null,
-    responsibility: typeof snapshotAgent?.responsibility === "string"
-      ? snapshotAgent.responsibility
-      : "",
-    skill: typeof snapshotAgent?.skill === "string" ? snapshotAgent.skill : "",
-    skills: Option.getOrElse(snapshotSkills, () => []),
+    effort: null,
+    responsibility: "",
+    skills: [],
   };
   return {
     ...baseAgent,
-    // The top-level execution fields are snapshotted by the server and remain
-    // authoritative during rolling upgrades, even when Agent defaults change.
+    // The claim's execution fields are immutable for this worker turn.
     provider: input.provider,
     model: input.model,
     effort: input.effort !== undefined
@@ -222,6 +204,14 @@ async function runClaimedIssueInRuntime(
   }
   const activeProject =
     config.projects.find((candidate) => candidate.id === project.id) ?? project;
+  const executionRpc = createAuthenticatedWorkerExecutionClient(
+    config.apiUrl,
+    workerToken,
+  );
+  const runEventTarget = {
+    case: "work" as const,
+    value: workClaimIdentityToProto(issue),
+  };
   const { workspace, workspaceError } = await allocateClaimWorkspace(
     config,
     activeProject,
@@ -315,7 +305,6 @@ async function runClaimedIssueInRuntime(
     model: execution.model,
     effort: execution.effort,
     responsibility: logicalAgent?.responsibility ?? "",
-    skill: logicalAgent?.skill ?? "",
     skills: logicalAgent?.skills ?? [],
     activeSkill: logicalAgent?.activeSkill ?? null,
   };
@@ -328,30 +317,13 @@ async function runClaimedIssueInRuntime(
   const usageCollector = createAgentExecutionUsageCollector(provider, {
     configuredModel: execution.model,
   });
-  const transcriptEnvelope = {
+  const transcriptBatcher = createWorkerTranscriptBatcher({
+    apiUrl: config.apiUrl,
+    token: workerToken,
     projectId: project.id,
+    work: issue,
     sessionId,
-    runId: issue.runId,
-    workType: "issue" as const,
-    workId: issue.runId,
-    claimToken: issue.claimToken,
-    ...(issue.executionId ? { executionId: issue.executionId } : {}),
-    workerId: activeProject.executionWorker?.workerId,
     agentProvider: provider,
-  };
-  const transcriptBatcher = new TranscriptBatcher({
-    send: async (events) => {
-      await request(config.apiUrl, "/transcripts", workerToken, {
-        method: "POST",
-        body: serializeTranscriptRequest(transcriptEnvelope, events),
-      });
-    },
-    measureBytes: (events) =>
-      Buffer.byteLength(
-        serializeTranscriptRequest(transcriptEnvelope, events),
-        "utf8",
-      ),
-    isPayloadTooLarge: isTranscriptPayloadTooLarge,
     onError: (error) => {
       console.error(
         `transcript upload failed for ${issue.sourceKey}: ${
@@ -384,7 +356,7 @@ async function runClaimedIssueInRuntime(
         diagnosticContext: {
           runId: issue.runId,
           workId: issue.runId,
-          executionId: issue.executionId ?? null,
+          executionId: issue.executionId,
           attempt: issue.currentAttempt,
           workType: "issue",
           turnNumber,
@@ -394,29 +366,28 @@ async function runClaimedIssueInRuntime(
           conversationId = nextConversationId;
           reportCheckpoint?.({ conversationId: nextConversationId });
         },
-        onPayload: async (rawPayload, line) => {
-          usageCollector.observe(rawPayload, new Date().toISOString());
-          runnerBlock ??= detachedProviderBlockFromPayload(rawPayload);
-          const direction = detachedPayloadDirection(rawPayload);
-          const payload = detachedTranscriptPayload(rawPayload, line);
-          const transcriptSequence = transcriptSequencer.nextForPayload(payload);
+        onPayload: async (output) => {
+          usageCollector.observe(
+            sidecarProviderRaw(output),
+            new Date().toISOString(),
+          );
+          runnerBlock ??= detachedProviderBlockFromPayload(output);
+          const transcriptSequence = transcriptSequencer.nextForPayload(output);
           if (transcriptSequence !== null) {
-            await transcriptBatcher.enqueue({
-              sequence: transcriptSequence,
-              direction,
-              payload,
-            });
+            await transcriptBatcher.enqueue(
+              transcriptEventFromSidecar(output, transcriptSequence),
+            );
           }
         },
       });
       await transcriptBatcher.flush();
       conversationId = turn.conversationId;
       if (runnerBlock) {
-        await request(config.apiUrl, "/run-events", workerToken, {
-          method: "POST",
-          headers: { "X-Briar-Claim-Token": issue.claimToken },
-          body: JSON.stringify(
-            detachedProviderBlockedRunEvent({
+        await executionRpc.recordRunEvent(
+          workerRunEventRequest({
+            projectId: project.id,
+            target: runEventTarget,
+            event: detachedProviderBlockedRunEvent({
               block: runnerBlock,
               runId: issue.runId,
               attempt: issue.currentAttempt,
@@ -425,14 +396,14 @@ async function runClaimedIssueInRuntime(
               model: execution.model,
               occurredAt: new Date().toISOString(),
             }),
-          ),
-        });
+          }),
+        );
         return;
       }
       const turnFailure = detachedProviderTurnFailure(turn);
 
-      const runtimeConfig = decodeConfig(
-        JSON.parse(await readFile(join(runtimeDirectory, "config.json"), "utf8")),
+      const runtimeConfig = decodeConfigJson(
+        await readFile(join(runtimeDirectory, "config.json"), "utf8"),
       );
       const disposition = detachedRunDisposition(
         runtimeConfig.projects.find((candidate) => candidate.id === project.id)
@@ -477,21 +448,22 @@ async function runClaimedIssueInRuntime(
   } catch (error) {
     if (!signal.aborted) {
       try {
-        await request(config.apiUrl, "/run-events", workerToken, {
-          method: "POST",
-          headers: { "X-Briar-Claim-Token": issue.claimToken },
-          body: JSON.stringify({
-            runId: issue.runId,
-            status: "failed",
-            workflowStage: null,
-            eventKey: `detached:${issue.currentAttempt}:agent-failed`,
-            occurredAt: new Date().toISOString(),
-            actor: `briar-worker:${activeProject.executionWorker?.workerId ?? "unknown"}`,
-            repository: issue.repository,
-            detail: error instanceof Error ? error.message : String(error),
-            pullRequestUrls: [],
+        await executionRpc.recordRunEvent(
+          workerRunEventRequest({
+            projectId: project.id,
+            target: runEventTarget,
+            event: {
+              status: "failed",
+              workflowStage: null,
+              eventKey: `detached:${issue.currentAttempt}:agent-failed`,
+              occurredAt: new Date().toISOString(),
+              actor: `briar-worker:${activeProject.executionWorker?.workerId ?? "unknown"}`,
+              repository: issue.repository,
+              detail: error instanceof Error ? error.message : String(error),
+              pullRequestUrls: [],
+            },
           }),
-        });
+        );
       } catch {
         // A cancellation or reassignment invalidates the claim before the
         // process exits. That expected late write must not hide the root error.
@@ -512,39 +484,15 @@ async function runClaimedIssueInRuntime(
       agentExecutionTokenUsageFromObservations(usageObservations),
     );
     try {
-      const metricsPayload = {
+      await reportIssueExecutionTelemetry({
+        apiUrl: config.apiUrl,
+        token: workerToken,
         projectId: project.id,
-        sessionId,
-        runId: issue.runId,
-        runAttempt: issue.currentAttempt,
-        workType: "issue" as const,
-        workId: issue.runId,
-        claimToken: issue.claimToken,
-        ...(issue.executionId ? { executionId: issue.executionId } : {}),
-        workerId: activeProject.executionWorker?.workerId,
+        work: issue,
         agentProvider: provider,
         executionMetrics,
-        ...(issue.executionId && usageRecords.length > 0
-          ? { usageRecords }
-          : {}),
-        ...(issue.executionId && costRecords.length > 0
-          ? { costRecords }
-          : {}),
-        events: [
-          {
-            sequence: transcriptSequencer.next(),
-            direction: "server",
-            payload: { type: "execution.metrics", executionMetrics },
-          },
-        ],
-      };
-      await uploadExecutionMetricsWithCostCompatibility({
-        payload: metricsPayload,
-        send: (payload) =>
-          request(config.apiUrl, "/transcripts", workerToken, {
-            method: "POST",
-            body: JSON.stringify(payload),
-          }),
+        usageObservations: usageRecords,
+        costObservations: costRecords,
       });
     } catch (error) {
       console.error(
@@ -557,8 +505,8 @@ async function runClaimedIssueInRuntime(
       try {
         let completedAt: string | undefined;
         try {
-          const runtimeConfig = decodeConfig(
-            JSON.parse(await readFile(join(runtimeDirectory, "config.json"), "utf8")),
+          const runtimeConfig = decodeConfigJson(
+            await readFile(join(runtimeDirectory, "config.json"), "utf8"),
           );
           const runtimeClaim = runtimeConfig.projects.find(
             (candidate) => candidate.id === project.id,

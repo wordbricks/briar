@@ -13,10 +13,12 @@ import {
   inspectOpenCodeTerminalPath,
   inspectOnboardingPrerequisites,
   installOnboardingPrerequisite,
-  type OpenCodeTerminalPathStatus,
-  type OnboardingPrerequisites,
-  type PrerequisiteId,
 } from "../lib/initial-onboarding";
+import type {
+  OnboardingPrerequisite,
+  OnboardingPrerequisites,
+  OpenCodeTerminalPathStatus,
+} from "../generated/tauri";
 import { agentProviders } from "../lib/agent-provider";
 import {
   AntigravityIcon,
@@ -27,7 +29,7 @@ import {
   OpenCodeIcon,
 } from "./AgentIcons";
 
-const prerequisiteIds: PrerequisiteId[] = ["git", ...agentProviders];
+const prerequisiteIds: OnboardingPrerequisite[] = ["git", ...agentProviders];
 
 export function DeveloperToolsSetup({
   onContinue,
@@ -40,7 +42,8 @@ export function DeveloperToolsSetup({
   const [prerequisites, setPrerequisites] =
     useState<OnboardingPrerequisites | null>(null);
   const [checking, setChecking] = useState(false);
-  const [installing, setInstalling] = useState<PrerequisiteId | null>(null);
+  const [installing, setInstalling] =
+    useState<OnboardingPrerequisite | null>(null);
   const [openCodeTerminalPath, setOpenCodeTerminalPath] =
     useState<OpenCodeTerminalPathStatus | null>(null);
   const [terminalPathSaving, setTerminalPathSaving] = useState(false);
@@ -67,7 +70,7 @@ export function DeveloperToolsSetup({
     void checkPrerequisites();
   }, [checkPrerequisites]);
 
-  const install = async (prerequisite: PrerequisiteId) => {
+  const install = async (prerequisite: OnboardingPrerequisite) => {
     setInstalling(prerequisite);
     setError(null);
     try {

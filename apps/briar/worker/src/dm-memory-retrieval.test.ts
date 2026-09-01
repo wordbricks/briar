@@ -1,4 +1,5 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { env } from "cloudflare:workers";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DmMemoryCreateInput } from "../../src/lib/dm-memory-contract";
 import { createChannel } from "./channels";
 import { createOrganizationAgent } from "./organization-agents";
@@ -8,7 +9,6 @@ import { processDmMemoryIndexJobs, processDmMemoryVectorCleanup } from "./dm-mem
 import { deleteDmMemory, getDmMemory, listDmMemories, saveDmMemory, type DmMemoryOwner } from "./dm-memory-repository";
 import { getDmMemoryReferences, searchDmMemory } from "./dm-memory-retrieval";
 import type { DmMemoryVectorStore } from "./dm-memory-vector-store";
-import { createIsolatedTestDatabase } from "./test-helpers/d1";
 
 function vectorStore() {
   const published = new Map<string, VectorizeVector>();
@@ -50,14 +50,12 @@ function vectorStore() {
 
 describe("DM memory retrieval with durable D1 state", () => {
   let db: D1Database;
-  let dispose: () => Promise<void>;
   const organizationId = crypto.randomUUID();
   const userId = crypto.randomUUID();
   const agentId = crypto.randomUUID();
   const now = "2026-09-01T00:00:00.000Z";
   beforeAll(async () => {
-    const database = await createIsolatedTestDatabase({ suite: "dm-memory-retrieval" });
-    db = database.db; dispose = database.dispose;
+    db = env.DB;
     await db.prepare(`insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
       values (?, 'Synthetic memory owner', ?, 1, ?, ?)`).bind(userId, `${userId}@example.com`, now, now).run();
     await db.prepare(`insert into briar_organizations (id, name, handle, created_at, updated_at)
@@ -67,14 +65,13 @@ describe("DM memory retrieval with durable D1 state", () => {
     await createOrganizationAgent(db, { id: agentId, organizationId, name: "Synthetic Agent", provider: "claude",
       model: null, responsibility: "Synthetic tests", effort: null, createdAt: now });
   }, 120_000);
-  afterAll(async () => { await dispose?.(); });
   beforeEach(async () => {
     await db.prepare("update briar_dm_memory_jobs set status = 'cancelled' where kind = 'index' and status <> 'succeeded'").run();
   });
 
   async function dm(): Promise<DmMemoryOwner> {
     const channelId = crypto.randomUUID();
-    await createChannel(db, { id: channelId, organizationId, kind: "dm", slug: channelId, name: "Synthetic DM",
+    await createChannel(db, { id: channelId, organizationId, kind: "dm", dmKey: null, slug: channelId, name: "Synthetic DM",
       visibility: "private", topic: null, defaultProjectId: null, createdByUserId: userId,
       agentIds: [agentId], createdAt: now });
     return { organizationId, channelId, userId };

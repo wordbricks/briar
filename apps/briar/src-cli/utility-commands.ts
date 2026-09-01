@@ -1,8 +1,11 @@
 import { join } from "node:path";
 import {
   inspectMergeQueueDoctor,
-  mergeQueueProfileFromResponse,
 } from "./merge-queue";
+import {
+  fetchMergeQueueProfile,
+  updateRemoteMergeQueueProfile,
+} from "./app-connect-client";
 import {
   configureBrowserSkillGuide,
   getSkillGuide,
@@ -15,7 +18,6 @@ import {
   value,
   has,
   loadConfig,
-  request,
   login,
   currentProject,
 } from "./command-support";
@@ -118,11 +120,11 @@ async function configureMergeQueueCommand() {
   }
   const config = await loadConfig();
   const { project, userToken } = await mergeQueueCommandProject(config);
-  const current = mergeQueueProfileFromResponse(await request<unknown>(
+  const current = await fetchMergeQueueProfile(
     config.apiUrl,
-    `/projects/${project.id}/merge-queue-profile`,
     userToken,
-  ));
+    project.id,
+  );
   const readinessStageId = value("--readiness-stage") ??
     current?.readinessStageId;
   if (has("--enable") && !readinessStageId) {
@@ -146,31 +148,28 @@ async function configureMergeQueueCommand() {
     2,
     5,
   );
-  const profile = mergeQueueProfileFromResponse(await request<unknown>(
+  const profile = await updateRemoteMergeQueueProfile(
     config.apiUrl,
-    `/projects/${project.id}/merge-queue-profile`,
     userToken,
     {
-      method: "PUT",
-      body: JSON.stringify({
-        enabled: has("--enable"),
-        ...(readinessStageId ? { readinessStageId } : {}),
-        quietWindowMs,
-        maxBatchSize,
-      }),
+      projectId: project.id,
+      enabled: has("--enable"),
+      ...(readinessStageId ? { readinessStageId } : {}),
+      quietWindowMs,
+      maxBatchSize,
     },
-  ));
+  );
   console.log(JSON.stringify({ profile }, null, 2));
 }
 
 async function mergeQueueDoctorCommand() {
   const config = await loadConfig();
   const { project, userToken } = await mergeQueueCommandProject(config);
-  const profile = mergeQueueProfileFromResponse(await request<unknown>(
+  const profile = await fetchMergeQueueProfile(
     config.apiUrl,
-    `/projects/${project.id}/merge-queue-profile`,
     userToken,
-  ));
+    project.id,
+  );
   const result = inspectMergeQueueDoctor({
     profile,
     repositoryPath: project.repositoryPath,

@@ -8,7 +8,6 @@ import {
 import { htmlArtifactContentSecurityPolicy } from "../../src/lib/agent-reply-attachments";
 import { devicePage as otpDevicePage } from "./auth-device";
 import { json } from "./http-response";
-import { decodeMobileHealthResponse } from "./mobile-contract";
 import { serveRelease } from "./releases";
 
 const pngResponse = (png: ArrayBuffer) =>
@@ -179,12 +178,12 @@ export async function handlePublicRoute(input: {
   }
 
   if (url.pathname === "/health") {
-    return json(decodeMobileHealthResponse({
+    return json({
       ok: true,
       service: "briar-api",
       database: "cloudflare-d1",
       updates: "cloudflare-r2",
-    }));
+    });
   }
 
   if (

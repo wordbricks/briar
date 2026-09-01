@@ -1,0 +1,112 @@
+syntax = "proto3";
+
+package briar.app.v1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+
+option swift_prefix = "BriarAPI_";
+
+// MergeQueueService owns the authenticated project merge-queue control plane.
+// GitHub callbacks and the merge executor lifecycle remain on their existing
+// transports; this service owns the user-facing profile and diagnostics wire
+// contract shared by the app, CLI, and Worker.
+service MergeQueueService {
+  rpc GetMergeQueueProfile(GetMergeQueueProfileRequest) returns (GetMergeQueueProfileResponse);
+  rpc UpdateMergeQueueProfile(UpdateMergeQueueProfileRequest) returns (UpdateMergeQueueProfileResponse);
+  rpc GetMergeQueueStatus(GetMergeQueueStatusRequest) returns (GetMergeQueueStatusResponse);
+}
+
+enum MergeQueueBatchState {
+  MERGE_QUEUE_BATCH_STATE_UNSPECIFIED = 0;
+  MERGE_QUEUE_BATCH_STATE_COLLECTING = 1;
+  MERGE_QUEUE_BATCH_STATE_FROZEN = 2;
+  MERGE_QUEUE_BATCH_STATE_ENQUEUEING = 3;
+  MERGE_QUEUE_BATCH_STATE_WAITING_TAIL = 4;
+  MERGE_QUEUE_BATCH_STATE_VALIDATING = 5;
+  MERGE_QUEUE_BATCH_STATE_PUBLISHING = 6;
+  MERGE_QUEUE_BATCH_STATE_AWAITING_MERGE = 7;
+  MERGE_QUEUE_BATCH_STATE_BLOCKED = 8;
+  MERGE_QUEUE_BATCH_STATE_DRAINING = 9;
+  MERGE_QUEUE_BATCH_STATE_COMPLETED = 10;
+  MERGE_QUEUE_BATCH_STATE_FAILED = 11;
+}
+
+enum MergeQueueCandidateState {
+  MERGE_QUEUE_CANDIDATE_STATE_UNSPECIFIED = 0;
+  MERGE_QUEUE_CANDIDATE_STATE_READY = 1;
+  MERGE_QUEUE_CANDIDATE_STATE_FROZEN = 2;
+  MERGE_QUEUE_CANDIDATE_STATE_ENQUEUED = 3;
+  MERGE_QUEUE_CANDIDATE_STATE_MERGED = 4;
+  MERGE_QUEUE_CANDIDATE_STATE_DEQUEUED = 5;
+  MERGE_QUEUE_CANDIDATE_STATE_FAILED = 6;
+}
+
+message MergeQueueProfile {
+  string project_id = 1;
+  uint64 repository_id = 2;
+  string repository = 3;
+  string base_branch = 4;
+  bool enabled = 5;
+  string readiness_stage_id = 6;
+  repeated string validation_commands = 7;
+  google.protobuf.Duration quiet_window = 8;
+  uint32 max_batch_size = 9;
+  google.protobuf.Timestamp updated_at = 10;
+}
+
+message GetMergeQueueProfileRequest {
+  string project_id = 1;
+}
+
+message GetMergeQueueProfileResponse {
+  optional MergeQueueProfile profile = 1;
+}
+
+message UpdateMergeQueueProfileRequest {
+  string project_id = 1;
+  bool enabled = 2;
+  optional string readiness_stage_id = 3;
+  optional google.protobuf.Duration quiet_window = 4;
+  optional uint32 max_batch_size = 5;
+}
+
+message UpdateMergeQueueProfileResponse {
+  MergeQueueProfile profile = 1;
+}
+
+message MergeQueueBatch {
+  string id = 1;
+  MergeQueueBatchState state = 2;
+  uint32 candidate_count = 3;
+  google.protobuf.Timestamp quiet_until = 4;
+  optional google.protobuf.Timestamp frozen_at = 5;
+  optional string merge_group_sha = 6;
+  optional string failure_code = 7;
+  optional google.protobuf.Timestamp completed_at = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp updated_at = 10;
+}
+
+message MergeQueueCandidate {
+  string id = 1;
+  optional string batch_id = 2;
+  string run_id = 3;
+  uint64 pull_request_number = 4;
+  string pull_request_url = 5;
+  MergeQueueCandidateState state = 6;
+  optional uint32 ordinal = 7;
+  google.protobuf.Timestamp ready_at = 8;
+  optional string failure_code = 9;
+  google.protobuf.Timestamp updated_at = 10;
+}
+
+message GetMergeQueueStatusRequest {
+  string project_id = 1;
+}
+
+message GetMergeQueueStatusResponse {
+  repeated MergeQueueBatch batches = 1;
+  repeated MergeQueueCandidate candidates = 2;
+  google.protobuf.Timestamp generated_at = 3;
+}

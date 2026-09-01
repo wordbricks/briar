@@ -8,7 +8,7 @@ use std::{
 
 const DISPATCH_VERSION: u8 = 1;
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct AutoHuntDispatchGroup {
     pub(crate) version: u8,
@@ -29,7 +29,7 @@ pub(crate) struct AutoHuntDispatchGroup {
     pub(crate) events: Vec<AutoHuntDispatchEvent>,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum AutoHuntDispatchStatus {
     Running,
@@ -38,7 +38,7 @@ pub(crate) enum AutoHuntDispatchStatus {
     Interrupted,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct AutoHuntDispatchWorker {
     pub(crate) session_id: String,
@@ -53,7 +53,7 @@ pub(crate) struct AutoHuntDispatchWorker {
     pub(crate) completed_at: Option<String>,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum AutoHuntWorkerStatus {
     Allocating,
@@ -63,6 +63,61 @@ pub(crate) enum AutoHuntWorkerStatus {
     Blocked,
     Failed,
     Cancelled,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum AutoHuntRunEvidenceStatus {
+    Pending,
+    Passed,
+    Failed,
+    Skipped,
+}
+
+impl AutoHuntRunEvidenceStatus {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Pending => "pending",
+            Self::Passed => "passed",
+            Self::Failed => "failed",
+            Self::Skipped => "skipped",
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AutoHuntRunEvidenceImage {
+    pub(crate) id: String,
+    pub(crate) filename: String,
+    pub(crate) content_type: String,
+    pub(crate) byte_size: u64,
+    pub(crate) sha256: String,
+    pub(crate) position: u32,
+    pub(crate) url: String,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AutoHuntRunEvidence {
+    pub(crate) key: String,
+    pub(crate) attempt: u32,
+    pub(crate) revision: u32,
+    pub(crate) stage: String,
+    #[serde(rename = "type")]
+    pub(crate) evidence_type: String,
+    pub(crate) status: AutoHuntRunEvidenceStatus,
+    pub(crate) detail: Option<String>,
+    pub(crate) command: Option<String>,
+    pub(crate) url: Option<String>,
+    #[specta(type = Option<crate::ipc::JsonValue>)]
+    pub(crate) metadata: Option<serde_json::Value>,
+    pub(crate) actor: String,
+    pub(crate) observed_at: String,
+    pub(crate) recorded_at: String,
+    pub(crate) images: Vec<AutoHuntRunEvidenceImage>,
+    pub(crate) required_revision: u32,
+    pub(crate) canonical: bool,
 }
 
 impl AutoHuntWorkerStatus {
@@ -76,8 +131,9 @@ impl AutoHuntWorkerStatus {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
+#[tauri_specta(event_name = "auto-hunt-dispatch-event")]
 pub(crate) struct AutoHuntDispatchEvent {
     pub(crate) dispatch_group_id: String,
     pub(crate) cursor: u64,
@@ -88,7 +144,7 @@ pub(crate) struct AutoHuntDispatchEvent {
     pub(crate) status: String,
     pub(crate) message: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) data: Option<serde_json::Value>,
+    pub(crate) evidence: Option<AutoHuntRunEvidence>,
     pub(crate) occurred_at: String,
 }
 
@@ -285,7 +341,7 @@ impl AutoHuntDispatchStore {
         &self,
         dispatch_group_id: &str,
         session_id: &str,
-        evidence: serde_json::Value,
+        evidence: AutoHuntRunEvidence,
     ) -> Result<AutoHuntDispatchGroup, String> {
         self.update(dispatch_group_id, |group| {
             let worker = group
@@ -294,28 +350,20 @@ impl AutoHuntDispatchStore {
                 .find(|worker| worker.session_id == session_id)
                 .ok_or_else(|| format!("worker session {session_id}을 찾지 못했습니다."))?;
             let run_id = worker.run_id.clone();
-            let status = evidence
-                .get("status")
-                .and_then(serde_json::Value::as_str)
-                .unwrap_or("recorded");
-            let stage = evidence
-                .get("stage")
-                .and_then(serde_json::Value::as_str)
-                .unwrap_or("workflow");
-            let evidence_type = evidence
-                .get("type")
-                .and_then(serde_json::Value::as_str)
-                .unwrap_or("evidence");
+            let status = evidence.status.as_str();
             push_event(
                 group,
                 "worker_evidence",
                 Some(session_id),
                 Some(&run_id),
                 status,
-                format!("{stage} 단계의 {evidence_type} 증거가 {status} 상태로 기록되었습니다."),
+                format!(
+                    "{} 단계의 {} 증거가 {status} 상태로 기록되었습니다.",
+                    evidence.stage, evidence.evidence_type
+                ),
             );
             if let Some(event) = group.events.last_mut() {
-                event.data = Some(evidence);
+                event.evidence = Some(evidence);
             }
             Ok(())
         })
@@ -388,6 +436,7 @@ impl AutoHuntDispatchStore {
     /// `running` group is interrupted rather than silently presented as live.
     /// The server-side claim lease remains authoritative and can be reaped or
     /// retried independently.
+    #[cfg(desktop)]
     pub(crate) fn interrupt_orphaned_groups(&self) -> Result<Vec<AutoHuntDispatchGroup>, String> {
         let entries = fs::read_dir(&self.directory)
             .map_err(|error| format!("이슈 처리 실행 폴더를 읽지 못했습니다: {error}"))?;
@@ -527,7 +576,7 @@ fn push_event(
         run_id: run_id.map(str::to_string),
         status: status.to_string(),
         message,
-        data: None,
+        evidence: None,
         occurred_at: now(),
     });
 }
@@ -588,6 +637,27 @@ mod tests {
         }
     }
 
+    fn evidence() -> AutoHuntRunEvidence {
+        AutoHuntRunEvidence {
+            key: "local-ci".to_string(),
+            attempt: 1,
+            revision: 2,
+            stage: "local_qa".to_string(),
+            evidence_type: "local_ci".to_string(),
+            status: AutoHuntRunEvidenceStatus::Passed,
+            detail: None,
+            command: None,
+            url: None,
+            metadata: None,
+            actor: "test".to_string(),
+            observed_at: "2026-01-01T00:00:00Z".to_string(),
+            recorded_at: "2026-01-01T00:00:01Z".to_string(),
+            images: Vec::new(),
+            required_revision: 2,
+            canonical: true,
+        }
+    }
+
     #[test]
     fn persists_worker_transitions_with_monotonic_cursors() {
         let directory = tempfile::tempdir().expect("dispatch fixture");
@@ -617,15 +687,7 @@ mod tests {
             )
             .expect("completed");
         store
-            .record_worker_evidence(
-                "group-1",
-                "group-1-w1",
-                serde_json::json!({
-                    "stage": "local_qa",
-                    "type": "local_ci",
-                    "status": "passed",
-                }),
-            )
+            .record_worker_evidence("group-1", "group-1-w1", evidence())
             .expect("evidence");
         let group = store.load("group-1").expect("load").expect("saved group");
         assert_eq!(group.workers[0].status, AutoHuntWorkerStatus::Completed);
@@ -644,12 +706,8 @@ mod tests {
         let evidence = group.events.last().expect("evidence event");
         assert_eq!(evidence.event_type, "worker_evidence");
         assert_eq!(
-            evidence
-                .data
-                .as_ref()
-                .and_then(|data| data.get("status"))
-                .and_then(serde_json::Value::as_str),
-            Some("passed")
+            evidence.evidence.as_ref().map(|value| value.status),
+            Some(AutoHuntRunEvidenceStatus::Passed)
         );
     }
 

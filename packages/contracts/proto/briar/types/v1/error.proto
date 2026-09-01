@@ -1,0 +1,90 @@
+syntax = "proto3";
+
+package briar.types.v1;
+
+import "briar/types/v1/provider.proto";
+import "google/protobuf/duration.proto";
+
+option swift_prefix = "BriarTypes_";
+
+message FieldViolation {
+  string path = 1;
+  string rule = 2;
+  string message = 3;
+}
+
+message ValidationErrorDetail {
+  repeated FieldViolation violations = 1;
+}
+
+// Stable application code for a typed Connect error. The canonical Connect
+// Code still owns transport retry semantics; this detail identifies the
+// product-specific failure without parsing a human-readable message.
+message ApplicationErrorDetail {
+  string code = 1;
+}
+
+message CursorExpiredDetail {
+  string resource = 1;
+  optional uint64 requested_cursor = 2;
+  optional uint64 minimum_cursor = 3;
+  uint64 current_cursor = 4;
+  bool reset_required = 5;
+}
+
+enum RevisionConflictReason {
+  REVISION_CONFLICT_REASON_UNSPECIFIED = 0;
+  REVISION_CONFLICT_REASON_STALE_WRITE = 1;
+  REVISION_CONFLICT_REASON_CHECKPOINT = 2;
+  REVISION_CONFLICT_REASON_CHECKPOINT_POLICY = 3;
+  REVISION_CONFLICT_REASON_PROPOSAL_STATE = 4;
+  REVISION_CONFLICT_REASON_IDEMPOTENCY_KEY_REUSED = 5;
+}
+
+message RevisionConflictDetail {
+  string resource_id = 1;
+  optional uint64 expected_revision = 2;
+  optional uint64 actual_revision = 3;
+  RevisionConflictReason reason = 4;
+}
+
+enum WorkerSelectionFailureReason {
+  WORKER_SELECTION_FAILURE_REASON_UNSPECIFIED = 0;
+  WORKER_SELECTION_FAILURE_REASON_NOT_FOUND = 1;
+  WORKER_SELECTION_FAILURE_REASON_UNAVAILABLE = 2;
+  WORKER_SELECTION_FAILURE_REASON_PROVIDER_UNSUPPORTED = 3;
+  WORKER_SELECTION_FAILURE_REASON_MODEL_UNSUPPORTED = 4;
+  WORKER_SELECTION_FAILURE_REASON_EFFORT_UNSUPPORTED = 5;
+  WORKER_SELECTION_FAILURE_REASON_NO_AVAILABLE_SLOT = 6;
+  WORKER_SELECTION_FAILURE_REASON_POLICY_DISALLOWS = 7;
+}
+
+message WorkerSelectionErrorDetail {
+  optional string worker_id = 1;
+  optional AgentProvider provider = 2;
+  optional string model = 3;
+  optional string effort = 4;
+  WorkerSelectionFailureReason reason = 5;
+}
+
+enum ResourceKind {
+  RESOURCE_KIND_UNSPECIFIED = 0;
+  RESOURCE_KIND_REQUEST_RATE = 1;
+  RESOURCE_KIND_USER = 2;
+  RESOURCE_KIND_ORGANIZATION = 3;
+  RESOURCE_KIND_MANAGED_COMPUTER = 4;
+  RESOURCE_KIND_WORKER_SESSION = 5;
+  RESOURCE_KIND_STORAGE_BYTES = 6;
+}
+
+message ResourceLimitDetail {
+  ResourceKind resource_kind = 1;
+  string scope = 2;
+  uint64 limit = 3;
+  optional google.protobuf.Duration retry_after = 4;
+}
+
+message IdempotencyConflictDetail {
+  string request_id = 1;
+  optional string existing_resource_id = 2;
+}

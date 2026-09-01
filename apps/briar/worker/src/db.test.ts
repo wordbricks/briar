@@ -1,13 +1,12 @@
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
-import { Miniflare } from "miniflare";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { env } from "cloudflare:workers";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import {
   cloneAutoHuntWorkflow,
   normalizeAutoHuntWorkflow,
   repositoryWorkflowBootstrap,
 } from "../../src/lib/auto-hunt-contract";
+import { encodeStructuredAgentResultJson } from "../../src/lib/agent-result";
 import type { HuntEventInput } from "./db";
 import {
   getDashboardSyncCursor,
@@ -22,7 +21,6 @@ import {
 import { listProjects } from "./project-repository";
 import {
   acceptOrganizationInvitation,
-  acceptIssueCreateProposal,
   reserveIssueCreateProposalApproval,
   acceptIssueUpdateProposal,
   acceptIssueReworkProposal,
@@ -30,7 +28,6 @@ import {
   claimNextProjectAgentTask,
   claimNextQueuedHuntRun,
   claimDueProjectAgentScheduleRun,
-  addOrganizationMember,
   completeProjectAgentScheduleRun,
   completeIssueResultReview,
   createOrganization,
@@ -119,7 +116,12 @@ import { registerExecutionWorker } from "./workers";
 import apiWorker from "./index";
 import { processSlackRevocationQueue } from "./slack-revocations";
 import { encryptSlackToken } from "./slack";
-import { executeD1Sql } from "./test-helpers/d1";
+import {
+  decodeStoredProjectAgentSessionSummary,
+  type StoredProjectAgentSessionPayload,
+} from "./project-request-contract";
+import { applyD1Migrations, executeD1Sql } from "./test-helpers/d1";
+import { workerRuntimeMetadataFixture } from "./test-helpers/worker-runtime";
 
 const releaseWorkflow = normalizeAutoHuntWorkflow({
   version: 2,
@@ -245,6 +247,37 @@ const baseTime = Date.parse("2026-07-21T00:00:00Z");
 const atMinute = (minute: number) =>
   new Date(baseTime + minute * 60_000).toISOString();
 
+const projectAgentSessionPayload = (input: {
+  id: string;
+  status: "running" | "completed" | "failed" | "interrupted";
+  startedAt: string;
+  completedAt: string | null;
+  events?: Array<{
+    id: string;
+    type: "completed";
+    occurredAt: string;
+  }>;
+}): StoredProjectAgentSessionPayload => ({
+  dispatchGroupId: input.id,
+  agentId: null,
+  sessionType: "task",
+  trigger: "manual",
+  scheduleId: null,
+  scheduleRunId: null,
+  parentSessionId: null,
+  request: "Review the repository",
+  followUps: [],
+  status: input.status,
+  issues: [],
+  startedAt: input.startedAt,
+  completedAt: input.completedAt,
+  conversationId: null,
+  summary: null,
+  error: null,
+  events: input.events ?? [],
+  updatedAt: input.completedAt ?? input.startedAt,
+});
+
 const updateProjectSettings = async (
   db: D1Database,
   targetProjectId: string,
@@ -325,11 +358,6 @@ const event = (
 });
 
 describe("Briar Auto Hunt D1 lifecycle", () => {
-  const miniflare = new Miniflare({
-    modules: true,
-    script: "export default { fetch() { return new Response('ok') } }",
-    d1Databases: { DB: "briar-test" },
-  });
   let db: D1Database;
 
   const claimResumedRun = async (runId: string, minute: number) => {
@@ -349,844 +377,99 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
   };
 
   beforeAll(async () => {
-    db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
-    for (const migration of [
-      "migrations/0001_briar.sql",
-      "migrations/0002_remove_repository_path.sql",
-      "migrations/0003_generalize_auto_hunt.sql",
-      "migrations/0004_auto_hunt_claims.sql",
-      "migrations/0005_auto_hunt_recovery.sql",
-      "migrations/0006_issue_attachments.sql",
-      "migrations/0007_configurable_workflows.sql",
-      "migrations/0008_organizations.sql",
-      "migrations/0009_auto_hunt_automation.sql",
-      "migrations/0010_issue_messages.sql",
-      "migrations/0011_issue_message_agents.sql",
-      "migrations/0012_organization_handles.sql",
-      "migrations/0013_execution_workers.sql",
-      "migrations/0014_agent_provider_grok.sql",
-    ]) {
-      await executeSql(db, await readFile(resolve(migration), "utf8"));
-    }
-    await executeSql(
-      db,
-      `alter table briar_issue_messages add column author_agent_id text;
-       alter table briar_issue_messages add column author_agent_name text;`,
-    );
-    await executeSql(
-      db,
-      `
-      insert into user (id, name, email, emailVerified, createdAt, updatedAt)
-      values ('owner', 'Owner', 'owner@example.com', 1, '${atMinute(0)}', '${atMinute(0)}');
-      insert into briar_organizations (id, name, handle, created_at, updated_at)
-      values (
-        '${projectId}', 'Example Org', 'example-org',
-        '${atMinute(0)}', '${atMinute(0)}'
-      );
-      insert into briar_organization_members (
-        organization_id, user_id, role, created_at, updated_at
-      ) values (
-        '${projectId}', 'owner', 'owner', '${atMinute(0)}', '${atMinute(0)}'
-      );
-      insert into briar_projects (
-        id, owner_user_id, organization_id, name, agent_token_hash, created_at, updated_at
-      ) values (
-        '${projectId}', 'owner', '${projectId}', 'Example',
-        'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-        '${atMinute(0)}', '${atMinute(0)}'
-      );
-      insert into briar_project_settings (
-        project_id, velen_org, linear_enabled, workflow_json, created_at, updated_at
-      ) values (
-        '${projectId}', 'example', 0,
-        '{"version":1,"preset":"release","stages":[{"id":"analyzing","label":"분석","required":true},{"id":"implementing","label":"구현","required":true},{"id":"pr_open","label":"PR 검증","required":true},{"id":"staging_qa","label":"Stage QA","required":true},{"id":"production_qa","label":"Production QA","required":true}]}',
-        '${atMinute(0)}', '${atMinute(0)}'
-      );
-      insert into briar_execution_workers (
-        id, project_id, label, host_fingerprint, agent_provider, versions_json,
-        state, last_heartbeat_at, created_at, updated_at
-      ) values (
-        'legacy-worker', '${projectId}', 'Legacy worker',
-        'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
-        'codex', '{"briar":"1.1.0"}', 'stale', '${atMinute(0)}',
-        '${atMinute(0)}', '${atMinute(0)}'
-      );
-      `,
-    );
-    await executeSql(
-      db,
-      `create view briar_teams as select * from briar_projects;
-       create trigger briar_teams_legacy_insert
-       instead of insert on briar_teams BEGIN
-         insert into briar_projects (
+    db = env.DB;
+    await applyD1Migrations(db);
+
+    const createdAt = atMinute(0);
+    await db.batch([
+      db.prepare(
+        `insert into user (
+           id, name, email, emailVerified, createdAt, updatedAt
+         ) values (?, ?, ?, 1, ?, ?)`,
+      ).bind(
+        "owner",
+        "Owner",
+        "owner@example.com",
+        createdAt,
+        createdAt,
+      ),
+      db.prepare(
+        `insert into briar_organizations (
+           id, name, handle, created_at, updated_at
+         ) values (?, ?, ?, ?, ?)`,
+      ).bind(
+        projectId,
+        "Example Org",
+        "example-org",
+        createdAt,
+        createdAt,
+      ),
+      db.prepare(
+        `insert into briar_organization_members (
+           organization_id, user_id, role, created_at, updated_at
+         ) values (?, ?, 'owner', ?, ?)`,
+      ).bind(projectId, "owner", createdAt, createdAt),
+      db.prepare(
+        `insert into briar_projects (
            id, owner_user_id, organization_id, name, agent_token_hash,
            created_at, updated_at
-         ) values (
-           new.id, new.owner_user_id, new.organization_id, new.name,
-           new.agent_token_hash, new.created_at, new.updated_at
-         );
-       END;`,
-    );
-    const migrationRunId = "99999999-9999-4999-8999-999999999999";
-    await executeSql(
-      db,
-      `insert into briar_hunt_runs (
-         id, project_id, source, source_key, title, stage, status,
-         workflow_stage, detail, repository, branch, commit_sha, started_at,
-         completed_at, last_event_at, created_at, updated_at
-       ) values (
-         '${migrationRunId}', '${projectId}', 'issue',
-         'pre-backlog-migration', 'Pre-backlog migration sentinel',
-         'cancelled', 'cancelled', null, 'cancelled detail',
-         'example/repository', null, null, '${atMinute(1)}', '${atMinute(1)}',
-         '${atMinute(1)}', '${atMinute(1)}', '${atMinute(1)}'
-       );
-       insert into briar_hunt_events (
-         id, run_id, event_key, stage, status, workflow_stage, detail, actor,
-         branch, commit_sha, occurred_at, recorded_at
-       ) values (
-         '88888888-8888-4888-8888-888888888888', '${migrationRunId}',
-         'pre-backlog-migration:cancelled', 'cancelled', 'cancelled', null,
-         'cancelled detail', 'vitest', null, null, '${atMinute(1)}',
-         '${atMinute(1)}'
-       );`,
-    );
-    await createIssueAttachments(db, projectId, migrationRunId, [
-      {
-        id: "11111111-2222-4333-8444-555555555555",
-        object_key: "issue-attachments/pre-backlog-migration/sentinel",
-        filename: "sentinel.png",
-        content_type: "image/png",
-        byte_size: 8,
-      },
+         ) values (?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        projectId,
+        "owner",
+        projectId,
+        "Example",
+        "a".repeat(64),
+        createdAt,
+        createdAt,
+      ),
+      db.prepare(
+        `insert into briar_project_settings (
+           project_id, velen_org, linear_enabled, workflow_json,
+           mandatory_checkpoints_json, created_at, updated_at
+         ) values (?, ?, 0, ?, ?, ?, ?)`,
+      ).bind(
+        projectId,
+        "example",
+        JSON.stringify(repositoryWorkflowBootstrap),
+        JSON.stringify(repositoryWorkflowBootstrap.execution.checkpoints),
+        createdAt,
+        createdAt,
+      ),
     ]);
-    await createIssueMessage(db, {
-      id: "66666666-7777-4888-8999-000000000000",
-      projectId,
-      runId: migrationRunId,
-      parentMessageId: null,
-      authorUserId: "owner",
-      authorAgentProvider: null,
-      body: "Preserve this message through the backlog migration.",
-      createdAt: atMinute(1),
-    });
-    await executeSql(
-      db,
-      await readFile(resolve("migrations/0015_backlog_status.sql"), "utf8"),
-    );
-    await executeSql(
-      db,
-      await readFile(resolve("migrations/0016_project_agents.sql"), "utf8"),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0017_default_auto_hunt_agent.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0018_project_agent_schedules.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0019_project_agent_schedule_runs.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0020_project_agent_calendar_color.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(resolve("migrations/0021_run_evidence.sql"), "utf8"),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0022_remove_workflow_presets.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0023_project_agent_skills.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0024_project_agent_avatars.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0025_project_agent_codex_pets.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0026_flexible_project_agent_schedules.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(resolve("migrations/0027_run_revisions.sql"), "utf8"),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0029_structured_agent_results.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0030_run_evidence_images.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(resolve("migrations/0031_organization_logos.sql"), "utf8"),
-    );
-    await executeSql(
-      db,
-      await readFile(resolve("migrations/0032_slack_integration.sql"), "utf8"),
-    );
-    await executeSql(
-      db,
-      `update briar_organizations
-       set logo = 'data:image/webp;base64,bGVnYWN5'
-       where id = '${projectId}'`,
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0033_organization_logo_browser_formats.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0034_execution_worker_credentials.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0035_detached_worker_dispatch.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0036_execution_worker_concurrency.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0037_workflow_stop_after_stage.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0038_project_execution_worker_policies.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0039_project_agent_tokens.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0040_run_execution_provider.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0041_issue_message_mentions.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0042_project_agent_sessions.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0043_execution_worker_icons.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0044_issue_agent_reply_jobs.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0045_issue_execution_preferences.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(resolve("migrations/0046_project_icons.sql"), "utf8"),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0047_project_icon_browser_formats.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(resolve("migrations/0048_issue_dependencies.sql"), "utf8"),
-    );
-    await executeSql(
-      db,
-      await readFile(resolve("migrations/0049_dashboard_delta_sync.sql"), "utf8"),
-    );
-    await executeSql(
-      db,
-      await readFile(resolve("migrations/0050_hunt_run_event_count.sql"), "utf8"),
-    );
-    await executeSql(
-      db,
-      await readFile(resolve("migrations/0051_log_archives.sql"), "utf8"),
-    );
-    await executeSql(
-      db,
-      await readFile(resolve("migrations/0051_user_profiles.sql"), "utf8"),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0052_project_agent_session_skipped.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0053_issue_result_reviews.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(resolve("migrations/0054_run_execution_metrics.sql"), "utf8"),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0057_organization_invitations.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0058_workflow_pause_after_stage.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(resolve("migrations/0059_workflow_v2_progress.sql"), "utf8"),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0060_workflow_checkpoint_policies.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0061_resume_requested_state.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0061_workflow_stage_status_events.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(resolve("migrations/0062_issue_assignees.sql"), "utf8"),
-    );
-    await executeSql(
-      db,
-      await readFile(resolve("migrations/0063_inbox_read_states.sql"), "utf8"),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0063_github_pull_request_sync.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(resolve("migrations/0064_github_integration.sql"), "utf8"),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0065_issue_rework_proposals.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0066_normalize_project_workflows_v2.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(resolve("migrations/0067_issue_checkpoints.sql"), "utf8"),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0068_issue_action_proposals.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      `alter table briar_issue_action_proposals
-         add column approval_reserved_by_user_id text;
-       alter table briar_issue_action_proposals
-         add column approval_reserved_at text;
-       alter table briar_issue_action_proposals
-         add column issue_source_key text;`,
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0069_project_agent_effort.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0070_project_issue_key_prefix.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(resolve("migrations/0056_ideas.sql"), "utf8"),
-    );
-    await executeSql(
-      db,
-      await readFile(resolve("migrations/0071_organization_agents.sql"), "utf8"),
-    );
-    await executeSql(
-      db,
-      await readFile(resolve("migrations/0072_organization_ideas.sql"), "utf8"),
-    );
-    await executeSql(
-      db,
-      await readFile(resolve("migrations/0073_organization_channels.sql"), "utf8"),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0075_channel_message_attachments.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0076_execution_worker_updates.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0077_project_agent_task_jobs.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(resolve("migrations/0079_agent_skills.sql"), "utf8"),
-    );
-    await executeSql(
-      db,
-      await readFile(resolve("migrations/0080_agent_skill_jobs.sql"), "utf8"),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0081_optimize_dashboard_worker_device_sync.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0082_explicit_agent_skill_selection.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      `alter table briar_issue_agent_reply_jobs
-         add column skill_id text
-           references briar_agent_skills (id) on delete set null;`,
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0083_suppress_heartbeat_dashboard_changes.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(resolve("migrations/0084_run_usage_ledger.sql"), "utf8"),
-    );
-    await executeSql(
-      db,
-      await readFile(resolve("migrations/0085_run_cost_ledger.sql"), "utf8"),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0097_project_usage_summary.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0088_organization_agent_context.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      `alter table briar_archive_cleanup_queue
-         add column generation integer not null default 1 check (generation >= 1);
-       alter table briar_archive_cleanup_queue add column next_attempt_at text;
-       alter table briar_archive_cleanup_queue add column dead_lettered_at text;
-       alter table briar_archive_cleanup_queue
-         add column alert_state text not null default 'none'
-           check (alert_state in ('none', 'pending', 'acknowledged'));
-       alter table briar_archive_cleanup_queue
-         add column alert_detail_json text
-           check (alert_detail_json is null or json_valid(alert_detail_json));
-       create table briar_account_deletion_jobs (
-         id text primary key not null,
-         user_id text not null unique,
-         email text not null,
-         created_at text not null
-       );
-       create table briar_account_deletion_job_organizations (
-         job_id text not null
-           references briar_account_deletion_jobs (id) on delete cascade,
-         organization_id text not null,
-         primary key (job_id, organization_id)
-       );
-       create table briar_slack_revocation_queue (
-         id text primary key not null,
-         team_id text not null,
-         encrypted_bot_token text not null,
-         token_iv text not null,
-         queued_at text not null,
-         next_attempt_at text not null,
-         attempts integer not null default 0,
-         last_attempt_at text,
-         last_error text,
-         dead_lettered_at text,
-         dead_letter_reason text
-       );
-       alter table briar_project_agent_task_jobs
-         add column skill_execution_proposal_id text;
-       create table briar_agent_skill_execution_approval_audit (
-         proposal_id text primary key not null,
-         project_id text not null,
-         result_session_id text not null,
-         agent_id text not null,
-         skill_id text not null,
-         request text not null,
-         worker_id text not null,
-         approved_by_user_id text
-       );`,
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0093_project_agent_session_sync.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(resolve("migrations/0098_issue_subscriptions.sql"), "utf8"),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0099_project_usage_analytics.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0102_auto_issue_subscriptions.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0108_channel_notification_inbox.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0113_agent_descriptions.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0113_project_schedule_tab.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(resolve("migrations/0117_email_otp_auth.sql"), "utf8"),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0119_execution_worker_update_handoffs.sql"),
-        "utf8",
-      ),
-    );
-    for (const migration of [
-      "0121_repository_merge_batches.sql",
-      "0122_remove_repository_merge_batches.sql",
-      "0123_native_merge_queue_coordinator.sql",
-      "0128_agent_skill_documents.sql",
-    ]) {
-      await executeSql(
-        db,
-        await readFile(resolve("migrations", migration), "utf8"),
-      );
-    }
-    await executeSql(
-      db,
-      `alter table briar_project_agent_sessions
-         add column requested_by_user_id text references "user" (id);
-       alter table briar_project_agent_schedules
-         add column created_by_user_id text references "user" (id);`,
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0133_channel_reply_sessions.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(resolve("migrations/0136_issue_difficulty.sql"), "utf8"),
-    );
-    await executeSql(
-      db,
-      await readFile(resolve("migrations/0140_issue_difficulty_optional.sql"), "utf8"),
-    );
-    await executeSql(
-      db,
-      await readFile(resolve("migrations/0138_project_members.sql"), "utf8"),
-    );
-    // The compact lifecycle schema intentionally skips the approval tables
-    // required by production migration 0140. Keep the shared Agent Skill
-    // helpers on their current schema without pulling those unrelated tables
-    // into this suite.
-    await executeSql(
-      db,
-      `alter table briar_agent_skills add column execution_mode text not null
-         default 'task'
-         check (execution_mode in ('conversation', 'task'));
-       alter table briar_agent_skills add column approval_policy text not null
-         default 'explicit'
-         check (approval_policy in ('invoke_is_consent', 'explicit'));`,
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0141_agent_designated_workers.sql"),
-        "utf8",
-      ),
-    );
-    // The compact lifecycle schema predates channel thread subscriptions and
-    // issue execution approvals. Supply the empty channel tables referenced by
-    // the production role migration's membership foreign keys and triggers.
-    await executeSql(
-      db,
-      `create table briar_channel_sync_state (
-         organization_id text primary key not null,
-         current_version integer not null default 0
-       );
-       create table briar_channel_changes (
-         version integer primary key autoincrement,
-         organization_id text not null,
-         channel_id text not null,
-         entity_type text not null,
-         entity_id text,
-         operation text not null,
-         created_at text not null
-       );
-       create table briar_channel_thread_subscriptions (
-         root_message_id text not null
-           references briar_channel_messages (id) on delete cascade,
-         channel_id text not null
-           references briar_channels (id) on delete cascade,
-         organization_id text not null,
-         user_id text not null,
-         created_at text not null,
-         primary key (root_message_id, user_id),
-         foreign key (organization_id, user_id)
-           references briar_organization_members (organization_id, user_id)
-           on delete cascade
-       );`,
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0146_organization_capability_roles.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0147_project_github_repository_identity.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      `drop trigger briar_issue_execution_org_member_remove_invalidate;`,
-    );
-    // The lifecycle suite intentionally uses a compact migration history, so
-    // add the issue-reply job columns that production migration 0116 supplies
-    // before exercising the shared DB helpers below.
-    await executeSql(
-      db,
-      `alter table briar_issue_agent_reply_jobs add column agent_id text;
-       alter table briar_issue_agent_reply_jobs
-         add column requires_preferred_worker integer not null default 0;
-       alter table briar_issue_agent_reply_jobs add column agent_name_snapshot text;
-       alter table briar_issue_agent_reply_jobs
-         add column agent_responsibility_snapshot text;
-       create unique index briar_issue_agent_reply_jobs_agent_test_idx
-         on briar_issue_agent_reply_jobs (project_id, trigger_message_id, agent_id);`,
-    );
-    // Current read paths distinguish the execution Team from the lightweight
-    // planning Project. This compact historical fixture intentionally stops
-    // before migration 0149, so model its compatibility contract with each
-    // legacy Project acting as its own General planning Project.
-    await executeSql(
-      db,
-      `alter table briar_projects add column team_id text;
-       update briar_projects set team_id = id;
-       create view briar_planning_projects as
-         select id, team_id, name from briar_projects;
-       alter table briar_hunt_runs add column planning_project_id text;
-       update briar_hunt_runs set planning_project_id = project_id;
-       create trigger briar_projects_legacy_general_after_insert
-       after insert on briar_projects
-       when new.team_id is null
-       BEGIN
-         update briar_projects set team_id = new.id where id = new.id;
-       END;
-       create trigger briar_hunt_runs_legacy_general_after_insert
-       after insert on briar_hunt_runs
-       when new.planning_project_id is null
-       BEGIN
-         update briar_hunt_runs
-         set planning_project_id = new.project_id where id = new.id;
-       END;
-       create trigger briar_hunt_runs_legacy_general_after_transfer
-       after update of project_id on briar_hunt_runs
-       BEGIN
-         update briar_hunt_runs
-         set planning_project_id = new.project_id where id = new.id;
-       END;
-       create trigger briar_teams_legacy_delete
-       instead of delete on briar_teams
-       BEGIN
-         delete from briar_projects where id = old.id;
-       END;`,
-    );
-  }, 30_000);
 
-  afterAll(async () => {
-    await miniflare.dispose();
-  });
+    await createProjectAgent(db, projectId, {
+      name: "Developer agent",
+      provider: "codex",
+      model: null,
+      effort: null,
+      responsibility: "Perform Auto Hunt for every queued issue.",
+      skills: [{
+        name: "Issue processing",
+        description: "Use for queued project issues.",
+        body: "Perform Auto Hunt for every queued issue.",
+        provider: "codex",
+        model: null,
+        effort: null,
+        kind: "issue_processing",
+        executionMode: "task",
+        approvalPolicy: "explicit",
+        position: 0,
+      }],
+      calendarColor: "#3275d5",
+    });
+    await registerExecutionWorker(db, projectId, {
+      id: "legacy-worker",
+      deviceId: "lifecycle-device",
+      organizationId: projectId,
+      ownerUserId: "owner",
+      label: "Lifecycle Worker",
+      deviceIdentityHash: "c".repeat(64),
+      credentialTokenHash: "d".repeat(64),
+      runtime: workerRuntimeMetadataFixture(),
+      observedAt: createdAt,
+    });
+  }, 60_000);
 
   it("compares normalized persisted event fields for idempotent replays", async () => {
     const sourceKey = "event-equivalence";
@@ -1340,11 +623,12 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       );
       insert into briar_project_settings (
         project_id, velen_org, linear_enabled, workflow_json, github_repository,
-        created_at, updated_at
+        mandatory_checkpoints_json, created_at, updated_at
       ) values (
         '${targetProjectId}', 'example', 0,
         '${JSON.stringify(localWorkflow).replace(/'/g, "''")}',
         'target/repository',
+        '${JSON.stringify(localWorkflow.execution.checkpoints).replace(/'/g, "''")}',
         '${atMinute(0)}', '${atMinute(0)}'
       );
     `,
@@ -1723,59 +1007,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await setStoredWorkflow(db, projectId, repositoryWorkflowBootstrap);
   });
 
-  it("preserves existing run data and child foreign keys in the backlog migration", async () => {
-    const run = await db
-      .prepare(
-        `select id, stage, status from briar_hunt_runs
-         where source_key = 'pre-backlog-migration'`,
-      )
-      .first<{ id: string; stage: string; status: string }>();
-
-    expect(run).toMatchObject({ stage: "cancelled", status: "cancelled" });
-    expect(
-      await db
-        .prepare("select event_count from briar_hunt_runs where id = ?")
-        .bind(run!.id)
-        .first<number>("event_count"),
-    ).toBe(1);
-    expect(
-      JSON.parse((await getProjectSettings(db, projectId))!.workflow_json),
-    ).toEqual(repositoryWorkflowBootstrap);
-    expect(
-      JSON.parse(
-        (await getHuntRunForProject(db, projectId, run!.id))!
-          .workflow_snapshot_json,
-      ),
-    ).not.toHaveProperty("preset");
-    expect(
-      await db
-        .prepare(
-          "select count(*) as count from briar_hunt_events where run_id = ?",
-        )
-        .bind(run!.id)
-        .first<number>("count"),
-    ).toBe(1);
-    expect(
-      await db
-        .prepare(
-          "select count(*) as count from briar_issue_attachments where run_id = ?",
-        )
-        .bind(run!.id)
-        .first<number>("count"),
-    ).toBe(1);
-    expect(
-      await db
-        .prepare(
-          "select count(*) as count from briar_issue_messages where run_id = ?",
-        )
-        .bind(run!.id)
-        .first<number>("count"),
-    ).toBe(1);
-    expect(await db.prepare("pragma foreign_key_check").all()).toMatchObject({
-      results: [],
-    });
-  });
-
   it("serves dashboard summaries without reading the event table", async () => {
     await updateProjectSettings(db, projectId, {
       velenOrg: "example",
@@ -1854,17 +1085,18 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
          )
          insert into briar_hunt_runs (
            id, project_id, source, source_key, title, stage, status,
-           repository, started_at, completed_at, last_event_at, created_at,
-           updated_at
+           workflow_snapshot_json, repository, started_at, completed_at,
+           last_event_at, created_at, updated_at
          )
          select 'usage-cap-' || printf('%03d', value), ?, 'issue',
                 'usage-cap-' || printf('%03d', value),
                 'Usage run ' || value, 'completed', 'completed',
-                'example/usage', ?, ?, ?, ?, ?
+                ?, 'example/usage', ?, ?, ?, ?, ?
          from sequence`,
       )
       .bind(
         usageProject.id,
+        JSON.stringify(repositoryWorkflowBootstrap),
         recentAt,
         recentAt,
         recentAt,
@@ -1927,50 +1159,61 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       .prepare(
         `insert into briar_hunt_runs (
            id, project_id, source, source_key, title, stage, status,
-           repository, started_at, completed_at, last_event_at, created_at,
-           updated_at
+           workflow_snapshot_json, repository, started_at, completed_at,
+           last_event_at, created_at, updated_at
          ) values (
            'usage-before-range', ?, 'issue', 'usage-before-range',
-           'Old usage run', 'completed', 'completed', 'example/usage',
+           'Old usage run', 'completed', 'completed', ?, 'example/usage',
            ?, ?, ?, ?, ?
          )`,
       )
-      .bind(usageProject.id, oldAt, oldAt, oldAt, oldAt, oldAt)
+      .bind(
+        usageProject.id,
+        JSON.stringify(repositoryWorkflowBootstrap),
+        oldAt,
+        oldAt,
+        oldAt,
+        oldAt,
+        oldAt,
+      )
       .run();
     await db
       .prepare(
         `insert into briar_hunt_runs (
            id, project_id, source, source_key, title, stage, status,
-           repository, paused_at, started_at, completed_at, last_event_at,
-           created_at, updated_at
+           workflow_snapshot_json, repository, paused_at, started_at,
+           completed_at, last_event_at, created_at, updated_at
          ) values
            (
              'usage-unclaimed', ?, 'issue', 'usage-unclaimed',
-             'Unclaimed backlog item', 'queued', 'backlog', 'example/usage',
+             'Unclaimed backlog item', 'queued', 'backlog', ?, 'example/usage',
              null, ?, null, ?, ?, ?
            ),
            (
              'usage-unclaimed-queued', ?, 'issue', 'usage-unclaimed-queued',
-             'Unclaimed queued item', 'queued', 'queued', 'example/usage',
+             'Unclaimed queued item', 'queued', 'queued', ?, 'example/usage',
              null, ?, null, ?, ?, ?
            ),
            (
              'usage-paused', ?, 'issue', 'usage-paused', 'Paused usage run',
-             'queued', 'queued', 'example/usage', ?, ?, null, ?, ?, ?
+             'queued', 'queued', ?, 'example/usage', ?, ?, null, ?, ?, ?
            )`,
       )
       .bind(
         usageProject.id,
+        JSON.stringify(repositoryWorkflowBootstrap),
         recentAt,
         recentAt,
         recentAt,
         recentAt,
         usageProject.id,
+        JSON.stringify(repositoryWorkflowBootstrap),
         recentAt,
         recentAt,
         recentAt,
         recentAt,
         usageProject.id,
+        JSON.stringify(repositoryWorkflowBootstrap),
         recentAt,
         recentAt,
         recentAt,
@@ -1993,16 +1236,17 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       .prepare(
         `insert into briar_hunt_runs (
            id, project_id, source, source_key, title, stage, status,
-           repository, started_at, completed_at, last_event_at, created_at,
-           updated_at
+           workflow_snapshot_json, repository, started_at, completed_at,
+           last_event_at, created_at, updated_at
          ) values (
            'usage-other-organization', ?, 'issue', 'usage-other-organization',
            'Other organization usage', 'completed', 'completed',
-           'example/other', ?, ?, ?, ?, ?
+           ?, 'example/other', ?, ?, ?, ?, ?
          )`,
       )
       .bind(
         otherProject.id,
+        JSON.stringify(repositoryWorkflowBootstrap),
         recentAt,
         recentAt,
         recentAt,
@@ -2055,9 +1299,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     expect(
       projectRows.some((row) => row.id === "usage-unclaimed-queued"),
     ).toBe(true);
-    expect(
-      projectRows.find((row) => row.id === "usage-cap-001"),
-    ).toMatchObject({ has_usage_ledger: 1 });
     expect(await listProjectUsageRuns(
       db,
       usageProject.id,
@@ -2099,48 +1340,28 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
 
   it("synchronizes the newest project agent session snapshot", async () => {
     const sessionId = "77777777-7777-4777-8777-777777777777";
-    const payload = {
-      dispatchGroupId: "",
-      agentId: null,
-      sessionType: "task",
-      trigger: "manual",
-      scheduleId: null,
-      scheduleRunId: null,
-      parentSessionId: null,
-      request: "Review the repository",
+    const payload = projectAgentSessionPayload({
+      id: sessionId,
       status: "running",
-      issues: [],
       startedAt: atMinute(2),
       completedAt: null,
-      conversationId: null,
-      summary: null,
-      error: null,
-      events: [],
-      updatedAt: atMinute(2),
-    };
+    });
     await upsertProjectAgentSession(db, {
-      project_id: projectId,
+      projectId,
       id: sessionId,
-      agent_id: null,
-      requested_by_user_id: "owner",
-      status: "running",
-      session_type: "task",
-      payload_json: JSON.stringify(payload),
-      started_at: atMinute(2),
-      completed_at: null,
-      updated_at: atMinute(2),
+      requestedByUserId: "owner",
+      payload,
     }, atMinute(2));
     await upsertProjectAgentSession(db, {
-      project_id: projectId,
+      projectId,
       id: sessionId,
-      agent_id: null,
-      requested_by_user_id: "owner",
-      status: "failed",
-      session_type: "task",
-      payload_json: JSON.stringify({ ...payload, status: "failed" }),
-      started_at: atMinute(2),
-      completed_at: atMinute(1),
-      updated_at: atMinute(1),
+      requestedByUserId: "owner",
+      payload: {
+        ...payload,
+        status: "failed",
+        completedAt: atMinute(1),
+        updatedAt: atMinute(1),
+      },
     }, atMinute(3));
 
     const sessions = await listProjectAgentSessions(db, projectId);
@@ -2153,107 +1374,29 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     ]);
   });
 
-  it("persists skipped project agent session snapshots", async () => {
-    const sessionId = "66666666-6666-4666-8666-666666666666";
-    await upsertProjectAgentSession(db, {
-      project_id: projectId,
-      id: sessionId,
-      agent_id: null,
-      requested_by_user_id: "owner",
-      status: "skipped",
-      session_type: "task",
-      payload_json: JSON.stringify({ status: "skipped" }),
-      started_at: atMinute(2),
-      completed_at: atMinute(3),
-      updated_at: atMinute(3),
-    }, atMinute(3));
-
-    await expect(
-      db.prepare(
-        "select status from briar_project_agent_sessions where project_id = ? and id = ?",
-      ).bind(projectId, sessionId).first<{ status: string }>(),
-    ).resolves.toEqual({ status: "skipped" });
-  });
-
-  it("uses the canonical terminal session Inbox version", async () => {
-    const sessionId = "55555555-5555-4555-8555-555555555555";
-    const completedAt = atMinute(4);
-    await upsertProjectAgentSession(db, {
-      project_id: projectId,
-      id: sessionId,
-      agent_id: null,
-      requested_by_user_id: "owner",
-      status: "completed",
-      session_type: "task",
-      payload_json: JSON.stringify({
-        status: "completed",
-        issues: [],
-        startedAt: atMinute(2),
-        completedAt,
-        events: [{
-          id: "terminal-completed-event",
-          type: "completed",
-          occurredAt: completedAt,
-        }],
-      }),
-      started_at: atMinute(2),
-      completed_at: completedAt,
-      updated_at: completedAt,
-    }, completedAt);
-
-    const summaries = await listProjectAgentSessionSummaries(
-      db,
-      projectId,
-      [sessionId],
-      "owner",
-    );
-    expect(JSON.parse(summaries[0]!.summary_json)).toMatchObject({
-      status: "completed",
-      inboxVersion: `session:v1:completed:${completedAt}`,
-      requestedByUserId: "owner",
-    });
-    await expect(
-      listProjectAgentSessionSummaries(
-        db,
-        projectId,
-        [sessionId],
-        "another-member",
-      ),
-    ).resolves.toEqual([]);
-  });
-
   it("preserves the trusted Agent Session requester across later updates", async () => {
     const sessionId = "44444444-4444-4444-8444-444444444444";
     const row = {
-      project_id: projectId,
+      projectId,
       id: sessionId,
-      agent_id: null,
-      requested_by_user_id: "owner",
-      status: "running" as const,
-      session_type: "task" as const,
-      payload_json: JSON.stringify({
+      requestedByUserId: "owner",
+      payload: projectAgentSessionPayload({
+        id: sessionId,
         status: "running",
-        issues: [],
         startedAt: atMinute(5),
         completedAt: null,
       }),
-      started_at: atMinute(5),
-      completed_at: null,
-      updated_at: atMinute(5),
     };
     await upsertProjectAgentSession(db, row, atMinute(5));
     await upsertProjectAgentSession(db, {
       ...row,
-      requested_by_user_id: null,
-      status: "completed",
-      payload_json: JSON.stringify({
+      requestedByUserId: null,
+      payload: projectAgentSessionPayload({
+        id: sessionId,
         status: "completed",
-        issues: [],
         startedAt: atMinute(5),
         completedAt: atMinute(6),
       }),
-      completed_at: atMinute(6),
-      updated_at: atMinute(6),
     }, atMinute(6));
 
     const stored = (await listProjectAgentSessions(db, projectId)).find(
@@ -2270,10 +1413,11 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       [sessionId],
       "owner",
     );
-    expect(JSON.parse(summary!.summary_json)).toMatchObject({
+    expect(decodeStoredProjectAgentSessionSummary(summary!.summary_json))
+      .toMatchObject({
       requestedByUserId: "owner",
       status: "completed",
-    });
+      });
   });
 
   it("pins a direct Agent task to the selected Worker through completion", async () => {
@@ -2289,12 +1433,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       credentialTokenHash: createHash("sha256")
         .update("briar_worker_direct_task_selected")
         .digest("hex"),
-      agentProvider: "codex",
-      providers: ["codex"],
-      providerHealth: {
-        codex: { installed: true, authenticated: true, healthy: true },
-      },
-      versions: { briar: "1.1.1" },
+      runtime: workerRuntimeMetadataFixture(),
       observedAt: atMinute(10),
     });
     const other = await registerExecutionWorker(db, projectId, {
@@ -2305,12 +1444,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       label: "Other direct task Worker",
       deviceIdentityHash: "f".repeat(64),
       credentialTokenHash: "0".repeat(64),
-      agentProvider: "codex",
-      providers: ["codex"],
-      providerHealth: {
-        codex: { installed: true, authenticated: true, healthy: true },
-      },
-      versions: { briar: "1.1.1" },
+      runtime: workerRuntimeMetadataFixture(),
       observedAt: atMinute(10),
     });
     const taskId = "55555555-5555-4555-8555-555555555555";
@@ -2339,7 +1473,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       await expect(
         claimNextProjectAgentTask(db, projectId, {
           workerId: other.worker.id,
-          agentProviders: ["codex"],
           claimTokenHash,
           claimedAt: atMinute(12),
           leaseExpiresAt: atMinute(14),
@@ -2348,7 +1481,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
 
       const claimed = await claimNextProjectAgentTask(db, projectId, {
         workerId: selected.worker.id,
-        agentProviders: ["codex"],
         claimTokenHash,
         claimedAt: atMinute(12),
         leaseExpiresAt: atMinute(14),
@@ -2361,9 +1493,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         status: "running",
         attempts: 1,
         agent_provider: "codex",
-        agent_skill: skill.body,
         selected_skill_id: skill.id,
-        selected_skill_instructions: skill.body,
       });
 
       await expect(
@@ -2377,24 +1507,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         id: taskId,
         lease_expires_at: atMinute(15),
       });
-
-      const wrongTokenResponse = await apiWorker.fetch(new Request(
-        `https://briar.example/agent-task-claims/${taskId}/complete`,
-        {
-          method: "POST",
-          headers: {
-            authorization: `Bearer ${workerCredential}`,
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({
-            projectId,
-            workerId: selected.worker.id,
-            claimToken: "briar_agent_task_claim_wrong_token",
-            summary: "This completion must not be acknowledged.",
-          }),
-        },
-      ), { DB: db } as Env);
-      expect(wrongTokenResponse.status).toBe(409);
 
       await expect(
         completeProjectAgentTask(db, projectId, taskId, {
@@ -2594,9 +1706,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       status: "running",
       scheduled_for: "2026-07-27T09:00:00.000Z",
     });
-    expect(JSON.parse(claimed!.workflow_json)).toEqual(
-      cloneAutoHuntWorkflow(),
-    );
     await expect(
       claimDueProjectAgentScheduleRun(db, projectId, {
         claimTokenHash: "b".repeat(64),
@@ -2792,6 +1901,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
           model: null,
           effort: "medium",
           kind: "issue_processing",
+          executionMode: "task",
+          approvalPolicy: "explicit",
           position: 0,
         },
         {
@@ -2802,6 +1913,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
           model: "sonnet",
           effort: "high",
           kind: "custom",
+          executionMode: "task",
+          approvalPolicy: "explicit",
           position: 1,
         },
       ],
@@ -2850,6 +1963,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
           model: null,
           effort: null,
           responsibility: "Must not update another project.",
+          skills: [],
           calendarColor: "#d97706",
         },
       ),
@@ -2872,6 +1986,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
           model: null,
           effort: "medium",
           kind: "issue_processing",
+          executionMode: "task",
+          approvalPolicy: "explicit",
           position: 0,
         },
         {
@@ -2882,6 +1998,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
           model: "sonnet",
           effort: "high",
           kind: "custom",
+          executionMode: "task",
+          approvalPolicy: "explicit",
           position: 1,
         },
       ],
@@ -2924,6 +2042,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
               model: issueSkill.model,
               effort: issueSkill.effort,
               kind: issueSkill.kind,
+              executionMode: issueSkill.execution_mode,
+              approvalPolicy: issueSkill.approval_policy,
               position: 0,
             },
           ],
@@ -2971,6 +2091,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
             model: issueSkill.model,
             effort: issueSkill.effort,
             kind: issueSkill.kind,
+            executionMode: issueSkill.execution_mode,
+            approvalPolicy: issueSkill.approval_policy,
             position: 0,
           },
           {
@@ -2982,6 +2104,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
             model: releaseSkill.model,
             effort: releaseSkill.effort,
             kind: releaseSkill.kind,
+            executionMode: releaseSkill.execution_mode,
+            approvalPolicy: releaseSkill.approval_policy,
             position: 1,
           },
         ],
@@ -3032,6 +2156,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         model: null,
         effort: "medium",
         kind: "custom",
+        executionMode: "task",
+        approvalPolicy: "explicit",
         position: 0,
       }],
       calendarColor: "#3275d5",
@@ -3060,6 +2186,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
           model: selectedSkill.model,
           effort: selectedSkill.effort,
           kind: selectedSkill.kind,
+          executionMode: selectedSkill.execution_mode,
+          approvalPolicy: selectedSkill.approval_policy,
           position: selectedSkill.position,
           ...overrides,
         }],
@@ -3083,7 +2211,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         { provider: "claude" as const },
       ]) {
         await expect(updateSkill(change)).rejects.toThrow(
-          "cannot change body or execution settings while queued or running work",
+          "cannot change body or execution settings while queued or running",
         );
       }
 
@@ -3098,7 +2226,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         { effort: "high" as const },
       ]) {
         await expect(updateSkill(change)).rejects.toThrow(
-          "cannot change body or execution settings while queued or running work",
+          "cannot change body or execution settings while queued or running",
         );
       }
 
@@ -3175,6 +2303,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
           model: null,
           effort: null,
           kind: "custom",
+          executionMode: "task",
+          approvalPolicy: "explicit",
           position: 0,
         },
       ],
@@ -3199,6 +2329,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
               model: "sonnet",
               effort: "high",
               kind: "custom",
+              executionMode: "task",
+              approvalPolicy: "explicit",
               position: 0,
             },
           ],
@@ -3286,7 +2418,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await expect(getProjectSettings(db, project.id)).resolves.toBeNull();
   });
 
-  it("shares organization projects with members without granting owner deletion", async () => {
+  it("scopes organization members to explicitly granted projects", async () => {
     await updateProjectSettings(db, projectId, {
       velenOrg: "example",
       dataSource: null,
@@ -3299,11 +2431,14 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       `
       insert into user (id, name, email, emailVerified, createdAt, updatedAt)
       values ('member', 'Member', 'member@example.com', 1, '${atMinute(0)}', '${atMinute(0)}');
+      insert into briar_organization_members
+        (organization_id, user_id, role, created_at, updated_at)
+      values ('${projectId}', 'member', 'developer', '${atMinute(0)}', '${atMinute(0)}');
+      insert into briar_project_members
+        (project_id, organization_id, user_id, created_at, updated_at)
+      values ('${projectId}', '${projectId}', 'member', '${atMinute(0)}', '${atMinute(0)}');
     `,
     );
-    await expect(
-      addOrganizationMember(db, projectId, "member@example.com", "developer"),
-    ).resolves.toBe("member");
 
     const projects = await listProjects(db, "member");
     expect(projects.map((project) => project.id)).toContain(projectId);
@@ -3597,7 +2732,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         .first(),
     ).resolves.toBeNull();
     await expect(
-      db.prepare(`select id from briar_teams where id = ?`).bind(project.id).first(),
+      db.prepare(`select id from briar_projects where id = ?`).bind(project.id).first(),
     ).resolves.toBeNull();
     await expect(
       db
@@ -3660,9 +2795,11 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       organizationIds: [organization.id],
       projectIds: [project.id],
     });
-    await expect(
-      addOrganizationMember(db, organization.id, memberEmail, "developer"),
-    ).resolves.toBe(memberId);
+    await db.prepare(
+      `insert into briar_organization_members
+       (organization_id, user_id, role, created_at, updated_at)
+       values (?, ?, 'developer', ?, ?)`,
+    ).bind(organization.id, memberId, atMinute(0), atMinute(0)).run();
 
     await expect(deleteAccountData(db, {
       userId: ownerId,
@@ -3967,9 +3104,11 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       handle: "account-deletion-shared",
       ownerUserId: ownerId,
     });
-    await expect(
-      addOrganizationMember(db, organization.id, memberEmail, "developer"),
-    ).resolves.toBe(memberId);
+    await db.prepare(
+      `insert into briar_organization_members
+       (organization_id, user_id, role, created_at, updated_at)
+       values (?, ?, 'developer', ?, ?)`,
+    ).bind(organization.id, memberId, atMinute(0), atMinute(0)).run();
     const sharedProject = await createProject(db, {
       ownerUserId: ownerId,
       organizationId: organization.id,
@@ -4043,6 +3182,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         commitSha: null,
         issueDescription: "Created directly in Briar",
         sourceCreatedAt: atMinute(20),
+        requiresClaimToken: true,
         context: {
           origin: "briar-app",
           issueId: "22222222-2222-4222-8222-222222222222",
@@ -5561,12 +4701,21 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
              commit_sha = 'aabbcc1', target_sha = 'ddeeff2',
              pull_request_urls = '["https://github.example/pr/1"]',
              result_summary = 'Original result',
-             structured_result_json = '{"summary":"Original result"}',
+             structured_result_json = ?,
              staging_qa_status = 'passed', production_qa_status = 'passed',
              completed_at = ?, last_event_at = ?, updated_at = ?
          where id = ?`,
       )
-      .bind(atMinute(77), atMinute(77), atMinute(77), runId)
+      .bind(
+        encodeStructuredAgentResultJson({
+          ...completedStructuredResult,
+          summary: "Original result",
+        }),
+        atMinute(77),
+        atMinute(77),
+        atMinute(77),
+        runId,
+      )
       .run();
     await db
       .prepare(
@@ -5766,7 +4915,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
           title: "Follow-up",
           description: null,
           priority: null,
-          status: "backlog",
         },
       }),
       createdAt: atMinute(87),
@@ -5794,18 +4942,21 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         title: "Follow-up",
         status: "backlog",
         workflowStage: null,
+        issueCheckpoints: [],
+        fullAuto: false,
+        context: {
+          origin: "briar-conversation",
+          proposalId: createProposal!.id,
+          conversationRunId: runId,
+        },
       }),
     );
-    expect(
-      await acceptIssueCreateProposal(db, {
-        projectId,
-        conversationRunId: runId,
-        proposalId: createProposal!.id,
-        userId: "owner",
-        acceptedAt: atMinute(89),
-        resultRunId: createdRunId,
-      }),
-    ).toMatchObject({ status: "accepted", result_run_id: createdRunId });
+    expect(await getIssueActionProposal(
+      db,
+      projectId,
+      runId,
+      createProposal!.id,
+    )).toMatchObject({ status: "accepted", result_run_id: createdRunId });
     expect(await listIssueActionProposals(db, projectId, runId)).toHaveLength(
       3,
     );

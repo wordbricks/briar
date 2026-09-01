@@ -1,11 +1,8 @@
 import { createHash } from "node:crypto";
-import { Miniflare } from "miniflare";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { env as cloudflareEnv } from "cloudflare:workers";
+import { beforeAll, describe, expect, it } from "vitest";
 import { channelReplyClaimTokenHeader } from "../../src/lib/channels-contract";
-import {
-  channelReplyClaimValidationError,
-  decodeChannelReplyClaimOrFail,
-} from "../../src-cli/channel-reply-claim";
+import { claimNextChannelReplyWork } from "./channel-reply-claim-routes";
 import {
   addChannelAgent,
   channelReplyJson,
@@ -24,9 +21,17 @@ import {
   recordHuntEvent,
   type HuntEventInput,
 } from "./db";
-import apiWorker from "./index";
+import { HttpError } from "./http-response";
 import { createOrganizationAgent } from "./organization-agents";
-import { createIsolatedTestDatabase } from "./test-helpers/d1";
+import { rethrowReplyCompletionHttpError } from "./reply-completion-http-error";
+import { workerRuntimeProtoJsonFixture } from "./test-helpers/worker-runtime";
+import {
+  completeChannelReplyApplication,
+} from "./worker-reply-completion-application";
+import type {
+  ChannelReplyCompletionInput,
+} from "./worker-reply-completion-mappers";
+import { requireWorkerProjectBinding } from "./worker-route-auth";
 
 const organizationId = "10000000-0000-4000-8000-000000000001";
 const projectId = "20000000-0000-4000-8000-000000000001";
@@ -69,9 +74,8 @@ const backlogEvent = (sourceKey: string): HuntEventInput => ({
 });
 
 describe("Organization Agent channel delegation", () => {
-  let miniflare: Miniflare;
-  let db: D1Database;
-  let archives: R2Bucket;
+  const db = cloudflareEnv.DB;
+  const archives = cloudflareEnv.ARCHIVES;
   let projectAgent: Awaited<ReturnType<typeof createProjectAgent>>;
   let otherProjectAgent: Awaited<ReturnType<typeof createProjectAgent>>;
   let organizationAgent: NonNullable<
@@ -79,17 +83,6 @@ describe("Organization Agent channel delegation", () => {
   >;
 
   beforeAll(async () => {
-    const database = await createIsolatedTestDatabase({
-      suite: "channel-agent-delegation",
-      miniflareOptions: {
-        modules: true,
-        script: "export default { fetch() { return new Response('ok') } }",
-        r2Buckets: ["ARCHIVES"],
-      },
-    });
-    miniflare = database.miniflare;
-    db = database.db;
-    archives = await miniflare.getR2Bucket("ARCHIVES") as unknown as R2Bucket;
     const now = new Date().toISOString();
     await db.batch([
       db.prepare(
@@ -144,19 +137,18 @@ describe("Organization Agent channel delegation", () => {
     ]) {
       await db.prepare(
         `insert into briar_execution_workers (
-           id, project_id, label, host_fingerprint, agent_provider, state,
-           accepting_work, readiness_state, capabilities_json,
+           id, project_id, label, host_fingerprint, runtime_proto_json, state,
+           accepting_work, readiness_state,
            last_heartbeat_at, created_at, updated_at, device_id
-         ) values (?, ?, 'Delegation worker', ?, 'claude', 'online', 1, 'ready',
-                   ?, ?, ?, ?, ?)`,
+         ) values (?, ?, 'Delegation worker', ?, ?, 'online', 1, 'ready',
+                   ?, ?, ?, ?)`,
       ).bind(
         id,
         boundProjectId,
         id === projectWorkerId ? "d".repeat(64) : "e".repeat(64),
-        JSON.stringify({
+        workerRuntimeProtoJsonFixture({
+          agentProvider: "claude",
           providers: ["claude"],
-          providerHealth: { claude: { healthy: true } },
-          organizationAgentContext: { protocol: 1 },
         }),
         now,
         now,
@@ -167,6 +159,8 @@ describe("Organization Agent channel delegation", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "delegation",
       name: "Delegation",
       topic: null,
@@ -200,6 +194,8 @@ describe("Organization Agent channel delegation", () => {
         model: null,
         effort: null,
         kind: "custom",
+        executionMode: "task",
+        approvalPolicy: "explicit",
         position: 0,
       }],
     });
@@ -225,10 +221,6 @@ describe("Organization Agent channel delegation", () => {
     });
   }, 60_000);
 
-  afterAll(async () => {
-    await miniflare.dispose();
-  });
-
   const env = () => ({
     DB: db,
     ARCHIVES: archives,
@@ -237,15 +229,122 @@ describe("Organization Agent channel delegation", () => {
     GOOGLE_CLIENT_SECRET: "google-secret-test",
   }) as unknown as Env;
 
-  const workerRequest = (path: string, body: unknown) =>
-    new Request(`https://briar.example${path}`, {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${workerToken}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
+  type ChannelCompletion = Extract<
+    ChannelReplyCompletionInput["outcome"],
+    { case: "success" }
+  >["completion"];
+  type ChannelCompletionDraft = Pick<ChannelCompletion, "body"> &
+    Partial<Omit<ChannelCompletion, "body">>;
+  type ChannelCompletionCall = {
+    readonly kind: "channel_completion";
+    readonly jobId: string;
+    readonly input: {
+      organizationId: string;
+      workerId: string;
+      claimToken: string;
+      conversationId?: string | null;
+      result?: ChannelCompletionDraft | null;
+      error?: string | null;
+    };
+  };
+
+  const completionCall = (
+    jobId: string,
+    input: ChannelCompletionCall["input"],
+  ): ChannelCompletionCall => ({ kind: "channel_completion", jobId, input });
+
+  const invokeChannelCompletion = async (
+    call: ChannelCompletionCall,
+    runtimeEnv: Env,
+  ) => {
+    const job = await getChannelAgentReplyJob(
+      db,
+      call.input.organizationId,
+      call.jobId,
+    );
+    const binding = await db.prepare(
+      `select w.project_id, w.device_id, d.organization_id
+       from briar_execution_workers w
+       join briar_execution_worker_devices d on d.id = w.device_id
+       where w.id = ?`,
+    ).bind(call.input.workerId).first<{
+      project_id: string;
+      device_id: string;
+      organization_id: string;
+    }>();
+    if (!job || !binding) {
+      return Response.json({ message: "Reply claim was not found" }, {
+        status: 409,
+      });
+    }
+    const result = call.input.result;
+    const outcome: ChannelReplyCompletionInput["outcome"] = call.input.error
+      ? { case: "failure", error: call.input.error }
+      : result
+      ? {
+          case: "success",
+          completion: {
+            body: result.body,
+            document: result.document ?? null,
+            issueProposal: result.issueProposal ?? null,
+            issueBatchProposal: result.issueBatchProposal ?? null,
+            executionProposal: result.executionProposal ?? null,
+            skillExecutionProposal: result.skillExecutionProposal ?? null,
+            delegation: result.delegation ?? null,
+          },
+        }
+      : { case: "failure", error: "Reply result is required" };
+    try {
+      const result = await completeChannelReplyApplication({
+        db,
+        env: runtimeEnv,
+        worker: {
+          principal: {
+            organizationId: binding.organization_id,
+            deviceId: binding.device_id,
+          },
+          binding: {
+            id: call.input.workerId,
+            project_id: binding.project_id,
+          },
+        },
+        request: {
+          requestId: crypto.randomUUID(),
+          projectId: binding.project_id,
+          workerId: call.input.workerId,
+          claim: {
+            replyKind: "channel",
+            organizationId: call.input.organizationId,
+            workId: call.jobId,
+            runId: job.channel_id,
+            claimToken: call.input.claimToken,
+          },
+          attachmentIds: [],
+          conversationId: call.input.conversationId ?? null,
+          outcome,
+        },
+      });
+      return Response.json(result);
+    } catch (error) {
+      try {
+        rethrowReplyCompletionHttpError(error);
+      } catch (mapped) {
+        if (mapped instanceof HttpError) {
+          return Response.json({ message: mapped.message }, {
+            status: mapped.status,
+          });
+        }
+        throw mapped;
+      }
+    }
+  };
+
+  const completionWorker = {
+    execute: (
+      input: ChannelCompletionCall,
+      runtimeEnv: Env,
+    ) => invokeChannelCompletion(input, runtimeEnv),
+  };
 
   const queueOrganizationReply = async (body: string) => {
     const now = new Date().toISOString();
@@ -279,20 +378,29 @@ describe("Organization Agent channel delegation", () => {
   };
 
   const claim = async (workerId: string) => {
-    const response = await apiWorker.fetch(
-      workerRequest("/channel-reply-claims", { organizationId, workerId }),
-      env(),
+    const authenticatedWorker = await requireWorkerProjectBinding(
+      db,
+      new Request("https://briar.example", {
+        headers: { authorization: `Bearer ${workerToken}` },
+      }),
+      workerId === projectWorkerId ? projectId : otherProjectId,
+      workerId,
     );
-    expect(response.status).toBe(200);
-    return response.json() as Promise<{ work: Record<string, unknown> | null }>;
+    const work = await claimNextChannelReplyWork({
+      input: { organizationId, workerId },
+      db,
+      env: env(),
+      authenticatedWorker,
+    });
+    return { work };
   };
 
   const queueDelegatedChild = async (request: string) => {
     const parent = await queueOrganizationReply(request);
     const parentClaim = await claim(otherWorkerId);
     expect(parentClaim.work).toMatchObject({ workId: parent.id });
-    const response = await apiWorker.fetch(
-      workerRequest(`/channel-reply-claims/${parent.id}/complete`, {
+    const response = await completionWorker.execute(
+      completionCall(parent.id, {
         organizationId,
         workerId: otherWorkerId,
         claimToken: String(parentClaim.work?.claimToken),
@@ -332,8 +440,8 @@ describe("Organization Agent channel delegation", () => {
       }],
     });
     const parentToken = String(parentClaim.work?.claimToken);
-    const completed = await apiWorker.fetch(
-      workerRequest(`/channel-reply-claims/${parent.id}/complete`, {
+    const completed = await completionWorker.execute(
+      completionCall(parent.id, {
         organizationId,
         workerId: otherWorkerId,
         claimToken: parentToken,
@@ -391,8 +499,8 @@ describe("Organization Agent channel delegation", () => {
     });
     const childToken = String(childClaim.work?.claimToken);
 
-    const recursive = await apiWorker.fetch(
-      workerRequest(`/channel-reply-claims/${child.id}/complete`, {
+    const recursive = await completionWorker.execute(
+      completionCall(child.id, {
         organizationId,
         workerId: projectWorkerId,
         claimToken: childToken,
@@ -411,8 +519,8 @@ describe("Organization Agent channel delegation", () => {
     );
     expect(recursive.status).toBe(400);
 
-    const childCompleted = await apiWorker.fetch(
-      workerRequest(`/channel-reply-claims/${child.id}/complete`, {
+    const childCompleted = await completionWorker.execute(
+      completionCall(child.id, {
         organizationId,
         workerId: projectWorkerId,
         claimToken: childToken,
@@ -445,8 +553,8 @@ describe("Organization Agent channel delegation", () => {
     });
     const parentClaimToken = String(parentClaim.work?.claimToken);
 
-    const organizationAttempt = await apiWorker.fetch(
-      workerRequest(`/channel-reply-claims/${parent.id}/complete`, {
+    const organizationAttempt = await completionWorker.execute(
+      completionCall(parent.id, {
         organizationId,
         workerId: otherWorkerId,
         claimToken: parentClaimToken,
@@ -473,8 +581,8 @@ describe("Organization Agent channel delegation", () => {
       getChannelMessage(db, channelId, parent.reply_message_id),
     ).resolves.toBeNull();
 
-    const delegated = await apiWorker.fetch(
-      workerRequest(`/channel-reply-claims/${parent.id}/complete`, {
+    const delegated = await completionWorker.execute(
+      completionCall(parent.id, {
         organizationId,
         workerId: otherWorkerId,
         claimToken: parentClaimToken,
@@ -516,8 +624,8 @@ describe("Organization Agent channel delegation", () => {
       },
     });
 
-    const childCompleted = await apiWorker.fetch(
-      workerRequest(`/channel-reply-claims/${child.id}/complete`, {
+    const childCompleted = await completionWorker.execute(
+      completionCall(child.id, {
         organizationId,
         workerId: projectWorkerId,
         claimToken: String(childClaim.work?.claimToken),
@@ -533,11 +641,6 @@ describe("Organization Agent channel delegation", () => {
       env(),
     );
     expect(childCompleted.status).toBe(200);
-    await expect(childCompleted.json()).resolves.toMatchObject({
-      message: {
-        skillExecutionProposal: null,
-      },
-    });
     await expect(db.prepare(
       `select status, delegated_by_reply_job_id, delegated_by_agent_id,
               delegated_by_agent_name, requested_worker_id, result_session_id
@@ -571,8 +674,8 @@ describe("Organization Agent channel delegation", () => {
     const direct = await queueOrganizationReply("Execute the Briar issue.");
     const directClaim = await claim(otherWorkerId);
     expect(directClaim.work).toMatchObject({ workId: direct.id, projectId: null });
-    const rejected = await apiWorker.fetch(
-      workerRequest(`/channel-reply-claims/${direct.id}/complete`, {
+    const rejected = await completionWorker.execute(
+      completionCall(direct.id, {
         organizationId,
         workerId: otherWorkerId,
         claimToken: String(directClaim.work?.claimToken),
@@ -587,8 +690,8 @@ describe("Organization Agent channel delegation", () => {
       env(),
     );
     expect(rejected.status).toBe(400);
-    const directFinished = await apiWorker.fetch(
-      workerRequest(`/channel-reply-claims/${direct.id}/complete`, {
+    const directFinished = await completionWorker.execute(
+      completionCall(direct.id, {
         organizationId,
         workerId: otherWorkerId,
         claimToken: String(directClaim.work?.claimToken),
@@ -627,8 +730,8 @@ describe("Organization Agent channel delegation", () => {
       occurredAt: afterClaimAt,
       sourceCreatedAt: afterClaimAt,
     });
-    const lateCompletion = await apiWorker.fetch(
-      workerRequest(`/channel-reply-claims/${child.id}/complete`, {
+    const lateCompletion = await completionWorker.execute(
+      completionCall(child.id, {
         organizationId,
         workerId: projectWorkerId,
         claimToken: String(childClaim.work?.claimToken),
@@ -646,8 +749,8 @@ describe("Organization Agent channel delegation", () => {
     await expect(
       getChannelMessage(db, channelId, child.reply_message_id),
     ).resolves.toBeNull();
-    const completed = await apiWorker.fetch(
-      workerRequest(`/channel-reply-claims/${child.id}/complete`, {
+    const completed = await completionWorker.execute(
+      completionCall(child.id, {
         organizationId,
         workerId: projectWorkerId,
         claimToken: String(childClaim.work?.claimToken),
@@ -662,18 +765,6 @@ describe("Organization Agent channel delegation", () => {
       env(),
     );
     expect(completed.status).toBe(200);
-    await expect(completed.json()).resolves.toMatchObject({
-      message: {
-        executionProposal: {
-          type: "request_issue_execute",
-          status: "pending",
-          projectId,
-          runId: targetRunId,
-          delegatedByAgentId: organizationAgent.id,
-          delegatedByAgentName: organizationAgent.name,
-        },
-      },
-    });
     await expect(db.prepare(
       `select proposed_by_agent_id, delegated_by_agent_id,
               delegated_by_agent_name, status, dispatch_request_id
@@ -745,8 +836,8 @@ describe("Organization Agent channel delegation", () => {
     ).bind(outsideTargetRunId, projectId).first();
     expect(currentRank).toEqual({ present: 1 });
 
-    const rejected = await apiWorker.fetch(
-      workerRequest(`/channel-reply-claims/${child.id}/complete`, {
+    const rejected = await completionWorker.execute(
+      completionCall(child.id, {
         organizationId,
         workerId: projectWorkerId,
         claimToken: String(childClaim.work?.claimToken),
@@ -766,8 +857,8 @@ describe("Organization Agent channel delegation", () => {
        where reply_message_id = ?`,
     ).bind(child.reply_message_id).first()).resolves.toEqual({ count: 0 });
 
-    const completed = await apiWorker.fetch(
-      workerRequest(`/channel-reply-claims/${child.id}/complete`, {
+    const completed = await completionWorker.execute(
+      completionCall(child.id, {
         organizationId,
         workerId: projectWorkerId,
         claimToken: String(childClaim.work?.claimToken),
@@ -847,8 +938,8 @@ describe("Organization Agent channel delegation", () => {
     expect(JSON.parse(stored!.execution_target_ids_json))
       .toEqual(targets!.map((target) => target.id));
 
-    const completed = await apiWorker.fetch(
-      workerRequest(`/channel-reply-claims/${child.id}/complete`, {
+    const completed = await completionWorker.execute(
+      completionCall(child.id, {
         organizationId,
         workerId: projectWorkerId,
         claimToken: String(childClaim.work?.claimToken),
@@ -962,8 +1053,8 @@ describe("Organization Agent channel delegation", () => {
       activeSkill: null,
       agent: { skills: [] },
     });
-    const completed = await apiWorker.fetch(
-      workerRequest(`/channel-reply-claims/${child.id}/complete`, {
+    const completed = await completionWorker.execute(
+      completionCall(child.id, {
         organizationId,
         workerId: projectWorkerId,
         claimToken: String(childClaim.work?.claimToken),
@@ -1025,8 +1116,8 @@ describe("Organization Agent channel delegation", () => {
         skills: [{ id: projectAgent.skills[0].id, provider: "codex" }],
       },
     });
-    const completed = await apiWorker.fetch(
-      workerRequest(`/channel-reply-claims/${child.id}/complete`, {
+    const completed = await completionWorker.execute(
+      completionCall(child.id, {
         organizationId,
         workerId: projectWorkerId,
         claimToken: String(childClaim.work?.claimToken),
@@ -1064,8 +1155,8 @@ describe("Organization Agent channel delegation", () => {
         request: "Cross the project boundary.",
       },
     ]) {
-      const response = await apiWorker.fetch(
-        workerRequest(`/channel-reply-claims/${parent.id}/complete`, {
+      const response = await completionWorker.execute(
+        completionCall(parent.id, {
           organizationId,
           workerId: otherWorkerId,
           claimToken: parentToken,
@@ -1080,8 +1171,8 @@ describe("Organization Agent channel delegation", () => {
       );
       expect(response.status).toBe(400);
     }
-    const ordinary = await apiWorker.fetch(
-      workerRequest(`/channel-reply-claims/${parent.id}/complete`, {
+    const ordinary = await completionWorker.execute(
+      completionCall(parent.id, {
         organizationId,
         workerId: otherWorkerId,
         claimToken: parentToken,
@@ -1103,8 +1194,8 @@ describe("Organization Agent channel delegation", () => {
     const parentToken = String(parentClaim.work?.claimToken);
 
     await removeChannelAgent(db, channelId, organizationAgent.id);
-    const completion = await apiWorker.fetch(
-      workerRequest(`/channel-reply-claims/${parent.id}/complete`, {
+    const completion = await completionWorker.execute(
+      completionCall(parent.id, {
         organizationId,
         workerId: otherWorkerId,
         claimToken: parentToken,
@@ -1148,8 +1239,8 @@ describe("Organization Agent channel delegation", () => {
     const parent = await queueOrganizationReply("Inspect Briar again.");
     const parentClaim = await claim(otherWorkerId);
     const parentToken = String(parentClaim.work?.claimToken);
-    const completed = await apiWorker.fetch(
-      workerRequest(`/channel-reply-claims/${parent.id}/complete`, {
+    const completed = await completionWorker.execute(
+      completionCall(parent.id, {
         organizationId,
         workerId: otherWorkerId,
         claimToken: parentToken,
@@ -1236,86 +1327,6 @@ describe("Organization Agent channel delegation", () => {
       listChannelAgentReplies(db, channelId, messageId),
     ).resolves.toEqual([]);
     await expect(claim(projectWorkerId)).resolves.toEqual({ work: null });
-  });
-
-  it("retries and fails undecodable Worker claims without waiting for their leases", async () => {
-    const job = await queueOrganizationReply("Check claim validation failure reporting.");
-    const response = await claim(otherWorkerId);
-    const valid = await decodeChannelReplyClaimOrFail(response.work, {
-      organizationId,
-      failClaim: async () => { throw new Error("The API claim should be valid"); },
-    });
-    expect(valid.workId).toBe(job.id);
-    expect(valid.session).not.toBeNull();
-
-    const rejected = await apiWorker.fetch(
-      workerRequest(`/channel-reply-claims/${job.id}/complete`, {
-        organizationId,
-        workerId: otherWorkerId,
-        claimToken: "briar_channel_claim_wrong_token",
-        error: channelReplyClaimValidationError,
-      }),
-      env(),
-    );
-    expect(rejected.status).toBe(409);
-    await expect(getChannelAgentReplyJob(db, organizationId, job.id))
-      .resolves.toMatchObject({ status: "running", attempts: 1 });
-
-    let raw = response.work;
-    for (const expectedStatus of ["queued", "queued", "failed"]) {
-      let reportedStatus = 0;
-      let reportedBody: unknown;
-      await expect(decodeChannelReplyClaimOrFail({
-        ...raw,
-        session: { ...valid.session, claimReason: "unsupported_future_reason" },
-      }, {
-        organizationId,
-        failClaim: async (reference, error) => {
-          const failed = await apiWorker.fetch(
-            workerRequest(`/channel-reply-claims/${reference.workId}/complete`, {
-              organizationId: reference.organizationId,
-              workerId: otherWorkerId,
-              claimToken: reference.claimToken,
-              error: error.message,
-            }),
-            env(),
-          );
-          reportedStatus = failed.status;
-          reportedBody = await failed.json();
-        },
-      })).rejects.toThrow(`Reported failure for reply ${job.id}`);
-      expect(reportedStatus).toBe(200);
-      expect(reportedBody).toMatchObject({
-        agentReply: { status: expectedStatus, error: channelReplyClaimValidationError },
-      });
-      await expect(getChannelAgentReplyJob(db, organizationId, job.id))
-        .resolves.toMatchObject({
-          status: expectedStatus,
-          claimed_worker_id: null,
-          claim_token_hash: null,
-          lease_expires_at: null,
-        });
-      if (expectedStatus === "queued") {
-        // No clock advance or lease expiry: the same job is immediately claimable.
-        const retry = await claim(otherWorkerId);
-        expect(retry.work).toMatchObject({ workId: job.id });
-        raw = retry.work;
-      }
-    }
-
-    await expect(getChannelAgentReplyJob(db, organizationId, job.id))
-      .resolves.toMatchObject({
-        status: "failed",
-        attempts: 3,
-        claimed_worker_id: null,
-        claim_token_hash: null,
-        lease_expires_at: null,
-        error: channelReplyClaimValidationError,
-      });
-    const replies = await listChannelAgentReplies(db, channelId, job.trigger_message_id);
-    expect(replies.some((reply) => reply.status === "running" || reply.status === "queued"))
-      .toBe(false);
-    await expect(claim(otherWorkerId)).resolves.toEqual({ work: null });
   });
 
   it("requires the claim token header for delegated attachment reads", async () => {

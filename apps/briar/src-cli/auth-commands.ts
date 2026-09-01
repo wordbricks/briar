@@ -1,18 +1,9 @@
-import * as Schema from "effect/Schema";
-import { HttpRequestError } from "./execution-metrics-upload";
-import { loadConfig, request } from "./command-support";
-
-const CurrentUserResponse = Schema.Struct({
-  user: Schema.Struct({
-    id: Schema.String,
-    name: Schema.String,
-    email: Schema.String,
-  }),
-}).annotate({
-  parseOptions: { onExcessProperty: "preserve" },
-});
-
-const decodeCurrentUserResponse = Schema.decodeUnknownSync(CurrentUserResponse);
+import type { User } from "@briar/contracts/gen/briar/app/v1/common_pb";
+import {
+  fetchCurrentUser,
+  isUnauthenticatedConnectError,
+} from "./app-connect-client";
+import { loadConfig } from "./command-support";
 
 export type WhoamiDependencies = {
   loadAuthentication: () => Promise<{
@@ -20,15 +11,14 @@ export type WhoamiDependencies = {
     userToken?: string;
   }>;
   environmentToken: () => string | undefined;
-  fetchCurrentUser: (apiUrl: string, userToken: string) => Promise<unknown>;
+  fetchCurrentUser: (apiUrl: string, userToken: string) => Promise<User>;
   writeLine: (line: string) => void;
 };
 
 const defaultDependencies: WhoamiDependencies = {
   loadAuthentication: loadConfig,
   environmentToken: () => process.env.BRIAR_USER_TOKEN,
-  fetchCurrentUser: (apiUrl, userToken) =>
-    request<unknown>(apiUrl, "/me", userToken),
+  fetchCurrentUser,
   writeLine: console.log,
 };
 
@@ -45,14 +35,14 @@ export async function whoami(
     );
   }
 
-  let response: unknown;
+  let currentUser: User;
   try {
-    response = await resolved.fetchCurrentUser(
+    currentUser = await resolved.fetchCurrentUser(
       authentication.apiUrl,
       userToken,
     );
   } catch (error) {
-    if (error instanceof HttpRequestError && error.status === 401) {
+    if (isUnauthenticatedConnectError(error)) {
       throw new Error(
         "Briar 로그인이 만료되었거나 유효하지 않습니다. `briar login`을 다시 실행하세요.",
       );
@@ -60,7 +50,6 @@ export async function whoami(
     throw error;
   }
 
-  const currentUser = decodeCurrentUserResponse(response).user;
   resolved.writeLine(
     `${currentUser.name} (${currentUser.email}) 계정으로 로그인되어 있습니다.`,
   );

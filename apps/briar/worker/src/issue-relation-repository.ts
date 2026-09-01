@@ -217,6 +217,34 @@ export async function setIssueParent(
   return existing ? "updated" : "created";
 }
 
+export function createIssueParentStatement(
+  db: D1Database,
+  input: {
+    projectId: string;
+    childRunId: string;
+    parentRunId: string;
+    createdByUserId: string;
+    createdAt: string;
+  },
+) {
+  return db.prepare(
+    `insert into briar_issue_parent_links (
+       project_id, parent_run_id, child_run_id, created_by_user_id, created_at
+     )
+     select ?, parent.id, ?, ?, ?
+     from briar_hunt_runs parent
+     where parent.project_id = ? and parent.id = ? and parent.id <> ?`,
+  ).bind(
+    input.projectId,
+    input.childRunId,
+    input.createdByUserId,
+    input.createdAt,
+    input.projectId,
+    input.parentRunId,
+    input.childRunId,
+  );
+}
+
 export async function deleteIssueParent(
   db: D1Database,
   projectId: string,

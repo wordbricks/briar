@@ -1,6 +1,9 @@
 import { type AgentSkillKind } from "./agent-skills";
+import {
+  replyCompletionReceiptStatement,
+  type ReplyCompletionCommit,
+} from "./reply-completion-repository";
 
-import { agentSkillExecutionApprovalTablesAvailable } from "./execution-approval-schema-repository";
 import {
   type ModelEffort,
   type ProjectAgentProvider,
@@ -59,8 +62,6 @@ export async function enqueueIssueAgentReply(
     createdAt: string;
   },
 ) {
-  const skillExecutionAvailable =
-    await agentSkillExecutionApprovalTablesAvailable(db);
   const targetAgentId = input.agentId ?? null;
   const preferredWorkerRequirement = input.requiresPreferredWorker === undefined
     ? null
@@ -96,8 +97,7 @@ export async function enqueueIssueAgentReply(
        )`;
   await db
     .prepare(
-      skillExecutionAvailable
-        ? `insert into briar_issue_agent_reply_jobs (
+      `insert into briar_issue_agent_reply_jobs (
          id, project_id, run_id, trigger_message_id, parent_message_id,
          reply_message_id, agent_id, requires_preferred_worker,
          agent_name_snapshot, agent_responsibility_snapshot,
@@ -141,87 +141,22 @@ export async function enqueueIssueAgentReply(
          on selected_skill.id = ? and selected_skill.agent_id = agent.id
        where run.id = ? and run.project_id = ?
          and (? is null or selected_skill.id is not null)
-       on conflict (project_id, trigger_message_id, agent_id) do nothing`
-        : `insert into briar_issue_agent_reply_jobs (
-         id, project_id, run_id, trigger_message_id, parent_message_id,
-         reply_message_id, agent_id, requires_preferred_worker,
-         agent_name_snapshot, agent_responsibility_snapshot,
-         preferred_worker_id, preferred_provider,
-         created_at, updated_at
-       )
-       select ?, run.project_id, run.id, trigger.id, parent.id, ?,
-              agent.id,
-              coalesce(?, case when run.worker_id is null then 0 else 1 end),
-              agent.name, agent.responsibility,
-              run.worker_id,
-              ${targetAgentId
-                ? `coalesce(
-                     (
-                       select skill.provider
-                       from briar_agent_skills skill
-                       where skill.agent_id = agent.id
-                         and skill.kind = 'issue_processing'
-                       order by skill.position, skill.created_at, skill.id
-                       limit 1
-                     ),
-                     agent.provider,
-                     run.requested_agent_provider
-                   )`
-                : `coalesce(
-                     run.requested_agent_provider,
-                     (
-                       select skill.provider
-                       from briar_agent_skills skill
-                       where skill.agent_id = agent.id
-                         and skill.kind = 'issue_processing'
-                       order by skill.position, skill.created_at, skill.id
-                       limit 1
-                     ),
-                     agent.provider
-                   )`},
-              ?, ?
-       from briar_hunt_runs run
-       join briar_issue_messages trigger
-         on trigger.id = ? and trigger.project_id = run.project_id
-        and trigger.run_id = run.id
-       join briar_issue_messages parent
-         on parent.id = ? and parent.project_id = run.project_id
-        and parent.run_id = run.id
-       left join briar_project_agents agent
-         on agent.id = coalesce(?, run.agent_id)
-        and agent.project_id = run.project_id
-       where run.id = ? and run.project_id = ?
        on conflict (project_id, trigger_message_id, agent_id) do nothing`,
     )
-    .bind(...(
-      skillExecutionAvailable
-        ? [
-            input.id,
-            input.replyMessageId,
-            preferredWorkerRequirement,
-            input.createdAt,
-            input.createdAt,
-            input.triggerMessageId,
-            input.parentMessageId,
-            targetAgentId,
-            input.skillId ?? null,
-            input.runId,
-            input.projectId,
-            input.skillId ?? null,
-          ]
-        : [
-            input.id,
-            input.replyMessageId,
-            preferredWorkerRequirement,
-            input.createdAt,
-            input.createdAt,
-            input.triggerMessageId,
-            input.parentMessageId,
-            targetAgentId,
-            input.runId,
-            input.projectId,
-          ]
-    ))
+    .bind(
+      input.id,
+      input.replyMessageId,
+      preferredWorkerRequirement,
+      input.createdAt,
+      input.createdAt,
+      input.triggerMessageId,
+      input.parentMessageId,
+      targetAgentId,
+      input.skillId ?? null,
+      input.runId,
+      input.projectId,
+      input.skillId ?? null,
+    )
     .run();
   return getIssueAgentReplyJob(
     db,
@@ -275,16 +210,12 @@ export async function claimNextIssueAgentReply(
   input: {
     workerId: string;
     agentProvider: ProjectAgentProvider;
-    agentProviders: ProjectAgentProvider[];
     claimTokenHash: string;
     claimedAt: string;
     leaseExpiresAt: string;
     staleBefore: string;
   },
 ) {
-  const skillProviderPlaceholders = input.agentProviders
-    .map(() => "?")
-    .join(", ");
   // Migration 0092 is a deployment prerequisite, so every claim enforces the
   // saved-Skill snapshot without a runtime compatibility branch.
   const selectedSkillGuard = `and (
@@ -306,7 +237,12 @@ export async function claimNextIssueAgentReply(
               and trigger.project_id = job.project_id
               and trigger.run_id = job.run_id
              where project.id = run.project_id
-               and selected_skill.provider in (${skillProviderPlaceholders})
+               and exists (
+                 select 1
+                 from briar_execution_worker_healthy_providers healthy
+                 where healthy.worker_id = ?
+                   and healthy.provider = selected_skill.provider
+               )
                and selected_agent.name = job.selected_agent_name_snapshot
                and selected_agent.responsibility =
                  job.selected_agent_responsibility_snapshot
@@ -341,15 +277,12 @@ export async function claimNextIssueAgentReply(
     .prepare(
       `update briar_issue_agent_reply_jobs
        set status = 'running', claimed_worker_id = ?,
-           agent_provider = case
-             when preferred_provider = 'codex' and ? = 1 then 'codex'
-             when preferred_provider = 'claude' and ? = 1 then 'claude'
-             when preferred_provider = 'cursor' and ? = 1 then 'cursor'
-             when preferred_provider = 'grok' and ? = 1 then 'grok'
-             when preferred_provider = 'agy' and ? = 1 then 'agy'
-             when preferred_provider = 'opencode' and ? = 1 then 'opencode'
-             when preferred_provider = 'openrouter' and ? = 1 then 'openrouter'
-             else ?
+           agent_provider = case when exists (
+             select 1
+             from briar_execution_worker_healthy_providers healthy
+             where healthy.worker_id = ?
+               and healthy.provider = preferred_provider
+           ) then preferred_provider else ?
            end,
            claim_token_hash = ?, claimed_at = ?, lease_expires_at = ?,
            attempts = attempts + case when planned_update_resume = 1 then 0 else 1 end,
@@ -421,13 +354,7 @@ export async function claimNextIssueAgentReply(
     )
     .bind(
       input.workerId,
-      input.agentProviders.includes("codex") ? 1 : 0,
-      input.agentProviders.includes("claude") ? 1 : 0,
-      input.agentProviders.includes("cursor") ? 1 : 0,
-      input.agentProviders.includes("grok") ? 1 : 0,
-      input.agentProviders.includes("agy") ? 1 : 0,
-      input.agentProviders.includes("opencode") ? 1 : 0,
-      input.agentProviders.includes("openrouter") ? 1 : 0,
+      input.workerId,
       input.agentProvider,
       input.claimTokenHash,
       input.claimedAt,
@@ -439,7 +366,7 @@ export async function claimNextIssueAgentReply(
       input.workerId,
       input.workerId,
       input.staleBefore,
-      ...input.agentProviders,
+      input.workerId,
     )
     .first<IssueAgentReplyJobRow>();
 }
@@ -519,17 +446,19 @@ export async function failIssueAgentReply(
     claimTokenHash: string;
     error: string;
     updatedAt: string;
+    commit?: ReplyCompletionCommit;
   },
 ) {
-  return await db
-    .prepare(
+  const transition = db.prepare(
       `update briar_issue_agent_reply_jobs
        set status = case when attempts >= 3 then 'failed' else 'queued' end,
            preferred_worker_id = case
              when requires_preferred_worker = 1 then preferred_worker_id
              else null
            end,
-           claim_token_hash = null, claimed_at = null, lease_expires_at = null,
+           ${input.commit
+             ? ""
+             : "claim_token_hash = null, claimed_at = null, lease_expires_at = null,"}
            error = ?, updated_at = ?
        where id = ? and project_id = ? and status = 'running'
          and claimed_worker_id = ? and claim_token_hash = ?
@@ -549,8 +478,35 @@ export async function failIssueAgentReply(
       input.workerId,
       input.claimTokenHash,
       input.updatedAt,
-    )
-    .first<IssueAgentReplyJobRow>();
+    );
+  if (!input.commit) return transition.first<IssueAgentReplyJobRow>();
+  const [transitioned, receipt] = await db.batch([
+    transition,
+    replyCompletionReceiptStatement(db, {
+      ...input.commit,
+      createdAt: input.updatedAt,
+    }),
+    db.prepare(
+      `update briar_issue_agent_reply_jobs
+       set claim_token_hash = null, claimed_at = null, lease_expires_at = null
+       where id = ? and project_id = ? and claimed_worker_id = ?
+         and claim_token_hash = ? and status in ('queued', 'failed')
+         and updated_at = ?`,
+    ).bind(
+      jobId,
+      projectId,
+      input.workerId,
+      input.claimTokenHash,
+      input.updatedAt,
+    ),
+  ]);
+  const failed = transitioned.results[0] as IssueAgentReplyJobRow | undefined;
+  if (failed && !receipt.results[0]) {
+    throw new Error("Issue reply failure receipt was not committed atomically");
+  }
+  return failed
+    ? { ...failed, claim_token_hash: null, claimed_at: null, lease_expires_at: null }
+    : null;
 }
 
 export async function completeIssueAgentReply(

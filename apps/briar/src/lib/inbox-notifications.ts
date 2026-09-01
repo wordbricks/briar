@@ -4,12 +4,28 @@ import {
   type InboxMessage,
 } from "../hooks/useInbox";
 import {
+  MobilePushNotificationTargetSchema,
+  type MobilePushNotificationTarget,
+} from "@briar/contracts/gen/briar/app/v1/inbox_pb";
+import { fromBinary } from "@bufbuild/protobuf";
+import * as Schema from "effect/Schema";
+import {
   getMobilePlatform,
   isDesktopTauri,
   isMacDesktopTauri,
 } from "./platform";
-import { request } from "./api/request";
-import { inboxSessionMessageVersion } from "./inbox-session-version";
+import {
+  commands,
+  events,
+  type InboxNotificationPermissionStatus,
+  type InboxNotificationTarget,
+} from "../generated/tauri";
+import {
+  registerMobilePushDevice,
+  unregisterMobilePushDevice,
+  type MobilePushDeviceLocale,
+} from "./app-rpc/account";
+import { UuidString } from "./api/schema-helpers";
 
 export const inboxNotificationCategories = [
   "urgent",
@@ -20,36 +36,15 @@ export const inboxNotificationCategories = [
 
 export type InboxNotificationPreferences = Record<InboxCategory, boolean>;
 
-export type InboxNotificationPermissionStatus =
-  | "authorized"
-  | "denied"
-  | "not_determined"
-  | "unsupported";
-
 const storageKey = "briar.settings.inbox-notifications.v1";
 const soundStorageKey = "briar.settings.inbox-notification-sound.v1";
 const targetStorageKey = "briar.inbox.notification-targets.v1";
 const browserOpenEvent = "briar:inbox-notification-open";
-const desktopOpenEvent = "inbox-notification-open";
-const desktopOpenAvailableEvent = "inbox-notification-open-available";
 const preferencesChangedEvent = "briar:inbox-notification-preferences-changed";
 const androidRemoteOpenEvent = "briar-remote-notification-open";
 const androidPushTokenEvent = "briar-remote-push-token";
 const androidRemoteReceiptStorageKey = "briar.remote-push-receipts.v1";
 const androidRemoteReceiptLifetimeMs = 7 * 24 * 60 * 60 * 1_000;
-
-export type InboxNotificationTarget = {
-  messageId: string;
-  messageVersion?: string;
-  notificationId?: string;
-  projectId: string;
-  targetId: string;
-  kind: InboxMessage["kind"];
-  /** Actual IssueMessage.id; messageId remains the Inbox row id for read state. */
-  conversationMessageId?: string;
-  channelMessageId?: string;
-  rootMessageId?: string;
-};
 
 type StoredInboxNotificationTarget = InboxNotificationTarget & {
   storedAt: number;
@@ -181,26 +176,161 @@ export function isInboxChannelTarget(
   );
 }
 
-function isInboxNotificationTarget(
+function inboxNotificationTargetFrom(
   value: unknown,
-): value is InboxNotificationTarget {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+): InboxNotificationTarget | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const target = value as Partial<InboxNotificationTarget>;
-  return (
-    typeof target.messageId === "string" &&
-    (target.messageVersion === undefined ||
-      typeof target.messageVersion === "string") &&
-    (target.notificationId === undefined ||
-      typeof target.notificationId === "string") &&
-    typeof target.projectId === "string" &&
-    typeof target.targetId === "string" &&
-    (target.kind === "issue" ||
-      target.kind === "conversation" ||
-      target.kind === "session" ||
-      (target.kind === "channel" &&
-        typeof target.channelMessageId === "string" &&
-        typeof target.rootMessageId === "string"))
+  if (
+    typeof target.messageId !== "string" ||
+    typeof target.projectId !== "string" ||
+    typeof target.targetId !== "string" ||
+    (target.kind !== "issue" &&
+      target.kind !== "conversation" &&
+      target.kind !== "session" &&
+      target.kind !== "channel") ||
+    (target.kind === "channel" &&
+      (typeof target.channelMessageId !== "string" ||
+        typeof target.rootMessageId !== "string"))
+  ) {
+    return null;
+  }
+  return {
+    messageId: target.messageId,
+    projectId: target.projectId,
+    targetId: target.targetId,
+    kind: target.kind,
+    ...(typeof target.conversationMessageId === "string"
+      ? { conversationMessageId: target.conversationMessageId }
+      : {}),
+    ...(typeof target.channelMessageId === "string"
+      ? { channelMessageId: target.channelMessageId }
+      : {}),
+    ...(typeof target.rootMessageId === "string"
+      ? { rootMessageId: target.rootMessageId }
+      : {}),
+  };
+}
+
+type AndroidRemoteNotificationOpen = {
+  target: InboxNotificationTarget;
+  messageVersion: string;
+  notificationId: string;
+};
+
+const decodeMobilePushValue = Schema.decodeUnknownSync(
+  Schema.Trim.check(Schema.isNonEmpty()),
+);
+const decodeMobilePushUuid = Schema.decodeUnknownSync(UuidString);
+
+const requiredMobilePushValue = (value: string, field: string) => {
+  const decoded = decodeMobilePushValue(value);
+  if (decoded !== value) {
+    throw new Error(`Mobile push target ${field} is required`);
+  }
+  return decoded;
+};
+
+const requiredMobilePushUuid = (value: string) => decodeMobilePushUuid(value);
+
+const impossibleMobilePushDestination = (destination: never): never => {
+  throw new Error(`Unknown mobile push destination: ${String(destination)}`);
+};
+
+const mobilePushNotificationOpenFromMessage = (
+  message: MobilePushNotificationTarget,
+): AndroidRemoteNotificationOpen => {
+  const messageId = requiredMobilePushValue(
+    message.inboxMessageId,
+    "inbox_message_id",
   );
+  const messageVersion = requiredMobilePushValue(
+    message.inboxMessageVersion,
+    "inbox_message_version",
+  );
+  const notificationId = requiredMobilePushValue(
+    message.notificationId,
+    "notification_id",
+  );
+  const projectId = requiredMobilePushUuid(message.projectId);
+  const metadata = { messageVersion, notificationId };
+  const destination = message.destination;
+  switch (destination.case) {
+    case "issue":
+      return {
+        target: {
+          messageId,
+          projectId,
+          targetId: requiredMobilePushUuid(message.targetId),
+          kind: "issue",
+        },
+        ...metadata,
+      };
+    case "conversation":
+      return {
+        target: {
+          messageId,
+          projectId,
+          targetId: requiredMobilePushUuid(message.targetId),
+          kind: "conversation",
+          conversationMessageId: requiredMobilePushUuid(
+            destination.value.conversationMessageId,
+          ),
+        },
+        ...metadata,
+      };
+    case "channel":
+      return {
+        target: {
+          messageId,
+          projectId,
+          targetId: requiredMobilePushUuid(message.targetId),
+          kind: "channel",
+          channelMessageId: requiredMobilePushUuid(
+            destination.value.channelMessageId,
+          ),
+          rootMessageId: requiredMobilePushUuid(
+            destination.value.rootMessageId,
+          ),
+        },
+        ...metadata,
+      };
+    case "session":
+      return {
+        target: {
+          messageId,
+          projectId,
+          targetId: requiredMobilePushValue(message.targetId, "target_id"),
+          kind: "session",
+        },
+        ...metadata,
+      };
+    case undefined:
+      throw new Error("Mobile push target destination is required");
+  }
+  return impossibleMobilePushDestination(destination);
+};
+
+const standardBase64Bytes = (encoded: string) => {
+  const binary = atob(encoded);
+  if (btoa(binary) !== encoded) throw new Error("Non-canonical base64 payload");
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+};
+
+export function decodeMobilePushNotificationOpen(
+  encoded: unknown,
+): AndroidRemoteNotificationOpen | null {
+  if (typeof encoded !== "string" || encoded.length === 0) return null;
+  try {
+    return mobilePushNotificationOpenFromMessage(
+      fromBinary(
+        MobilePushNotificationTargetSchema,
+        standardBase64Bytes(encoded),
+      ),
+    );
+  } catch {
+    return null;
+  }
 }
 
 type MacInboxNotificationBridge = {
@@ -218,8 +348,9 @@ export async function listenForMacInboxNotificationClicks(
     const next = drainQueue.catch(() => undefined).then(async () => {
       const pending = await bridge.drain();
       if (stopped || !Array.isArray(pending)) return;
-      for (const target of pending) {
-        if (isInboxNotificationTarget(target)) onOpen(target);
+      for (const candidate of pending) {
+        const target = inboxNotificationTargetFrom(candidate);
+        if (target) onOpen(target);
       }
     });
     drainQueue = next;
@@ -246,7 +377,7 @@ function inboxNotificationId(messageId: string) {
   return (hash >>> 0) & 0x7fff_ffff || 1;
 }
 
-function readStoredTargets(): Record<string, StoredInboxNotificationTarget> {
+function readStoredTargets() {
   if (typeof window === "undefined") return {};
   try {
     const value = JSON.parse(
@@ -254,11 +385,13 @@ function readStoredTargets(): Record<string, StoredInboxNotificationTarget> {
     );
     if (!value || typeof value !== "object" || Array.isArray(value)) return {};
     return Object.fromEntries(
-      Object.entries(value).filter(
-        (entry): entry is [string, StoredInboxNotificationTarget] =>
-          isInboxNotificationTarget(entry[1]) &&
-          typeof (entry[1] as StoredInboxNotificationTarget).storedAt === "number",
-      ),
+      Object.entries(value).flatMap(([id, candidate]) => {
+        const target = inboxNotificationTargetFrom(candidate);
+        const storedAt = (candidate as { storedAt?: unknown }).storedAt;
+        return target && typeof storedAt === "number"
+          ? [[id, { ...target, storedAt }] as const]
+          : [];
+      }),
     );
   } catch {
     return {};
@@ -289,7 +422,7 @@ function targetFromExtra(extra: unknown) {
   if (typeof serialized !== "string") return null;
   try {
     const target: unknown = JSON.parse(serialized);
-    return isInboxNotificationTarget(target) ? target : null;
+    return inboxNotificationTargetFrom(target);
   } catch {
     return null;
   }
@@ -310,21 +443,7 @@ export function targetFromNotificationAction(payload: unknown) {
     return null;
   }
   const stored = readStoredTargets()[String(notificationId)];
-  return stored && isInboxNotificationTarget(stored)
-    ? {
-        messageId: stored.messageId,
-        projectId: stored.projectId,
-        targetId: stored.targetId,
-        kind: stored.kind,
-        ...(stored.conversationMessageId
-          ? { conversationMessageId: stored.conversationMessageId }
-          : {}),
-        ...(stored.channelMessageId
-          ? { channelMessageId: stored.channelMessageId }
-          : {}),
-        ...(stored.rootMessageId ? { rootMessageId: stored.rootMessageId } : {}),
-      }
-    : null;
+  return stored ? inboxNotificationTargetFrom(stored) : null;
 }
 
 function dispatchBrowserNotificationOpen(target: InboxNotificationTarget) {
@@ -340,55 +459,46 @@ export async function listenForInboxNotificationClicks(
 ) {
   if (isTauriRuntime()) {
     if (isDesktopTauri()) {
-      const { listen } = await import("@tauri-apps/api/event");
       if (isMacDesktopTauri()) {
-        const { invoke } = await import("@tauri-apps/api/core");
         return listenForMacInboxNotificationClicks(onOpen, {
           listenAvailable: (callback) =>
-            listen(desktopOpenAvailableEvent, callback),
-          drain: () => invoke("drain_pending_inbox_notification_opens"),
+            events.inboxNotificationOpenAvailable.listen(callback),
+          drain: () => commands.drainPendingInboxNotificationOpens(),
         });
       }
-      return listen<InboxNotificationTarget>(desktopOpenEvent, ({ payload }) => {
-        if (isInboxNotificationTarget(payload)) onOpen(payload);
+      return events.inboxNotificationOpen.listen(({ payload }) => {
+        const target = inboxNotificationTargetFrom(payload);
+        if (target) onOpen(target);
       });
     }
 
-    const handleRemoteOpen = (event: Event) => {
-      const target = (event as CustomEvent<unknown>).detail;
-      if (isInboxNotificationTarget(target)) {
-        recordAndroidRemoteNotificationReceipt(target);
-        onOpen(target);
+    const drainRemoteOpen = () => {
+      const open = decodeMobilePushNotificationOpen(
+        androidPushBridge()?.drainOpen(),
+      );
+      if (open) {
+        recordAndroidRemoteNotificationReceipt(open);
+        onOpen(open.target);
       }
-      androidPushBridge()?.drainOpen();
     };
-    window.addEventListener(androidRemoteOpenEvent, handleRemoteOpen);
-    const pendingRemoteOpen = androidPushBridge()?.drainOpen();
-    if (pendingRemoteOpen) {
-      try {
-        const target: unknown = JSON.parse(pendingRemoteOpen);
-        if (isInboxNotificationTarget(target)) {
-          recordAndroidRemoteNotificationReceipt(target);
-          onOpen(target);
-        }
-      } catch {
-        // Ignore a malformed native payload; the Inbox remains available.
-      }
-    }
+    window.addEventListener(androidRemoteOpenEvent, drainRemoteOpen);
+    drainRemoteOpen();
     const { onAction } = await import("@tauri-apps/plugin-notification");
     const listener = await onAction((payload) => {
       const target = targetFromNotificationAction(payload);
       if (target) onOpen(target);
     });
     return () => {
-      window.removeEventListener(androidRemoteOpenEvent, handleRemoteOpen);
+      window.removeEventListener(androidRemoteOpenEvent, drainRemoteOpen);
       listener.unregister();
     };
   }
 
   const handleOpen = (event: Event) => {
-    const target = (event as CustomEvent<unknown>).detail;
-    if (isInboxNotificationTarget(target)) onOpen(target);
+    const target = inboxNotificationTargetFrom(
+      (event as CustomEvent<unknown>).detail,
+    );
+    if (target) onOpen(target);
   };
   window.addEventListener(browserOpenEvent, handleOpen);
   return () => window.removeEventListener(browserOpenEvent, handleOpen);
@@ -397,7 +507,6 @@ export async function listenForInboxNotificationClicks(
 type AndroidPushBridge = {
   token: () => string;
   configured: () => boolean;
-  topic: () => string;
   drainOpen: () => string;
   hasActiveInboxNotification: (identity: string) => boolean;
 };
@@ -418,11 +527,12 @@ function readAndroidRemoteNotificationReceipts() {
   }
 }
 
-function recordAndroidRemoteNotificationReceipt(target: InboxNotificationTarget) {
-  if (!target.notificationId || !target.messageVersion) return;
+function recordAndroidRemoteNotificationReceipt(
+  open: AndroidRemoteNotificationOpen,
+) {
   try {
     const receipts = readAndroidRemoteNotificationReceipts();
-    receipts[`${target.notificationId}\u0000${target.messageVersion}`] = Date.now();
+    receipts[`${open.notificationId}\u0000${open.messageVersion}`] = Date.now();
     window.localStorage.setItem(
       androidRemoteReceiptStorageKey,
       JSON.stringify(receipts),
@@ -434,10 +544,11 @@ function recordAndroidRemoteNotificationReceipt(target: InboxNotificationTarget)
 
 function androidRemoteNotificationAlreadyHandled(message: InboxMessage) {
   const identity = inboxNotificationIdentity(message);
-  const version = message.kind === "session"
-    ? inboxSessionMessageVersion(message.status, message.occurredAt)
-    : message.version;
-  if (readAndroidRemoteNotificationReceipts()[`${identity}\u0000${version}`]) {
+  if (
+    readAndroidRemoteNotificationReceipts()[
+      `${identity}\u0000${message.version}`
+    ]
+  ) {
     return true;
   }
   try {
@@ -457,7 +568,7 @@ function androidPushBridge(): AndroidPushBridge | null {
   return bridge?.configured() ? bridge : null;
 }
 
-function pushLocale(): "ko" | "en" | "zh" {
+function pushLocale(): MobilePushDeviceLocale {
   const language = document.documentElement.lang.toLowerCase();
   if (language.startsWith("zh")) return "zh";
   if (language.startsWith("en")) return "en";
@@ -469,30 +580,18 @@ export async function synchronizeAndroidPushRegistration(
 ) {
   const bridge = androidPushBridge();
   const token = bridge?.token().trim();
-  const topic = bridge?.topic().trim();
-  if (!bridge || !token || !topic) return false;
+  if (!bridge || !token) return false;
   const preferences = readInboxNotificationPreferences();
-  await request<{ registered: boolean }>(
-    "/inbox/push-registration",
-    sessionToken,
-    {
-      method: "PUT",
-      body: JSON.stringify({
-        platform: "fcm",
-        token,
-        environment: "production",
-        topic,
-        locale: pushLocale(),
-        preferences: {
-          playSound: readInboxNotificationSoundPreference(),
-          urgent: preferences.urgent,
-          actionRequired: preferences.action_required,
-          important: preferences.important,
-          activity: preferences.activity,
-        },
-      }),
-    },
-  );
+  await registerMobilePushDevice(sessionToken, {
+    endpoint: "fcm",
+    deviceToken: token,
+    locale: pushLocale(),
+    playSound: readInboxNotificationSoundPreference(),
+    urgent: preferences.urgent,
+    actionRequired: preferences.action_required,
+    important: preferences.important,
+    activity: preferences.activity,
+  });
   return true;
 }
 
@@ -500,14 +599,7 @@ export async function deleteAndroidPushRegistration(sessionToken: string) {
   const bridge = androidPushBridge();
   const token = bridge?.token().trim();
   if (!bridge || !token) return false;
-  await request<{ deleted: boolean }>(
-    "/inbox/push-registration",
-    sessionToken,
-    {
-      method: "DELETE",
-      body: JSON.stringify({ platform: "fcm", token }),
-    },
-  );
+  await unregisterMobilePushDevice(sessionToken, "fcm", token);
   return true;
 }
 
@@ -519,8 +611,7 @@ export const androidPushRegistrationEvents = {
 export async function requestInboxNotificationPermission() {
   if (isTauriRuntime()) {
     if (isMacDesktopTauri()) {
-      const { invoke } = await import("@tauri-apps/api/core");
-      return invoke<boolean>("request_inbox_notification_permission");
+      return commands.requestInboxNotificationPermission();
     }
     const { isPermissionGranted, requestPermission } = await import(
       "@tauri-apps/plugin-notification"
@@ -539,15 +630,7 @@ export async function readInboxNotificationPermissionStatus(): Promise<
   InboxNotificationPermissionStatus
 > {
   if (isMacDesktopTauri()) {
-    const { invoke } = await import("@tauri-apps/api/core");
-    const status = await invoke<unknown>(
-      "inbox_notification_permission_status",
-    );
-    return status === "authorized" ||
-        status === "denied" ||
-        status === "not_determined"
-      ? status
-      : "unsupported";
+    return commands.inboxNotificationPermissionStatus();
   }
 
   if (isTauriRuntime()) {
@@ -565,8 +648,7 @@ export async function readInboxNotificationPermissionStatus(): Promise<
 
 export async function openInboxNotificationSystemSettings() {
   if (!isMacDesktopTauri()) return false;
-  const { invoke } = await import("@tauri-apps/api/core");
-  await invoke("open_inbox_notification_settings");
+  await commands.openInboxNotificationSettings();
   return true;
 }
 
@@ -674,13 +756,12 @@ export async function sendInboxNotification(
       ) {
         return false;
       }
-      const { invoke } = await import("@tauri-apps/api/core");
-      await invoke("show_inbox_notification", {
+      await commands.showInboxNotification(
         title,
         body,
         target,
         playSound,
-      });
+      );
       return true;
     }
 

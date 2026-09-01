@@ -43,8 +43,6 @@ import {
   inspectOpenCodeTerminalPath,
   inspectOnboardingPrerequisites,
   installOnboardingPrerequisite,
-  type OpenCodeTerminalPathStatus,
-  type OnboardingPrerequisites,
 } from "../lib/initial-onboarding";
 import {
   loadAppProviderSettings,
@@ -54,8 +52,6 @@ import {
   updateOpenRouterApiKey,
   type AgentProvider,
   type AgentProviderModelCatalogEntry,
-  type AppProviderSettings,
-  type OpenRouterCredentialStatus,
   defaultAgentProviderModelCatalog,
   sortAgentModelsByPreference,
 } from "../lib/project-llm";
@@ -67,14 +63,22 @@ import {
 import {
   loadAppRuntimeSettings,
   updateAppRuntimeSettings,
-  type AppRuntimeSettings,
 } from "../lib/app-runtime-settings";
 import {
   loadAgentUsage,
   openAgentProviderLogin,
-  type AgentUsageProvider,
-  type AgentUsageSnapshot,
 } from "../lib/agent-usage";
+import type {
+  AgentLoginProvider,
+  AgentUsageSnapshot,
+  AppProviderSettings,
+  AppRuntimeSettings,
+  OnboardingPrerequisites,
+  OpenCodeTerminalPathStatus,
+  OpenRouterCredentialStatus,
+  ProviderUsage,
+  RepositoryReadiness,
+} from "../generated/tauri";
 import {
   AntigravityIcon,
   ClaudeIcon,
@@ -88,7 +92,6 @@ import { MacSecurePasswordInput } from "./MacSecurePasswordInput";
 import { AgentUsageSettings } from "./AgentUsageSettings";
 import { AppearanceSettings } from "./AppearanceSettings";
 import { InboxNotificationSettings } from "./InboxNotificationSettings";
-import type { RepositoryReadiness } from "../lib/project-connection";
 import {
   localProjectReadiness,
   type LocalProjectConnectionState,
@@ -369,7 +372,7 @@ export function AppSettings({
       })),
   });
 
-  const openProviderLogin = async (provider: AgentProvider) => {
+  const openProviderLogin = async (provider: AgentLoginProvider) => {
     if (providerLoginOpening) return;
     setProviderLoginOpening(provider);
     setProviderError(null);
@@ -1731,7 +1734,7 @@ function ProviderDetails({
   onLogin: () => void;
   onToggleFavorite: (model: string) => void;
   providerName: string;
-  usage?: AgentUsageProvider;
+  usage?: ProviderUsage;
 }) {
   const { t } = useI18n();
   const connected = Boolean(installed && authenticated);

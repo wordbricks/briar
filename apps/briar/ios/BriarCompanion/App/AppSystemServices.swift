@@ -1,4 +1,6 @@
+import BriarContracts
 import Foundation
+import SwiftProtobuf
 import SwiftUI
 import UIKit
 import UserNotifications
@@ -72,6 +74,7 @@ enum AppIconService {
         guard UIApplication.shared.supportsAlternateIcons || icon == .purple else {
             throw AppIconError.unsupported
         }
+        let storageKey = storageKey
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             UIApplication.shared.setAlternateIconName(icon.alternateIconName) { error in
                 if let error {
@@ -135,7 +138,7 @@ struct InboxNotificationPreferences: Equatable, Sendable {
             return InboxNotificationPreferences()
         }
         return InboxNotificationPreferences(
-            playSound: decoded.play_sound ?? true,
+            playSound: decoded.play_sound,
             urgent: decoded.urgent,
             actionRequired: decoded.action_required,
             important: decoded.important,
@@ -159,7 +162,7 @@ struct InboxNotificationPreferences: Equatable, Sendable {
     private static let storageKey = "briar.settings.inbox-notifications.v1"
 
     private struct Storage: Codable {
-        var play_sound: Bool?
+        var play_sound: Bool
         var urgent: Bool
         var action_required: Bool
         var important: Bool
@@ -197,17 +200,21 @@ final class IssueConversationViewTracker: ObservableObject {
     func receiveRealtimeNotification(
         _ notification: ChannelRealtimeNotification
     ) async {
-        let matchesVisibleProject: Bool
-        if let projectID, let notificationProjectID = notification.projectId {
-            matchesVisibleProject = notificationProjectID
-                .caseInsensitiveCompare(projectID.uuidString) == .orderedSame
-        } else {
-            matchesVisibleProject = false
+        switch notification {
+        case .ready:
+            await refreshAction?()
+        case .projectChanged(let notificationProjectID, _):
+            guard let projectID,
+                  notificationProjectID.caseInsensitiveCompare(
+                    projectID.uuidString
+                  ) == .orderedSame
+            else { return }
+            await refreshAction?()
+        case .channelsChanged,
+             .inboxChanged,
+             .projectAgentSessionsChanged:
+            return
         }
-        guard notification.topic == "ready" ||
-            (notification.topic == "project" && matchesVisibleProject)
-        else { return }
-        await refreshAction?()
     }
 }
 
@@ -325,18 +332,16 @@ final class LocalNotificationService: ObservableObject {
     }
 
     private func schedule(_ message: InboxMessage) async {
+        guard let target = message.mobilePushNotificationTarget,
+              let targetData = try? target.serializedData()
+        else { return }
         let presentation = InboxNotificationPresentationBuilder.content(for: message)
         let content = UNMutableNotificationContent()
         content.title = presentation.title
         content.body = presentation.body
         content.sound = preferences.playSound ? .default : nil
         content.userInfo = [
-            "briarInboxTarget": [
-                "messageId": message.id,
-                "projectId": message.projectId.uuidString.lowercased(),
-                "targetId": message.targetId,
-                "kind": message.kind.rawValue,
-            ],
+            "briarInboxTargetProto": targetData.base64EncodedString(),
         ]
         let request = UNNotificationRequest(
             identifier: "inbox-\(message.notificationGroupId ?? message.id)",
@@ -357,6 +362,42 @@ final class LocalNotificationService: ObservableObject {
                 continuation.resume(returning: versions)
             }
         }
+    }
+}
+
+private extension InboxMessage {
+    var mobilePushNotificationTarget: BriarAPI_MobilePushNotificationTarget? {
+        var target = BriarAPI_MobilePushNotificationTarget()
+        target.inboxMessageID = id
+        target.inboxMessageVersion = version
+        target.notificationID = notificationGroupId ?? id
+        target.projectID = projectId.uuidString.lowercased()
+        target.targetID = targetId
+        switch kind {
+        case .issue:
+            guard UUID(uuidString: targetId) != nil else { return nil }
+            target.issue = .init()
+        case .conversation:
+            guard UUID(uuidString: targetId) != nil,
+                  let conversationMessageId
+            else { return nil }
+            var destination = BriarAPI_MobilePushConversationDestination()
+            destination.conversationMessageID = conversationMessageId.uuidString.lowercased()
+            target.conversation = destination
+        case .channel:
+            guard UUID(uuidString: targetId) != nil,
+                  let channelMessageId,
+                  let rootMessageId
+            else { return nil }
+            var destination = BriarAPI_MobilePushChannelDestination()
+            destination.channelMessageID = channelMessageId.uuidString.lowercased()
+            destination.rootMessageID = rootMessageId.uuidString.lowercased()
+            target.channel = destination
+        case .session:
+            guard !targetId.isEmpty else { return nil }
+            target.session = .init()
+        }
+        return target
     }
 }
 

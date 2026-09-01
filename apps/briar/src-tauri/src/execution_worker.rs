@@ -36,7 +36,7 @@ fn enable_execution_worker(
     project_id: &str,
     bun_path: &str,
     cli_path: &str,
-) -> Result<serde_json::Value, String> {
+) -> Result<(), String> {
     // A failed registration has not produced a local binding that can be
     // unregistered reliably. Cleanup begins only after the CLI confirms that
     // registration completed.
@@ -52,24 +52,19 @@ fn enable_execution_worker(
         cli_path,
     ])
     .map_err(|cause| rollback_enabled_worker_failure(run, project_id, cause))?;
-    let status = run(&["worker", "status", "--project", project_id])
+    run(&["worker", "status", "--project", project_id])
         .map_err(|cause| rollback_enabled_worker_failure(run, project_id, cause))?;
-    serde_json::from_str(&status).map_err(|error| {
-        rollback_enabled_worker_failure(
-            run,
-            project_id,
-            format!("Worker 상태를 읽지 못했습니다: {error}"),
-        )
-    })
+    Ok(())
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) fn configure_execution_worker(
     app: AppHandle,
     project_id: String,
     user_token: String,
     enabled: bool,
-) -> Result<serde_json::Value, String> {
+) -> Result<(), String> {
     if project_id.trim().is_empty() || user_token.trim().is_empty() {
         return Err("프로젝트와 로그인 정보가 필요합니다.".to_string());
     }
@@ -119,11 +114,12 @@ pub(super) fn configure_execution_worker(
     run(&["worker", "uninstall-service", "--project", &project_id])?;
     run(&["worker", "unregister", "--project", &project_id])?;
 
-    let status = run(&["worker", "status", "--project", &project_id])?;
-    serde_json::from_str(&status).map_err(|error| format!("Worker 상태를 읽지 못했습니다: {error}"))
+    run(&["worker", "status", "--project", &project_id])?;
+    Ok(())
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) fn inspect_execution_workers(
     app: AppHandle,
     project_ids: Vec<String>,
@@ -132,6 +128,7 @@ pub(super) fn inspect_execution_workers(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) fn current_execution_worker_device_id(
     app: AppHandle,
     organization_id: String,
@@ -140,7 +137,8 @@ pub(super) fn current_execution_worker_device_id(
 }
 
 #[tauri::command]
-pub(super) fn sync_execution_worker_labels(app: AppHandle) -> Result<serde_json::Value, String> {
+#[specta::specta]
+pub(super) fn sync_execution_worker_labels(app: AppHandle) -> Result<(), String> {
     let resource_directory = app
         .path()
         .resource_dir()
@@ -165,11 +163,11 @@ pub(super) fn sync_execution_worker_labels(app: AppHandle) -> Result<serde_json:
         let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
         return Err(if stderr.is_empty() { stdout } else { stderr });
     }
-    serde_json::from_slice(&output.stdout)
-        .map_err(|error| format!("Worker 이름 동기화 결과를 읽지 못했습니다: {error}"))
+    Ok(())
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) fn refresh_execution_worker_runtime(app: AppHandle) -> Result<bool, String> {
     let resource_directory = app
         .path()
@@ -204,24 +202,14 @@ pub(super) fn inspect_execution_workers_at(
                 .map(|project| (project_id, project))
         })
         .map(|(project_id, project)| {
-            let worker = project
-                .extra
-                .get("executionWorker")
-                .filter(|value| !value.is_null())
-                .map(|value| {
-                    serde_json::from_value::<StoredExecutionWorker>(value.clone())
-                        .map_err(|error| format!("Worker 로컬 설정이 손상되었습니다: {error}"))
-                })
-                .transpose()?;
+            let worker = project.execution_worker.as_option();
             Ok(LocalExecutionWorkerStatus {
                 project_id,
                 registered: worker.is_some(),
-                worker_id: worker.as_ref().map(|worker| worker.worker_id.clone()),
-                device_id: worker.as_ref().map(|worker| worker.device_id.clone()),
-                label: worker.as_ref().map(|worker| worker.label.clone()),
-                max_concurrent_sessions: worker
-                    .as_ref()
-                    .map(|worker| worker.max_concurrent_sessions),
+                worker_id: worker.map(|worker| worker.worker_id.clone()),
+                device_id: worker.map(|worker| worker.device_id.clone()),
+                label: worker.map(|worker| worker.label.clone()),
+                max_concurrent_sessions: worker.map(|worker| worker.max_concurrent_sessions),
             })
         })
         .collect()
@@ -235,16 +223,9 @@ pub(super) fn current_execution_worker_device_id_at(
     let mut device_ids = config
         .projects
         .iter()
-        .filter_map(|project| project.extra.get("executionWorker"))
-        .filter(|value| !value.is_null())
-        .map(|value| {
-            serde_json::from_value::<StoredExecutionWorker>(value.clone())
-                .map_err(|error| format!("Worker 로컬 설정이 손상되었습니다: {error}"))
-        })
-        .collect::<Result<Vec<_>, _>>()?
-        .into_iter()
-        .filter(|worker| worker.organization_id.as_deref() == Some(organization_id))
-        .map(|worker| worker.device_id)
+        .filter_map(|project| project.execution_worker.as_option())
+        .filter(|worker| worker.organization_id == organization_id)
+        .map(|worker| worker.device_id.clone())
         .collect::<BTreeSet<_>>();
     if device_ids.len() > 1 {
         return Err("같은 조직의 로컬 Worker device ID가 서로 다릅니다.".to_string());
@@ -283,15 +264,18 @@ impl ExecutionWorkerRestartPolicy {
     }
 }
 
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 pub(super) fn execution_worker_restart_version_path(home: &Path) -> PathBuf {
     home.join(".local/share/briar/WORKER_RUNTIME_RESTART_VERSION")
 }
 
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 pub(super) fn execution_worker_restart_is_current(home: &Path) -> bool {
     read_trimmed_file(&execution_worker_restart_version_path(home)).as_deref()
         == Some(env!("CARGO_PKG_VERSION"))
 }
 
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 pub(super) fn record_execution_worker_restart_version(home: &Path) -> Result<(), String> {
     fs::write(
         execution_worker_restart_version_path(home),
@@ -528,10 +512,7 @@ pub(super) fn auto_hunt_health_sync_with(
     project_id: &str,
     inspect_velen: &dyn Fn(Option<String>) -> Result<VelenInspection, String>,
 ) -> Result<AutoHuntHealth, String> {
-    let contents = fs::read_to_string(config_path)
-        .map_err(|error| format!("Briar 로컬 설정을 읽지 못했습니다: {error}"))?;
-    let config = serde_json::from_str::<CliConfig>(&contents)
-        .map_err(|error| format!("Briar 로컬 설정이 손상되었습니다: {error}"))?;
+    let config = read_cli_config(config_path)?;
     let project = config
         .projects
         .iter()
@@ -571,7 +552,13 @@ pub(super) fn auto_hunt_health_sync_with(
     );
     let skill_expected_version = read_trimmed_file(&skill_source.join("VERSION"))
         .unwrap_or_else(|| expected_version.clone());
-    let skill_directory = match project.llm.clone().unwrap_or_default().provider {
+    let llm = project
+        .llm
+        .as_option()
+        .map(project_llm_settings_from_proto)
+        .transpose()?
+        .unwrap_or_default();
+    let skill_directory = match llm.provider {
         agent::AgentProviderKind::Codex => ".codex",
         agent::AgentProviderKind::Claude => ".claude",
         agent::AgentProviderKind::Cursor => ".cursor",
@@ -597,7 +584,7 @@ pub(super) fn auto_hunt_health_sync_with(
 
     let velen_org = project
         .auto_hunt
-        .as_ref()
+        .as_option()
         .and_then(|auto_hunt| auto_hunt.velen_org.clone());
     let (velen_authenticated, velen_email, velen_healthy) = if let Some(org) = velen_org.as_deref()
     {
@@ -612,10 +599,14 @@ pub(super) fn auto_hunt_health_sync_with(
     } else {
         (false, None, true)
     };
-    let requirements = project
+    let workflow = project
         .auto_hunt
+        .as_option()
+        .and_then(|auto_hunt| auto_hunt.workflow.as_option())
+        .map(workflow_from_proto)
+        .transpose()?;
+    let requirements = workflow
         .as_ref()
-        .and_then(|auto_hunt| auto_hunt.workflow.as_ref())
         .map(|workflow| inspect_workflow_requirements(runner.as_ref(), &workflow.requirements))
         .unwrap_or_default();
     for requirement in requirements
@@ -654,6 +645,7 @@ pub(super) fn auto_hunt_health_sync_with(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn auto_hunt_health(
     app: tauri::AppHandle,
     project_id: String,
@@ -672,6 +664,7 @@ pub(super) async fn auto_hunt_health(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn repair_auto_hunt(
     app: tauri::AppHandle,
     project_id: String,

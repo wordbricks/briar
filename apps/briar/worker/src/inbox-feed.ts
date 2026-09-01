@@ -1,13 +1,11 @@
-import * as Option from "effect/Option";
 import {
   autoHuntWorkflowStageCatalog,
   normalizeAutoHuntWorkflow,
 } from "../../src/lib/auto-hunt-contract";
-import {
-  decodeStructuredAgentResultOption,
-  type StructuredAgentResult,
-} from "../../src/lib/agent-result";
+import type { StructuredAgentResult } from "../../src/lib/agent-result";
 import { inboxSessionMessageVersion } from "../../src/lib/inbox-session-version";
+import { parseStructuredResult } from "./agent-result-json";
+import { decodeStoredProjectAgentSessionSummary } from "./project-request-contract";
 import type {
   ChannelConversationNotificationRow,
   HuntRunRow,
@@ -149,56 +147,30 @@ type ParsedSession = {
   version: string;
 };
 
-function objectValue(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
-}
-
-function optionalString(value: unknown) {
-  return typeof value === "string" ? value : null;
-}
-
 function parseSession(
   project: InboxFeedProject,
   row: InboxFeedSessionSummary,
 ): ParsedSession | null {
-  let payload: Record<string, unknown> | null = null;
-  try {
-    payload = objectValue(JSON.parse(row.summary_json));
-  } catch {
-    return null;
-  }
-  if (!payload) return null;
+  const payload = decodeStoredProjectAgentSessionSummary(row.summary_json);
   const status = payload.status;
   if (status !== "completed" && status !== "failed") return null;
-  const issues = Array.isArray(payload.issues)
-    ? payload.issues.flatMap((value) => {
-        const issue = objectValue(value);
-        const title = optionalString(issue?.title);
-        const outcome = optionalString(issue?.outcome);
-        return title && outcome ? [{ title, outcome }] : [];
-      })
-    : [];
-  const startedAt = optionalString(payload.startedAt) ?? row.updated_at;
-  const completedAt = optionalString(payload.completedAt);
   return {
     project,
     id: row.session_id,
-    agentName: optionalString(payload.agentName)?.trim() || null,
-    parentSessionId: optionalString(payload.parentSessionId),
-    requestedByUserId: optionalString(payload.requestedByUserId),
-    request: optionalString(payload.request),
+    agentName: payload.agentName,
+    parentSessionId: payload.parentSessionId,
+    requestedByUserId: payload.requestedByUserId,
+    request: payload.request,
     status,
-    issues,
-    startedAt,
-    completedAt,
-    summary: optionalString(payload.summary),
-    error: optionalString(payload.error),
-    updatedAt: optionalString(payload.updatedAt) ?? row.updated_at,
+    issues: payload.issues,
+    startedAt: payload.startedAt,
+    completedAt: payload.completedAt,
+    summary: payload.summary,
+    error: payload.error,
+    updatedAt: payload.updatedAt,
     version: inboxSessionMessageVersion(
       status,
-      completedAt ?? startedAt,
+      payload.completedAt ?? payload.startedAt,
     ),
   };
 }
@@ -218,16 +190,7 @@ function workflowStageLabel(run: InboxFeedRun) {
 }
 
 function structuredResult(run: InboxFeedRun) {
-  if (!run.structured_result_json) return null;
-  try {
-    return Option.getOrNull(
-      decodeStructuredAgentResultOption(
-        JSON.parse(run.structured_result_json),
-      ),
-    );
-  } catch {
-    return null;
-  }
+  return parseStructuredResult(run.structured_result_json);
 }
 
 /**

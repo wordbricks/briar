@@ -1,14 +1,8 @@
-import * as Schema from "effect/Schema";
 import type { DmMemoryDescriptor } from "../../src/lib/dm-memory-query-contract";
 import type { DmMemoryAccess } from "./dm-memory-access";
 import { expireDmMemories } from "./dm-memory-access";
 import { requireDmMemoryReplyFence } from "./dm-memory-reply-fence";
 import { HttpError } from "./http-response";
-
-const capability = Schema.Struct({ dmMemory: Schema.Struct({ protocol: Schema.Literal(1) }) });
-export function supportsDmMemory(capabilitiesJson: string) {
-  try { return Schema.is(capability)(JSON.parse(capabilitiesJson)); } catch { return false; }
-}
 
 type ClaimSpace = {
   id: string; organization_id: string; channel_id: string; owner_user_id: string; agent_id: string;

@@ -1,5 +1,4 @@
 import {
-  autoHuntPersistedRunStatuses,
   type AutoHuntPersistedRunStatus,
   type AutoHuntWorkflowStageId,
 } from "./auto-hunt-contract";
@@ -71,27 +70,11 @@ export type LinearImportResult = {
   };
 };
 
-const statusSet = new Set<string>(autoHuntPersistedRunStatuses);
-
 export function placementKey(placement: LinearImportPlacement): string {
   if (placement.status === "running" && placement.workflowStage) {
     return `stage:${placement.workflowStage}`;
   }
   return `status:${placement.status}`;
-}
-
-export function parsePlacementKey(value: string): LinearImportPlacement | null {
-  if (value.startsWith("stage:")) {
-    const workflowStage = value.slice("stage:".length).trim();
-    if (!workflowStage) return null;
-    return { status: "running", workflowStage };
-  }
-  if (value.startsWith("status:")) {
-    const status = value.slice("status:".length).trim();
-    if (!statusSet.has(status)) return null;
-    return { status: status as AutoHuntPersistedRunStatus, workflowStage: null };
-  }
-  return null;
 }
 
 /** Map Linear workflow state types to Briar run placements. */

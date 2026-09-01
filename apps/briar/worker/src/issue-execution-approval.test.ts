@@ -1,6 +1,12 @@
+import { create } from "@bufbuild/protobuf";
+import {
+  CompleteIssueReplyRequestSchema,
+  IssueReplyClaimIdentitySchema,
+  WorkClaimIdentitySchema,
+} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import { createHash } from "node:crypto";
-import { Miniflare } from "miniflare";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { env as cloudflareEnv } from "cloudflare:workers";
+import { beforeAll, describe, expect, it } from "vitest";
 import {
   addChannelAgent,
   createChannel,
@@ -28,13 +34,25 @@ import {
   reserveIssueExecutionProposalApproval,
   transferIssue,
 } from "./db";
-import worker from "./index";
+import {
+  acceptOrganizationChannelExecutionProposal,
+  acceptOrganizationChannelProposal,
+} from "./channel-proposal-routes";
+import {
+  acceptProjectIssueActionProposal,
+  acceptProjectIssueExecutionProposal,
+} from "./issue-proposal-routes";
+import { HttpError } from "./http-response";
 import { createOrganizationAgent } from "./organization-agents";
-import { createIsolatedTestDatabase } from "./test-helpers/d1";
+import { RequestDecodeError } from "./request-schema";
+import { workerRuntimeMetadataFixture } from "./test-helpers/worker-runtime";
+import { completeIssueReplyApplication } from "./worker-reply-completion-application";
+import { completeIssueReplyInputFromProto } from "./worker-reply-completion-mappers";
 import {
   dispatchHuntRun,
   registerExecutionWorker,
   unassignHuntRun,
+  WorkerConflictError,
 } from "./workers";
 
 const organizationId = "a1000000-0000-4000-8000-000000000001";
@@ -139,25 +157,12 @@ const event = (
   context: null,
 });
 describe("conversational issue execution approval", () => {
-  let miniflare: Miniflare;
-  let db: D1Database;
-  let attachments: R2Bucket;
+  const db = cloudflareEnv.DB;
+  const attachments = cloudflareEnv.ATTACHMENTS;
   let sequence = 0;
   let projectAgentId: string;
 
   beforeAll(async () => {
-    const database = await createIsolatedTestDatabase({
-      suite: "issue-execution-approval",
-      miniflareOptions: {
-        modules: true,
-        script: "export default { fetch() { return new Response('ok') } }",
-        r2Buckets: ["ATTACHMENTS"],
-      },
-    });
-    miniflare = database.miniflare;
-    db = database.db;
-    attachments = await miniflare.getR2Bucket("ATTACHMENTS") as unknown as R2Bucket;
-
     for (const [id, name, token] of [
       [ownerId, "Owner", ownerToken],
       [memberId, "Member", memberToken],
@@ -257,20 +262,10 @@ describe("conversational issue execution approval", () => {
       deviceIdentityHash: createHash("sha256").update("execution-device").digest("hex"),
       credentialTokenHash: createHash("sha256")
         .update(executionWorkerCredential).digest("hex"),
-      agentProvider: "codex",
-      providers: ["codex"],
-      providerHealth: {
-        codex: { installed: true, authenticated: true, healthy: true },
-      },
-      providerCapabilities,
-      versions: { briar: "1.0.0" },
+      runtime: workerRuntimeMetadataFixture({ providerCapabilities }),
       observedAt: new Date().toISOString(),
     });
   }, 60_000);
-
-  afterAll(async () => {
-    await miniflare.dispose();
-  });
 
   const env = () => ({
     DB: db,
@@ -279,6 +274,114 @@ describe("conversational issue execution approval", () => {
     GOOGLE_CLIENT_ID: "google-client",
     GOOGLE_CLIENT_SECRET: "google-secret",
   }) as unknown as Env;
+
+  type ChannelProposalApplicationCall = {
+    kind: "create" | "execution";
+    channelId: string;
+    proposalId: string;
+    token: string;
+    request: Record<string, unknown>;
+  };
+
+  type IssueProposalApplicationCall = {
+    kind: "action" | "execution";
+    runId: string;
+    proposalId: string;
+    token: string;
+    request?: Record<string, unknown>;
+  };
+
+  const invokeChannelProposal = async (
+    call: ChannelProposalApplicationCall,
+    runtimeEnv: Env,
+  ) => {
+    const userId = call.token === ownerToken
+      ? ownerId
+      : call.token === memberToken
+      ? memberId
+      : null;
+    if (!userId) {
+      return Response.json({ message: "Unauthorized" }, { status: 401 });
+    }
+    try {
+      const result = call.kind === "create"
+        ? await acceptOrganizationChannelProposal({
+          db,
+          env: runtimeEnv,
+          organizationId,
+          channelId: call.channelId,
+          proposalId: call.proposalId,
+          userId,
+          request: call.request,
+        })
+        : await acceptOrganizationChannelExecutionProposal({
+          db,
+          env: runtimeEnv,
+          organizationId,
+          channelId: call.channelId,
+          proposalId: call.proposalId,
+          userId,
+          request: call.request,
+        });
+      return Response.json(result);
+    } catch (error) {
+      if (error instanceof HttpError) {
+        return Response.json({ message: error.message }, { status: error.status });
+      }
+      if (error instanceof WorkerConflictError) {
+        return Response.json({ message: error.message }, { status: 409 });
+      }
+      return Response.json({ message: "Internal server error" }, { status: 500 });
+    }
+  };
+
+  const invokeIssueProposal = async (call: IssueProposalApplicationCall) => {
+    const session = await db.prepare(
+      `select "userId" as user_id from "session" where token = ?`,
+    ).bind(call.token).first<{ user_id: string }>();
+    const userId = session?.user_id ?? null;
+    if (!userId) {
+      return Response.json({ message: "Unauthorized" }, { status: 401 });
+    }
+    try {
+      const shared = {
+        db,
+        archivesBucket: attachments,
+        projectId: projectAId,
+        conversationRunId: call.runId,
+        proposalId: call.proposalId,
+        userId,
+      };
+      const result = call.kind === "action"
+        ? await acceptProjectIssueActionProposal(shared)
+        : await acceptProjectIssueExecutionProposal({
+          ...shared,
+          request: call.request ?? {},
+        });
+      return Response.json(result);
+    } catch (error) {
+      if (error instanceof HttpError) {
+        return Response.json({ message: error.message }, { status: error.status });
+      }
+      if (error instanceof RequestDecodeError) {
+        return Response.json({ message: error.message }, { status: 400 });
+      }
+      if (error instanceof WorkerConflictError) {
+        return Response.json({ message: error.message }, { status: 409 });
+      }
+      return Response.json({ message: "Internal server error" }, { status: 500 });
+    }
+  };
+
+  const worker = {
+    fetch: (
+      input: ChannelProposalApplicationCall | IssueProposalApplicationCall,
+      runtimeEnv: Env,
+    ) =>
+      "channelId" in input
+        ? invokeChannelProposal(input, runtimeEnv)
+        : invokeIssueProposal(input),
+  };
 
   const seedIssueProposal = async () => {
     sequence += 1;
@@ -343,18 +446,13 @@ describe("conversational issue execution approval", () => {
       effort: "high",
       workerId: null,
     },
-  ) => new Request(
-    `https://briar.example/projects/${projectAId}/runs/${runId}` +
-      `/issue-execution-proposals/${proposalId}/accept`,
-    {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${token}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify(body),
-    },
-  );
+  ): IssueProposalApplicationCall => ({
+    kind: "execution",
+    runId,
+    proposalId,
+    token,
+    request: body,
+  });
 
   const seedClaimedIssueReply = async (input?: {
     claimToken?: string;
@@ -423,29 +521,43 @@ describe("conversational issue execution approval", () => {
     };
   };
 
-  const completeIssueReplyRequest = (
+  const completeIssueReply = async (
     jobId: string,
+    runId: string,
     claimToken: string,
-    body: Record<string, unknown> = {
-      body: "실행 설정을 선택하고 승인해 주세요.",
-      executionProposal: { type: "request_issue_execute" },
+    body = "실행 설정을 선택하고 승인해 주세요.",
+  ) => completeIssueReplyApplication({
+    db,
+    env: env(),
+    worker: {
+      principal: { organizationId, deviceId: "execution-device" },
+      binding: { id: "execution-any-worker", project_id: projectAId },
     },
-  ) => new Request(
-    `https://briar.example/issue-reply-claims/${jobId}/complete`,
-    {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${executionWorkerCredential}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
+    request: completeIssueReplyInputFromProto(create(
+      CompleteIssueReplyRequestSchema,
+      {
+        requestId: crypto.randomUUID(),
         projectId: projectAId,
         workerId: "execution-any-worker",
-        claimToken,
-        ...body,
-      }),
-    },
-  );
+        work: create(WorkClaimIdentitySchema, {
+          workId: jobId,
+          runId,
+          claimToken,
+          work: {
+            case: "issueReply",
+            value: create(IssueReplyClaimIdentitySchema),
+          },
+        }),
+        outcome: {
+          case: "success",
+          value: {
+            body,
+            action: { case: "execution", value: {} },
+          },
+        },
+      },
+    )),
+  });
 
   it("dispatches only after explicit approval and finalizes both audits atomically", async () => {
     const { runId, proposalId } = await seedIssueProposal();
@@ -562,23 +674,11 @@ describe("conversational issue execution approval", () => {
 
   it("atomically persists an Issue Agent execution card from its live lease", async () => {
     const seeded = await seedClaimedIssueReply();
-    const response = await worker.fetch(
-      completeIssueReplyRequest(seeded.jobId, seeded.claimToken),
-      env(),
+    await completeIssueReply(
+      seeded.jobId,
+      seeded.runId,
+      seeded.claimToken,
     );
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
-      agentReply: { status: "completed" },
-      message: {
-        id: seeded.replyMessageId,
-        executionProposal: {
-          type: "request_issue_execute",
-          status: "pending",
-          projectId: projectAId,
-          runId: seeded.runId,
-        },
-      },
-    });
     await expect(db.prepare(
       `select status, claim_token_hash, lease_expires_at
        from briar_issue_agent_reply_jobs where id = ?`,
@@ -639,11 +739,11 @@ describe("conversational issue execution approval", () => {
       seeded.jobId,
     ).run();
 
-    const stale = await worker.fetch(
-      completeIssueReplyRequest(seeded.jobId, oldToken),
-      env(),
-    );
-    expect(stale.status).toBe(409);
+    await expect(completeIssueReply(
+      seeded.jobId,
+      seeded.runId,
+      oldToken,
+    )).rejects.toMatchObject({ reason: "claim_conflict" });
     await expect(db.prepare(
       `select count(*) as count from briar_issue_messages where id = ?`,
     ).bind(seeded.replyMessageId).first()).resolves.toEqual({ count: 0 });
@@ -652,19 +752,22 @@ describe("conversational issue execution approval", () => {
        where reply_message_id = ?`,
     ).bind(seeded.replyMessageId).first()).resolves.toEqual({ count: 0 });
 
-    const current = await worker.fetch(
-      completeIssueReplyRequest(seeded.jobId, newToken, {
-        body: "새 claim이 만든 승인 카드입니다.",
-        executionProposal: { type: "request_issue_execute" },
-      }),
-      env(),
+    await completeIssueReply(
+      seeded.jobId,
+      seeded.runId,
+      newToken,
+      "새 claim이 만든 승인 카드입니다.",
     );
-    expect(current.status).toBe(200);
-    await expect(current.json()).resolves.toMatchObject({
-      message: {
-        body: "새 claim이 만든 승인 카드입니다.",
-        executionProposal: { status: "pending" },
-      },
+    await expect(db.prepare(
+      `select body from briar_issue_messages where id = ?`,
+    ).bind(seeded.replyMessageId).first()).resolves.toEqual({
+      body: "새 claim이 만든 승인 카드입니다.",
+    });
+    await expect(db.prepare(
+      `select status from briar_issue_execution_proposals
+       where reply_message_id = ?`,
+    ).bind(seeded.replyMessageId).first()).resolves.toEqual({
+      status: "pending",
     });
   });
 
@@ -717,7 +820,6 @@ describe("conversational issue execution approval", () => {
       leaseExpiresAt: new Date(Date.now() + 60_000).toISOString(),
       runId,
       workerId: "execution-any-worker",
-      agentProvider: "codex",
       detachedOnly: true,
     })).rejects.toThrow("conversational execution approval audit is missing");
     await expect(unassignHuntRun(db, organizationId, projectAId, {
@@ -778,6 +880,8 @@ describe("conversational issue execution approval", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: `execution-${sequence}`,
       name: `Execution ${sequence}`,
       topic: null,
@@ -872,18 +976,13 @@ describe("conversational issue execution approval", () => {
       effort: null,
       workerId: null,
     },
-  ) => new Request(
-    `https://briar.example/organizations/${organizationId}/channels/${channelId}` +
-      `/proposals/${proposalId}/accept-execution`,
-    {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${token}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify(body),
-    },
-  );
+  ): ChannelProposalApplicationCall => ({
+    kind: "execution",
+    channelId,
+    proposalId,
+    token,
+    request: body,
+  });
 
   it("accepts channel execution once and binds retries to the same member and settings", async () => {
     const seeded = await seedChannelProposal({ reserve: false });
@@ -974,18 +1073,18 @@ describe("conversational issue execution approval", () => {
           title: "Issue create then execute",
           description: null,
           priority: 2,
-          status: "backlog",
         },
       }),
       executeAfterCreate: true,
       executionProposalId: issueExecutionId,
       createdAt: initialAt,
     });
-    const issueCreateAccept = () => new Request(
-      `https://briar.example/projects/${projectAId}/runs/${conversationRunId}` +
-        `/issue-action-proposals/${issueActionId}/accept`,
-      { method: "POST", headers: { authorization: `Bearer ${ownerToken}` } },
-    );
+    const issueCreateAccept = (): IssueProposalApplicationCall => ({
+      kind: "action",
+      runId: conversationRunId,
+      proposalId: issueActionId,
+      token: ownerToken,
+    });
     const issueCreatedResponse = await worker.fetch(issueCreateAccept(), env());
     expect(issueCreatedResponse.status).toBe(200);
     const issueCreated = await issueCreatedResponse.json<{
@@ -1030,6 +1129,8 @@ describe("conversational issue execution approval", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: `create-execute-${sequence}`,
       name: "Create and execute",
       topic: null,
@@ -1087,25 +1188,19 @@ describe("conversational issue execution approval", () => {
           title: "Channel create then execute",
           description: null,
           priority: 2,
-          status: "backlog",
         },
       }),
       channelExecutionId,
       initialAt,
       initialAt,
     ).run();
-    const channelCreateAccept = () => new Request(
-      `https://briar.example/organizations/${organizationId}/channels/${channelId}` +
-        `/proposals/${channelActionId}/accept`,
-      {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${ownerToken}`,
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({ projectId: projectAId }),
-      },
-    );
+    const channelCreateAccept = (): ChannelProposalApplicationCall => ({
+      kind: "create",
+      channelId,
+      proposalId: channelActionId,
+      token: ownerToken,
+      request: { projectId: projectAId },
+    });
     const channelCreatedResponse = await worker.fetch(channelCreateAccept(), env());
     expect(channelCreatedResponse.status).toBe(200);
     const channelCreated = await channelCreatedResponse.json<{
@@ -1205,7 +1300,6 @@ describe("conversational issue execution approval", () => {
           title: "Collision result",
           description: null,
           priority: null,
-          status: "backlog",
         },
       }),
       executeAfterCreate: true,
@@ -1414,7 +1508,6 @@ describe("conversational issue execution approval", () => {
       leaseExpiresAt: new Date(Date.now() + 60_000).toISOString(),
       runId: agentApproval.runId,
       workerId: "execution-any-worker",
-      agentProvider: "codex",
       detachedOnly: true,
     })).resolves.toMatchObject({ id: agentApproval.runId });
     await db.prepare(`delete from briar_project_agents where id = ?`)
@@ -1444,13 +1537,7 @@ describe("conversational issue execution approval", () => {
         .update(`committed-device-${sequence}`).digest("hex"),
       credentialTokenHash: createHash("sha256")
         .update(`committed-token-${sequence}`).digest("hex"),
-      agentProvider: "codex",
-      providers: ["codex"],
-      providerHealth: {
-        codex: { installed: true, authenticated: true, healthy: true },
-      },
-      providerCapabilities,
-      versions: { briar: "1.0.0" },
+      runtime: workerRuntimeMetadataFixture({ providerCapabilities }),
       observedAt: new Date().toISOString(),
     });
     const workerApproval = await seedIssueProposal();
@@ -1468,7 +1555,6 @@ describe("conversational issue execution approval", () => {
       leaseExpiresAt: new Date(Date.now() + 60_000).toISOString(),
       runId: workerApproval.runId,
       workerId: selectedWorkerId,
-      agentProvider: "codex",
       detachedOnly: true,
     })).resolves.toMatchObject({ id: workerApproval.runId });
     await db.prepare(`delete from briar_execution_workers where id = ?`)
@@ -1536,7 +1622,6 @@ describe("conversational issue execution approval", () => {
       leaseExpiresAt: new Date(Date.now() + 60_000).toISOString(),
       runId: memberApproval.runId,
       workerId: "execution-any-worker",
-      agentProvider: "codex",
       detachedOnly: true,
     })).resolves.toMatchObject({ id: memberApproval.runId });
     await db.prepare(`delete from "user" where id = ?`).bind(approverId).run();
@@ -1622,13 +1707,7 @@ describe("conversational issue execution approval", () => {
         .update(`selected-device-${sequence}`).digest("hex"),
       credentialTokenHash: createHash("sha256")
         .update(`selected-token-${sequence}`).digest("hex"),
-      agentProvider: "codex",
-      providers: ["codex"],
-      providerHealth: {
-        codex: { installed: true, authenticated: true, healthy: true },
-      },
-      providerCapabilities,
-      versions: { briar: "1.0.0" },
+      runtime: workerRuntimeMetadataFixture({ providerCapabilities }),
       observedAt: new Date().toISOString(),
     });
     const selected = await seedIssueProposal();

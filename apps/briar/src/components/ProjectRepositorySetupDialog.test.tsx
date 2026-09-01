@@ -15,6 +15,7 @@ const readiness = {
   remoteReachable: true,
   pushAccess: true,
   requiresGithub: true,
+  githubRepositoryId: null,
   githubRepository: "wordbricks/briar",
   ghInstalled: false,
   ghVersion: null,
@@ -169,6 +170,7 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
           remoteReachable: false,
           pushAccess: false,
           requiresGithub: false,
+          githubRepositoryId: null,
         }}
       />,
     );

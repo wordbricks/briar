@@ -8,16 +8,12 @@ import {
   claudeOptions,
   claudePrompt,
   createClaudeEventState,
-  decodeClaudeRunnerRequest,
   normalizeClaudeMessage,
-  type ClaudeRunnerOutput,
-  type ClaudeRunnerRequest,
 } from "./claude-runner-lib";
 import { createRunnerIo } from "./runner-io";
 
-const runnerIo = createRunnerIo<ClaudeRunnerRequest, ClaudeRunnerOutput>({
+const runnerIo = createRunnerIo({
   closeError: "Briar closed the Claude runner input.",
-  decodeRequest: decodeClaudeRunnerRequest,
 });
 const { emit, request: requestPromise, waitForApproval } = runnerIo;
 
@@ -26,8 +22,7 @@ async function main() {
   let approvalSequence = 0;
   const canUseTool: CanUseTool = async (toolName, input, options) => {
     const id = String(++approvalSequence);
-    emit({
-      type: "approval",
+    emit.approval({
       id,
       toolName,
       input,
@@ -51,15 +46,15 @@ async function main() {
     if (message.type === "system" && message.subtype === "init") {
       const sessionId = (message as unknown as { session_id?: unknown }).session_id;
       if (typeof sessionId === "string" && sessionId.trim()) {
-        emit({ type: "session", sessionId });
+        emit.session(sessionId);
       }
     }
     const normalizedEvents = normalizeClaudeMessage(message, state);
     if (normalizedEvents.length === 0) {
-      emit({ type: "event", raw: message });
+      emit.event({ raw: message });
     } else {
       for (const event of normalizedEvents) {
-        emit({ type: "event", raw: message, event });
+        emit.event({ raw: message, event });
       }
     }
     if (message.type === "result") {
@@ -75,8 +70,7 @@ async function main() {
   if (!result) {
     throw new Error("Claude completed without a result message.");
   }
-  emit({
-    type: "result",
+  emit.result({
     sessionId: result.session_id,
     message:
       result.structured_output === undefined
@@ -87,10 +81,7 @@ async function main() {
 
 void main()
   .catch((caught) => {
-    emit({
-      type: "error",
-      message: caught instanceof Error ? caught.message : String(caught),
-    });
+    emit.error(caught instanceof Error ? caught.message : String(caught));
     process.exitCode = 1;
   })
   .finally(runnerIo.close);

@@ -1,6 +1,13 @@
 import * as Schema from "effect/Schema";
+import {
+  DmMemoryClass,
+  DmMemoryService,
+} from "@briar/contracts/gen/briar/app/v1/dm_memory_pb";
+import { Code, createClient } from "@connectrpc/connect";
+import { createConnectTransport } from "@connectrpc/connect-web";
 import { strFromU8, unzipSync } from "fflate";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { env } from "cloudflare:workers";
+import { beforeAll, describe, expect, it } from "vitest";
 import { dmMemoryCreateInput, type DmMemoryCreateInput } from "../../src/lib/dm-memory-contract";
 import { addChannelMember, createChannel, removeChannelMember } from "./channels";
 import { createOrganizationAgent } from "./organization-agents";
@@ -10,11 +17,9 @@ import {
   type DmMemoryOwner,
 } from "./dm-memory-repository";
 import { dmMemoryZipResponse } from "./dm-memory-export";
-import { createIsolatedTestDatabase } from "./test-helpers/d1";
 
 describe("DM memory authoritative storage", () => {
   let db: D1Database;
-  let dispose: () => Promise<void>;
   const organizationId = crypto.randomUUID();
   const userId = crypto.randomUUID();
   const otherUserId = crypto.randomUUID();
@@ -22,9 +27,7 @@ describe("DM memory authoritative storage", () => {
   const now = "2026-09-01T00:00:00.000Z";
 
   beforeAll(async () => {
-    const database = await createIsolatedTestDatabase({ suite: "dm-memory" });
-    db = database.db;
-    dispose = database.dispose;
+    db = env.DB;
     for (const id of [userId, otherUserId]) await db.prepare(`insert into "user"
       (id, name, email, emailVerified, createdAt, updatedAt) values (?, 'Test', ?, 1, ?, ?)`)
       .bind(id, `${id}@example.com`, now, now).run();
@@ -41,12 +44,11 @@ describe("DM memory authoritative storage", () => {
       responsibility: "Use synthetic test data only", effort: null, createdAt: now,
     });
   }, 120_000);
-  afterAll(async () => { await dispose?.(); });
 
   async function dm(): Promise<DmMemoryOwner> {
     const channelId = crypto.randomUUID();
     await createChannel(db, {
-      id: channelId, organizationId, kind: "dm", slug: channelId, name: "Test DM",
+      id: channelId, organizationId, kind: "dm", dmKey: null, slug: channelId, name: "Test DM",
       visibility: "private", topic: null, defaultProjectId: null,
       createdByUserId: userId, agentIds: [agentId], createdAt: now,
     });
@@ -271,25 +273,58 @@ describe("DM memory authoritative storage", () => {
     await expect(entries.next()).rejects.toMatchObject({ code: "version_conflict" });
   });
 
-  it("routes authenticated CRUD through the Worker and rejects forged fields and other owners", async () => {
+  it("serves authenticated CRUD through the generated Connect contract", async () => {
     const owner = await dm();
-    const env = { DB: db, BETTER_AUTH_SECRET: "memory-integration-test-only-not-production",
+    const workerEnv = { DB: db, BETTER_AUTH_SECRET: "memory-integration-test-only-not-production",
       GOOGLE_CLIENT_ID: "memory-test", GOOGLE_CLIENT_SECRET: "memory-test" } as Env;
-    const path = `https://briar-api.example/organizations/${organizationId}/channels/${owner.channelId}/memory`;
-    const call = (suffix: string, method = "GET", body?: unknown, actor = userId) => apiWorker.fetch(
-      new Request(path + suffix, { method, headers: { authorization: `Bearer memory-test-${actor}`,
-        "content-type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) }), env,
+    const client = createClient(
+      DmMemoryService,
+      createConnectTransport({
+        baseUrl: "https://briar-api.example",
+        fetch: async (input, init) => apiWorker.fetch(
+          new Request(input, { ...init, redirect: "manual" }),
+          workerEnv,
+        ),
+      }),
     );
-    const forged = await call("/documents", "POST", { ...memory(), protectedByUser: false });
-    expect(forged.status).toBe(400);
-    const created = await call("/documents", "POST", memory());
-    expect(created.status).toBe(200);
-    const payload = await created.json() as { documentId: string };
-    const read = await call(`/documents/${payload.documentId}`);
-    expect(read.status).toBe(200);
-    expect(read.headers.get("Cache-Control")).toBe("private, no-store");
-    expect((await call(`/documents/${payload.documentId}`, "GET", undefined, otherUserId)).status).toBe(404);
-    expect((await call(`/documents/${payload.documentId}`, "DELETE")).status).toBe(200);
-    expect((await call(`/documents/${payload.documentId}`)).status).toBe(404);
+    const options = (actor: string) => ({
+      headers: { authorization: `Bearer memory-test-${actor}` },
+    });
+    const created = await client.createDmMemoryDocument({
+      organizationId,
+      channelId: owner.channelId,
+      requestId: crypto.randomUUID(),
+      title: "Connect memory",
+      body: "Generated clients own the wire contract.",
+      memoryClass: DmMemoryClass.PROFILE,
+      sourceLanguage: "en",
+    }, options(userId));
+    expect(created).toMatchObject({ version: 1, replayed: false });
+
+    const read = await client.getDmMemoryDocument({
+      organizationId,
+      channelId: owner.channelId,
+      documentId: created.documentId,
+    }, options(userId));
+    expect(read.document).toMatchObject({
+      id: created.documentId,
+      body: "Generated clients own the wire contract.",
+      protectedByUser: true,
+    });
+    await expect(client.getDmMemoryDocument({
+      organizationId,
+      channelId: owner.channelId,
+      documentId: created.documentId,
+    }, options(otherUserId))).rejects.toMatchObject({ code: Code.NotFound });
+    await client.deleteDmMemoryDocument({
+      organizationId,
+      channelId: owner.channelId,
+      documentId: created.documentId,
+    }, options(userId));
+    await expect(client.getDmMemoryDocument({
+      organizationId,
+      channelId: owner.channelId,
+      documentId: created.documentId,
+    }, options(userId))).rejects.toMatchObject({ code: Code.NotFound });
   });
 });

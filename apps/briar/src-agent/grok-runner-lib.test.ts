@@ -3,6 +3,19 @@ import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  AgentActivityKind,
+  AgentActivityStatus,
+} from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
+import {
+  normalizedActivityCompleted,
+  normalizedActivityDelta,
+  normalizedActivityStarted,
+  normalizedMessageCompleted,
+  normalizedMessageDelta,
+  normalizedMessageStarted,
+  normalizedTurnCompleted,
+} from "./normalized-agent-event";
+import {
   buildGrokPromptParts,
   buildPromptParts,
   createGrokEventState,
@@ -18,11 +31,10 @@ import {
   resolveGrokFinalMessage,
   shouldAutoApprovePermission,
   shouldDenyGrokPermission,
-  type GrokRunnerRequest,
 } from "./grok-runner-lib";
+import type { RunnerRequest } from "./runner-request";
 
-const request: GrokRunnerRequest = {
-  type: "run",
+const request: RunnerRequest = {
   message: "Inspect the repository",
   workspaceRoot: "/repo",
   model: "grok-4.5",
@@ -30,7 +42,9 @@ const request: GrokRunnerRequest = {
   approvalPolicy: "never",
   sandboxMode: "readOnly",
   networkAccess: false,
-  grokBinary: "/usr/local/bin/grok",
+  attachments: [],
+  additionalDirectories: [],
+  providerBinaryPath: "/usr/local/bin/grok",
 };
 
 describe("Grok runner", () => {
@@ -320,32 +334,29 @@ describe("Grok runner", () => {
       state,
     );
 
-    expect(started.events).toEqual([{
-      type: "messageStarted",
+    expect(started.events).toEqual([normalizedMessageStarted({
       id: "session-1:assistant:1",
       phase: "commentary",
       text: "Hel",
-    }]);
-    expect(delta.events).toEqual([{
-      type: "messageDelta",
+    })]);
+    expect(delta.events).toEqual([normalizedMessageDelta({
       id: "session-1:assistant:1",
       delta: "lo",
-    }]);
+    })]);
     expect(finalizeGrokMessage(state, "end_turn")).toEqual([
-      {
-        type: "messageCompleted",
+      normalizedMessageCompleted({
         id: "session-1:assistant:1",
         phase: "final",
         text: "Hello",
-      },
-      { type: "turnCompleted", status: "completed" },
+      }),
+      normalizedTurnCompleted("completed"),
     ]);
     expect(grokStopReasonSucceeded("end_turn")).toBe(true);
     expect(grokStopReasonSucceeded("cancelled")).toBe(false);
     expect(grokStopReasonSucceeded("max_tokens")).toBe(false);
     expect(grokStopReasonSucceeded(undefined)).toBe(false);
     expect(finalizeGrokMessage(createGrokEventState(), "max_tokens")).toEqual([
-      { type: "turnCompleted", status: "max_tokens" },
+      normalizedTurnCompleted("max_tokens"),
     ]);
   });
 
@@ -379,24 +390,23 @@ describe("Grok runner", () => {
       state,
     );
 
-    expect(toolCall.events[0]).toEqual({
-      type: "messageCompleted",
+    expect(toolCall.events[0]).toEqual(normalizedMessageCompleted({
       id: "session-1:assistant:1",
       phase: "commentary",
       text: "Checking the repository.",
-    });
-    expect(finalStarted.events[0]).toEqual({
-      type: "messageStarted",
+    }));
+    expect(finalStarted.events[0]).toEqual(normalizedMessageStarted({
       id: "session-1:assistant:2",
       phase: "commentary",
       text: '{"action":"respond"}',
-    });
-    expect(finalizeGrokMessage(state, "end_turn")[0]).toEqual({
-      type: "messageCompleted",
+    }));
+    expect(finalizeGrokMessage(state, "end_turn")[0]).toEqual(
+      normalizedMessageCompleted({
       id: "session-1:assistant:2",
       phase: "final",
       text: '{"action":"respond"}',
-    });
+      }),
+    );
     expect(state.lastAssistantText).toBe('{"action":"respond"}');
   });
 
@@ -418,41 +428,37 @@ describe("Grok runner", () => {
       title: "Run tests",
       status: "in_progress",
       rawInput: { command: "bun test" },
-    })).toEqual([{
-      type: "activityStarted",
+    })).toEqual([normalizedActivityStarted({
       id: "tool-ok",
-      kind: "command",
+      kind: AgentActivityKind.COMMAND,
       title: "Run tests",
       text: "",
-    }]);
+    })]);
     expect(update({
       sessionUpdate: "tool_call_update",
       toolCallId: "tool-ok",
       rawOutput: "PASS first suite\n",
-    })).toEqual([{
-      type: "activityDelta",
+    })).toEqual([normalizedActivityDelta({
       id: "tool-ok",
       delta: "PASS first suite\n",
-    }]);
+    })]);
     expect(update({
       sessionUpdate: "tool_call_update",
       toolCallId: "tool-ok",
       status: "completed",
       rawOutput: "PASS first suite\nPASS second suite\n",
     })).toEqual([
-      {
-        type: "activityDelta",
+      normalizedActivityDelta({
         id: "tool-ok",
         delta: "PASS second suite\n",
-      },
-      {
-        type: "activityCompleted",
+      }),
+      normalizedActivityCompleted({
         id: "tool-ok",
-        kind: "command",
+        kind: AgentActivityKind.COMMAND,
         title: "Run tests",
         text: "PASS first suite\nPASS second suite\n",
-        status: "completed",
-      },
+        status: AgentActivityStatus.COMPLETED,
+      }),
     ]);
 
     update({
@@ -467,14 +473,13 @@ describe("Grok runner", () => {
       toolCallId: "tool-failed",
       status: "failed",
       rawOutput: "1 test failed",
-    })).toContainEqual({
-      type: "activityCompleted",
+    })).toContainEqual(normalizedActivityCompleted({
       id: "tool-failed",
-      kind: "command",
+      kind: AgentActivityKind.COMMAND,
       title: "Run failing tests",
       text: "1 test failed",
-      status: "failed",
-    });
+      status: AgentActivityStatus.FAILED,
+    }));
 
     update({
       sessionUpdate: "tool_call",
@@ -487,14 +492,13 @@ describe("Grok runner", () => {
       sessionUpdate: "tool_call_update",
       toolCallId: "tool-cancelled",
       status: "cancelled",
-    })).toEqual([{
-      type: "activityCompleted",
+    })).toEqual([normalizedActivityCompleted({
       id: "tool-cancelled",
-      kind: "command",
+      kind: AgentActivityKind.COMMAND,
       title: "Push changes",
       text: "",
-      status: "cancelled",
-    }]);
+      status: AgentActivityStatus.CANCELLED,
+    })]);
   });
 
   it("extracts balanced JSON from fenced conversational output", () => {
@@ -549,7 +553,7 @@ describe("Grok runner", () => {
     expect(
       resolveGrokFinalMessage(state, undefined, { type: "object" }),
     ).toBe('{"action":"respond"}');
-    expect(resolveGrokFinalMessage(state, undefined, null)).toBe(
+    expect(resolveGrokFinalMessage(state, undefined, undefined)).toBe(
       '```json\\n{"action":"respond"}\\n```',
     );
   });

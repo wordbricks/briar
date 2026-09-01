@@ -3,7 +3,7 @@ import {
   cloneAutoHuntWorkflow,
   normalizeAutoHuntWorkflow,
 } from "./auto-hunt-contract";
-import type { RepositoryReadiness } from "./project-connection";
+import type { RepositoryReadiness } from "../generated/tauri";
 
 const now = Date.now();
 const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
@@ -338,6 +338,7 @@ export const demoDashboard: DashboardPayload = {
     name: "Briar",
     issueKeyPrefix: "AH",
     scheduleTabEnabled: true,
+    icon: null,
     organizationId: "demo-organization",
     organizationName: "Briar",
     role: "owner",
@@ -404,6 +405,7 @@ export const demoRepositoryReadiness: RepositoryReadiness = {
   remoteReachable: true,
   pushAccess: true,
   requiresGithub: true,
+  githubRepositoryId: null,
   githubRepository: "wordbricks/briar",
   ghInstalled: true,
   ghVersion: "gh version 2.94.0",

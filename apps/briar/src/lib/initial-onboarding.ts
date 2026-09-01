@@ -1,24 +1,7 @@
-import type { AgentProvider } from "./agent-provider";
-
-export type PrerequisiteId = "git" | AgentProvider;
-
-export type PrerequisiteStatus = {
-  installed: boolean;
-  version: string | null;
-  authenticated: boolean;
-};
-
-export type OnboardingPrerequisites = Record<
-  PrerequisiteId,
-  PrerequisiteStatus
->;
-
-export type OpenCodeTerminalPathStatus = {
-  supported: boolean;
-  configured: boolean;
-  binaryPath: string | null;
-  configPath: string | null;
-};
+import {
+  commands,
+  type OnboardingPrerequisite,
+} from "../generated/tauri";
 
 export const initialOnboardingStorageKey = "briar.initial-onboarding.seen.v1";
 
@@ -48,25 +31,18 @@ export async function inspectOnboardingPrerequisites() {
       "필수 도구 확인은 Briar 데스크톱 앱에서 사용할 수 있습니다.",
     );
   }
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<OnboardingPrerequisites>(
-    "inspect_onboarding_prerequisites",
-  );
+  return commands.inspectOnboardingPrerequisites();
 }
 
 export async function installOnboardingPrerequisite(
-  prerequisite: PrerequisiteId,
+  prerequisite: OnboardingPrerequisite,
 ) {
   if (!isTauri()) {
     throw new Error(
       "필수 도구 설치는 Briar 데스크톱 앱에서 사용할 수 있습니다.",
     );
   }
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<OnboardingPrerequisites>(
-    "install_onboarding_prerequisite",
-    { prerequisite },
-  );
+  return commands.installOnboardingPrerequisite(prerequisite);
 }
 
 export async function inspectOpenCodeTerminalPath() {
@@ -75,10 +51,7 @@ export async function inspectOpenCodeTerminalPath() {
       "OpenCode 터미널 PATH 확인은 Briar 데스크톱 앱에서 사용할 수 있습니다.",
     );
   }
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<OpenCodeTerminalPathStatus>(
-    "inspect_open_code_terminal_path",
-  );
+  return commands.inspectOpenCodeTerminalPath();
 }
 
 export async function configureOpenCodeTerminalPath() {
@@ -87,8 +60,5 @@ export async function configureOpenCodeTerminalPath() {
       "OpenCode 터미널 PATH 설정은 Briar 데스크톱 앱에서 사용할 수 있습니다.",
     );
   }
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<OpenCodeTerminalPathStatus>(
-    "configure_open_code_terminal_path",
-  );
+  return commands.configureOpenCodeTerminalPath();
 }

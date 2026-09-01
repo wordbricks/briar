@@ -1,3 +1,4 @@
+use crate::agent;
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, USER_AGENT};
 use serde::{Deserialize, Serialize};
@@ -28,19 +29,28 @@ const GROK_WEEKLY_MINUTES: u64 = 10_080;
 const GROK_MONTHLY_MINUTES: u64 = 43_200;
 const GROK_TOKEN_SKEW_MILLIS: u64 = 5 * 60 * 1_000;
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct AgentUsageWindow {
+    #[specta(type = specta_typescript::Number)]
     used_percent: f64,
     window_minutes: u64,
     resets_at: Option<u64>,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, specta::Type)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum ProviderUsageStatus {
+    Ok,
+    Error,
+    Unavailable,
+}
+
+#[derive(Clone, Debug, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ProviderUsage {
-    provider: &'static str,
-    status: &'static str,
+    provider: agent::AgentProviderKind,
+    status: ProviderUsageStatus,
     session: Option<AgentUsageWindow>,
     weekly: Option<AgentUsageWindow>,
     monthly: Option<AgentUsageWindow>,
@@ -51,7 +61,7 @@ pub(crate) struct ProviderUsage {
     error: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct AgentUsageSnapshot {
     codex: ProviderUsage,
@@ -166,22 +176,40 @@ pub(crate) async fn load(home: PathBuf, openrouter_configured: bool) -> AgentUsa
     let opencode = tauri::async_runtime::spawn_blocking(move || load_opencode(&opencode_home));
     let cursor = tauri::async_runtime::spawn_blocking(move || load_cursor(&cursor_home));
     let codex = codex.await.unwrap_or_else(|error| {
-        failed_provider("codex", format!("Codex usage task failed: {error}"))
+        failed_provider(
+            agent::AgentProviderKind::Codex,
+            format!("Codex usage task failed: {error}"),
+        )
     });
     let claude = claude.await.unwrap_or_else(|error| {
-        failed_provider("claude", format!("Claude usage task failed: {error}"))
+        failed_provider(
+            agent::AgentProviderKind::Claude,
+            format!("Claude usage task failed: {error}"),
+        )
     });
     let grok = grok.await.unwrap_or_else(|error| {
-        failed_provider("grok", format!("Grok usage task failed: {error}"))
+        failed_provider(
+            agent::AgentProviderKind::Grok,
+            format!("Grok usage task failed: {error}"),
+        )
     });
     let agy = agy.await.unwrap_or_else(|error| {
-        failed_provider("agy", format!("Antigravity usage task failed: {error}"))
+        failed_provider(
+            agent::AgentProviderKind::Agy,
+            format!("Antigravity usage task failed: {error}"),
+        )
     });
     let opencode = opencode.await.unwrap_or_else(|error| {
-        failed_provider("opencode", format!("OpenCode usage task failed: {error}"))
+        failed_provider(
+            agent::AgentProviderKind::Opencode,
+            format!("OpenCode usage task failed: {error}"),
+        )
     });
     let cursor = cursor.await.unwrap_or_else(|error| {
-        failed_provider("cursor", format!("Cursor usage task failed: {error}"))
+        failed_provider(
+            agent::AgentProviderKind::Cursor,
+            format!("Cursor usage task failed: {error}"),
+        )
     });
     let openrouter = load_openrouter(openrouter_configured);
     AgentUsageSnapshot {
@@ -198,11 +226,11 @@ pub(crate) async fn load(home: PathBuf, openrouter_configured: bool) -> AgentUsa
 
 fn load_openrouter(configured: bool) -> ProviderUsage {
     if configured {
-        return connected_provider_without_windows("openrouter", None);
+        return connected_provider_without_windows(agent::AgentProviderKind::Openrouter, None);
     }
     provider_without_usage(
-        "openrouter",
-        "unavailable",
+        agent::AgentProviderKind::Openrouter,
+        ProviderUsageStatus::Unavailable,
         "OpenRouter API 키가 필요합니다.".to_string(),
     )
 }
@@ -273,12 +301,12 @@ fn load_codex(home: &Path) -> ProviderUsage {
         }
         Err(error) => {
             let status = if error.contains("CLI") || error.contains("로그인") {
-                "unavailable"
+                ProviderUsageStatus::Unavailable
             } else {
-                "error"
+                ProviderUsageStatus::Error
             };
             provider_without_usage_with_account(
-                "codex",
+                agent::AgentProviderKind::Codex,
                 status,
                 error,
                 account_label,
@@ -443,8 +471,8 @@ fn parse_codex_response(message: &Value) -> Result<ProviderUsage, String> {
         return Err("Codex 계정에 usage 정보가 없습니다. 로그인 상태를 확인하세요.".to_string());
     }
     Ok(ProviderUsage {
-        provider: "codex",
-        status: "ok",
+        provider: agent::AgentProviderKind::Codex,
+        status: ProviderUsageStatus::Ok,
         session,
         weekly,
         monthly: None,
@@ -487,7 +515,13 @@ fn parse_codex_window(value: Option<&Value>, fallback_minutes: u64) -> Option<Ag
 async fn load_claude(home: &Path) -> ProviderUsage {
     let credentials = match read_claude_credentials(home) {
         Ok(credentials) => credentials,
-        Err(error) => return provider_without_usage("claude", "unavailable", error),
+        Err(error) => {
+            return provider_without_usage(
+                agent::AgentProviderKind::Claude,
+                ProviderUsageStatus::Unavailable,
+                error,
+            )
+        }
     };
     match fetch_claude_usage(&credentials.access_token).await {
         Ok(mut usage) => {
@@ -497,8 +531,8 @@ async fn load_claude(home: &Path) -> ProviderUsage {
             usage
         }
         Err(error) => provider_without_usage_with_account(
-            "claude",
-            "error",
+            agent::AgentProviderKind::Claude,
+            ProviderUsageStatus::Error,
             error,
             credentials.account_label,
             true,
@@ -629,8 +663,8 @@ async fn fetch_claude_usage(access_token: &str) -> Result<ProviderUsage, String>
         return Err("Claude 계정에 usage 정보가 없습니다.".to_string());
     }
     Ok(ProviderUsage {
-        provider: "claude",
-        status: "ok",
+        provider: agent::AgentProviderKind::Claude,
+        status: ProviderUsageStatus::Ok,
         session,
         weekly,
         monthly: None,
@@ -656,11 +690,11 @@ async fn load_grok(home: &Path) -> ProviderUsage {
         Ok(session) => session,
         Err(error) => {
             let status = if error.contains("로그인") {
-                "unavailable"
+                ProviderUsageStatus::Unavailable
             } else {
-                "error"
+                ProviderUsageStatus::Error
             };
-            return provider_without_usage("grok", status, error);
+            return provider_without_usage(agent::AgentProviderKind::Grok, status, error);
         }
     };
     if session
@@ -668,8 +702,8 @@ async fn load_grok(home: &Path) -> ProviderUsage {
         .is_some_and(|expires_at| expires_at <= now_millis() + GROK_TOKEN_SKEW_MILLIS)
     {
         return provider_without_usage_with_account(
-            "grok",
-            "error",
+            agent::AgentProviderKind::Grok,
+            ProviderUsageStatus::Error,
             "Grok 로그인이 만료되었습니다. Grok CLI를 실행해 인증을 갱신하세요.".to_string(),
             session.account_label,
             true,
@@ -681,9 +715,13 @@ async fn load_grok(home: &Path) -> ProviderUsage {
             usage.authenticated = true;
             usage
         }
-        Err(error) => {
-            provider_without_usage_with_account("grok", "error", error, session.account_label, true)
-        }
+        Err(error) => provider_without_usage_with_account(
+            agent::AgentProviderKind::Grok,
+            ProviderUsageStatus::Error,
+            error,
+            session.account_label,
+            true,
+        ),
     }
 }
 
@@ -774,8 +812,8 @@ async fn fetch_grok_usage(session: &GrokAuthSession) -> Result<ProviderUsage, St
         return Err("Grok 계정에 usage 정보가 없습니다.".to_string());
     }
     Ok(ProviderUsage {
-        provider: "grok",
-        status: "ok",
+        provider: agent::AgentProviderKind::Grok,
+        status: ProviderUsageStatus::Ok,
         session: None,
         weekly,
         monthly,
@@ -903,7 +941,11 @@ fn epoch_to_millis(value: u64) -> u64 {
 }
 
 fn clamp_percent(value: f64) -> f64 {
-    value.clamp(0.0, 100.0)
+    if value.is_finite() {
+        value.clamp(0.0, 100.0)
+    } else {
+        0.0
+    }
 }
 
 fn parse_cli_reset_time(value: &Value) -> Option<u64> {
@@ -946,53 +988,33 @@ fn parse_agy_cli_quota(value: &Value) -> Result<ProviderUsage, String> {
         ));
     }
 
-    let groups = value.pointer("/command/data/groups").ok_or_else(|| {
-        "올바르지 않은 CLI quota 형식입니다: groups가 누락되었습니다.".to_string()
-    })?;
-
-    // Antigravity CLI 1.1.15 changed groups and buckets from name-keyed
-    // objects to arrays. Accept both layouts so older installations continue
-    // to work while current releases can report quota.
-    let gemini_buckets: Vec<&Value> = match groups {
-        Value::Object(groups) => groups
-            .iter()
-            .find(|(name, _)| name.eq_ignore_ascii_case("gemini models"))
-            .and_then(|(_, group)| group.as_object())
-            .map(|buckets| buckets.values().collect())
-            .ok_or_else(|| "quota에서 Gemini Models 그룹을 찾을 수 없습니다.".to_string())?,
-        Value::Array(groups) => groups
-            .iter()
-            .find(|group| {
-                group
-                    .get("name")
-                    .and_then(Value::as_str)
-                    .is_some_and(|name| name.eq_ignore_ascii_case("gemini models"))
-            })
-            .and_then(|group| group.get("buckets"))
-            .and_then(Value::as_array)
-            .map(|buckets| buckets.iter().collect())
-            .ok_or_else(|| "quota에서 Gemini Models 그룹을 찾을 수 없습니다.".to_string())?,
-        _ => {
-            return Err(
-                "올바르지 않은 CLI quota 형식입니다: groups 형식이 잘못되었습니다.".to_string(),
-            );
-        }
-    };
+    let groups = value
+        .pointer("/command/data/groups")
+        .and_then(Value::as_array)
+        .ok_or_else(|| {
+            "올바르지 않은 CLI quota 형식입니다: groups 형식이 잘못되었습니다.".to_string()
+        })?;
+    let gemini_buckets = groups
+        .iter()
+        .find(|group| {
+            group
+                .get("name")
+                .and_then(Value::as_str)
+                .is_some_and(|name| name.eq_ignore_ascii_case("gemini models"))
+        })
+        .and_then(|group| group.get("buckets"))
+        .and_then(Value::as_array)
+        .ok_or_else(|| "quota에서 Gemini Models 그룹을 찾을 수 없습니다.".to_string())?;
 
     let mut session = None;
     let mut weekly = None;
 
     for bucket_val in gemini_buckets {
-        let remaining_fraction = bucket_val
-            .get("remaining_fraction")
-            .or_else(|| bucket_val.get("remainingFraction"))
-            .and_then(Value::as_f64);
+        let remaining_fraction = bucket_val.get("remaining_fraction").and_then(Value::as_f64);
 
         let window = bucket_val.get("window").and_then(Value::as_str);
 
-        let reset_val = bucket_val
-            .get("reset_time")
-            .or_else(|| bucket_val.get("resetTime"));
+        let reset_val = bucket_val.get("reset_time");
 
         if let (Some(rem), Some(win)) = (remaining_fraction, window) {
             let used_percent = clamp_percent((1.0 - rem) * 100.0);
@@ -1015,8 +1037,8 @@ fn parse_agy_cli_quota(value: &Value) -> Result<ProviderUsage, String> {
     }
 
     Ok(ProviderUsage {
-        provider: "agy",
-        status: "ok",
+        provider: agent::AgentProviderKind::Agy,
+        status: ProviderUsageStatus::Ok,
         session,
         weekly,
         monthly: None,
@@ -1094,7 +1116,13 @@ async fn load_agy(home: &Path) -> ProviderUsage {
     let execution_path = crate::cli_execution_path(home).unwrap_or_default();
     let binary = match crate::agent::agy_binary(home, &execution_path) {
         Ok(path) => path,
-        Err(error) => return provider_without_usage("agy", "unavailable", error),
+        Err(error) => {
+            return provider_without_usage(
+                agent::AgentProviderKind::Agy,
+                ProviderUsageStatus::Unavailable,
+                error,
+            )
+        }
     };
     let authenticated = agy_locally_authenticated(home, &binary, &execution_path);
 
@@ -1123,11 +1151,11 @@ async fn load_agy(home: &Path) -> ProviderUsage {
                     Err(api_error) => {
                         // Both failed
                         return provider_without_usage_with_account(
-                            "agy",
+                            agent::AgentProviderKind::Agy,
                             if authenticated {
-                                "error"
+                                ProviderUsageStatus::Error
                             } else {
-                                "unavailable"
+                                ProviderUsageStatus::Unavailable
                             },
                             format!("CLI 오류: {}; API 오류: {}", cli_error, api_error),
                             credentials.email.clone(),
@@ -1140,8 +1168,8 @@ async fn load_agy(home: &Path) -> ProviderUsage {
             // CLI failed and API fallback is unavailable
             if authenticated {
                 return provider_without_usage_with_account(
-                    "agy",
-                    "error",
+                    agent::AgentProviderKind::Agy,
+                    ProviderUsageStatus::Error,
                     format!("CLI 오류: {}", cli_error),
                     read_gemini_oauth_email_any(home),
                     true,
@@ -1151,8 +1179,8 @@ async fn load_agy(home: &Path) -> ProviderUsage {
     }
 
     provider_without_usage(
-        "agy",
-        "unavailable",
+        agent::AgentProviderKind::Agy,
+        ProviderUsageStatus::Unavailable,
         "Antigravity 로그인이 필요합니다.".to_string(),
     )
 }
@@ -1160,31 +1188,40 @@ async fn load_agy(home: &Path) -> ProviderUsage {
 fn load_opencode(home: &Path) -> ProviderUsage {
     let (authenticated, account_label) = read_opencode_account_identity(home);
     if authenticated {
-        return connected_provider_without_windows("opencode", account_label);
+        return connected_provider_without_windows(
+            agent::AgentProviderKind::Opencode,
+            account_label,
+        );
     }
     provider_without_usage(
-        "opencode",
-        "unavailable",
+        agent::AgentProviderKind::Opencode,
+        ProviderUsageStatus::Unavailable,
         "OpenCode CLI가 필요합니다.".to_string(),
     )
 }
 
 fn load_cursor(home: &Path) -> ProviderUsage {
     if env::var("CURSOR_API_KEY").is_ok_and(|value| !value.trim().is_empty()) {
-        return connected_provider_without_windows("cursor", None);
+        return connected_provider_without_windows(agent::AgentProviderKind::Cursor, None);
     }
     let execution_path = crate::cli_execution_path(home).unwrap_or_default();
     let binary = match crate::agent::cursor_binary(home, &execution_path) {
         Ok(path) => path,
-        Err(error) => return provider_without_usage("cursor", "unavailable", error),
+        Err(error) => {
+            return provider_without_usage(
+                agent::AgentProviderKind::Cursor,
+                ProviderUsageStatus::Unavailable,
+                error,
+            )
+        }
     };
     let (authenticated, account_label) = read_cursor_account_identity(home, &binary);
     if authenticated {
-        return connected_provider_without_windows("cursor", account_label);
+        return connected_provider_without_windows(agent::AgentProviderKind::Cursor, account_label);
     }
     provider_without_usage(
-        "cursor",
-        "unavailable",
+        agent::AgentProviderKind::Cursor,
+        ProviderUsageStatus::Unavailable,
         "Cursor 로그인이 필요합니다.".to_string(),
     )
 }
@@ -1404,8 +1441,8 @@ fn parse_agy_quota(body: &Value) -> Result<ProviderUsage, String> {
             .unwrap_or(std::cmp::Ordering::Equal)
     });
     Ok(ProviderUsage {
-        provider: "agy",
-        status: "ok",
+        provider: agent::AgentProviderKind::Agy,
+        status: ProviderUsageStatus::Ok,
         session,
         weekly: None,
         monthly: None,
@@ -1445,12 +1482,12 @@ fn map_agy_quota_bucket(value: &Value) -> Option<AgentUsageWindow> {
 }
 
 fn connected_provider_without_windows(
-    provider: &'static str,
+    provider: agent::AgentProviderKind,
     account_label: Option<String>,
 ) -> ProviderUsage {
     ProviderUsage {
         provider,
-        status: "ok",
+        status: ProviderUsageStatus::Ok,
         session: None,
         weekly: None,
         monthly: None,
@@ -1462,21 +1499,21 @@ fn connected_provider_without_windows(
     }
 }
 
-fn failed_provider(provider: &'static str, error: String) -> ProviderUsage {
-    provider_without_usage(provider, "error", error)
+fn failed_provider(provider: agent::AgentProviderKind, error: String) -> ProviderUsage {
+    provider_without_usage(provider, ProviderUsageStatus::Error, error)
 }
 
 fn provider_without_usage(
-    provider: &'static str,
-    status: &'static str,
+    provider: agent::AgentProviderKind,
+    status: ProviderUsageStatus,
     error: String,
 ) -> ProviderUsage {
     provider_without_usage_with_account(provider, status, error, None, false)
 }
 
 fn provider_without_usage_with_account(
-    provider: &'static str,
-    status: &'static str,
+    provider: agent::AgentProviderKind,
+    status: ProviderUsageStatus,
     error: String,
     account_label: Option<String>,
     authenticated: bool,
@@ -1509,7 +1546,7 @@ mod tests {
     #[test]
     fn reflects_openrouter_credential_status_without_quota_windows() {
         let configured = load_openrouter(true);
-        assert_eq!(configured.status, "ok");
+        assert_eq!(configured.status, ProviderUsageStatus::Ok);
         assert!(configured.authenticated);
         assert!(configured.session.is_none());
         assert!(configured.weekly.is_none());
@@ -1517,7 +1554,7 @@ mod tests {
         assert!(configured.error.is_none());
 
         let missing = load_openrouter(false);
-        assert_eq!(missing.status, "unavailable");
+        assert_eq!(missing.status, ProviderUsageStatus::Unavailable);
         assert!(!missing.authenticated);
         assert!(missing.error.is_some());
     }
@@ -1543,7 +1580,7 @@ mod tests {
             }
         });
         let usage = parse_codex_response(&response).unwrap();
-        assert_eq!(usage.status, "ok");
+        assert_eq!(usage.status, ProviderUsageStatus::Ok);
         assert_eq!(usage.session.unwrap().used_percent, 37.5);
         assert_eq!(usage.weekly.unwrap().window_minutes, 10_080);
         assert_eq!(usage.plan_type.as_deref(), Some("plus"));
@@ -1688,7 +1725,7 @@ mod tests {
             ]
         }))
         .unwrap();
-        assert_eq!(usage.status, "ok");
+        assert_eq!(usage.status, ProviderUsageStatus::Ok);
         let session = usage.session.unwrap();
         assert_eq!(session.used_percent, 75.0);
         assert_eq!(session.window_minutes, 60);
@@ -1707,52 +1744,7 @@ mod tests {
     }
 
     #[test]
-    fn parses_agy_cli_quota_success() {
-        let output = json!({
-            "command": {
-                "name": "usage",
-                "data": {
-                    "groups": {
-                        "Gemini Models": {
-                            "gemini-weekly": {
-                                "window": "weekly",
-                                "remaining_fraction": 0.8,
-                                "reset_time": "2026-08-18T12:00:00Z"
-                            },
-                            "gemini-5h": {
-                                "window": "5h",
-                                "remaining_fraction": 0.25,
-                                "reset_time": 1800000000000u64
-                            }
-                        },
-                        "Claude and GPT models": {
-                            "claude-weekly": {
-                                "window": "weekly",
-                                "remaining_fraction": 0.5,
-                                "reset_time": "2026-08-18T13:00:00Z"
-                            }
-                        }
-                    }
-                }
-            }
-        });
-        let usage = parse_agy_cli_quota(&output).unwrap();
-        assert_eq!(usage.status, "ok");
-        assert!(usage.authenticated);
-
-        let session = usage.session.unwrap();
-        assert_eq!(session.window_minutes, 300);
-        assert!((session.used_percent - 75.0).abs() < 0.0001);
-        assert_eq!(session.resets_at, Some(1800000000000u64));
-
-        let weekly = usage.weekly.unwrap();
-        assert_eq!(weekly.window_minutes, 10080);
-        assert!((weekly.used_percent - 20.0).abs() < 0.0001);
-        assert_eq!(weekly.resets_at, parse_iso_millis("2026-08-18T12:00:00Z"));
-    }
-
-    #[test]
-    fn parses_agy_cli_quota_from_v1_1_15_array_layout() {
+    fn parses_agy_cli_quota() {
         let output = json!({
             "command": {
                 "name": "usage",
@@ -1806,14 +1798,17 @@ mod tests {
             "command": {
                 "name": "usage",
                 "data": {
-                    "groups": {
-                        "Claude and GPT models": {
-                            "claude-weekly": {
-                                "window": "weekly",
-                                "remaining_fraction": 0.5
-                            }
+                    "groups": [
+                        {
+                            "name": "Claude and GPT models",
+                            "buckets": [
+                                {
+                                    "window": "weekly",
+                                    "remaining_fraction": 0.5
+                                }
+                            ]
                         }
-                    }
+                    ]
                 }
             }
         });
@@ -1823,7 +1818,7 @@ mod tests {
             "command": {
                 "name": "not-usage",
                 "data": {
-                    "groups": {}
+                    "groups": []
                 }
             }
         });
@@ -1833,16 +1828,19 @@ mod tests {
             "command": {
                 "name": "usage",
                 "data": {
-                    "groups": {
-                        "Gemini Models": {
-                            "gemini-weekly": {
-                                "window": "weekly"
-                            },
-                            "gemini-5h": {
-                                "remaining_fraction": 0.25
-                            }
+                    "groups": [
+                        {
+                            "name": "Gemini Models",
+                            "buckets": [
+                                {
+                                    "window": "weekly"
+                                },
+                                {
+                                    "remaining_fraction": 0.25
+                                }
+                            ]
                         }
-                    }
+                    ]
                 }
             }
         });
@@ -1881,15 +1879,18 @@ mod tests {
             "command": {
                 "name": "usage",
                 "data": {
-                    "groups": {
-                        "Gemini Models": {
-                            "gemini-5h": {
-                                "window": "5h",
-                                "remaining_fraction": 0.5,
-                                "reset_time": "2026-08-18T12:00:00Z"
-                            }
+                    "groups": [
+                        {
+                            "name": "Gemini Models",
+                            "buckets": [
+                                {
+                                    "window": "5h",
+                                    "remaining_fraction": 0.5,
+                                    "reset_time": "2026-08-18T12:00:00Z"
+                                }
+                            ]
                         }
-                    }
+                    ]
                 }
             }
         });
@@ -1908,7 +1909,7 @@ mod tests {
 
         let execution_path = bin_dir.into_os_string();
         let usage = fetch_agy_usage_cli(home, &mock_agy, &execution_path).unwrap();
-        assert_eq!(usage.status, "ok");
+        assert_eq!(usage.status, ProviderUsageStatus::Ok);
         let session = usage.session.unwrap();
         assert_eq!(session.window_minutes, 300);
         assert_eq!(session.used_percent, 50.0);
@@ -1962,7 +1963,7 @@ exit 1
 
         let usage = tauri::async_runtime::block_on(async { load_agy(home).await });
 
-        assert_eq!(usage.status, "error");
+        assert_eq!(usage.status, ProviderUsageStatus::Error);
         assert!(usage.authenticated);
         assert_eq!(usage.account_label.as_deref(), Some("user@example.com"));
         let err = usage.error.unwrap();
@@ -2011,7 +2012,7 @@ exit 1
 
         let usage = tauri::async_runtime::block_on(async { load_agy(home).await });
 
-        assert_eq!(usage.status, "error");
+        assert_eq!(usage.status, ProviderUsageStatus::Error);
         assert!(usage.authenticated);
         assert_eq!(usage.account_label.as_deref(), Some("fallback@example.com"));
         let err = usage.error.unwrap();

@@ -1,7 +1,15 @@
+import BriarContracts
 import Foundation
 
 @MainActor
 final class InboxStore: ObservableObject {
+    private enum RemoteSync {
+        case disabled
+        case service(
+            @Sendable (String) -> any BriarAPI_InboxServiceClientInterface
+        )
+    }
+
     @Published private(set) var messages: [InboxMessage] = []
     @Published private(set) var unreadCount = 0
     @Published private(set) var feedReady = false
@@ -18,7 +26,7 @@ final class InboxStore: ObservableObject {
     private var feedRefreshTask: Task<Void, Never>?
     private var feedPollingTask: Task<Void, Never>?
     private var realtimeRefreshTask: Task<Void, Never>?
-    private var feedETag: String?
+    private var feedVersion: String?
     private var accountGeneration: UInt64 = 0
     private var feedGeneration: UInt64 = 0
     private var syncRequestGeneration: UInt64 = 0
@@ -28,17 +36,39 @@ final class InboxStore: ObservableObject {
     private var userID: String?
     private var organizationID: UUID?
     private let defaults: UserDefaults
-    private let api: (any MobileAPIClientProtocol)?
+    private let remoteSync: RemoteSync
+    private var inboxService: (any BriarAPI_InboxServiceClientInterface)?
     private let pollInterval: Duration
     private let storageKeyPrefix = "briar.inbox.v1"
 
     init(
         defaults: UserDefaults = .standard,
-        api: (any MobileAPIClientProtocol)? = nil,
         pollInterval: Duration = .seconds(15)
     ) {
         self.defaults = defaults
-        self.api = api
+        remoteSync = .disabled
+        self.pollInterval = pollInterval
+    }
+
+    init(
+        defaults: UserDefaults = .standard,
+        servicesFactory: any AuthenticatedMobileServicesFactory,
+        pollInterval: Duration = .seconds(15)
+    ) {
+        self.defaults = defaults
+        remoteSync = .service { token in
+            servicesFactory.authenticatedServices(token: token).inbox
+        }
+        self.pollInterval = pollInterval
+    }
+
+    init(
+        defaults: UserDefaults = .standard,
+        inboxService: any BriarAPI_InboxServiceClientInterface,
+        pollInterval: Duration = .seconds(15)
+    ) {
+        self.defaults = defaults
+        remoteSync = .service { _ in inboxService }
         self.pollInterval = pollInterval
     }
 
@@ -61,6 +91,12 @@ final class InboxStore: ObservableObject {
             pushTask = nil
             self.token = token
             self.userID = nextUserID
+            switch remoteSync {
+            case .disabled:
+                inboxService = nil
+            case let .service(serviceForToken):
+                inboxService = token.map(serviceForToken)
+            }
             pendingPush = [:]
             inFlightPush = [:]
             remoteReadVersions = [:]
@@ -79,7 +115,7 @@ final class InboxStore: ObservableObject {
         feedRefreshTask = nil
         feedPollingTask = nil
         realtimeRefreshTask = nil
-        feedETag = nil
+        feedVersion = nil
         latestRealtimeVersion = -1
         self.organizationID = organizationID
         feedReady = false
@@ -104,7 +140,7 @@ final class InboxStore: ObservableObject {
     func update(
         snapshot: DashboardSnapshot?,
         sessions: [ProjectAgentSession],
-        project: ProjectsResponse.Project
+        project: Project
     ) {
         if let userID {
             loadReadVersions(storageKey: storageKey(for: userID))
@@ -191,56 +227,38 @@ final class InboxStore: ObservableObject {
             await feedRefreshTask.value
             return
         }
-        guard let api, let token, let userID, let organizationID else { return }
+        guard let inboxService, let token, let userID, let organizationID else { return }
         let expectedGeneration = feedGeneration
         let task = Task { [weak self] in
             guard let self else { return }
             do {
-                let result = try await api.conditionalGet(
-                    MobileAPIContract.Endpoint.inbox(organizationID: organizationID),
-                    token: token,
-                    eTag: self.feedETag,
-                    as: InboxFeedResponse.self
+                var request = BriarAPI_GetInboxFeedRequest()
+                request.organizationID = coreUUIDString(organizationID)
+                if let feedVersion = self.feedVersion {
+                    request.knownVersion = feedVersion
+                }
+                let wireResponse = await inboxService.getInboxFeed(
+                    request: request,
+                    headers: [:]
                 )
+                let response = try InboxFeedUpdate(connectMessage: wireResponse.briarValue())
                 guard
                     !Task.isCancelled,
                     expectedGeneration == self.feedGeneration,
                     self.token == token,
                     self.organizationID == organizationID
                 else { return }
-                self.feedETag = result.eTag
+                self.feedVersion = response.version
                 self.notificationBaselineID =
                     "\(userID):\(organizationID.uuidString.lowercased()):feed"
-                if result.notModified {
+                if response.unchanged {
                     self.feedReady = true
                     return
-                }
-                guard let response = result.value else {
-                    throw MobileAPIError.invalidResponse
-                }
-                if let subscribedIssueIds = response.subscribedIssueIds {
-                    let subscribed = Set(
-                        subscribedIssueIds.map { $0.uuidString.lowercased() }
-                    )
-                    self.sourceMessages.removeAll { message in
-                        (message.kind == .issue || message.kind == .conversation) &&
-                        !subscribed.contains(message.targetId)
-                    }
-                }
-                let authorizedSessionMessageIDs = Set(
-                    response.messages.compactMap { message in
-                        message.kind == .session ? message.id : nil
-                    }
-                )
-                self.sourceMessages.removeAll { message in
-                    message.kind == .session &&
-                        !authorizedSessionMessageIDs.contains(message.id)
                 }
                 let storedByID = Dictionary(
                     uniqueKeysWithValues: self.sourceMessages.map { ($0.id, $0) }
                 )
-                let feedMessages = response.messages.map { feedMessage in
-                    let message = feedMessage.inboxMessage()
+                let feedMessages = response.messages.map { message in
                     // Feed rows are compact. Keep richer selected-project
                     // details when the canonical cross-client version agrees.
                     if let stored = storedByID[message.id],
@@ -249,7 +267,7 @@ final class InboxStore: ObservableObject {
                     }
                     return message
                 }
-                self.mergeMessages(feedMessages)
+                self.replaceMessages(feedMessages)
                 self.feedReady = true
             } catch is CancellationError {
                 return
@@ -268,8 +286,7 @@ final class InboxStore: ObservableObject {
     func receiveRealtimeNotification(
         _ notification: ChannelRealtimeNotification
     ) {
-        guard notification.topic == "inbox",
-              let version = notification.version,
+        guard case .inboxChanged(let version) = notification,
               version > latestRealtimeVersion,
               organizationID != nil
         else { return }
@@ -298,7 +315,7 @@ final class InboxStore: ObservableObject {
     }
 
     private func startFeedPolling() {
-        guard api != nil, token != nil, organizationID != nil else { return }
+        guard inboxService != nil, token != nil, organizationID != nil else { return }
         feedPollingTask?.cancel()
         feedPollingTask = Task { [weak self, pollInterval] in
             guard let self else { return }
@@ -322,6 +339,15 @@ final class InboxStore: ObservableObject {
                     ? $0.id < $1.id
                     : $0.occurredAt > $1.occurredAt
             }
+        recompute()
+    }
+
+    private func replaceMessages(_ incoming: [InboxMessage]) {
+        sourceMessages = incoming.sorted {
+            $0.occurredAt == $1.occurredAt
+                ? $0.id < $1.id
+                : $0.occurredAt > $1.occurredAt
+        }
         recompute()
     }
 
@@ -367,29 +393,8 @@ final class InboxStore: ObservableObject {
         guard
             let data = defaults.data(forKey: storageKey),
             let decoded = try? JSONDecoder().decode(Storage.self, from: data)
-        else {
-            // Migrate legacy per-project keys once so local reads are not lost.
-            if readVersions.isEmpty {
-                readVersions = migrateLegacyReadVersions()
-            }
-            return
-        }
+        else { return }
         readVersions = decoded.readVersions
-    }
-
-    private func migrateLegacyReadVersions() -> [String: String] {
-        var migrated: [String: String] = [:]
-        for (key, value) in defaults.dictionaryRepresentation() {
-            guard key.hasPrefix("\(storageKeyPrefix).") else { continue }
-            guard !key.contains(".user.") else { continue }
-            guard let data = value as? Data,
-                  let decoded = try? JSONDecoder().decode(Storage.self, from: data)
-            else { continue }
-            for (messageID, version) in decoded.readVersions {
-                migrated[messageID] = version
-            }
-        }
-        return migrated
     }
 
     private func persistIfPossible() {
@@ -406,7 +411,7 @@ final class InboxStore: ObservableObject {
     }
 
     private func queuePush(_ versions: [String: String]) {
-        guard api != nil, token != nil, userID != nil else { return }
+        guard inboxService != nil, token != nil, userID != nil else { return }
         var changed = false
         for (messageID, version) in versions {
             if remoteReadVersions[messageID] != version,
@@ -424,7 +429,7 @@ final class InboxStore: ObservableObject {
 
     @discardableResult
     private func startReadStateSync() -> Task<Void, Never>? {
-        guard api != nil, let token, let userID else { return nil }
+        guard inboxService != nil, let token, let userID else { return nil }
         // Foregrounding and pull-to-refresh also retry a previously failed PUT.
         startPushIfNeeded()
         syncRequestGeneration &+= 1
@@ -465,13 +470,12 @@ final class InboxStore: ObservableObject {
                 syncTask = nil
             }
         }
-        guard let api else { return }
+        guard let inboxService else { return }
         do {
-            let response = try await api.get(
-                MobileAPIContract.Endpoint.inboxReadStates,
-                token: token,
-                as: InboxReadStatesResponse.self
-            )
+            let response = try await inboxService.getInboxReadStates(
+                request: BriarAPI_GetInboxReadStatesRequest(),
+                headers: [:]
+            ).briarValue().readVersions
             guard isCurrentAccount(
                 generation: accountGeneration,
                 token: token,
@@ -481,13 +485,13 @@ final class InboxStore: ObservableObject {
             else { return }
 
             let localOnly = localAtRequestStart.filter {
-                response.readVersions[$0.key] == nil
+                response[$0.key] == nil
             }
             var protectedLocal = localOnly
             protectedLocal.merge(inFlightPush) { _, latest in latest }
             protectedLocal.merge(pendingPush) { _, latest in latest }
             applyRemoteReadVersions(
-                response.readVersions,
+                response,
                 preserving: protectedLocal
             )
             if !localOnly.isEmpty {
@@ -501,7 +505,7 @@ final class InboxStore: ObservableObject {
     private func startPushIfNeeded() {
         guard pushTask == nil,
               !pendingPush.isEmpty,
-              api != nil,
+              inboxService != nil,
               let token,
               let userID
         else { return }
@@ -521,7 +525,7 @@ final class InboxStore: ObservableObject {
         token: String,
         userID: String
     ) async {
-        guard let api else { return }
+        guard let inboxService else { return }
         while isCurrentAccount(
             generation: accountGeneration,
             token: token,
@@ -536,13 +540,12 @@ final class InboxStore: ObservableObject {
             inFlightPush = payload
 
             do {
-                let response = try await api.send(
-                    MobileAPIContract.Endpoint.inboxReadStates,
-                    method: "PUT",
-                    token: token,
-                    body: InboxReadStatesRequest(readVersions: payload),
-                    as: InboxReadStatesResponse.self
-                )
+                var request = BriarAPI_PutInboxReadStatesRequest()
+                request.readVersions = payload
+                let response = try await inboxService.putInboxReadStates(
+                    request: request,
+                    headers: [:]
+                ).briarValue().readVersions
                 guard isCurrentAccount(
                     generation: accountGeneration,
                     token: token,
@@ -552,7 +555,7 @@ final class InboxStore: ObservableObject {
                 remoteMutationGeneration &+= 1
                 inFlightPush = [:]
                 applyRemoteReadVersions(
-                    response.readVersions,
+                    response,
                     preserving: pendingPush
                 )
             } catch {

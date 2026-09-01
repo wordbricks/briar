@@ -1,15 +1,19 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import * as Predicate from "effect/Predicate";
 import { afterEach, describe, expect, it } from "vitest";
+import { IssueAgentReplyProviderOutputSchema } from "../src/lib/agent-reply-contract";
 import {
   collectIssueReplyAttachments,
-  issueReplyCompleteRequestBody,
   parseIssueReplyAgentResult,
 } from "./issue-reply-attachments";
+import { providerStructuredOutputContract } from "./structured-output-contract";
 
 const temporaryDirectories: string[] = [];
+const decodeIssueReplyJson = providerStructuredOutputContract(
+  "codex",
+  IssueAgentReplyProviderOutputSchema,
+).decodeJson;
 
 async function temporaryWorkspace() {
   const directory = await mkdtemp(join(tmpdir(), "briar-issue-reply-out-"));
@@ -33,9 +37,9 @@ describe("issue reply agent attachments", () => {
       proposedAction: null,
       executionProposal: null,
       skillExecutionProposal: null,
-    }))).toEqual({
+    }), decodeIssueReplyJson)).toEqual({
       result: {
-        reply: "Here is the mockup.",
+        body: "Here is the mockup.",
         proposedAction: null,
         executionProposal: null,
         skillExecutionProposal: null,
@@ -44,77 +48,43 @@ describe("issue reply agent attachments", () => {
     });
   });
 
-  it("keeps legacy plain-text issue replies compatible", () => {
-    expect(parseIssueReplyAgentResult("An ordinary answer.")).toEqual({
-      result: {
-        reply: "An ordinary answer.",
-        proposedAction: null,
-        executionProposal: null,
-        skillExecutionProposal: null,
-      },
-      attachmentPaths: [],
+  it("rejects Skill execution unless the server selected that authority", () => {
+    const output = JSON.stringify({
+      reply: "The saved Skill requires approval.",
+      attachments: [],
+      proposedAction: null,
+      executionProposal: null,
+      skillExecutionProposal: { type: "request_agent_skill_execute" },
+    });
+
+    expect(() => parseIssueReplyAgentResult(output, decodeIssueReplyJson)).toThrow(
+      "Agent Skill execution target is not authorized",
+    );
+    expect(parseIssueReplyAgentResult(output, decodeIssueReplyJson, {
+      allowSkillExecutionProposal: true,
+    }).result.skillExecutionProposal).toEqual({
+      type: "request_agent_skill_execute",
     });
   });
 
-  it("reads workspace images and HTML artifacts into the multipart contract", async () => {
+  it("reads validated workspace images and HTML artifacts", async () => {
     const workspacePath = await temporaryWorkspace();
     await writeFile(
       join(workspacePath, "mockup.png"),
       new Uint8Array([137, 80, 78, 71]),
     );
     await writeFile(join(workspacePath, "lesson.html"), "<h1>Lesson</h1>");
-    const attachments = await collectIssueReplyAttachments({
+    await expect(collectIssueReplyAttachments({
       workspacePath,
       paths: ["mockup.png", "lesson.html"],
-    });
-    const body = issueReplyCompleteRequestBody({
-      projectId: "11111111-1111-4111-8111-111111111111",
-      workerId: "worker-1",
-      claimToken: `briar_reply_claim_${"a".repeat(64)}`,
-      result: {
-        reply: "Here is the mockup.",
-        proposedAction: null,
-        executionProposal: null,
-        skillExecutionProposal: null,
-      },
-      attachments,
-    });
-
-    expect(body).toBeInstanceOf(FormData);
-    const form = body as FormData;
-    expect(JSON.parse(String(form.get("complete")))).toMatchObject({
-      body: "Here is the mockup.",
-    });
-    expect(form.getAll("attachments")).toHaveLength(2);
-    expect(form.get("attachments")).toMatchObject({
+    })).resolves.toEqual([expect.objectContaining({
       name: "mockup.png",
       type: "image/png",
       size: 4,
-    });
-    expect(form.getAll("attachments")[1]).toMatchObject({
+    }), expect.objectContaining({
       name: "lesson.html",
       type: "text/html",
       size: 15,
-    });
-  });
-
-  it("keeps JSON completion when there are no attachments", () => {
-    const body = issueReplyCompleteRequestBody({
-      projectId: "11111111-1111-4111-8111-111111111111",
-      workerId: "worker-1",
-      claimToken: `briar_reply_claim_${"b".repeat(64)}`,
-      result: {
-        reply: "Answer",
-        proposedAction: null,
-        executionProposal: null,
-        skillExecutionProposal: null,
-      },
-      attachments: [],
-    });
-
-    if (!Predicate.isString(body)) {
-      throw new Error("attachment-free issue replies must use a JSON body");
-    }
-    expect(JSON.parse(body)).toMatchObject({ body: "Answer" });
+    })]);
   });
 });

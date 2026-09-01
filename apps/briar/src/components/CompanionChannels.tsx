@@ -43,7 +43,6 @@ import {
   type ChannelSummary,
 } from "../lib/channels-contract";
 import {
-  channelHasUnread,
   laterTimestamp,
   markChannelCatalogRead,
   markChannelSummaryRead,
@@ -101,7 +100,6 @@ import {
   ChannelIssueProposalDetails,
   channelIssueBatchProposalDetails,
   channelIssueProposalDetails,
-  channelIssueProposalIsValid,
   channelIssueProposalRequestsExecution,
 } from "./ChannelIssueProposalDetails";
 import { IssueExecutionApproval } from "./IssueExecutionApproval";
@@ -335,7 +333,7 @@ export function CompanionChannels({
 
   const markSelectedChannelRead = useCallback(
     (summary: ChannelSummary) => {
-      if (!channelHasUnread(summary)) return summary;
+      if (!summary.hasUnread) return summary;
       const lastReadAt = laterTimestamp(
         summary.lastMessageAt,
         new Date().toISOString(),
@@ -378,7 +376,11 @@ export function CompanionChannels({
   const applyChannelCatalogDelta = useCallback(
     (delta: ChannelDelta) => {
       setChannels((current) =>
-        mergeChannels(current, delta.channels, delta.removedChannelIds)
+        mergeChannels(
+          delta.reset ? [] : current,
+          delta.channels,
+          delta.removedChannelIds,
+        )
       );
     },
     [],
@@ -402,7 +404,11 @@ export function CompanionChannels({
     [markSelectedChannelRead],
   );
   const applyCachedDeltaMessages = useCallback(
-    (incoming: ChannelMessage[], removedMessageIds: string[]) => {
+    (
+      incoming: ChannelMessage[],
+      removedMessageIds: string[],
+      reset: boolean,
+    ) => {
       const activeId = channel?.id;
       if (!activeId) return;
       const storedThreads = resolvedChannelCache.get(activeId)?.threads;
@@ -412,17 +418,12 @@ export function CompanionChannels({
           storedThreads.delete(parentId);
           continue;
         }
-        storedThreads.set(
-          parentId,
-          mergeChannelMessages(
-            storedThread,
-            incoming.filter(
-              (item) =>
-                item.id === parentId || item.parentMessageId === parentId,
-            ),
-            removedMessageIds,
-          ),
+        const relevant = incoming.filter(
+          (item) => item.id === parentId || item.parentMessageId === parentId,
         );
+        storedThreads.set(parentId, reset
+          ? relevant
+          : mergeChannelMessages(storedThread, relevant, removedMessageIds));
       }
     },
     [channel?.id, resolvedChannelCache],
@@ -1129,7 +1130,7 @@ export function CompanionChannels({
             {group.channels.map((item) => (
               <li key={item.id}>
                 <button
-                  className={channelHasUnread(item) ? "unread" : undefined}
+                  className={item.hasUnread ? "unread" : undefined}
                   onClick={() => void openChannel(item)}
                   type="button"
                 >
@@ -1223,7 +1224,7 @@ const companionChannelAuthorId = (author: ChannelMessage["author"]) =>
 const companionChannelReplyParticipants = (
   message: ChannelMessage,
 ): ConversationReplyParticipant[] =>
-  [message.author, ...(message.replyAuthors ?? [])]
+  [message.author, ...message.replyAuthors]
     .filter(
       (author, index, authors) =>
         authors.findIndex(
@@ -1352,9 +1353,7 @@ function MessageRow({
     },
     { enabled: showingThreadActions, priority: 200 },
   );
-  const issueProposal = message.proposal?.actionType === "request_issue_create"
-    ? message.proposal
-    : null;
+  const issueProposal = message.proposal;
   const proposalProjectId =
     issueProposal?.projectId ?? channel.defaultProjectId ?? selectedProjectId;
   const needsProject =
@@ -1368,7 +1367,6 @@ function MessageRow({
     : null;
   const proposalIssue = channelIssueProposalDetails(issueProposal);
   const proposalBatch = channelIssueBatchProposalDetails(issueProposal);
-  const proposalValid = channelIssueProposalIsValid(issueProposal);
   const requestsExecution = channelIssueProposalRequestsExecution(issueProposal);
   const executionProjectName = message.executionProposal
     ? projects.find(
@@ -1496,7 +1494,7 @@ function MessageRow({
                   className="channel-proposal-approve-button"
                   disabled={
                     busy || Boolean(channel.archivedAt) ||
-                    !proposalProjectId || !proposalValid
+                    !proposalProjectId
                   }
                   onClick={() => void onAcceptProposal()}
                   type="button"

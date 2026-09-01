@@ -29,7 +29,7 @@ use std::{
 };
 #[cfg(target_os = "macos")]
 use tauri::{webview::Color, WebviewUrl, WebviewWindowBuilder};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Manager};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
 #[cfg(target_os = "macos")]
 use tauri_plugin_opener::OpenerExt;
@@ -39,20 +39,9 @@ const AUTO_HUNT_EVENT_DIRECTORY: &str = "auto-hunt-sessions";
 const WORKTREE_INCLUDE_FILE: &str = ".worktreeinclude";
 const WORKTREE_INCLUDE_MAX_BYTES: u64 = 256 * 1024;
 const WORKTREE_INCLUDE_MAX_ENTRIES: usize = 200;
-const AUTO_HUNT_APP_SERVER_EVENT: &str = "auto-hunt-app-server-event";
-const AUTO_HUNT_DISPATCH_EVENT: &str = "auto-hunt-dispatch-event";
-const PROJECT_LLM_PROGRESS_EVENT: &str = "project-llm-progress";
-const PROJECT_AGENT_SCHEDULE_POLL_EVENT: &str = "project-agent-schedule-poll";
 #[cfg(all(desktop, not(dev)))]
 const WORKTREE_SWEEP_INTERVAL_SECS: u64 = 60 * 60;
-#[cfg(all(desktop, not(target_os = "macos")))]
-const INBOX_NOTIFICATION_OPEN_EVENT: &str = "inbox-notification-open";
-#[cfg(target_os = "macos")]
-const INBOX_NOTIFICATION_OPEN_AVAILABLE_EVENT: &str = "inbox-notification-open-available";
 const AGENT_SESSION_STOPPED_ERROR: &str = "사용자가 에이전트 세션을 중지했습니다.";
-#[cfg(not(target_os = "windows"))]
-#[cfg(target_os = "windows")]
-const GITHUB_CLI_NOOP_BROWSER: &str = "cmd.exe /D /C rem";
 const DEFAULT_MAIN_WINDOW_SIZE: (f64, f64) = (1440.0, 900.0);
 const DEFAULT_MAIN_WINDOW_MIN_SIZE: (f64, f64) = (980.0, 680.0);
 const ONBOARDING_MAIN_WINDOW_SIZE: (f64, f64) = (780.0, 580.0);
@@ -108,11 +97,14 @@ mod app_builder;
 mod app_state;
 mod auto_hunt;
 mod execution_worker;
+mod ipc;
+mod local_config;
 mod native_ui;
 mod project_config;
 mod project_execution;
 mod repository;
 mod settings;
+mod worker_connect;
 
 use agent_cli::*;
 use app_state::*;
@@ -121,6 +113,7 @@ use execution_worker::*;
 use host::{bundled_bun_binary, cli_execution_path, LocalExecutionEnvironment};
 #[cfg(test)]
 use host::{bundled_runtime_directories, cli_execution_path_with_runtime};
+use local_config::*;
 use native_ui::*;
 use project_config::*;
 use project_execution::*;

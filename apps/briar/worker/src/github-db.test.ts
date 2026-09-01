@@ -1,12 +1,15 @@
-import { Miniflare } from "miniflare";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { env } from "cloudflare:workers";
+import { create } from "@bufbuild/protobuf";
+import {
+  GitHubPullRequestIdentitySchema,
+} from "@briar/contracts/gen/briar/types/v1/github_identity_pb";
+import { beforeAll, describe, expect, it } from "vitest";
 import { normalizeAutoHuntWorkflow } from "../../src/lib/auto-hunt-contract";
 import type {
   GithubPullRequestSyncInput,
   HuntEventInput,
   RunPullRequestRow,
 } from "./db";
-import { createIsolatedTestDatabase } from "./test-helpers/d1";
 import {
   claimGithubDelivery,
   connectGithubInstallation,
@@ -44,6 +47,20 @@ const nextDeliveryId = () => {
   deliveryNumber += 1;
   return `github-db-delivery-${deliveryNumber}`;
 };
+
+const pullRequestIdentity = (
+  number: number,
+  overrides: {
+    repositoryId?: number;
+    pullRequestId?: number;
+    pullRequestNodeId?: string;
+  } = {},
+) => create(GitHubPullRequestIdentitySchema, {
+    repositoryId: BigInt(overrides.repositoryId ?? 9001),
+    pullRequestId: BigInt(overrides.pullRequestId ?? 10_000 + number),
+    pullRequestNodeId: overrides.pullRequestNodeId ?? `PR_node_${number}`,
+    pullRequestNumber: BigInt(number),
+  });
 
 type Checkpoint = {
   key: string;
@@ -131,8 +148,7 @@ const workflowFor = (checkpoint: Checkpoint) => {
 };
 
 describe("GitHub pull request D1 integration", () => {
-  let miniflare: Miniflare;
-  let db: D1Database;
+  const db = env.DB;
   let organizationId: string;
 
   const createScenario = async (
@@ -180,15 +196,8 @@ describe("GitHub pull request D1 integration", () => {
       detail: `Pull request #${number} opened`,
       command: "gh pr create",
       url,
-      metadata: {
-        githubPullRequest: {
-          repositoryId: 9001,
-          repository,
-          pullRequestId: 10_000 + number,
-          pullRequestNodeId: `PR_node_${number}`,
-          pullRequestNumber: number,
-        },
-      },
+      metadata: null,
+      githubPullRequest: pullRequestIdentity(number),
       actor: "vitest",
       observedAt: nextTime(),
     });
@@ -311,11 +320,6 @@ describe("GitHub pull request D1 integration", () => {
       .first<RunPullRequestRow>();
 
   beforeAll(async () => {
-    const database = await createIsolatedTestDatabase({
-      suite: "github-db",
-    });
-    miniflare = database.miniflare;
-    db = database.db;
     const createdAt = nextTime();
     await db
       .prepare(
@@ -338,10 +342,6 @@ describe("GitHub pull request D1 integration", () => {
     });
     organizationId = organization.id;
   }, 60_000);
-
-  afterAll(async () => {
-    await miniflare.dispose();
-  });
 
   it("links pull_request evidence to the current attempt and revision", async () => {
     const scenario = await createScenario();
@@ -388,25 +388,25 @@ describe("GitHub pull request D1 integration", () => {
       });
   });
 
-  it("rejects new URL-only evidence before storing a false success", async () => {
+  it("rejects URL-only evidence before storing a false success", async () => {
     const scenario = await createScenario();
     const number = ++pullRequestNumber;
     const url = `https://github.com/${repository}/pull/${number}`;
     await expect(
       recordRunEvidence(db, scenario.projectId, {
         runId: scenario.runId,
-        evidenceKey: `legacy-pr-open:${number}`,
+        evidenceKey: `url-only-pr-open:${number}`,
         stage: "pr_open",
         type: "pull_request",
         status: "passed",
-        detail: "Recorded by a legacy CLI without immutable GitHub IDs",
+        detail: "Recorded without immutable GitHub IDs",
         command: "gh pr create",
         url,
         metadata: null,
-        actor: "legacy-cli",
+        actor: "incomplete-client",
         observedAt: nextTime(),
       }),
-    ).rejects.toThrow("update and use the bundled Briar CLI");
+    ).rejects.toThrow("typed immutable identity");
 
     await expect(pullRequestRow(scenario, url)).resolves.toBeNull();
     await expect(
@@ -430,6 +430,89 @@ describe("GitHub pull request D1 integration", () => {
     });
   });
 
+  it("rolls back evidence when its immutable PR association cannot commit", async () => {
+    const scenario = await createScenario();
+    const number = ++pullRequestNumber;
+    const url = `https://github.com/${repository}/pull/${number}`;
+    await db.prepare(
+      `create trigger reject_test_evidence_pr_association
+       before insert on briar_run_evidence_pull_requests
+       begin
+         select raise(abort, 'forced association failure');
+       end`,
+    ).run();
+
+    try {
+      await expect(recordRunEvidence(db, scenario.projectId, {
+        runId: scenario.runId,
+        evidenceKey: `pr-open:atomic:${number}`,
+        stage: "pr_open",
+        type: "pull_request",
+        status: "passed",
+        detail: `Pull request #${number} opened`,
+        command: "gh pr create",
+        url,
+        metadata: { note: "must roll back with the association" },
+        githubPullRequest: pullRequestIdentity(number),
+        actor: "vitest",
+        observedAt: nextTime(),
+      })).rejects.toThrow(/forced association failure/iu);
+    } finally {
+      await db.prepare(
+        "drop trigger reject_test_evidence_pr_association",
+      ).run();
+    }
+
+    await expect(db.prepare(
+      `select count(*) as count from briar_run_evidence
+       where project_id = ? and run_id = ?`,
+    ).bind(scenario.projectId, scenario.runId).first()).resolves.toMatchObject({
+      count: 0,
+    });
+    await expect(pullRequestRow(scenario, url)).resolves.toBeNull();
+    await expect(
+      getHuntRunForProject(db, scenario.projectId, scenario.runId),
+    ).resolves.toMatchObject({ pull_request_urls: "[]" });
+  });
+
+  it("keeps an exact evidence replay read-only", async () => {
+    const scenario = await createScenario();
+    const number = ++pullRequestNumber;
+    const url = `https://github.com/${repository}/pull/${number}`;
+    const evidence = {
+      runId: scenario.runId,
+      evidenceKey: `pr-open:replay:${number}`,
+      stage: "pr_open",
+      type: "pull_request",
+      status: "passed" as const,
+      detail: `Pull request #${number} opened`,
+      command: "gh pr create",
+      url,
+      metadata: { source: "replay-test" },
+      githubPullRequest: pullRequestIdentity(number),
+      actor: "vitest",
+      observedAt: nextTime(),
+    };
+    const first = await recordRunEvidence(db, scenario.projectId, evidence);
+    await db.prepare(
+      `create trigger reject_test_replayed_pr_association
+       before insert on briar_run_evidence_pull_requests
+       begin
+         select raise(abort, 'replay attempted a write');
+       end`,
+    ).run();
+
+    try {
+      await expect(
+        recordRunEvidence(db, scenario.projectId, evidence),
+      ).resolves.toMatchObject({ id: first?.id });
+    } finally {
+      await db.prepare(
+        "drop trigger reject_test_replayed_pr_association",
+      ).run();
+    }
+  });
+
   it("does not authorize a pull request from another repository", async () => {
     const scenario = await createScenario();
     const number = ++pullRequestNumber;
@@ -447,15 +530,12 @@ describe("GitHub pull request D1 integration", () => {
         detail: `Pull request #${number} opened in another repository`,
         command: "gh pr create",
         url: pullRequest.url,
-        metadata: {
-          githubPullRequest: {
-            repositoryId: 9002,
-            repository: "other/repository",
-            pullRequestId: 20_000 + number,
-            pullRequestNodeId: `PR_other_${number}`,
-            pullRequestNumber: number,
-          },
-        },
+        metadata: null,
+        githubPullRequest: pullRequestIdentity(number, {
+          repositoryId: 9002,
+          pullRequestId: 20_000 + number,
+          pullRequestNodeId: `PR_other_${number}`,
+        }),
         actor: "vitest",
         observedAt: nextTime(),
       }),
@@ -520,15 +600,8 @@ describe("GitHub pull request D1 integration", () => {
         detail: "This request authenticated before the claim changed",
         command: "gh pr create",
         url,
-        metadata: {
-          githubPullRequest: {
-            repositoryId: 9001,
-            repository,
-            pullRequestId: 10_000 + number,
-            pullRequestNodeId: `PR_node_${number}`,
-            pullRequestNumber: number,
-          },
-        },
+        metadata: null,
+        githubPullRequest: pullRequestIdentity(number),
         actor: "stale-worker",
         observedAt: nextTime(),
       }, {
@@ -573,15 +646,12 @@ describe("GitHub pull request D1 integration", () => {
       detail: `Pull request #${number} opened`,
       command: "gh pr create",
       url: configuredUrl,
-      metadata: {
-        githubPullRequest: {
-          repositoryId: 9002,
-          repository,
-          pullRequestId: 20_000 + number,
-          pullRequestNodeId: `PR_other_${number}`,
-          pullRequestNumber: number,
-        },
-      },
+      metadata: null,
+      githubPullRequest: pullRequestIdentity(number, {
+        repositoryId: 9002,
+        pullRequestId: 20_000 + number,
+        pullRequestNodeId: `PR_other_${number}`,
+      }),
       actor: "untrusted-worker",
       observedAt: nextTime(),
     });
@@ -619,15 +689,8 @@ describe("GitHub pull request D1 integration", () => {
       detail: `Pull request #${number} opened`,
       command: "gh pr create",
       url: decoratedUrl,
-      metadata: {
-        githubPullRequest: {
-          repositoryId: 9001,
-          repository,
-          pullRequestId: 10_000 + number,
-          pullRequestNodeId: `PR_node_${number}`,
-          pullRequestNumber: number,
-        },
-      },
+      metadata: null,
+      githubPullRequest: pullRequestIdentity(number),
       actor: "vitest",
       observedAt: nextTime(),
     });
@@ -676,15 +739,12 @@ describe("GitHub pull request D1 integration", () => {
       detail: `Pull request #${number} opened after repository recreation`,
       command: "gh pr create",
       url: pullRequest.url,
-      metadata: {
-        githubPullRequest: {
-          repositoryId: 9002,
-          repository,
-          pullRequestId: 20_000 + number,
-          pullRequestNodeId: `PR_recreated_${number}`,
-          pullRequestNumber: number,
-        },
-      },
+      metadata: null,
+      githubPullRequest: pullRequestIdentity(number, {
+        repositoryId: 9002,
+        pullRequestId: 20_000 + number,
+        pullRequestNodeId: `PR_recreated_${number}`,
+      }),
       actor: "vitest",
       observedAt: nextTime(),
     });
@@ -1241,98 +1301,6 @@ describe("GitHub pull request D1 integration", () => {
     ).resolves.toEqual({ outcome: "not_ready" });
   });
 
-  it("adopts a signed merge snapshot for evidence that finishes after the webhook", async () => {
-    const first = await createScenario();
-    const second = await createScenario();
-    const pullRequest = await addPullRequestEvidence(first);
-    await updateProjectSettings(db, second.projectId, {
-      velenOrg: null,
-      dataSource: null,
-      linear: { enabled: false, source: null, teamKey: null },
-      githubRepository: null,
-      workflow: workflowFor(second.checkpoint),
-    });
-    const secondEvidence = {
-      runId: second.runId,
-      evidenceKey: `pr-open:in-flight:${pullRequest.number}`,
-      stage: "pr_open",
-      type: "pull_request",
-      status: "passed" as const,
-      detail: "Evidence request authenticated before the merge webhook",
-      command: "gh pr create",
-      url: pullRequest.url,
-      metadata: {
-        githubPullRequest: {
-          repositoryId: 9001,
-          repository,
-          pullRequestId: 10_000 + pullRequest.number,
-          pullRequestNodeId: `PR_node_${pullRequest.number}`,
-          pullRequestNumber: pullRequest.number,
-        },
-      },
-      actor: "vitest",
-      observedAt: nextTime(),
-    };
-    await recordRunEvidence(db, second.projectId, secondEvidence);
-    await updateProjectSettings(db, second.projectId, {
-      velenOrg: null,
-      dataSource: null,
-      linear: { enabled: false, source: null, teamKey: null },
-      githubRepository: repository,
-      workflow: workflowFor(second.checkpoint),
-    });
-    const associationStartedAt = "2035-01-01T00:00:00.000Z";
-    const webhookAt = "2035-01-01T00:00:01.000Z";
-    const evidenceRecordedAt = "2035-01-01T00:00:02.000Z";
-    await db
-      .prepare(
-        `update briar_run_evidence
-         set github_association_started_at = ?, recorded_at = ?
-         where run_id = ? and evidence_key = ?`,
-      )
-      .bind(
-        associationStartedAt,
-        evidenceRecordedAt,
-        second.runId,
-        secondEvidence.evidenceKey,
-      )
-      .run();
-    const merge = pullRequestEvent(pullRequest, "merged", {
-      providerUpdatedAt: webhookAt,
-      closedAt: webhookAt,
-      mergedAt: webhookAt,
-      observedAt: webhookAt,
-      linkedIssues: [
-        { projectId: first.projectId, runId: first.runId },
-        { projectId: second.projectId, runId: second.runId },
-      ],
-    });
-
-    await expect(syncGithubPullRequest(db, merge)).resolves.toMatchObject({
-      matchedRunCount: 1,
-      updatedRunCount: 1,
-    });
-    await recordRunEvidence(db, second.projectId, secondEvidence);
-    await expect(
-      pullRequestRow(second, pullRequest.url),
-    ).resolves.toMatchObject({
-      state: "merged",
-      last_delivery_id: merge.deliveryId,
-    });
-
-    await pauseAtConfiguredCheckpoint(second);
-    await expect(reconcileGithubMergedRuns(db)).resolves.toMatchObject({
-      examined: 1,
-      resumed: 1,
-    });
-    await expect(
-      getHuntRunForProject(db, second.projectId, second.runId),
-    ).resolves.toMatchObject({
-      resume_requested_at: merge.mergedAt,
-      waiting_checkpoint_key: null,
-    });
-  });
-
   it("rejects a merge timestamp older than its evidence link", async () => {
     const scenario = await createScenario();
     const pullRequest = await addPullRequestEvidence(scenario);
@@ -1684,56 +1652,4 @@ describe("GitHub pull request D1 integration", () => {
     }
   });
 
-  it("keeps a revision with legacy unbound PR evidence on manual review", async () => {
-    const scenario = await createScenario();
-    await updateProjectSettings(db, scenario.projectId, {
-      velenOrg: null,
-      dataSource: null,
-      linear: { enabled: false, source: null, teamKey: null },
-      githubRepository: null,
-      workflow: workflowFor(scenario.checkpoint),
-    });
-    const legacyNumber = ++pullRequestNumber;
-    await recordRunEvidence(db, scenario.projectId, {
-      runId: scenario.runId,
-      evidenceKey: `legacy-pr-open:${legacyNumber}`,
-      stage: "pr_open",
-      type: "pull_request",
-      status: "passed",
-      detail: "Recorded before immutable GitHub identity was required",
-      command: "gh pr create",
-      url: `https://github.com/${repository}/pull/${legacyNumber}`,
-      metadata: null,
-      actor: "legacy-cli",
-      observedAt: nextTime(),
-    });
-    await updateProjectSettings(db, scenario.projectId, {
-      velenOrg: null,
-      dataSource: null,
-      linear: { enabled: false, source: null, teamKey: null },
-      githubRepository: repository,
-      workflow: workflowFor(scenario.checkpoint),
-    });
-    const current = await addPullRequestEvidence(scenario);
-    await pauseAtConfiguredCheckpoint(scenario);
-
-    await expect(
-      syncGithubPullRequest(db, pullRequestEvent(current, "merged")),
-    ).resolves.toMatchObject({
-      matchedRunCount: 1,
-      updatedRunCount: 1,
-      resumedRunCount: 0,
-      resumeOutcomes: [{ runId: scenario.runId, outcome: "not_ready" }],
-    });
-    await expect(reconcileGithubMergedRuns(db)).resolves.toMatchObject({
-      examined: 0,
-      resumed: 0,
-    });
-    await expect(
-      getHuntRunForProject(db, scenario.projectId, scenario.runId),
-    ).resolves.toMatchObject({
-      resume_requested_at: null,
-      waiting_checkpoint_key: scenario.checkpoint.key,
-    });
-  });
 });

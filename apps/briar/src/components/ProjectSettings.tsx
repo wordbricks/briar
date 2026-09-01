@@ -82,21 +82,24 @@ import {
   updateProjectLlmSettings,
   updateProjectSandboxSettings,
   type AgentProvider,
-  type AppProviderSettings,
-  type ApprovalPolicy,
   type ModelEffort,
 } from "../lib/project-llm";
 import { useAgentProviderModels } from "../hooks/useAgentProviderModels";
+import type {
+  AppProviderSettings,
+  ApprovalPolicy,
+  AutoHuntHealth,
+  VelenInspection,
+} from "../generated/tauri";
 import { hasOrganizationCapability } from "../lib/organization-role";
-import type { AutoHuntHealth, VelenInspection } from "../lib/project-connection";
 import type {
   LinearImportConnectResult,
   LinearImportResult,
   LinearImportStatesResult,
+  LinearStatusMapping,
 } from "../lib/linear-import";
 import { requiredWorkflowStages } from "../lib/auto-hunt-contract";
 import {
-  defaultIssueKeyPrefix,
   isIssueKeyPrefix,
   normalizeIssueKeyPrefix,
 } from "../lib/issue-key";
@@ -171,7 +174,7 @@ export function ProjectSettings({
   onImportLinearIssues: (input: {
     apiKey: string;
     teamIds: string[];
-    statusMapping: Record<string, string>;
+    statusMapping: LinearStatusMapping;
   }) => Promise<LinearImportResult>;
   onIconChange: (projectId: string, icon: string | null) => Promise<unknown>;
   onIssueKeyPrefixChange: (
@@ -242,7 +245,7 @@ export function ProjectSettings({
   const [iconError, setIconError] = useState<string | null>(null);
   const [iconSaved, setIconSaved] = useState(false);
   const [issueKeyPrefix, setIssueKeyPrefix] = useState(
-    project.issueKeyPrefix ?? defaultIssueKeyPrefix,
+    project.issueKeyPrefix,
   );
   const [issueKeyPrefixSaving, setIssueKeyPrefixSaving] = useState(false);
   const [issueKeyPrefixError, setIssueKeyPrefixError] = useState<string | null>(null);
@@ -256,7 +259,7 @@ export function ProjectSettings({
     if (initialSection) setActiveSection(initialSection);
   }, [initialSection]);
   useEffect(() => {
-    setIssueKeyPrefix(project.issueKeyPrefix ?? defaultIssueKeyPrefix);
+    setIssueKeyPrefix(project.issueKeyPrefix);
     setIssueKeyPrefixError(null);
     setIssueKeyPrefixSaved(false);
   }, [project.id, project.issueKeyPrefix]);
@@ -710,8 +713,7 @@ export function ProjectSettings({
                         !canManageProject ||
                         issueKeyPrefixSaving ||
                         !isIssueKeyPrefix(issueKeyPrefix) ||
-                        issueKeyPrefix ===
-                          (project.issueKeyPrefix ?? defaultIssueKeyPrefix)
+                        issueKeyPrefix === project.issueKeyPrefix
                       }
                       onClick={() => {
                         setIssueKeyPrefixSaving(true);

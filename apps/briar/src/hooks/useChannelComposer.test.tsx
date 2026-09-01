@@ -318,7 +318,7 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     await cleanup();
   });
 
-  it("adds a pasted image and submits its multipart references", async () => {
+  it("adds a pasted image and submits its prepared upload references", async () => {
     const onSend = vi.fn<OnSend>();
     const { cleanup, container } = await renderHarness({ onSend });
     const input = container.querySelector<HTMLInputElement>(

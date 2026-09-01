@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { HttpRequestError } from "./execution-metrics-upload";
+import { Code, ConnectError } from "@connectrpc/connect";
 import { whoami, type WhoamiDependencies } from "./auth-commands";
 
 const dependencies = (
@@ -11,11 +11,10 @@ const dependencies = (
   }),
   environmentToken: () => undefined,
   fetchCurrentUser: async () => ({
-    user: {
-      id: "user-1",
-      name: "Jay Nam",
-      email: "jay@example.com",
-    },
+    $typeName: "briar.app.v1.User",
+    id: "user-1",
+    name: "Jay Nam",
+    email: "jay@example.com",
   }),
   writeLine: vi.fn(),
   ...overrides,
@@ -24,11 +23,10 @@ const dependencies = (
 describe("whoami", () => {
   it("prints the user returned by the authenticated API", async () => {
     const fetchCurrentUser = vi.fn(async () => ({
-      user: {
-        id: "user-1",
-        name: "Jay Nam",
-        email: "jay@example.com",
-      },
+      $typeName: "briar.app.v1.User" as const,
+      id: "user-1",
+      name: "Jay Nam",
+      email: "jay@example.com",
     }));
     const writeLine = vi.fn();
 
@@ -45,11 +43,10 @@ describe("whoami", () => {
 
   it("uses an environment token when one is configured", async () => {
     const fetchCurrentUser = vi.fn(async () => ({
-      user: {
-        id: "user-1",
-        name: "Jay Nam",
-        email: "jay@example.com",
-      },
+      $typeName: "briar.app.v1.User" as const,
+      id: "user-1",
+      name: "Jay Nam",
+      email: "jay@example.com",
     }));
 
     await whoami(dependencies({
@@ -74,7 +71,7 @@ describe("whoami", () => {
   it("explains how to recover from an expired login", async () => {
     await expect(whoami(dependencies({
       fetchCurrentUser: async () => {
-        throw new HttpRequestError("Unauthorized", 401, null);
+        throw new ConnectError("Unauthorized", Code.Unauthenticated);
       },
     }))).rejects.toThrow(
       "Briar 로그인이 만료되었거나 유효하지 않습니다. `briar login`을 다시 실행하세요.",

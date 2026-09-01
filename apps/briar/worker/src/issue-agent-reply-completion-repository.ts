@@ -1,9 +1,12 @@
-import {
-  agentSkillExecutionApprovalTablesAvailable,
-  issueExecutionApprovalTablesAvailable,
-} from "./execution-approval-schema-repository";
 import { type IssueAttachmentInput } from "./issue-attachment-repository";
 import { type IssueAgentReplyJobRow } from "./issue-agent-reply-repository";
+import { encodeApprovedProjectAgentTaskSession } from "./project-agent-session-materialization";
+import {
+  consumeReplyAttachmentStatements,
+  replyAttachmentAvailabilityGuard,
+  replyCompletionReceiptStatement,
+  type ReplyCompletionCommit,
+} from "./reply-completion-repository";
 
 export type IssueAgentReplyCompletionOutput = {
   body: string;
@@ -43,26 +46,9 @@ export async function completeIssueAgentReplyOutput(
     claimTokenHash: string;
     completedAt: string;
     output: IssueAgentReplyCompletionOutput;
+    commit?: ReplyCompletionCommit;
   },
 ) {
-  const executionApprovalsAvailable =
-    await issueExecutionApprovalTablesAvailable(db);
-  const skillExecutionApprovalsAvailable =
-    await agentSkillExecutionApprovalTablesAvailable(db);
-  if (
-    !executionApprovalsAvailable &&
-    (input.output.executionProposal ||
-      (input.output.proposedAction?.type === "request_issue_create" &&
-        input.output.proposedAction.executeAfterCreate))
-  ) {
-    throw new Error("issue execution approval schema is unavailable");
-  }
-  if (
-    input.output.skillExecutionProposal &&
-    !skillExecutionApprovalsAvailable
-  ) {
-    throw new Error("Agent Skill execution approval schema is unavailable");
-  }
   if (
     input.output.skillExecutionProposal &&
     (input.output.executionProposal || input.output.proposedAction)
@@ -94,8 +80,53 @@ export async function completeIssueAgentReplyOutput(
   const consentTaskSessionId = input.output.skillExecutionProposal
     ? crypto.randomUUID()
     : null;
-  const staleExecutionGuard = executionApprovalsAvailable
-    ? `and not exists (
+  const consentTaskBinding = input.output.skillExecutionProposal
+    ? await db.prepare(
+      `select coalesce(job.agent_id, run.agent_id) as agent_id,
+              job.selected_agent_name_snapshot as agent_name,
+              job.skill_id, job.skill_execution_request_snapshot as request,
+              job.claimed_worker_id as worker_id,
+              trigger.author_user_id as requested_by_user_id,
+              skill.execution_mode, skill.approval_policy
+       from briar_issue_agent_reply_jobs job
+       join briar_hunt_runs run
+         on run.id = job.run_id and run.project_id = job.project_id
+       join briar_project_agents agent
+         on agent.id = coalesce(job.agent_id, run.agent_id)
+        and agent.project_id = job.project_id
+       join briar_agent_skills skill
+         on skill.id = job.skill_id and skill.agent_id = agent.id
+       join briar_issue_messages trigger
+         on trigger.id = job.trigger_message_id
+        and trigger.project_id = job.project_id and trigger.run_id = job.run_id
+       where job.id = ? and job.project_id = ?`,
+    ).bind(jobId, projectId).first<{
+      agent_id: string;
+      agent_name: string;
+      skill_id: string;
+      request: string;
+      worker_id: string | null;
+      requested_by_user_id: string | null;
+      execution_mode: "conversation" | "task";
+      approval_policy: "explicit" | "invoke_is_consent";
+    }>()
+    : null;
+  const consentTaskPayloadJson = consentTaskSessionId &&
+      consentTaskBinding?.execution_mode === "task" &&
+      consentTaskBinding.approval_policy === "invoke_is_consent" &&
+      consentTaskBinding.worker_id && consentTaskBinding.requested_by_user_id
+    ? encodeApprovedProjectAgentTaskSession({
+      sessionId: consentTaskSessionId,
+      agentId: consentTaskBinding.agent_id,
+      agentName: consentTaskBinding.agent_name,
+      skillId: consentTaskBinding.skill_id,
+      request: consentTaskBinding.request,
+      workerId: consentTaskBinding.worker_id,
+      requestedByUserId: consentTaskBinding.requested_by_user_id,
+      acceptedAt: input.completedAt,
+    })
+    : null;
+  const staleExecutionGuard = `and not exists (
          select 1 from briar_issue_execution_proposals stale_execution
          where stale_execution.reply_message_id = job.reply_message_id
             or (
@@ -103,10 +134,8 @@ export async function completeIssueAgentReplyOutput(
               and stale_execution.trigger_message_id = job.trigger_message_id
               and stale_execution.source_kind = 'issue'
             )
-       )`
-    : "";
-  const staleSkillExecutionGuard = skillExecutionApprovalsAvailable
-    ? `and not exists (
+       )`;
+  const staleSkillExecutionGuard = `and not exists (
          select 1
          from briar_agent_skill_execution_proposals stale_skill_execution
          where stale_skill_execution.reply_message_id = job.reply_message_id
@@ -116,8 +145,10 @@ export async function completeIssueAgentReplyOutput(
                 job.trigger_message_id
               and stale_skill_execution.source_kind = 'issue'
             )
-       )`
-    : "";
+       )`;
+  const attachmentGuard = input.commit
+    ? replyAttachmentAvailabilityGuard(input.commit)
+    : { sql: "", bindings: [] as unknown[] };
 
   const transition = db
     .prepare(
@@ -215,6 +246,7 @@ export async function completeIssueAgentReplyOutput(
                and trigger.body = job.skill_execution_request_snapshot
            )
          )
+         ${attachmentGuard.sql}
        returning *`,
     )
     .bind(
@@ -229,6 +261,7 @@ export async function completeIssueAgentReplyOutput(
       rework?.workflowStage ?? null,
       input.output.executionProposal ? 1 : 0,
       input.output.skillExecutionProposal ? 1 : 0,
+      ...attachmentGuard.bindings,
     );
 
   const completedClaim = (alias: string) =>
@@ -244,8 +277,20 @@ export async function completeIssueAgentReplyOutput(
     input.claimTokenHash,
     input.completedAt,
   ];
-  const statements: D1PreparedStatement[] = [
-    transition,
+  const statements: D1PreparedStatement[] = [transition];
+  if (input.commit) {
+    statements.push(
+      replyCompletionReceiptStatement(db, {
+        ...input.commit,
+        createdAt: input.completedAt,
+      }),
+      ...consumeReplyAttachmentStatements(db, {
+        ...input.commit,
+        consumedAt: input.completedAt,
+      }),
+    );
+  }
+  statements.push(
     db.prepare(
       `insert into briar_issue_messages (
          id, project_id, run_id, parent_message_id, author_user_id,
@@ -266,7 +311,7 @@ export async function completeIssueAgentReplyOutput(
       input.completedAt,
       ...claimBindings,
     ),
-  ];
+  );
 
   for (const attachment of input.output.attachments ?? []) {
     statements.push(db.prepare(
@@ -276,7 +321,16 @@ export async function completeIssueAgentReplyOutput(
        )
        select ?, job.run_id, job.project_id, ?, ?, ?, ?, ?
        from briar_issue_agent_reply_jobs job
-       where ${completedClaim("job")}`,
+       where ${completedClaim("job")}
+         ${input.commit
+           ? `and exists (
+                select 1 from briar_uploads upload
+                where upload.upload_id = ?
+                  and upload.consumer_kind = 'reply_completion'
+                  and upload.consumer_id = ?
+                  and upload.consumed_at = ?
+              )`
+           : ""}`,
     ).bind(
       attachment.id,
       attachment.object_key,
@@ -285,6 +339,9 @@ export async function completeIssueAgentReplyOutput(
       attachment.byte_size,
       input.completedAt,
       ...claimBindings,
+      ...(input.commit
+        ? [attachment.id, input.commit.requestId, input.completedAt]
+        : []),
     ));
   }
 
@@ -319,8 +376,7 @@ export async function completeIssueAgentReplyOutput(
         : { issue: action.issue },
     );
     statements.push(db.prepare(
-      executionApprovalsAvailable
-        ? `insert into briar_issue_action_proposals (
+      `insert into briar_issue_action_proposals (
              id, project_id, conversation_run_id, trigger_message_id,
              reply_message_id, action_type, payload_json,
              expected_run_updated_at, execute_after_create,
@@ -334,46 +390,20 @@ export async function completeIssueAgentReplyOutput(
            from briar_issue_agent_reply_jobs job
            join briar_hunt_runs run
              on run.id = job.run_id and run.project_id = job.project_id
-           where ${completedClaim("job")}`
-        : `insert into briar_issue_action_proposals (
-             id, project_id, conversation_run_id, trigger_message_id,
-             reply_message_id, action_type, payload_json,
-             expected_run_updated_at, created_at, updated_at
-           )
-           select ?, job.project_id, run.id, job.trigger_message_id,
-                  job.reply_message_id, ?, ?,
-                  case when ? = 'request_issue_update'
-                    then run.updated_at else null end,
-                  ?, ?
-           from briar_issue_agent_reply_jobs job
-           join briar_hunt_runs run
-             on run.id = job.run_id and run.project_id = job.project_id
            where ${completedClaim("job")}`,
-    ).bind(...(
-      executionApprovalsAvailable
-        ? [
-            actionProposalId,
-            action.type,
-            payloadJson,
-            action.type,
-            action.type === "request_issue_create" && action.executeAfterCreate
-              ? 1
-              : 0,
-            createExecutionProposalId,
-            input.completedAt,
-            input.completedAt,
-            ...claimBindings,
-          ]
-        : [
-            actionProposalId,
-            action.type,
-            payloadJson,
-            action.type,
-            input.completedAt,
-            input.completedAt,
-            ...claimBindings,
-          ]
-    )));
+    ).bind(
+      actionProposalId,
+      action.type,
+      payloadJson,
+      action.type,
+      action.type === "request_issue_create" && action.executeAfterCreate
+        ? 1
+        : 0,
+      createExecutionProposalId,
+      input.completedAt,
+      input.completedAt,
+      ...claimBindings,
+    ));
   }
 
   if (input.output.executionProposal) {
@@ -483,7 +513,8 @@ export async function completeIssueAgentReplyOutput(
               and trigger.run_id = job.run_id
              where job.id = source_reply_job_id
            ),
-           accepted_at = ?, updated_at = ?
+           accepted_at = ?, updated_at = ?,
+           materialized_session_payload_json = ?
        where id = ? and status = 'pending' and execution_mode = 'task'
          and approval_policy = 'invoke_is_consent'
          and exists (
@@ -501,6 +532,7 @@ export async function completeIssueAgentReplyOutput(
       consentTaskSessionId,
       input.completedAt,
       input.completedAt,
+      consentTaskPayloadJson,
       skillExecutionProposalId,
     ));
   }
@@ -513,6 +545,13 @@ export async function completeIssueAgentReplyOutput(
 
   const results = await db.batch(statements);
   const completed = results[0]?.results[0] as IssueAgentReplyJobRow | undefined;
+  if (completed && input.commit) {
+    const receipt = results[1]?.results[0];
+    const consumed = results.slice(2, 2 + input.commit.attachmentIds.length);
+    if (!receipt || consumed.some((result) => result.results.length !== 1)) {
+      throw new Error("Issue reply completion receipt was not committed atomically");
+    }
+  }
   return completed
     ? { ...completed, claim_token_hash: null, lease_expires_at: null }
     : null;

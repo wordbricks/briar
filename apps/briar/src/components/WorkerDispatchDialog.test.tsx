@@ -461,6 +461,7 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
             label: "Claude Opus 4.6",
           },
         ],
+        allowCustomModels: true,
         error: null,
       },
     };

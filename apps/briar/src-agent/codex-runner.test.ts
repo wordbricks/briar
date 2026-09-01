@@ -1,93 +1,115 @@
+import { create } from "@bufbuild/protobuf";
+import { sizeDelimitedDecodeStream } from "@bufbuild/protobuf/wire";
+import { CONTRACTS_DESCRIPTOR_FINGERPRINT } from "@briar/contracts/descriptor-fingerprint";
+import {
+  ApprovalPolicy,
+  BlockReason,
+  RunRequestSchema,
+  RunnerToParentSchema,
+  SandboxMode,
+  type RunnerToParent,
+} from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
+import { AgentActivityStatus } from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
 import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawn } from "node:child_process";
 import { describe, expect, it } from "vitest";
+import {
+  encodeSidecarRunRequest,
+  sidecarProviderRaw,
+} from "./sidecar-protocol";
 
-const runnerRequest = {
-  type: "run",
-  message: "Review the repository without using Figma.",
-  workspaceRoot: process.cwd(),
-  conversationId: null,
-  instructions: "Complete the assigned workflow.",
-  outputSchema: null,
-  model: "gpt-5",
-  effort: "high",
-  approvalPolicy: "never",
-  sandboxMode: "workspaceWrite",
-  networkAccess: true,
-};
+const runnerRequest = (providerBinaryPath: string) =>
+  create(RunRequestSchema, {
+    message: "Review the repository without using Figma.",
+    workspaceRoot: process.cwd(),
+    instructions: "Complete the assigned workflow.",
+    model: "gpt-5",
+    effort: "high",
+    approvalPolicy: ApprovalPolicy.NEVER,
+    sandboxMode: SandboxMode.WORKSPACE_WRITE,
+    networkAccess: true,
+    providerBinaryPath,
+    protocolFingerprint: CONTRACTS_DESCRIPTOR_FINGERPRINT,
+  });
 
 describe("Codex runner MCP isolation", () => {
   it("restarts with an unused unauthenticated Figma plugin disabled", async () => {
     const result = await runScenario("optional");
 
     expect(result.exitCode).toBe(0);
-    expect(result.payloads).toContainEqual(
-      expect.objectContaining({
-        type: "event",
-        event: expect.objectContaining({
-          type: "activityCompleted",
-          title: "codex_apps MCP unavailable",
-          status: "failed",
-        }),
-      }),
-    );
-    expect(result.payloads.filter((payload) => payload.type === "session"))
+    expect(result.payloads.some((payload) => {
+      const normalized = payload.payload.case === "event"
+        ? payload.payload.value.normalized
+        : undefined;
+      return normalized?.event.case === "activityCompleted" &&
+        normalized.event.value.title === "codex_apps MCP unavailable" &&
+        normalized.event.value.status === AgentActivityStatus.FAILED;
+    })).toBe(true);
+    expect(
+      result.payloads.filter(
+        (payload) => payload.payload.case === "sessionStarted",
+      ),
+    )
       .toHaveLength(1);
-    expect(result.payloads).toContainEqual(
-      expect.objectContaining({
-        type: "event",
-        direction: "client",
-        raw: expect.objectContaining({
-          method: "thread/resume",
-          params: expect.objectContaining({
-            config: {
-              apps: { connector_figma: { enabled: false } },
-            },
-          }),
+    expect(result.payloads.some((payload) => {
+      const raw = sidecarProviderRaw(payload);
+      if (!raw || typeof raw !== "object") return false;
+      const record = raw as Record<string, unknown>;
+      return record.method === "thread/resume" &&
+        JSON.stringify(record.params).includes("connector_figma");
+    })).toBe(true);
+    expect(result.payloads).toContainEqual(expect.objectContaining({
+      payload: {
+        case: "result",
+        value: expect.objectContaining({
+          sessionId: "thread-1",
+          message: "Review and checks continued after Figma isolation.",
         }),
-      }),
-    );
-    expect(result.payloads).toContainEqual({
-      type: "result",
-      sessionId: "thread-1",
-      message: "Review and checks continued after Figma isolation.",
-    });
-    expect(result.payloads.some((payload) => payload.type === "error")).toBe(
-      false,
-    );
+      },
+    }));
+    expect(
+      result.payloads.some((payload) => payload.payload.case === "error"),
+    ).toBe(false);
   });
 
   it("returns an authentication wait when the failed MCP was invoked", async () => {
     const result = await runScenario("required");
 
     expect(result.exitCode).toBe(0);
-    expect(result.payloads).toContainEqual({
-      type: "blocked",
-      reason: "mcp_auth_required",
-      provider: "codex",
-      message: "Authentication is required for MCP server(s): Figma.",
-      serverNames: ["Figma"],
-      nextRetryAt: null,
-    });
-    expect(result.payloads.some((payload) => payload.type === "result")).toBe(
-      false,
-    );
-    expect(result.payloads.some((payload) => payload.type === "error")).toBe(
-      false,
-    );
+    expect(result.payloads).toContainEqual(expect.objectContaining({
+      payload: {
+        case: "blocked",
+        value: expect.objectContaining({
+          reason: BlockReason.MCP_AUTH_REQUIRED,
+          provider: "codex",
+          message: "Authentication is required for MCP server(s): Figma.",
+          serverNames: ["Figma"],
+        }),
+      },
+    }));
+    expect(
+      result.payloads.some((payload) => payload.payload.case === "result"),
+    ).toBe(false);
+    expect(
+      result.payloads.some((payload) => payload.payload.case === "error"),
+    ).toBe(false);
   });
 
   it("fails fast when the App Server emits a schema-invalid message", async () => {
     const result = await runScenario("invalid");
 
     expect(result.exitCode).toBe(1);
-    expect(result.payloads).toContainEqual({
-      type: "error",
-      message:
-        'Codex App Server emitted invalid JSON: {"id":1,"method":42}',
-    });
+    expect(result.payloads).toContainEqual(expect.objectContaining({
+      payload: {
+        case: "error",
+        value: expect.objectContaining({
+          message:
+            'Codex App Server emitted invalid JSON: {"id":1,"method":42}',
+        }),
+      },
+    }));
   });
 });
 
@@ -101,19 +123,23 @@ async function runScenario(scenario: "invalid" | "optional" | "required") {
     env: { ...process.env, FAKE_CODEX_SCENARIO: scenario },
     stdio: ["pipe", "pipe", "pipe"],
   });
-  let stdout = "";
   let stderr = "";
-  child.stdout.setEncoding("utf8");
   child.stderr.setEncoding("utf8");
-  child.stdout.on("data", (chunk: string) => {
-    stdout += chunk;
-  });
+  const outputPromise = (async () => {
+    const payloads: RunnerToParent[] = [];
+    for await (const message of sizeDelimitedDecodeStream(
+      RunnerToParentSchema,
+      child.stdout,
+      { readMaxBytes: 16 * 1024 * 1024 },
+    )) {
+      payloads.push(message);
+    }
+    return payloads;
+  })();
   child.stderr.on("data", (chunk: string) => {
     stderr += chunk;
   });
-  child.stdin.write(
-    `${JSON.stringify({ ...runnerRequest, codexBinary: fakeCodex })}\n`,
-  );
+  child.stdin.write(encodeSidecarRunRequest(runnerRequest(fakeCodex)));
 
   const timeout = setTimeout(() => child.kill("SIGKILL"), 10_000);
   try {
@@ -124,10 +150,7 @@ async function runScenario(scenario: "invalid" | "optional" | "required") {
     if (exitCode !== 0 && stderr) {
       throw new Error(`Codex runner failed: ${stderr}`);
     }
-    const payloads = stdout
-      .split("\n")
-      .filter(Boolean)
-      .map((line) => JSON.parse(line) as Record<string, unknown>);
+    const payloads = await outputPromise;
     return { exitCode, payloads };
   } finally {
     clearTimeout(timeout);

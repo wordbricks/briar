@@ -13,7 +13,6 @@ import {
   buildOpenCodeParts,
   completeOpenCodeMessages,
   createOpenCodeEventState,
-  decodeOpenCodeRunnerRequest,
   isOpenCodeWritePermission,
   mapEffortToOpenCode,
   normalizeOpenCodeEvent,
@@ -27,10 +26,10 @@ import {
   shouldAutoApproveOpenCodePermission,
   type OpenCodeBlockedRetry,
   type OpenCodeEventState,
-  type OpenCodeRunnerOutput,
-  type OpenCodeRunnerRequest,
 } from "./opencode-runner-lib";
+import { normalizedTurnCompleted } from "./normalized-agent-event";
 import { createRunnerIo } from "./runner-io";
+import type { RunnerRequest } from "./runner-request";
 import { waitForOpenCodeServerUrl } from "./opencode-server-startup";
 import {
   providerInstructionSeatbeltPattern,
@@ -228,7 +227,7 @@ class OpenCodeServer {
 
 async function resolveSession(
   client: OpencodeClient,
-  request: OpenCodeRunnerRequest,
+  request: RunnerRequest,
 ): Promise<string> {
   const permissions = buildOpenCodePermissionRules(request);
   if (request.conversationId) {
@@ -277,28 +276,24 @@ export function openCodeFinalTurnOutputs(
   response: OpenCodeFinalResponse,
   eventState: OpenCodeEventState,
   message: string,
-): OpenCodeRunnerOutput[] {
+) {
   return [
     ...completeOpenCodeMessages(eventState, {
       messageId: response.info.id,
       text: message,
       phase: "final",
-    }).map((event): OpenCodeRunnerOutput => ({
-      type: "event",
+    }).map((event) => ({
       raw: response,
       event,
     })),
     {
-      type: "event",
       raw: response,
-      event: { type: "turnCompleted", status: "completed" },
+      event: normalizedTurnCompleted("completed"),
     },
   ];
 }
 
-type OpenCodeRunnerIo = ReturnType<
-  typeof createRunnerIo<OpenCodeRunnerRequest, OpenCodeRunnerOutput>
->;
+type OpenCodeRunnerIo = ReturnType<typeof createRunnerIo>;
 
 async function main(runnerIo: OpenCodeRunnerIo) {
   const { emit, request: requestPromise, waitForApproval } = runnerIo;
@@ -306,13 +301,13 @@ async function main(runnerIo: OpenCodeRunnerIo) {
   const request = await requestPromise;
   emitRunnerDiagnostic("runner.request_received", {
     workspaceRoot: request.workspaceRoot,
-    opencodeBinary: request.opencodeBinary,
+    opencodeBinary: request.providerBinaryPath,
     model: request.model ?? null,
     sandboxMode: request.sandboxMode,
     attachmentCount: request.attachments?.length ?? 0,
   });
   const server = await OpenCodeServer.start(
-    request.opencodeBinary,
+    request.providerBinaryPath,
     request.workspaceRoot,
     process.env,
     request.sandboxMode === "readOnly",
@@ -325,7 +320,7 @@ async function main(runnerIo: OpenCodeRunnerIo) {
       throwOnError: true,
     });
     const sessionId = await resolveSession(client, request);
-    emit({ type: "session", sessionId });
+    emit.session(sessionId);
     const eventState = createOpenCodeEventState();
     const controller = new AbortController();
     const subscription = await client.event.subscribe(undefined, {
@@ -335,10 +330,10 @@ async function main(runnerIo: OpenCodeRunnerIo) {
       for await (const raw of subscription.stream) {
         const normalizedEvents = normalizeOpenCodeEvent(raw, sessionId, eventState);
         if (normalizedEvents.length === 0) {
-          emit({ type: "event", raw });
+          emit.event({ raw });
         } else {
           for (const event of normalizedEvents) {
-            emit({ type: "event", raw, event });
+            emit.event({ raw, event });
           }
         }
         const blockedRetry = openCodeBlockedRetry(raw, sessionId);
@@ -364,8 +359,7 @@ async function main(runnerIo: OpenCodeRunnerIo) {
               isOpenCodeWritePermission(permission)
             )
           ) {
-            emit({
-              type: "approval",
+            emit.approval({
               id,
               toolName: permission,
               input: openCodePermissionInput(properties),
@@ -381,8 +375,7 @@ async function main(runnerIo: OpenCodeRunnerIo) {
 
         if (event.type === "question.asked") {
           const question = properties as unknown as QuestionRequest;
-          emit({
-            type: "approval",
+          emit.approval({
             id: question.id,
             toolName: "question",
             input: openCodeQuestionInput(question),
@@ -439,9 +432,9 @@ async function main(runnerIo: OpenCodeRunnerIo) {
       eventState,
       message,
     )) {
-      emit(output);
+      emit.event(output);
     }
-    emit({ type: "result", sessionId, message });
+    emit.result({ sessionId, message });
   } finally {
     server.close();
   }
@@ -449,9 +442,8 @@ async function main(runnerIo: OpenCodeRunnerIo) {
 
 export async function runOpenCodeRunner() {
   emitRunnerDiagnostic("runner.started");
-  const runnerIo = createRunnerIo<OpenCodeRunnerRequest, OpenCodeRunnerOutput>({
+  const runnerIo = createRunnerIo({
     closeError: "Briar closed the OpenCode runner input.",
-    decodeRequest: decodeOpenCodeRunnerRequest,
     onClose: () => emitRunnerDiagnostic("runner.input_closed"),
   });
   const { emit } = runnerIo;
@@ -462,12 +454,9 @@ export async function runOpenCodeRunner() {
       error: caught instanceof Error ? caught.message : String(caught),
     });
     if (caught instanceof OpenCodeBlockedError) {
-      emit({ type: "blocked", ...caught.blocker });
+      emit.blocked(caught.blocker);
     } else {
-      emit({
-        type: "error",
-        message: caught instanceof Error ? caught.message : String(caught),
-      });
+      emit.error(caught instanceof Error ? caught.message : String(caught));
     }
     process.exitCode = 1;
   } finally {

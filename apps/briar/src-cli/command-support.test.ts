@@ -1,4 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
+import type {
+  DeviceTokenPollResult,
+} from "../src/lib/device-authorization-client";
 import { type Config } from "./config-contract";
 import {
   login,
@@ -26,46 +29,57 @@ const config = (): Config => ({
 
 const loginDependencies = (
   openVerificationPage: (url: string) => void,
+  pollResults: readonly DeviceTokenPollResult[] = [{
+    status: "authorized",
+    accessToken: "access-token",
+    tokenType: "Bearer",
+    expiresIn: 3_600,
+    scope: "openid profile email",
+  }],
 ) => {
-  const requestedPaths: string[] = [];
-  const request = (async <T>(
-    _apiUrl: string,
-    path: string,
-  ): Promise<T> => {
-    requestedPaths.push(path);
-    if (path === "/api/auth/device/code") {
-      return {
-        device_code: "device-code",
-        user_code: "ABCD-1234",
-        verification_uri: "https://briar.example/device",
-        verification_uri_complete: "https://briar.example/device?code=ABCD-1234",
-        interval: 0,
-      } as T;
-    }
-    if (path === "/api/auth/device/token") {
-      return { access_token: "access-token" } as T;
-    }
-    if (path === "/me") {
-      return {
-        user: { name: "Jay Nam", email: "jay@example.com" },
-      } as T;
-    }
-    throw new Error(`Unexpected request: ${path}`);
-  }) as LoginDependencies["request"];
+  const requestedOperations: string[] = [];
+  let pollIndex = 0;
   const saveConfig = vi.fn(async () => undefined);
+  const sleep = vi.fn(async () => undefined);
   const writeLine = vi.fn();
 
   return {
     dependencies: {
+      createDeviceAuthorizationClient: () => ({
+        requestCode: async () => {
+          requestedOperations.push("requestCode");
+          return {
+            deviceCode: "device-code",
+            userCode: "ABCD-1234",
+            verificationUri: "https://briar.example/device",
+            verificationUriComplete:
+              "https://briar.example/device?code=ABCD-1234",
+            expiresIn: 300,
+            interval: 1,
+          };
+        },
+        pollToken: async () => {
+          requestedOperations.push("pollToken");
+          const result = pollResults[pollIndex++];
+          if (!result) throw new Error("Unexpected device token poll");
+          return result;
+        },
+      }),
+      fetchCurrentUser: async () => ({
+        $typeName: "briar.app.v1.User",
+        id: "user-id",
+        name: "Jay Nam",
+        email: "jay@example.com",
+      }),
       loadConfig: async () => config(),
       openBrowser: openVerificationPage,
-      request,
       saveConfig,
-      sleep: async () => undefined,
+      sleep,
       writeLine,
     } satisfies LoginDependencies,
-    requestedPaths,
+    requestedOperations,
     saveConfig,
+    sleep,
     writeLine,
   };
 };
@@ -100,23 +114,38 @@ describe("openBrowser", () => {
 });
 
 describe("login browser launch", () => {
-  it("polls immediately even when the browser opener never exits", async () => {
+  it("uses structured pending and slow-down states without waiting for the browser", async () => {
     const unref = vi.fn();
     const launch = vi.fn(() => ({
       exited: new Promise<number | null>(() => undefined),
       unref,
     }));
-    const state = loginDependencies((url) => {
-      openBrowser(url, { launch, platform: "linux" });
-    });
+    const state = loginDependencies(
+      (url) => openBrowser(url, { launch, platform: "linux" }),
+      [{
+        status: "authorization_pending",
+        description: "not encoded in an English message",
+      }, {
+        status: "slow_down",
+        description: "rate limited",
+      }, {
+        status: "authorized",
+        accessToken: "access-token",
+        tokenType: "Bearer",
+        expiresIn: 3_600,
+        scope: "openid profile email",
+      }],
+    );
 
     await login(undefined, state.dependencies);
 
-    expect(state.requestedPaths).toEqual([
-      "/api/auth/device/code",
-      "/api/auth/device/token",
-      "/me",
+    expect(state.requestedOperations).toEqual([
+      "requestCode",
+      "pollToken",
+      "pollToken",
+      "pollToken",
     ]);
+    expect(state.sleep.mock.calls).toEqual([[1_000], [1_000], [6_000]]);
     expect(unref).toHaveBeenCalledOnce();
     expect(state.saveConfig).toHaveBeenCalledOnce();
   });
@@ -139,7 +168,7 @@ describe("login browser launch", () => {
       "브라우저를 자동으로 열지 못했습니다. 다음 주소를 직접 여세요: " +
         "https://briar.example/device?code=ABCD-1234",
     );
-    expect(state.requestedPaths).toContain("/api/auth/device/token");
+    expect(state.requestedOperations).toContain("pollToken");
     expect(state.saveConfig).toHaveBeenCalledOnce();
   });
 });

@@ -25,8 +25,15 @@ const channel = (id: string): ChannelSummary => ({
   archivedAt: null,
   memberCount: 0,
   agentCount: 0,
+  kind: "channel",
+  createdByUserId: null,
   createdAt: "2026-08-01T00:00:00.000Z",
   updatedAt: "2026-08-01T00:00:00.000Z",
+  lastMessageAt: null,
+  lastMessagePreview: null,
+  lastReadAt: null,
+  hasUnread: false,
+  dmParticipants: [],
 });
 
 const message = (id: string, parentMessageId: string | null = null): ChannelMessage => ({
@@ -41,15 +48,19 @@ const message = (id: string, parentMessageId: string | null = null): ChannelMess
     image: null,
   },
   body: id,
+  blocks: [],
   mentionedUserIds: [],
   mentionedAgentIds: [],
   attachments: [],
   reactions: [],
   replyCount: 0,
   lastReplyAt: null,
+  replyAuthors: [],
+  subscribers: [],
   document: null,
   proposal: null,
   executionProposal: null,
+  skillExecutionProposal: null,
   createdAt: "2026-08-01T01:00:00.000Z",
 });
 

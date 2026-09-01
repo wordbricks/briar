@@ -20,9 +20,9 @@ import {
   requestInboxNotificationPermission,
   writeInboxNotificationPreferences,
   writeInboxNotificationSoundPreference,
-  type InboxNotificationPermissionStatus,
   type InboxNotificationPreferences,
 } from "../lib/inbox-notifications";
+import type { InboxNotificationPermissionStatus } from "../generated/tauri";
 import type { InboxCategory } from "../hooks/useInbox";
 import { isMacDesktopTauri } from "../lib/platform";
 

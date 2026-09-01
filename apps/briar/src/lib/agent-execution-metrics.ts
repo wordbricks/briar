@@ -14,8 +14,9 @@ import {
   type AgentExecutionUsageProvider,
   AgentExecutionUsageRecord,
   decodeAgentExecutionMetrics,
-  decodeAgentExecutionMetricsOption,
+  decodeAgentExecutionMetricsJson,
   decodeAgentExecutionUsageRecord,
+  encodeAgentExecutionMetricsJson,
   parseObservedAt,
 } from "./agent-execution-metrics/model";
 import {
@@ -46,8 +47,9 @@ export {
   type AgentExecutionUsageProvider,
   AgentExecutionUsageRecord,
   decodeAgentExecutionMetrics,
-  decodeAgentExecutionMetricsOption,
+  decodeAgentExecutionMetricsJson,
   decodeAgentExecutionUsageRecord,
+  encodeAgentExecutionMetricsJson,
   openCodeExecutionCostObservationsFromPayload,
   openCodeExecutionUsageObservationsFromPayload,
 };
@@ -558,35 +560,7 @@ export function codexExecutionUsageObservationsFromPayload(
     ];
   }
 
-  // Compatibility with App Server versions that attached turn usage directly
-  // to turn/completed rather than publishing thread/tokenUsage/updated.
-  const turn = asRecord(params?.turn);
-  const directUsage =
-    asRecord(turn?.usage) ??
-    asRecord(params?.usage) ??
-    (message.type === "turn.completed" ? asRecord(message.usage) : null);
-  const tokenUsage = directUsage
-    ? normalizedTokenUsage("codex", directUsage)
-    : null;
-  const directTurnId = nonEmptyString(turn?.id) ?? identity.turnId;
-  return tokenUsage
-    ? [
-        {
-          kind: "delta",
-          provider: "codex",
-          model: null,
-          canonicalModel: null,
-          modelProvider: null,
-          modelSource: "unknown",
-          tokenUsage,
-          source: "codex.turnUsage",
-          scopeId: directTurnId ?? identity.sessionId,
-          sessionId: identity.sessionId,
-          turnId: directTurnId,
-          dedupeKey: dedupeKey("codex", "turn", directTurnId, "usage"),
-        },
-      ]
-    : [];
+  return [];
 }
 
 const grokTokenUsage = (
@@ -1961,22 +1935,9 @@ export function agentExecutionCostRecordsFromObservations(
 }
 
 export function agentExecutionTokenUsageFromObservations(
-  observations: AgentExecutionTokenObservation[],
+  observations: AgentExecutionUsageObservation[],
 ): AgentExecutionTokenUsage | null {
   return aggregateTokenUsage(observations);
-}
-
-/**
- * Compatibility wrapper for the pre-ledger execution metrics path. New usage
- * ingestion should retain every observation so per-model totals are not lost.
- */
-export function agentExecutionTokenUsageFromPayload(
-  provider: AgentExecutionUsageProvider,
-  payload: unknown,
-): AgentExecutionTokenUsage | null {
-  return aggregateTokenUsage(
-    agentExecutionUsageObservationsFromPayload(provider, payload),
-  );
 }
 
 export const agentExecutionMetrics = (

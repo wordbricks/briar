@@ -55,6 +55,8 @@ export type HuntRunRow = {
   staging_qa_detail: string | null;
   production_qa_detail: string | null;
   context_json: string | null;
+  full_auto: 0 | 1;
+  requires_claim_token: 0 | 1;
   current_attempt: number;
   current_revision: number;
   claim_token_hash: string | null;

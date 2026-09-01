@@ -2,10 +2,14 @@ import { readFile } from "node:fs/promises";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import {
+  decodeManagedComputerRemoteRelayControlFrame,
+  encodeManagedComputerRemoteAgentControlFrame,
   managedComputerRemoteHeartbeatIntervalMs,
   managedComputerRemoteHeartbeatRequest,
   managedComputerRemoteHeartbeatResponse,
   managedComputerRemoteHeartbeatTimeoutMs,
+  type ManagedComputerRemoteDisplayErrorCode,
+  type ManagedComputerRemoteRelayControlFrame,
 } from "../src/lib/managed-computer-remote-protocol";
 import { ManagedComputerSetupAgent } from "./managed-computer-setup-agent";
 
@@ -25,22 +29,9 @@ const RemoteAgentConfig = Schema.Struct({
   apiOrigin: Schema.String.check(Schema.isPattern(/^https:\/\//u)),
 });
 
-const RemoteAgentControl = Schema.Union([
-  Schema.Struct({
-    type: Schema.Literal("controller_ready"),
-    sessionId: Schema.String.check(Schema.isPattern(/^[0-9a-f-]{36}$/u)),
-  }),
-  Schema.Struct({
-    type: Schema.Literal("controller_ended"),
-    sessionId: Schema.String.check(Schema.isPattern(/^[0-9a-f-]{36}$/u)),
-  }),
-]);
-
 export type ManagedComputerRemoteAgentConfig = typeof RemoteAgentConfig.Type;
-type RemoteAgentControl = typeof RemoteAgentControl.Type;
 
 const decodeConfig = Schema.decodeUnknownOption(RemoteAgentConfig);
-const decodeControl = Schema.decodeUnknownOption(RemoteAgentControl);
 
 export function parseManagedComputerRemoteAgentConfig(value: unknown) {
   const parsed = decodeConfig(value);
@@ -164,33 +155,34 @@ export class ManagedComputerRemoteSessionAgent {
         this.lastHeartbeatResponseAt = Date.now();
         return;
       }
-      let parsed: unknown;
+      let control: ManagedComputerRemoteRelayControlFrame;
       try {
-        parsed = JSON.parse(value);
+        control = decodeManagedComputerRemoteRelayControlFrame(value);
       } catch {
         return;
       }
-      const control = decodeControl(parsed);
-      if (Option.isNone(control)) return;
-      await this.handleControl(control.value);
+      await this.handleControl(control);
       return;
     }
     const data = await binaryMessage(value);
-    if (!data || !this.activeSessionId) return;
+    const sessionId = this.activeSessionId;
+    if (!data || !sessionId) return;
     this.controllerBytes += data.byteLength;
     if (this.localSocket) {
       this.localSocket.write(data);
       return;
     }
     if (this.pendingInputBytes + data.byteLength > 8 * 1024 * 1024) {
-      this.reportDisplayFailure("input_backpressure");
+      this.reportDisplayFailure("input_backpressure", sessionId);
       return;
     }
     this.pendingInput.push(data.slice());
     this.pendingInputBytes += data.byteLength;
   }
 
-  private async handleControl(control: RemoteAgentControl) {
+  private async handleControl(
+    control: ManagedComputerRemoteRelayControlFrame,
+  ) {
     if (control.type === "controller_ended") {
       if (this.activeSessionId === control.sessionId) {
         this.closeDisplay("controller_ended");
@@ -202,11 +194,16 @@ export class ManagedComputerRemoteSessionAgent {
     }
     this.activeSessionId = control.sessionId;
     if (this.localSocket || this.localConnect) return;
-    this.localConnect = Bun.connect({
+    const sessionId = control.sessionId;
+    const localConnect = Bun.connect({
       hostname: this.display.host,
       port: this.display.port,
       socket: {
         open: (socket) => {
+          if (this.activeSessionId !== sessionId) {
+            socket.end();
+            return;
+          }
           this.localSocket = socket;
           for (const pending of this.pendingInput) socket.write(pending);
           this.pendingInput = [];
@@ -215,41 +212,57 @@ export class ManagedComputerRemoteSessionAgent {
             managedComputerId: this.config.managedComputerId,
           });
         },
-        data: (_socket, data) => {
+        data: (socket, data) => {
+          if (
+            this.localSocket !== socket ||
+            this.activeSessionId !== sessionId
+          ) {
+            return;
+          }
           const relay = this.websocket;
           if (!relay || relay.readyState !== WebSocket.OPEN) return;
           this.screenBytes += data.byteLength;
           if (relay.bufferedAmount > 8 * 1024 * 1024) {
-            this.reportDisplayFailure("screen_backpressure");
+            this.reportDisplayFailure("screen_backpressure", sessionId);
             return;
           }
           relay.send(Uint8Array.from(data));
         },
-        close: () => {
+        close: (socket) => {
+          if (this.localSocket !== socket) return;
           this.localSocket = null;
           this.localConnect = null;
-          if (this.activeSessionId) this.reportDisplayFailure("display_closed");
+          this.reportDisplayFailure("display_closed", sessionId);
         },
         error: (_socket, error) => {
           event("remote_display_error", { error: error.message });
         },
       },
     });
+    this.localConnect = localConnect;
     try {
-      await this.localConnect;
+      await localConnect;
     } catch (error) {
-      this.localConnect = null;
+      if (this.localConnect === localConnect) this.localConnect = null;
       event("remote_display_connect_failed", {
         error: error instanceof Error ? error.message : String(error),
       });
-      this.reportDisplayFailure("display_connect_failed");
+      this.reportDisplayFailure("display_connect_failed", sessionId);
     }
   }
 
-  private reportDisplayFailure(code: string) {
+  private reportDisplayFailure(
+    code: ManagedComputerRemoteDisplayErrorCode,
+    sessionId: string,
+  ) {
+    if (this.activeSessionId !== sessionId) return;
     const relay = this.websocket;
     if (relay?.readyState === WebSocket.OPEN) {
-      relay.send(JSON.stringify({ type: "display_error", code }));
+      relay.send(encodeManagedComputerRemoteAgentControlFrame({
+        type: "display_error",
+        sessionId,
+        code,
+      }));
     }
     this.closeDisplay(code);
   }

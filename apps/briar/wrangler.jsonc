@@ -49,26 +49,17 @@
       "/app",
       "/app/*",
       "/api/*",
-      "/me",
+      "/briar.app.v1.*",
+      "/briar.worker.v1.*",
       "/inbox/*",
       "/invitations*",
       "/organizations*",
       "/workspaces*",
       "/teams*",
       "/projects*",
-      "/workers*",
       "/managed-computers*",
-      "/worker-claims",
-      "/merge-batch-claims*",
       "/runs*",
-      "/transcripts",
-      "/issue-reply-claims*",
-      "/agent-task-claims",
-      "/agent-task-claims/*",
-      "/agent-schedule-runs/claim",
-      "/channel-reply-claims*",
-      "/queue*",
-      "/run-events",
+      "/uploads*",
       "/health",
       "/html-artifact-preview",
       "/github/*",
@@ -94,7 +85,7 @@
     {
       "binding": "DM_MEMORY_INDEX",
       "index_name": "briar-dm-memory-prod-m3-v1",
-      "remote": false
+      "remote": true
     }
   ],
   "durable_objects": {

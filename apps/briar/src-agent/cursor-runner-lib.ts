@@ -12,51 +12,19 @@ import {
   shouldAutoApprovePermission,
   shouldDenyGrokPermission,
   type GrokEventState,
-  type GrokRunnerRequest,
 } from "./grok-runner-lib";
-import * as Schema from "effect/Schema";
-import type { NormalizedAgentEvent } from "./normalized-agent-event";
-import {
-  commonRunnerRequestFields,
-  runnerRequestDecoderOptions,
-} from "./runner-request";
-
-export const CursorRunnerRequest = Schema.Struct({
-  ...commonRunnerRequestFields,
-  effort: Schema.optional(Schema.NullOr(Schema.String)),
-  cursorBinary: Schema.String,
-});
-
-export type CursorRunnerRequest = typeof CursorRunnerRequest.Type;
-
-export const decodeCursorRunnerRequest = Schema.decodeUnknownResult(
-  CursorRunnerRequest,
-  runnerRequestDecoderOptions,
-);
-
-export type CursorRunnerOutput =
-  | { type: "session"; sessionId: string }
-  | { type: "event"; raw: unknown; event?: NormalizedAgentEvent }
-  | {
-      type: "approval";
-      id: string;
-      toolName: string;
-      input: Record<string, unknown>;
-      title?: string;
-    }
-  | { type: "result"; sessionId: string; message: string }
-  | { type: "error"; message: string };
+import type { NormalizedAgentEvent } from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
+import type { RunnerRequest } from "./runner-request";
 
 export type CursorEventState = GrokEventState;
 
 function asStandardAcpRequest(
-  request: CursorRunnerRequest,
+  request: RunnerRequest,
   message = request.message,
-): GrokRunnerRequest {
+): RunnerRequest {
   return {
     ...request,
     message,
-    grokBinary: request.cursorBinary,
   };
 }
 
@@ -71,13 +39,13 @@ export const cursorPermissionOptions = permissionOptions;
 export const cursorPermissionToolName = permissionToolName;
 
 export function cursorSessionMeta(
-  request: CursorRunnerRequest,
+  request: RunnerRequest,
 ): { rules: string } | undefined {
   const instructions = request.instructions?.trim();
   return instructions ? { rules: instructions } : undefined;
 }
 
-export async function buildCursorPromptParts(request: CursorRunnerRequest) {
+export async function buildCursorPromptParts(request: RunnerRequest) {
   const instructions = request.instructions?.trim();
   const message = instructions
     ? [
@@ -97,7 +65,7 @@ export function resolveCursorModelId(model: string | null | undefined): string {
 }
 
 export function mapEffortToCursor(
-  effort: CursorRunnerRequest["effort"],
+  effort: RunnerRequest["effort"],
 ): string | undefined {
   const normalized = effort?.trim().toLowerCase();
   if (!normalized) return undefined;
@@ -109,17 +77,17 @@ export function mapEffortToCursor(
 export function resolveCursorFinalMessage(
   state: CursorEventState,
   promptResultText: string | undefined,
-  outputSchema: CursorRunnerRequest["outputSchema"],
+  outputSchema: RunnerRequest["outputSchema"],
 ) {
   return resolveGrokFinalMessage(state, promptResultText, outputSchema);
 }
 
-export function shouldAutoApproveCursorPermission(request: CursorRunnerRequest) {
+export function shouldAutoApproveCursorPermission(request: RunnerRequest) {
   return shouldAutoApprovePermission(asStandardAcpRequest(request));
 }
 
 export function shouldDenyCursorPermission(
-  request: CursorRunnerRequest,
+  request: RunnerRequest,
   toolName: string,
   input: Record<string, unknown> = {},
 ) {

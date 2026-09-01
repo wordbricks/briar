@@ -1,4 +1,3 @@
-import * as Option from "effect/Option";
 import type {
   HuntEventRow,
   IssueMessageRow,
@@ -25,10 +24,19 @@ import {
   decodeArchivedWorkLogEntry,
   decodeArchiveLine,
   decodeArchiveManifest,
-  decodeRelatedArchiveObjectKeysOption,
+  decodeRelatedArchiveObjectKeys,
+  encodeRelatedArchiveObjectKeys,
   type ArchiveKind,
   type ExecutionAuditArchiveRow,
 } from "./archive-contract";
+import {
+  attachmentObjectIsReferencedSql,
+  attachmentObjectReferenceBindings,
+} from "./attachment-object-ownership";
+import {
+  decodeStoredProjectAgentSessionPayload,
+  encodeStoredProjectAgentSessionPayload,
+} from "./project-request-contract";
 
 export const defaultArchiveRowLimit = 500;
 export const maxArchiveUncompressedBytes = 16 * 1024 * 1024;
@@ -487,14 +495,19 @@ const messagesCandidate = async (
   const result = await db
     .prepare(
       `select message.id, message.run_id, message.parent_message_id,
-              message.author_user_id, message.author_agent_provider,
-              author.name as author_name, author.image as author_image,
-              message.body,
+              message.author_user_id, message.author_agent_id,
+              message.author_agent_name, message.author_agent_provider,
+              coalesce(author.name, message.author_agent_name) as author_name,
+              author.image as author_image,
+              agent.avatar as author_agent_image, message.body,
               (select count(*) from briar_issue_messages reply
                where reply.parent_message_id = message.id) as reply_count,
               message.created_at, message.updated_at
        from briar_issue_messages message
        left join "user" author on author.id = message.author_user_id
+       left join briar_project_agents agent
+         on agent.id = message.author_agent_id
+        and agent.project_id = message.project_id
        where message.id in (
          with recursive thread_messages(id) as (
            select ?
@@ -540,6 +553,7 @@ const projectSessionCandidate = async (
     .bind(cutoff)
     .first<ProjectAgentSessionRow>();
   if (!session) return null;
+  decodeStoredProjectAgentSessionPayload(session.payload_json);
   return {
     projectId: session.project_id,
     runId: null,
@@ -704,7 +718,7 @@ const insertArchiveMetadata = async (
       serialized.expiresAt,
       status === "failed" ? 1 : 0,
       error,
-      JSON.stringify(candidate.relatedObjectKeys),
+      encodeRelatedArchiveObjectKeys(candidate.relatedObjectKeys),
       candidate.kind,
       candidate.runId,
       candidate.runId,
@@ -906,16 +920,11 @@ async function restoreArchivedProjectAgentSessionRequester(
     .bind(session.project_id, session.id)
     .first<{ approved_by_user_id: string }>();
   if (!approval) return session;
-  let payload: Record<string, unknown>;
-  try {
-    payload = JSON.parse(session.payload_json) as Record<string, unknown>;
-  } catch {
-    return session;
-  }
+  const payload = decodeStoredProjectAgentSessionPayload(session.payload_json);
   return {
     ...session,
     requested_by_user_id: approval.approved_by_user_id,
-    payload_json: JSON.stringify({
+    payload_json: encodeStoredProjectAgentSessionPayload({
       ...payload,
       requestedByUserId: approval.approved_by_user_id,
     }),
@@ -1333,51 +1342,6 @@ export async function getArchivedProjectAgentSession(
   );
 }
 
-/**
- * Migration 0093 can project hot rows in SQL, but historical archive payloads
- * only exist in R2. Read each missing legacy object once and persist its small
- * D1 catalog entry so every later list/delta request remains R2-free.
- */
-export async function backfillArchivedProjectAgentSessionSummaries(
-  db: D1Database,
-  bucket: ArchiveBucket,
-  projectId: string,
-) {
-  const result = await db
-    .prepare(
-      `select archive.*
-       from briar_log_archives archive
-       where archive.project_id = ?
-         and archive.archive_kind = 'project_agent_sessions'
-         and archive.status in ('verified', 'complete')
-         and not exists (
-           select 1 from briar_project_agent_session_summaries summary
-           where summary.project_id = archive.project_id
-             and summary.session_id = archive.scope_id
-         )
-       order by archive.period_end desc, archive.id
-       limit 200`,
-    )
-    .bind(projectId)
-    .all<ArchiveMetadataRow>();
-  for (let offset = 0; offset < result.results.length; offset += 8) {
-    const archived = await Promise.all(
-      result.results
-        .slice(offset, offset + 8)
-        .map(async (metadata) =>
-          restoreArchivedProjectAgentSessionRequester(
-            db,
-            await readArchivedProjectAgentSession(bucket, metadata),
-          )
-        ),
-    );
-    for (const session of archived) {
-      await upsertProjectAgentSessionSummary(db, session, true);
-    }
-  }
-  return result.results.length;
-}
-
 export async function getArchivedEvidenceImage(
   db: D1Database,
   bucket: ArchiveBucket,
@@ -1414,10 +1378,9 @@ export async function listArchiveObjectsForDeletion(
   const attachments: string[] = [];
   for (const row of result.results ?? []) {
     archives.push(row.object_key);
-    const parsed = decodeRelatedArchiveObjectKeysOption(
-      JSON.parse(row.related_object_keys_json),
+    attachments.push(
+      ...decodeRelatedArchiveObjectKeys(row.related_object_keys_json),
     );
-    if (Option.isSome(parsed)) attachments.push(...parsed.value);
   }
   return { archives, attachments };
 }
@@ -1474,20 +1437,6 @@ export async function processArchiveCleanupQueue(
        from briar_archive_cleanup_queue queue
        where queue.dead_lettered_at is null
          and (queue.next_attempt_at is null or queue.next_attempt_at <= ?)
-         and (
-           (
-             queue.run_id is not null
-             and not exists (
-               select 1 from briar_hunt_runs run where run.id = queue.run_id
-             )
-           ) or (
-             queue.run_id is null
-             and not exists (
-               select 1 from briar_teams project
-               where project.id = queue.project_id
-             )
-           )
-         )
        order by coalesce(queue.next_attempt_at, queue.queued_at),
                 queue.queued_at, queue.bucket, queue.object_key
        limit ?`,
@@ -1505,16 +1454,6 @@ export async function processArchiveCleanupQueue(
   let deleted = 0;
   let failed = 0;
   for (const item of result.results ?? []) {
-    const stillOwned = item.run_id
-      ? await db
-          .prepare(`select 1 as present from briar_hunt_runs where id = ?`)
-          .bind(item.run_id)
-          .first<{ present: number }>()
-      : await db
-          .prepare(`select 1 as present from briar_teams where id = ?`)
-          .bind(item.project_id)
-          .first<{ present: number }>();
-    if (stillOwned) continue;
     const referenced = item.bucket === "archives"
       ? await db
           .prepare(
@@ -1526,36 +1465,9 @@ export async function processArchiveCleanupQueue(
       : await db
           .prepare(
             `select 1 as present
-             where exists (
-               select 1 from briar_issue_attachments
-               where object_key = ?
-             )
-             or exists (
-               select 1 from briar_run_evidence_images
-               where object_key = ?
-             )
-             or exists (
-               select 1 from briar_project_agents
-               where avatar_spritesheet_object_key = ?
-             )
-             or exists (
-               select 1 from briar_channel_message_attachments
-               where object_key = ?
-             )
-             or exists (
-               select 1
-               from briar_log_archives archive,
-                    json_each(archive.related_object_keys_json) related
-               where related.type = 'text' and related.value = ?
-             )`,
+             where ${attachmentObjectIsReferencedSql("?")}`,
           )
-          .bind(
-            item.object_key,
-            item.object_key,
-            item.object_key,
-            item.object_key,
-            item.object_key,
-          )
+          .bind(...attachmentObjectReferenceBindings(item.object_key))
           .first<{ present: number }>();
     if (referenced) {
       // Ownership moved after this cleanup item was queued. The destination
@@ -1579,29 +1491,9 @@ export async function processArchiveCleanupQueue(
                ) or (
                  bucket = 'attachments'
                  and (
-                   exists (
-                     select 1 from briar_issue_attachments attachment
-                     where attachment.object_key = briar_archive_cleanup_queue.object_key
-                   )
-                   or exists (
-                     select 1 from briar_run_evidence_images image
-                     where image.object_key = briar_archive_cleanup_queue.object_key
-                   )
-                   or exists (
-                     select 1 from briar_project_agents agent
-                     where agent.avatar_spritesheet_object_key = briar_archive_cleanup_queue.object_key
-                   )
-                   or exists (
-                     select 1 from briar_channel_message_attachments attachment
-                     where attachment.object_key = briar_archive_cleanup_queue.object_key
-                   )
-                   or exists (
-                     select 1
-                     from briar_log_archives archive,
-                          json_each(archive.related_object_keys_json) related
-                     where related.type = 'text'
-                       and related.value = briar_archive_cleanup_queue.object_key
-                   )
+                   ${attachmentObjectIsReferencedSql(
+                     "briar_archive_cleanup_queue.object_key",
+                   )}
                  )
                )
              )`,
@@ -1629,21 +1521,6 @@ export async function processArchiveCleanupQueue(
              and generation = ?
              and (
                (
-                 run_id is not null
-                 and not exists (
-                   select 1 from briar_hunt_runs run
-                   where run.id = briar_archive_cleanup_queue.run_id
-                 )
-               ) or (
-                 run_id is null
-                 and not exists (
-                   select 1 from briar_teams project
-                   where project.id = briar_archive_cleanup_queue.project_id
-                 )
-               )
-             )
-             and (
-               (
                  bucket = 'archives'
                  and not exists (
                    select 1 from briar_log_archives archive
@@ -1651,28 +1528,10 @@ export async function processArchiveCleanupQueue(
                  )
                ) or (
                  bucket = 'attachments'
-                 and not exists (
-                   select 1 from briar_issue_attachments attachment
-                   where attachment.object_key = briar_archive_cleanup_queue.object_key
-                 )
-                 and not exists (
-                   select 1 from briar_run_evidence_images image
-                   where image.object_key = briar_archive_cleanup_queue.object_key
-                 )
-                 and not exists (
-                   select 1 from briar_project_agents agent
-                   where agent.avatar_spritesheet_object_key = briar_archive_cleanup_queue.object_key
-                 )
-                 and not exists (
-                   select 1 from briar_channel_message_attachments attachment
-                   where attachment.object_key = briar_archive_cleanup_queue.object_key
-                 )
-                 and not exists (
-                   select 1
-                   from briar_log_archives archive,
-                        json_each(archive.related_object_keys_json) related
-                   where related.type = 'text'
-                     and related.value = briar_archive_cleanup_queue.object_key
+                 and not (
+                   ${attachmentObjectIsReferencedSql(
+                     "briar_archive_cleanup_queue.object_key",
+                   )}
                  )
                )
              )`,
@@ -1761,12 +1620,12 @@ export async function expireArchives(
     .all<ArchiveMetadataRow>();
   let deleted = 0;
   for (const archive of result.results ?? []) {
-    const related = decodeRelatedArchiveObjectKeysOption(
-      JSON.parse(archive.related_object_keys_json),
+    const related = decodeRelatedArchiveObjectKeys(
+      archive.related_object_keys_json,
     );
     await archivesBucket.delete(archive.object_key);
-    if (Option.isSome(related) && related.value.length > 0) {
-      await attachmentsBucket.delete(related.value);
+    if (related.length > 0) {
+      await attachmentsBucket.delete(related);
     }
     if (archive.archive_kind === "project_agent_sessions") {
       await db.batch([

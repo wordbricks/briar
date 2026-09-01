@@ -64,31 +64,6 @@ fn validates_auto_hunt_session_ids_before_building_log_paths() {
 }
 
 #[test]
-fn retries_the_requested_run_through_the_briar_cli() {
-    let arguments = auto_hunt_retry_arguments(
-        "515b7a2c-8918-5a8f-a292-f0b95090281c",
-        "616b7a2c-8918-5a8f-a292-f0b95090281d",
-        "GitHub authentication was restored.",
-    );
-
-    assert_eq!(
-        arguments,
-        vec![
-            "run",
-            "retry",
-            "--run",
-            "515b7a2c-8918-5a8f-a292-f0b95090281c",
-            "--request-id",
-            "616b7a2c-8918-5a8f-a292-f0b95090281d",
-            "--reason",
-            "GitHub authentication was restored.",
-            "--actor",
-            "briar-agent-host-tool",
-        ],
-    );
-}
-
-#[test]
 fn targets_the_requested_run_when_claiming_auto_hunt_work() {
     let arguments = auto_hunt_claim_arguments("515b7a2c-8918-5a8f-a292-f0b95090281c");
 
@@ -139,7 +114,8 @@ fn records_an_actionable_handoff_for_runtime_blockers() {
         "blocked",
         "workspace-allocation",
         "worktree creation failed",
-    );
+    )
+    .expect("blocked event arguments should serialize");
 
     let detail_index = arguments
         .iter()
@@ -150,67 +126,150 @@ fn records_an_actionable_handoff_for_runtime_blockers() {
 
     let result_index = arguments
         .iter()
-        .position(|argument| argument == "--structured-result")
+        .position(|argument| argument == "--structured-result-proto-json")
         .expect("blocked event should include a structured result");
-    let result: serde_json::Value = serde_json::from_str(&arguments[result_index + 1])
-        .expect("structured result should be valid JSON");
-    assert_eq!(result["outcome"], "blocked");
-    assert_eq!(result["humanActionRequired"], true);
-    assert!(result["summary"]
-        .as_str()
-        .expect("summary should be text")
-        .contains("작업을 시작할 수 없습니다"));
-    assert!(result["nextAction"]
-        .as_str()
-        .expect("next action should be text")
+    let result: app_proto::StructuredRunResult = serde_json::from_str(&arguments[result_index + 1])
+        .expect("structured result should be canonical generated ProtoJSON");
+    assert_eq!(
+        result.outcome.as_known(),
+        Some(app_proto::structured_run_result::Outcome::Blocked)
+    );
+    assert_eq!(
+        result.importance.as_known(),
+        Some(app_proto::structured_run_result::Importance::Important)
+    );
+    assert_eq!(
+        result.urgency.as_known(),
+        Some(app_proto::structured_run_result::Urgency::Normal)
+    );
+    assert_eq!(
+        result.impact.as_known(),
+        Some(app_proto::structured_run_result::Impact::Issue)
+    );
+    assert!(result.human_action_required);
+    assert!(result.summary.contains("작업을 시작할 수 없습니다"));
+    assert!(result
+        .next_action
+        .expect("blocked result should include its next action")
         .contains("저장소 연결을 다시 확인"));
 }
 
-#[test]
-fn parses_the_claimed_runs_durable_issue_snapshot() {
-    let response = serde_json::from_value::<CliClaimResponse>(serde_json::json!({
-        "work": {
-            "runId": "515b7a2c-8918-5a8f-a292-f0b95090281c",
-            "runNumber": 13,
-            "sourceKey": "BRIAR-13",
-            "title": "Render the attached layout",
-            "description": "Match the mobile reference.",
-            "priority": 1,
-            "context": { "customer": "enterprise" },
-            "workflow": { "version": 2 },
-            "attachments": [{
-                "id": "attachment-1",
-                "filename": "layout.png",
-                "contentType": "image/png",
-                "byteSize": 2048,
-                "url": "/projects/project-1/runs/run-1/attachments/attachment-1",
-                "localPath": "/tmp/attachments/layout.png",
-                "downloadError": null
-            }],
-            "messages": [{
-                "id": "message-1",
-                "parentMessageId": null,
-                "body": "The compact breakpoint is required.",
-                "author": {
-                    "id": "user-1",
-                    "name": "Jay",
-                    "provider": null
-                },
-                "createdAt": "2026-07-30T00:00:00Z",
-                "updatedAt": "2026-07-30T00:00:00Z"
-            }]
+fn generated_claim(
+    workspace: Option<local_proto::LocalWorkspace>,
+    workspace_error: Option<&str>,
+) -> local_proto::LocalClaimResult {
+    let run = local_proto::LocalClaimedRun {
+        payload: worker_proto::ClaimedIssuePayload {
+            run_id: "515b7a2c-8918-5a8f-a292-f0b95090281c".to_string(),
+            run_number: 13,
+            source_key: "BRIAR-13".to_string(),
+            title: "Render the attached layout".to_string(),
+            workflow: types_proto::AutoHuntWorkflow {
+                version: 2,
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
         }
-    }))
-    .expect("claim response should parse");
-    let work = response.work.expect("claim should contain work");
+        .into(),
+        workspace: workspace.into(),
+        workspace_error: workspace_error.map(str::to_string),
+        ..Default::default()
+    };
+    local_proto::LocalClaimResult {
+        outcome: Some(local_proto::local_claim_result::Outcome::Claimed(Box::new(
+            run,
+        ))),
+        ..Default::default()
+    }
+}
 
+#[test]
+fn maps_the_generated_no_work_outcome() {
+    let result = claim_outcome(local_proto::LocalClaimResult {
+        outcome: Some(local_proto::local_claim_result::Outcome::NoWork(
+            Box::default(),
+        )),
+        ..Default::default()
+    })
+    .expect("generated no-work result should map");
+
+    assert!(matches!(result, AutoHuntClaimOutcome::NoWork));
+}
+
+#[test]
+fn maps_the_generated_worktree_to_the_runtime_domain() {
+    let result = claim_outcome(generated_claim(
+        Some(local_proto::LocalWorkspace {
+            kind: local_proto::local_workspace::Kind::Worktree.into(),
+            path: "/tmp/briar/worktrees/BRIAR-13".to_string(),
+            ..Default::default()
+        }),
+        None,
+    ))
+    .expect("generated claim should map");
+
+    let AutoHuntClaimOutcome::Claimed(claimed) = result else {
+        panic!("claim should contain work");
+    };
+    assert_eq!(claimed.issue.source_key, "BRIAR-13");
     assert_eq!(
-        work.description.as_deref(),
-        Some("Match the mobile reference.")
+        claimed.workspace_path.as_deref(),
+        Some("/tmp/briar/worktrees/BRIAR-13")
     );
+}
+
+#[test]
+fn preserves_workspace_allocation_failure_as_claimed_work() {
+    let result = claim_outcome(generated_claim(None, Some("worktree creation failed")))
+        .expect("workspace failure should remain reportable");
+
+    let AutoHuntClaimOutcome::Claimed(claimed) = result else {
+        panic!("claim should remain claimed");
+    };
+    assert!(claimed.workspace_path.is_none());
     assert_eq!(
-        work.attachments[0].local_path.as_deref(),
-        Some("/tmp/attachments/layout.png")
+        claimed.workspace_error.as_deref(),
+        Some("worktree creation failed")
     );
-    assert_eq!(work.messages[0].body, "The compact breakpoint is required.");
+}
+
+#[test]
+fn maps_generated_run_evidence_and_rejects_a_mismatched_run() {
+    let mut evidence = app_proto::RunEvidence {
+        key: "local-tests".to_string(),
+        attempt: 2,
+        revision: 3,
+        stage: "local_qa".to_string(),
+        r#type: "test".to_string(),
+        status: app_proto::run_evidence::Status::Passed.into(),
+        detail: Some("Rust checks passed".to_string()),
+        actor: "briar-auto-hunt-runtime".to_string(),
+        canonical: true,
+        required_revision: 3,
+        ..Default::default()
+    };
+    evidence.observed_at.get_or_insert_default().seconds = 1;
+    evidence.recorded_at.get_or_insert_default().seconds = 2;
+    let response = app_proto::ListRunEvidenceResponse {
+        run_id: "515b7a2c-8918-5a8f-a292-f0b95090281c".to_string(),
+        evidence: vec![evidence],
+        attempt: 2,
+        revision: 3,
+        ..Default::default()
+    };
+
+    let mapped = run_evidence_result(response.clone(), "515b7a2c-8918-5a8f-a292-f0b95090281c")
+        .expect("matching evidence should map");
+    assert_eq!(mapped.len(), 1);
+    assert_eq!(mapped[0].key, "local-tests");
+    assert_eq!(
+        mapped[0].status,
+        auto_hunt_dispatch::AutoHuntRunEvidenceStatus::Passed
+    );
+    assert_eq!(mapped[0].revision, 3);
+    assert_eq!(mapped[0].required_revision, 3);
+    assert!(mapped[0].canonical);
+
+    assert!(run_evidence_result(response, "different-run").is_err());
 }

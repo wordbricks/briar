@@ -9,7 +9,6 @@ import {
   insertAgentSkillStatement,
   normalizedAgentSkillRows,
   replaceAgentSkillStatements,
-  soleAgentSkillRowFromLegacy,
   type AgentSkillEffort,
   type AgentSkillInput,
   type AgentSkillRow,
@@ -124,15 +123,6 @@ export async function createOrganizationAgent(
   const skillRows = normalizedAgentSkillRows(
     input.id,
     input.skills ?? [],
-    {
-      name: input.name,
-      description: input.description?.trim() || input.responsibility.slice(0, 1000),
-      body: input.responsibility,
-      provider: input.provider,
-      model: input.model,
-      effort: input.effort,
-      kind: "custom",
-    },
     input.createdAt,
   );
   await db.batch([
@@ -169,7 +159,7 @@ export async function updateOrganizationAgent(
     description?: string;
     responsibility: string;
     effort: AgentSkillEffort | null;
-    skills?: AgentSkillInput[];
+    skills: AgentSkillInput[];
     updatedAt: string;
   },
 ) {
@@ -179,46 +169,17 @@ export async function updateOrganizationAgent(
     input.agentId,
   );
   if (!existing || existing.project_id !== null) return null;
-  const supplementalStatements: D1PreparedStatement[] = [];
-  if (input.skills !== undefined) {
-    const skillRows = normalizedAgentSkillRows(
-      input.agentId,
-      input.skills,
-      {
-        name: input.name,
-        description: input.description?.trim() || input.responsibility.slice(0, 1000),
-        body: input.responsibility,
-        provider: input.provider,
-        model: input.model,
-        effort: input.effort,
-        kind: "custom",
-      },
-      input.updatedAt,
-    );
-    await assertAgentSkillReplacementAllowed(
-      db,
-      input.agentId,
-      skillRows,
-    );
-    supplementalStatements.push(
-      ...replaceAgentSkillStatements(db, input.agentId, skillRows),
-    );
-  } else {
-    const legacySkill = soleAgentSkillRowFromLegacy(existing.skills ?? [], {
-        description: input.description?.trim() || input.responsibility.slice(0, 1000),
-        body: input.responsibility,
-        provider: input.provider,
-        model: input.model,
-        effort: input.effort,
-        updatedAt: input.updatedAt,
-      });
-    if (legacySkill) {
-      await assertAgentSkillReplacementAllowed(db, input.agentId, [legacySkill]);
-      supplementalStatements.push(
-        ...replaceAgentSkillStatements(db, input.agentId, [legacySkill]),
-      );
-    }
-  }
+  const skillRows = normalizedAgentSkillRows(
+    input.agentId,
+    input.skills,
+    input.updatedAt,
+  );
+  await assertAgentSkillReplacementAllowed(db, input.agentId, skillRows);
+  const supplementalStatements = replaceAgentSkillStatements(
+    db,
+    input.agentId,
+    skillRows,
+  );
   await db.batch([
     db.prepare(
       `update briar_project_agents

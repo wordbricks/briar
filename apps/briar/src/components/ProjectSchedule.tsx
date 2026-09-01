@@ -69,6 +69,24 @@ const dayCount = 7;
 const allAgentsFilter = "all";
 const agentFilterPrefix = "agent:";
 
+export type ProjectScheduleServices = {
+  readonly createProjectAgentSchedule: typeof createProjectAgentSchedule;
+  readonly deleteProjectAgentSchedule: typeof deleteProjectAgentSchedule;
+  readonly loadProjectAgentSchedules: typeof loadProjectAgentSchedules;
+  readonly loadProjectAgentScheduleRuns: typeof loadProjectAgentScheduleRuns;
+  readonly loadProjectAgents: typeof loadProjectAgents;
+  readonly updateProjectAgentSchedule: typeof updateProjectAgentSchedule;
+};
+
+const defaultProjectScheduleServices: ProjectScheduleServices = {
+  createProjectAgentSchedule,
+  deleteProjectAgentSchedule,
+  loadProjectAgentSchedules,
+  loadProjectAgentScheduleRuns,
+  loadProjectAgents,
+  updateProjectAgentSchedule,
+};
+
 function agentFilterValue(id: string) {
   return `${agentFilterPrefix}${id}`;
 }
@@ -132,11 +150,13 @@ export function ProjectSchedule({
   isSidebarOpen,
   now: providedNow,
   project,
+  services = defaultProjectScheduleServices,
   token,
 }: {
   isSidebarOpen: boolean;
   now?: Date;
   project: Project;
+  services?: ProjectScheduleServices;
   token: string | null;
 }) {
   const { locale, localeTag, t } = useI18n();
@@ -275,9 +295,9 @@ export function ProjectSchedule({
     setScheduleError(null);
     const load = token
       ? Promise.all([
-          loadProjectAgents(token, project.id, locale),
-          loadProjectAgentSchedules(token, project.id),
-          loadProjectAgentScheduleRuns(token, project.id),
+          services.loadProjectAgents(token, project.id),
+          services.loadProjectAgentSchedules(token, project.id),
+          services.loadProjectAgentScheduleRuns(token, project.id),
         ])
       : Promise.resolve([
           demoProjectAgents(project.id, locale),
@@ -304,7 +324,7 @@ export function ProjectSchedule({
     return () => {
       cancelled = true;
     };
-  }, [locale, project.id, token]);
+  }, [locale, project.id, services, token]);
 
   const addSchedule = async (input: CreateProjectAgentScheduleInput) => {
     setIsMutatingSchedule(true);
@@ -314,7 +334,7 @@ export function ProjectSchedule({
       if (!agent) throw new Error(t("schedule.agentRequired"));
       const createdAt = new Date().toISOString();
       const schedule = token
-        ? await createProjectAgentSchedule(token, project.id, input)
+        ? await services.createProjectAgentSchedule(token, project.id, input)
         : {
             id: crypto.randomUUID(),
             projectId: project.id,
@@ -345,7 +365,7 @@ export function ProjectSchedule({
       const agent = agents.find((candidate) => candidate.id === input.agentId);
       if (!agent) throw new Error(t("schedule.agentRequired"));
       const updated = token
-        ? await updateProjectAgentSchedule(
+        ? await services.updateProjectAgentSchedule(
             token,
             project.id,
             editingSchedule.id,
@@ -375,7 +395,7 @@ export function ProjectSchedule({
     setScheduleError(null);
     try {
       if (token) {
-        await deleteProjectAgentSchedule(token, project.id, schedule.id);
+        await services.deleteProjectAgentSchedule(token, project.id, schedule.id);
       }
       setSchedules((current) =>
         current.filter((candidate) => candidate.id !== schedule.id),

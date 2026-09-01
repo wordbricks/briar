@@ -8,9 +8,8 @@ import {
   sendInboxNotification,
   synchronizeAndroidPushRegistration,
   androidPushRegistrationEvents,
-  type InboxNotificationTarget,
 } from "../lib/inbox-notifications";
-import { inboxSessionMessageVersion } from "../lib/inbox-session-version";
+import type { InboxNotificationTarget } from "../generated/tauri";
 import {
   classifyInboxMessage,
   inboxNotificationIdentity,
@@ -31,14 +30,8 @@ export function findChangedInboxMessages(
   return messages.filter(
     (message) =>
       previousVersions[inboxNotificationIdentity(message)] !==
-      inboxNotificationVersion(message),
+      message.version,
   );
-}
-
-export function inboxNotificationVersion(message: InboxMessageWithReadState) {
-  return message.kind === "session"
-    ? inboxSessionMessageVersion(message.status, message.occurredAt)
-    : message.version;
 }
 
 export function inboxConversationSyncSignal(
@@ -135,7 +128,7 @@ export function useInboxNotifications(
     const versions = Object.fromEntries(
       messages.map((message) => [
         inboxNotificationIdentity(message),
-        inboxNotificationVersion(message),
+        message.version,
       ]),
     );
     const baseline = baselineRef.current;

@@ -106,11 +106,11 @@ export function IssueConversation({
     error: string | null;
   }>>({});
   const [activeProfile, setActiveProfile] = useState<ProfileTarget | null>(null);
-  const subscriberMembers = useMemo(() => (run.subscribers ?? []).flatMap(subscriber => {
+  const subscriberMembers = useMemo(() => run.subscribers.flatMap(subscriber => {
     const member = mentionMembers.find(candidate => candidate.userId === subscriber.userId);
     return member ? [member] : [];
   }), [mentionMembers, run.subscribers]);
-  const backendSubscribed = Boolean(currentUserId && (run.assigneeUserId === currentUserId || (run.subscribers ?? []).some(subscriber => subscriber.userId === currentUserId)));
+  const backendSubscribed = Boolean(currentUserId && (run.assigneeUserId === currentUserId || run.subscribers.some(subscriber => subscriber.userId === currentUserId)));
   const assigneeSubscriptionRequired = Boolean(currentUserId && run.assigneeUserId === currentUserId);
   const [subscriptionOverride, setSubscriptionOverride] = useState<boolean | null>(null);
   const [subscriptionPending, setSubscriptionPending] = useState(false);
@@ -276,7 +276,12 @@ export function IssueConversation({
             if (disposed || activeRunIdRef.current !== run.id) return;
             conversationCursorRef.current = delta.cursor;
             if (delta.changed && delta.messages && delta.agentReplies) {
-              setMessages(current => mergeIssueMessages(current, delta.messages!));
+              if (delta.reset) {
+                trackedAgentRepliesRef.current.clear();
+                agentRepliesByIdRef.current.clear();
+                setAgentReplyStates({});
+              }
+              setMessages(current => delta.reset ? delta.messages! : mergeIssueMessages(current, delta.messages!));
               reconcileAgentReplies(delta.agentReplies, delta.messages);
             }
             hasMore = delta.hasMore;
@@ -525,6 +530,9 @@ export function IssueConversation({
         provider: null
       },
       replyCount: 0,
+      proposedAction: null,
+      executionProposal: null,
+      skillExecutionProposal: null,
       optimistic: true,
       createdAt,
       updatedAt: createdAt

@@ -1,0 +1,827 @@
+syntax = "proto3";
+
+package briar.app.v1;
+
+import "briar/app/v1/agent.proto";
+import "briar/app/v1/common.proto";
+import "briar/types/v1/provider.proto";
+import "briar/types/v1/upload.proto";
+import "briar/types/v1/workflow.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+option swift_prefix = "BriarAPI_";
+
+service IssueService {
+  // Shared intentionally by the three issue attachment preparation methods.
+  // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+  // buf:lint:ignore RPC_RESPONSE_STANDARD_NAME
+  rpc PrepareCreateIssueAttachments(PrepareCreateIssueAttachmentsRequest) returns (PrepareIssueAttachmentsResponse);
+  rpc CreateIssue(CreateIssueRequest) returns (CreateIssueResponse);
+  // Shared intentionally by the three issue attachment preparation methods.
+  // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+  // buf:lint:ignore RPC_RESPONSE_STANDARD_NAME
+  rpc PrepareUpdateIssueAttachments(PrepareUpdateIssueAttachmentsRequest) returns (PrepareIssueAttachmentsResponse);
+  rpc UpdateIssue(UpdateIssueRequest) returns (UpdateIssueResponse);
+  rpc DeleteIssue(DeleteIssueRequest) returns (DeleteIssueResponse);
+  rpc TransferIssue(TransferIssueRequest) returns (TransferIssueResponse);
+  rpc SetIssueSubscription(SetIssueSubscriptionRequest) returns (SetIssueSubscriptionResponse);
+  rpc UpdateIssuePreferences(UpdateIssuePreferencesRequest) returns (UpdateIssuePreferencesResponse);
+  rpc UpdateIssueCheckpoints(UpdateIssueCheckpointsRequest) returns (UpdateIssueCheckpointsResponse);
+  rpc SetIssueDependency(SetIssueDependencyRequest) returns (SetIssueDependencyResponse);
+  rpc SetIssueParent(SetIssueParentRequest) returns (SetIssueParentResponse);
+  rpc SetRelatedIssue(SetRelatedIssueRequest) returns (SetRelatedIssueResponse);
+  rpc MoveRun(MoveRunRequest) returns (MoveRunResponse);
+  // Shared intentionally with WorkerExecutionService so run control has one DTO.
+  // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+  rpc RetryRun(RetryRunRequest) returns (RetryRunResponse);
+  // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+  rpc CancelRun(CancelRunRequest) returns (CancelRunResponse);
+  // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+  rpc ResumeRun(ResumeRunRequest) returns (ResumeRunResponse);
+  // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+  rpc ReworkRun(ReworkRunRequest) returns (ReworkRunResponse);
+  rpc UnassignRun(UnassignRunRequest) returns (UnassignRunResponse);
+  rpc DispatchRun(DispatchRunRequest) returns (DispatchRunResponse);
+  rpc ReassignRun(ReassignRunRequest) returns (ReassignRunResponse);
+  rpc CompleteResultReview(CompleteResultReviewRequest) returns (CompleteResultReviewResponse);
+  rpc ListIssueMessages(ListIssueMessagesRequest) returns (ListIssueMessagesResponse);
+  rpc SyncIssueMessages(SyncIssueMessagesRequest) returns (SyncIssueMessagesResponse);
+  // Shared intentionally by the three issue attachment preparation methods.
+  // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+  // buf:lint:ignore RPC_RESPONSE_STANDARD_NAME
+  rpc PrepareIssueMessageAttachments(PrepareIssueMessageAttachmentsRequest) returns (PrepareIssueAttachmentsResponse);
+  rpc CreateIssueMessage(CreateIssueMessageRequest) returns (CreateIssueMessageResponse);
+  rpc UpdateIssueMessage(UpdateIssueMessageRequest) returns (UpdateIssueMessageResponse);
+  rpc DeleteIssueMessage(DeleteIssueMessageRequest) returns (DeleteIssueMessageResponse);
+  rpc GetIssueAgentReply(GetIssueAgentReplyRequest) returns (GetIssueAgentReplyResponse);
+  // Shared intentionally with WorkerExecutionService so evidence has one DTO.
+  // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+  rpc ListRunEvidence(ListRunEvidenceRequest) returns (ListRunEvidenceResponse);
+  rpc AcceptIssueReworkProposal(AcceptIssueReworkProposalRequest) returns (AcceptIssueReworkProposalResponse);
+  rpc AcceptIssueActionProposal(AcceptIssueActionProposalRequest) returns (AcceptIssueActionProposalResponse);
+  rpc AcceptIssueExecutionProposal(AcceptIssueExecutionProposalRequest) returns (AcceptIssueExecutionProposalResponse);
+  rpc AcceptIssueSkillExecutionProposal(AcceptIssueSkillExecutionProposalRequest) returns (AcceptIssueSkillExecutionProposalResponse);
+}
+
+message PrepareCreateIssueAttachmentsRequest {
+  // Stable across a retry of one upload preparation attempt. It is separate
+  // from client_issue_id so a client can prepare a replacement batch.
+  string preparation_request_id = 1;
+  string project_id = 2;
+  // Binds the uploads to the idempotency identity and canonical run ID of the
+  // CreateIssue mutation that is allowed to consume them.
+  string client_issue_id = 3;
+  repeated briar.types.v1.UploadFileMetadata attachments = 4;
+}
+
+message PrepareUpdateIssueAttachmentsRequest {
+  // Stable across a retry of one upload preparation attempt. It is separate
+  // from request_id so a client can prepare a replacement batch.
+  string preparation_request_id = 1;
+  string project_id = 2;
+  string run_id = 3;
+  // Binds the uploads to the idempotency identity of the UpdateIssue mutation
+  // that is allowed to consume them.
+  string request_id = 4;
+  repeated briar.types.v1.UploadFileMetadata attachments = 5;
+}
+
+message PrepareIssueMessageAttachmentsRequest {
+  // Stable across a retry of one upload preparation attempt. It is separate
+  // from client_message_id so a client can prepare a replacement batch.
+  string preparation_request_id = 1;
+  string project_id = 2;
+  string run_id = 3;
+  // Binds the uploads to the idempotency identity of the CreateIssueMessage
+  // mutation that is allowed to consume them.
+  string client_message_id = 4;
+  repeated briar.types.v1.UploadFileMetadata attachments = 5;
+}
+
+message PrepareIssueAttachmentsResponse {
+  bool replayed = 1;
+  repeated briar.types.v1.PreparedUpload uploads = 2;
+}
+
+message CreateIssueRequest {
+  reserved 2, 13, 15;
+
+  string project_id = 1;
+  string title = 3;
+  optional string description = 4;
+  optional uint32 priority = 5;
+  optional IssueDifficulty difficulty = 6;
+  optional string assignee_user_id = 7;
+  RunStatus status = 8;
+  optional briar.types.v1.AgentProvider preferred_provider = 9;
+  optional string preferred_model = 10;
+  optional string preferred_effort = 11;
+  bool full_auto = 12;
+  repeated briar.types.v1.WorkflowCheckpointSpec checkpoints = 14;
+  // The client-generated idempotency identity is also the canonical run ID.
+  // It is required even when the mutation has no attachments.
+  string client_issue_id = 16;
+  // Uploaded bytes must have been prepared by PrepareCreateIssueAttachments
+  // for this exact project, client issue, and authenticated user.
+  repeated briar.types.v1.UploadReference attachments = 17;
+  optional string planning_project_id = 18;
+  optional string parent_run_id = 19;
+}
+
+message CreateIssueResponse {
+  string run_id = 1;
+  string source_key = 2;
+  RunStatus status = 3;
+  string stage = 4;
+  repeated IssueAttachment attachments = 5;
+  optional string assignee_user_id = 6;
+  string created_by_user_id = 7;
+  optional IssueDifficulty difficulty = 8;
+  optional string parent_run_id = 9;
+}
+
+message UpdateIssueRequest {
+  reserved 3, 10;
+
+  message ClearAssignee {}
+
+  message KeptAttachmentIdsPatch {
+    repeated string values = 1;
+  }
+
+  string project_id = 1;
+  string run_id = 2;
+  string title = 4;
+  optional string description = 5;
+  optional uint32 priority = 6;
+  optional IssueDifficulty difficulty = 7;
+  oneof assignee_update {
+    string assignee_user_id = 8;
+    ClearAssignee clear_assignee = 9;
+  }
+  optional KeptAttachmentIdsPatch kept_attachment_ids = 11;
+  // Client-generated idempotency identity for the complete update payload.
+  // It is required even when the mutation has no new attachments.
+  string request_id = 12;
+  // Uploaded bytes must have been prepared by PrepareUpdateIssueAttachments
+  // for this exact project, run, request, and authenticated user.
+  repeated briar.types.v1.UploadReference attachments = 13;
+}
+
+message UpdateIssueResponse {
+  string run_id = 1;
+  string title = 2;
+  optional string description = 3;
+  optional uint32 priority = 4;
+  optional IssueDifficulty difficulty = 5;
+  optional string assignee_user_id = 6;
+  repeated IssueAttachment attachments = 7;
+}
+
+message DeleteIssueRequest {
+  reserved 3;
+
+  string project_id = 1;
+  string run_id = 2;
+}
+
+message DeleteIssueResponse {
+  bool deleted = 1;
+}
+
+message TransferIssueRequest {
+  reserved 4;
+
+  string project_id = 1;
+  string run_id = 2;
+  string target_project_id = 3;
+}
+
+message TransferIssueResponse {
+  enum Outcome {
+    OUTCOME_UNSPECIFIED = 0;
+    OUTCOME_TRANSFERRED = 1;
+    OUTCOME_ALREADY_TRANSFERRED = 2;
+  }
+
+  string run_id = 1;
+  string source_project_id = 2;
+  string target_project_id = 3;
+  Outcome outcome = 4;
+}
+
+message SetIssueSubscriptionRequest {
+  reserved 4;
+
+  string project_id = 1;
+  string run_id = 2;
+  bool subscribed = 3;
+}
+
+message SetIssueSubscriptionResponse {
+  string run_id = 1;
+  repeated IssueSubscriber subscribers = 2;
+}
+
+message UpdateIssuePreferencesRequest {
+  reserved 3;
+
+  string project_id = 1;
+  string run_id = 2;
+  optional briar.types.v1.AgentProvider provider = 4;
+  optional string model = 5;
+  optional string effort = 6;
+}
+
+message UpdateIssuePreferencesResponse {
+  string run_id = 1;
+  optional briar.types.v1.AgentProvider provider = 2;
+  optional string model = 3;
+  optional string effort = 4;
+}
+
+message UpdateIssueCheckpointsRequest {
+  string project_id = 1;
+  string run_id = 2;
+  repeated briar.types.v1.WorkflowCheckpointSpec checkpoints = 3;
+}
+
+message UpdateIssueCheckpointsResponse {
+  string run_id = 1;
+  repeated briar.types.v1.WorkflowCheckpointSpec checkpoints = 2;
+}
+
+message SetIssueDependencyRequest {
+  reserved 5;
+
+  string project_id = 1;
+  string run_id = 2;
+  string prerequisite_run_id = 3;
+  bool enabled = 4;
+}
+
+message SetIssueDependencyResponse {
+  enum Outcome {
+    OUTCOME_UNSPECIFIED = 0;
+    OUTCOME_CREATED = 1;
+    OUTCOME_ALREADY_EXISTS = 2;
+    OUTCOME_REMOVED = 3;
+    OUTCOME_ALREADY_REMOVED = 4;
+  }
+
+  string prerequisite_run_id = 1;
+  string dependent_run_id = 2;
+  Outcome outcome = 3;
+}
+
+message SetIssueParentRequest {
+  string project_id = 1;
+  string child_run_id = 2;
+  // Absence removes the current parent.
+  optional string parent_run_id = 3;
+}
+
+message SetIssueParentResponse {
+  enum Outcome {
+    OUTCOME_UNSPECIFIED = 0;
+    OUTCOME_CREATED = 1;
+    OUTCOME_UPDATED = 2;
+    OUTCOME_ALREADY_EXISTS = 3;
+    OUTCOME_REMOVED = 4;
+    OUTCOME_ALREADY_REMOVED = 5;
+  }
+
+  string child_run_id = 1;
+  optional string parent_run_id = 2;
+  Outcome outcome = 3;
+}
+
+message SetRelatedIssueRequest {
+  string project_id = 1;
+  string run_id = 2;
+  string related_run_id = 3;
+  bool enabled = 4;
+}
+
+message SetRelatedIssueResponse {
+  enum Outcome {
+    OUTCOME_UNSPECIFIED = 0;
+    OUTCOME_CREATED = 1;
+    OUTCOME_ALREADY_EXISTS = 2;
+    OUTCOME_REMOVED = 3;
+    OUTCOME_ALREADY_REMOVED = 4;
+  }
+
+  string run_id = 1;
+  string related_run_id = 2;
+  Outcome outcome = 3;
+}
+
+message MoveRunRequest {
+  string project_id = 1;
+  string run_id = 2;
+  string request_id = 3;
+  RunStatus status = 4;
+  optional string workflow_stage = 5;
+}
+
+message MoveRunResponse {
+  enum Outcome {
+    OUTCOME_UNSPECIFIED = 0;
+    OUTCOME_MOVED = 1;
+    OUTCOME_UNCHANGED = 2;
+    OUTCOME_ALREADY_MOVED = 3;
+  }
+
+  string run_id = 1;
+  Outcome outcome = 2;
+  RunStatus status = 3;
+  optional string workflow_stage = 4;
+}
+
+message RetryRunRequest {
+  string project_id = 1;
+  string run_id = 2;
+  string request_id = 3;
+  optional string reason = 4;
+}
+
+message RetryRunResponse {
+  enum Outcome {
+    OUTCOME_UNSPECIFIED = 0;
+    OUTCOME_RETRIED = 1;
+    OUTCOME_ALREADY_RETRIED = 2;
+  }
+
+  string run_id = 1;
+  Outcome outcome = 2;
+  uint32 attempt = 3;
+  RunStatus status = 4;
+}
+
+message CancelRunRequest {
+  string project_id = 1;
+  string run_id = 2;
+  string request_id = 3;
+  optional string reason = 4;
+}
+
+message CancelRunResponse {
+  enum Outcome {
+    OUTCOME_UNSPECIFIED = 0;
+    OUTCOME_CANCELLED = 1;
+    OUTCOME_ALREADY_CANCELLED = 2;
+  }
+
+  string run_id = 1;
+  Outcome outcome = 2;
+  uint32 attempt = 3;
+  RunStatus status = 4;
+}
+
+message ResumeRunRequest {
+  string project_id = 1;
+  string run_id = 2;
+  string request_id = 3;
+  string checkpoint_key = 4;
+  uint32 attempt = 5;
+  uint32 revision = 6;
+}
+
+message ResumeRunResponse {
+  enum Outcome {
+    OUTCOME_UNSPECIFIED = 0;
+    OUTCOME_APPROVED = 1;
+    OUTCOME_ALREADY_APPROVED = 2;
+    OUTCOME_RESUMED = 3;
+    OUTCOME_ALREADY_RESUMED = 4;
+  }
+
+  string run_id = 1;
+  Outcome outcome = 2;
+  optional string workflow_stage = 3;
+  optional string start_stage = 4;
+  optional string checkpoint_key = 5;
+  optional uint32 attempt = 6;
+  optional uint32 revision = 7;
+  bool terminal_review_only = 8;
+}
+
+message ReworkRunCheckpointIdentity {
+  string key = 1;
+  uint32 attempt = 2;
+  uint32 revision = 3;
+}
+
+message ReworkRunRequest {
+  string project_id = 1;
+  string run_id = 2;
+  string request_id = 3;
+  string workflow_stage = 4;
+  string reason = 5;
+  ReworkRunCheckpointIdentity checkpoint = 6;
+}
+
+message ReworkRunResponse {
+  enum Outcome {
+    OUTCOME_UNSPECIFIED = 0;
+    OUTCOME_REWORKED = 1;
+    OUTCOME_ALREADY_REWORKED = 2;
+  }
+
+  string run_id = 1;
+  Outcome outcome = 2;
+  uint32 attempt = 3;
+  uint32 revision = 4;
+  string workflow_stage = 5;
+}
+
+message UnassignRunRequest {
+  string project_id = 1;
+  string run_id = 2;
+  string request_id = 3;
+}
+
+message UnassignRunResponse {
+  enum Outcome {
+    OUTCOME_UNSPECIFIED = 0;
+    OUTCOME_UNASSIGNED = 1;
+    OUTCOME_NOT_ASSIGNED = 2;
+  }
+
+  string run_id = 1;
+  Outcome outcome = 2;
+}
+
+message DispatchRunInput {
+  string request_id = 1;
+  optional string agent_id = 2;
+  briar.types.v1.AgentProvider provider = 3;
+  optional string model = 4;
+  optional string effort = 5;
+  bool persist_preferences = 6;
+  optional string worker_id = 7;
+}
+
+message DispatchRunRequest {
+  string project_id = 1;
+  string run_id = 2;
+  DispatchRunInput dispatch = 3;
+}
+
+message DispatchRunResponse {
+  IssueExecutionDispatch dispatch = 1;
+}
+
+message ReassignRunRequest {
+  string project_id = 1;
+  string run_id = 2;
+  DispatchRunInput dispatch = 3;
+}
+
+message ReassignRunResponse {
+  IssueExecutionDispatch dispatch = 1;
+}
+
+message CompleteResultReviewRequest {
+  reserved 3;
+
+  string project_id = 1;
+  string run_id = 2;
+}
+
+message CompleteResultReviewResponse {
+  ResultReview review = 1;
+}
+
+message ListIssueMessagesRequest {
+  string project_id = 1;
+  string run_id = 2;
+}
+
+message ListIssueMessagesResponse {
+  uint64 cursor = 1;
+  repeated IssueMessage messages = 2;
+  repeated IssueAgentReply agent_replies = 3;
+}
+
+message SyncIssueMessagesRequest {
+  string project_id = 1;
+  string run_id = 2;
+  uint64 cursor = 3;
+}
+
+message SyncIssueMessagesResponse {
+  uint64 cursor = 1;
+  bool has_more = 2;
+  bool changed = 3;
+  bool reset = 4;
+  repeated IssueMessage messages = 5;
+  repeated IssueAgentReply agent_replies = 6;
+}
+
+message CreateIssueMessageRequest {
+  reserved 9, 10;
+
+  string project_id = 1;
+  string run_id = 2;
+  string client_message_id = 3;
+  string body = 4;
+  optional string parent_message_id = 5;
+  repeated string mentioned_user_ids = 6;
+  repeated string mentioned_agent_ids = 7;
+  optional string agent_conversation_id = 8;
+  // Uploaded bytes must have been prepared by PrepareIssueMessageAttachments
+  // for this exact project, run, client message, and authenticated user.
+  repeated briar.types.v1.UploadReference attachments = 11;
+}
+
+message CreateIssueMessageResponse {
+  IssueMessage message = 1;
+  repeated IssueAgentReply agent_replies = 2;
+  optional IssueAgentReply agent_reply = 3;
+}
+
+message UpdateIssueMessageRequest {
+  string project_id = 1;
+  string run_id = 2;
+  string message_id = 3;
+  string body = 4;
+  repeated string mentioned_user_ids = 5;
+}
+
+message UpdateIssueMessageResponse {
+  IssueMessage message = 1;
+}
+
+message DeleteIssueMessageRequest {
+  string project_id = 1;
+  string run_id = 2;
+  string message_id = 3;
+}
+
+message DeleteIssueMessageResponse {
+  bool deleted = 1;
+}
+
+message GetIssueAgentReplyRequest {
+  string project_id = 1;
+  string run_id = 2;
+  string trigger_message_id = 3;
+}
+
+message GetIssueAgentReplyResponse {
+  IssueAgentReply agent_reply = 1;
+  repeated IssueAgentReply agent_replies = 2;
+  repeated IssueMessage messages = 3;
+  optional IssueMessage message = 4;
+}
+
+message ListRunEvidenceRequest {
+  string project_id = 1;
+  string run_id = 2;
+}
+
+message ListRunEvidenceResponse {
+  repeated RunEvidence evidence = 1;
+  string run_id = 2;
+  uint32 attempt = 3;
+  uint32 revision = 4;
+}
+
+message AcceptIssueReworkProposalRequest {
+  reserved 4;
+
+  string project_id = 1;
+  string run_id = 2;
+  string proposal_id = 3;
+}
+
+message AcceptIssueReworkProposalResponse {
+  IssueReworkProposal proposal = 1;
+  ApprovalOutcome outcome = 2;
+  uint32 attempt = 3;
+  uint32 revision = 4;
+  string workflow_stage = 5;
+}
+
+message AcceptIssueActionProposalRequest {
+  reserved 4;
+
+  string project_id = 1;
+  string run_id = 2;
+  string proposal_id = 3;
+}
+
+message AcceptIssueActionProposalResponse {
+  oneof proposal {
+    IssueUpdateProposal update = 1;
+    IssueCreateProposal create = 2;
+  }
+
+  ApprovalOutcome outcome = 3;
+  optional string result_run_id = 4;
+  optional IssueExecutionProposal execution_proposal = 5;
+}
+
+message IssueExecutionApproval {
+  briar.types.v1.AgentProvider provider = 1;
+  optional string model = 2;
+  optional string effort = 3;
+  optional string worker_id = 4;
+}
+
+message AcceptIssueExecutionProposalRequest {
+  reserved 4;
+
+  string project_id = 1;
+  string conversation_run_id = 2;
+  string proposal_id = 3;
+  IssueExecutionApproval approval = 5;
+}
+
+message AcceptIssueExecutionProposalResponse {
+  IssueExecutionProposal proposal = 1;
+  ApprovalOutcome outcome = 2;
+  string project_id = 3;
+  string run_id = 4;
+  IssueExecutionDispatch dispatch = 5;
+}
+
+message AcceptIssueSkillExecutionProposalRequest {
+  reserved 4;
+
+  string project_id = 1;
+  string conversation_run_id = 2;
+  string proposal_id = 3;
+  optional string worker_id = 5;
+}
+
+message AcceptIssueSkillExecutionProposalResponse {
+  ApprovalOutcome outcome = 1;
+  AgentSkillExecutionProposal proposal = 2;
+  string project_id = 3;
+  optional ProjectAgentSession session = 4;
+}
+
+message IssueMessage {
+  string id = 1;
+  string run_id = 2;
+  optional string parent_message_id = 3;
+  string body = 4;
+  repeated IssueAttachment attachments = 5;
+  MessageAuthor author = 6;
+  uint32 reply_count = 7;
+
+  oneof proposed_action {
+    IssueReworkProposal rework_proposal = 8;
+    IssueUpdateProposal update_proposal = 9;
+    IssueCreateProposal create_proposal = 10;
+  }
+
+  optional IssueExecutionProposal execution_proposal = 11;
+  optional AgentSkillExecutionProposal skill_execution_proposal = 12;
+  google.protobuf.Timestamp created_at = 13;
+  google.protobuf.Timestamp updated_at = 14;
+}
+
+message IssueReworkProposal {
+  string id = 1;
+  string workflow_stage = 2;
+  string reason = 3;
+  ProposalStatus status = 4;
+  optional google.protobuf.Timestamp accepted_at = 5;
+  optional uint32 applied_revision = 6;
+}
+
+message IssueUpdateChanges {
+  optional string title = 1;
+  optional string description = 2;
+  optional uint32 priority = 3;
+}
+
+enum IssueChangedField {
+  ISSUE_CHANGED_FIELD_UNSPECIFIED = 0;
+  ISSUE_CHANGED_FIELD_TITLE = 1;
+  ISSUE_CHANGED_FIELD_DESCRIPTION = 2;
+  ISSUE_CHANGED_FIELD_PRIORITY = 3;
+}
+
+message IssueUpdateProposal {
+  string id = 1;
+  IssueUpdateChanges changes = 2;
+  repeated IssueChangedField changed_fields = 3;
+  ProposalStatus status = 4;
+  optional google.protobuf.Timestamp accepted_at = 5;
+  optional string result_run_id = 6;
+}
+
+message ProposedIssue {
+  reserved 4;
+
+  string title = 1;
+  optional string description = 2;
+  optional uint32 priority = 3;
+}
+
+message IssueCreateProposal {
+  string id = 1;
+  ProposedIssue issue = 2;
+  bool execute_after_create = 3;
+  ProposalStatus status = 4;
+  optional google.protobuf.Timestamp accepted_at = 5;
+  optional string result_run_id = 6;
+}
+
+message IssueExecutionProposal {
+  string id = 1;
+  ProposalStatus status = 2;
+  string project_id = 3;
+  string run_id = 4;
+  string title = 5;
+  google.protobuf.Timestamp created_at = 6;
+  optional google.protobuf.Timestamp accepted_at = 7;
+  optional briar.types.v1.AgentProvider requested_provider = 8;
+  optional string requested_model = 9;
+  optional string requested_effort = 10;
+  optional string requested_worker_id = 11;
+  optional string delegated_by_agent_id = 12;
+  optional string delegated_by_agent_name = 13;
+}
+
+message IssueAgentReply {
+  string id = 1;
+  string trigger_message_id = 2;
+  string parent_message_id = 3;
+  optional string agent_id = 4;
+  optional string agent_name = 5;
+  ReplyJobStatus status = 6;
+  uint32 attempts = 7;
+  optional string error = 8;
+  optional string worker_id = 9;
+  optional briar.types.v1.AgentProvider provider = 10;
+  google.protobuf.Timestamp updated_at = 11;
+}
+
+message IssueExecutionDispatch {
+  enum DispatchMode {
+    DISPATCH_MODE_UNSPECIFIED = 0;
+    DISPATCH_MODE_ANY = 1;
+    DISPATCH_MODE_SPECIFIC = 2;
+  }
+
+  enum Outcome {
+    OUTCOME_UNSPECIFIED = 0;
+    OUTCOME_DISPATCHED = 1;
+    OUTCOME_ALREADY_DISPATCHED = 2;
+  }
+
+  string run_id = 1;
+  optional string agent_id = 2;
+  briar.types.v1.AgentProvider provider = 3;
+  optional string model = 4;
+  optional string effort = 5;
+  optional string requested_worker_id = 6;
+  string requested_by_user_id = 7;
+  DispatchMode dispatch_mode = 8;
+  google.protobuf.Timestamp dispatched_at = 9;
+  Outcome outcome = 10;
+}
+
+message RunEvidence {
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    STATUS_PENDING = 1;
+    STATUS_PASSED = 2;
+    STATUS_FAILED = 3;
+    STATUS_SKIPPED = 4;
+  }
+
+  string key = 1;
+  uint32 attempt = 2;
+  uint32 revision = 3;
+  string stage = 4;
+  string type = 5;
+  Status status = 6;
+  optional string detail = 7;
+  optional string url = 8;
+  string actor = 9;
+  google.protobuf.Timestamp observed_at = 10;
+  repeated RunEvidenceImage images = 11;
+  bool canonical = 12;
+  optional string command = 13;
+  optional google.protobuf.Struct metadata = 14;
+  google.protobuf.Timestamp recorded_at = 15;
+  uint32 required_revision = 16;
+}
+
+message RunEvidenceImage {
+  string id = 1;
+  string filename = 2;
+  string content_type = 3;
+  uint64 byte_size = 4;
+  string sha256 = 5;
+  uint32 position = 6;
+  string url = 7;
+}

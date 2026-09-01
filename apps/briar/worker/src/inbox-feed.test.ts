@@ -3,13 +3,46 @@ import {
   buildInboxFeedMessages,
   type InboxFeedProjectData,
 } from "./inbox-feed";
-import {
-  mobileInboxFeedResponseSchema,
-} from "./mobile-contract";
-import { decodeMobileSchema } from "./mobile-contract-schema";
+import { encodeStoredProjectAgentSessionSummary } from "./project-request-contract";
 
 const occurredAt = "2026-08-11T13:00:00.000Z";
 const currentUserId = "inbox-user-a";
+
+const sessionSummaryJson = (input: {
+  id: string;
+  requestedByUserId: string | null;
+  status: "completed" | "failed";
+  completedAt: string;
+  issues?: Array<{ title: string; outcome: "blocked" | "failed" }>;
+}) => encodeStoredProjectAgentSessionSummary({
+  dispatchGroupId: input.id,
+  agentId: null,
+  agentName: "Second Agent",
+  skillId: null,
+  sessionType: "task",
+  trigger: "manual",
+  scheduleId: null,
+  scheduleRunId: null,
+  parentSessionId: null,
+  requestedByUserId: input.requestedByUserId,
+  request: `Request for ${input.id}`,
+  status: input.status,
+  issues: (input.issues ?? []).map((issue, index) => ({
+    runId: `${input.id}-run-${index}`,
+    runNumber: index + 1,
+    sourceKey: `BR-${index + 1}`,
+    title: issue.title,
+    outcome: issue.outcome,
+    summary: null,
+  })),
+  startedAt: occurredAt,
+  completedAt: input.completedAt,
+  summary: input.status === "completed" ? "Completed safely." : null,
+  error: input.status === "failed" ? "Execution failed." : null,
+  requestedWorkerId: null,
+  workerId: null,
+  updatedAt: input.completedAt,
+});
 
 function projectData(
   id: string,
@@ -55,14 +88,12 @@ describe("organization Inbox feed", () => {
     );
     second.sessionSummaries = [{
       session_id: "second-project-session",
-      summary_json: JSON.stringify({
-        agentName: "Second Agent",
+      summary_json: sessionSummaryJson({
+        id: "second-project-session",
         requestedByUserId: currentUserId,
         status: "failed",
         issues: [{ title: "Second project issue", outcome: "failed" }],
-        startedAt: occurredAt,
         completedAt: "2026-08-11T13:01:00.000Z",
-        inboxVersion: "second-project-failed-event",
       }),
       updated_at: "2026-08-11T13:01:00.000Z",
     }];
@@ -72,12 +103,6 @@ describe("organization Inbox feed", () => {
       [],
       currentUserId,
     );
-
-    expect(() => decodeMobileSchema(mobileInboxFeedResponseSchema, {
-      messages,
-      subscribedIssueIds: [],
-      generatedAt: "2026-08-11T13:02:00.000Z",
-    })).not.toThrow();
 
     expect(messages).toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -119,12 +144,6 @@ describe("organization Inbox feed", () => {
       notification_reason: "mention",
       created_at: occurredAt,
     }], currentUserId);
-
-    expect(() => decodeMobileSchema(mobileInboxFeedResponseSchema, {
-      messages,
-      subscribedIssueIds: [],
-      generatedAt: "2026-08-11T13:02:00.000Z",
-    })).not.toThrow();
 
     expect(messages).toContainEqual(expect.objectContaining({
       id: "channel:cccccccc-cccc-4ccc-8ccc-cccccccccccc",
@@ -206,12 +225,6 @@ describe("organization Inbox feed", () => {
 
     const messages = buildInboxFeedMessages([second], [], currentUserId);
 
-    expect(() => decodeMobileSchema(mobileInboxFeedResponseSchema, {
-      messages,
-      subscribedIssueIds: [],
-      generatedAt: "2026-08-11T13:02:00.000Z",
-    })).not.toThrow();
-
     expect(messages).toContainEqual(expect.objectContaining({
       id: "conversation:cccccccc-cccc-4ccc-8ccc-cccccccccccc",
       projectId: second.project.id,
@@ -260,35 +273,24 @@ describe("organization Inbox feed", () => {
     project.sessionSummaries = [
       {
         session_id: "owned-failed-session",
-        summary_json: JSON.stringify({
+        summary_json: sessionSummaryJson({
+          id: "owned-failed-session",
           requestedByUserId: currentUserId,
           status: "completed",
           issues: [{ title: "Blocked result", outcome: "blocked" }],
-          startedAt: occurredAt,
           completedAt: "2026-08-11T13:01:00.000Z",
         }),
         updated_at: "2026-08-11T13:01:00.000Z",
       },
       {
         session_id: "other-member-session",
-        summary_json: JSON.stringify({
+        summary_json: sessionSummaryJson({
+          id: "other-member-session",
           requestedByUserId: "inbox-user-b",
           status: "failed",
-          issues: [],
-          startedAt: occurredAt,
           completedAt: "2026-08-11T13:02:00.000Z",
         }),
         updated_at: "2026-08-11T13:02:00.000Z",
-      },
-      {
-        session_id: "unknown-legacy-session",
-        summary_json: JSON.stringify({
-          status: "completed",
-          issues: [],
-          startedAt: occurredAt,
-          completedAt: "2026-08-11T13:03:00.000Z",
-        }),
-        updated_at: "2026-08-11T13:03:00.000Z",
       },
     ];
 
@@ -316,5 +318,8 @@ describe("organization Inbox feed", () => {
     ).toEqual([
       expect.objectContaining({ id: "session:other-member-session" }),
     ]);
+
+    project.sessionSummaries[0]!.summary_json = '{"status":"completed"}';
+    expect(() => buildInboxFeedMessages([project], [], currentUserId)).toThrow();
   });
 });

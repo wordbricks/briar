@@ -21,7 +21,7 @@ function companionWorkerProviders(worker: ExecutionWorker) {
   ) {
     return [];
   }
-  return [...new Set(worker.providers ?? [])];
+  return [...new Set(worker.providers)];
 }
 
 export function companionActiveWorkerCount(workers: ExecutionWorker[]) {

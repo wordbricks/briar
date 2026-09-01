@@ -1,9 +1,9 @@
 import * as Option from "effect/Option";
 import {
-  decodeAgentReplyActivityFrameOption,
+  agentReplyActivityExpiresAt,
+  decodeAgentReplyActivityFrameBinaryOption,
+  encodeAgentReplyActivityFrameBinary,
   type AgentReplyActivityFrame,
-  type ChannelAgentActivityFrame,
-  type IssueAgentActivityFrame,
 } from "../../src/lib/channel-agent-activity";
 
 type ChannelActivitySocketAttachment = {
@@ -48,8 +48,8 @@ async function publishActivity(
   const hub = env.CHANNEL_ACTIVITY_REALTIME.getByName(hubName);
   const response = await hub.fetch("https://channel-activity.internal/publish", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(frame),
+    headers: { "Content-Type": "application/protobuf" },
+    body: encodeAgentReplyActivityFrameBinary(frame),
   });
   if (!response.ok) {
     throw new Error(`${failureMessage} (${response.status})`);
@@ -92,7 +92,9 @@ export class ChannelActivityHub {
     }
     if (url.pathname === "/publish" && request.method === "POST") {
       const parsed = Option.getOrNull(
-        decodeAgentReplyActivityFrameOption(await request.json<unknown>()),
+        decodeAgentReplyActivityFrameBinaryOption(
+          new Uint8Array(await request.arrayBuffer()),
+        ),
       );
       if (parsed === null) {
         return new Response("Invalid activity frame", { status: 400 });
@@ -116,11 +118,11 @@ export class ChannelActivityHub {
     server.serializeAttachment(attachment);
     const now = Date.now();
     for (const [replyJobId, frame] of this.latestByReply) {
-      if (Date.parse(frame.expiresAt) <= now) {
+      if (agentReplyActivityExpiresAt(frame) <= now) {
         this.latestByReply.delete(replyJobId);
         continue;
       }
-      server.send(JSON.stringify(frame));
+      server.send(encodeAgentReplyActivityFrameBinary(frame));
     }
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -128,7 +130,7 @@ export class ChannelActivityHub {
   private publish(frame: AgentReplyActivityFrame) {
     const now = Date.now();
     for (const [replyJobId, current] of this.latestByReply) {
-      if (Date.parse(current.expiresAt) <= now) {
+      if (agentReplyActivityExpiresAt(current) <= now) {
         this.latestByReply.delete(replyJobId);
       }
     }
@@ -145,7 +147,7 @@ export class ChannelActivityHub {
     // already in flight cannot resurrect activity after reply completion.
     this.latestByReply.set(frame.replyJobId, frame);
 
-    const payload = JSON.stringify(frame);
+    const payload = encodeAgentReplyActivityFrameBinary(frame);
     for (const socket of this.state.getWebSockets()) {
       const attachment = socket.deserializeAttachment() as
         | ChannelActivitySocketAttachment
@@ -199,11 +201,14 @@ export async function subscribeToChannelActivity(
 export async function publishChannelActivity(
   env: Env,
   organizationId: string,
-  frame: ChannelAgentActivityFrame,
+  frame: AgentReplyActivityFrame,
 ) {
+  if (frame.scope.case !== "channel") {
+    throw new Error("Channel activity frame requires channel scope");
+  }
   return publishActivity(
     env,
-    activityHubName(organizationId, frame.channelId),
+    activityHubName(organizationId, frame.scope.value.channelId),
     frame,
     "Channel activity publish failed",
   );
@@ -229,11 +234,18 @@ export async function subscribeToIssueActivity(
 export async function publishIssueActivity(
   env: Env,
   organizationId: string,
-  frame: IssueAgentActivityFrame,
+  frame: AgentReplyActivityFrame,
 ) {
+  if (frame.scope.case !== "issue") {
+    throw new Error("Issue activity frame requires issue scope");
+  }
   return publishActivity(
     env,
-    issueActivityHubName(organizationId, frame.projectId, frame.runId),
+    issueActivityHubName(
+      organizationId,
+      frame.scope.value.projectId,
+      frame.scope.value.runId,
+    ),
     frame,
     "Issue activity publish failed",
   );

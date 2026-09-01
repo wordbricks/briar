@@ -14,7 +14,7 @@ export const projectAgentScheduleJson = (row: ProjectAgentScheduleRow) => ({
   agentName: row.agent_name,
   agentProvider: row.agent_provider,
   name: row.name,
-  recurrence: row.frequency ?? row.recurrence,
+  recurrence: row.recurrence,
   timeOfDay: row.time_of_day,
   dayOfWeek: row.day_of_week,
   intervalValue: row.interval_value,

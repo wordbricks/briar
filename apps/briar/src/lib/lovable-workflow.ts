@@ -2,14 +2,23 @@ import {
   canonicalizeProjectWorkflow,
   type AutoHuntWorkflow,
 } from "./auto-hunt-contract";
-import type { LovableRepositoryCompatibility } from "./project-connection";
+import type {
+  LovablePackageManager,
+  LovableRepositoryCompatibility,
+  LovableStack,
+} from "../generated/tauri";
 
 const packageManagerLabels = {
   bun: "Bun",
   npm: "npm",
   pnpm: "pnpm",
   yarn: "Yarn",
-} as const;
+} as const satisfies Record<LovablePackageManager, string>;
+
+const stackLabels = {
+  "tanstack-start": "TanStack Start",
+  "vite-react": "React + Vite",
+} as const satisfies Record<LovableStack, string>;
 
 const validationScriptOrder = ["lint", "typecheck", "test", "build"] as const;
 
@@ -28,9 +37,7 @@ export function lovableWorkflowPreset(
   const checks = validationScriptOrder
     .filter((script) => availableScripts.has(script))
     .map((script) => `${packageManager} run ${script}`);
-  const stackLabel = compatibility.stack === "tanstack-start"
-    ? "TanStack Start"
-    : "React + Vite";
+  const stackLabel = stackLabels[compatibility.stack];
 
   return canonicalizeProjectWorkflow({
     version: 2,

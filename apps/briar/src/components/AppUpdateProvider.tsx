@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { isDesktopTauri } from "../lib/platform";
+import { commands } from "../generated/tauri";
 import {
   listenForAppMenuUpdate,
   syncAppUpdateMenu,
@@ -151,8 +152,7 @@ export function AppUpdateProvider({
       void checkForUpdate()
         .then(async (update) => {
           if (!update) {
-            const { invoke } = await import("@tauri-apps/api/core");
-            await invoke("refresh_execution_worker_runtime");
+            await commands.refreshExecutionWorkerRuntime();
             return;
           }
           if (compareSemanticVersions(update.version, targetVersion) < 0) {

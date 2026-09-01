@@ -1,3 +1,7 @@
+import {
+  encodeStoredMergeQueueValidationCommands,
+} from "../../src/lib/merge-queue-validation-contract";
+
 export type MergeQueueProfileRow = {
   project_id: string;
   repository_id: number;
@@ -40,7 +44,9 @@ export async function configureMergeQueueProfile(
   },
 ) {
   const repository = input.repository.toLowerCase();
-  const validationCommandsJson = JSON.stringify(input.validationCommands);
+  const validationCommandsJson = encodeStoredMergeQueueValidationCommands(
+    input.validationCommands,
+  );
   const active = await db.prepare(
     `select id, repository_id, repository, base_branch from briar_merge_batches
      where project_id = ? and state in (${activeBatchStates}) limit 1`,

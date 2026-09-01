@@ -186,7 +186,7 @@ fn selects_an_authenticated_llm_provider_for_repository_analysis() {
         provider_prerequisites((true, false), (true, true), (false, false), (false, false));
 
     assert_eq!(
-        connected_agent_provider(&prerequisites, AppProviderSettings::default())
+        connected_agent_provider(&prerequisites, default_agent_provider_settings())
             .expect("Claude should be selected"),
         agent::AgentProviderKind::Claude
     );
@@ -200,7 +200,7 @@ fn skips_authenticated_llm_providers_disabled_in_app_settings() {
     assert_eq!(
         connected_agent_provider(
             &prerequisites,
-            AppProviderSettings {
+            LocalAgentProviderSettings {
                 codex: false,
                 claude: true,
                 cursor: true,
@@ -208,6 +208,7 @@ fn skips_authenticated_llm_providers_disabled_in_app_settings() {
                 agy: true,
                 opencode: true,
                 openrouter: true,
+                ..Default::default()
             },
         )
         .expect("Grok should be selected"),
@@ -221,7 +222,7 @@ fn selects_connected_opencode_for_repository_analysis() {
         provider_prerequisites((false, false), (false, false), (false, false), (true, true));
 
     assert_eq!(
-        connected_agent_provider(&prerequisites, AppProviderSettings::default())
+        connected_agent_provider(&prerequisites, default_agent_provider_settings())
             .expect("OpenCode should be selected"),
         agent::AgentProviderKind::Opencode
     );
@@ -233,7 +234,7 @@ fn rejects_repository_analysis_without_a_connected_llm_provider() {
         provider_prerequisites((true, false), (false, false), (true, false), (false, false));
 
     assert!(
-        connected_agent_provider(&prerequisites, AppProviderSettings::default())
+        connected_agent_provider(&prerequisites, default_agent_provider_settings())
             .expect_err("a connected provider should be required")
             .contains("연결된 LLM 프로바이더가 없습니다")
     );
@@ -283,8 +284,9 @@ fn uses_the_cursor_agent_companion_binary_for_login() {
             .expect("Cursor CLI fixture should be executable");
     }
 
-    let (binary, arguments) = provider_login_binary_and_args(home.path(), "cursor")
-        .expect("Cursor login command should resolve");
+    let (binary, arguments) =
+        provider_login_binary_and_args(home.path(), AgentLoginProvider::Cursor)
+            .expect("Cursor login command should resolve");
 
     assert_eq!(binary, binary_directory.join("agent"));
     assert_eq!(arguments, vec!["login"]);

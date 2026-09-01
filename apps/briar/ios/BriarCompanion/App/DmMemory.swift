@@ -1,128 +1,60 @@
+import BriarContracts
 import Foundation
 import SwiftUI
+import SwiftProtobuf
 
-struct DmMemorySpace: Decodable, Identifiable, Sendable {
-    let id: String
-    let channelId: String
-    let agentId: String
-    let rosterEpoch: Int
-    let status: String
-    let useEnabled: Bool
-    let autoEnabled: Bool
-    let memoryRevision: Int
-    let revocationEpoch: Int
-    let createdAt: String
-    let updatedAt: String
+typealias DmMemorySpace = BriarAPI_DmMemorySpace
+typealias DmMemoryDocument = BriarAPI_DmMemoryDocument
+typealias DmMemoryPage = BriarAPI_ListDmMemoriesResponse
+typealias DmMemoryRevisionPage = BriarAPI_ListDmMemoryRevisionsResponse
+
+private func dmMemoryTimestamp(_ value: Google_Protobuf_Timestamp) -> String {
+    value.date.ISO8601Format()
 }
 
-struct DmMemorySource: Decodable, Sendable {
-    let type: String
-    let id: String
-    let version: Int
-}
-
-struct DmMemoryDocument: Decodable, Identifiable, Sendable {
-    let id: String
-    let memorySpaceId: String
-    let kind: String
-    let title: String
-    let version: Int
-    let status: String
-    let conflicted: Bool
-    let memoryClass: String
-    let evidenceType: String
-    let protectedByUser: Bool
-    let sourceLanguage: String
-    let observedAt: String?
-    let validUntil: String?
-    let createdAt: String
-    let updatedAt: String
-    let indexState: String
-    let body: String?
-    let sources: [DmMemorySource]?
-}
-
-struct DmMemoryPage: Decodable, Sendable {
-    struct Capabilities: Decodable, Sendable {
-        let recall: Bool
-        let automaticLearning: Bool
+private extension BriarAPI_DmMemoryClass {
+    var label: String {
+        switch self {
+        case .profile: "profile"
+        case .log: "log"
+        case .note: "note"
+        case .unspecified, .UNRECOGNIZED: "unknown"
+        }
     }
-    let eligible: Bool
-    let capabilities: Capabilities
-    let spaces: [DmMemorySpace]
-    let selectedSpaceId: String?
-    var documents: [DmMemoryDocument]
-    var nextCursor: String?
-    let learning: DmMemoryLearningStatus?
 }
 
-struct DmMemoryLearningStatus: Decodable, Sendable {
-    struct Configuration: Decodable, Sendable {
-        struct Model: Decodable, Sendable { let model: String; let provider: String }
-        let proposer: Model
-        let verifier: Model
-        let spaceDailyCalls: Int
-        let spaceDailyMicroUsd: Int
+private extension BriarAPI_DmMemorySourceType {
+    var label: String {
+        switch self {
+        case .message: "message"
+        case .userEditEvent: "user_edit_event"
+        case .unspecified, .UNRECOGNIZED: "unknown"
+        }
     }
-    struct Job: Decodable, Sendable {
-        let id: String; let kind: String; let status: String; let stage: String?
-        let errorCode: String?; let updatedAt: String
-    }
-    let configuration: Configuration?
-    let callsToday: Int
-    let reservedMicroUsdToday: Int
-    let pendingJobs: Int
-    let failedJobs: Int
-    let lastJob: Job?
-    let retryableJob: RetryableJob?
-    struct RetryableJob: Decodable, Sendable { let id: String; let callsUsed: Int }
 }
 
-struct DmMemoryRevisionPage: Decodable, Sendable {
-    struct Revision: Decodable, Identifiable, Sendable {
-        var id: Int { version }
-        let version: Int
-        let createdAt: String
-        let memoryClass: String
-        let protectedByUser: Bool
-        let validUntil: String?
-        let origin: String
+private extension BriarAPI_DmMemoryRevisionOrigin {
+    var label: String {
+        switch self {
+        case .userEdit: "user_edit"
+        case .explicitRequest: "explicit_request"
+        case .extract: "extract"
+        case .consolidate: "consolidate"
+        case .unspecified, .UNRECOGNIZED: "unknown"
+        }
     }
-    let documentId: String
-    let currentVersion: Int
-    var revisions: [Revision]
-    let nextCursor: Int?
 }
 
-struct DmMemoryWrite: Encodable, Sendable, Equatable {
+struct DmMemoryWrite: Sendable, Equatable {
     var requestId = UUID().uuidString.lowercased()
     var memorySpaceId: String?
-    var expectedVersion: Int?
+    var expectedVersion: UInt32?
     var title: String
     var body: String
-    var memoryClass: String
+    var memoryClass: BriarAPI_DmMemoryClass
     var sourceLanguage: String
     var observedAt: String?
     var validUntil: String?
-
-    // These nullable fields are required by the shared contract; synthesized
-    // Encodable would omit them instead of encoding JSON null.
-    func encode(to encoder: any Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(requestId, forKey: .requestId)
-        try container.encodeIfPresent(memorySpaceId, forKey: .memorySpaceId)
-        try container.encodeIfPresent(expectedVersion, forKey: .expectedVersion)
-        try container.encode(title, forKey: .title)
-        try container.encode(body, forKey: .body)
-        try container.encode(memoryClass, forKey: .memoryClass)
-        try container.encode(sourceLanguage, forKey: .sourceLanguage)
-        try container.encode(observedAt, forKey: .observedAt)
-        try container.encode(validUntil, forKey: .validUntil)
-    }
-    private enum CodingKeys: String, CodingKey {
-        case requestId, memorySpaceId, expectedVersion, title, body, memoryClass
-        case sourceLanguage, observedAt, validUntil
-    }
 }
 
 @MainActor
@@ -132,35 +64,41 @@ final class DmMemoryStore: ObservableObject, Identifiable {
     @Published private(set) var busy = false
     @Published private(set) var errorMessage: String?
     @Published private(set) var exportedFile: URL?
-    private let api: any MobileAPIClientProtocol
+    private let service: any BriarAPI_DmMemoryServiceClientInterface
+    private let downloadClient: any AuthenticatedDownloadClientProtocol
     private let token: String
-    private let path: String
+    private let organizationID: String
+    private let channelID: String
     private let scopeIsCurrent: @MainActor () -> Bool
 
-    init(api: any MobileAPIClientProtocol, token: String, organizationID: UUID,
-         channelID: UUID, scopeIsCurrent: @escaping @MainActor () -> Bool) {
-        self.api = api
+    init(
+        service: any BriarAPI_DmMemoryServiceClientInterface,
+        downloadClient: any AuthenticatedDownloadClientProtocol,
+        token: String,
+        organizationID: UUID,
+        channelID: UUID,
+        scopeIsCurrent: @escaping @MainActor () -> Bool
+    ) {
+        self.service = service
+        self.downloadClient = downloadClient
         self.token = token
-        self.path = MobileAPIContract.Endpoint.dmMemory(organizationID: organizationID, channelID: channelID)
+        self.organizationID = organizationID.uuidString.lowercased()
+        self.channelID = channelID.uuidString.lowercased()
         self.scopeIsCurrent = scopeIsCurrent
     }
-    var space: DmMemorySpace? { page?.spaces.first { $0.id == page?.selectedSpaceId } }
-    var writable: Bool { page?.eligible == true && (space == nil || space?.status == "active") }
+    var space: DmMemorySpace? { page?.spaces.first { $0.id == page?.selectedSpaceID } }
+    var writable: Bool { page?.eligible == true && (space == nil || space?.status == .active) }
     private func requireScope() throws {
         guard scopeIsCurrent() else { throw MobileAPIError.invalidRequest }
     }
-    private func query(spaceID: String?, cursor: String? = nil) -> String {
-        var items: [URLQueryItem] = []
-        if let spaceID { items.append(URLQueryItem(name: "memorySpaceId", value: spaceID)) }
-        if let cursor { items.append(URLQueryItem(name: "cursor", value: cursor)) }
-        var parts = URLComponents()
-        parts.queryItems = items
-        return parts.percentEncodedQuery.map { "?" + $0 } ?? ""
-    }
     private func fetchPage(spaceID: String?, cursor: String? = nil) async throws -> DmMemoryPage {
         try requireScope()
-        let result = try await api.send(path + query(spaceID: spaceID, cursor: cursor), method: "GET",
-                                        token: token, body: nil, as: DmMemoryPage.self)
+        var request = BriarAPI_ListDmMemoriesRequest()
+        request.organizationID = organizationID
+        request.channelID = channelID
+        if let spaceID { request.memorySpaceID = spaceID }
+        if let cursor { request.cursor = cursor }
+        let result = try await service.listDmMemories(request: request, headers: [:]).briarValue()
         try requireScope()
         return result
     }
@@ -169,72 +107,134 @@ final class DmMemoryStore: ObservableObject, Identifiable {
         busy = true; errorMessage = nil
         defer { busy = false }
         do {
-            var result = try await fetchPage(spaceID: spaceID ?? page?.selectedSpaceId,
-                                             cursor: more ? page?.nextCursor : nil)
+            var result = try await fetchPage(
+                spaceID: spaceID ?? page?.selectedSpaceID,
+                cursor: more ? page?.nextCursor : nil
+            )
             if more { result.documents = (page?.documents ?? []) + result.documents }
             page = result
         } catch { errorMessage = error.localizedDescription }
     }
     func document(_ id: String, version: Int? = nil) async throws -> DmMemoryDocument {
-        struct Response: Decodable, Sendable { let document: DmMemoryDocument }
         try requireScope()
-        let result = try await api.send(path + "/documents/" + id + (version.map { "?version=\($0)" } ?? ""), method: "GET", token: token,
-                                        body: nil, as: Response.self)
+        var request = BriarAPI_GetDmMemoryDocumentRequest()
+        request.organizationID = organizationID
+        request.channelID = channelID
+        request.documentID = id
+        if let version {
+            guard version > 0, let wireVersion = UInt32(exactly: version) else {
+                throw MobileAPIError.invalidRequest
+            }
+            request.version = wireVersion
+        }
+        let result = try await service.getDmMemoryDocument(request: request, headers: [:]).briarValue()
         try requireScope()
+        guard result.hasDocument else { throw MobileAPIError.invalidResponse }
         return result.document
     }
-    func history(_ id: String, cursor: Int? = nil) async throws -> DmMemoryRevisionPage {
+
+    func history(_ id: String, cursor: UInt32? = nil) async throws -> DmMemoryRevisionPage {
         try requireScope()
-        let result = try await api.send(path + "/documents/" + id + "/revisions" + (cursor.map { "?cursor=\($0)" } ?? ""),
-                                        method: "GET", token: token, body: nil, as: DmMemoryRevisionPage.self)
+        var request = BriarAPI_ListDmMemoryRevisionsRequest()
+        request.organizationID = organizationID
+        request.channelID = channelID
+        request.documentID = id
+        if let cursor { request.cursor = cursor }
+        let result = try await service.listDmMemoryRevisions(request: request, headers: [:]).briarValue()
         try requireScope()
         return result
     }
+
     func refreshStatus() async {
         guard !busy else { return }
         do {
-            let selectedSpaceID = page?.selectedSpaceId
+            let selectedSpaceID = page?.selectedSpaceID
             let revision = space?.memoryRevision
             let count = page?.documents.count ?? 0
             var fresh = try await fetchPage(spaceID: selectedSpaceID)
-            while let cursor = fresh.nextCursor, fresh.documents.count < count {
-                let next = try await fetchPage(spaceID: selectedSpaceID, cursor: cursor)
+            while fresh.hasNextCursor, fresh.documents.count < count {
+                let next = try await fetchPage(
+                    spaceID: selectedSpaceID,
+                    cursor: fresh.nextCursor
+                )
                 fresh.documents += next.documents
-                fresh.nextCursor = next.nextCursor
+                if next.hasNextCursor { fresh.nextCursor = next.nextCursor }
+                else { fresh.clearNextCursor() }
             }
-            guard !busy, page?.selectedSpaceId == selectedSpaceID, space?.memoryRevision == revision else { return }
+            guard !busy,
+                  page?.selectedSpaceID == selectedSpaceID,
+                  space?.memoryRevision == revision else { return }
             page = fresh
         } catch { errorMessage = error.localizedDescription }
     }
+
+    private func timestamp(_ value: String?) throws -> Google_Protobuf_Timestamp? {
+        guard let value else { return nil }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let date = formatter.date(from: value) ?? ISO8601DateFormatter().date(from: value)
+        guard let date else { throw MobileAPIError.invalidRequest }
+        return Google_Protobuf_Timestamp(date: date)
+    }
+
     func save(_ input: DmMemoryWrite, documentID: String?) async -> Bool {
         guard !busy else { return false }
         busy = true; errorMessage = nil
         defer { busy = false }
-        struct Response: Decodable, Sendable { let documentId: String; let version: Int; let replayed: Bool }
         do {
             try requireScope()
-            _ = try await api.send(path + "/documents" + (documentID.map { "/" + $0 } ?? ""),
-                                   method: documentID == nil ? "POST" : "PATCH", token: token,
-                                   body: input, as: Response.self)
-            page = try await fetchPage(spaceID: page?.selectedSpaceId)
+            if let documentID {
+                guard let expectedVersion = input.expectedVersion else {
+                    throw MobileAPIError.invalidRequest
+                }
+                var request = BriarAPI_UpdateDmMemoryDocumentRequest()
+                request.organizationID = organizationID
+                request.channelID = channelID
+                request.documentID = documentID
+                request.requestID = input.requestId
+                if let memorySpaceID = input.memorySpaceId { request.memorySpaceID = memorySpaceID }
+                request.expectedVersion = expectedVersion
+                request.title = input.title
+                request.body = input.body
+                request.memoryClass = input.memoryClass
+                request.sourceLanguage = input.sourceLanguage
+                if let observedAt = try timestamp(input.observedAt) { request.observedAt = observedAt }
+                if let validUntil = try timestamp(input.validUntil) { request.validUntil = validUntil }
+                _ = try await service.updateDmMemoryDocument(request: request, headers: [:]).briarValue()
+            } else {
+                var request = BriarAPI_CreateDmMemoryDocumentRequest()
+                request.organizationID = organizationID
+                request.channelID = channelID
+                request.requestID = input.requestId
+                if let memorySpaceID = input.memorySpaceId { request.memorySpaceID = memorySpaceID }
+                request.title = input.title
+                request.body = input.body
+                request.memoryClass = input.memoryClass
+                request.sourceLanguage = input.sourceLanguage
+                if let observedAt = try timestamp(input.observedAt) { request.observedAt = observedAt }
+                if let validUntil = try timestamp(input.validUntil) { request.validUntil = validUntil }
+                _ = try await service.createDmMemoryDocument(request: request, headers: [:]).briarValue()
+            }
+            page = try await fetchPage(spaceID: page?.selectedSpaceID)
             return true
         } catch { errorMessage = error.localizedDescription; return false }
     }
-    func setUse(_ enabled: Bool, newSpace: Bool = false, automatic: Bool? = nil) async {
-        struct Input: Encodable, Sendable {
-            let requestId: String; let memorySpaceId: String?; let expectedMemoryRevision: Int
-            let useEnabled: Bool; let autoEnabled: Bool
-        }
-        struct Response: Decodable, Sendable { let space: DmMemorySpace }
+    func setUse(_ enabled: Bool, automatic: Bool = false, newSpace: Bool = false) async {
         guard !busy else { return }
         busy = true; errorMessage = nil
         defer { busy = false }
         do {
             try requireScope()
-            let result = try await api.send(path + "/settings", method: "PATCH", token: token,
-                body: Input(requestId: UUID().uuidString.lowercased(), memorySpaceId: newSpace ? nil : space?.id,
-                            expectedMemoryRevision: newSpace ? 0 : space?.memoryRevision ?? 0,
-                            useEnabled: enabled, autoEnabled: enabled && !newSpace && (automatic ?? space?.autoEnabled ?? false)), as: Response.self)
+            var request = BriarAPI_UpdateDmMemorySettingsRequest()
+            request.organizationID = organizationID
+            request.channelID = channelID
+            request.requestID = UUID().uuidString.lowercased()
+            if !newSpace, let space { request.memorySpaceID = space.id }
+            request.expectedMemoryRevision = newSpace ? 0 : space?.memoryRevision ?? 0
+            request.useEnabled = enabled
+            request.autoEnabled = automatic
+            let result = try await service.updateDmMemorySettings(request: request, headers: [:]).briarValue()
+            guard result.hasSpace else { throw MobileAPIError.invalidResponse }
             page = try await fetchPage(spaceID: result.space.id)
         } catch { errorMessage = error.localizedDescription }
     }
@@ -244,21 +244,27 @@ final class DmMemoryStore: ObservableObject, Identifiable {
         defer { busy = false }
         do {
             try requireScope()
-            try await api.sendVoid(path + "/documents/" + id, method: "DELETE", token: token, body: nil)
-            page = try await fetchPage(spaceID: page?.selectedSpaceId)
+            var request = BriarAPI_DeleteDmMemoryDocumentRequest()
+            request.organizationID = organizationID
+            request.channelID = channelID
+            request.documentID = id
+            _ = try await service.deleteDmMemoryDocument(request: request, headers: [:]).briarValue()
+            page = try await fetchPage(spaceID: page?.selectedSpaceID)
         } catch { errorMessage = error.localizedDescription }
     }
     func retryLearning(_ jobID: String) async {
-        struct Input: Encodable, Sendable { let requestId: String; let revocationEpoch: Int }
-        struct Response: Decodable, Sendable { let accepted: Bool; let replayed: Bool }
         guard !busy, let space else { return }
         busy = true; errorMessage = nil
         defer { busy = false }
         do {
             try requireScope()
-            _ = try await api.send(path + "/jobs/" + jobID + "/retry", method: "POST", token: token,
-                                   body: Input(requestId: UUID().uuidString.lowercased(),
-                                               revocationEpoch: space.revocationEpoch), as: Response.self)
+            var request = BriarAPI_RetryDmMemoryLearningRequest()
+            request.organizationID = organizationID
+            request.channelID = channelID
+            request.jobID = jobID
+            request.requestID = UUID().uuidString.lowercased()
+            request.revocationEpoch = space.revocationEpoch
+            _ = try await service.retryDmMemoryLearning(request: request, headers: [:]).briarValue()
             page = try await fetchPage(spaceID: space.id)
         } catch { errorMessage = error.localizedDescription }
     }
@@ -272,7 +278,8 @@ final class DmMemoryStore: ObservableObject, Identifiable {
             let destination = FileManager.default.temporaryDirectory
                 .appendingPathComponent("dm-memory-" + id.uuidString, isDirectory: true)
                 .appendingPathComponent("briar-memory-" + space.id + ".zip")
-            let file = try await api.download(path + "/export" + query(spaceID: space.id), token: token, to: destination)
+            let path = "/organizations/\(organizationID)/channels/\(channelID)/memory/export?memorySpaceId=\(space.id)"
+            let file = try await downloadClient.download(path, token: token, to: destination)
             guard scopeIsCurrent() else {
                 try? FileManager.default.removeItem(at: file)
                 throw MobileAPIError.invalidRequest
@@ -314,17 +321,17 @@ struct DmMemoryView: View {
                 }
                 if let page = store.page {
                     Section(text("설정", "Settings")) {
-                        if page.spaces.count > 1 {
+                        if page.spaces.count > 1, page.hasSelectedSpaceID {
                             Picker(text("기억 공간", "Memory space"), selection: Binding(
-                                get: { page.selectedSpaceId ?? "" },
+                                get: { page.selectedSpaceID },
                                 set: { value in Task { await store.load(spaceID: value) } }
                             )) {
-                                ForEach(page.spaces) { space in
-                                    Text("\(space.status) · \(space.createdAt.prefix(10))").tag(space.id)
+                                ForEach(page.spaces, id: \.id) { space in
+                                    Text(spaceLabel(space)).tag(space.id)
                                 }
                             }
                         }
-                        if store.space?.status == "closed" {
+                        if store.space?.status == .closed {
                             Text(text("참여자가 바뀌어 닫힌 공간입니다. 읽기·삭제·내보내기만 가능합니다.",
                                       "This space was closed after a participant change. Read, delete or export only."))
                             if page.eligible {
@@ -342,19 +349,21 @@ struct DmMemoryView: View {
                         Toggle(page.capabilities.automaticLearning
                                ? text("대화에서 자동으로 기억", "Learn memories from this conversation")
                                : text("자동 학습 · 아직 사용할 수 없음", "Automatic learning · not available yet"),
-                               isOn: Binding(get: { store.space?.autoEnabled ?? false },
-                                             set: { enabled in Task { await store.setUse(true, automatic: enabled) } }))
+                               isOn: Binding(
+                                get: { store.space?.autoEnabled ?? false },
+                                set: { enabled in Task { await store.setUse(true, automatic: enabled) } }
+                               ))
                             .disabled(!store.writable || store.space?.useEnabled != true ||
                                       (!page.capabilities.automaticLearning && store.space?.autoEnabled != true))
                             .accessibilityIdentifier("dm-memory-automatic")
-                        Text(text("기억 사용을 먼저 켜세요. 자동 학습은 켠 시점 이후의 대화만 처리하며 별도 모델과 예산을 사용합니다. 직접 편집한 기억은 덮어쓰지 않습니다.",
-                                  "Enable memory use first. Automatic learning processes conversations after opt-in with separate models and budgets. It cannot overwrite memories you edited."))
+                        Text(text("기억 사용을 먼저 켜세요. 자동 학습은 켠 시점 이후의 대화만 처리하며 직접 편집한 기억은 덮어쓰지 않습니다.",
+                                  "Enable memory first. Automatic learning only processes later conversations and never overwrites user-edited memories."))
                             .font(.caption).foregroundStyle(.secondary)
-                        if let learning = page.learning { learningStatus(learning) }
+                        if page.hasLearning { learningStatus(page.learning) }
                     }
                     Section(text("저장된 기억", "Saved memories")) {
                         if page.documents.isEmpty { Text(text("저장된 기억이 없습니다.", "No saved memories.")) }
-                        ForEach(page.documents) { document in
+                        ForEach(page.documents, id: \.id) { document in
                             Button {
                                 Task {
                                     do { draft = Draft(document: try await store.document(document.id)) }
@@ -363,15 +372,15 @@ struct DmMemoryView: View {
                             } label: {
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(document.title).foregroundStyle(.primary)
-                                    Text("\(document.memoryClass) · v\(document.version) · \(indexLabel(document.indexState))")
+                                    Text("\(document.memoryClass.label) · v\(document.version) · \(indexLabel(document.indexState))")
                                         .font(.caption).foregroundStyle(.secondary)
-                                    if let validUntil = document.validUntil {
-                                        let expired = memoryDate(validUntil) <= observedNow
-                                        Text("\(expired ? text("만료됨", "Expired") : text("유효기간", "Valid until")) · \(validUntil)")
+                                    if document.hasValidUntil {
+                                        let validUntil = document.validUntil.date
+                                        Text("\(validUntil <= observedNow ? text("만료됨", "Expired") : text("유효기간", "Valid until")) · \(validUntil.ISO8601Format())")
                                             .font(.caption).foregroundStyle(.secondary)
                                     }
                                     if document.protectedByUser { Text(text("사용자 보호", "User protected")).font(.caption) }
-                                    if document.conflicted || document.status != "active" {
+                                    if document.conflicted || document.status != .active {
                                         Text(text("충돌 또는 근거 변경 · 확인 필요", "Conflict or changed evidence · needs review"))
                                             .font(.caption).foregroundStyle(.orange)
                                     }
@@ -384,7 +393,7 @@ struct DmMemoryView: View {
                                 }
                             }
                         }
-                        if page.nextCursor != nil {
+                        if page.hasNextCursor {
                             Button(text("더 보기", "Load more")) { Task { await store.load(more: true) } }
                         }
                         if store.writable {
@@ -426,70 +435,88 @@ struct DmMemoryView: View {
         }
     }
 
+    private func indexLabel(_ value: BriarAPI_DmMemoryIndexState) -> String {
+        switch value {
+        case .ready: text("검색 가능", "Search ready")
+        case .failed: text("색인 실패", "Index failed")
+        case .pending: text("색인 대기", "Awaiting index")
+        case .unspecified, .UNRECOGNIZED: text("알 수 없음", "Unknown")
+        }
+    }
+
     @ViewBuilder
-    private func learningStatus(_ learning: DmMemoryLearningStatus) -> some View {
-        if let configuration = learning.configuration {
+    private func learningStatus(_ learning: BriarAPI_DmMemoryLearningStatus) -> some View {
+        if learning.hasConfiguration {
+            let configuration = learning.configuration
             Text("\(text("제안 / 검증 모델", "Proposer / verifier model")) · \(configuration.proposer.model) / \(configuration.verifier.model)")
                 .font(.caption)
-            Text("OpenRouter · \(configuration.proposer.provider) / \(configuration.verifier.provider)").font(.caption)
+            Text("OpenRouter · \(configuration.proposer.provider) / \(configuration.verifier.provider)")
+                .font(.caption)
             Text("\(text("오늘 호출 / 하루 한도", "Calls today / daily limit")) · \(learning.callsToday) / \(configuration.spaceDailyCalls)")
                 .font(.caption)
             Text(text("오늘 예약 비용 / 하루 한도", "Reserved cost today / daily limit") + " · " +
                  String(format: "$%.4f / $%.2f USD", Double(learning.reservedMicroUsdToday) / 1_000_000,
-                        Double(configuration.spaceDailyMicroUsd) / 1_000_000)).font(.caption)
+                        Double(configuration.spaceDailyMicroUsd) / 1_000_000))
+                .font(.caption)
         }
         Text("\(text("대기·진행 작업", "Pending or running jobs")) · \(learning.pendingJobs) / \(text("실패 기록", "Failed jobs")) · \(learning.failedJobs)")
             .font(.caption)
-        if let job = learning.lastJob {
-            let state = job.status == "running" ? job.stage ?? job.status : job.status
-            let labels = ["pending": text("실행 대기", "Waiting to run"), "running": text("처리 중", "Processing"),
-                          "retry_wait": text("재시도 대기", "Waiting to retry"), "failed": text("학습 실패 · 기억은 변경하지 않음", "Learning failed; memories unchanged"),
-                          "cancelled": text("취소됨", "Cancelled"), "succeeded": text("기억 저장 완료", "Memories saved"),
-                          "no_change": text("검토 완료 · 새 기억 없음", "Reviewed; no new memories"),
-                          "proposing": text("기억 변경안 생성 중", "Proposing memory changes"),
-                          "verifying": text("원본 근거 검증 중", "Verifying original evidence"),
-                          "committing": text("검증된 기억 저장 중", "Saving verified memories")]
-            Text(text("학습 상태", "Learning status") + " · " + (labels[state] ?? text("확인 필요", "Needs review"))).font(.caption)
-            if let code = job.errorCode {
-                Text(learningError(code)).font(.caption).foregroundStyle(.red)
+        if learning.hasLastJob {
+            Text(text("학습 상태", "Learning status") + " · " + learningState(learning.lastJob))
+                .font(.caption)
+            if learning.lastJob.hasErrorCode {
+                Text(learningError(learning.lastJob.errorCode))
+                    .font(.caption).foregroundStyle(.red)
             }
-            if let retryable = learning.retryableJob {
+            if learning.hasRetryableJob {
                 Button(text("실패한 학습 다시 시도", "Retry failed learning")) {
-                    Task { await store.retryLearning(retryable.id) }
+                    Task { await store.retryLearning(learning.retryableJob.id) }
                 }.disabled(store.busy)
             }
-        } else { Text(text("아직 학습 작업 없음", "No learning jobs yet")).font(.caption) }
+        } else {
+            Text(text("아직 학습 작업 없음", "No learning jobs yet")).font(.caption)
+        }
     }
 
-    private func learningError(_ code: String) -> String {
+    private func learningState(_ job: BriarAPI_DmMemoryLearningJob) -> String {
+        if job.status == .running, job.hasStage {
+            switch job.stage {
+            case .proposing: return text("기억 변경안 생성 중", "Proposing memory changes")
+            case .verifying: return text("원본 근거 검증 중", "Verifying original evidence")
+            case .committing: return text("검증된 기억 저장 중", "Saving verified memories")
+            case .unspecified, .UNRECOGNIZED: break
+            }
+        }
+        switch job.status {
+        case .pending: return text("실행 대기", "Waiting to run")
+        case .running: return text("처리 중", "Processing")
+        case .retryWait: return text("재시도 대기", "Waiting to retry")
+        case .failed: return text("학습 실패 · 기억은 변경하지 않음", "Learning failed; memories unchanged")
+        case .cancelled: return text("취소됨", "Cancelled")
+        case .succeeded: return text("기억 저장 완료", "Memories saved")
+        case .noChange: return text("검토 완료 · 새 기억 없음", "Reviewed; no new memories")
+        case .unspecified, .UNRECOGNIZED: return text("확인 필요", "Needs review")
+        }
+    }
+
+    private func learningError(_ code: BriarAPI_DmMemoryLearningFailureCode) -> String {
         switch code {
-        case "invalid_proposal": return text("변경안 형식이나 근거가 유효하지 않아 저장하지 않았습니다.", "The proposal or evidence was invalid. No changes were saved.")
-        case "verification_rejected": return text("별도 검증이 변경안을 거절했습니다. 저장된 기억은 바뀌지 않았습니다.", "Independent verification rejected the proposal. Saved memories are unchanged.")
-        case "stale": return text("근거나 기억이 바뀌어 최신 입력으로 다시 처리합니다.", "Evidence or memories changed. Processing will use current input.")
-        case "scope_revoked": return text("기억 설정이나 접근 권한이 바뀌어 작업을 중단했습니다.", "Memory settings or access changed. The job stopped.")
-        case "budget_exhausted": return text("설정된 호출·비용 한도를 소진했습니다. 미처리 대화는 남아 있습니다.", "The call or cost limit was reached. Unprocessed conversations remain queued.")
-        case "model_unavailable": return text("학습 모델에 연결하지 못했습니다. 대화와 기존 기억은 유지됩니다.", "The learning model could not be reached. Conversations and existing memories remain.")
-        case "model_timeout": return text("학습 모델 응답 시간이 초과됐습니다.", "The learning model timed out.")
-        case "model_credentials": return text("학습 모델 인증이나 잔액 설정을 확인해야 합니다.", "Check learning model credentials or account balance.")
-        case "model_configuration": return text("설정된 학습 모델·제공자·출력 계약을 사용할 수 없습니다.", "The configured model, provider or output contract is unavailable.")
-        case "input_capacity": return text("입력 한도를 초과해 학습을 중단했습니다. 일부만 저장하지 않았습니다.", "The input exceeded its limit. No partial memories were saved.")
-        default: return text("학습 실패 기록을 확인하세요.", "Check the learning failure record.")
+        case .invalidProposal: return text("변경안 형식이나 근거가 유효하지 않아 저장하지 않았습니다.", "The proposal or evidence was invalid. No changes were saved.")
+        case .verificationRejected: return text("별도 검증이 변경안을 거절했습니다. 저장된 기억은 바뀌지 않았습니다.", "Independent verification rejected the proposal. Saved memories were unchanged.")
+        case .stale: return text("근거나 기억이 바뀌어 최신 입력으로 다시 처리합니다.", "Evidence or memories changed. Processing will use current input.")
+        case .scopeRevoked: return text("기억 설정이나 접근 권한이 바뀌어 작업을 중단했습니다.", "Memory settings or access changed. The job stopped.")
+        case .budgetExhausted: return text("설정된 호출·비용 한도를 소진했습니다.", "The call or cost limit was reached.")
+        case .modelUnavailable: return text("학습 모델에 연결하지 못했습니다.", "The learning model could not be reached.")
+        case .modelTimeout: return text("학습 모델 응답 시간이 초과됐습니다.", "The learning model timed out.")
+        case .modelCredentials: return text("학습 모델 인증이나 잔액 설정을 확인해야 합니다.", "Check learning model credentials or account balance.")
+        case .modelConfiguration: return text("설정된 학습 모델·제공자·출력 계약을 사용할 수 없습니다.", "The configured model, provider or output contract is unavailable.")
+        case .inputCapacity: return text("입력 한도를 초과해 학습을 중단했습니다.", "The input exceeded its limit.")
+        case .unspecified, .UNRECOGNIZED: return text("학습 실패 기록을 확인하세요.", "Check the learning failure record.")
         }
     }
 
-    private func memoryDate(_ value: String) -> Date {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = formatter.date(from: value) { return date }
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter.date(from: value) ?? .distantFuture
-    }
-    private func indexLabel(_ value: String) -> String {
-        switch value {
-        case "ready": text("검색 가능", "Search ready")
-        case "failed": text("색인 실패", "Index failed")
-        default: text("색인 대기", "Awaiting index")
-        }
+    private func spaceLabel(_ space: DmMemorySpace) -> String {
+        "\(space.status) · \(dmMemoryTimestamp(space.createdAt).prefix(10))"
     }
 }
 
@@ -503,8 +530,13 @@ private struct DmMemoryEditor: View {
     init(store: DmMemoryStore, document: DmMemoryDocument?, locale: CompanionLocale) {
         self.store = store; self.document = document; self.locale = locale
         _draft = State(initialValue: DmMemoryWrite(memorySpaceId: store.space?.id, expectedVersion: document?.version,
-            title: document?.title ?? "", body: document?.body ?? "", memoryClass: document?.memoryClass ?? "profile",
-            sourceLanguage: document?.sourceLanguage ?? "und", observedAt: document?.observedAt, validUntil: document?.validUntil))
+            title: document?.title ?? "",
+            body: document?.hasBody == true ? document?.body ?? "" : "",
+            memoryClass: document?.memoryClass ?? .profile,
+            sourceLanguage: document?.sourceLanguage ?? "und",
+            observedAt: document?.hasObservedAt == true ? dmMemoryTimestamp(document!.observedAt) : nil,
+            validUntil: document?.hasValidUntil == true ? dmMemoryTimestamp(document!.validUntil) : nil
+        ))
     }
     var body: some View {
         NavigationStack {
@@ -515,7 +547,9 @@ private struct DmMemoryEditor: View {
                     TextEditor(text: $draft.body).frame(minHeight: 160).accessibilityLabel(text("기억 본문", "Memory text"))
                     Text("\(draft.body.utf8.count) / 65536 bytes").font(.caption)
                     Picker(text("분류", "Category"), selection: $draft.memoryClass) {
-                        ForEach(["profile", "log", "note"], id: \.self) { Text($0) }
+                        ForEach([BriarAPI_DmMemoryClass.profile, .log, .note], id: \.rawValue) {
+                            Text($0.label)
+                        }
                     }
                     TextField(text("원본 언어: ko, en, mul, und", "Source language: ko, en, mul, und"), text: $draft.sourceLanguage)
                         .textInputAutocapitalization(.never).autocorrectionDisabled()
@@ -532,9 +566,9 @@ private struct DmMemoryEditor: View {
                             DmMemoryHistoryView(store: store, documentID: document.id, locale: locale)
                         }
                         .accessibilityIdentifier("dm-memory-history")
-                        Text(document.updatedAt).font(.caption)
-                        ForEach(Array((document.sources ?? []).enumerated()), id: \.offset) { _, source in
-                            Text("\(source.type):\(source.id)@\(source.version)").font(.caption).textSelection(.enabled)
+                        Text(dmMemoryTimestamp(document.updatedAt)).font(.caption)
+                        ForEach(Array(document.sources.enumerated()), id: \.offset) { _, source in
+                            Text("\(source.type.label):\(source.id)@\(source.version)").font(.caption).textSelection(.enabled)
                         }
                         Button(text("기억에서 삭제", "Forget memory"), role: .destructive) {
                             Task { await store.forget(document.id); if store.errorMessage == nil { dismiss() } }
@@ -565,7 +599,6 @@ private struct DmMemoryEditor: View {
     }
 }
 
-
 private struct DmMemoryHistoryView: View {
     @ObservedObject var store: DmMemoryStore
     let documentID: String
@@ -581,24 +614,27 @@ private struct DmMemoryHistoryView: View {
             if let error { Text(error).foregroundStyle(.red) }
             if loading { ProgressView() }
             if let history {
-                ForEach(history.revisions) { revision in
-                    Button("v\(revision.version) · \(revision.createdAt) · \(revision.origin)") {
+                ForEach(history.revisions, id: \.version) { revision in
+                    Button("v\(revision.version) · \(dmMemoryTimestamp(revision.createdAt)) · \(revision.origin.label)") {
                         Task {
                             loading = true
                             defer { loading = false }
-                            do { preview = try await store.document(documentID, version: revision.version) }
+                            do { preview = try await store.document(documentID, version: Int(revision.version)) }
                             catch { self.error = error.localizedDescription }
                         }
-                    }.accessibilityIdentifier("dm-memory-revision-\(revision.version)")
+                    }
+                    .accessibilityIdentifier("dm-memory-revision-\(revision.version)")
                 }
-                if let cursor = history.nextCursor {
-                    Button(text("더 보기", "Load more")) { Task { await load(cursor: cursor) } }
+                if history.hasNextCursor {
+                    Button(text("더 보기", "Load more")) {
+                        Task { await load(cursor: history.nextCursor) }
+                    }
                 }
             }
             if let preview {
                 Section(text("이전 버전 · 읽기 전용", "Earlier version · read only")) {
                     Text("v\(preview.version)").font(.caption)
-                    Text(preview.body ?? "").textSelection(.enabled)
+                    Text(preview.body).textSelection(.enabled)
                         .accessibilityIdentifier("dm-memory-revision-body")
                 }
             }
@@ -607,7 +643,8 @@ private struct DmMemoryHistoryView: View {
         .navigationTitle(text("변경 이력", "Revision history"))
         .task { await load() }
     }
-    private func load(cursor: Int? = nil) async {
+
+    private func load(cursor: UInt32? = nil) async {
         guard !loading else { return }
         loading = true
         defer { loading = false }
@@ -633,24 +670,34 @@ struct DmMemoryCitationView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     if let document {
                         Text(document.title).font(.headline)
-                        Text("v\(document.version) · \(document.memoryClass)").font(.caption)
-                        Text(document.body ?? (locale == .ko ? "기억을 불러오지 못했습니다." : "Memory is unavailable.")).textSelection(.enabled)
+                        Text("v\(document.version) · \(document.memoryClass.label)").font(.caption)
+                        Text(document.body).textSelection(.enabled)
                             .accessibilityIdentifier("dm-memory-citation-body")
                     } else if let error { Text(error).foregroundStyle(.red) }
                     else { ProgressView() }
-                }.frame(maxWidth: .infinity, alignment: .leading).padding()
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding()
             }
             .navigationTitle(locale == .ko ? "참고한 기억" : "Referenced memory")
-            .toolbar { ToolbarItem(placement: .confirmationAction) {
-                Button(locale == .ko ? "닫기" : "Close") { dismiss() }
-            } }
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(locale == .ko ? "닫기" : "Close") { dismiss() }
+                }
+            }
         }
         .task(id: reference.id) {
-            document = nil; error = nil
+            document = nil
+            error = nil
             do {
-                let loaded = try await store.document(reference.documentId.uuidString.lowercased(), version: reference.version)
+                let loaded = try await store.document(
+                    reference.documentId.uuidString.lowercased(),
+                    version: reference.version
+                )
                 if !Task.isCancelled { document = loaded }
-            } catch { if !Task.isCancelled { self.error = error.localizedDescription } }
+            } catch {
+                if !Task.isCancelled { self.error = error.localizedDescription }
+            }
         }
     }
 }

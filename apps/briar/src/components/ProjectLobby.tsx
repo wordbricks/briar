@@ -23,7 +23,7 @@ import { IssueDifficultyIcon } from "./hunt/IssueDifficultyIcon";
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
 import { formatUsageDuration } from "../lib/agent-usage";
-import type { RepositoryReadiness } from "../lib/project-connection";
+import type { RepositoryReadiness } from "../generated/tauri";
 import {
   isLocalProjectRepositoryReady,
   localProjectReadiness,

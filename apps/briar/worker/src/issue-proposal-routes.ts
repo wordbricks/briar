@@ -2,13 +2,11 @@ import { channelExecutionProposalAcceptInputSchema } from "../../src/lib/channel
 import {
   approveAgentSkillExecutionProposal,
 } from "./agent-skill-execution-approval";
-import type { BriarAuth } from "./auth";
 import { approvedIssueCreation } from "./channel-proposal-helpers";
 import {
   acceptIssueCreateProposal,
   acceptIssueReworkProposal,
   acceptIssueUpdateProposal,
-  agentSkillExecutionApprovalTablesAvailable,
   getHuntRunForProject,
   getIssueActionProposal,
   getIssueAgentSkillExecutionProposal,
@@ -16,13 +14,12 @@ import {
   getIssueReworkProposal,
   getProject,
   HuntTransitionError,
-  issueExecutionApprovalTablesAvailable,
   listIssueExecutionProposals,
   reserveIssueCreateProposalApproval,
   reserveIssueExecutionProposalApproval,
   reworkHuntRun,
 } from "./db";
-import { HttpError, json } from "./http-response";
+import { HttpError } from "./http-response";
 import { hasOrganizationCapability } from "./organization-access";
 import {
   issueActionProposalJson,
@@ -35,261 +32,234 @@ import {
   decodeIssueCreateProposalAction,
   decodeIssueUpdateProposalAction,
 } from "./issue-request-contract";
-import { createIssueWithAttachments } from "./issue-write-service";
+import { createProjectIssue } from "./issue-core-routes";
 import { newConversationProposalIssueSourceKey } from "./proposal-issue-source";
-import { readJson } from "./request-readers";
 import { decodeRequestSync } from "./request-schema";
-import { requireSession } from "./session-auth";
 import { dispatchHuntRun, WorkerConflictError } from "./workers";
 
 const decodeChannelExecutionProposalAcceptInput = decodeRequestSync(
   channelExecutionProposalAcceptInputSchema,
 );
 
-export async function handleIssueProposalRoute(input: {
-  request: Request;
-  url: URL;
-  auth: BriarAuth;
+type IssueProposalApplicationInput = {
   db: D1Database;
-  attachmentsBucket: R2Bucket;
   archivesBucket: R2Bucket;
-}): Promise<Response | undefined> {
-  const {
-    request,
-    url,
-    auth,
-    db,
-    attachmentsBucket,
-    archivesBucket,
-  } = input;
+  projectId: string;
+  conversationRunId: string;
+  proposalId: string;
+  userId: string;
+};
 
-  const issueReworkProposalAcceptMatch = url.pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/rework-proposals\/([0-9a-f-]+)\/accept$/u,
-  );
-  if (issueReworkProposalAcceptMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(
-      db,
-      issueReworkProposalAcceptMatch[1],
-      session.user.id,
-    );
-    if (!project) throw new HttpError(404, "Project not found");
-    if (!hasOrganizationCapability(project.member_role, "issues:execute")) {
-      throw new HttpError(403, "Issue execution permission required");
-    }
-    const proposal = await getIssueReworkProposal(
-      db,
-      project.id,
-      issueReworkProposalAcceptMatch[2],
-      issueReworkProposalAcceptMatch[3],
-    );
-    if (!proposal) throw new HttpError(404, "Rework proposal not found");
-    if (proposal.status === "accepted") {
-      return json({
-        proposal: issueReworkProposalJson(proposal),
-        outcome: "already_accepted",
-        attempt: proposal.expected_attempt,
-        revision: proposal.applied_revision,
-        workflowStage: proposal.workflow_stage,
-      });
-    }
-    const acceptedAt = new Date().toISOString();
-    try {
-      const rework = await reworkHuntRun(db, project.id, {
-        runId: proposal.run_id,
-        workflowStage: proposal.workflow_stage,
-        requestId: proposal.id,
-        actor: `briar-app:${session.user.id}`,
-        reason: proposal.reason,
-        occurredAt: acceptedAt,
-        completed: {
-          expectedAttempt: proposal.expected_attempt,
-          expectedRevision: proposal.expected_revision,
-        },
-      });
-      if (rework.outcome === "not_found" || rework.revision === null) {
-        throw new HttpError(404, "Run not found");
-      }
-      const accepted = await acceptIssueReworkProposal(db, {
-        projectId: project.id,
-        runId: proposal.run_id,
-        proposalId: proposal.id,
-        userId: session.user.id,
-        acceptedAt,
-        appliedRevision: rework.revision,
-      }) ?? await getIssueReworkProposal(
-        db,
-        project.id,
-        proposal.run_id,
-        proposal.id,
-      );
-      if (!accepted) throw new HttpError(409, "Rework proposal changed");
-      return json({
-        proposal: issueReworkProposalJson(accepted),
-        outcome:
-          rework.outcome === "already_reworked"
-            ? "already_accepted"
-            : "accepted",
-        attempt: rework.attempt,
-        revision: rework.revision,
-        workflowStage: rework.workflowStage,
-      });
-    } catch (error) {
-      if (error instanceof HuntTransitionError) {
-        throw new HttpError(409, error.message, "REWORK_PROPOSAL_CONFLICT");
-      }
-      throw error;
-    }
+async function requireIssueProposalProject(
+  input: IssueProposalApplicationInput,
+  capability: "issues:execute" | "issues:write",
+  deniedMessage: string,
+) {
+  const project = await getProject(input.db, input.projectId, input.userId);
+  if (!project) throw new HttpError(404, "Project not found");
+  if (!hasOrganizationCapability(project.member_role, capability)) {
+    throw new HttpError(403, deniedMessage);
   }
+  return project;
+}
 
-  const issueActionProposalAcceptMatch = url.pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/issue-action-proposals\/([0-9a-f-]+)\/accept$/u,
+export async function acceptProjectIssueReworkProposal(
+  input: IssueProposalApplicationInput,
+) {
+  const project = await requireIssueProposalProject(
+    input,
+    "issues:execute",
+    "Issue execution permission required",
   );
-  if (issueActionProposalAcceptMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(
-      db,
-      issueActionProposalAcceptMatch[1],
-      session.user.id,
-    );
-    if (!project) throw new HttpError(404, "Project not found");
-    if (!hasOrganizationCapability(project.member_role, "issues:write")) {
-      throw new HttpError(403, "Issue editing permission required");
+  const proposal = await getIssueReworkProposal(
+    input.db,
+    project.id,
+    input.conversationRunId,
+    input.proposalId,
+  );
+  if (!proposal) throw new HttpError(404, "Rework proposal not found");
+  if (proposal.status === "accepted") {
+    return {
+      proposal: issueReworkProposalJson(proposal),
+      outcome: "already_accepted" as const,
+      attempt: proposal.expected_attempt,
+      revision: proposal.applied_revision,
+      workflowStage: proposal.workflow_stage,
+    };
+  }
+  const acceptedAt = new Date().toISOString();
+  try {
+    const rework = await reworkHuntRun(input.db, project.id, {
+      runId: proposal.run_id,
+      workflowStage: proposal.workflow_stage,
+      requestId: proposal.id,
+      actor: `briar-app:${input.userId}`,
+      reason: proposal.reason,
+      occurredAt: acceptedAt,
+      completed: {
+        expectedAttempt: proposal.expected_attempt,
+        expectedRevision: proposal.expected_revision,
+      },
+    });
+    if (rework.outcome === "not_found" || rework.revision === null) {
+      throw new HttpError(404, "Run not found");
     }
-    const proposal = await getIssueActionProposal(
-      db,
+    const accepted = await acceptIssueReworkProposal(input.db, {
+      projectId: project.id,
+      runId: proposal.run_id,
+      proposalId: proposal.id,
+      userId: input.userId,
+      acceptedAt,
+      appliedRevision: rework.revision,
+    }) ?? await getIssueReworkProposal(
+      input.db,
       project.id,
-      issueActionProposalAcceptMatch[2],
-      issueActionProposalAcceptMatch[3],
+      proposal.run_id,
+      proposal.id,
     );
-    if (!proposal) throw new HttpError(404, "Issue action proposal not found");
-    if (proposal.status === "accepted") {
-      const executionProposal = (await listIssueExecutionProposals(
-        db,
-        project.id,
-        proposal.conversation_run_id,
-      )).find(
-        (candidate) => candidate.origin_create_proposal_id === proposal.id,
-      ) ?? null;
-      return json({
-        proposal: issueActionProposalJson(proposal),
-        executionProposal: executionProposal
-          ? issueExecutionProposalJson(executionProposal)
-          : null,
-        outcome: "already_accepted",
-        resultRunId: proposal.result_run_id,
-      });
+    if (!accepted) throw new HttpError(409, "Rework proposal changed");
+    return {
+      proposal: issueReworkProposalJson(accepted),
+      outcome: rework.outcome === "already_reworked"
+        ? "already_accepted" as const
+        : "accepted" as const,
+      attempt: rework.attempt,
+      revision: rework.revision,
+      workflowStage: rework.workflowStage,
+    };
+  } catch (error) {
+    if (error instanceof HuntTransitionError) {
+      throw new HttpError(409, error.message, "REWORK_PROPOSAL_CONFLICT");
     }
+    throw error;
+  }
+}
 
-    const acceptedAt = new Date().toISOString();
-    const rawPayload = JSON.parse(proposal.payload_json);
-    if (proposal.action_type === "request_issue_update") {
-      const action = decodeIssueUpdateProposalAction({
-        type: proposal.action_type,
-        ...rawPayload,
-      });
-      const run = await getHuntRunForProject(
-        db,
-        project.id,
-        proposal.conversation_run_id,
-      );
-      if (!run) throw new HttpError(404, "Run not found");
-      const hasDescription = Object.prototype.hasOwnProperty.call(
-        action.changes,
-        "description",
-      );
-      const hasPriority = Object.prototype.hasOwnProperty.call(
-        action.changes,
-        "priority",
-      );
-      const accepted = await acceptIssueUpdateProposal(db, {
-        projectId: project.id,
-        conversationRunId: proposal.conversation_run_id,
-        proposalId: proposal.id,
-        userId: session.user.id,
-        acceptedAt,
-        title: action.changes.title ?? run.title,
-        description: hasDescription
-          ? action.changes.description ?? null
-          : run.issue_description,
-        priority: hasPriority
-          ? action.changes.priority ?? null
-          : run.priority,
-      });
-      if (!accepted) {
-        throw new HttpError(
-          409,
-          "The issue changed after this proposal was created",
-          "ISSUE_ACTION_PROPOSAL_CONFLICT",
-        );
-      }
-      return json({
-        proposal: issueActionProposalJson(accepted),
-        outcome: "accepted",
-        resultRunId: accepted.result_run_id,
-      });
-    }
+export async function acceptProjectIssueActionProposal(
+  input: IssueProposalApplicationInput,
+) {
+  const project = await requireIssueProposalProject(
+    input,
+    "issues:write",
+    "Issue editing permission required",
+  );
+  const proposal = await getIssueActionProposal(
+    input.db,
+    project.id,
+    input.conversationRunId,
+    input.proposalId,
+  );
+  if (!proposal) throw new HttpError(404, "Issue action proposal not found");
+  const acceptedResponse = async (
+    accepted: NonNullable<Awaited<ReturnType<typeof getIssueActionProposal>>>,
+  ) => {
+    const executionProposal = (await listIssueExecutionProposals(
+      input.db,
+      project.id,
+      accepted.conversation_run_id,
+    )).find(
+      (candidate) => candidate.origin_create_proposal_id === accepted.id,
+    ) ?? null;
+    return {
+      proposal: issueActionProposalJson(accepted),
+      executionProposal: executionProposal
+        ? issueExecutionProposalJson(executionProposal)
+        : null,
+      outcome: "already_accepted" as const,
+      resultRunId: accepted.result_run_id,
+    };
+  };
+  if (proposal.status === "accepted") return acceptedResponse(proposal);
 
-    const action = decodeIssueCreateProposalAction({
+  const acceptedAt = new Date().toISOString();
+  const rawPayload = JSON.parse(proposal.payload_json);
+  if (proposal.action_type === "request_issue_update") {
+    const action = decodeIssueUpdateProposalAction({
       type: proposal.action_type,
       ...rawPayload,
     });
-    const reservation = await reserveIssueCreateProposalApproval(db, {
+    const run = await getHuntRunForProject(
+      input.db,
+      project.id,
+      proposal.conversation_run_id,
+    );
+    if (!run) throw new HttpError(404, "Run not found");
+    const hasDescription = Object.hasOwn(action.changes, "description");
+    const hasPriority = Object.hasOwn(action.changes, "priority");
+    const accepted = await acceptIssueUpdateProposal(input.db, {
       projectId: project.id,
       conversationRunId: proposal.conversation_run_id,
       proposalId: proposal.id,
-      userId: session.user.id,
-      reservedAt: acceptedAt,
-      issueSourceKey: newConversationProposalIssueSourceKey(),
+      userId: input.userId,
+      acceptedAt,
+      title: action.changes.title ?? run.title,
+      description: hasDescription
+        ? action.changes.description ?? null
+        : run.issue_description,
+      priority: hasPriority ? action.changes.priority ?? null : run.priority,
     });
-    if (!reservation) {
-      const latest = await getIssueActionProposal(
-        db,
-        project.id,
-        proposal.conversation_run_id,
-        proposal.id,
-      );
-      if (latest?.status === "accepted") {
-        const executionProposal = (await listIssueExecutionProposals(
-          db,
-          project.id,
-          latest.conversation_run_id,
-        )).find(
-          (candidate) => candidate.origin_create_proposal_id === latest.id,
-        ) ?? null;
-        return json({
-          proposal: issueActionProposalJson(latest),
-          executionProposal: executionProposal
-            ? issueExecutionProposalJson(executionProposal)
-            : null,
-          outcome: "already_accepted",
-          resultRunId: latest.result_run_id,
-        });
-      }
+    if (!accepted) {
       throw new HttpError(
         409,
-        "This issue proposal is being accepted by another member",
+        "The issue changed after this proposal was created",
         "ISSUE_ACTION_PROPOSAL_CONFLICT",
       );
     }
-    if (!reservation.issue_source_key) {
-      throw new HttpError(
-        409,
-        "This issue proposal has no approval identity",
-        "ISSUE_ACTION_PROPOSAL_CONFLICT",
-      );
-    }
-    let created: Awaited<ReturnType<typeof createIssueWithAttachments>>;
-    try {
-      created = await createIssueWithAttachments({
-        db,
-        attachmentsBucket,
-        project,
-        issue: approvedIssueCreation(action.issue),
-        attachments: [],
+    return {
+      proposal: issueActionProposalJson(accepted),
+      outcome: "accepted" as const,
+      resultRunId: accepted.result_run_id,
+    };
+  }
+
+  const action = decodeIssueCreateProposalAction({
+    type: proposal.action_type,
+    ...rawPayload,
+    executeAfterCreate: proposal.execute_after_create === 1,
+  });
+  const reservation = await reserveIssueCreateProposalApproval(input.db, {
+    projectId: project.id,
+    conversationRunId: proposal.conversation_run_id,
+    proposalId: proposal.id,
+    userId: input.userId,
+    reservedAt: acceptedAt,
+    issueSourceKey: newConversationProposalIssueSourceKey(),
+  });
+  if (!reservation) {
+    const latest = await getIssueActionProposal(
+      input.db,
+      project.id,
+      proposal.conversation_run_id,
+      proposal.id,
+    );
+    if (latest?.status === "accepted") return acceptedResponse(latest);
+    throw new HttpError(
+      409,
+      "This issue proposal is being accepted by another member",
+      "ISSUE_ACTION_PROPOSAL_CONFLICT",
+    );
+  }
+  if (
+    !reservation.issue_source_key ||
+    !reservation.approval_reserved_by_user_id
+  ) {
+    throw new HttpError(
+      409,
+      "This issue proposal has no approval identity",
+      "ISSUE_ACTION_PROPOSAL_CONFLICT",
+    );
+  }
+  let created: Awaited<ReturnType<typeof createProjectIssue>>;
+  try {
+    created = await createProjectIssue({
+      db: input.db,
+      projectId: project.id,
+      userId: reservation.approval_reserved_by_user_id,
+      clientIssueId: proposal.id,
+      request: approvedIssueCreation(action.issue),
+      attachmentIds: [],
+      attribution: {
         sourceKey: reservation.issue_source_key,
-        // Keep the event payload stable across retries. The accepting user is
-        // recorded on the proposal row itself.
         actor: "briar-conversation",
         detail: "대화창에서 사용자가 승인한 제안으로 생성된 이슈입니다.",
         context: {
@@ -297,280 +267,252 @@ export async function handleIssueProposalRoute(input: {
           proposalId: proposal.id,
           conversationRunId: proposal.conversation_run_id,
         },
-        issueId: proposal.id,
-        createdByUserId: reservation.approval_reserved_by_user_id,
-        occurredAt: proposal.created_at,
-      });
-    } catch (error) {
-      if (
-        error instanceof Error &&
-        error.message.includes(
-          "conversation proposal no longer belongs to project",
-        )
-      ) {
-        throw new HttpError(
-          409,
-          "The conversation moved before this proposal could be accepted",
-          "ISSUE_ACTION_PROPOSAL_CONFLICT",
-        );
-      }
-      throw error;
-    }
-    const finalized = await acceptIssueCreateProposal(db, {
-      projectId: project.id,
-      conversationRunId: proposal.conversation_run_id,
-      proposalId: proposal.id,
-      userId: session.user.id,
-      acceptedAt,
-      resultRunId: created.runId,
+      },
     });
-    const accepted = finalized ?? await getIssueActionProposal(
-      db,
-      project.id,
-      proposal.conversation_run_id,
-      proposal.id,
-    );
+  } catch (error) {
     if (
-      !accepted || accepted.status !== "accepted" ||
-      accepted.result_run_id !== created.runId
+      error instanceof Error && error.message.includes(
+        "conversation proposal no longer belongs to project",
+      )
     ) {
       throw new HttpError(
         409,
-        "The created issue is not eligible for this approval",
+        "The conversation moved before this proposal could be accepted",
         "ISSUE_ACTION_PROPOSAL_CONFLICT",
       );
     }
-    const executionProposal = (await listIssueExecutionProposals(
-      db,
-      project.id,
-      accepted.conversation_run_id,
-    )).find(
-      (candidate) => candidate.origin_create_proposal_id === accepted.id,
-    ) ?? null;
-    return json({
-      proposal: issueActionProposalJson(accepted),
-      executionProposal: executionProposal
-        ? issueExecutionProposalJson(executionProposal)
-        : null,
-      outcome:
-        accepted.status === "accepted" && accepted.accepted_at !== acceptedAt
-          ? "already_accepted"
-          : "accepted",
-      resultRunId: accepted.result_run_id,
-    });
+    throw error;
   }
-
-  const issueSkillExecutionProposalAcceptMatch = url.pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/skill-execution-proposals\/([0-9a-f-]+)\/accept$/u,
+  const finalized = await acceptIssueCreateProposal(input.db, {
+    projectId: project.id,
+    conversationRunId: proposal.conversation_run_id,
+    proposalId: proposal.id,
+    userId: input.userId,
+    acceptedAt,
+    resultRunId: created.runId,
+  });
+  const accepted = finalized ?? await getIssueActionProposal(
+    input.db,
+    project.id,
+    proposal.conversation_run_id,
+    proposal.id,
   );
-  if (issueSkillExecutionProposalAcceptMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(
-      db,
-      issueSkillExecutionProposalAcceptMatch[1],
-      session.user.id,
+  if (
+    !accepted || accepted.status !== "accepted" ||
+    accepted.result_run_id !== created.runId
+  ) {
+    throw new HttpError(
+      409,
+      "The created issue is not eligible for this approval",
+      "ISSUE_ACTION_PROPOSAL_CONFLICT",
     );
-    if (!project) throw new HttpError(404, "Project not found");
-    if (!hasOrganizationCapability(project.member_role, "issues:execute")) {
-      throw new HttpError(403, "Issue execution permission required");
-    }
-    if (!(await agentSkillExecutionApprovalTablesAvailable(db))) {
-      throw new HttpError(
-        503,
-        "Agent Skill execution approval is not available during this upgrade",
-        "AGENT_SKILL_EXECUTION_APPROVAL_UNAVAILABLE",
-      );
-    }
-    const conversationRunId = issueSkillExecutionProposalAcceptMatch[2];
-    const proposalId = issueSkillExecutionProposalAcceptMatch[3];
-    const loadProposal = () => getIssueAgentSkillExecutionProposal(
-      db,
-      project.id,
-      conversationRunId,
-      proposalId,
-    );
-    const proposal = await loadProposal();
-    if (!proposal) {
-      throw new HttpError(404, "Agent Skill execution proposal not found");
-    }
-    const input = decodeAgentSkillExecutionProposalAcceptInput(
-      await readJson(request),
-    );
-    return json(await approveAgentSkillExecutionProposal(db, archivesBucket, proposal, {
+  }
+  const executionProposal = (await listIssueExecutionProposals(
+    input.db,
+    project.id,
+    accepted.conversation_run_id,
+  )).find(
+    (candidate) => candidate.origin_create_proposal_id === accepted.id,
+  ) ?? null;
+  return {
+    proposal: issueActionProposalJson(accepted),
+    executionProposal: executionProposal
+      ? issueExecutionProposalJson(executionProposal)
+      : null,
+    outcome: accepted.accepted_at !== acceptedAt
+      ? "already_accepted" as const
+      : "accepted" as const,
+    resultRunId: accepted.result_run_id,
+  };
+}
+
+export async function acceptProjectIssueSkillExecutionProposal(
+  input: IssueProposalApplicationInput & { request: unknown },
+) {
+  const project = await requireIssueProposalProject(
+    input,
+    "issues:execute",
+    "Issue execution permission required",
+  );
+  const loadProposal = () => getIssueAgentSkillExecutionProposal(
+    input.db,
+    project.id,
+    input.conversationRunId,
+    input.proposalId,
+  );
+  const proposal = await loadProposal();
+  if (!proposal) {
+    throw new HttpError(404, "Agent Skill execution proposal not found");
+  }
+  const request = decodeAgentSkillExecutionProposalAcceptInput(input.request);
+  return approveAgentSkillExecutionProposal(
+    input.db,
+    input.archivesBucket,
+    proposal,
+    {
       sourceKind: "issue",
-      userId: session.user.id,
-      workerId: input.workerId,
+      userId: input.userId,
+      workerId: request.workerId,
       staleCode: "ISSUE_SKILL_EXECUTION_PROPOSAL_STALE",
       conflictCode: "ISSUE_SKILL_EXECUTION_PROPOSAL_CONFLICT",
       reload: loadProposal,
-    }));
-  }
-
-  const issueExecutionProposalAcceptMatch = url.pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/issue-execution-proposals\/([0-9a-f-]+)\/accept$/u,
+    },
   );
-  if (issueExecutionProposalAcceptMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(
-      db,
-      issueExecutionProposalAcceptMatch[1],
-      session.user.id,
-    );
-    if (!project) throw new HttpError(404, "Project not found");
-    if (!hasOrganizationCapability(project.member_role, "issues:execute")) {
-      throw new HttpError(403, "Issue execution permission required");
-    }
-    if (!(await issueExecutionApprovalTablesAvailable(db))) {
-      throw new HttpError(
-        503,
-        "Issue execution approval is not available during this upgrade",
-        "ISSUE_EXECUTION_APPROVAL_UNAVAILABLE",
-      );
-    }
-    const proposal = await getIssueExecutionProposal(
-      db,
-      project.id,
-      issueExecutionProposalAcceptMatch[2],
-      issueExecutionProposalAcceptMatch[3],
-    );
-    if (!proposal) throw new HttpError(404, "Execution proposal not found");
-    const input = decodeChannelExecutionProposalAcceptInput(
-      await readJson(request),
-    );
-    decodeExecutionPreferences({
-      provider: input.provider,
-      model: input.model,
-      effort: input.effort,
-    });
-    const run = await getHuntRunForProject(db, project.id, proposal.target_run_id);
-    if (proposal.status === "accepted") {
-      if (
-        proposal.accepted_by_user_id !== session.user.id ||
-        proposal.requested_provider !== input.provider ||
-        proposal.requested_model !== input.model ||
-        proposal.requested_effort !== input.effort ||
-        proposal.requested_worker_id !== input.workerId
-      ) {
-        throw new HttpError(
-          409,
-          "Execution was approved with different settings or by another member",
-          "ISSUE_EXECUTION_PROPOSAL_CONFLICT",
-        );
-      }
-      if (
-        !run || !proposal.dispatch_request_id ||
-        run.dispatch_request_id !== proposal.dispatch_request_id
-      ) {
-        throw new HttpError(
-          409,
-          "This execution approval is stale; request a new approval",
-          "ISSUE_EXECUTION_PROPOSAL_STALE",
-        );
-      }
-      return json({
-        proposal: issueExecutionProposalJson(proposal),
-        outcome: "already_accepted",
-        projectId: proposal.project_id,
-        runId: proposal.target_run_id,
-        dispatch: {
-          runId: proposal.target_run_id,
-          agentId: proposal.proposed_by_agent_id,
-          provider: proposal.requested_provider,
-          model: proposal.requested_model,
-          effort: proposal.requested_effort,
-          requestedWorkerId: proposal.requested_worker_id,
-          requestedByUserId: proposal.accepted_by_user_id,
-          dispatchMode: proposal.requested_worker_id ? "specific" : "any",
-          dispatchedAt: proposal.accepted_at,
-          outcome: "already_dispatched",
-        },
-      });
-    }
-    if (proposal.status !== "pending") {
+}
+
+export async function acceptProjectIssueExecutionProposal(
+  input: IssueProposalApplicationInput & { request: unknown },
+) {
+  const project = await requireIssueProposalProject(
+    input,
+    "issues:execute",
+    "Issue execution permission required",
+  );
+  const proposal = await getIssueExecutionProposal(
+    input.db,
+    project.id,
+    input.conversationRunId,
+    input.proposalId,
+  );
+  if (!proposal) throw new HttpError(404, "Execution proposal not found");
+  const request = decodeChannelExecutionProposalAcceptInput(input.request);
+  decodeExecutionPreferences({
+    provider: request.provider,
+    model: request.model,
+    effort: request.effort,
+  });
+  const run = await getHuntRunForProject(
+    input.db,
+    project.id,
+    proposal.target_run_id,
+  );
+  if (proposal.status === "accepted") {
+    if (
+      proposal.accepted_by_user_id !== input.userId ||
+      proposal.requested_provider !== request.provider ||
+      proposal.requested_model !== request.model ||
+      proposal.requested_effort !== request.effort ||
+      proposal.requested_worker_id !== request.workerId
+    ) {
       throw new HttpError(
         409,
-        "This execution proposal is no longer valid",
-        "ISSUE_EXECUTION_PROPOSAL_STALE",
-      );
-    }
-    const acceptedAt = new Date().toISOString();
-    const reservation = await reserveIssueExecutionProposalApproval(db, {
-      projectId: project.id,
-      conversationRunId: proposal.conversation_run_id!,
-      proposalId: proposal.id,
-      userId: session.user.id,
-      provider: input.provider,
-      model: input.model,
-      effort: input.effort,
-      workerId: input.workerId,
-      dispatchRequestId: crypto.randomUUID(),
-      reservedAt: acceptedAt,
-    });
-    if (!reservation?.dispatch_request_id ||
-        !reservation.approval_reserved_by_user_id ||
-        !reservation.approval_reserved_at) {
-      throw new HttpError(
-        409,
-        "The issue or execution approval changed before dispatch",
+        "Execution was approved with different settings or by another member",
         "ISSUE_EXECUTION_PROPOSAL_CONFLICT",
       );
     }
-    try {
-      const dispatched = await dispatchHuntRun(
-        db,
-        project.organization_id,
-        project.id,
-        {
-          runId: reservation.target_run_id,
-          agentId: reservation.proposed_by_agent_id,
-          provider: reservation.requested_provider!,
-          model: reservation.requested_model,
-          effort: reservation.requested_effort,
-          persistPreferences: false,
-          workerId: reservation.requested_worker_id,
-          requestedByUserId: reservation.approval_reserved_by_user_id,
-          requestId: reservation.dispatch_request_id,
-          occurredAt: reservation.approval_reserved_at,
-        },
+    if (
+      !run || !proposal.dispatch_request_id ||
+      run.dispatch_request_id !== proposal.dispatch_request_id
+    ) {
+      throw new HttpError(
+        409,
+        "This execution approval is stale; request a new approval",
+        "ISSUE_EXECUTION_PROPOSAL_STALE",
       );
-      if (!dispatched) throw new HttpError(404, "Run not found");
-      const accepted = await getIssueExecutionProposal(
-        db,
-        reservation.project_id,
-        reservation.conversation_run_id!,
-        reservation.id,
-      );
-      if (
-        !accepted || accepted.status !== "accepted" ||
-        accepted.dispatch_request_id !== reservation.dispatch_request_id
-      ) {
-        throw new HttpError(
-          409,
-          "Execution approval was not finalized",
-          "ISSUE_EXECUTION_PROPOSAL_CONFLICT",
-        );
-      }
-      return json({
-        proposal: issueExecutionProposalJson(accepted),
-        outcome: "accepted",
-        projectId: accepted.project_id,
-        runId: accepted.target_run_id,
-        dispatch: dispatched,
-      });
-    } catch (error) {
-      if (error instanceof WorkerConflictError || (
-        error instanceof Error && error.message.includes("execution proposal")
-      )) {
-        throw new HttpError(
-          409,
-          error.message,
-          "ISSUE_EXECUTION_PROPOSAL_CONFLICT",
-        );
-      }
-      throw error;
     }
+    return {
+      proposal: issueExecutionProposalJson(proposal),
+      outcome: "already_accepted" as const,
+      projectId: proposal.project_id,
+      runId: proposal.target_run_id,
+      dispatch: {
+        runId: proposal.target_run_id,
+        agentId: proposal.proposed_by_agent_id,
+        provider: proposal.requested_provider,
+        model: proposal.requested_model,
+        effort: proposal.requested_effort,
+        requestedWorkerId: proposal.requested_worker_id,
+        requestedByUserId: proposal.accepted_by_user_id,
+        dispatchMode: proposal.requested_worker_id ? "specific" : "any",
+        dispatchedAt: proposal.accepted_at,
+        outcome: "already_dispatched" as const,
+      },
+    };
   }
-
-
-  return undefined;
+  if (proposal.status !== "pending") {
+    throw new HttpError(
+      409,
+      "This execution proposal is no longer valid",
+      "ISSUE_EXECUTION_PROPOSAL_STALE",
+    );
+  }
+  const acceptedAt = new Date().toISOString();
+  const reservation = await reserveIssueExecutionProposalApproval(input.db, {
+    projectId: project.id,
+    conversationRunId: proposal.conversation_run_id!,
+    proposalId: proposal.id,
+    userId: input.userId,
+    provider: request.provider,
+    model: request.model,
+    effort: request.effort,
+    workerId: request.workerId,
+    dispatchRequestId: crypto.randomUUID(),
+    reservedAt: acceptedAt,
+  });
+  if (
+    !reservation?.dispatch_request_id ||
+    !reservation.approval_reserved_by_user_id ||
+    !reservation.approval_reserved_at
+  ) {
+    throw new HttpError(
+      409,
+      "The issue or execution approval changed before dispatch",
+      "ISSUE_EXECUTION_PROPOSAL_CONFLICT",
+    );
+  }
+  try {
+    const dispatched = await dispatchHuntRun(
+      input.db,
+      project.organization_id,
+      project.id,
+      {
+        runId: reservation.target_run_id,
+        agentId: reservation.proposed_by_agent_id,
+        provider: reservation.requested_provider!,
+        model: reservation.requested_model,
+        effort: reservation.requested_effort,
+        persistPreferences: false,
+        workerId: reservation.requested_worker_id,
+        requestedByUserId: reservation.approval_reserved_by_user_id,
+        requestId: reservation.dispatch_request_id,
+        occurredAt: reservation.approval_reserved_at,
+      },
+    );
+    if (!dispatched) throw new HttpError(404, "Run not found");
+    const accepted = await getIssueExecutionProposal(
+      input.db,
+      reservation.project_id,
+      reservation.conversation_run_id!,
+      reservation.id,
+    );
+    if (
+      !accepted || accepted.status !== "accepted" ||
+      accepted.dispatch_request_id !== reservation.dispatch_request_id
+    ) {
+      throw new HttpError(
+        409,
+        "Execution approval was not finalized",
+        "ISSUE_EXECUTION_PROPOSAL_CONFLICT",
+      );
+    }
+    return {
+      proposal: issueExecutionProposalJson(accepted),
+      outcome: "accepted" as const,
+      projectId: accepted.project_id,
+      runId: accepted.target_run_id,
+      dispatch: dispatched,
+    };
+  } catch (error) {
+    if (
+      error instanceof WorkerConflictError ||
+      (error instanceof Error && error.message.includes("execution proposal"))
+    ) {
+      throw new HttpError(
+        409,
+        error.message,
+        "ISSUE_EXECUTION_PROPOSAL_CONFLICT",
+      );
+    }
+    throw error;
+  }
 }

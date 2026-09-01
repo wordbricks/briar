@@ -1,8 +1,16 @@
+import { create } from "@bufbuild/protobuf";
+import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import {
+  AgentActivitySchema,
+  AgentReplyActivityFrameSchema,
+  ChannelActivityScopeSchema,
+  IssueActivityScopeSchema,
+  type AgentReplyActivityFrame,
+} from "@briar/contracts/gen/briar/realtime/v1/realtime_pb";
+import {
+  agentActivityKindToProto,
   CHANNEL_AGENT_ACTIVITY_STALE_MS,
-  CHANNEL_AGENT_ACTIVITY_VERSION,
-  type ChannelAgentActivityFrame,
-  type IssueAgentActivityFrame,
+  type ChannelAgentActivityPublishInput,
 } from "../../src/lib/channel-agent-activity";
 import { getDashboardSyncCursor } from "./dashboard-change-repository";
 import {
@@ -32,6 +40,24 @@ import {
 import { HttpError } from "./http-response";
 import { mobilePushProvidersConfigured } from "./mobile-push-provider";
 import { flushMobilePushOutbox } from "./mobile-push-service";
+
+type OrganizationInboxFlushServices = {
+  readonly mobilePushProvidersConfigured:
+    typeof mobilePushProvidersConfigured;
+  readonly flushMobilePushOutbox: typeof flushMobilePushOutbox;
+  readonly listRealtimeOutbox: typeof listOrganizationInboxRealtimeOutbox;
+  readonly publishRealtime: typeof publishInboxRealtime;
+  readonly acknowledgeRealtime:
+    typeof acknowledgeOrganizationInboxRealtimeOutbox;
+};
+
+const organizationInboxFlushServices: OrganizationInboxFlushServices = {
+  mobilePushProvidersConfigured,
+  flushMobilePushOutbox,
+  listRealtimeOutbox: listOrganizationInboxRealtimeOutbox,
+  publishRealtime: publishInboxRealtime,
+  acknowledgeRealtime: acknowledgeOrganizationInboxRealtimeOutbox,
+};
 
 type ActivityReplyIdentity = {
   id: string;
@@ -64,28 +90,35 @@ async function activityCredential(
 }
 
 type ActivityFrameInput = Pick<
-  ChannelAgentActivityFrame,
+  ChannelAgentActivityPublishInput,
   "sequence" | "activity"
 >;
 
-function activityFrame<Scope extends object>(
+function activityFrame(
   job: Omit<ActivityReplyIdentity, "lease_expires_at">,
   input: ActivityFrameInput,
-  scope: Scope,
+  scope: AgentReplyActivityFrame["scope"],
   now: number,
 ) {
-  return {
-    version: CHANNEL_AGENT_ACTIVITY_VERSION,
+  return create(AgentReplyActivityFrameSchema, {
     replyJobId: job.id,
     attempt: job.attempts,
-    sequence: input.sequence,
-    ...scope,
+    sequence: BigInt(input.sequence),
     triggerMessageId: job.trigger_message_id,
     parentMessageId: job.parent_message_id,
-    activity: input.activity,
-    sentAt: new Date(now).toISOString(),
-    expiresAt: new Date(now + CHANNEL_AGENT_ACTIVITY_STALE_MS).toISOString(),
-  };
+    activity: input.activity === null
+      ? undefined
+      : create(AgentActivitySchema, {
+        id: input.activity.id,
+        kind: agentActivityKindToProto(input.activity.kind),
+        headline: input.activity.headline,
+      }),
+    sentAt: timestampFromDate(new Date(now)),
+    expiresAt: timestampFromDate(
+      new Date(now + CHANNEL_AGENT_ACTIVITY_STALE_MS),
+    ),
+    scope,
+  });
 }
 
 function scheduleActivityClear<Frame>(
@@ -98,7 +131,6 @@ function scheduleActivityClear<Frame>(
     failureContext: Record<string, string>;
   },
 ) {
-  if (!env.CHANNEL_ACTIVITY_REALTIME) return;
   const frame = adapter.makeFrame({
     sequence: Number.MAX_SAFE_INTEGER,
     activity: null,
@@ -117,25 +149,27 @@ function scheduleActivityClear<Frame>(
 export async function flushOrganizationInboxRealtimeOutbox(
   env: Env,
   db: D1Database,
+  services: OrganizationInboxFlushServices = organizationInboxFlushServices,
 ) {
-  if (mobilePushProvidersConfigured(env)) {
-    try {
-      await flushMobilePushOutbox(env, db);
-    } catch (error) {
-      // Remote push retries from its own outbox and must never prevent the
-      // existing websocket fan-out from advancing.
+  const pushFlush = services.mobilePushProvidersConfigured(env)
+    ? services.flushMobilePushOutbox(env, db).catch((error) => {
+      // Remote push retries from its own outbox and must never delay or
+      // prevent the existing websocket fan-out from advancing.
       console.error(JSON.stringify({
         message: "Mobile push outbox flush failed",
         error: error instanceof Error ? error.message : String(error),
       }));
-    }
-  }
-  if (!env.CHANNEL_REALTIME) return;
-  const pending = await listOrganizationInboxRealtimeOutbox(db);
+    })
+    : undefined;
+  const pending = await services.listRealtimeOutbox(db);
   for (const row of pending) {
     try {
-      await publishInboxRealtime(env, row.organization_id, row.version);
-      await acknowledgeOrganizationInboxRealtimeOutbox(
+      await services.publishRealtime(
+        env,
+        row.organization_id,
+        row.version,
+      );
+      await services.acknowledgeRealtime(
         db,
         row.organization_id,
         row.version,
@@ -151,6 +185,7 @@ export async function flushOrganizationInboxRealtimeOutbox(
       }));
     }
   }
+  await pushFlush;
 }
 
 export function scheduleInboxRealtimeFlush(
@@ -158,7 +193,6 @@ export function scheduleInboxRealtimeFlush(
   db: D1Database,
   context?: ExecutionContext,
 ) {
-  if (!env.CHANNEL_REALTIME && !mobilePushProvidersConfigured(env)) return;
   const flush = flushOrganizationInboxRealtimeOutbox(env, db).catch((error) => {
     console.error(JSON.stringify({
       message: "Inbox realtime outbox flush failed",
@@ -231,7 +265,6 @@ export function scheduleChannelRealtimePublish(
   organizationId: string,
   context?: ExecutionContext,
 ) {
-  if (!env.CHANNEL_REALTIME) return;
   const publish = getChannelSyncCursor(db, organizationId)
     .then((cursor) => publishChannelRealtime(env, organizationId, cursor))
     .catch((error) => {
@@ -263,6 +296,10 @@ export async function channelActivityCredential(
   job: ChannelActivityReplyIdentity & { claim_token_hash?: string | null },
   input: { workerId: string; deviceId: string },
 ) {
+  if (!job.claim_token_hash) {
+    throw new Error("Channel reply claim token hash is required");
+  }
+  const claimTokenHash = job.claim_token_hash;
   return activityCredential(
     env,
     job,
@@ -270,7 +307,7 @@ export async function channelActivityCredential(
       organizationId: job.organization_id,
       channelId: job.channel_id,
       replyJobId: job.id,
-      ...(job.claim_token_hash ? { claimTokenHash: job.claim_token_hash } : {}),
+      claimTokenHash,
       agentId: job.agent_id,
       triggerMessageId: job.trigger_message_id,
       parentMessageId: job.parent_message_id,
@@ -284,13 +321,19 @@ export async function channelActivityCredential(
 
 export function channelActivityFrame(
   job: Omit<ChannelActivityReplyIdentity, "lease_expires_at">,
-  input: Pick<ChannelAgentActivityFrame, "sequence" | "activity">,
+  input: ActivityFrameInput,
   now = Date.now(),
-): ChannelAgentActivityFrame {
+): AgentReplyActivityFrame {
   return activityFrame(
     job,
     input,
-    { agentId: job.agent_id, channelId: job.channel_id },
+    {
+      case: "channel",
+      value: create(ChannelActivityScopeSchema, {
+        agentId: job.agent_id,
+        channelId: job.channel_id,
+      }),
+    },
     now,
   );
 }
@@ -349,13 +392,19 @@ export async function issueActivityCredential(
 
 export function issueActivityFrame(
   job: Omit<IssueActivityReplyIdentity, "lease_expires_at">,
-  input: Pick<IssueAgentActivityFrame, "sequence" | "activity">,
+  input: ActivityFrameInput,
   now = Date.now(),
-): IssueAgentActivityFrame {
+): AgentReplyActivityFrame {
   return activityFrame(
     job,
     input,
-    { projectId: job.project_id, runId: job.run_id },
+    {
+      case: "issue",
+      value: create(IssueActivityScopeSchema, {
+        projectId: job.project_id,
+        runId: job.run_id,
+      }),
+    },
     now,
   );
 }
@@ -385,7 +434,6 @@ export function scheduleChannelActivityDisconnect(
   channelId: string,
   context?: ExecutionContext,
 ) {
-  if (!env.CHANNEL_ACTIVITY_REALTIME) return;
   const disconnect = disconnectChannelActivitySubscribers(
     env,
     organizationId,
@@ -408,7 +456,6 @@ export function scheduleProjectRealtimePublish(
   projectId: string,
   context?: ExecutionContext,
 ) {
-  if (!env.CHANNEL_REALTIME) return;
   const publish = Promise.all([
     db.prepare(
       `select organization_id from briar_teams where id = ?`,
@@ -440,7 +487,6 @@ export function scheduleProjectAgentSessionRealtimePublish(
   projectId: string,
   context?: ExecutionContext,
 ) {
-  if (!env.CHANNEL_REALTIME) return;
   const publish = Promise.all([
     db.prepare(
       `select organization_id from briar_teams where id = ?`,
@@ -463,40 +509,4 @@ export function scheduleProjectAgentSessionRealtimePublish(
   });
   if (context) context.waitUntil(publish);
   else void publish;
-}
-
-export function channelMutationOrganization(
-  pathname: string,
-  method: string,
-  status: number,
-) {
-  if (status >= 400 || method === "GET" || method === "HEAD") return null;
-  return pathname.match(
-    /^\/organizations\/([0-9a-f-]+)\/channels(?:\/|$)/u,
-  )?.[1] ?? null;
-}
-
-export function projectScheduleClaimMutation(
-  pathname: string,
-  method: string,
-  status: number,
-) {
-  if (status >= 400 || method !== "POST") return false;
-  return pathname === "/agent-schedule-runs/claim" ||
-    /^\/projects\/[0-9a-f-]+\/agent-schedule-runs\/claim$/u.test(pathname);
-}
-
-export function projectMutationProject(
-  pathname: string,
-  method: string,
-  status: number,
-) {
-  if (status >= 400 || method === "GET" || method === "HEAD") return null;
-  if (projectScheduleClaimMutation(pathname, method, status)) return null;
-  if (
-    /^\/projects\/[0-9a-f-]+\/agent-sessions\/[^/]+$/u.test(
-      pathname,
-    )
-  ) return null;
-  return pathname.match(/^\/projects\/([0-9a-f-]+)(?:\/|$)/u)?.[1] ?? null;
 }

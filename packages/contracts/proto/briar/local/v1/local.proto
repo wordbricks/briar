@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package briar.local.v1;
+
+import "briar/worker/v1/worker_queue.proto";
+
+option swift_prefix = "BriarLocal_";
+
+// Stable ProtoJSON written by `briar queue claim` for local process consumers.
+// Claim credentials deliberately do not exist in this descriptor; they remain
+// in the CLI's private config and can never be serialized by this message.
+message LocalClaimResult {
+  oneof outcome {
+    LocalClaimedRun claimed = 1;
+    LocalNoWork no_work = 2;
+  }
+}
+
+message LocalNoWork {}
+
+message LocalClaimedRun {
+  briar.worker.v1.ClaimedIssuePayload payload = 1;
+  repeated LocalQueuedAttachment attachments = 2;
+  string briar_issue_url = 3;
+  optional LocalWorkspace workspace = 4;
+  optional string workspace_error = 5;
+}
+
+message LocalQueuedAttachment {
+  briar.worker.v1.QueuedAttachment attachment = 1;
+  optional string local_path = 2;
+  optional string download_error = 3;
+}
+
+message LocalWorkspace {
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    KIND_CURRENT = 1;
+    KIND_WORKTREE = 2;
+  }
+
+  Kind kind = 1;
+  string path = 2;
+  optional string branch = 3;
+  optional string base_ref = 4;
+  optional string base_ref_resolved = 5;
+  optional string base_sha = 6;
+  bool reused = 7;
+  repeated string included_paths = 8;
+  optional string warning = 9;
+}

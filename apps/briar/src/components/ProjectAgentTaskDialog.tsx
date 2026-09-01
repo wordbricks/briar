@@ -32,7 +32,7 @@ function availableWorkersForProvider(
 ) {
   return (dashboard?.workers ?? []).filter(
     (worker) =>
-      (worker.providers ?? [worker.agentProvider]).includes(provider) &&
+      worker.providers.includes(provider) &&
       worker.acceptingWork &&
       worker.readiness === "available",
   );

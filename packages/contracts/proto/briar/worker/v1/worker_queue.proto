@@ -1,0 +1,1314 @@
+syntax = "proto3";
+
+package briar.worker.v1;
+
+import "briar/app/v1/channel.proto";
+import "briar/app/v1/issue.proto";
+import "briar/app/v1/dm_memory.proto";
+import "briar/app/v1/common.proto";
+import "briar/app/v1/dashboard.proto";
+import "briar/app/v1/fleet.proto";
+import "briar/realtime/v1/realtime.proto";
+import "briar/types/v1/agent_event.proto";
+import "briar/types/v1/agent_execution.proto";
+import "briar/types/v1/github_identity.proto";
+import "briar/types/v1/provider.proto";
+import "briar/types/v1/upload.proto";
+import "briar/types/v1/worker.proto";
+import "briar/types/v1/workflow.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+// The machine Worker queue control plane. Attachment metadata and upload
+// capabilities are negotiated here, while attachment bytes, large evidence,
+// and provider-specific streams intentionally use their dedicated transports.
+service WorkerQueueService {
+  rpc ClaimWork(ClaimWorkRequest) returns (ClaimWorkResponse);
+  rpc RenewWorkLease(RenewWorkLeaseRequest) returns (RenewWorkLeaseResponse);
+  rpc CheckpointChannelReplySession(CheckpointChannelReplySessionRequest) returns (CheckpointChannelReplySessionResponse);
+  rpc PrepareReplyAttachmentUploads(PrepareReplyAttachmentUploadsRequest) returns (PrepareReplyAttachmentUploadsResponse);
+  rpc CompleteIssueReply(CompleteIssueReplyRequest) returns (CompleteIssueReplyResponse);
+  rpc CompleteChannelReply(CompleteChannelReplyRequest) returns (CompleteChannelReplyResponse);
+  rpc HandoffWork(HandoffWorkRequest) returns (HandoffWorkResponse);
+  rpc CompleteProjectAgentTask(CompleteProjectAgentTaskRequest) returns (CompleteProjectAgentTaskResponse);
+  rpc RecordMergeBatchCandidateEnqueued(RecordMergeBatchCandidateEnqueuedRequest) returns (RecordMergeBatchCandidateEnqueuedResponse);
+  rpc RecordMergeBatchAuthority(RecordMergeBatchAuthorityRequest) returns (RecordMergeBatchAuthorityResponse);
+  rpc RecordMergeBatchValidation(RecordMergeBatchValidationRequest) returns (RecordMergeBatchValidationResponse);
+  rpc CompleteMergeBatchPublication(CompleteMergeBatchPublicationRequest) returns (CompleteMergeBatchPublicationResponse);
+  rpc BlockMergeBatch(BlockMergeBatchRequest) returns (BlockMergeBatchResponse);
+  rpc CheckDmMemoryClaim(CheckDmMemoryClaimRequest) returns (CheckDmMemoryClaimResponse);
+  rpc GetDmMemoryBrief(GetDmMemoryBriefRequest) returns (GetDmMemoryBriefResponse);
+  rpc LookupDmMemory(LookupDmMemoryRequest) returns (LookupDmMemoryResponse);
+  rpc ReserveDmMemoryLearningCall(ReserveDmMemoryLearningCallRequest) returns (ReserveDmMemoryLearningCallResponse);
+  rpc SubmitDmMemoryLearningProposal(SubmitDmMemoryLearningProposalRequest) returns (SubmitDmMemoryLearningProposalResponse);
+  rpc SubmitDmMemoryLearningVerification(SubmitDmMemoryLearningVerificationRequest) returns (SubmitDmMemoryLearningVerificationResponse);
+  rpc FailDmMemoryLearning(FailDmMemoryLearningRequest) returns (FailDmMemoryLearningResponse);
+}
+
+// Ephemeral reply activity uses the short-lived capability returned with a
+// reply claim, not the Worker's long-lived credential. The server derives the
+// authoritative scope and attempt from that signed capability.
+service ReplyActivityService {
+  rpc PublishReplyActivity(PublishReplyActivityRequest) returns (PublishReplyActivityResponse);
+}
+
+// Worker-credential runtime control plane. Enrollment and project binding are
+// user-authenticated FleetService operations instead.
+service WorkerControlService {
+  rpc HeartbeatWorker(HeartbeatWorkerRequest) returns (HeartbeatWorkerResponse);
+  rpc UpdateWorkerLabel(UpdateWorkerLabelRequest) returns (UpdateWorkerLabelResponse);
+  rpc PrepareWorkerUpdateHandoff(PrepareWorkerUpdateHandoffRequest) returns (PrepareWorkerUpdateHandoffResponse);
+  rpc GetWorkerUpdateHandoff(GetWorkerUpdateHandoffRequest) returns (GetWorkerUpdateHandoffResponse);
+  rpc FailWorkerUpdateHandoff(FailWorkerUpdateHandoffRequest) returns (FailWorkerUpdateHandoffResponse);
+}
+
+// Execution-credential operations shared by the interactive CLI and the
+// desktop-hosted Auto Hunt runtime.
+service WorkerExecutionService {
+  rpc ClaimIssue(ClaimIssueRequest) returns (ClaimIssueResponse);
+  rpc ListProjectChannelMessages(ListProjectChannelMessagesRequest) returns (ListProjectChannelMessagesResponse);
+  // Shared intentionally with IssueService so evidence has one DTO.
+  // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+  rpc ListRunEvidence(briar.app.v1.ListRunEvidenceRequest) returns (briar.app.v1.ListRunEvidenceResponse);
+  rpc AppendTranscriptEvents(AppendTranscriptEventsRequest) returns (AppendTranscriptEventsResponse);
+  rpc ReportIssueExecutionTelemetry(ReportIssueExecutionTelemetryRequest) returns (ReportIssueExecutionTelemetryResponse);
+  rpc RecordRunEvent(RecordRunEventRequest) returns (RecordRunEventResponse);
+  rpc PrepareRunEvidenceImageUploads(PrepareRunEvidenceImageUploadsRequest) returns (PrepareRunEvidenceImageUploadsResponse);
+  rpc RecordRunEvidence(RecordRunEvidenceRequest) returns (RecordRunEvidenceResponse);
+  rpc TransitionWorkflowStage(TransitionWorkflowStageRequest) returns (TransitionWorkflowStageResponse);
+  // Shared intentionally with IssueService so run control has one wire DTO.
+  // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+  rpc RetryRun(briar.app.v1.RetryRunRequest) returns (briar.app.v1.RetryRunResponse);
+  // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+  rpc CancelRun(briar.app.v1.CancelRunRequest) returns (briar.app.v1.CancelRunResponse);
+  // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+  rpc ResumeRun(briar.app.v1.ResumeRunRequest) returns (briar.app.v1.ResumeRunResponse);
+  // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+  rpc ReworkRun(briar.app.v1.ReworkRunRequest) returns (briar.app.v1.ReworkRunResponse);
+}
+
+message ClaimIssueRequest {
+  string project_id = 1;
+  optional string run_id = 2;
+  string claimed_by = 3;
+}
+
+message ClaimIssueResponse {
+  optional ClaimedIssue issue = 1;
+}
+
+message ListProjectChannelMessagesRequest {
+  string project_id = 1;
+  string channel_id = 2;
+  optional string parent_message_id = 3;
+  optional string cursor = 4;
+  optional uint32 limit = 5;
+}
+
+message ListProjectChannelMessagesResponse {
+  briar.app.v1.ChannelSummary channel = 1;
+  repeated briar.app.v1.ChannelMessage messages = 2;
+  optional string next_cursor = 3;
+}
+
+message AppendTranscriptEventsRequest {
+  string project_id = 1;
+  WorkClaimIdentity work = 2;
+  string session_id = 3;
+  briar.types.v1.AgentProvider agent_provider = 4;
+  repeated AgentTranscriptEvent events = 5;
+}
+
+message AgentTranscriptEvent {
+  uint64 sequence = 1;
+  briar.types.v1.AgentEventDirection direction = 2;
+  google.protobuf.Value raw_payload = 3;
+  optional briar.types.v1.NormalizedAgentEvent normalized = 4;
+  optional TranscriptArchiveCompaction archive_compaction = 5;
+}
+
+message TranscriptArchiveCompaction {
+  uint64 first_sequence = 1;
+  uint32 represented_event_count = 2;
+}
+
+message AppendTranscriptEventsResponse {
+  string session_id = 1;
+  uint32 archived_event_count = 2;
+  uint64 archived_uncompressed_bytes = 3;
+  uint64 archived_compressed_bytes = 4;
+  uint32 projected_entry_count = 5;
+}
+
+message ReportIssueExecutionTelemetryRequest {
+  string project_id = 1;
+  WorkClaimIdentity work = 2;
+  string execution_id = 3;
+  briar.types.v1.AgentProvider agent_provider = 4;
+  briar.types.v1.AgentExecutionMetrics execution_metrics = 5;
+  repeated briar.types.v1.AgentUsageObservation usage_observations = 6;
+  repeated briar.types.v1.AgentCostObservation cost_observations = 7;
+}
+
+message ReportIssueExecutionTelemetryResponse {
+  bool execution_metrics_updated = 1;
+  uint32 usage_observations_stored = 2;
+  uint32 cost_observations_stored = 3;
+}
+
+message RunSourceIdentity {
+  AutoHuntSource source = 1;
+  string source_key = 2;
+  string title = 3;
+}
+
+message RecordRunEventRequest {
+  string project_id = 1;
+
+  // Claimed work requires its exact active claim. A source identity is the
+  // agent-token intake path and may create a run when no matching run exists.
+  oneof target {
+    WorkClaimIdentity work = 2;
+    RunSourceIdentity source_identity = 3;
+  }
+
+  briar.app.v1.RunStatus status = 4;
+  optional string workflow_stage = 5;
+  string event_key = 6;
+  google.protobuf.Timestamp occurred_at = 7;
+  string actor = 8;
+  string repository = 9;
+  optional string detail = 10;
+  optional uint32 priority = 11;
+  optional string branch = 12;
+  optional string commit_sha = 13;
+  optional briar.app.v1.TrackerReference tracker = 14;
+  optional string issue_description = 15;
+  optional string result_summary = 16;
+  optional briar.app.v1.StructuredRunResult structured_result = 17;
+  repeated string pull_request_urls = 18;
+  optional string target_sha = 19;
+  optional google.protobuf.Timestamp source_created_at = 20;
+  optional google.protobuf.Struct context = 21;
+}
+
+message RecordRunEventResponse {
+  string run_id = 1;
+  briar.app.v1.RunStatus status = 2;
+  optional string workflow_stage = 3;
+}
+
+message PrepareRunEvidenceImageUploadsRequest {
+  // Stable across a client retry. Reusing it with different metadata fails.
+  string request_id = 1;
+  string project_id = 2;
+  // Only an exact active issue claim is accepted.
+  WorkClaimIdentity work = 3;
+  repeated briar.types.v1.UploadFileMetadata images = 4;
+}
+
+message PrepareRunEvidenceImageUploadsResponse {
+  bool replayed = 1;
+  repeated briar.types.v1.PreparedUpload uploads = 2;
+}
+
+message RecordRunEvidenceRequest {
+  string project_id = 1;
+  // Supplies the run ID and exact active issue claim. The transport does not
+  // duplicate either value in headers or paths.
+  WorkClaimIdentity work = 2;
+  string evidence_key = 3;
+  string stage = 4;
+  string type = 5;
+  briar.app.v1.RunEvidence.Status status = 6;
+  google.protobuf.Timestamp observed_at = 7;
+  string actor = 8;
+  optional string detail = 9;
+  optional string command = 10;
+  optional string url = 11;
+  optional google.protobuf.Struct metadata = 12;
+  repeated briar.types.v1.UploadReference images = 13;
+  optional briar.types.v1.GitHubPullRequestIdentity github_pull_request = 14;
+}
+
+message RecordRunEvidenceResponse {
+  string run_id = 1;
+  uint32 attempt = 2;
+  string evidence_key = 3;
+  string stage = 4;
+  string type = 5;
+  briar.app.v1.RunEvidence.Status status = 6;
+  repeated briar.app.v1.RunEvidenceImage images = 7;
+}
+
+message TransitionWorkflowStageRequest {
+  enum Action {
+    ACTION_UNSPECIFIED = 0;
+    ACTION_START = 1;
+    ACTION_COMPLETE = 2;
+  }
+
+  string project_id = 1;
+  WorkClaimIdentity work = 2;
+  string request_id = 3;
+  string stage = 4;
+  Action action = 5;
+  optional uint32 attempt = 6;
+  optional uint32 revision = 7;
+}
+
+message WorkflowStageLifecycleCheckpoint {
+  string key = 1;
+  string stage = 2;
+  briar.types.v1.WorkflowCheckpoint.Position position = 3;
+  uint32 revision = 4;
+}
+
+message TransitionWorkflowStageResponse {
+  enum Outcome {
+    OUTCOME_UNSPECIFIED = 0;
+    OUTCOME_STARTED = 1;
+    OUTCOME_COMPLETED = 2;
+    OUTCOME_ALREADY_STARTED = 3;
+    OUTCOME_ALREADY_COMPLETED = 4;
+    OUTCOME_PAUSED = 5;
+  }
+
+  string run_id = 1;
+  string request_id = 2;
+  Outcome outcome = 3;
+  uint32 attempt = 4;
+  uint32 revision = 5;
+  string stage = 6;
+  optional WorkflowStageLifecycleCheckpoint checkpoint = 7;
+}
+
+message ClaimWorkRequest {
+  string project_id = 1;
+  string worker_id = 2;
+  string claimed_by = 3;
+  // Reply jobs do not consume a regular execution slot. A saturated Worker
+  // uses this flag to avoid claiming issue, task, or merge-batch work.
+  bool replies_only = 4;
+}
+
+message ClaimWorkResponse {
+  optional ClaimedWork work = 1;
+  optional uint32 retry_after_ms = 2;
+}
+
+message ClaimedWork {
+  oneof work {
+    ClaimedIssue issue = 1;
+    ClaimedIssueReply issue_reply = 2;
+    ClaimedChannelReply channel_reply = 3;
+    ClaimedProjectAgentTask project_agent_task = 4;
+    ClaimedMergeBatch merge_batch = 5;
+    ClaimedDmMemoryLearning dm_memory = 6;
+  }
+}
+
+message RenewWorkLeaseRequest {
+  string project_id = 1;
+  string worker_id = 2;
+  WorkClaimIdentity work = 3;
+}
+
+message WorkClaimIdentity {
+  string work_id = 1;
+  string run_id = 2;
+  string claim_token = 3;
+
+  oneof work {
+    IssueClaimIdentity issue = 10;
+    IssueReplyClaimIdentity issue_reply = 11;
+    ChannelReplyClaimIdentity channel_reply = 12;
+    ProjectAgentTaskClaimIdentity project_agent_task = 13;
+    MergeBatchClaimIdentity merge_batch = 14;
+    DmMemoryLearningClaimIdentity dm_memory = 15;
+  }
+}
+
+message IssueClaimIdentity {}
+message IssueReplyClaimIdentity {}
+message ProjectAgentTaskClaimIdentity {}
+message MergeBatchClaimIdentity {}
+message DmMemoryLearningClaimIdentity {
+  string organization_id = 1;
+  string input_hash = 2;
+}
+
+message ChannelReplyClaimIdentity {
+  string organization_id = 1;
+}
+
+message RenewWorkLeaseResponse {
+  google.protobuf.Timestamp lease_expires_at = 1;
+  oneof work {
+    IssueLeaseRenewal issue = 10;
+    IssueReplyLeaseRenewal issue_reply = 11;
+    ChannelReplyLeaseRenewal channel_reply = 12;
+    ProjectAgentTaskLeaseRenewal project_agent_task = 13;
+    MergeBatchLeaseRenewal merge_batch = 14;
+    DmMemoryLearningLeaseRenewal dm_memory = 15;
+  }
+}
+
+message CheckpointChannelReplySessionRequest {
+  string project_id = 1;
+  string worker_id = 2;
+  // Must contain the exact active channel_reply claim. Other work variants and
+  // unknown oneof cases are rejected rather than inferred from scalar fields.
+  WorkClaimIdentity work = 3;
+  optional string conversation_id = 4;
+}
+
+message CheckpointChannelReplySessionResponse {
+  google.protobuf.Timestamp retained_until = 1;
+}
+
+message PrepareReplyAttachmentUploadsRequest {
+  // Stable across a client retry. Reusing it with different metadata fails.
+  string request_id = 1;
+  string project_id = 2;
+  string worker_id = 3;
+  // Only exact active issue_reply and channel_reply claims are accepted.
+  // Other or unknown oneof variants fail closed.
+  WorkClaimIdentity work = 4;
+  repeated briar.types.v1.UploadFileMetadata attachments = 5;
+}
+
+message PrepareReplyAttachmentUploadsResponse {
+  bool replayed = 1;
+  repeated briar.types.v1.PreparedUpload uploads = 2;
+}
+
+message ReplyFailure {
+  string error = 1;
+}
+
+message ReplyIssueDraft {
+  reserved 4;
+
+  string title = 1;
+  optional string description = 2;
+  optional uint32 priority = 3;
+}
+
+message IssueReplyReworkAction {
+  string workflow_stage = 1;
+  string reason = 2;
+}
+
+message IssueReplyUpdateAction {
+  optional string title = 1;
+
+  oneof description {
+    string set_description = 2;
+    google.protobuf.Empty clear_description = 3;
+  }
+
+  oneof priority {
+    uint32 set_priority = 4;
+    google.protobuf.Empty clear_priority = 5;
+  }
+}
+
+message IssueReplyCreateAction {
+  ReplyIssueDraft issue = 1;
+  bool execute_after_create = 2;
+}
+
+message IssueReplyExecutionAction {}
+message IssueReplySkillExecutionAction {}
+
+message IssueReplySuccess {
+  string body = 1;
+  repeated briar.types.v1.UploadReference attachments = 2;
+
+  // A reply can propose at most one follow-up action. Unknown action variants
+  // and unspecified nested enums are rejected rather than ignored.
+  oneof action {
+    IssueReplyReworkAction rework = 10;
+    IssueReplyUpdateAction update = 11;
+    IssueReplyCreateAction create = 12;
+    IssueReplyExecutionAction execution = 13;
+    IssueReplySkillExecutionAction skill_execution = 14;
+  }
+}
+
+message CompleteIssueReplyRequest {
+  // Stable across a client retry. The server records the exact outcome before
+  // clearing the claim token so a lost response can be replayed safely.
+  string request_id = 1;
+  string project_id = 2;
+  string worker_id = 3;
+  // Must be the exact active issue_reply claim; other variants fail closed.
+  WorkClaimIdentity work = 4;
+
+  oneof outcome {
+    IssueReplySuccess success = 10;
+    ReplyFailure failure = 11;
+  }
+}
+
+enum ReplyCompletionDisposition {
+  REPLY_COMPLETION_DISPOSITION_UNSPECIFIED = 0;
+  REPLY_COMPLETION_DISPOSITION_COMPLETED = 1;
+  REPLY_COMPLETION_DISPOSITION_REQUEUED = 2;
+  REPLY_COMPLETION_DISPOSITION_FAILED = 3;
+}
+
+message CompleteIssueReplyResponse {
+  bool replayed = 1;
+  // Implementations reject unspecified and unknown values on read.
+  ReplyCompletionDisposition disposition = 2;
+}
+
+message ChannelReplyDocumentAction {
+  string title = 1;
+  string markdown = 2;
+  optional string project_id = 3;
+}
+
+message ChannelReplyIssueAction {
+  optional string project_id = 1;
+  ReplyIssueDraft issue = 2;
+  bool execute_after_create = 3;
+}
+
+message ChannelReplyIssueBatchItem {
+  string key = 1;
+  ReplyIssueDraft issue = 2;
+}
+
+message ChannelReplyIssueBatchDependency {
+  string prerequisite_key = 1;
+  string dependent_key = 2;
+}
+
+message ChannelReplyIssueBatchAction {
+  optional string project_id = 1;
+  repeated ChannelReplyIssueBatchItem items = 2;
+  repeated ChannelReplyIssueBatchDependency dependencies = 3;
+}
+
+message ChannelReplyExecutionAction {
+  string project_id = 1;
+  string run_id = 2;
+}
+
+message ChannelReplySkillExecutionAction {}
+
+message ChannelReplyDelegationAction {
+  string project_id = 1;
+  string agent_id = 2;
+  string request = 3;
+}
+
+message ChannelReplyArtifactsAction {
+  optional ChannelReplyDocumentAction document = 1;
+
+  oneof proposal {
+    ChannelReplyIssueAction issue = 10;
+    ChannelReplyIssueBatchAction issue_batch = 11;
+    ChannelReplyExecutionAction execution = 12;
+  }
+}
+
+message ChannelReplySuccess {
+  string body = 1;
+  optional string conversation_id = 2;
+  repeated briar.types.v1.UploadReference attachments = 3;
+  repeated briar.app.v1.DmMemoryReference memory_citations = 4;
+  optional DmMemorySaveRequest memory_save_request = 5;
+
+  // A document may accompany at most one proposal. Skill execution and
+  // delegation remain exclusive from every artifact at the wire boundary.
+  // Unknown action variants and unspecified nested enums fail closed.
+  oneof action {
+    ChannelReplyArtifactsAction artifacts = 10;
+    ChannelReplySkillExecutionAction skill_execution = 11;
+    ChannelReplyDelegationAction delegation = 12;
+  }
+}
+
+message DmMemorySaveRequest {
+  repeated briar.app.v1.DmMemoryReference documents = 1;
+}
+
+message CompleteChannelReplyRequest {
+  // Stable across a client retry and bound to the exact claim result.
+  string request_id = 1;
+  string project_id = 2;
+  string worker_id = 3;
+  // Must be the exact active channel_reply claim; other variants fail closed.
+  WorkClaimIdentity work = 4;
+
+  oneof outcome {
+    ChannelReplySuccess success = 10;
+    ReplyFailure failure = 11;
+  }
+}
+
+message CompleteChannelReplyResponse {
+  bool replayed = 1;
+  // Implementations reject unspecified and unknown values on read.
+  ReplyCompletionDisposition disposition = 2;
+  optional google.protobuf.Timestamp retained_until = 3;
+}
+
+message DmMemoryClaimIdentity {
+  string project_id = 1;
+  string worker_id = 2;
+  WorkClaimIdentity work = 3;
+  uint64 revocation_epoch = 4;
+}
+
+message CheckDmMemoryClaimRequest {
+  DmMemoryClaimIdentity claim = 1;
+}
+
+message CheckDmMemoryClaimResponse {
+  briar.app.v1.DmMemoryDescriptor memory = 1;
+}
+
+message GetDmMemoryBriefRequest {
+  DmMemoryClaimIdentity claim = 1;
+}
+
+message GetDmMemoryBriefResponse {
+  briar.app.v1.DmMemoryDescriptor memory = 1;
+  google.protobuf.Value brief = 2;
+}
+
+message LookupDmMemoryRequest {
+  DmMemoryClaimIdentity claim = 1;
+  string request_id = 2;
+  google.protobuf.Value request = 3;
+}
+
+message LookupDmMemoryResponse {
+  google.protobuf.Value response = 1;
+}
+
+message PublishReplyActivityRequest {
+  string reply_job_id = 1;
+  uint64 sequence = 2;
+  // Absence clears the visible activity. Implementations reject unspecified or
+  // unrecognized AgentActivityKind values instead of treating them as a default.
+  optional briar.realtime.v1.AgentActivity activity = 3;
+}
+
+message PublishReplyActivityResponse {}
+
+message IssueLeaseRenewal {}
+message ProjectAgentTaskLeaseRenewal {}
+
+message IssueReplyLeaseRenewal {
+  optional ChannelActivityCredential activity = 1;
+}
+
+message ChannelReplyLeaseRenewal {
+  optional google.protobuf.Timestamp retained_until = 1;
+  optional ChannelActivityCredential activity = 2;
+}
+
+message MergeBatchLeaseRenewal {
+  string batch_id = 1;
+}
+
+message DmMemoryLearningLeaseRenewal {}
+
+message ClaimedDmMemoryLearning {
+  string work_id = 1;
+  string run_id = 2;
+  string organization_id = 3;
+  string worker_id = 4;
+  string source_key = 5;
+  string title = 6;
+  string claim_token = 7;
+  google.protobuf.Timestamp claimed_at = 8;
+  google.protobuf.Timestamp lease_expires_at = 9;
+  string input_hash = 10;
+  bytes snapshot_json = 11;
+}
+
+enum DmMemoryLearningStage {
+  DM_MEMORY_LEARNING_STAGE_UNSPECIFIED = 0;
+  DM_MEMORY_LEARNING_STAGE_PROPOSING = 1;
+  DM_MEMORY_LEARNING_STAGE_VERIFYING = 2;
+}
+
+enum DmMemoryLearningFailure {
+  DM_MEMORY_LEARNING_FAILURE_UNSPECIFIED = 0;
+  DM_MEMORY_LEARNING_FAILURE_INVALID_PROPOSAL = 1;
+  DM_MEMORY_LEARNING_FAILURE_VERIFICATION_REJECTED = 2;
+  DM_MEMORY_LEARNING_FAILURE_STALE = 3;
+  DM_MEMORY_LEARNING_FAILURE_SCOPE_REVOKED = 4;
+  DM_MEMORY_LEARNING_FAILURE_BUDGET_EXHAUSTED = 5;
+  DM_MEMORY_LEARNING_FAILURE_MODEL_UNAVAILABLE = 6;
+  DM_MEMORY_LEARNING_FAILURE_MODEL_TIMEOUT = 7;
+  DM_MEMORY_LEARNING_FAILURE_MODEL_CREDENTIALS = 8;
+  DM_MEMORY_LEARNING_FAILURE_MODEL_CONFIGURATION = 9;
+  DM_MEMORY_LEARNING_FAILURE_INPUT_CAPACITY = 10;
+}
+
+message DmMemoryLearningUsage {
+  uint64 input_tokens = 1;
+  uint64 output_tokens = 2;
+  optional uint64 cost_micro_usd = 3;
+}
+
+message DmMemoryLearningRequestIdentity {
+  string project_id = 1;
+  string worker_id = 2;
+  WorkClaimIdentity work = 3;
+}
+
+message ReserveDmMemoryLearningCallRequest {
+  DmMemoryLearningRequestIdentity claim = 1;
+  string call_id = 2;
+  DmMemoryLearningStage stage = 3;
+}
+
+message SubmitDmMemoryLearningProposalRequest {
+  DmMemoryLearningRequestIdentity claim = 1;
+  string call_id = 2;
+  bytes proposal_json = 3;
+  DmMemoryLearningUsage usage = 4;
+}
+
+message SubmitDmMemoryLearningVerificationRequest {
+  DmMemoryLearningRequestIdentity claim = 1;
+  string call_id = 2;
+  string proposal_id = 3;
+  string proposal_hash = 4;
+  bytes verification_json = 5;
+  DmMemoryLearningUsage usage = 6;
+}
+
+message FailDmMemoryLearningRequest {
+  DmMemoryLearningRequestIdentity claim = 1;
+  DmMemoryLearningFailure code = 2;
+  optional string call_id = 3;
+  optional DmMemoryLearningUsage usage = 4;
+}
+
+message ReserveDmMemoryLearningCallResponse {
+  bytes json = 1;
+}
+
+message SubmitDmMemoryLearningProposalResponse {
+  bytes json = 1;
+}
+
+message SubmitDmMemoryLearningVerificationResponse {
+  bytes json = 1;
+}
+
+message FailDmMemoryLearningResponse {
+  bool released = 1;
+}
+
+message HandoffWorkRequest {
+  string request_id = 1;
+  string project_id = 2;
+  string worker_id = 3;
+  WorkClaimIdentity work = 4;
+  WorkerExecutionCheckpoint checkpoint = 5;
+}
+
+message WorkerExecutionCheckpoint {
+  optional string conversation_id = 1;
+  optional string workspace_path = 2;
+}
+
+message HandoffWorkResponse {
+  enum Outcome {
+    OUTCOME_UNSPECIFIED = 0;
+    OUTCOME_RELEASED = 1;
+    OUTCOME_ALREADY_RELEASED = 2;
+  }
+
+  enum State {
+    STATE_UNSPECIFIED = 0;
+    STATE_DRAINING = 1;
+    STATE_READY = 2;
+  }
+
+  Outcome outcome = 1;
+  string request_id = 2;
+  State state = 3;
+  uint32 active_work_count = 4;
+  bool ready = 5;
+}
+
+message CompleteProjectAgentTaskRequest {
+  string project_id = 1;
+  string worker_id = 2;
+  WorkClaimIdentity work = 3;
+
+  oneof result {
+    ProjectAgentTaskSuccess success = 10;
+    ProjectAgentTaskFailure failure = 11;
+  }
+}
+
+message ProjectAgentTaskSuccess {
+  string summary = 1;
+  optional string conversation_id = 2;
+}
+
+message ProjectAgentTaskFailure {
+  string error = 1;
+}
+
+message CompleteProjectAgentTaskResponse {
+  bool replayed = 1;
+}
+
+message RecordMergeBatchCandidateEnqueuedRequest {
+  string project_id = 1;
+  string worker_id = 2;
+  WorkClaimIdentity work = 3;
+  string candidate_id = 4;
+  string expected_head_sha = 5;
+  string expected_base_sha = 6;
+  string queue_entry_id = 7;
+}
+
+message RecordMergeBatchCandidateEnqueuedResponse {
+  string batch_id = 1;
+  string candidate_id = 2;
+  MergeBatchState state = 3;
+}
+
+message RecordMergeBatchAuthorityRequest {
+  string project_id = 1;
+  string worker_id = 2;
+  WorkClaimIdentity work = 3;
+  string integration_ref = 4;
+  string integration_sha = 5;
+  string base_sha = 6;
+}
+
+message RecordMergeBatchAuthorityResponse {
+  string batch_id = 1;
+  MergeBatchState state = 2;
+  string merge_group_sha = 3;
+}
+
+message RecordMergeBatchValidationRequest {
+  string project_id = 1;
+  string worker_id = 2;
+  WorkClaimIdentity work = 3;
+  string merge_group_sha = 4;
+  MergeBatchValidationResults validation_results = 5;
+}
+
+message RecordMergeBatchValidationResponse {
+  string batch_id = 1;
+  MergeBatchState state = 2;
+  google.protobuf.Timestamp validated_at = 3;
+}
+
+message CompleteMergeBatchPublicationRequest {
+  string project_id = 1;
+  string worker_id = 2;
+  WorkClaimIdentity work = 3;
+  string merge_group_sha = 4;
+}
+
+message CompleteMergeBatchPublicationResponse {
+  string batch_id = 1;
+  MergeBatchState state = 2;
+  google.protobuf.Timestamp published_at = 3;
+}
+
+message BlockMergeBatchRequest {
+  string project_id = 1;
+  string worker_id = 2;
+  WorkClaimIdentity work = 3;
+  string code = 4;
+  string detail = 5;
+}
+
+message BlockMergeBatchResponse {
+  string batch_id = 1;
+  MergeBatchState state = 2;
+}
+
+enum WorkerReadinessState {
+  WORKER_READINESS_STATE_UNSPECIFIED = 0;
+  WORKER_READINESS_STATE_READY = 1;
+  WORKER_READINESS_STATE_BUSY = 2;
+  WORKER_READINESS_STATE_NEEDS_ATTENTION = 3;
+}
+
+message HeartbeatWorkerRequest {
+  string worker_id = 1;
+  briar.types.v1.WorkerRuntimeAdvertisement runtime = 2;
+  bool refresh_maintenance = 3;
+  bool accepting_work = 4;
+  WorkerReadinessState readiness_state = 5;
+  optional string readiness_detail = 6;
+}
+
+message HeartbeatWorkerResponse {
+  briar.app.v1.DashboardWorker worker = 1;
+  repeated briar.types.v1.WorkflowRequirement workflow_requirements = 2;
+  optional briar.app.v1.ExecutionWorkerUpdateRequestState update_directive = 3;
+}
+
+message UpdateWorkerLabelRequest {
+  string worker_id = 1;
+  string label = 2;
+}
+
+message UpdateWorkerLabelResponse {
+  string device_id = 1;
+  string label = 2;
+}
+
+message PrepareWorkerUpdateHandoffRequest {
+  string worker_id = 1;
+  string target_version = 2;
+}
+
+message PrepareWorkerUpdateHandoffResponse {
+  briar.app.v1.ExecutionWorkerUpdateRequestState update = 1;
+  uint32 active_work_count = 2;
+  bool ready = 3;
+}
+
+message GetWorkerUpdateHandoffRequest {
+  string worker_id = 1;
+  optional string request_id = 2;
+}
+
+message GetWorkerUpdateHandoffResponse {
+  optional briar.app.v1.ExecutionWorkerUpdateRequestState update = 1;
+  uint32 active_work_count = 2;
+  bool ready = 3;
+}
+
+message FailWorkerUpdateHandoffRequest {
+  string worker_id = 1;
+  string request_id = 2;
+  string error = 3;
+}
+
+message FailWorkerUpdateHandoffResponse {}
+
+message ClaimedHandoffContext {
+  enum WorkKind {
+    WORK_KIND_UNSPECIFIED = 0;
+    WORK_KIND_ISSUE = 1;
+    WORK_KIND_ISSUE_REPLY = 2;
+    WORK_KIND_CHANNEL_REPLY = 3;
+    WORK_KIND_PROJECT_AGENT_TASK = 4;
+  }
+
+  string request_id = 1;
+  WorkKind work_kind = 2;
+  string work_id = 3;
+  optional string run_id = 4;
+  optional string conversation_id = 5;
+  optional string workspace_path = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+message QueuedAttachment {
+  string id = 1;
+  string filename = 2;
+  string content_type = 3;
+  uint32 byte_size = 4;
+  string url = 5;
+}
+
+message QueuedIssueMessage {
+  message Author {
+    optional string id = 1;
+    string name = 2;
+    optional string image = 3;
+    optional briar.types.v1.AgentProvider provider = 4;
+  }
+
+  string id = 1;
+  string run_id = 2;
+  optional string parent_message_id = 3;
+  string body = 4;
+  repeated QueuedAttachment attachments = 5;
+  Author author = 6;
+  uint32 reply_count = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+}
+
+message ResumeContext {
+  string checkpoint_key = 1;
+  briar.types.v1.WorkflowCheckpoint.Position position = 2;
+  uint32 revision = 3;
+  bool terminal_review_only = 4;
+}
+
+message DetachedExecution {
+  briar.types.v1.AgentProvider provider = 1;
+  optional string model = 2;
+  optional string effort = 3;
+}
+
+enum AgentSkillKind {
+  AGENT_SKILL_KIND_UNSPECIFIED = 0;
+  AGENT_SKILL_KIND_ISSUE_PROCESSING = 1;
+  AGENT_SKILL_KIND_CUSTOM = 2;
+}
+
+enum AgentSkillExecutionMode {
+  AGENT_SKILL_EXECUTION_MODE_UNSPECIFIED = 0;
+  AGENT_SKILL_EXECUTION_MODE_CONVERSATION = 1;
+  AGENT_SKILL_EXECUTION_MODE_TASK = 2;
+}
+
+enum AgentSkillApprovalPolicy {
+  AGENT_SKILL_APPROVAL_POLICY_UNSPECIFIED = 0;
+  AGENT_SKILL_APPROVAL_POLICY_INVOKE_IS_CONSENT = 1;
+  AGENT_SKILL_APPROVAL_POLICY_EXPLICIT = 2;
+}
+
+message DetachedAgentSkill {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  string body = 4;
+  briar.types.v1.AgentProvider provider = 5;
+  optional string model = 6;
+  optional string effort = 7;
+  AgentSkillKind kind = 8;
+  AgentSkillExecutionMode execution_mode = 9;
+  AgentSkillApprovalPolicy approval_policy = 10;
+  uint32 position = 11;
+}
+
+message DetachedAgentClaim {
+  reserved 7;
+  reserved "skill";
+
+  string id = 1;
+  string name = 2;
+  briar.types.v1.AgentProvider provider = 3;
+  optional string model = 4;
+  optional string effort = 5;
+  string responsibility = 6;
+  repeated DetachedAgentSkill skills = 8;
+}
+
+message DetachedAgentSkillExecutionTarget {
+  string project_id = 1;
+  string agent_id = 2;
+  string skill_id = 3;
+  string skill_name = 4;
+  string request = 5;
+  AgentSkillExecutionMode execution_mode = 6;
+  AgentSkillApprovalPolicy approval_policy = 7;
+  bool approved = 8;
+}
+
+enum AutoHuntSource {
+  AUTO_HUNT_SOURCE_UNSPECIFIED = 0;
+  AUTO_HUNT_SOURCE_ISSUE = 1;
+  AUTO_HUNT_SOURCE_ERROR = 2;
+  AUTO_HUNT_SOURCE_FEEDBACK = 3;
+}
+
+// Secret-free durable issue snapshot shared by the Worker RPC claim and local
+// CLI ProtoJSON output. Attachments are wrapped separately because local
+// allocation adds a downloaded path or error to each attachment.
+message ClaimedIssuePayload {
+  string execution_id = 1;
+  string run_id = 2;
+  uint32 run_number = 3;
+  uint32 current_attempt = 4;
+  uint32 current_revision = 5;
+  AutoHuntSource source = 6;
+  string source_key = 7;
+  string title = 8;
+  optional string description = 9;
+  optional uint32 priority = 10;
+  string repository = 11;
+  optional google.protobuf.Timestamp source_created_at = 12;
+  optional string created_by_user_id = 13;
+  optional google.protobuf.Struct context = 14;
+  optional string review_feedback = 15;
+  briar.types.v1.AutoHuntWorkflow workflow = 16;
+  optional string workflow_stage = 17;
+  optional string start_stage = 18;
+  optional ResumeContext resume_context = 19;
+  repeated QueuedIssueMessage messages = 20;
+  string claimed_by = 21;
+  google.protobuf.Timestamp claimed_at = 22;
+  google.protobuf.Timestamp lease_expires_at = 23;
+  uint32 claim_attempts = 24;
+  optional DetachedExecution execution = 25;
+}
+
+message ClaimedIssue {
+  ClaimedIssuePayload payload = 1;
+  repeated QueuedAttachment attachments = 2;
+  string claim_token = 3;
+  optional ClaimedHandoffContext handoff_context = 4;
+  optional DetachedAgentClaim agent = 5;
+  optional DetachedAgentSkill active_skill = 6;
+}
+
+message ClaimedProjectAgentTask {
+  string work_id = 1;
+  string run_id = 2;
+  string source_key = 3;
+  string title = 4;
+  string claim_token = 5;
+  uint32 claim_attempts = 6;
+  google.protobuf.Timestamp claimed_at = 7;
+  google.protobuf.Timestamp lease_expires_at = 8;
+  string request = 9;
+  DetachedAgentClaim agent = 10;
+  optional DetachedAgentSkill active_skill = 11;
+  optional ClaimedHandoffContext handoff_context = 12;
+}
+
+message ChannelActivityCredential {
+  string token = 1;
+  google.protobuf.Timestamp expires_at = 2;
+}
+
+message ClaimedIssueReply {
+  message Snapshot {
+    google.protobuf.Struct run = 1;
+    repeated QueuedIssueMessage messages = 2;
+    repeated google.protobuf.Struct agent_transcript = 3;
+    repeated google.protobuf.Struct evidence = 4;
+  }
+
+  string work_id = 1;
+  string run_id = 2;
+  string source_key = 3;
+  string title = 4;
+  string trigger_message_id = 5;
+  string parent_message_id = 6;
+  briar.types.v1.AgentProvider provider = 7;
+  optional string model = 8;
+  optional string effort = 9;
+  optional DetachedAgentClaim agent = 10;
+  optional DetachedAgentSkill active_skill = 11;
+  optional DetachedAgentSkillExecutionTarget skill_execution_target = 12;
+  optional string branch = 13;
+  bool requires_preferred_worker = 14;
+  string claim_token = 15;
+  google.protobuf.Timestamp claimed_at = 16;
+  google.protobuf.Timestamp lease_expires_at = 17;
+  optional ChannelActivityCredential activity = 18;
+  optional ClaimedHandoffContext handoff_context = 19;
+  Snapshot snapshot = 20;
+}
+
+message ChannelReplyScope {
+  message Organization {
+    string organization_id = 1;
+  }
+
+  message Project {
+    string organization_id = 1;
+    string project_id = 2;
+  }
+
+  oneof scope {
+    Organization organization = 1;
+    Project project = 2;
+  }
+}
+
+message ClaimedChannelDelegation {
+  string delegated_by_reply_id = 1;
+  string delegated_by_agent_id = 2;
+  string delegated_by_agent_name = 3;
+  string request = 4;
+}
+
+message ChannelDelegationTarget {
+  message Skill {
+    string id = 1;
+    string name = 2;
+  }
+
+  string agent_id = 1;
+  string agent_name = 2;
+  string project_id = 3;
+  string project_name = 4;
+  string responsibility = 5;
+  repeated Skill skills = 6;
+}
+
+enum ChannelReplySessionClaimReason {
+  CHANNEL_REPLY_SESSION_CLAIM_REASON_UNSPECIFIED = 0;
+  CHANNEL_REPLY_SESSION_CLAIM_REASON_SESSION_CREATED = 1;
+  CHANNEL_REPLY_SESSION_CLAIM_REASON_WORKER_REUSED = 2;
+  CHANNEL_REPLY_SESSION_CLAIM_REASON_WORKER_REUSED_RUNTIME_CHANGED = 3;
+  CHANNEL_REPLY_SESSION_CLAIM_REASON_WORKER_FAILOVER_LEASE_EXPIRED = 4;
+  CHANNEL_REPLY_SESSION_CLAIM_REASON_WORKER_FAILOVER_UNAVAILABLE_OR_INCOMPATIBLE = 5;
+  CHANNEL_REPLY_SESSION_CLAIM_REASON_TTL_EXPIRED_REACTIVATED = 6;
+}
+
+message ChannelReplySession {
+  string id = 1;
+  string thread_id = 2;
+  optional string conversation_id = 3;
+  google.protobuf.Timestamp retained_until = 4;
+  ChannelReplySessionClaimReason claim_reason = 5;
+}
+
+message ClaimedChannelReply {
+  string work_id = 1;
+  string channel_id = 2;
+  ChannelReplyScope scope = 3;
+  string run_id = 4;
+  string source_key = 5;
+  string title = 6;
+  string trigger_message_id = 7;
+  string parent_message_id = 8;
+  briar.types.v1.AgentProvider provider = 9;
+  optional string model = 10;
+  optional string effort = 11;
+  DetachedAgentClaim agent = 12;
+  optional DetachedAgentSkill active_skill = 13;
+  optional DetachedAgentSkillExecutionTarget skill_execution_target = 14;
+  string claim_token = 15;
+  google.protobuf.Timestamp claimed_at = 16;
+  google.protobuf.Timestamp lease_expires_at = 17;
+  optional ChannelActivityCredential activity = 18;
+  optional google.protobuf.Timestamp organization_context_snapshot_at = 19;
+  optional ClaimedChannelDelegation delegation = 20;
+  repeated ChannelDelegationTarget delegation_targets = 21;
+  optional ChannelReplySession session = 22;
+  optional ClaimedHandoffContext handoff_context = 23;
+  // Untrusted prompt context only; consumers must not derive privileged operations from it.
+  google.protobuf.Struct snapshot = 24;
+  // Trigger-message files with claim-scoped raw download URLs.
+  repeated QueuedAttachment trigger_attachments = 25;
+  optional briar.app.v1.DmMemoryDescriptor memory = 26;
+  bool memory_learning_enabled = 27;
+}
+
+enum MergeBatchPhase {
+  MERGE_BATCH_PHASE_UNSPECIFIED = 0;
+  MERGE_BATCH_PHASE_ENQUEUE = 1;
+  MERGE_BATCH_PHASE_TAIL_AUTHORITY = 2;
+  MERGE_BATCH_PHASE_VALIDATE = 3;
+  MERGE_BATCH_PHASE_PUBLISH = 4;
+  MERGE_BATCH_PHASE_DRAIN = 5;
+}
+
+enum MergeBatchState {
+  MERGE_BATCH_STATE_UNSPECIFIED = 0;
+  MERGE_BATCH_STATE_FROZEN = 1;
+  MERGE_BATCH_STATE_ENQUEUEING = 2;
+  MERGE_BATCH_STATE_WAITING_TAIL = 3;
+  MERGE_BATCH_STATE_VALIDATING = 4;
+  MERGE_BATCH_STATE_PUBLISHING = 5;
+  MERGE_BATCH_STATE_DRAINING = 6;
+  MERGE_BATCH_STATE_COLLECTING = 7;
+  MERGE_BATCH_STATE_AWAITING_MERGE = 8;
+  MERGE_BATCH_STATE_BLOCKED = 9;
+  MERGE_BATCH_STATE_COMPLETED = 10;
+  MERGE_BATCH_STATE_FAILED = 11;
+}
+
+enum MergeBatchMemberState {
+  MERGE_BATCH_MEMBER_STATE_UNSPECIFIED = 0;
+  MERGE_BATCH_MEMBER_STATE_READY = 1;
+  MERGE_BATCH_MEMBER_STATE_FROZEN = 2;
+  MERGE_BATCH_MEMBER_STATE_ENQUEUED = 3;
+  MERGE_BATCH_MEMBER_STATE_MERGED = 4;
+  MERGE_BATCH_MEMBER_STATE_DEQUEUED = 5;
+  MERGE_BATCH_MEMBER_STATE_FAILED = 6;
+}
+
+enum MergeBatchValidationFailureCode {
+  MERGE_BATCH_VALIDATION_FAILURE_CODE_UNSPECIFIED = 0;
+  MERGE_BATCH_VALIDATION_FAILURE_CODE_CI_FAILED = 1;
+  MERGE_BATCH_VALIDATION_FAILURE_CODE_OUTPUT_LIMIT = 2;
+}
+
+message MergeBatchValidationResult {
+  string context = 1;
+  bool passed = 2;
+  uint32 exit_code = 3;
+  optional MergeBatchValidationFailureCode failure_code = 4;
+  string log = 5;
+  string log_sha256 = 6;
+  bool log_truncated = 7;
+}
+
+message MergeBatchValidationResults {
+  repeated MergeBatchValidationResult results = 1;
+}
+
+message MergeBatch {
+  string id = 1;
+  MergeBatchState state = 2;
+  optional string final_delivery_id = 3;
+  optional string merge_group_ref = 4;
+  optional string merge_group_sha = 5;
+  optional string merge_group_base_sha = 6;
+  optional MergeBatchValidationResults validation_results = 7;
+  optional google.protobuf.Timestamp validated_at = 8;
+  optional google.protobuf.Timestamp published_at = 9;
+  optional string failure_code = 10;
+  optional string failure_detail = 11;
+}
+
+message MergeBatchMember {
+  string id = 1;
+  uint32 ordinal = 2;
+  string run_id = 3;
+  uint32 attempt = 4;
+  uint32 revision = 5;
+  uint64 pull_request_id = 6;
+  string pull_request_node_id = 7;
+  uint32 pull_request_number = 8;
+  string pull_request_url = 9;
+  string head_sha = 10;
+  string base_sha = 11;
+  optional string queue_entry_id = 12;
+  MergeBatchMemberState state = 13;
+}
+
+message PendingMergeGroupHead {
+  string delivery_id = 1;
+  string head_ref = 2;
+  string head_sha = 3;
+  string base_sha = 4;
+  uint32 tail_pull_request_number = 5;
+  google.protobuf.Timestamp received_at = 6;
+}
+
+message ClaimedMergeBatch {
+  string work_id = 1;
+  string run_id = 2;
+  string source_key = 3;
+  string title = 4;
+  string project_id = 5;
+  uint64 repository_id = 6;
+  string repository = 7;
+  string base_branch = 8;
+  repeated string validation_commands = 9;
+  MergeBatchPhase phase = 10;
+  string claim_token = 11;
+  google.protobuf.Timestamp claimed_at = 12;
+  google.protobuf.Timestamp lease_expires_at = 13;
+  uint32 claim_attempts = 14;
+  MergeBatch batch = 15;
+  repeated MergeBatchMember members = 16;
+  repeated PendingMergeGroupHead pending_heads = 17;
+}

@@ -3,15 +3,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { afterEach, describe, expect, it } from "vitest";
+import { type Config, encodeConfigJson } from "./config-contract";
 
 const temporaryHomes: string[] = [];
 const repositoryWorkflow = {
-  version: 2,
+  version: 2 as const,
   requirements: [],
   stages: [{ id: "analyzing", label: "Analyze", required: true }],
   execution: { checkpoints: [] },
   completion: { requiredStages: ["analyzing"] },
-} as const;
+};
 const bunExecutable = spawnSync("/usr/bin/env", ["which", "bun"], {
   encoding: "utf8",
 }).stdout.trim();
@@ -26,21 +27,36 @@ async function cliHome(velenOrg?: string) {
 
 async function writeCliConfig(configDirectory: string, velenOrg?: string) {
   await mkdir(configDirectory, { recursive: true });
+  const config = {
+    apiUrl: "http://127.0.0.1:8787",
+    agentProviders: {
+      codex: true,
+      claude: true,
+      cursor: true,
+      grok: true,
+      agy: true,
+      opencode: true,
+      openrouter: true,
+    },
+    appSettings: {
+      preventSleepWhileRunning: false,
+      browserAutomationProvider: "ego-browser",
+    },
+    projects: [{
+      id: "11111111-1111-4111-8111-111111111111",
+      repositoryPath: process.cwd(),
+      agentToken: "briar_agent_test",
+      apiUrl: "http://127.0.0.1:8787",
+      autoHunt: {
+        ...(velenOrg ? { velenOrg } : undefined),
+        linear: { enabled: false },
+        workflow: repositoryWorkflow,
+      },
+    }],
+  } satisfies Config;
   await writeFile(
     join(configDirectory, "config.json"),
-    JSON.stringify({
-      apiUrl: "http://127.0.0.1:8787",
-      projects: [{
-        id: "11111111-1111-4111-8111-111111111111",
-        repositoryPath: process.cwd(),
-        agentToken: "briar_agent_test",
-        autoHunt: {
-          ...(velenOrg ? { velenOrg } : undefined),
-          linear: { enabled: false },
-          workflow: repositoryWorkflow,
-        },
-      }],
-    }),
+    encodeConfigJson(config),
   );
 }
 

@@ -5,11 +5,10 @@ import { sha256 } from "./crypto-digest";
 import { expireDmMemories } from "./dm-memory-access";
 import { captureDmLearningInput, dmLearningInputsCurrentSql, dmLearningLiveSpaceSql,
   type DmLearningJobRow, type DmLearningSpaceRow } from "./dm-memory-learning-input";
-import { supportsDmMemoryLearning } from "./dm-memory-learning-policy";
 import { scheduleDmLearningJobs } from "./dm-memory-learning-queue";
 import { reapDmLearningClaims } from "./dm-memory-learning-maintenance";
 import { DmLearningError } from "./dm-memory-learning-validation";
-import { executionWorkerBindingById, executionWorkerDeviceSessionBindings,
+import { executionWorkerBindingById, executionWorkerDeviceSessionBindings, executionWorkerRuntime,
   executionWorkerDeviceSessionsQuery, workerStateAt } from "./workers";
 
 export type DmLearningClaimIdentity = { organizationId: string; workerId: string; deviceId: string; claimTokenHash: string; jobId: string };
@@ -25,12 +24,12 @@ export const dmLearningWorkerCurrentSql = `exists (
       where policy.project_id = agent.project_id and policy.selection_mode <> 'any')
       or exists (select 1 from briar_project_execution_worker_allowlist allowed
         where allowed.project_id = agent.project_id and allowed.worker_id = worker.id))
-    and json_valid(worker.capabilities_json)
-    and json_extract(worker.capabilities_json, '$.dmMemory.protocol') = 1
-    and json_type(worker.capabilities_json, '$.dmMemory.protocol') = 'integer'
-    and json_extract(worker.capabilities_json, '$.dmMemoryLearning.protocol') = 1
-    and json_type(worker.capabilities_json, '$.dmMemoryLearning.protocol') = 'integer'
-    and json_extract(worker.capabilities_json, '$.dmMemoryLearning.transport') = 'openrouter')`;
+    and json_valid(worker.runtime_proto_json)
+    and json_extract(worker.runtime_proto_json, '$.capabilities.dmMemoryProtocol') = 1
+    and json_type(worker.runtime_proto_json, '$.capabilities.dmMemoryProtocol') = 'integer'
+    and json_extract(worker.runtime_proto_json, '$.capabilities.dmMemoryLearning.protocol') = 1
+    and json_type(worker.runtime_proto_json, '$.capabilities.dmMemoryLearning.protocol') = 'integer'
+    and json_extract(worker.runtime_proto_json, '$.capabilities.dmMemoryLearning.transport') = 'openrouter')`;
 
 export const dmLearningClaimCurrentSql = `job.status = 'running' and job.lease_expires_at > ?
   and job.kind in ('extract', 'explicit_request', 'consolidate')
@@ -95,11 +94,49 @@ export async function failDmLearningClaim(db: D1Database, identity: DmLearningCl
   return true;
 }
 
+export async function renewDmLearningClaim(
+  db: D1Database,
+  input: {
+    identity: DmLearningClaimIdentity;
+    policy: DmLearningPolicy;
+    inputHash: string;
+    now: string;
+  },
+) {
+  const { job } = await requireDmLearningClaim(
+    db,
+    input.identity,
+    input.policy,
+    input.now,
+  );
+  if (job.input_hash !== input.inputHash) throw new DmLearningError("stale");
+  const leaseExpiresAt = new Date(Date.parse(input.now) + 5 * 60_000).toISOString();
+  const renewed = await db.prepare(`update briar_dm_memory_jobs as job set lease_expires_at = ?, updated_at = ?
+    where job.id = ? and job.lease_token_hash = ? and job.input_hash = ? and job.policy_json = ?
+      and exists (select 1 from briar_dm_memory_spaces space where space.id = job.space_id
+        and job.expected_memory_revision = space.memory_revision and ${dmLearningClaimCurrentSql}
+        and ${dmLearningInputsCurrentSql}) returning id`)
+    .bind(
+      leaseExpiresAt,
+      input.now,
+      input.identity.jobId,
+      input.identity.claimTokenHash,
+      input.inputHash,
+      dmMemoryCanonicalJson(input.policy),
+      input.now,
+      input.now,
+    ).first();
+  if (!renewed) throw new DmLearningError("stale");
+  return leaseExpiresAt;
+}
+
 export async function claimDmLearningJob(db: D1Database, input: {
   organizationId: string; deviceId: string; workerId: string; projectId: string; policy: DmLearningPolicy; now: string;
 }): Promise<ClaimedDmMemory | null> {
   const worker = await executionWorkerBindingById(db, input.deviceId, input.workerId);
-  if (!worker || worker.project_id !== input.projectId || !supportsDmMemoryLearning(worker.capabilities_json) ||
+  const capabilities = worker === null ? undefined : executionWorkerRuntime(worker).proto.capabilities;
+  if (!worker || worker.project_id !== input.projectId || capabilities?.dmMemoryProtocol !== 1 ||
+    capabilities.dmMemoryLearning?.protocol !== 1 || capabilities.dmMemoryLearning.transport !== "openrouter" ||
     workerStateAt(worker.last_heartbeat_at, input.now, worker.state) !== "online" || worker.accepting_work !== 1 ||
     worker.readiness_state === "needs_attention") return null;
   await scheduleDmLearningJobs(db, input.organizationId, input.policy, input.now);

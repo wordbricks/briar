@@ -26,7 +26,7 @@ import type {
   ProjectAgentScheduleRecurrence,
 } from "./lib/project-agent-schedule";
 import type { IssueDifficulty } from "./lib/issue-difficulty";
-import type { ManagedComputerSetupProvider } from "./lib/managed-computer-setup-protocol";
+import type { ManagedComputerSetupProvider } from "./lib/agent-provider";
 
 export type HuntStatus = AutoHuntRunStatus;
 export type HuntSource = AutoHuntSource;
@@ -142,14 +142,14 @@ export type IssueMessage = {
   runId: string;
   parentMessageId: string | null;
   body: string;
-  attachments?: IssueAttachment[];
+  attachments: IssueAttachment[];
   author: IssueMessageAuthor;
   replyCount: number;
-  proposedAction?: IssueProposedAction | null;
+  proposedAction: IssueProposedAction | null;
   /** A separate approval boundary for execution, including create-then-execute. */
-  executionProposal?: IssueExecutionProposal | null;
+  executionProposal: IssueExecutionProposal | null;
   /** A separate approval boundary for a matched saved Project Agent Skill. */
-  skillExecutionProposal?: AgentSkillExecutionProposal | null;
+  skillExecutionProposal: AgentSkillExecutionProposal | null;
   /** Client-only state while a newly sent message awaits its server response. */
   optimistic?: boolean;
   createdAt: string;
@@ -187,7 +187,6 @@ export type IssueCreateProposal = {
     title: string;
     description: string | null;
     priority: number | null;
-    status: "backlog" | "queued";
   };
   executeAfterCreate?: boolean;
   status: "pending" | "accepted";
@@ -248,6 +247,7 @@ export type IssueConversationDelta = {
   cursor: number;
   hasMore: boolean;
   changed: boolean;
+  reset: boolean;
   messages?: IssueMessage[];
   agentReplies?: IssueAgentReplyState[];
 };
@@ -346,7 +346,7 @@ export type HuntRun = {
   difficulty: IssueDifficulty | null;
   assigneeUserId?: string | null;
   createdByUserId?: string | null;
-  subscribers?: IssueSubscriber[];
+  subscribers: IssueSubscriber[];
   repository: string;
   branch: string | null;
   commitSha: string | null;
@@ -539,7 +539,7 @@ export type ExecutionWorker = {
   label: string;
   icon?: WorkerIcon | null;
   agentProvider: AgentProvider;
-  providers?: AgentProvider[];
+  providers: AgentProvider[];
   versions: Record<string, string>;
   state: "online" | "stale" | "disabled";
   readiness:
@@ -597,7 +597,7 @@ export type OrganizationExecutionWorker = {
     projectId: string;
     projectName: string;
     agentProvider: AgentProvider;
-    providers?: AgentProvider[];
+    providers: AgentProvider[];
     state: "online" | "stale" | "disabled";
     acceptingWork: boolean;
     readiness:
@@ -716,12 +716,12 @@ export type HuntRunPlacement = {
 export type Project = {
   id: string;
   name: string;
-  issueKeyPrefix?: string;
-  scheduleTabEnabled?: boolean;
-  icon?: string | null;
-  organizationId?: string;
-  organizationName?: string;
-  role?: OrganizationRole;
+  issueKeyPrefix: string;
+  scheduleTabEnabled: boolean;
+  icon: string | null;
+  organizationId: string;
+  organizationName: string;
+  role: OrganizationRole;
   createdAt: string;
 };
 
@@ -808,11 +808,11 @@ export type ProjectAgentSkillInput = Pick<
   | "model"
   | "effort"
   | "kind"
+  | "executionMode"
+  | "approvalPolicy"
   | "position"
 > & {
   id?: string;
-  executionMode?: ProjectAgentSkillExecutionMode;
-  approvalPolicy?: ProjectAgentSkillApprovalPolicy;
 };
 
 export type CreateProjectAgentInput = {
@@ -1049,6 +1049,7 @@ export type DashboardPayload = {
 export type DashboardDeltaPayload = {
   cursor: number;
   hasMore: boolean;
+  reset: boolean;
   runs: HuntRun[];
   deletedRunIds: string[];
   workers: ExecutionWorker[];

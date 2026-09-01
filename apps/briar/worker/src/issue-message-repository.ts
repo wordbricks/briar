@@ -17,82 +17,35 @@ export type IssueMessageRow = {
   updated_at: string;
 };
 
-async function issueMessageAgentSchema(db: D1Database) {
-  const result = await db.prepare(
-    `select
-       exists(
-         select 1 from pragma_table_info('briar_issue_messages')
-         where name = 'author_agent_id'
-       ) as has_author_agent_id,
-       exists(
-         select 1 from pragma_table_info('briar_issue_messages')
-         where name = 'author_agent_name'
-       ) as has_author_agent_name,
-       exists(
-         select 1 from pragma_table_info('briar_issue_messages')
-         where name = 'author_agent_provider'
-       ) as has_author_agent_provider,
-       exists(
-         select 1 from sqlite_master
-         where type = 'table' and name = 'briar_project_agents'
-       ) as has_project_agents`,
-  ).first<{
-    has_author_agent_id: number;
-    has_author_agent_name: number;
-    has_author_agent_provider: number;
-    has_project_agents: number;
-  }>();
-  return {
-    hasAuthorAgentId: result?.has_author_agent_id === 1,
-    hasAuthorAgentName: result?.has_author_agent_name === 1,
-    hasAuthorAgentProvider: result?.has_author_agent_provider === 1,
-    hasProjectAgents: result?.has_project_agents === 1,
-  };
-}
+const issueMessageSelection = `
+  message.id, message.run_id, message.parent_message_id,
+  message.author_user_id, message.author_agent_id,
+  message.author_agent_name, message.author_agent_provider,
+  coalesce(author.name, message.author_agent_name) as author_name,
+  author.image as author_image, agent.avatar as author_agent_image,
+  message.body,
+  (select count(*) from briar_issue_messages reply
+   where reply.parent_message_id = message.id) as reply_count,
+  message.created_at, message.updated_at`;
+
+const issueMessageAuthorJoins = `
+  left join "user" author on author.id = message.author_user_id
+  left join briar_project_agents agent
+    on agent.id = message.author_agent_id
+   and agent.project_id = message.project_id`;
 
 export async function listIssueMessages(
   db: D1Database,
   projectId: string,
   runId: string,
 ) {
-  const schema = await issueMessageAgentSchema(db);
-  const authorAgentId = schema.hasAuthorAgentId
-    ? "message.author_agent_id"
-    : "null";
-  const authorAgentName = schema.hasAuthorAgentName
-    ? "message.author_agent_name"
-    : "null";
-  const authorAgentProvider = schema.hasAuthorAgentProvider
-    ? "message.author_agent_provider"
-    : "null";
-  const authorName = schema.hasAuthorAgentName
-    ? "coalesce(author.name, message.author_agent_name)"
-    : "author.name";
-  const agentImage = schema.hasAuthorAgentId && schema.hasProjectAgents
-    ? "agent.avatar"
-    : "null";
-  const agentJoin = schema.hasAuthorAgentId && schema.hasProjectAgents
-    ? `left join briar_project_agents agent
-         on agent.id = message.author_agent_id
-        and agent.project_id = message.project_id`
-    : "";
   const result = await db
     .prepare(
-      `select message.id, message.run_id, message.parent_message_id,
-              message.author_user_id, ${authorAgentId} as author_agent_id,
-              ${authorAgentName} as author_agent_name,
-              ${authorAgentProvider} as author_agent_provider,
-              ${authorName} as author_name,
-              author.image as author_image,
-              ${agentImage} as author_agent_image, message.body,
-              (select count(*) from briar_issue_messages reply
-               where reply.parent_message_id = message.id) as reply_count,
-              message.created_at, message.updated_at
+      `select ${issueMessageSelection}
        from briar_issue_messages message
        join briar_hunt_runs run
          on run.id = message.run_id and run.project_id = message.project_id
-       left join "user" author on author.id = message.author_user_id
-       ${agentJoin}
+       ${issueMessageAuthorJoins}
        where message.project_id = ? and message.run_id = ?
        order by message.created_at, message.id
        limit 1000`,
@@ -108,44 +61,13 @@ export async function listIssueThreadMessages(
   runId: string,
   messageId: string,
 ) {
-  const schema = await issueMessageAgentSchema(db);
-  const authorAgentId = schema.hasAuthorAgentId
-    ? "message.author_agent_id"
-    : "null";
-  const authorAgentName = schema.hasAuthorAgentName
-    ? "message.author_agent_name"
-    : "null";
-  const authorAgentProvider = schema.hasAuthorAgentProvider
-    ? "message.author_agent_provider"
-    : "null";
-  const authorName = schema.hasAuthorAgentName
-    ? "coalesce(author.name, message.author_agent_name)"
-    : "author.name";
-  const agentImage = schema.hasAuthorAgentId && schema.hasProjectAgents
-    ? "agent.avatar"
-    : "null";
-  const agentJoin = schema.hasAuthorAgentId && schema.hasProjectAgents
-    ? `left join briar_project_agents agent
-         on agent.id = message.author_agent_id
-        and agent.project_id = message.project_id`
-    : "";
   const result = await db
     .prepare(
-      `select message.id, message.run_id, message.parent_message_id,
-              message.author_user_id, ${authorAgentId} as author_agent_id,
-              ${authorAgentName} as author_agent_name,
-              ${authorAgentProvider} as author_agent_provider,
-              ${authorName} as author_name,
-              author.image as author_image,
-              ${agentImage} as author_agent_image, message.body,
-              (select count(*) from briar_issue_messages reply
-               where reply.parent_message_id = message.id) as reply_count,
-              message.created_at, message.updated_at
+      `select ${issueMessageSelection}
        from briar_issue_messages message
        join briar_hunt_runs run
          on run.id = message.run_id and run.project_id = message.project_id
-       left join "user" author on author.id = message.author_user_id
-       ${agentJoin}
+       ${issueMessageAuthorJoins}
        where message.project_id = ? and message.run_id = ?
          and message.id in (
            with recursive thread_path(id, parent_message_id) as (
@@ -192,13 +114,9 @@ export async function createIssueMessage(
   },
 ) {
   const parentMessageId = input.parentMessageId?.toLowerCase() ?? null;
-  const schema = await issueMessageAgentSchema(db);
-  const hasAgentIdentityColumns =
-    schema.hasAuthorAgentId && schema.hasAuthorAgentName;
   const result = await db
     .prepare(
-      hasAgentIdentityColumns
-        ? `insert into briar_issue_messages (
+      `insert into briar_issue_messages (
          id, project_id, run_id, parent_message_id, author_user_id,
          author_agent_id, author_agent_name, author_agent_provider,
          body, created_at, updated_at
@@ -210,49 +128,22 @@ export async function createIssueMessage(
         and parent.project_id = run.project_id
         and parent.run_id = run.id
        where run.id = ? and run.project_id = ?
-         and (? is null or parent.id is not null)`
-        : `insert into briar_issue_messages (
-         id, project_id, run_id, parent_message_id, author_user_id,
-         author_agent_provider, body, created_at, updated_at
-       )
-       select ?, run.project_id, run.id, parent.id, ?, ?, ?, ?, ?
-       from briar_hunt_runs run
-       left join briar_issue_messages parent
-         on parent.id = ?
-        and parent.project_id = run.project_id
-        and parent.run_id = run.id
-       where run.id = ? and run.project_id = ?
          and (? is null or parent.id is not null)`,
     )
-    .bind(...(
-      hasAgentIdentityColumns
-        ? [
-            input.id,
-            input.authorUserId,
-            input.authorAgentId ?? null,
-            input.authorAgentName ?? null,
-            input.authorAgentProvider,
-            input.body,
-            input.createdAt,
-            input.createdAt,
-            parentMessageId,
-            input.runId,
-            input.projectId,
-            parentMessageId,
-          ]
-        : [
-            input.id,
-            input.authorUserId,
-            input.authorAgentProvider,
-            input.body,
-            input.createdAt,
-            input.createdAt,
-            parentMessageId,
-            input.runId,
-            input.projectId,
-            parentMessageId,
-          ]
-    ))
+    .bind(
+      input.id,
+      input.authorUserId,
+      input.authorAgentId ?? null,
+      input.authorAgentName ?? null,
+      input.authorAgentProvider,
+      input.body,
+      input.createdAt,
+      input.createdAt,
+      parentMessageId,
+      input.runId,
+      input.projectId,
+      parentMessageId,
+    )
     .run();
   if (result.meta.changes < 1) return null;
   const mentionedUserIds = [...new Set(input.mentionedUserIds ?? [])];
@@ -289,42 +180,11 @@ export async function getIssueMessage(
   runId: string,
   messageId: string,
 ) {
-  const schema = await issueMessageAgentSchema(db);
-  const authorAgentId = schema.hasAuthorAgentId
-    ? "message.author_agent_id"
-    : "null";
-  const authorAgentName = schema.hasAuthorAgentName
-    ? "message.author_agent_name"
-    : "null";
-  const authorAgentProvider = schema.hasAuthorAgentProvider
-    ? "message.author_agent_provider"
-    : "null";
-  const authorName = schema.hasAuthorAgentName
-    ? "coalesce(author.name, message.author_agent_name)"
-    : "author.name";
-  const agentImage = schema.hasAuthorAgentId && schema.hasProjectAgents
-    ? "agent.avatar"
-    : "null";
-  const agentJoin = schema.hasAuthorAgentId && schema.hasProjectAgents
-    ? `left join briar_project_agents agent
-         on agent.id = message.author_agent_id
-        and agent.project_id = message.project_id`
-    : "";
   return await db
     .prepare(
-      `select message.id, message.run_id, message.parent_message_id,
-              message.author_user_id, ${authorAgentId} as author_agent_id,
-              ${authorAgentName} as author_agent_name,
-              ${authorAgentProvider} as author_agent_provider,
-              ${authorName} as author_name,
-              author.image as author_image,
-              ${agentImage} as author_agent_image, message.body,
-              (select count(*) from briar_issue_messages reply
-               where reply.parent_message_id = message.id) as reply_count,
-              message.created_at, message.updated_at
+      `select ${issueMessageSelection}
        from briar_issue_messages message
-       left join "user" author on author.id = message.author_user_id
-       ${agentJoin}
+       ${issueMessageAuthorJoins}
        where message.project_id = ? and message.run_id = ? and message.id = ?
          and exists (
            select 1 from briar_hunt_runs run

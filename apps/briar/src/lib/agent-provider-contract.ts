@@ -1,6 +1,5 @@
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
-import * as SchemaTransformation from "effect/SchemaTransformation";
 import { agentProviders, type AgentProvider } from "./agent-provider";
 
 const strictSchemaOptions = {
@@ -58,24 +57,14 @@ export const AgentProviderCapability = Schema.Struct({
       mutableArray(AgentEffortCapability).check(Schema.isMaxLength(20)),
     ),
   ),
-  allowCustomModels: Schema.mutableKey(Schema.optional(Schema.Boolean)),
+  allowCustomModels: Schema.mutableKey(Schema.Boolean),
   error: Schema.mutableKey(
     Schema.NullOr(Schema.Trim.check(Schema.isMaxLength(2_000))),
   ),
 }).annotate({ parseOptions: strictSchemaOptions });
 export type AgentProviderCapability = typeof AgentProviderCapability.Type;
 
-const PartialAgentProviderCapabilityCatalog = Schema.Struct({
-  codex: Schema.mutableKey(Schema.optional(AgentProviderCapability)),
-  claude: Schema.mutableKey(Schema.optional(AgentProviderCapability)),
-  cursor: Schema.mutableKey(Schema.optional(AgentProviderCapability)),
-  grok: Schema.mutableKey(Schema.optional(AgentProviderCapability)),
-  agy: Schema.mutableKey(Schema.optional(AgentProviderCapability)),
-  opencode: Schema.mutableKey(Schema.optional(AgentProviderCapability)),
-  openrouter: Schema.mutableKey(Schema.optional(AgentProviderCapability)),
-}).annotate({ parseOptions: strictSchemaOptions });
-
-const FullAgentProviderCapabilityCatalog = Schema.Struct({
+export const AgentProviderCapabilityCatalog = Schema.Struct({
   codex: Schema.mutableKey(AgentProviderCapability),
   claude: Schema.mutableKey(AgentProviderCapability),
   cursor: Schema.mutableKey(AgentProviderCapability),
@@ -86,21 +75,7 @@ const FullAgentProviderCapabilityCatalog = Schema.Struct({
 }).annotate({ parseOptions: strictSchemaOptions });
 
 export type AgentProviderCapabilityCatalog =
-  typeof FullAgentProviderCapabilityCatalog.Type;
-
-export const AgentProviderCapabilityCatalog =
-  PartialAgentProviderCapabilityCatalog.pipe(
-    Schema.decodeTo(
-      FullAgentProviderCapabilityCatalog,
-      SchemaTransformation.transform({
-        decode: (partial): AgentProviderCapabilityCatalog => ({
-          ...emptyAgentProviderCapabilityCatalog(),
-          ...partial,
-        }),
-        encode: (catalog) => catalog,
-      }),
-    ),
-  );
+  typeof AgentProviderCapabilityCatalog.Type;
 
 export const decodeAgentProviderCapabilityCatalog = Schema.decodeUnknownSync(
   AgentProviderCapabilityCatalog,

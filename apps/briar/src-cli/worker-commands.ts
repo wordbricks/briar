@@ -1,15 +1,10 @@
-import { dmMemoryCapability } from "../src/lib/dm-memory-query-contract";
-import { decodeClaimedDmMemory } from "../src/lib/dm-memory-learning-contract";
-import { releaseClaimedDmMemory, renewClaimedDmMemory, runClaimedDmMemory } from "./dm-memory-learning";
 import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { platform } from "node:os";
 import { join } from "node:path";
+import { Code, ConnectError } from "@connectrpc/connect";
 import { autoHuntRequirementKinds } from "../src/lib/auto-hunt-contract";
-import { organizationAgentContextCapability } from "../src/lib/organization-agent-context-contract";
 import { runProjectAgentTaskCompletionFlow } from "./agent-runner";
-import { type ChannelActivityCredential } from "./channel-activity-publisher";
-import { decodeChannelReplyClaimOrFail } from "./channel-reply-claim";
-import { HttpRequestError } from "./execution-metrics-upload";
 import {
   inspectWorkflowRequirements,
   workflowRequirementReadinessDetail,
@@ -20,18 +15,12 @@ import {
   defaultWorkerLabel,
   interruptibleSleep,
   runWorkerLoop,
+  type WorkerLoopUpdateDirective,
 } from "./worker";
-import {
-  claimMergeBatchIfReady,
-  executeClaimedMergeBatch,
-  releaseMergeBatchClaim,
-  renewMergeBatchClaim,
-  type MergeBatchApi,
-} from "./merge-queue";
+import { executeClaimedMergeBatch } from "./merge-queue";
 import {
   supportsRemoteWorkerUpdates,
   workerUpdateLaunch,
-  type WorkerUpdateDirective,
 } from "./worker-update";
 import {
   analysisWorktreePath,
@@ -50,15 +39,15 @@ import {
 } from "./provider-health";
 import { discoverWorkerProviderCapabilities } from "./provider-capabilities";
 import {
-  decodeClaimedChannelReply,
-  decodeClaimedIssueReply,
-  decodeClaimedMergeBatch,
-  decodeClaimedProjectAgentTask,
-  decodeClaimedRun,
-  decodeWorkerBinding,
-  decodeWorkerRegistration,
-  type WorkerRegistration,
-} from "./worker-claim-contract";
+  createWorkerControlClient,
+  createWorkerEnrollmentClient,
+  type WorkerRuntimeInput,
+} from "./worker-control-client";
+import {
+  createWorkerQueueClient,
+  createWorkerQueueOperations,
+} from "./worker-queue-client";
+import type { ClaimedWork } from "./worker-queue-contract";
 import {
   configDirectory,
   cliVersion,
@@ -66,7 +55,6 @@ import {
   has,
   loadConfig,
   saveConfig,
-  request,
   login,
   gitValueAt,
   runGit,
@@ -85,16 +73,41 @@ import {
 } from "./issue-execution";
 import {
   runClaimedProjectAgentTask,
-  completeClaimedProjectAgentTask,
-  failClaimedProjectAgentTask,
   runClaimedIssueReply,
   failClaimedIssueReply,
   runClaimedChannelReply,
   failClaimedChannelReply,
 } from "./reply-execution";
 import { loadManagedComputerCredential } from "./managed-computer-credential";
+import { runClaimedDmMemory } from "./dm-memory-learning";
 
 const WORKER_SERVER_MAINTENANCE_INTERVAL_MS = 5 * 60_000;
+
+const retryableCompletionCodes = new Set([
+  Code.DeadlineExceeded,
+  Code.ResourceExhausted,
+  Code.Internal,
+  Code.Unavailable,
+]);
+
+const isRetryableWorkerCompletionError = (error: unknown) =>
+  !(error instanceof ConnectError) || retryableCompletionCodes.has(error.code);
+
+const workerRuntime = (input: {
+  agentProvider: WorkerRuntimeInput["agentProvider"];
+  providerHealth: WorkerRuntimeInput["providerHealth"];
+  providerCapabilities: WorkerRuntimeInput["providerCapabilities"];
+  worktrees: boolean;
+  workflowRequirements?: WorkerRuntimeInput["workflowRequirements"];
+  dmMemoryLearning: boolean;
+}): WorkerRuntimeInput => ({
+  ...input,
+  versions: { briar: cliVersion },
+  remoteUpdates: {
+    supported: supportsRemoteWorkerUpdates(platform()),
+    protocol: 1,
+  },
+});
 
 async function workerRegisterCommand() {
   const config = await loadConfig();
@@ -127,27 +140,21 @@ async function workerRegisterCommand() {
     value("--max-sessions") ?? "",
     10,
   );
-  let registration: WorkerRegistration | null = null;
+  const enrollment = createWorkerEnrollmentClient(config.apiUrl, userToken);
+  let registration: Awaited<ReturnType<typeof enrollment.register>> | null = null;
   if (config.projects.some((candidate) => candidate.executionWorker)) {
     try {
-      const binding = decodeWorkerBinding(
-        await request(
-          config.apiUrl,
-          `/projects/${project.id}/workers/bind`,
-          userToken,
-          {
-            method: "POST",
-            body: JSON.stringify({
-              deviceIdentity,
-              agentProvider: provider,
-              providers,
-              providerHealth,
-              providerCapabilities,
-              versions: { briar: cliVersion },
-            }),
-          },
-        ),
-      );
+      const binding = await enrollment.bind({
+        projectId: project.id,
+        deviceIdentity,
+        runtime: workerRuntime({
+          agentProvider: provider,
+          providerHealth,
+          providerCapabilities,
+          worktrees: true,
+          dmMemoryLearning: Boolean(config.openrouterApiKey?.trim()),
+        }),
+      });
       const existing = config.projects.find(
         (candidate) => candidate.executionWorker?.deviceId === binding.deviceId,
       )?.executionWorker;
@@ -157,34 +164,29 @@ async function workerRegisterCommand() {
           workerToken: existing.token,
         };
       }
-    } catch {
+    } catch (error) {
+      if (!(error instanceof ConnectError) || error.code !== Code.FailedPrecondition) {
+        throw error;
+      }
       // The device is not enrolled in this organization yet. Registration
       // below creates it and issues the first organization credential.
     }
   }
-  registration ??= decodeWorkerRegistration(
-    await request(
-      config.apiUrl,
-      `/projects/${project.id}/workers/register`,
-      userToken,
-      {
-        method: "POST",
-        body: JSON.stringify({
-          label,
-          deviceIdentity,
-          agentProvider: provider,
-          providers,
-          providerHealth,
-          providerCapabilities,
-          ...(Number.isInteger(requestedMaxSessions) &&
-          requestedMaxSessions > 0
-            ? { maxConcurrentSessions: requestedMaxSessions }
-            : {}),
-          versions: { briar: cliVersion },
-        }),
-      },
-    ),
-  );
+  registration ??= await enrollment.register({
+    projectId: project.id,
+    label,
+    deviceIdentity,
+    runtime: workerRuntime({
+      agentProvider: provider,
+      providerHealth,
+      providerCapabilities,
+      worktrees: true,
+      dmMemoryLearning: Boolean(config.openrouterApiKey?.trim()),
+    }),
+    ...(Number.isInteger(requestedMaxSessions) && requestedMaxSessions > 0
+      ? { maxConcurrentSessions: requestedMaxSessions }
+      : {}),
+  });
   config.workerDeviceIdentity = deviceIdentity;
   config.projects = config.projects.map((candidate) => {
     if (
@@ -243,19 +245,12 @@ async function workerUnregisterCommand() {
   const lifecycleReason = requestedLifecycleReason === "managed-deprovision"
     ? "managed_deprovision"
     : "explicit_user_unlink";
-  await request(
-    config.apiUrl,
-    `/projects/${project.id}/workers/${project.executionWorker.workerId}`,
-    userToken,
-    {
-      method: "DELETE",
-      headers: {
-        "Idempotency-Key":
-          `worker-unlink:${project.id}:${project.executionWorker.workerId}`,
-        "X-Briar-Worker-Lifecycle-Reason": lifecycleReason,
-      },
-    },
-  );
+  await createWorkerEnrollmentClient(config.apiUrl, userToken).unbind({
+    projectId: project.id,
+    workerId: project.executionWorker.workerId,
+    requestId: `worker-unlink:${project.id}:${project.executionWorker.workerId}`,
+    reason: lifecycleReason,
+  });
   config.projects = config.projects.map((candidate) =>
     candidate.id === project.id
       ? { ...candidate, executionWorker: undefined }
@@ -299,15 +294,10 @@ async function workerSyncLabelCommand() {
     let lastFailure: WorkerLabelSyncFailure | null = null;
     for (const registration of registrations) {
       try {
-        await request(
+        await createWorkerControlClient(
           config.apiUrl,
-          `/workers/${registration.workerId}/label`,
           registration.token,
-          {
-            method: "PATCH",
-            body: JSON.stringify({ label }),
-          },
-        );
+        ).updateLabel(registration.workerId, label);
         syncedDeviceIds.add(deviceId);
         lastFailure = null;
         break;
@@ -376,9 +366,10 @@ async function workerCommand() {
   if (!workerToken) {
     throw new Error("이 worker의 machine credential을 읽지 못했습니다.");
   }
+  const workerControl = createWorkerControlClient(config.apiUrl, workerToken);
   const label = registered.label;
   const workerId = registered.workerId;
-  const triggerWorkerUpdate = (directive: WorkerUpdateDirective) => {
+  const triggerWorkerUpdate = (directive: WorkerLoopUpdateDirective) => {
     if (directive.handoffState === "failed") return;
     const launch = workerUpdateLaunch(directive, workerId);
     const child = spawn(launch.command, launch.args, {
@@ -412,37 +403,23 @@ async function workerCommand() {
     const providerCapabilities = await discoverWorkerProviderCapabilities(
       config.agentProviders,
     );
-    const heartbeat = await request<{
-      updateDirective?: WorkerUpdateDirective | null;
-    }>(
-      config.apiUrl,
-      `/workers/${workerId}/heartbeat`,
-      workerToken,
-      {
-        method: "POST",
-        body: JSON.stringify({
-          versions: { briar: cliVersion },
-          acceptingWork: false,
-          readinessState: "needs_attention",
-          readinessDetail: readinessProblem,
-          capabilities: {
-            providers: healthyWorkerProviders(providerHealth),
-            providerHealth,
-            providerCapabilities,
-            worktrees: true,
-            remoteUpdates: {
-              supported: supportsRemoteWorkerUpdates(platform()),
-              protocol: 1,
-            },
-            organizationAgentContext: organizationAgentContextCapability,
-            dmMemory: { ...dmMemoryCapability, learningRequests: 1 },
-            ...(config.openrouterApiKey?.trim()
-              ? { dmMemoryLearning: { protocol: 1, transport: "openrouter" } }
-              : {}),
-          },
-        }),
-      },
-    );
+    const providers = healthyWorkerProviders(providerHealth);
+    const configuredProvider = project.llm?.provider ?? "codex";
+    const heartbeat = await workerControl.heartbeat({
+      workerId,
+      runtime: workerRuntime({
+        agentProvider: providers.includes(configuredProvider)
+          ? configuredProvider
+          : (providers[0] ?? configuredProvider),
+        providerHealth,
+        providerCapabilities,
+        worktrees: true,
+        dmMemoryLearning: Boolean(config.openrouterApiKey?.trim()),
+      }),
+      acceptingWork: false,
+      readinessState: "needs_attention",
+      readinessDetail: readinessProblem,
+    });
     if (
       heartbeat.updateDirective &&
       supportsRemoteWorkerUpdates(platform())
@@ -453,127 +430,31 @@ async function workerCommand() {
   }
 
   const maxIssues = Number.parseInt(value("--max-issues") ?? "", 10);
-  const mergeBatchApi: MergeBatchApi = <T = unknown>(
-    path: string,
-    init: { method: "POST"; body: string },
-  ) => request<T>(config.apiUrl, path, workerToken, init);
+  const workerQueueClient = createWorkerQueueClient(config.apiUrl, workerToken);
+  const workerQueue = createWorkerQueueOperations(workerQueueClient);
   let lastWorktreeSweepAt = Number.NEGATIVE_INFINITY;
   let lastAnalysisWorktreeSweepAt = Number.NEGATIVE_INFINITY;
   let lastServerMaintenanceAt = Number.NEGATIVE_INFINITY;
   let lastTriggeredUpdateId: string | null = null;
-  const result = await runWorkerLoop(
+  const result = await runWorkerLoop<ClaimedWork>(
     {
-      claim: async (_options) => {
-        const mergeBatch = await claimMergeBatchIfReady({
-          api: mergeBatchApi,
+      claim: async (_options) => workerQueue.claimWork({
+          organizationId: registered.organizationId,
           projectId: project.id,
           workerId,
           claimedBy: label,
           repliesOnly: _options?.repliesOnly === true,
-        });
-        if (mergeBatch) return { work: mergeBatch };
-        // The combined API claim is ordered by reply queues first and applies
-        // the regular-session limit atomically to issue/task queues. The loop
-        // still passes its local reply-only hint without adding a wire-field,
-        // keeping this endpoint compatible with older API deployments during
-        // rollout.
-        const claim = await request<{
-          work: unknown;
-          retryAfterMs?: number;
-        }>(
-          config.apiUrl,
-          "/worker-claims",
-          workerToken,
-          {
-            method: "POST",
-            body: JSON.stringify({
-              claimedBy: label,
-              workerId,
-              projectId: project.id,
-            }),
-          },
-        );
-        if (claim.work === null) {
-          return { work: null, retryAfterMs: claim.retryAfterMs };
-        }
-        const workType = typeof claim.work === "object" && claim.work !== null &&
-            "workType" in claim.work
-          ? claim.work.workType
-          : undefined;
-        const work = workType === "mergeBatch"
-          ? decodeClaimedMergeBatch(claim.work)
-          : workType === "dmMemory"
-          ? decodeClaimedDmMemory(claim.work)
-          : workType === "issueReply"
-          ? decodeClaimedIssueReply(claim.work)
-          : workType === "projectAgentTask"
-            ? decodeClaimedProjectAgentTask(claim.work)
-            : workType === "channelReply"
-              ? await decodeChannelReplyClaimOrFail(claim.work, {
-                organizationId: registered.organizationId,
-                failClaim: (reply, error, signal) => failClaimedChannelReply(
-                  config,
-                  project,
-                  reply,
-                  workerToken,
-                  error,
-                  signal,
-                ),
-              })
-              : decodeClaimedRun(claim.work);
-        return { work };
-      },
+        }),
       renewLease: async (issue) => {
-        if (issue.workType === "dmMemory") {
-          await renewClaimedDmMemory({ apiUrl: config.apiUrl, workerToken, claim: decodeClaimedDmMemory(issue) });
-          return;
-        }
-        if (issue.workType === "mergeBatch") {
-          await renewMergeBatchClaim(
-            mergeBatchApi,
-            decodeClaimedMergeBatch(issue),
-            workerId,
-          );
-          return;
-        }
-        if (issue.workType === "projectAgentTask") {
-          const task = decodeClaimedProjectAgentTask(issue);
-          await request(
-            config.apiUrl,
-            `/agent-task-claims/${task.workId}/lease`,
-            workerToken,
-            {
-              method: "POST",
-              body: JSON.stringify({
-                projectId: project.id,
-                workerId,
-                claimToken: task.claimToken,
-              }),
-            },
-          );
-          return;
-        }
+        const renewed = await workerQueue.renewWorkLease({
+          projectId: project.id,
+          workerId,
+          work: issue,
+        });
         if (issue.workType === "channelReply") {
-          const reply = decodeClaimedChannelReply(issue);
-          const renewed = await request<{
-            leaseExpiresAt: string;
-            retainedUntil?: string | null;
-            activity?: ChannelActivityCredential | null;
-          }>(
-            config.apiUrl,
-            `/channel-reply-claims/${reply.workId}/lease`,
-            workerToken,
-            {
-              method: "POST",
-              body: JSON.stringify({
-                organizationId: reply.organizationId,
-                workerId,
-                claimToken: reply.claimToken,
-              }),
-            },
-          );
+          const reply = issue;
           activeReplyActivityPublishers.get(reply.workId)?.updateCredential(
-            renewed.activity ?? null,
+            renewed.activity,
           );
           if (reply.session && renewed.retainedUntil) {
             if (reply.projectId) {
@@ -606,40 +487,11 @@ async function workerCommand() {
           return;
         }
         if (issue.workType === "issueReply") {
-          const reply = decodeClaimedIssueReply(issue);
-          const renewed = await request<{
-            leaseExpiresAt: string;
-            activity?: ChannelActivityCredential | null;
-          }>(
-            config.apiUrl,
-            `/issue-reply-claims/${reply.workId}/lease`,
-            workerToken,
-            {
-              method: "POST",
-              body: JSON.stringify({
-                projectId: project.id,
-                workerId,
-                claimToken: reply.claimToken,
-              }),
-            },
-          );
+          const reply = issue;
           activeReplyActivityPublishers.get(reply.workId)?.updateCredential(
-            renewed.activity ?? null,
+            renewed.activity,
           );
-          return;
         }
-        await request(
-          config.apiUrl,
-          `/runs/${issue.runId}/lease`,
-          workerToken,
-          {
-            method: "POST",
-            body: JSON.stringify({
-              claimToken: issue.claimToken,
-              projectId: project.id,
-            }),
-          },
-        );
       },
       heartbeat: async (readinessState = "ready") => {
         if (Date.now() - lastAnalysisWorktreeSweepAt >= 5 * 60_000) {
@@ -719,51 +571,28 @@ async function workerCommand() {
         const refreshMaintenance =
           Date.now() - lastServerMaintenanceAt >=
             WORKER_SERVER_MAINTENANCE_INTERVAL_MS;
-        const heartbeat = await request<{
-          worker: { maxConcurrentSessions?: number };
-          updateDirective?: WorkerUpdateDirective | null;
-          workflowRequirements?: Array<{
-            id: string;
-            label: string;
-            kind: (typeof autoHuntRequirementKinds)[number];
-            tool: string;
-            reason: string;
-          }>;
-        }>(
-          config.apiUrl,
-          `/workers/${workerId}/heartbeat`,
-          workerToken,
-          {
-            method: "POST",
-            body: JSON.stringify({
-              versions: { briar: cliVersion },
-              refreshMaintenance,
-              acceptingWork,
-              readinessState: nextReadinessState,
-              readinessDetail: nextReadinessDetail,
-              capabilities: {
-                providers,
-                providerHealth,
-                providerCapabilities,
-                worktrees: worktreesEnabled(project),
-                remoteUpdates: {
-                  supported: supportsRemoteWorkerUpdates(platform()),
-                  protocol: 1,
-                },
-                organizationAgentContext: organizationAgentContextCapability,
-                dmMemory: { ...dmMemoryCapability, learningRequests: 1 },
-                ...(config.openrouterApiKey?.trim()
-                  ? { dmMemoryLearning: { protocol: 1, transport: "openrouter" } }
-                  : {}),
-                workflowRequirements: requirementHealth.map((item) => ({
-                  id: item.id,
-                  healthy: item.healthy,
-                  detail: item.detail,
-                })),
-              },
-            }),
-          },
-        );
+        const configuredProvider = project.llm?.provider ?? "codex";
+        const heartbeat = await workerControl.heartbeat({
+          workerId,
+          runtime: workerRuntime({
+            agentProvider: providers.includes(configuredProvider)
+              ? configuredProvider
+              : (providers[0] ?? configuredProvider),
+            providerHealth,
+            providerCapabilities,
+            worktrees: worktreesEnabled(project),
+            workflowRequirements: requirementHealth.map((item) => ({
+              id: item.id,
+              healthy: item.healthy,
+              detail: item.detail,
+            })),
+            dmMemoryLearning: Boolean(config.openrouterApiKey?.trim()),
+          }),
+          refreshMaintenance,
+          acceptingWork,
+          readinessState: nextReadinessState,
+          readinessDetail: nextReadinessDetail,
+        });
         if (refreshMaintenance) lastServerMaintenanceAt = Date.now();
         let effectiveAcceptingWork = acceptingWork;
         if (heartbeat.updateDirective) {
@@ -783,7 +612,7 @@ async function workerCommand() {
             );
           }
         }
-        if (Array.isArray(heartbeat.workflowRequirements)) {
+        if (heartbeat.workflowRequirements) {
           const previousKey = JSON.stringify(sharedWorkflowRequirements ?? []);
           const nextKey = JSON.stringify(heartbeat.workflowRequirements);
           sharedWorkflowRequirements = heartbeat.workflowRequirements;
@@ -812,116 +641,88 @@ async function workerCommand() {
               workflowRequirementReadinessDetail(refreshedHealth);
             if (refreshedDetail || !hasHealthyProvider) {
               effectiveAcceptingWork = false;
-              await request(
-                config.apiUrl,
-                `/workers/${workerId}/heartbeat`,
-                workerToken,
-                {
-                  method: "POST",
-                  body: JSON.stringify({
-                    versions: { briar: cliVersion },
-                    acceptingWork: false,
-                    readinessState: "needs_attention",
-                    readinessDetail: !hasHealthyProvider
-                      ? providerHealthReadinessDetail(providerHealth)
-                      : refreshedDetail,
-                    capabilities: {
-                      providers,
-                      providerHealth,
-                      providerCapabilities,
-                      worktrees: worktreesEnabled(project),
-                      remoteUpdates: {
-                        supported: supportsRemoteWorkerUpdates(platform()),
-                        protocol: 1,
-                      },
-                      organizationAgentContext: organizationAgentContextCapability,
-                      dmMemory: { ...dmMemoryCapability, learningRequests: 1 },
-                      ...(config.openrouterApiKey?.trim()
-                        ? { dmMemoryLearning: { protocol: 1, transport: "openrouter" } }
-                        : {}),
-                      workflowRequirements: refreshedHealth.map((item) => ({
-                        id: item.id,
-                        healthy: item.healthy,
-                        detail: item.detail,
-                      })),
-                    },
-                  }),
-                },
-              );
+              await workerControl.heartbeat({
+                workerId,
+                runtime: workerRuntime({
+                  agentProvider: providers.includes(configuredProvider)
+                    ? configuredProvider
+                    : (providers[0] ?? configuredProvider),
+                  providerHealth,
+                  providerCapabilities,
+                  worktrees: worktreesEnabled(project),
+                  workflowRequirements: refreshedHealth.map((item) => ({
+                    id: item.id,
+                    healthy: item.healthy,
+                    detail: item.detail,
+                  })),
+                  dmMemoryLearning: Boolean(config.openrouterApiKey?.trim()),
+                }),
+                acceptingWork: false,
+                readinessState: "needs_attention",
+                readinessDetail: !hasHealthyProvider
+                  ? providerHealthReadinessDetail(providerHealth)
+                  : refreshedDetail,
+              });
             }
           }
         }
         return createWorkerLoopHeartbeat({
           acceptingWork: effectiveAcceptingWork,
           maxConcurrentSessions:
-            heartbeat.worker.maxConcurrentSessions ??
+            heartbeat.maxConcurrentSessions ??
             registered.maxConcurrentSessions,
           updateDirective: heartbeat.updateDirective,
         });
       },
       handoff: async (issue, requestId, checkpoint) => {
-        if (issue.workType === "dmMemory") {
-          await releaseClaimedDmMemory({ apiUrl: config.apiUrl, workerToken, claim: decodeClaimedDmMemory(issue) });
-          return;
-        }
-        if (issue.workType === "mergeBatch") {
-          try {
-            await releaseMergeBatchClaim(
-              mergeBatchApi,
-              decodeClaimedMergeBatch(issue),
-              workerId,
-            );
-          } catch (error) {
-            // A phase may have completed and atomically released just as the
-            // planned update aborted it. A missing old lease is already the
-            // safe handoff outcome.
-            if (!(error instanceof HttpRequestError) || error.status !== 409) {
-              throw error;
-            }
-          }
-          return;
-        }
-        const workType = issue.workType ?? "issue";
-        const workId = issue.workId ?? issue.runId;
-        await request(
-          config.apiUrl,
-          `/workers/${workerId}/update-handoff/claim`,
-          workerToken,
-          {
-            method: "POST",
-            body: JSON.stringify({
-              requestId,
-              projectId: project.id,
-              workType,
-              workId,
-              runId: issue.runId,
-              claimToken: issue.claimToken,
-              checkpoint: {
-                conversationId: checkpoint.conversationId ?? null,
-                workspacePath: checkpoint.workspacePath ?? null,
-              },
-            }),
-          },
-        );
+        await workerQueue.handoffWork({
+          requestId,
+          projectId: project.id,
+          workerId,
+          work: issue,
+          checkpoint,
+        });
       },
       runIssue: async (issue, signal, reportCheckpoint) => {
         if (issue.workType === "dmMemory") {
-          await runClaimedDmMemory({ apiUrl: config.apiUrl, workerToken, claim: decodeClaimedDmMemory(issue),
-            apiKey: config.openrouterApiKey ?? null, signal });
+          await runClaimedDmMemory({
+            rpc: workerQueueClient,
+            projectId: project.id,
+            claim: issue,
+            apiKey: config.openrouterApiKey ?? null,
+            signal,
+          });
           return;
         }
         if (issue.workType === "mergeBatch") {
+          const claim = issue;
           await executeClaimedMergeBatch({
-            claim: decodeClaimedMergeBatch(issue),
+            claim,
             workerId,
             repositoryPath: project.repositoryPath,
             signal,
-            api: mergeBatchApi,
+            rpc: workerQueueClient,
+            renewLease: async () => {
+              await workerQueue.renewWorkLease({
+                projectId: project.id,
+                workerId,
+                work: claim,
+              });
+            },
+            releaseLease: async () => {
+              await workerQueue.handoffWork({
+                requestId: randomUUID(),
+                projectId: project.id,
+                workerId,
+                work: claim,
+                checkpoint: {},
+              });
+            },
           });
           return;
         }
         if (issue.workType === "projectAgentTask") {
-          const task = decodeClaimedProjectAgentTask(issue);
+          const task = issue;
           await runProjectAgentTaskCompletionFlow({
             runProvider: () => runClaimedProjectAgentTask(
               config,
@@ -932,34 +733,38 @@ async function workerCommand() {
               signal,
               reportCheckpoint,
             ),
-            completeSuccess: (completion) => completeClaimedProjectAgentTask(
-              config,
-              task,
-              workerToken,
-              completion,
-              signal,
-            ),
+            completeSuccess: (completion) =>
+              workerQueue.completeProjectAgentTask({
+                projectId: project.id,
+                workerId,
+                work: task,
+                result: {
+                  case: "success",
+                  summary: completion.summary,
+                  conversationId: completion.conversationId,
+                },
+                signal,
+              }),
             completeFailure: async (error) => {
               if (signal.aborted) throw error;
-              return failClaimedProjectAgentTask(
-                config,
-                project,
-                task,
-                workerToken,
-                error,
-              );
+              return workerQueue.completeProjectAgentTask({
+                projectId: project.id,
+                workerId,
+                work: task,
+                result: {
+                  case: "failure",
+                  error: error instanceof Error ? error.message : String(error),
+                },
+              });
             },
-            isRetryableCompletionError: (error) =>
-              !(error instanceof HttpRequestError) ||
-              error.status === 408 || error.status === 429 ||
-              error.status >= 500,
+            isRetryableCompletionError: isRetryableWorkerCompletionError,
             sleep: interruptibleSleep,
             signal,
           });
           return;
         }
         if (issue.workType === "channelReply") {
-          const reply = decodeClaimedChannelReply(issue);
+          const reply = issue;
           try {
             await runClaimedChannelReply(
               config,
@@ -982,7 +787,7 @@ async function workerCommand() {
           return;
         }
         if (issue.workType === "issueReply") {
-          const reply = decodeClaimedIssueReply(issue);
+          const reply = issue;
           try {
             await runClaimedIssueReply(
               config,
@@ -1007,7 +812,7 @@ async function workerCommand() {
         await runClaimedIssue(
           config,
           project,
-          decodeClaimedRun(issue),
+          issue,
           workerToken,
           signal,
           reportCheckpoint,

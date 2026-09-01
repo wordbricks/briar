@@ -1,3 +1,4 @@
+import BriarContracts
 import Foundation
 
 struct AcceptIssueProposalResult: Sendable {
@@ -11,28 +12,31 @@ final class IssueMutationStore: ObservableObject {
     @Published private(set) var activeActions: Set<String> = []
     @Published private(set) var errorMessage: String?
 
-    private let api: any MobileAPIClientProtocol
+    private let preparedUploadClient: any PreparedUploadClientProtocol
+    private let issueService: any BriarAPI_IssueServiceClientInterface
+    private let projectService: any BriarAPI_ProjectServiceClientInterface
     private let projectID: UUID
-    private let issueProjectID: UUID?
-    private let token: String
+    private let planningProjectID: UUID?
     private let requestID: @Sendable () -> UUID
     private let attachmentReference: @Sendable () -> String
     private var pendingRequestIDs: [String: UUID] = [:]
 
     init(
-        api: any MobileAPIClientProtocol,
+        preparedUploadClient: any PreparedUploadClientProtocol,
+        issueService: any BriarAPI_IssueServiceClientInterface,
+        projectService: any BriarAPI_ProjectServiceClientInterface,
         projectID: UUID,
-        issueProjectID: UUID? = nil,
-        token: String,
+        planningProjectID: UUID? = nil,
         requestID: @escaping @Sendable () -> UUID = UUID.init,
         attachmentReference: @escaping @Sendable () -> String = {
             UUID().uuidString.lowercased()
         }
     ) {
-        self.api = api
+        self.preparedUploadClient = preparedUploadClient
+        self.issueService = issueService
+        self.projectService = projectService
         self.projectID = projectID
-        self.issueProjectID = issueProjectID
-        self.token = token
+        self.planningProjectID = planningProjectID
         self.requestID = requestID
         self.attachmentReference = attachmentReference
     }
@@ -42,8 +46,9 @@ final class IssueMutationStore: ObservableObject {
     func createIssue(
         draft: IssueDraft,
         attachments: [PendingIssueAttachment],
+        attachmentReferences: [String]? = nil,
         parentRunId: UUID? = nil
-    ) async throws -> CreateIssueResponse {
+    ) async throws {
         try await perform("create") {
             let title = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
             if let titleError = IssueTitleLimits.validationError(for: title) {
@@ -53,124 +58,206 @@ final class IssueMutationStore: ObservableObject {
                 throw IssueMutationError.attachment(message)
             }
             let description = draft.description.trimmingCharacters(in: .whitespacesAndNewlines)
-            let path = MobileAPIContract.Endpoint.issues(
-                projectID: issueProjectID ?? projectID
-            )
-            if attachments.isEmpty {
-                return try await api.send(
-                    path,
-                    method: "POST",
-                    token: token,
-                    body: CreateIssueRequest(
-                        title: title,
-                        description: description.isEmpty ? nil : description,
-                        priority: draft.priority,
-                        difficulty: draft.difficulty,
-                        assigneeUserId: draft.assigneeUserId,
-                        parentRunId: parentRunId,
-                        status: draft.status,
-                        preferredProvider: draft.preferredProvider,
-                        preferredModel: draft.preferredModel,
-                        preferredEffort: draft.preferredProvider != nil && draft.preferredModel != nil
-                            ? draft.preferredEffort
-                            : nil,
-                        fullAuto: draft.fullAuto
-                    ),
-                    as: CreateIssueResponse.self
+            var normalizedDraft = draft
+            normalizedDraft.title = title
+            normalizedDraft.description = description
+            normalizedDraft.preferredEffort = draft.preferredProvider != nil &&
+                    draft.preferredModel != nil
+                ? draft.preferredEffort
+                : nil
+            let mutationKey = "create"
+            let clientIssueID = idempotencyID(for: mutationKey)
+            let clientIDs = attachmentReferences ?? attachments.map { coreUUIDString($0.id) }
+            var uploadReferences: [BriarTypes_UploadReference] = []
+            var preparationKey: String?
+            if !attachments.isEmpty {
+                let key = "prepare-create-\(clientIssueID)"
+                preparationKey = key
+                var prepareRequest = BriarAPI_PrepareCreateIssueAttachmentsRequest()
+                prepareRequest.preparationRequestID = coreUUIDString(idempotencyID(for: key))
+                prepareRequest.projectID = coreUUIDString(projectID)
+                prepareRequest.clientIssueID = coreUUIDString(clientIssueID)
+                prepareRequest.attachments = try PreparedUploadPipeline.metadata(
+                    attachments: attachments,
+                    clientIDs: clientIDs
                 )
-            }
-            return try await api.upload(
-                path,
-                fields: [
-                    "title": title,
-                    "description": description,
-                    "priority": draft.priority.map(String.init) ?? "",
-                    "difficulty": draft.difficulty?.rawValue ?? "",
-                    "assigneeUserId": draft.assigneeUserId ?? "",
-                    "parentRunId": parentRunId?.uuidString.lowercased() ?? "",
-                    "status": draft.status.rawValue,
-                    "preferredProvider": draft.preferredProvider?.rawValue ?? "",
-                    "preferredModel": draft.preferredModel ?? "",
-                    "preferredEffort": draft.preferredProvider != nil && draft.preferredModel != nil
-                        ? (draft.preferredEffort?.rawValue ?? "")
-                        : "",
-                    "fullAuto": draft.fullAuto ? "true" : "false",
-                ],
-                files: attachments.map {
-                    MultipartFile(
-                        fieldName: "attachments",
-                        filename: $0.filename,
-                        contentType: $0.contentType,
-                        data: $0.data
+                let prepared = try await issueService.prepareCreateIssueAttachments(
+                    request: prepareRequest,
+                    headers: [:]
+                ).briarValue()
+                let uploadIDs = try await PreparedUploadPipeline.upload(
+                    attachments: attachments,
+                    clientIDs: clientIDs,
+                    preparedUploads: prepared.uploads,
+                    using: preparedUploadClient
+                )
+                normalizedDraft.description = try PreparedUploadPipeline
+                    .replacingAttachmentReferences(
+                        in: normalizedDraft.description,
+                        clientIDs: clientIDs,
+                        uploadIDs: uploadIDs
                     )
-                },
-                token: token,
-                as: CreateIssueResponse.self
-            )
+                uploadReferences = try PreparedUploadPipeline.references(uploadIDs: uploadIDs)
+            } else if !clientIDs.isEmpty {
+                throw MobileAPIError.invalidRequest
+            }
+            var request = try issueCreateRequest(
+                    projectID: projectID,
+                    clientIssueID: clientIssueID,
+                    draft: normalizedDraft,
+                    attachments: uploadReferences,
+                    parentRunID: parentRunId
+                )
+            if let planningProjectID {
+                request.planningProjectID = coreUUIDString(planningProjectID)
+            }
+            let response = try await issueService.createIssue(
+                request: request,
+                headers: [:]
+            ).briarValue()
+            guard try issueUUID(response.runID) == clientIssueID else {
+                throw MobileAPIError.invalidResponse
+            }
+            pendingRequestIDs.removeValue(forKey: mutationKey)
+            if let preparationKey {
+                pendingRequestIDs.removeValue(forKey: preparationKey)
+            }
         }
     }
 
-    func updateIssue(runID: UUID, draft: IssueDraft) async throws -> UpdateIssueResponse {
+    func updateIssue(
+        runID: UUID,
+        draft: IssueDraft,
+        attachments: [PendingIssueAttachment] = [],
+        attachmentReferences: [String]? = nil,
+        keptAttachmentIDs: [UUID]? = nil
+    ) async throws {
         try await perform("update-\(runID)") {
             let title = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
             if let titleError = IssueTitleLimits.validationError(for: title) {
                 throw titleError
             }
             let description = draft.description.trimmingCharacters(in: .whitespacesAndNewlines)
-            return try await api.send(
-                MobileAPIContract.Endpoint.run(projectID: projectID, runID: runID),
-                method: "PATCH",
-                token: token,
-                body: UpdateIssueRequest(
-                    title: title,
-                    description: description.isEmpty ? nil : description,
-                    priority: draft.priority,
-                    difficulty: draft.difficulty,
-                    assigneeUserId: draft.assigneeUserId
+            var normalizedDraft = draft
+            normalizedDraft.title = title
+            normalizedDraft.description = description
+            if let message = PendingIssueAttachment.validationMessage(for: attachments) {
+                throw IssueMutationError.attachment(message)
+            }
+            let mutationKey = "update-\(runID)"
+            let mutationRequestID = idempotencyID(for: mutationKey)
+            let clientIDs = attachmentReferences ?? attachments.map { coreUUIDString($0.id) }
+            var uploadReferences: [BriarTypes_UploadReference] = []
+            var preparationKey: String?
+            if !attachments.isEmpty {
+                let key = "prepare-update-\(mutationRequestID)"
+                preparationKey = key
+                var prepareRequest = BriarAPI_PrepareUpdateIssueAttachmentsRequest()
+                prepareRequest.preparationRequestID = coreUUIDString(idempotencyID(for: key))
+                prepareRequest.projectID = coreUUIDString(projectID)
+                prepareRequest.runID = coreUUIDString(runID)
+                prepareRequest.requestID = coreUUIDString(mutationRequestID)
+                prepareRequest.attachments = try PreparedUploadPipeline.metadata(
+                    attachments: attachments,
+                    clientIDs: clientIDs
+                )
+                let prepared = try await issueService.prepareUpdateIssueAttachments(
+                    request: prepareRequest,
+                    headers: [:]
+                ).briarValue()
+                let uploadIDs = try await PreparedUploadPipeline.upload(
+                    attachments: attachments,
+                    clientIDs: clientIDs,
+                    preparedUploads: prepared.uploads,
+                    using: preparedUploadClient
+                )
+                normalizedDraft.description = try PreparedUploadPipeline
+                    .replacingAttachmentReferences(
+                        in: normalizedDraft.description,
+                        clientIDs: clientIDs,
+                        uploadIDs: uploadIDs
+                    )
+                uploadReferences = try PreparedUploadPipeline.references(uploadIDs: uploadIDs)
+            } else if !clientIDs.isEmpty {
+                throw MobileAPIError.invalidRequest
+            }
+            let response = await issueService.updateIssue(
+                request: try issueUpdateRequest(
+                    projectID: projectID,
+                    runID: runID,
+                    requestID: mutationRequestID,
+                    draft: normalizedDraft,
+                    assigneeUpdate: draft.assigneeUserId.map(IssueAssigneeUpdate.assign) ?? .clear,
+                    attachments: uploadReferences,
+                    keptAttachmentIDs: keptAttachmentIDs
                 ),
-                as: UpdateIssueResponse.self
+                headers: [:]
             )
+            let message = try response.briarValue()
+            guard try issueUUID(message.runID) == runID else {
+                throw MobileAPIError.invalidResponse
+            }
+            pendingRequestIDs.removeValue(forKey: mutationKey)
+            if let preparationKey {
+                pendingRequestIDs.removeValue(forKey: preparationKey)
+            }
         }
     }
 
     func setSubscription(
         runID: UUID,
         subscribed: Bool
-    ) async throws -> IssueSubscriptionResponse {
+    ) async throws -> [IssueSubscriber] {
         try await perform("subscription-\(runID)") {
-            try await api.send(
-                MobileAPIContract.Endpoint.runSubscription(
-                    projectID: projectID,
-                    runID: runID
-                ),
-                method: subscribed ? "PUT" : "DELETE",
-                token: token,
-                body: nil,
-                as: IssueSubscriptionResponse.self
+            var request = BriarAPI_SetIssueSubscriptionRequest()
+            request.projectID = coreUUIDString(projectID)
+            request.runID = coreUUIDString(runID)
+            request.subscribed = subscribed
+            let response = await issueService.setIssueSubscription(
+                request: request,
+                headers: [:]
             )
+            let message = try response.briarValue()
+            guard try issueUUID(message.runID) == runID else {
+                throw MobileAPIError.invalidResponse
+            }
+            return try message.subscribers.map(IssueSubscriber.init(connectMessage:))
         }
     }
 
     func deleteIssue(runID: UUID) async throws {
         try await perform("delete-\(runID)") {
-            try await api.sendVoid(
-                MobileAPIContract.Endpoint.run(projectID: projectID, runID: runID),
-                method: "DELETE",
-                token: token,
-                body: nil
-            )
+            var request = BriarAPI_DeleteIssueRequest()
+            request.projectID = coreUUIDString(projectID)
+            request.runID = coreUUIDString(runID)
+            let response = await issueService.deleteIssue(request: request, headers: [:])
+            guard try response.briarValue().deleted else {
+                throw MobileAPIError.invalidResponse
+            }
         }
     }
 
-    func transferIssue(runID: UUID, targetProjectID: UUID) async throws -> TransferIssueResponse {
+    func transferIssue(runID: UUID, targetProjectID: UUID) async throws {
         try await perform("transfer-\(runID)") {
-            try await api.send(
-                MobileAPIContract.Endpoint.runTransfer(projectID: projectID, runID: runID),
-                method: "POST",
-                token: token,
-                body: TransferIssueRequest(targetProjectId: targetProjectID),
-                as: TransferIssueResponse.self
+            var request = BriarAPI_TransferIssueRequest()
+            request.projectID = coreUUIDString(projectID)
+            request.runID = coreUUIDString(runID)
+            request.targetProjectID = coreUUIDString(targetProjectID)
+            let response = await issueService.transferIssue(
+                request: request,
+                headers: [:]
             )
+            let message = try response.briarValue()
+            guard try issueUUID(message.runID) == runID,
+                  try issueUUID(message.sourceProjectID) == projectID,
+                  try issueUUID(message.targetProjectID) == targetProjectID
+            else { throw MobileAPIError.invalidResponse }
+            switch message.outcome {
+            case .transferred, .alreadyTransferred:
+                break
+            case .unspecified, .UNRECOGNIZED:
+                throw MobileAPIError.invalidResponse
+            }
         }
     }
 
@@ -178,96 +265,99 @@ final class IssueMutationStore: ObservableObject {
         runID: UUID,
         sourceProjectID: UUID,
         targetProjectID: UUID
-    ) async throws -> IssueProjectMoveResponse {
+    ) async throws {
         try await perform("move-project-\(runID)") {
-            try await api.send(
-                MobileAPIContract.Endpoint.planningProjectIssue(
-                    projectID: sourceProjectID,
-                    runID: runID
-                ),
-                method: "PATCH",
-                token: token,
-                body: IssueProjectMoveRequest(targetProjectId: targetProjectID),
-                as: IssueProjectMoveResponse.self
-            )
+            var request = BriarAPI_MoveIssueToPlanningProjectRequest()
+            request.sourceProjectID = coreUUIDString(sourceProjectID)
+            request.runID = coreUUIDString(runID)
+            request.targetProjectID = coreUUIDString(targetProjectID)
+            let response = try await projectService.moveIssueToPlanningProject(
+                request: request,
+                headers: [:]
+            ).briarValue()
+            switch response.outcome {
+            case .moved, .sameProject:
+                break
+            case .unspecified, .UNRECOGNIZED:
+                throw MobileAPIError.invalidResponse
+            }
         }
     }
 
     func savePreferences(
         runID: UUID,
         preferences: IssueExecutionPreferences
-    ) async throws -> IssueExecutionPreferencesResponse {
+    ) async throws {
         try await perform("preferences-\(runID)") {
             guard preferences.isValid else { throw IssueMutationError.invalidPreferences }
-            return try await api.send(
-                MobileAPIContract.Endpoint.runPreferences(projectID: projectID, runID: runID),
-                method: "PUT",
-                token: token,
-                body: preferences,
-                as: IssueExecutionPreferencesResponse.self
+            var request = BriarAPI_UpdateIssuePreferencesRequest()
+            request.projectID = coreUUIDString(projectID)
+            request.runID = coreUUIDString(runID)
+            if let provider = preferences.provider {
+                request.provider = issueProviderMessage(provider)
+            }
+            if let model = preferences.model { request.model = model }
+            if let effort = preferences.effort { request.effort = effort.rawValue }
+            let response = await issueService.updateIssuePreferences(
+                request: request,
+                headers: [:]
             )
+            let message = try response.briarValue()
+            guard try issueUUID(message.runID) == runID else {
+                throw MobileAPIError.invalidResponse
+            }
         }
     }
 
     func setDependency(runID: UUID, prerequisiteID: UUID, enabled: Bool) async throws {
         try await perform("dependency-\(runID)-\(prerequisiteID)") {
-            let path = MobileAPIContract.Endpoint.runDependency(
-                projectID: projectID,
-                runID: runID,
-                prerequisiteID: prerequisiteID
-            )
-            if enabled {
-                let _: DependencyResponse = try await api.send(
-                    path,
-                    method: "PUT",
-                    token: token,
-                    body: nil,
-                    as: DependencyResponse.self
-                )
-            } else {
-                try await api.sendVoid(path, method: "DELETE", token: token, body: nil)
-            }
+            var request = BriarAPI_SetIssueDependencyRequest()
+            request.projectID = coreUUIDString(projectID)
+            request.runID = coreUUIDString(runID)
+            request.prerequisiteRunID = coreUUIDString(prerequisiteID)
+            request.enabled = enabled
+            _ = try await issueService.setIssueDependency(
+                request: request,
+                headers: [:]
+            ).briarValue()
         }
     }
 
     func setParent(runID: UUID, parentID: UUID?) async throws {
         try await perform("parent-\(runID)") {
-            let path = MobileAPIContract.Endpoint.runParent(
-                projectID: projectID,
-                runID: runID,
-                parentID: parentID
-            )
-            if parentID != nil {
-                let _: ParentIssueResponse = try await api.send(
-                    path,
-                    method: "PUT",
-                    token: token,
-                    body: nil,
-                    as: ParentIssueResponse.self
-                )
-            } else {
-                try await api.sendVoid(path, method: "DELETE", token: token, body: nil)
+            var request = BriarAPI_SetIssueParentRequest()
+            request.projectID = coreUUIDString(projectID)
+            request.childRunID = coreUUIDString(runID)
+            if let parentID { request.parentRunID = coreUUIDString(parentID) }
+            let response = try await issueService.setIssueParent(
+                request: request,
+                headers: [:]
+            ).briarValue()
+            switch response.outcome {
+            case .created, .updated, .alreadyExists, .removed, .alreadyRemoved:
+                break
+            case .unspecified, .UNRECOGNIZED:
+                throw MobileAPIError.invalidResponse
             }
         }
     }
 
     func setRelated(runID: UUID, relatedID: UUID, enabled: Bool) async throws {
         try await perform("related-\(runID)-\(relatedID)") {
-            let path = MobileAPIContract.Endpoint.runRelated(
-                projectID: projectID,
-                runID: runID,
-                relatedID: relatedID
-            )
-            if enabled {
-                let _: RelatedIssueResponse = try await api.send(
-                    path,
-                    method: "PUT",
-                    token: token,
-                    body: nil,
-                    as: RelatedIssueResponse.self
-                )
-            } else {
-                try await api.sendVoid(path, method: "DELETE", token: token, body: nil)
+            var request = BriarAPI_SetRelatedIssueRequest()
+            request.projectID = coreUUIDString(projectID)
+            request.runID = coreUUIDString(runID)
+            request.relatedRunID = coreUUIDString(relatedID)
+            request.enabled = enabled
+            let response = try await issueService.setRelatedIssue(
+                request: request,
+                headers: [:]
+            ).briarValue()
+            switch response.outcome {
+            case .created, .alreadyExists, .removed, .alreadyRemoved:
+                break
+            case .unspecified, .UNRECOGNIZED:
+                throw MobileAPIError.invalidResponse
             }
         }
     }
@@ -275,17 +365,16 @@ final class IssueMutationStore: ObservableObject {
     func move(runID: UUID, status: DashboardRun.Status, workflowStage: String? = nil) async throws {
         try await perform("move-\(runID)") {
             let idempotencyKey = "move-\(runID)-\(status.rawValue)-\(workflowStage ?? "none")"
-            let _: RunStatusResponse = try await api.send(
-                MobileAPIContract.Endpoint.runStatus(projectID: projectID, runID: runID),
-                method: "PUT",
-                token: token,
-                body: RunStatusRequest(
-                    requestId: idempotencyID(for: idempotencyKey),
-                    status: status,
-                    workflowStage: workflowStage
-                ),
-                as: RunStatusResponse.self
-            )
+            var request = BriarAPI_MoveRunRequest()
+            request.projectID = coreUUIDString(projectID)
+            request.runID = coreUUIDString(runID)
+            request.requestID = coreUUIDString(idempotencyID(for: idempotencyKey))
+            request.status = issueRunStatusMessage(status)
+            if let workflowStage { request.workflowStage = workflowStage }
+            _ = try await issueService.moveRun(
+                request: request,
+                headers: [:]
+            ).briarValue()
             pendingRequestIDs.removeValue(forKey: idempotencyKey)
         }
     }
@@ -302,24 +391,38 @@ final class IssueMutationStore: ObservableObject {
             }
             guard preferences.isValid else { throw IssueMutationError.invalidPreferences }
             let idempotencyKey = "dispatch-\(runID)-\(reassign)-\(provider.rawValue)-\(preferences.model ?? "none")-\(preferences.effort?.rawValue ?? "none")-\(workerID ?? "any")"
-            let _: DispatchRunResponse = try await api.send(
-                MobileAPIContract.Endpoint.runDispatch(
-                    projectID: projectID,
-                    runID: runID,
-                    reassign: reassign
-                ),
-                method: "POST",
-                token: token,
-                body: DispatchRunRequest(
-                    provider: provider,
-                    model: preferences.model,
-                    effort: preferences.effort,
-                    persistPreferences: true,
-                    workerId: workerID,
-                    requestId: idempotencyID(for: idempotencyKey)
-                ),
-                as: DispatchRunResponse.self
-            )
+            var dispatch = BriarAPI_DispatchRunInput()
+            dispatch.requestID = coreUUIDString(idempotencyID(for: idempotencyKey))
+            dispatch.provider = issueProviderMessage(provider)
+            if let model = preferences.model { dispatch.model = model }
+            if let effort = preferences.effort { dispatch.effort = effort.rawValue }
+            dispatch.persistPreferences = true
+            if let workerID { dispatch.workerID = workerID }
+            let result: DispatchRunResponse
+            if reassign {
+                var request = BriarAPI_ReassignRunRequest()
+                request.projectID = coreUUIDString(projectID)
+                request.runID = coreUUIDString(runID)
+                request.dispatch = dispatch
+                let response = try await issueService.reassignRun(
+                    request: request,
+                    headers: [:]
+                ).briarValue()
+                guard response.hasDispatch else { throw MobileAPIError.invalidResponse }
+                result = try DispatchRunResponse(connectMessage: response.dispatch)
+            } else {
+                var request = BriarAPI_DispatchRunRequest()
+                request.projectID = coreUUIDString(projectID)
+                request.runID = coreUUIDString(runID)
+                request.dispatch = dispatch
+                let response = try await issueService.dispatchRun(
+                    request: request,
+                    headers: [:]
+                ).briarValue()
+                guard response.hasDispatch else { throw MobileAPIError.invalidResponse }
+                result = try DispatchRunResponse(connectMessage: response.dispatch)
+            }
+            _ = result
             pendingRequestIDs.removeValue(forKey: idempotencyKey)
         }
     }
@@ -327,20 +430,30 @@ final class IssueMutationStore: ObservableObject {
     func recover(runID: UUID, action: String, reason: String? = nil) async throws {
         try await perform("recover-\(runID)") {
             let idempotencyKey = "recover-\(runID)-\(action)-\(reason ?? "none")"
-            let _: RunRecoveryResponse = try await api.send(
-                MobileAPIContract.Endpoint.runRecovery(
-                    projectID: projectID,
-                    runID: runID,
-                    action: action
-                ),
-                method: "POST",
-                token: token,
-                body: RequestIdentity(
-                    requestId: idempotencyID(for: idempotencyKey),
-                    reason: reason
-                ),
-                as: RunRecoveryResponse.self
-            )
+            switch action {
+            case "retry":
+                var request = BriarAPI_RetryRunRequest()
+                request.projectID = coreUUIDString(projectID)
+                request.runID = coreUUIDString(runID)
+                request.requestID = coreUUIDString(idempotencyID(for: idempotencyKey))
+                if let reason { request.reason = reason }
+                _ = try await issueService.retryRun(
+                    request: request,
+                    headers: [:]
+                ).briarValue()
+            case "cancel":
+                var request = BriarAPI_CancelRunRequest()
+                request.projectID = coreUUIDString(projectID)
+                request.runID = coreUUIDString(runID)
+                request.requestID = coreUUIDString(idempotencyID(for: idempotencyKey))
+                if let reason { request.reason = reason }
+                _ = try await issueService.cancelRun(
+                    request: request,
+                    headers: [:]
+                ).briarValue()
+            default:
+                throw MobileAPIError.invalidRequest
+            }
             pendingRequestIDs.removeValue(forKey: idempotencyKey)
         }
     }
@@ -348,31 +461,35 @@ final class IssueMutationStore: ObservableObject {
     func resume(runID: UUID, checkpoint: WorkflowCheckpoint) async throws {
         try await perform("resume-\(runID)") {
             let idempotencyKey = "resume-\(runID)-\(checkpoint.key)-\(checkpoint.attempt)-\(checkpoint.revision)"
-            let _: ResumeRunResponse = try await api.send(
-                MobileAPIContract.Endpoint.runResume(projectID: projectID, runID: runID),
-                method: "POST",
-                token: token,
-                body: ResumeRunRequest(
-                    requestId: idempotencyID(for: idempotencyKey),
-                    checkpointKey: checkpoint.key,
-                    attempt: checkpoint.attempt,
-                    revision: checkpoint.revision
-                ),
-                as: ResumeRunResponse.self
-            )
+            guard let attempt = UInt32(exactly: checkpoint.attempt),
+                  let revision = UInt32(exactly: checkpoint.revision)
+            else { throw MobileAPIError.invalidRequest }
+            var request = BriarAPI_ResumeRunRequest()
+            request.projectID = coreUUIDString(projectID)
+            request.runID = coreUUIDString(runID)
+            request.requestID = coreUUIDString(idempotencyID(for: idempotencyKey))
+            request.checkpointKey = checkpoint.key
+            request.attempt = attempt
+            request.revision = revision
+            _ = try await issueService.resumeRun(
+                request: request,
+                headers: [:]
+            ).briarValue()
             pendingRequestIDs.removeValue(forKey: idempotencyKey)
         }
     }
 
     func completeReview(runID: UUID) async throws -> ResultReview {
         try await perform("review-\(runID)") {
-            try await api.send(
-                MobileAPIContract.Endpoint.runResultReviews(projectID: projectID, runID: runID),
-                method: "POST",
-                token: token,
-                body: nil,
-                as: ResultReview.self
-            )
+            var request = BriarAPI_CompleteResultReviewRequest()
+            request.projectID = coreUUIDString(projectID)
+            request.runID = coreUUIDString(runID)
+            let response = try await issueService.completeResultReview(
+                request: request,
+                headers: [:]
+            ).briarValue()
+            guard response.hasReview else { throw MobileAPIError.invalidResponse }
+            return try ResultReview(connectMessage: response.review)
         }
     }
 
@@ -382,33 +499,32 @@ final class IssueMutationStore: ObservableObject {
     ) async throws -> AcceptIssueProposalResult {
         try await perform("issue-proposal-\(proposal.id)") {
             if proposal.type == .rework {
-                let response: AcceptIssueReworkProposalResponse = try await api.send(
-                    MobileAPIContract.Endpoint.acceptIssueReworkProposal(
-                        projectID: projectID,
-                        runID: runID,
-                        proposalID: proposal.id
-                    ),
-                    method: "POST",
-                    token: token,
-                    body: nil,
-                    as: AcceptIssueReworkProposalResponse.self
+                var request = BriarAPI_AcceptIssueReworkProposalRequest()
+                request.projectID = coreUUIDString(projectID)
+                request.runID = coreUUIDString(runID)
+                request.proposalID = coreUUIDString(proposal.id)
+                let wireResponse = await issueService.acceptIssueReworkProposal(
+                    request: request,
+                    headers: [:]
                 )
+                let response = try wireResponse.briarValue()
+                guard response.hasProposal else { throw MobileAPIError.invalidResponse }
                 return AcceptIssueProposalResult(
-                    proposal: response.proposal,
+                    proposal: try IssueProposedAction(connectMessage: response.proposal),
                     executionProposal: nil,
                     requiresAuthoritativeReload: false
                 )
             }
-            let response: AcceptIssueActionProposalResponse = try await api.send(
-                MobileAPIContract.Endpoint.acceptIssueActionProposal(
-                    projectID: projectID,
-                    runID: runID,
-                    proposalID: proposal.id
-                ),
-                method: "POST",
-                token: token,
-                body: nil,
-                as: AcceptIssueActionProposalResponse.self
+            var request = BriarAPI_AcceptIssueActionProposalRequest()
+            request.projectID = coreUUIDString(projectID)
+            request.runID = coreUUIDString(runID)
+            request.proposalID = coreUUIDString(proposal.id)
+            let wireResponse = await issueService.acceptIssueActionProposal(
+                request: request,
+                headers: [:]
+            )
+            let response = try AcceptIssueActionProposalResponse(
+                connectMessage: wireResponse.briarValue()
             )
             let proposalMatches = response.proposal.id == proposal.id
             let executionProposal: IssueExecutionProposal? =
@@ -438,16 +554,17 @@ final class IssueMutationStore: ObservableObject {
         request: AcceptIssueExecutionProposalRequest
     ) async throws -> AcceptIssueExecutionProposalResponse {
         try await perform("issue-execution-proposal-\(proposalID)") {
-            try await api.send(
-                MobileAPIContract.Endpoint.acceptIssueExecutionProposal(
-                    projectID: projectID,
-                    conversationRunID: conversationRunID,
-                    proposalID: proposalID
-                ),
-                method: "POST",
-                token: token,
-                body: request,
-                as: AcceptIssueExecutionProposalResponse.self
+            var message = BriarAPI_AcceptIssueExecutionProposalRequest()
+            message.projectID = coreUUIDString(projectID)
+            message.conversationRunID = coreUUIDString(conversationRunID)
+            message.proposalID = coreUUIDString(proposalID)
+            message.approval = issueExecutionApprovalMessage(request)
+            let response = await issueService.acceptIssueExecutionProposal(
+                request: message,
+                headers: [:]
+            )
+            return try AcceptIssueExecutionProposalResponse(
+                connectMessage: response.briarValue()
             )
         }
     }
@@ -458,16 +575,17 @@ final class IssueMutationStore: ObservableObject {
         request: AcceptAgentSkillExecutionProposalRequest
     ) async throws -> AcceptAgentSkillExecutionProposalResponse {
         try await perform("agent-skill-execution-proposal-\(proposalID)") {
-            try await api.send(
-                MobileAPIContract.Endpoint.acceptIssueSkillExecutionProposal(
-                    projectID: projectID,
-                    conversationRunID: conversationRunID,
-                    proposalID: proposalID
-                ),
-                method: "POST",
-                token: token,
-                body: request,
-                as: AcceptAgentSkillExecutionProposalResponse.self
+            var message = BriarAPI_AcceptIssueSkillExecutionProposalRequest()
+            message.projectID = coreUUIDString(projectID)
+            message.conversationRunID = coreUUIDString(conversationRunID)
+            message.proposalID = coreUUIDString(proposalID)
+            if let workerID = request.workerId { message.workerID = workerID }
+            let response = await issueService.acceptIssueSkillExecutionProposal(
+                request: message,
+                headers: [:]
+            )
+            return try AcceptAgentSkillExecutionProposalResponse(
+                connectMessage: response.briarValue()
             )
         }
     }
@@ -497,88 +615,130 @@ final class IssueMutationStore: ObservableObject {
             guard attachments.allSatisfy({ $0.contentType.hasPrefix("image/") }) else {
                 throw IssueMutationError.attachment(L10n.text("대화에는 이미지만 첨부할 수 있습니다."))
             }
-            let path = MobileAPIContract.Endpoint.runMessages(projectID: projectID, runID: runID)
             let uniqueMentionedUserIds = Array(Set(mentionedUserIds.filter { !$0.isEmpty })).sorted()
             let uniqueMentionedAgentIds = Array(Set(mentionedAgentIds.filter { !$0.isEmpty })).sorted()
-            let mentionedUserIdsJSON = String(
-                data: try JSONEncoder().encode(uniqueMentionedUserIds),
-                encoding: .utf8
-            ) ?? "[]"
-            let mentionedAgentIdsJSON = String(
-                data: try JSONEncoder().encode(uniqueMentionedAgentIds),
-                encoding: .utf8
-            ) ?? "[]"
-            let response: CreateIssueMessageResponse
-            if attachments.isEmpty {
-                response = try await api.send(
-                    path,
-                    method: "POST",
-                    token: token,
-                    body: CreateIssueMessageRequest(
-                        body: trimmed,
-                        clientMessageId: clientMessageID,
-                        parentMessageId: parentMessageID,
-                        mentionedUserIds: uniqueMentionedUserIds,
-                        mentionedAgentIds: uniqueMentionedAgentIds,
-                        agentConversationId: nil
-                    ),
-                    as: CreateIssueMessageResponse.self
-                )
-            } else {
-                let payload = try AttachmentMessagePayload(
+            let mentionedAgentUUIDs = try uniqueMentionedAgentIds.map {
+                guard let id = UUID(uuidString: $0) else {
+                    throw MobileAPIError.invalidRequest
+                }
+                return id
+            }
+            let generatedMessageKey = "message-id-\(runID)"
+            let resolvedClientMessageID = clientMessageID ?? idempotencyID(
+                for: generatedMessageKey
+            )
+            let payload = attachments.isEmpty
+                ? nil
+                : try AttachmentMessagePayload(
                     body: trimmed,
                     attachments: attachments,
                     references: attachmentReferences,
                     referenceGenerator: attachmentReference
                 )
-                response = try await api.upload(
-                    path,
-                    fields: [
-                        "body": payload.body,
-                        "clientMessageId": clientMessageID?.uuidString.lowercased() ?? "",
-                        "parentMessageId": parentMessageID?.uuidString.lowercased() ?? "",
-                        "mentionedUserIds": mentionedUserIdsJSON,
-                        "mentionedAgentIds": mentionedAgentIdsJSON,
-                        "agentConversationId": "",
-                        "attachmentReferences": payload.referencesJSON,
-                    ],
-                    files: payload.files,
-                    token: token,
-                    as: CreateIssueMessageResponse.self
-                )
+            var request = BriarAPI_CreateIssueMessageRequest()
+            request.projectID = coreUUIDString(projectID)
+            request.runID = coreUUIDString(runID)
+            request.clientMessageID = coreUUIDString(resolvedClientMessageID)
+            request.body = payload?.body ?? trimmed
+            if let parentMessageID {
+                request.parentMessageID = coreUUIDString(parentMessageID)
             }
-            onCreated?(response.message)
-            let initialReplies = response.agentReplies.isEmpty
-                ? response.agentReply.map { [$0] } ?? []
-                : response.agentReplies
-            guard !initialReplies.isEmpty else { return [response.message] }
+            request.mentionedUserIds = uniqueMentionedUserIds
+            request.mentionedAgentIds = mentionedAgentUUIDs.map(coreUUIDString)
+            var preparationKey: String?
+            if let payload {
+                let key = "prepare-message-\(resolvedClientMessageID)"
+                preparationKey = key
+                var prepareRequest = BriarAPI_PrepareIssueMessageAttachmentsRequest()
+                prepareRequest.preparationRequestID = coreUUIDString(idempotencyID(for: key))
+                prepareRequest.projectID = coreUUIDString(projectID)
+                prepareRequest.runID = coreUUIDString(runID)
+                prepareRequest.clientMessageID = coreUUIDString(resolvedClientMessageID)
+                prepareRequest.attachments = try PreparedUploadPipeline.metadata(
+                    attachments: attachments,
+                    clientIDs: payload.references
+                )
+                let prepared = try await issueService.prepareIssueMessageAttachments(
+                    request: prepareRequest,
+                    headers: [:]
+                ).briarValue()
+                let uploadIDs = try await PreparedUploadPipeline.upload(
+                    attachments: attachments,
+                    clientIDs: payload.references,
+                    preparedUploads: prepared.uploads,
+                    using: preparedUploadClient
+                )
+                request.body = try PreparedUploadPipeline.replacingAttachmentReferences(
+                    in: request.body,
+                    clientIDs: payload.references,
+                    uploadIDs: uploadIDs
+                )
+                request.attachments = try PreparedUploadPipeline.references(uploadIDs: uploadIDs)
+            }
+            let wireResponse = try await issueService.createIssueMessage(
+                request: request,
+                headers: [:]
+            ).briarValue()
+            guard wireResponse.hasMessage else { throw MobileAPIError.invalidResponse }
+            let createdMessage = try IssueMessage(connectMessage: wireResponse.message)
+            let createdAgentReply = wireResponse.hasAgentReply
+                ? try IssueAgentReplyJob(connectMessage: wireResponse.agentReply)
+                : nil
+            let createdAgentReplies = try wireResponse.agentReplies.map(
+                IssueAgentReplyJob.init(connectMessage:)
+            )
+            if clientMessageID == nil {
+                pendingRequestIDs.removeValue(forKey: generatedMessageKey)
+            }
+            if let preparationKey {
+                pendingRequestIDs.removeValue(forKey: preparationKey)
+            }
+            onCreated?(createdMessage)
+            let initialReplies = createdAgentReplies.isEmpty
+                ? createdAgentReply.map { [$0] } ?? []
+                : createdAgentReplies
+            guard !initialReplies.isEmpty else { return [createdMessage] }
             for initialReply in initialReplies {
                 onAgentReplyChanged?(initialReply)
             }
             for _ in 0..<maximumPolls {
                 try await Task.sleep(for: pollInterval)
-                let polled: IssueAgentReplyResponse
+                let polledAgentReply: IssueAgentReplyJob
+                let polledMessage: IssueMessage?
+                let polledReplies: [IssueAgentReplyJob]
+                let polledMessages: [IssueMessage]
                 do {
-                    polled = try await api.send(
-                        MobileAPIContract.Endpoint.runAgentReply(
-                            projectID: projectID,
-                            runID: runID,
-                            triggerMessageID: response.message.id
-                        ),
-                        method: "GET",
-                        token: token,
-                        body: nil,
-                        as: IssueAgentReplyResponse.self
+                    var request = BriarAPI_GetIssueAgentReplyRequest()
+                    request.projectID = coreUUIDString(projectID)
+                    request.runID = coreUUIDString(runID)
+                    request.triggerMessageID = coreUUIDString(createdMessage.id)
+                    let wireResponse = await issueService.getIssueAgentReply(
+                        request: request,
+                        headers: [:]
+                    )
+                    let message = try wireResponse.briarValue()
+                    guard message.hasAgentReply else {
+                        throw MobileAPIError.invalidResponse
+                    }
+                    polledAgentReply = try IssueAgentReplyJob(
+                        connectMessage: message.agentReply
+                    )
+                    polledMessage = message.hasMessage
+                        ? try IssueMessage(connectMessage: message.message)
+                        : nil
+                    polledReplies = try message.agentReplies.map(
+                        IssueAgentReplyJob.init(connectMessage:)
+                    )
+                    polledMessages = try message.messages.map(
+                        IssueMessage.init(connectMessage:)
                     )
                 } catch is CancellationError {
                     throw CancellationError()
                 } catch {
                     throw IssueMutationError.agentReplyPollingFailed
                 }
-                let polledReplies = polled.agentReplies.isEmpty
-                    ? [polled.agentReply]
-                    : polled.agentReplies
-                for polledReply in polledReplies {
+                let replies = polledReplies.isEmpty ? [polledAgentReply] : polledReplies
+                for polledReply in replies {
                     onAgentReplyChanged?(polledReply)
                     if polledReply.status == .failed {
                         throw IssueMutationError.agentReplyFailed(
@@ -586,13 +746,13 @@ final class IssueMutationStore: ObservableObject {
                         )
                     }
                 }
-                if polledReplies.count >= initialReplies.count &&
-                    polledReplies.allSatisfy({ $0.status == .completed }) {
-                    let completedMessages = polled.messages.isEmpty
-                        ? polled.message.map { [$0] } ?? []
-                        : polled.messages
-                    return [response.message] + completedMessages.filter {
-                        $0.id != response.message.id
+                if replies.count >= initialReplies.count &&
+                    replies.allSatisfy({ $0.status == .completed }) {
+                    let completedMessages = polledMessages.isEmpty
+                        ? polledMessage.map { [$0] } ?? []
+                        : polledMessages
+                    return [createdMessage] + completedMessages.filter {
+                        $0.id != createdMessage.id
                     }
                 }
             }
@@ -623,4 +783,5 @@ final class IssueMutationStore: ObservableObject {
         pendingRequestIDs[key] = created
         return created
     }
+
 }

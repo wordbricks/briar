@@ -1,5 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createInterface } from "node:readline";
+import { AgentEventDirection } from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
 import * as Result from "effect/Result";
 import {
   codexAppServerArgs,
@@ -10,21 +11,18 @@ import {
   codexServerRequestResponse,
   consumeCodexAppServerMessage,
   createCodexAppServerState,
-  decodeCodexRunnerRequest,
   normalizeCodexAppServerMessage,
   type CodexMcpIsolation,
   type CodexMcpTurnFailure,
-  type CodexRunnerOutput,
-  type CodexRunnerRequest,
   type CodexRpcMessage,
 } from "./codex-runner-lib";
 import { decodeJsonRpcMessageJsonResult } from "./json-rpc-message";
 import { createRunnerIo } from "./runner-io";
+import type { RunnerRequest } from "./runner-request";
 
 let activeChild: ChildProcessWithoutNullStreams | null = null;
-const runnerIo = createRunnerIo<CodexRunnerRequest, CodexRunnerOutput>({
+const runnerIo = createRunnerIo({
   closeError: "Briar closed the Codex runner input.",
-  decodeRequest: decodeCodexRunnerRequest,
   onClose: () => {
     if (activeChild && activeChild.exitCode === null) {
       activeChild.kill("SIGTERM");
@@ -43,7 +41,7 @@ for (const signal of ["SIGTERM", "SIGINT"] as const) {
 
 function send(child: ChildProcessWithoutNullStreams, message: CodexRpcMessage) {
   child.stdin.write(`${JSON.stringify(message)}\n`);
-  emit({ type: "event", direction: "client", raw: message });
+  emit.event({ direction: AgentEventDirection.CLIENT, raw: message });
 }
 
 function childExit(
@@ -70,12 +68,12 @@ type CodexAttemptResult =
 const maxOptionalMcpRecoveries = 3;
 
 async function runCodexAttempt(
-  request: CodexRunnerRequest,
+  request: RunnerRequest,
   isolation: CodexMcpIsolation,
   emittedSessions: Set<string>,
 ): Promise<CodexAttemptResult> {
   const child = spawn(
-    request.codexBinary,
+    request.providerBinaryPath,
     codexAppServerArgs(request, process.env.BRIAR_BROWSER_AUTOMATION_PROVIDER),
     {
       cwd: request.workspaceRoot,
@@ -112,17 +110,15 @@ async function runCodexAttempt(
       const message: CodexRpcMessage = decoded.success;
 
       const normalized = normalizeCodexAppServerMessage(message);
-      emit({
-        type: "event",
-        direction: "server",
+      emit.event({
+        direction: AgentEventDirection.SERVER,
         raw: message,
         ...(normalized ? { event: normalized } : {}),
       });
 
       const approval = codexApprovalRequest(message);
       if (approval) {
-        emit({
-          type: "approval",
+        emit.approval({
           id: approval.id,
           toolName: approval.toolName,
           input: approval.input,
@@ -143,7 +139,7 @@ async function runCodexAttempt(
       const transition = consumeCodexAppServerMessage(state, request, message);
       if (state.threadId && !emittedSessions.has(state.threadId)) {
         emittedSessions.add(state.threadId);
-        emit({ type: "session", sessionId: state.threadId });
+        emit.session(state.threadId);
       }
       for (const outgoing of transition.outgoing) send(child, outgoing);
       if (transition.mcpFailure) {
@@ -214,8 +210,7 @@ async function main() {
       emittedSessions,
     );
     if (result.type === "completed") {
-      emit({
-        type: "result",
+      emit.result({
         sessionId: result.threadId,
         message: result.message,
       });
@@ -223,8 +218,7 @@ async function main() {
     }
 
     if (result.failure.disposition === "blocked") {
-      emit({
-        type: "blocked",
+      emit.blocked({
         reason: "mcp_auth_required",
         provider: "codex",
         message: `Authentication is required for MCP server(s): ${result.failure.serverNames.join(", ")}.`,
@@ -286,10 +280,7 @@ function isolationKey(value: CodexMcpIsolation): string {
 
 void main()
   .catch((caught) => {
-    emit({
-      type: "error",
-      message: caught instanceof Error ? caught.message : String(caught),
-    });
+    emit.error(caught instanceof Error ? caught.message : String(caught));
     process.exitCode = 1;
   })
   .finally(runnerIo.close);

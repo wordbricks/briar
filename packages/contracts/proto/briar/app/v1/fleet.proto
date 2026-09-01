@@ -1,0 +1,441 @@
+syntax = "proto3";
+
+package briar.app.v1;
+
+import "briar/app/v1/dashboard.proto";
+import "briar/types/v1/provider.proto";
+import "briar/types/v1/worker.proto";
+import "google/protobuf/timestamp.proto";
+
+option swift_prefix = "BriarAPI_";
+
+// FleetService owns authenticated organization-level machine administration.
+// WebSocket upgrades for remote desktop and guided setup remain ordinary HTTP;
+// this service owns only their unary control-plane requests and tickets.
+service FleetService {
+  rpc RegisterProjectExecutionWorker(RegisterProjectExecutionWorkerRequest) returns (RegisterProjectExecutionWorkerResponse);
+  rpc BindProjectExecutionWorker(BindProjectExecutionWorkerRequest) returns (BindProjectExecutionWorkerResponse);
+  rpc UnbindProjectExecutionWorker(UnbindProjectExecutionWorkerRequest) returns (UnbindProjectExecutionWorkerResponse);
+  rpc ListExecutionWorkers(ListExecutionWorkersRequest) returns (ListExecutionWorkersResponse);
+  rpc RequestExecutionWorkerUpdate(RequestExecutionWorkerUpdateRequest) returns (RequestExecutionWorkerUpdateResponse);
+  rpc UpdateExecutionWorker(UpdateExecutionWorkerRequest) returns (UpdateExecutionWorkerResponse);
+  rpc DeleteExecutionWorker(DeleteExecutionWorkerRequest) returns (DeleteExecutionWorkerResponse);
+  rpc GetManagedComputerProduct(GetManagedComputerProductRequest) returns (GetManagedComputerProductResponse);
+  rpc ListManagedComputers(ListManagedComputersRequest) returns (ListManagedComputersResponse);
+  rpc GetManagedComputer(GetManagedComputerRequest) returns (GetManagedComputerResponse);
+  rpc ValidateManagedComputerPromotion(ValidateManagedComputerPromotionRequest) returns (ValidateManagedComputerPromotionResponse);
+  rpc ApplyForManagedComputer(ApplyForManagedComputerRequest) returns (ApplyForManagedComputerResponse);
+  rpc RetryManagedComputer(RetryManagedComputerRequest) returns (RetryManagedComputerResponse);
+  rpc RetireManagedComputer(RetireManagedComputerRequest) returns (RetireManagedComputerResponse);
+  rpc CreateManagedComputerRemoteSession(CreateManagedComputerRemoteSessionRequest) returns (CreateManagedComputerRemoteSessionResponse);
+  rpc EndManagedComputerRemoteSession(EndManagedComputerRemoteSessionRequest) returns (EndManagedComputerRemoteSessionResponse);
+  rpc CreateManagedComputerSetupSession(CreateManagedComputerSetupSessionRequest) returns (CreateManagedComputerSetupSessionResponse);
+  rpc GetManagedComputerSetupStatus(GetManagedComputerSetupStatusRequest) returns (GetManagedComputerSetupStatusResponse);
+}
+
+message RegisterProjectExecutionWorkerRequest {
+  string project_id = 1;
+  string label = 2;
+  string device_identity = 3;
+  briar.types.v1.WorkerRuntimeAdvertisement runtime = 4;
+  optional uint32 max_concurrent_sessions = 5;
+}
+
+message RegisterProjectExecutionWorkerResponse {
+  string organization_id = 1;
+  string device_id = 2;
+  DashboardWorker worker = 3;
+  string worker_token = 4;
+}
+
+message BindProjectExecutionWorkerRequest {
+  string project_id = 1;
+  string device_identity = 2;
+  briar.types.v1.WorkerRuntimeAdvertisement runtime = 3;
+}
+
+message BindProjectExecutionWorkerResponse {
+  string organization_id = 1;
+  string device_id = 2;
+  DashboardWorker worker = 3;
+}
+
+message UnbindProjectExecutionWorkerRequest {
+  enum Reason {
+    REASON_UNSPECIFIED = 0;
+    REASON_EXPLICIT_USER_UNLINK = 1;
+    REASON_MANAGED_DEPROVISION = 2;
+  }
+
+  string project_id = 1;
+  string worker_id = 2;
+  string request_id = 3;
+  Reason reason = 4;
+}
+
+message UnbindProjectExecutionWorkerResponse {
+  bool already_unbound = 1;
+}
+
+enum ExecutionWorkerUpdateStatus {
+  EXECUTION_WORKER_UPDATE_STATUS_UNSPECIFIED = 0;
+  EXECUTION_WORKER_UPDATE_STATUS_REQUESTED = 1;
+  EXECUTION_WORKER_UPDATE_STATUS_COMPLETED = 2;
+  EXECUTION_WORKER_UPDATE_STATUS_CANCELLED = 3;
+}
+
+enum ExecutionWorkerHandoffState {
+  EXECUTION_WORKER_HANDOFF_STATE_UNSPECIFIED = 0;
+  EXECUTION_WORKER_HANDOFF_STATE_IDLE = 1;
+  EXECUTION_WORKER_HANDOFF_STATE_DRAINING = 2;
+  EXECUTION_WORKER_HANDOFF_STATE_READY = 3;
+  EXECUTION_WORKER_HANDOFF_STATE_FAILED = 4;
+}
+
+message ExecutionWorkerUpdateRequestState {
+  string id = 1;
+  string target_version = 2;
+  ExecutionWorkerUpdateStatus status = 3;
+  google.protobuf.Timestamp requested_at = 4;
+  ExecutionWorkerHandoffState handoff_state = 5;
+  optional string handoff_error = 6;
+}
+
+message ExecutionWorkerBinding {
+  string id = 1;
+  string project_id = 2;
+  string project_name = 3;
+  briar.types.v1.AgentProvider agent_provider = 4;
+  repeated briar.types.v1.AgentProvider providers = 5;
+  DashboardWorker.State state = 6;
+  bool accepting_work = 7;
+  DashboardWorker.Readiness readiness = 8;
+  optional string readiness_detail = 9;
+}
+
+message OrganizationExecutionWorker {
+  string device_id = 1;
+  string owner_user_id = 2;
+  string owner_name = 3;
+  string label = 4;
+  optional WorkerIcon icon = 5;
+  DashboardWorker.State state = 6;
+  uint32 max_concurrent_sessions = 7;
+  uint32 active_sessions = 8;
+  google.protobuf.Timestamp last_heartbeat_at = 9;
+  google.protobuf.Timestamp created_at = 10;
+  map<string, string> versions = 11;
+  bool remote_update_supported = 12;
+  optional ExecutionWorkerUpdateRequestState update_request = 13;
+  repeated ExecutionWorkerBinding bindings = 14;
+}
+
+message ListExecutionWorkersRequest {
+  string organization_id = 1;
+}
+
+message ListExecutionWorkersResponse {
+  repeated OrganizationExecutionWorker workers = 1;
+  optional string latest_version = 2;
+  bool can_manage = 3;
+  google.protobuf.Timestamp generated_at = 4;
+}
+
+message RequestExecutionWorkerUpdateRequest {
+  string organization_id = 1;
+  string device_id = 2;
+}
+
+message RequestExecutionWorkerUpdateResponse {
+  enum Outcome {
+    OUTCOME_UNSPECIFIED = 0;
+    OUTCOME_REQUESTED = 1;
+    OUTCOME_ALREADY_CURRENT = 2;
+  }
+
+  Outcome outcome = 1;
+  optional string request_id = 2;
+  string target_version = 3;
+}
+
+message UpdateExecutionWorkerRequest {
+  message ClearIcon {}
+
+  string organization_id = 1;
+  string device_id = 2;
+  optional uint32 max_concurrent_sessions = 3;
+  oneof icon_update {
+    WorkerIcon icon = 4;
+    ClearIcon clear_icon = 5;
+  }
+}
+
+message UpdateExecutionWorkerResponse {
+  string device_id = 1;
+  uint32 max_concurrent_sessions = 2;
+  optional WorkerIcon icon = 3;
+}
+
+message DeleteExecutionWorkerRequest {
+  string organization_id = 1;
+  string device_id = 2;
+  string request_id = 3;
+}
+
+message DeleteExecutionWorkerResponse {
+  bool deleted = 1;
+}
+
+enum ManagedComputerState {
+  MANAGED_COMPUTER_STATE_UNSPECIFIED = 0;
+  MANAGED_COMPUTER_STATE_REQUESTED = 1;
+  MANAGED_COMPUTER_STATE_PROVISIONING = 2;
+  MANAGED_COMPUTER_STATE_BOOTSTRAPPING = 3;
+  MANAGED_COMPUTER_STATE_NEEDS_SETUP = 4;
+  MANAGED_COMPUTER_STATE_READY = 5;
+  MANAGED_COMPUTER_STATE_FAILED = 6;
+  MANAGED_COMPUTER_STATE_DRAINING = 7;
+  MANAGED_COMPUTER_STATE_STOPPED = 8;
+  MANAGED_COMPUTER_STATE_TERMINATED = 9;
+}
+
+message ManagedComputerError {
+  string code = 1;
+  string message = 2;
+}
+
+message ManagedComputer {
+  string id = 1;
+  string organization_id = 2;
+  string requester_user_id = 3;
+  ManagedComputerState state = 4;
+  string region = 5;
+  optional string instance_id = 6;
+  optional string volume_id = 7;
+  optional string device_id = 8;
+  optional ManagedComputerError error = 9;
+  uint32 retry_count = 10;
+  bool retry_available = 11;
+  google.protobuf.Timestamp created_at = 12;
+  google.protobuf.Timestamp expires_at = 13;
+  google.protobuf.Timestamp updated_at = 14;
+}
+
+enum ManagedComputerCurrency {
+  MANAGED_COMPUTER_CURRENCY_UNSPECIFIED = 0;
+  MANAGED_COMPUTER_CURRENCY_USD = 1;
+}
+
+message ManagedComputerSpecification {
+  string instance_type = 1;
+  uint32 vcpu = 2;
+  uint32 memory_gib = 3;
+  uint32 volume_gib = 4;
+  uint32 max_concurrent_runs = 5;
+  optional string region = 6;
+}
+
+message ManagedComputerProduct {
+  ManagedComputerCurrency currency = 1;
+  uint32 monthly_price_cents = 2;
+  uint32 quantity = 3;
+  ManagedComputerSpecification specification = 4;
+  bool model_api_costs_included = 5;
+}
+
+message GetManagedComputerProductRequest {
+  string organization_id = 1;
+}
+
+message GetManagedComputerProductResponse {
+  ManagedComputerProduct product = 1;
+  bool applications_enabled = 2;
+  bool remote_desktop_enabled = 3;
+  bool configuration_ready = 4;
+  bool can_apply = 5;
+  uint32 organization_limit = 6;
+  uint32 fleet_limit = 7;
+}
+
+message ListManagedComputersRequest {
+  string organization_id = 1;
+}
+
+message ListManagedComputersResponse {
+  repeated ManagedComputer computers = 1;
+  google.protobuf.Timestamp generated_at = 2;
+}
+
+message GetManagedComputerRequest {
+  string organization_id = 1;
+  string managed_computer_id = 2;
+}
+
+message GetManagedComputerResponse {
+  ManagedComputer computer = 1;
+}
+
+enum ManagedComputerPromotionLimitReason {
+  MANAGED_COMPUTER_PROMOTION_LIMIT_REASON_UNSPECIFIED = 0;
+  MANAGED_COMPUTER_PROMOTION_LIMIT_REASON_USER = 1;
+  MANAGED_COMPUTER_PROMOTION_LIMIT_REASON_ORGANIZATION = 2;
+  MANAGED_COMPUTER_PROMOTION_LIMIT_REASON_FLEET = 3;
+}
+
+message ValidateManagedComputerPromotionRequest {
+  string organization_id = 1;
+  string code = 2;
+}
+
+message ValidateManagedComputerPromotionResponse {
+  bool valid = 1;
+  bool eligible = 2;
+  uint32 total_cents = 3;
+  ManagedComputerCurrency currency = 4;
+  bool applications_enabled = 5;
+  optional ManagedComputerPromotionLimitReason limit_reason = 6;
+}
+
+message ApplyForManagedComputerRequest {
+  string organization_id = 1;
+  string code = 2;
+  string request_id = 3;
+}
+
+message ManagedComputerEntitlement {
+  enum Source {
+    SOURCE_UNSPECIFIED = 0;
+    SOURCE_FREE_PROMOTION = 1;
+  }
+
+  Source source = 1;
+  uint32 total_cents = 2;
+  ManagedComputerCurrency currency = 3;
+}
+
+message ApplyForManagedComputerResponse {
+  ManagedComputer computer = 1;
+  bool duplicate = 2;
+  ManagedComputerEntitlement entitlement = 3;
+}
+
+message RetryManagedComputerRequest {
+  string organization_id = 1;
+  string managed_computer_id = 2;
+  string request_id = 3;
+}
+
+message RetryManagedComputerResponse {
+  ManagedComputer computer = 1;
+  bool duplicate = 2;
+}
+
+message RetireManagedComputerRequest {
+  string organization_id = 1;
+  string managed_computer_id = 2;
+}
+
+message RetireManagedComputerResponse {
+  ManagedComputer computer = 1;
+  bool duplicate = 2;
+}
+
+enum ManagedComputerRemoteSessionState {
+  MANAGED_COMPUTER_REMOTE_SESSION_STATE_UNSPECIFIED = 0;
+  MANAGED_COMPUTER_REMOTE_SESSION_STATE_CREATED = 1;
+  MANAGED_COMPUTER_REMOTE_SESSION_STATE_CONNECTING = 2;
+  MANAGED_COMPUTER_REMOTE_SESSION_STATE_CONNECTED = 3;
+  MANAGED_COMPUTER_REMOTE_SESSION_STATE_DISCONNECTED = 4;
+  MANAGED_COMPUTER_REMOTE_SESSION_STATE_ENDED = 5;
+  MANAGED_COMPUTER_REMOTE_SESSION_STATE_EXPIRED = 6;
+  MANAGED_COMPUTER_REMOTE_SESSION_STATE_REJECTED = 7;
+}
+
+message ManagedComputerRemoteSession {
+  string id = 1;
+  string managed_computer_id = 2;
+  ManagedComputerRemoteSessionState state = 3;
+  uint32 connection_generation = 4;
+  google.protobuf.Timestamp token_expires_at = 5;
+  google.protobuf.Timestamp max_expires_at = 6;
+  optional google.protobuf.Timestamp connected_at = 7;
+  optional google.protobuf.Timestamp disconnected_at = 8;
+  optional google.protobuf.Timestamp ended_at = 9;
+}
+
+message ManagedComputerSocketTicket {
+  string url = 1;
+  string protocol = 2;
+}
+
+message CreateManagedComputerRemoteSessionRequest {
+  string organization_id = 1;
+  string managed_computer_id = 2;
+  string request_id = 3;
+  optional string reconnect_session_id = 4;
+}
+
+message CreateManagedComputerRemoteSessionResponse {
+  ManagedComputerRemoteSession session = 1;
+  ManagedComputerSocketTicket socket = 2;
+  bool reconnected = 3;
+}
+
+message EndManagedComputerRemoteSessionRequest {
+  string organization_id = 1;
+  string managed_computer_id = 2;
+  string remote_session_id = 3;
+}
+
+message EndManagedComputerRemoteSessionResponse {
+  bool ended = 1;
+}
+
+enum ManagedComputerSetupSessionStatus {
+  MANAGED_COMPUTER_SETUP_SESSION_STATUS_UNSPECIFIED = 0;
+  MANAGED_COMPUTER_SETUP_SESSION_STATUS_PENDING = 1;
+  MANAGED_COMPUTER_SETUP_SESSION_STATUS_CONSUMED = 2;
+  MANAGED_COMPUTER_SETUP_SESSION_STATUS_EXPIRED = 3;
+}
+
+message ManagedComputerSetupSession {
+  string id = 1;
+  string managed_computer_id = 2;
+  string organization_id = 3;
+  string project_id = 4;
+  ManagedComputerSetupSessionStatus status = 5;
+  google.protobuf.Timestamp expires_at = 6;
+}
+
+message CreateManagedComputerSetupSessionRequest {
+  string organization_id = 1;
+  string managed_computer_id = 2;
+  string project_id = 3;
+  string request_id = 4;
+}
+
+message CreateManagedComputerSetupSessionResponse {
+  ManagedComputerSetupSession session = 1;
+  string setup_token = 2;
+  ManagedComputerSocketTicket socket = 3;
+  bool agent_connected = 4;
+  bool duplicate = 5;
+}
+
+message GetManagedComputerSetupStatusRequest {
+  string organization_id = 1;
+  string managed_computer_id = 2;
+}
+
+message ManagedComputerSetupStatusSession {
+  string id = 1;
+  string project_id = 2;
+  ManagedComputerSetupSessionStatus status = 3;
+  google.protobuf.Timestamp expires_at = 4;
+  optional google.protobuf.Timestamp consumed_at = 5;
+}
+
+message GetManagedComputerSetupStatusResponse {
+  optional ManagedComputerSetupStatusSession session = 1;
+  optional DashboardWorker worker = 2;
+}

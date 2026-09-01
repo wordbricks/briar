@@ -179,11 +179,7 @@ export function OrganizationAgentsSettings({
           effort: editingAgent.effort,
           description: editingAgent.description ?? "",
           responsibility: editingAgent.responsibility,
-          skills: projectAgentSkillInputs(editingSkills).map((skill) => ({
-            ...skill,
-            executionMode: skill.executionMode ?? "task",
-            approvalPolicy: skill.approvalPolicy ?? "explicit",
-          })),
+          skills: projectAgentSkillInputs(editingSkills),
         },
       );
       setAgents((current) =>

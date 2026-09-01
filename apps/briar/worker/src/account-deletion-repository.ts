@@ -350,6 +350,16 @@ export async function deleteAccountData(
   statements.push(
     db
       .prepare(
+        `delete from briar_channels
+         where organization_id in (
+           select organization_id
+           from briar_account_deletion_job_organizations
+           where job_id = ?
+         )`,
+      )
+      .bind(jobId),
+    db
+      .prepare(
         `delete from verification
          where (
            lower(identifier) = lower(?)

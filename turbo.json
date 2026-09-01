@@ -77,9 +77,11 @@
     },
     "web:build": { "cache": false },
     "build:release": { "cache": false },
-    "mobile:contract": { "cache": false },
     "ios:native:project": { "cache": false },
-    "ios:native:test": { "cache": false },
+    "ios:native:test": {
+      "cache": false,
+      "passThroughEnv": ["BRIAR_IOS_*", "BRIAR_IPAD_*"]
+    },
     "ios:release:verify": { "outputs": [] },
     "qa:release-updater": {
       "cache": false,
@@ -134,10 +136,6 @@
       "passThroughEnv": ["CLOUDFLARE_*", "WRANGLER_*"]
     },
     "test:d1:migrations": { "cache": false },
-    "test:d1:cache-recovery": { "cache": false },
-    "test:d1:integration": { "cache": false },
-    "test:d1:prepare": { "cache": false },
-    "test:d1:clean": { "cache": false },
     "secrets:verify-encrypted": { "cache": false },
     "secrets:check": { "cache": false },
     "worker:dev": {

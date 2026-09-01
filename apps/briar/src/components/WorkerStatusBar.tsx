@@ -38,7 +38,7 @@ export function workerProviders(worker: ExecutionWorker): AgentProvider[] {
   ) {
     return [];
   }
-  const providers = worker.providers ?? [];
+  const providers = worker.providers;
   return [...new Set(providers)];
 }
 

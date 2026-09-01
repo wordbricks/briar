@@ -5,11 +5,40 @@ import {
   readArchivedProjectAgentSession,
 } from "./archive";
 import { archiveFormatVersion } from "./archive-contract";
+import { encodeStoredProjectAgentSessionPayload } from "./project-request-contract";
 
 const encoder = new TextEncoder();
 const archiveId = "a".repeat(64);
 const projectId = "project-1";
 const sessionId = "session-1";
+const agentId = "11111111-1111-4111-8111-111111111111";
+const completedAt = "2026-01-01T00:01:00.000Z";
+
+const sessionPayloadJson = encodeStoredProjectAgentSessionPayload({
+  dispatchGroupId: sessionId,
+  agentId,
+  agentName: "Archive Agent",
+  skillId: null,
+  sessionType: "task",
+  trigger: "manual",
+  scheduleId: null,
+  scheduleRunId: null,
+  parentSessionId: null,
+  request: "Archive this session",
+  followUps: [],
+  status: "completed",
+  issues: [],
+  startedAt: "2026-01-01T00:00:00.000Z",
+  completedAt,
+  conversationId: null,
+  summary: "done",
+  error: null,
+  requestedWorkerId: null,
+  workerId: null,
+  events: [{ id: "completed-event", type: "completed", occurredAt: completedAt }],
+  updatedAt: completedAt,
+  requestedByUserId: null,
+});
 
 const bytesToHex = (bytes: ArrayBuffer) =>
   [...new Uint8Array(bytes)]
@@ -34,13 +63,14 @@ const sessionRecord = (overrides: Record<string, unknown> = {}) => ({
   data: {
     project_id: projectId,
     id: sessionId,
-    agent_id: "agent-1",
+    agent_id: agentId,
+    requested_by_user_id: null,
     status: "completed",
     session_type: "task",
-    payload_json: '{"summary":"done"}',
+    payload_json: sessionPayloadJson,
     started_at: "2026-01-01T00:00:00.000Z",
-    completed_at: "2026-01-01T00:01:00.000Z",
-    updated_at: "2026-01-01T00:01:00.000Z",
+    completed_at: completedAt,
+    updated_at: completedAt,
     ...overrides,
   },
 });

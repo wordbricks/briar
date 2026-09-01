@@ -80,7 +80,10 @@ import {
   demoRepositoryReadiness,
 } from "../lib/demo-data";
 import { deleteAndroidPushRegistration } from "../lib/inbox-notifications";
-import { isRepositoryConnectedForImport } from "../lib/linear-import";
+import {
+  isRepositoryConnectedForImport,
+  type LinearStatusMapping,
+} from "../lib/linear-import";
 import {
   configureLocalExecutionWorker,
   connectLocalProject,
@@ -101,12 +104,14 @@ import {
   resolveProjectConnectionWorkflow,
   updateLocalProjectVelenOrg,
   updateLocalProjectWorkflow,
-  type AutoHuntHealth,
   type LocalAutoHuntConfig,
-  type PreparedProjectRepository,
-  type RepositoryReadiness,
-  type VelenInspection,
 } from "../lib/project-connection";
+import type {
+  AutoHuntHealth,
+  PreparedProjectRepository,
+  RepositoryReadiness,
+  VelenInspection,
+} from "../generated/tauri";
 import { projectIconFromDataUrl } from "../lib/project-icon";
 import {
   createLocalProjectReadinessCoordinator,
@@ -150,6 +155,7 @@ import {
   type AutoHuntWorkflowCheckpoint,
 } from "../lib/auto-hunt-contract";
 import { isMobileCompanion, isWebApp } from "../lib/platform";
+import { defaultIssueKeyPrefix } from "../lib/issue-key";
 import { canonicalizeIssueAttachmentReferences } from "../lib/issue-markdown";
 import { mergeIssueMessages } from "../lib/issue-message-merge";
 import {
@@ -233,11 +239,11 @@ const demoUser: SessionUser = {
   email: "demo@briar.local",
 };
 const demoOrganization: Organization = {
-  id: demoDashboard.project.organizationId!,
-  name: demoDashboard.project.organizationName!,
+  id: demoDashboard.project.organizationId,
+  name: demoDashboard.project.organizationName,
   handle: "briar",
   logo: null,
-  role: demoDashboard.project.role!,
+  role: demoDashboard.project.role,
   createdAt: demoDashboard.project.createdAt,
 };
 const demoMessageTime = new Date(Date.now() - 18 * 60_000).toISOString();
@@ -249,6 +255,7 @@ const initialDemoIssueMessages = {
       runId: "demo-1",
       parentMessageId: null,
       body: "이벤트 스트림에서 빠지는 상태가 없는지 같이 확인해 주세요.",
+      attachments: [],
       author: {
         id: demoUser.id,
         name: demoUser.name,
@@ -256,6 +263,9 @@ const initialDemoIssueMessages = {
         provider: null,
       },
       replyCount: 1,
+      proposedAction: null,
+      executionProposal: null,
+      skillExecutionProposal: null,
       createdAt: demoMessageTime,
       updatedAt: demoMessageTime,
     },
@@ -264,6 +274,7 @@ const initialDemoIssueMessages = {
       runId: "demo-1",
       parentMessageId: "demo-message-1",
       body: "완료·실패·중단 상태까지 회귀 테스트에 포함했습니다.",
+      attachments: [],
       author: {
         id: null,
         name: "Briar · Codex",
@@ -271,6 +282,9 @@ const initialDemoIssueMessages = {
         provider: "codex",
       },
       replyCount: 0,
+      proposedAction: null,
+      executionProposal: null,
+      skillExecutionProposal: null,
       createdAt: demoReplyTime,
       updatedAt: demoReplyTime,
     },
@@ -625,6 +639,11 @@ export function useBriar(options: UseBriarOptions = {}) {
                 cursor,
                 abort.signal,
               );
+              if (delta.reset) {
+                current = await loadDashboard(token, projectId, abort.signal);
+                cursor = current.cursor ?? null;
+                break;
+              }
             } catch (caught) {
               if (!isApiErrorStatus(caught, 410)) throw caught;
               current = await loadDashboard(token, projectId, abort.signal);
@@ -1332,14 +1351,9 @@ export function useBriar(options: UseBriarOptions = {}) {
       if (lockedProjectId && projectId !== lockedProjectId) return;
       const project = projects.find((candidate) => candidate.id === projectId);
       if (!project) return;
-      if (activeProjectIdRef.current === project.id) {
-        setActiveOrganizationId((current) => project.organizationId ?? current);
-        setError(null);
-        return;
-      }
       reconnectRequest.current += 1;
       setActiveProjectId(projectId);
-      setActiveOrganizationId((current) => project.organizationId ?? current);
+      setActiveOrganizationId(project.organizationId);
       if (!demoMode) {
         setDashboard(null);
         setError(null);
@@ -1371,13 +1385,8 @@ export function useBriar(options: UseBriarOptions = {}) {
       if (!project) {
         throw new Error("요청한 프로젝트를 찾을 수 없습니다.");
       }
-      if (activeProjectIdRef.current === project.id) {
-        setActiveOrganizationId((current) => project.organizationId ?? current);
-        setError(null);
-        return project;
-      }
       setActiveProjectId(project.id);
-      setActiveOrganizationId((current) => project.organizationId ?? current);
+      setActiveOrganizationId(project.organizationId);
       if (!demoMode) {
         setDashboard(null);
         setError(null);
@@ -1655,6 +1664,9 @@ export function useBriar(options: UseBriarOptions = {}) {
         const project: Project = {
           id: crypto.randomUUID(),
           name: input.name.trim(),
+          issueKeyPrefix: defaultIssueKeyPrefix,
+          scheduleTabEnabled: true,
+          icon: null,
           organizationId: organization.id,
           organizationName: organization.name,
           role: organization.role,
@@ -1679,9 +1691,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         const nextOrganizations = await loadOrganizations(token).catch(() => null);
         setProjects((current) => [...current, result.project]);
         if (nextOrganizations) setOrganizations(nextOrganizations);
-        setActiveOrganizationId(
-          result.project.organizationId ?? activeOrganizationId,
-        );
+        setActiveOrganizationId(result.project.organizationId);
         setActiveProjectId(result.project.id);
         setIsCreatingProject(false);
         setVelen(null);
@@ -2169,7 +2179,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     if (request !== reconnectRequest.current) return "superseded" as const;
     setVelen(null);
     setActiveProjectId(project.id);
-    setActiveOrganizationId((current) => project.organizationId ?? current);
+    setActiveOrganizationId(project.organizationId);
     setIsCreatingProject(true);
     setProjectConnection({
       kind: "reconnect",
@@ -2466,7 +2476,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       input: {
         apiKey: string;
         teamIds: string[];
-        statusMapping: Record<string, string>;
+        statusMapping: LinearStatusMapping;
       },
     ) => {
       assertRepositoryReadyForLinearImport(projectId);
@@ -2592,9 +2602,7 @@ export function useBriar(options: UseBriarOptions = {}) {
           targetDate: null,
           icon: null,
           color: null,
-          sortOrder: planningProjects.filter(
-            (candidate) => candidate.teamId === teamId,
-          ).length,
+          sortOrder: planningProjects.filter((candidate) => candidate.teamId === teamId).length,
           isDefault: false,
           role: team.role ?? "owner",
           createdAt: observedAt,
@@ -2606,8 +2614,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       if (!token) throw new Error("로그인이 필요합니다.");
       const project = await createRemotePlanningProject(token, teamId, input);
       setPlanningProjects((current) => [...current, project].sort(
-        (left, right) =>
-          left.teamId.localeCompare(right.teamId) ||
+        (left, right) => left.teamId.localeCompare(right.teamId) ||
           left.sortOrder - right.sortOrder ||
           left.createdAt.localeCompare(right.createdAt),
       ));
@@ -2619,15 +2626,9 @@ export function useBriar(options: UseBriarOptions = {}) {
   const editPlanningProject = useCallback(
     async (
       projectId: string,
-      input: {
-        name: string;
-        description: string;
-        status: PlanningProjectStatus;
-      },
+      input: { name: string; description: string; status: PlanningProjectStatus },
     ) => {
-      const existing = planningProjects.find(
-        (candidate) => candidate.id === projectId,
-      );
+      const existing = planningProjects.find((candidate) => candidate.id === projectId);
       if (!existing) throw new Error("수정할 프로젝트가 없습니다.");
       const normalized = {
         name: input.name.trim(),
@@ -2635,11 +2636,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         status: input.status,
       };
       const project = demoMode
-        ? {
-            ...existing,
-            ...normalized,
-            updatedAt: new Date().toISOString(),
-          }
+        ? { ...existing, ...normalized, updatedAt: new Date().toISOString() }
         : await (async () => {
             if (!token) throw new Error("로그인이 필요합니다.");
             return updateRemotePlanningProject(token, projectId, normalized);
@@ -2654,9 +2651,7 @@ export function useBriar(options: UseBriarOptions = {}) {
 
   const addIssue = useCallback(
     async (projectId: string, input: CreateIssueInput) => {
-      const planningProject = planningProjects.find(
-        (candidate) => candidate.id === projectId,
-      );
+      const planningProject = planningProjects.find((candidate) => candidate.id === projectId);
       const teamId = planningProject?.teamId ?? projectId;
       const project = projects.find((candidate) => candidate.id === teamId);
       if (!project || (!demoMode && !planningProject)) {
@@ -2744,10 +2739,13 @@ export function useBriar(options: UseBriarOptions = {}) {
             detail,
             priority: input.priority,
             difficulty: input.difficulty,
-            assigneeUserId:
-              input.assigneeUserId === undefined
-                ? user?.id ?? null
-                : input.assigneeUserId,
+            assigneeUserId: input.assigneeUserId === undefined
+              ? user?.id ?? null
+              : input.assigneeUserId,
+            subscribers: [{
+              userId: demoUser.id,
+              subscribedAt: occurredAt,
+            }],
             preferredProvider: input.preferredProvider ?? null,
             preferredModel: input.preferredModel ?? null,
             preferredEffort: input.preferredEffort ?? null,
@@ -2785,7 +2783,7 @@ export function useBriar(options: UseBriarOptions = {}) {
           };
           runEventsByRun.current[run.id] = [initialEvent];
           setActiveProjectId(teamId);
-          setActiveOrganizationId((current) => project.organizationId ?? current);
+          setActiveOrganizationId(project.organizationId);
           setDashboard({
             ...targetDashboard,
             runs: [run, ...targetDashboard.runs],
@@ -2828,9 +2826,7 @@ export function useBriar(options: UseBriarOptions = {}) {
   const moveIssueProject = useCallback(
     async (runId: string, sourceProjectId: string, targetProjectId: string) => {
       if (!dashboard) throw new Error("이슈를 이동할 팀이 없습니다.");
-      const target = planningProjects.find(
-        (project) => project.id === targetProjectId,
-      );
+      const target = planningProjects.find((project) => project.id === targetProjectId);
       if (!target || target.teamId !== dashboard.project.id) {
         throw new Error("같은 팀의 프로젝트로만 이슈를 이동할 수 있습니다.");
       }
@@ -2840,12 +2836,7 @@ export function useBriar(options: UseBriarOptions = {}) {
           setDashboard((current) => current ? {
             ...current,
             runs: current.runs.map((run) => run.id === runId
-              ? {
-                ...run,
-                projectId: target.id,
-                projectName: target.name,
-                updatedAt: new Date().toISOString(),
-              }
+              ? { ...run, projectId: target.id, projectName: target.name, updatedAt: new Date().toISOString() }
               : run),
           } : current);
           return { outcome: "moved" as const };
@@ -2919,12 +2910,12 @@ export function useBriar(options: UseBriarOptions = {}) {
                               : input.assigneeUserId,
                           attachments: [
                             ...(input.keptAttachmentIds
-                              ? (run.attachments ?? []).filter((attachment) =>
+                              ? run.attachments.filter((attachment) =>
                                   input.keptAttachmentIds?.includes(
                                     attachment.id,
                                   ),
                                 )
-                              : run.attachments ?? []),
+                              : run.attachments),
                             ...addedAttachments,
                           ],
                           updatedAt,
@@ -3638,6 +3629,9 @@ export function useBriar(options: UseBriarOptions = {}) {
             provider: null,
           },
           replyCount: 0,
+          proposedAction: null,
+          executionProposal: null,
+          skillExecutionProposal: null,
           createdAt,
           updatedAt: createdAt,
         });
@@ -3813,8 +3807,7 @@ export function useBriar(options: UseBriarOptions = {}) {
                 proposedAction: result.proposal,
                 executionProposal:
                   materializedExecutionProposal ??
-                  message.executionProposal ??
-                  null,
+                  message.executionProposal,
               }
             : message,
         ),

@@ -1,168 +1,200 @@
+import { create } from "@bufbuild/protobuf";
+import { sizeDelimitedDecodeStream, sizeDelimitedEncode } from "@bufbuild/protobuf/wire";
+import { CONTRACTS_DESCRIPTOR_FINGERPRINT } from "@briar/contracts/descriptor-fingerprint";
+import {
+  ApprovalPolicy,
+  JsonSchemaSchema,
+  ParentToRunnerSchema,
+  RunRequestSchema,
+  RunnerToParentSchema,
+  SandboxMode,
+} from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
+import { AgentEventDirection } from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
 import { PassThrough } from "node:stream";
-import * as Schema from "effect/Schema";
 import { describe, expect, it, vi } from "vitest";
 import { createRunnerIo } from "./runner-io";
+import {
+  encodeSidecarApprovalResponse,
+  encodeSidecarRunRequest,
+} from "./sidecar-protocol";
+import type { RunnerRequest } from "./runner-request";
 
-type TestRequest = { type: "run"; message: string };
-type TestOutput = { type: "result"; message: string };
-
-const TestRequest = Schema.Struct({
-  type: Schema.Literal("run"),
-  message: Schema.String,
+const runRequest = create(RunRequestSchema, {
+  message: "Fix it",
+  workspaceRoot: "/repo",
+  outputSchema: create(JsonSchemaSchema, {
+    value: { case: "object", value: { type: "object" } },
+  }),
+  approvalPolicy: ApprovalPolicy.ON_REQUEST,
+  sandboxMode: SandboxMode.WORKSPACE_WRITE,
+  networkAccess: true,
+  providerBinaryPath: "/bin/codex",
+  protocolFingerprint: CONTRACTS_DESCRIPTOR_FINGERPRINT,
 });
-const decodeTestRequest = Schema.decodeUnknownResult(TestRequest);
+
+async function firstFrame(bytes: Uint8Array) {
+  async function* source() {
+    yield bytes;
+  }
+  for await (const message of sizeDelimitedDecodeStream(
+    RunnerToParentSchema,
+    source(),
+  )) {
+    return message;
+  }
+  throw new Error("missing frame");
+}
 
 function testIo(onClose = vi.fn()) {
   const input = new PassThrough();
   const output = new PassThrough();
-  let written = "";
-  output.setEncoding("utf8");
-  output.on("data", (chunk: string) => {
-    written += chunk;
-  });
-  const io = createRunnerIo<TestRequest, TestOutput>({
+  const written: Buffer[] = [];
+  const terminate = vi.fn();
+  output.on("data", (chunk: Buffer) => written.push(chunk));
+  const io = createRunnerIo({
     closeError: "input closed",
-    decodeRequest: decodeTestRequest,
     input,
     onClose,
     output,
+    terminate,
   });
-  return { input, io, onClose, written: () => written };
+  return {
+    input,
+    io,
+    onClose,
+    terminate,
+    written: () => Buffer.concat(written),
+  };
 }
 
-async function beginRun(input: PassThrough, request: Promise<TestRequest>) {
-  input.write(`${JSON.stringify({ type: "run", message: "Fix it" })}\n`);
-  await request;
+async function beginRun(
+  input: PassThrough,
+  request: Promise<RunnerRequest>,
+) {
+  input.write(encodeSidecarRunRequest(runRequest));
+  return request;
 }
 
-describe("runner JSON-lines I/O", () => {
-  it("accepts the first run request and emits one JSON object per line", async () => {
+describe("runner protobuf I/O", () => {
+  it("decodes fragmented input and emits a size-delimited result frame", async () => {
     const { input, io, written } = testIo();
-    input.write(`${JSON.stringify({ type: "run", message: "Fix it" })}\n`);
+    const frame = encodeSidecarRunRequest(runRequest);
+    input.write(frame.subarray(0, 3));
+    input.write(frame.subarray(3));
 
-    await expect(io.request).resolves.toEqual({
-      type: "run",
+    await expect(io.request).resolves.toMatchObject({
       message: "Fix it",
+      workspaceRoot: "/repo",
+      approvalPolicy: "on-request",
+      sandboxMode: "workspaceWrite",
+      outputSchema: { type: "object" },
+      providerBinaryPath: "/bin/codex",
     });
-    io.emit({ type: "result", message: "done" });
-    expect(written()).toBe('{"type":"result","message":"done"}\n');
-    io.close();
-  });
-
-  it("routes approval responses and ignores unknown approval ids", async () => {
-    const { input, io } = testIo();
-    await beginRun(input, io.request);
-    const approval = io.waitForApproval("approval-1");
-    input.write(
-      `${JSON.stringify({
-        type: "approvalResponse",
-        id: "unknown",
-        approved: false,
-      })}\n`,
-    );
-    input.write(
-      `${JSON.stringify({
-        type: "approvalResponse",
-        id: "approval-1",
-        approved: true,
-      })}\n`,
-    );
-
-    await expect(approval).resolves.toBe(true);
-    io.close();
-  });
-
-  it("denies pending approvals and rejects a missing run when input closes", async () => {
-    const first = testIo();
-    const pendingApproval = first.io.waitForApproval("approval-1");
-    first.input.end();
-
-    await expect(first.io.request).rejects.toThrow("input closed");
-    await expect(pendingApproval).resolves.toBe(false);
-    expect(first.onClose).toHaveBeenCalledOnce();
-  });
-
-  it("rejects malformed JSON before the run request", async () => {
-    const { input, io } = testIo();
-    input.write("{not-json}\n");
-
-    await expect(io.request).rejects.toBeInstanceOf(SyntaxError);
-    io.close();
-  });
-
-  it("rejects a run request that does not match its provider schema", async () => {
-    const { input, io } = testIo();
-    input.write(`${JSON.stringify({ type: "run", message: 42 })}\n`);
-
-    const error = await io.request.catch((cause) => cause);
-    expect(Schema.isSchemaError(error)).toBe(true);
-    io.close();
-  });
-
-  it("denies malformed approval responses with a matching id", async () => {
-    const { input, io } = testIo();
-    await beginRun(input, io.request);
-    const truthyApproval = io.waitForApproval("approval-1");
-
-    input.write(`${JSON.stringify({
-      type: "approvalResponse",
-      id: "approval-1",
-      approved: "true",
-    })}\n`);
-    await expect(truthyApproval).resolves.toBe(false);
-
-    const missingApproval = io.waitForApproval("approval-2");
-    input.write(`${JSON.stringify({
-      type: "approvalResponse",
-      id: "approval-2",
-    })}\n`);
-    await expect(missingApproval).resolves.toBe(false);
-    io.close();
-  });
-
-  it("ignores a malformed approval response for an unknown id", async () => {
-    const { input, io } = testIo();
-    await beginRun(input, io.request);
-    let settled = false;
-    const approval = io.waitForApproval("approval-1").finally(() => {
-      settled = true;
+    io.emit.result({ sessionId: "session-1", message: "done" });
+    await expect(firstFrame(written())).resolves.toMatchObject({
+      payload: {
+        case: "result",
+        value: { sessionId: "session-1", message: "done" },
+      },
     });
-
-    input.write(`${JSON.stringify({
-      type: "approvalResponse",
-      id: "unknown",
-      approved: "true",
-    })}\n`);
-    await new Promise((resolve) => setImmediate(resolve));
-    expect(settled).toBe(false);
-
-    input.write(`${JSON.stringify({
-      type: "approvalResponse",
-      id: "approval-1",
-      approved: true,
-    })}\n`);
-    await expect(approval).resolves.toBe(true);
     io.close();
   });
 
-  it("denies an approval when its abort signal fires", async () => {
+  it("routes approval frames and denies pending approvals when input closes", async () => {
     const { input, io } = testIo();
     await beginRun(input, io.request);
-    const controller = new AbortController();
-    const approval = io.waitForApproval("approval-1", controller.signal);
-    controller.abort();
+    const cancelledSignal = new AbortController();
+    const cancelled = io.waitForApproval(
+      "approval-cancelled",
+      cancelledSignal.signal,
+    );
+    const approved = io.waitForApproval("approval-approved");
+    input.write(encodeSidecarApprovalResponse("approval-approved", true));
+    await expect(approved).resolves.toBe(true);
+    cancelledSignal.abort();
+    await expect(cancelled).resolves.toBe(false);
 
-    await expect(approval).resolves.toBe(false);
+    const deniedOnClose = io.waitForApproval("approval-closed");
+    io.emit.result({ sessionId: "session-1", message: "done" });
+    io.close();
+    await expect(deniedOnClose).resolves.toBe(false);
+  });
+
+  it("rejects a runner built from a different descriptor image", async () => {
+    const { input, io } = testIo();
+    const validFrame = encodeSidecarRunRequest(runRequest);
+    async function* source() {
+      yield validFrame;
+    }
+    let requestMessage;
+    for await (const message of sizeDelimitedDecodeStream(
+      ParentToRunnerSchema,
+      source(),
+    )) {
+      requestMessage = message;
+      break;
+    }
+    if (!requestMessage || requestMessage.payload.case !== "run") {
+      throw new Error("missing run request");
+    }
+    requestMessage.payload.value.protocolFingerprint = new Uint8Array(32);
+    input.write(sizeDelimitedEncode(
+      ParentToRunnerSchema,
+      requestMessage,
+    ));
+
+    await expect(io.request).rejects.toThrow("fingerprint");
     io.close();
   });
 
-  it("denies approvals registered after the input closes", async () => {
-    const { io, onClose } = testIo();
-    const request = expect(io.request).rejects.toThrow("input closed");
-    io.close();
+  it("rejects an unspecified provider policy before execution", async () => {
+    const { input, io } = testIo();
+    input.write(encodeSidecarRunRequest(create(RunRequestSchema, {
+      ...runRequest,
+      approvalPolicy: ApprovalPolicy.UNSPECIFIED,
+    })));
 
-    await request;
-    await expect(io.waitForApproval("approval-1")).resolves.toBe(false);
-    expect(onClose).toHaveBeenCalledOnce();
+    await expect(io.request).rejects.toThrow("approval policy");
+    io.close();
+  });
+
+  it("treats unknown approvals and EOF before terminal output as fatal", async () => {
+    const unknown = testIo();
+    await beginRun(unknown.input, unknown.io.request);
+    unknown.input.write(encodeSidecarApprovalResponse("unknown", true));
+    await vi.waitFor(() => expect(unknown.terminate).toHaveBeenCalledOnce());
+    expect(unknown.onClose).toHaveBeenCalledOnce();
+
+    const earlyEof = testIo();
+    await beginRun(earlyEof.input, earlyEof.io.request);
+    earlyEof.input.end();
+    await vi.waitFor(() => expect(earlyEof.terminate).toHaveBeenCalledOnce());
+    expect(earlyEof.onClose).toHaveBeenCalledOnce();
+  });
+
+  it("treats duplicate runs and corrupted framing as fatal", async () => {
+    const duplicate = testIo();
+    await beginRun(duplicate.input, duplicate.io.request);
+    duplicate.input.write(encodeSidecarRunRequest(runRequest));
+    await vi.waitFor(() => expect(duplicate.terminate).toHaveBeenCalledOnce());
+    expect(duplicate.input.destroyed).toBe(true);
+
+    const corrupted = testIo();
+    corrupted.input.end(new Uint8Array(11).fill(0xff));
+    await expect(corrupted.io.request).rejects.toThrow();
+    await vi.waitFor(() => expect(corrupted.terminate).toHaveBeenCalledOnce());
+    expect(corrupted.input.destroyed).toBe(true);
+  });
+
+  it("rejects every frame after terminal output", async () => {
+    const { input, io, terminate } = testIo();
+    await beginRun(input, io.request);
+    io.emit.result({ sessionId: "session-1", message: "done" });
+
+    expect(() => io.emit.event({
+      direction: AgentEventDirection.SERVER,
+      raw: { jsonrpc: "2.0" },
+    })).toThrow("after terminal output");
+    expect(terminate).toHaveBeenCalledOnce();
   });
 });

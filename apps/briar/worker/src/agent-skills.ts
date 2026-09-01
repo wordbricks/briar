@@ -23,8 +23,8 @@ export type AgentSkillInput = {
   model: string | null;
   effort: AgentSkillEffort | null;
   kind: AgentSkillKind;
-  executionMode?: AgentSkillExecutionMode;
-  approvalPolicy?: AgentSkillApprovalPolicy;
+  executionMode: AgentSkillExecutionMode;
+  approvalPolicy: AgentSkillApprovalPolicy;
   position: number;
 };
 
@@ -44,18 +44,6 @@ export type AgentSkillRow = {
   position: number;
   created_at: string;
   updated_at: string;
-};
-
-export type AgentSkillFallback = {
-  name: string;
-  description: string;
-  body: string;
-  provider: AgentSkillProvider;
-  model: string | null;
-  effort: AgentSkillEffort | null;
-  kind?: AgentSkillKind;
-  executionMode?: AgentSkillExecutionMode;
-  approvalPolicy?: AgentSkillApprovalPolicy;
 };
 
 export class AgentSkillConflictError extends Error {
@@ -78,21 +66,15 @@ export function agentSkillConflictMessage(error: unknown): string | null {
 
 export function normalizedAgentSkillRows(
   agentId: string,
-  input: readonly AgentSkillInput[] | undefined,
-  fallback: AgentSkillFallback,
+  input: readonly AgentSkillInput[],
   observedAt: string,
 ): AgentSkillRow[] {
-  const requested: readonly AgentSkillInput[] = input ?? [{
-    ...fallback,
-    kind: fallback.kind ?? "custom",
-    position: 0,
-  }];
-  if (requested.length > agentSkillsMaxCount) {
+  if (input.length > agentSkillsMaxCount) {
     throw new Error(`An Agent can have at most ${agentSkillsMaxCount} Skills`);
   }
   const names = new Set<string>();
   const ids = new Set<string>();
-  return requested.map((skill, index) => {
+  return input.map((skill) => {
     const normalizedName = skill.name.trim();
     const normalizedDescription = skill.description.trim();
     const normalizedBody = skill.body.trim();
@@ -133,10 +115,10 @@ export function normalizedAgentSkillRows(
       model: normalizedModel,
       effort: skill.effort,
       kind: skill.kind,
-      execution_mode: skill.executionMode ?? "task",
-      approval_policy: skill.approvalPolicy ?? "explicit",
+      execution_mode: skill.executionMode,
+      approval_policy: skill.approvalPolicy,
       is_default: 0,
-      position: skill.position ?? index,
+      position: skill.position,
       created_at: observedAt,
       updated_at: observedAt,
     };
@@ -477,36 +459,6 @@ export function insertAgentSkillStatement(
     );
 }
 
-/**
- * A client from before first-class Skills omits the `skills` field and expects
- * the Agent execution controls to affect the next run. Preserve that behavior
- * only when the Agent has one unambiguous Skill. A multi-Skill roster must
- * never be changed by an implicit selection.
- */
-export function soleAgentSkillRowFromLegacy(
-  skills: readonly AgentSkillRow[],
-  input: {
-    description: string;
-    body: string;
-    provider: AgentSkillProvider;
-    model: string | null;
-    effort: AgentSkillEffort | null;
-    updatedAt: string;
-  },
-) {
-  if (skills.length !== 1) return null;
-  return {
-    ...skills[0],
-    description: input.description.trim(),
-    body: input.body.trim(),
-    provider: input.provider,
-    model: input.model?.trim() || null,
-    effort: input.effort,
-    is_default: 0,
-    updated_at: input.updatedAt,
-  } satisfies AgentSkillRow;
-}
-
 export async function listAgentSkills(
   db: D1Database,
   agentIds: readonly string[],
@@ -594,17 +546,12 @@ export const agentSkillJson = (skill: AgentSkillRow) => ({
   name: skill.name,
   description: skill.description,
   body: skill.body,
-  // Rolling/native compatibility only. New clients persist description/body.
-  instructions: skill.body,
   provider: skill.provider,
   model: skill.model,
   effort: skill.effort,
   kind: skill.kind,
   executionMode: skill.execution_mode,
   approvalPolicy: skill.approval_policy,
-  // Workers from before explicit Skill selection require this wire field.
-  // It is always false and has no selection or persistence semantics.
-  isDefault: false,
   position: skill.position,
   createdAt: skill.created_at,
   updatedAt: skill.updated_at,

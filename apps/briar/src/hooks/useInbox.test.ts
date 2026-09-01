@@ -26,6 +26,7 @@ function session(
     dispatchEvents: [],
     projectId: project.id,
     agentName: "Inbox Agent",
+    sessionType: "task",
     requestedByUserId: "owner",
     status,
     issues: [
@@ -39,6 +40,7 @@ function session(
       },
     ],
     startedAt,
+    updatedAt: status === "running" ? startedAt : completedAt,
     completedAt: status === "running" ? null : completedAt,
     conversationId: null,
     workspaceRoot: null,
@@ -255,7 +257,7 @@ describe("Inbox messages", () => {
         messageId: "message-reply",
         rootMessageId: "message-root",
         authorImage: "https://example.com/member.png",
-        issueKey: `${demoDashboard.project.issueKeyPrefix ?? "AH"}-1321`,
+        issueKey: `${demoDashboard.project.issueKeyPrefix}-1321`,
         reason: "thread_reply",
       }),
     ]);
@@ -440,7 +442,7 @@ describe("Inbox messages", () => {
       filterInboxMessagesByOrganization(
         messages,
         [project, otherProject],
-        project.organizationId ?? null,
+        project.organizationId,
       ).map((message) => message.id),
     ).toEqual(["session:selected-session"]);
     expect(

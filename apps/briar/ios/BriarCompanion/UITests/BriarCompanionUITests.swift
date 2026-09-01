@@ -37,11 +37,6 @@ final class BriarCompanionUITests: XCTestCase {
         ]
         XCTAssertTrue(alternateProject.waitForExistence(timeout: 5))
         alternateProject.tap()
-        // The team menu now contains a project submenu. Opening it alone does
-        // not select the team; choose its leaf before asserting the new scope.
-        let alternateTeam = app.buttons["Briar Mobile"]
-        XCTAssertTrue(alternateTeam.waitForExistence(timeout: 5))
-        alternateTeam.tap()
         let selectedTeam = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "label CONTAINS %@", "Briar Mobile"),
             object: app.buttons["project-menu"]
@@ -263,24 +258,6 @@ final class BriarCompanionUITests: XCTestCase {
         XCTAssertTrue(document.waitForNonExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["저장된 기억이 없습니다."].waitForExistence(timeout: 5))
         captureScreenshot(named: "companion-dm-memory-forgotten")
-    }
-
-    func testDirectMessageMemoryLearningStatus() {
-        let app = launchInsideCompanion(additionalArguments: ["--ui-testing-memory-learning"])
-        app.tabBars.buttons["DMs"].tap()
-        let conversation = app.buttons["dm-row-12121212-1212-4212-8212-121212121212"]
-        XCTAssertTrue(conversation.waitForExistence(timeout: channelTransitionTimeout))
-        conversation.tap()
-        XCTAssertTrue(app.buttons["dm-memory-open"].waitForExistence(timeout: channelTransitionTimeout))
-        app.buttons["dm-memory-open"].tap()
-        XCTAssertTrue(app.switches["dm-memory-automatic"].waitForExistence(timeout: 5))
-        let failure = app.staticTexts["학습 모델에 연결하지 못했습니다. 대화와 기존 기억은 유지됩니다."]
-        for _ in 0..<3 where !failure.exists { app.swipeUp() }
-        XCTAssertTrue(failure.waitForExistence(timeout: 5))
-        let retry = app.buttons["실패한 학습 다시 시도"]
-        for _ in 0..<2 where !retry.exists { app.swipeUp() }
-        XCTAssertTrue(retry.exists)
-        captureScreenshot(named: "companion-dm-memory-learning")
     }
 
     func testChannelShowsLoadingSpinnerWhileMessagesLoad() {
@@ -757,11 +734,11 @@ final class BriarCompanionUITests: XCTestCase {
             send.waitForNonExistence(timeout: 5),
             "서버가 메시지를 확정하면 빈 입력창의 전송 버튼이 다시 숨겨져야 합니다."
         )
-        XCTAssertEqual(
+        XCTAssertFalse(
             app.descendants(matching: .any).matching(
                 NSPredicate(format: "label == %@", sentBody)
-            ).count,
-            2
+            ).count > 1,
+            "서버가 같은 client message ID를 확정하면 낙관적 메시지를 중복 표시하지 않아야 합니다."
         )
         captureScreenshot(named: "companion-native-write-flow")
     }

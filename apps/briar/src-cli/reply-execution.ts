@@ -1,5 +1,3 @@
-import { DmMemoryInvocation, decodeDmMemoryTurn, dmMemoryExecutionError } from "./dm-memory-invocation";
-import { Buffer } from "node:buffer";
 import {
   mkdtemp,
   mkdir,
@@ -7,17 +5,20 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { decodeOrganizationAgentContextRequestTurn } from "../src/lib/organization-agent-context-contract";
+import {
+  DmMemoryInvocation,
+  dmMemoryExecutionError,
+} from "./dm-memory-invocation";
+import {
+  ChannelAgentReplyProviderOutputSchema,
+  type ParsedChannelReplyAgentResult,
+} from "../src/lib/channel-agent-reply-contract";
+import { IssueAgentReplyProviderOutputSchema } from "../src/lib/agent-reply-contract";
 import {
   createDetachedTranscriptSequencer,
   detachedChannelReplyPrompt,
-  detachedChannelReplyOutputSchema,
   detachedIssueReplyPrompt,
-  detachedIssueReplyOutputSchema,
   detachedProjectAgentPrompt,
-  detachedPayloadDirection,
-  detachedTranscriptPayload,
-  parseDetachedJsonResult,
   shouldPersistDetachedTranscriptPayload,
   type DetachedAgent,
 } from "./agent-runner";
@@ -28,8 +29,17 @@ import {
   runDetachedProviderTurn,
 } from "./detached-provider-turn";
 import { materializeDetachedAgentSkillCatalog } from "./agent-skill-discovery";
-import { TranscriptBatcher } from "./transcript-batcher";
 import { ChannelActivityPublisher } from "./channel-activity-publisher";
+import { createReplyActivityClient } from "./reply-activity-client";
+import { createReplyCompletionClient } from "./reply-completion-client";
+import {
+  createWorkerQueueClient,
+  createWorkerQueueOperations,
+} from "./worker-queue-client";
+import {
+  createWorkerTranscriptBatcher,
+  transcriptEventFromSidecar,
+} from "./worker-transcript-client";
 import {
   workerCliPath,
   workerExecutionPath,
@@ -47,17 +57,15 @@ import {
   removeAnalysisWorktree,
 } from "./worktree";
 import {
-  channelReplyCompleteRequestBody,
   collectChannelReplyAttachments,
-  parseChannelReplyAgentResult,
 } from "./channel-reply-attachments";
 import {
   collectIssueReplyAttachments,
-  issueReplyCompleteRequestBody,
   parseIssueReplyAgentResult,
 } from "./issue-reply-attachments";
 import { ReplyGeneratedImageCollector } from "./reply-generated-images";
 import { validateReplyAttachments } from "./reply-attachments";
+import { providerStructuredOutputContract } from "./structured-output-contract";
 import {
   channelReplyImageDirectory,
   cleanupChannelReplyImages,
@@ -79,16 +87,13 @@ import {
   type ClaimedChannelReply,
   type ClaimedIssueReply,
   type ClaimedProjectAgentTask,
-} from "./worker-claim-contract";
+} from "./worker-queue-contract";
 import {
   providerExecutionEnvironment,
   configDirectory,
   value,
   has,
   required,
-  request,
-  serializeTranscriptRequest,
-  isTranscriptPayloadTooLarge,
   runGit,
   worktreeSettings,
   worktreesEnabled,
@@ -150,28 +155,13 @@ async function runClaimedProjectAgentTask(
     // Direct Agent tasks are not Hunt runs. Their task/session UUID is the
     // durable transcript key, while attempt-scoped sequence ranges make Worker
     // retries append safely without requiring a Hunt-run binding.
-    const transcriptEnvelope = {
+    const transcriptBatcher = createWorkerTranscriptBatcher({
+      apiUrl: config.apiUrl,
+      token: workerToken,
       projectId: project.id,
+      work: task,
       sessionId: task.workId,
-      workType: "projectAgentTask" as const,
-      workId: task.workId,
-      claimToken: task.claimToken,
-      workerId,
       agentProvider: agent.provider,
-    };
-    const transcriptBatcher = new TranscriptBatcher({
-      send: async (events) => {
-        await request(config.apiUrl, "/transcripts", workerToken, {
-          method: "POST",
-          body: serializeTranscriptRequest(transcriptEnvelope, events),
-        });
-      },
-      measureBytes: (events) =>
-        Buffer.byteLength(
-          serializeTranscriptRequest(transcriptEnvelope, events),
-          "utf8",
-        ),
-      isPayloadTooLarge: isTranscriptPayloadTooLarge,
       onError: (error) => {
         console.error(
           `transcript upload failed for ${task.sourceKey}: ${
@@ -202,15 +192,12 @@ async function runClaimedProjectAgentTask(
             conversationId = nextConversationId;
             reportCheckpoint?.({ conversationId: nextConversationId });
           },
-          onPayload: async (rawPayload, line) => {
-            const payload = detachedTranscriptPayload(rawPayload, line);
+          onPayload: async (payload) => {
             const sequence = transcriptSequencer.nextForPayload(payload);
             if (sequence === null) return;
-            await transcriptBatcher.enqueue({
-              sequence,
-              direction: detachedPayloadDirection(rawPayload),
-              payload,
-            });
+            await transcriptBatcher.enqueue(
+              transcriptEventFromSidecar(payload, sequence),
+            );
           },
         });
       } finally {
@@ -248,56 +235,6 @@ async function runClaimedProjectAgentTask(
       throw cleanupError;
     }
   }
-}
-
-async function completeClaimedProjectAgentTask(
-  config: Config,
-  task: ClaimedProjectAgentTask,
-  workerToken: string,
-  completion: {
-    projectId: string;
-    workerId: string;
-    claimToken: string;
-    summary: string;
-    conversationId: string | null;
-  },
-  signal: AbortSignal,
-) {
-  await request(
-    config.apiUrl,
-    `/agent-task-claims/${task.workId}/complete`,
-    workerToken,
-    {
-      method: "POST",
-      signal,
-      body: JSON.stringify(completion),
-    },
-  );
-}
-
-async function failClaimedProjectAgentTask(
-  config: Config,
-  project: ProjectConfig,
-  task: ClaimedProjectAgentTask,
-  workerToken: string,
-  error: unknown,
-) {
-  const workerId = project.executionWorker?.workerId;
-  if (!workerId) throw error;
-  await request(
-    config.apiUrl,
-    `/agent-task-claims/${task.workId}/complete`,
-    workerToken,
-    {
-      method: "POST",
-      body: JSON.stringify({
-        projectId: project.id,
-        workerId,
-        claimToken: task.claimToken,
-        error: error instanceof Error ? error.message : String(error),
-      }),
-    },
-  );
 }
 
 async function runClaimedIssueReply(
@@ -338,7 +275,6 @@ async function runClaimedIssueReply(
     worktreesEnabled: projectUsesWorktrees,
     hasConfiguredWorktree: configuredWorktree !== null,
     requiresPreferredWorker: issue.requiresPreferredWorker,
-    branch: issue.branch,
   });
   if (workspaceMode === "missing-required") {
     throw new Error(
@@ -375,22 +311,19 @@ async function runClaimedIssueReply(
   const imageDirectory = await mkdtemp(join(tmpdir(), "briar-issue-reply-images-"));
   let imagesCleaned = false;
   let lastActivityErrorAt = Number.NEGATIVE_INFINITY;
+  const replyActivity = createReplyActivityClient(config.apiUrl);
+  const replyCompletion = createReplyCompletionClient(
+    config.apiUrl,
+    workerToken,
+  );
   const activityPublisher = new ChannelActivityPublisher({
     credential: issue.activity,
-    send: async (credential, input) => {
-      await request(
-        config.apiUrl,
-        `/issue-reply-claims/${issue.workId}/activity`,
-        null,
-        {
-          method: "POST",
-          headers: {
-            "X-Briar-Channel-Activity-Token": credential.token,
-          },
-          body: JSON.stringify(input),
-        },
-      );
-    },
+    send: (credential, activity) =>
+      replyActivity.publishReplyActivity({
+        replyJobId: issue.workId,
+        capability: credential.token,
+        activity,
+      }).then(() => undefined),
     onError: (error) => {
       const now = Date.now();
       if (now - lastActivityErrorAt < 60_000) return;
@@ -439,7 +372,6 @@ async function runClaimedIssueReply(
       effort: issue.effort,
       agent: issue.agent,
       activeSkill: issue.activeSkill,
-      snapshot: issue.snapshot,
       fallbackName: "Project Agent",
       scope: {
         kind: "project",
@@ -454,9 +386,9 @@ async function runClaimedIssueReply(
         issue.skillExecutionTarget.skillId !== agent.activeSkill?.id ||
         issue.skillExecutionTarget.skillName !== agent.activeSkill?.name ||
         issue.skillExecutionTarget.executionMode !==
-          (agent.activeSkill?.executionMode ?? "task") ||
+          agent.activeSkill?.executionMode ||
         issue.skillExecutionTarget.approvalPolicy !==
-          (agent.activeSkill?.approvalPolicy ?? "explicit") ||
+          agent.activeSkill?.approvalPolicy ||
         issue.skillExecutionTarget.request !== trigger.body)
     ) {
       throw new Error(
@@ -474,30 +406,18 @@ async function runClaimedIssueReply(
       workspaceShared: workspaceMode !== "cached-analysis",
       skillExecutionTarget: issue.skillExecutionTarget,
     });
+    const outputContract = providerStructuredOutputContract(
+      agent.provider,
+      IssueAgentReplyProviderOutputSchema,
+    );
     let sequence = 0;
-    const transcriptEnvelope = {
+    const transcriptBatcher = createWorkerTranscriptBatcher({
+      apiUrl: config.apiUrl,
+      token: workerToken,
       projectId: project.id,
+      work: issue,
       sessionId: `reply-${issue.workId}`,
-      runId: issue.runId,
-      workType: "issueReply" as const,
-      workId: issue.workId,
-      claimToken: issue.claimToken,
-      workerId: registered.workerId,
       agentProvider: provider,
-    };
-    const transcriptBatcher = new TranscriptBatcher({
-      send: async (events) => {
-        await request(config.apiUrl, "/transcripts", workerToken, {
-          method: "POST",
-          body: serializeTranscriptRequest(transcriptEnvelope, events),
-        });
-      },
-      measureBytes: (events) =>
-        Buffer.byteLength(
-          serializeTranscriptRequest(transcriptEnvelope, events),
-          "utf8",
-        ),
-      isPayloadTooLarge: isTranscriptPayloadTooLarge,
       onError: (error) => {
         console.error(
           `transcript upload failed for reply ${issue.workId}: ${
@@ -518,7 +438,7 @@ async function runClaimedIssueReply(
           fullAccess: project.autoHunt?.sandbox?.fullAccess ?? true,
           attachments,
           conversationId,
-          outputSchema: detachedIssueReplyOutputSchema,
+          outputSchema: outputContract.jsonSchema,
           environment: providerExecutionEnvironment(config, agent.provider, {
             ...process.env,
             PATH: workerExecutionPath(),
@@ -537,18 +457,14 @@ async function runClaimedIssueReply(
             conversationId = nextConversationId;
             reportCheckpoint?.({ conversationId: nextConversationId });
           },
-          onPayload: async (payload, line) => {
+          onPayload: async (payload) => {
             activityPublisher.observePayload(payload);
             generatedImages.observePayload(payload);
             sequence += 1;
-            const direction = detachedPayloadDirection(payload);
-            const bounded = detachedTranscriptPayload(payload, line);
-            if (shouldPersistDetachedTranscriptPayload(bounded)) {
-              await transcriptBatcher.enqueue({
-                sequence,
-                direction,
-                payload: bounded,
-              });
+            if (shouldPersistDetachedTranscriptPayload(payload)) {
+              await transcriptBatcher.enqueue(
+                transcriptEventFromSidecar(payload, sequence),
+              );
             }
           },
         });
@@ -560,12 +476,15 @@ async function runClaimedIssueReply(
     })();
     assertDetachedProviderTurnSucceeded(turn);
     if (!turn.resultText) throw new Error("Agent returned an empty issue reply");
-    const parsedResult = parseIssueReplyAgentResult(turn.resultText, {
-      allowSkillExecutionProposal:
-        issue.skillExecutionTarget?.executionMode === "task",
-    });
+    const parsedResult = parseIssueReplyAgentResult(
+      turn.resultText,
+      outputContract.decodeJson,
+      {
+        allowSkillExecutionProposal:
+          issue.skillExecutionTarget?.executionMode === "task",
+      },
+    );
     const result = parsedResult.result;
-    if (!result.reply) throw new Error("Agent returned an empty issue reply");
     const replyAttachments = validateReplyAttachments([
       ...await collectIssueReplyAttachments({
         workspacePath,
@@ -576,21 +495,13 @@ async function runClaimedIssueReply(
     // Private downloaded images must be removed before the durable reply
     // succeeds. Worktree cache bookkeeping is best-effort in the outer cleanup.
     await cleanupContext();
-    await request(
-      config.apiUrl,
-      `/issue-reply-claims/${issue.workId}/complete`,
-      workerToken,
-      {
-        method: "POST",
-        body: issueReplyCompleteRequestBody({
-          projectId: project.id,
-          workerId: registered.workerId,
-          claimToken: issue.claimToken,
-          result,
-          attachments: replyAttachments,
-        }),
-      },
-    );
+    await replyCompletion.completeIssueReply({
+      projectId: project.id,
+      workerId: registered.workerId,
+      work: issue,
+      outcome: { case: "success", result, attachments: replyAttachments },
+      signal,
+    });
   } finally {
     activityPublisher.stop();
     if (activeReplyActivityPublishers.get(issue.workId) === activityPublisher) {
@@ -629,20 +540,16 @@ async function failClaimedIssueReply(
 ) {
   const workerId = project.executionWorker?.workerId;
   if (!workerId) throw error;
-  await request(
-    config.apiUrl,
-    `/issue-reply-claims/${issue.workId}/complete`,
-    workerToken,
-    {
-      method: "POST",
-      body: JSON.stringify({
-        projectId: project.id,
-        workerId,
-        claimToken: issue.claimToken,
+  await createReplyCompletionClient(config.apiUrl, workerToken)
+    .completeIssueReply({
+      projectId: project.id,
+      workerId,
+      work: issue,
+      outcome: {
+        case: "failure",
         error: error instanceof Error ? error.message : String(error),
-      }),
-    },
-  );
+      },
+    });
 }
 
 async function runClaimedChannelReply(
@@ -652,8 +559,12 @@ async function runClaimedChannelReply(
   workerToken: string,
   signal: AbortSignal,
   reportCheckpoint?: (value: WorkerExecutionCheckpoint) => void,
-  runtime: { runProviderTurn: typeof runDetachedProviderTurn; workspaceRoot: string } = {
-    runProviderTurn: runDetachedProviderTurn, workspaceRoot: configDirectory,
+  runtime: {
+    runProviderTurn: typeof runDetachedProviderTurn;
+    workspaceRoot: string;
+  } = {
+    runProviderTurn: runDetachedProviderTurn,
+    workspaceRoot: configDirectory,
   },
 ) {
   const registered = project.executionWorker;
@@ -705,7 +616,7 @@ async function runClaimedChannelReply(
       sessionId: reply.session.id,
       channelId: reply.channelId,
       threadId: reply.session.threadId,
-      agentId: reply.agent?.id ?? null,
+      agentId: reply.agent.id,
       claimReason: reply.session.claimReason,
       workspaceReused: sessionWorktree?.reused ?? false,
       retainedUntil,
@@ -723,33 +634,35 @@ async function runClaimedChannelReply(
   }
   const imageDirectory = channelReplyImageDirectory(workspacePath);
   const memoryAbort = new AbortController();
-  const invocationSignal = AbortSignal.any([...(signal ? [signal] : []), memoryAbort.signal]);
+  const invocationSignal = AbortSignal.any([signal, memoryAbort.signal]);
   let memoryInvocation: DmMemoryInvocation | null = null;
   let organizationContextCleaned = false;
   let imagesCleaned = false;
   let workspaceCleaned = false;
   let lastActivityErrorAt = Number.NEGATIVE_INFINITY;
+  const replyActivity = createReplyActivityClient(config.apiUrl);
+  const workerQueueClient = createWorkerQueueClient(config.apiUrl, workerToken);
+  const workerQueue = createWorkerQueueOperations(workerQueueClient);
+  const replyCompletion = createReplyCompletionClient(
+    config.apiUrl,
+    workerToken,
+    { queue: workerQueueClient },
+  );
   const activityPublisher = new ChannelActivityPublisher({
     credential: reply.activity,
-    send: async (credential, input) => {
-      try { await memoryInvocation?.check(false); }
-      catch (error) {
+    send: async (credential, activity) => {
+      try {
+        await memoryInvocation?.check(false);
+      } catch (error) {
         memoryAbort.abort();
         await memoryInvocation?.cleanup();
         throw error;
       }
-      await request(
-        config.apiUrl,
-        `/channel-reply-claims/${reply.workId}/activity`,
-        null,
-        {
-          method: "POST",
-          headers: {
-            "X-Briar-Channel-Activity-Token": credential.token,
-          },
-          body: JSON.stringify(input),
-        },
-      );
+      await replyActivity.publishReplyActivity({
+        replyJobId: reply.workId,
+        capability: credential.token,
+        activity,
+      });
     },
     onError: (error) => {
       const now = Date.now();
@@ -757,7 +670,9 @@ async function runClaimedChannelReply(
       lastActivityErrorAt = now;
       console.error(
         `channel activity publish failed for ${reply.workId}: ${
-          reply.memory ? dmMemoryExecutionError(error).message : error instanceof Error ? error.message : String(error)
+          reply.memory
+            ? dmMemoryExecutionError(error).message
+            : error instanceof Error ? error.message : String(error)
         }`,
       );
     },
@@ -765,7 +680,10 @@ async function runClaimedChannelReply(
   activeReplyActivityPublishers.set(reply.workId, activityPublisher);
   const cleanupContext = () =>
     cleanupChannelReplyResources([
-      { label: "private DM memory", run: async () => { await memoryInvocation?.cleanup(); } },
+      {
+        label: "private DM memory",
+        run: async () => memoryInvocation?.cleanup(),
+      },
       ...(reply.scope.kind === "organization"
         ? [{
             label: "organization context",
@@ -804,11 +722,16 @@ async function runClaimedChannelReply(
         : []),
     ]);
   try {
-    if (reply.memory) memoryInvocation = await DmMemoryInvocation.create({
-      apiUrl: config.apiUrl, workerToken, organizationId: reply.organizationId,
-      workId: reply.workId, workerId: registered.workerId, claimToken: reply.claimToken,
-      memory: reply.memory, signal: invocationSignal,
-    });
+    if (reply.memory) {
+      memoryInvocation = await DmMemoryInvocation.create({
+        queue: workerQueueClient,
+        projectId: project.id,
+        workerId: registered.workerId,
+        work: reply,
+        memory: reply.memory,
+        signal: invocationSignal,
+      });
+    }
     const organizationContext = reply.scope.kind === "organization"
       ? await downloadOrganizationAgentContextManifest({
           apiUrl: config.apiUrl,
@@ -828,8 +751,7 @@ async function runClaimedChannelReply(
       organizationId: reply.organizationId,
       workId: reply.workId,
       claimToken: reply.claimToken,
-      triggerMessageId: reply.triggerMessageId,
-      snapshot: reply.snapshot,
+      triggerAttachments: reply.triggerAttachments,
       workspacePath,
     });
     const agent = detachedReplyAgent({
@@ -839,10 +761,13 @@ async function runClaimedChannelReply(
       effort: reply.effort,
       agent: reply.agent,
       activeSkill: reply.activeSkill,
-      snapshot: reply.snapshot,
       fallbackName: "Briar Channel",
       scope: reply.scope,
     });
+    const outputContract = providerStructuredOutputContract(
+      agent.provider,
+      ChannelAgentReplyProviderOutputSchema,
+    );
     // A retained channel session resumes the same provider conversation across
     // replies. Keep its Skill catalog at a stable workspace path for that
     // conversation; workspace/session TTL cleanup owns its eventual removal.
@@ -860,7 +785,7 @@ async function runClaimedChannelReply(
       },
       workspaceAvailable: Boolean(analysisWorktree),
       organizationContextAvailable: organizationContext !== null,
-      memoryLearningAvailable: reply.memoryLearning?.enabled === true,
+      memoryLearningAvailable: reply.memoryLearningEnabled,
       delegationTargets: reply.delegationTargets,
       delegation: reply.delegation,
       skillExecutionTarget: reply.skillExecutionTarget,
@@ -869,16 +794,23 @@ async function runClaimedChannelReply(
       reply.session?.conversationId ?? reply.handoffContext?.conversationId ?? null;
     if (conversationId) reportCheckpoint?.({ conversationId });
     let lookupRounds = 0;
-    let turnPrompt = [prompt, memoryInvocation?.prompt()].filter(Boolean).join("\n\n");
-    let result: ReturnType<typeof parseChannelReplyAgentResult>["result"] | null =
-      null;
+    let turnPrompt = [prompt, memoryInvocation?.prompt()]
+      .filter(Boolean)
+      .join("\n\n");
+    let result: ParsedChannelReplyAgentResult["result"] | null = null;
     let attachmentPaths: string[] = [];
     const generatedImages = new ReplyGeneratedImageCollector();
     while (!result) {
-      if (await memoryInvocation?.check()) {
+      const currentMemoryInvocation = memoryInvocation;
+      if (currentMemoryInvocation && await currentMemoryInvocation.check()) {
         conversationId = null;
-        turnPrompt = [prompt, memoryInvocation?.prompt(), organizationContext
-          ? "Re-read the organization context manifest for previously loaded context." : null].filter(Boolean).join("\n\n");
+        turnPrompt = [
+          prompt,
+          currentMemoryInvocation.prompt(),
+          organizationContext
+            ? "Re-read the organization context manifest for previously loaded context."
+            : null,
+        ].filter(Boolean).join("\n\n");
       }
       const turn = await runtime.runProviderTurn({
         agent,
@@ -889,7 +821,7 @@ async function runClaimedChannelReply(
         attachments: lookupRounds === 0
           ? downloadedImages.attachments
           : undefined,
-        outputSchema: detachedChannelReplyOutputSchema,
+        outputSchema: outputContract.jsonSchema,
         organizationContextManifestPath:
           organizationContext?.manifestPath ?? null,
         delegationTargets: reply.scope.kind === "organization"
@@ -910,30 +842,31 @@ async function runClaimedChannelReply(
           workType: "channelReply",
         },
         onDiagnostic: (diagnostic) => {
-          if (!reply.memory) { logDetachedProviderTurnDiagnostic(diagnostic); return; }
-          if (["turn.started", "turn.completed", "turn.aborted_before_start"].includes(diagnostic.phase)) {
-            logDetachedProviderTurnDiagnostic({ at: diagnostic.at, phase: diagnostic.phase,
-              context: { workId: reply.workId, workType: "channelReply" } });
+          if (!reply.memory) {
+            logDetachedProviderTurnDiagnostic(diagnostic);
+            return;
+          }
+          if (
+            ["turn.started", "turn.completed", "turn.aborted_before_start"]
+              .includes(diagnostic.phase)
+          ) {
+            logDetachedProviderTurnDiagnostic({
+              at: diagnostic.at,
+              phase: diagnostic.phase,
+              context: { workId: reply.workId, workType: "channelReply" },
+            });
           }
         },
         onConversationId: async (nextConversationId) => {
           conversationId = nextConversationId;
           reportCheckpoint?.({ conversationId: nextConversationId });
           if (reply.session) {
-            const checkpoint = await request<{ retainedUntil: string }>(
-              config.apiUrl,
-              `/channel-reply-claims/${reply.workId}/session`,
-              workerToken,
-              {
-                method: "POST",
-                body: JSON.stringify({
-                  organizationId: reply.organizationId,
-                  workerId: registered.workerId,
-                  claimToken: reply.claimToken,
-                  conversationId: nextConversationId,
-                }),
-              },
-            );
+            const checkpoint = await workerQueue.checkpointChannelReplySession({
+              projectId: project.id,
+              workerId: registered.workerId,
+              work: reply,
+              conversationId: nextConversationId,
+            });
             retainedUntil = checkpoint.retainedUntil;
             if (sessionWorktree) {
               await extendCachedAnalysisWorktreeRetention({
@@ -959,57 +892,27 @@ async function runClaimedChannelReply(
       if (!turn.resultText) {
         throw new Error("Agent returned an empty channel reply");
       }
-      const parsed = parseDetachedJsonResult(turn.resultText);
-      const parsedRecord = parsed && typeof parsed === "object" &&
-          !Array.isArray(parsed)
-        ? parsed as Record<string, unknown>
-        : null;
-      const contextRequests = parsedRecord?.contextRequests;
-      const memoryRequests = parsedRecord?.memoryRequests;
-      if (memoryRequests !== null && memoryRequests !== undefined) {
-        const memoryRequest = decodeDmMemoryTurn(parsed);
-        if (!memoryInvocation) throw new Error("memory_unavailable");
-        if (lookupRounds >= 3) throw new Error("lookup_budget_exhausted");
-        const memoryPrompt = await memoryInvocation.lookup(memoryRequest);
-        lookupRounds += 1;
-        conversationId = turn.conversationId;
-        const continuation = `The memory lookup is complete. Use only supported evidence and return the next structured result.\n${memoryPrompt}`;
-        turnPrompt = conversationId ? continuation : `${prompt}\n\n${continuation}`;
-        continue;
-      }
-      if (contextRequests === null || contextRequests === undefined) {
-        const parsedResult = parseChannelReplyAgentResult(parsed);
-        result = parsedResult.result;
-        if (result.memorySaveRequest && reply.memoryLearning?.enabled !== true) {
+      const decodedTurn = outputContract.decodeJson(turn.resultText);
+      if (decodedTurn.case === "reply") {
+        result = decodedTurn.result;
+        if (result.memorySaveRequest && !reply.memoryLearningEnabled) {
           throw new Error("memory_learning_unavailable");
         }
-        // Old servers use a strict reply decoder and have no learning-request field.
-        if (!reply.memoryLearning) {
-          const { memorySaveRequest: _request, ...compatible } = result;
-          result = compatible;
-        }
-        attachmentPaths = parsedResult.attachmentPaths;
+        attachmentPaths = decodedTurn.attachmentPaths;
         break;
       }
-      const lookup = decodeOrganizationAgentContextRequestTurn({
-        contextRequests,
-      });
-      if (
-        parsedRecord?.body !== null ||
-        !Array.isArray(parsedRecord.attachments) ||
-        parsedRecord.attachments.length !== 0 ||
-        parsedRecord.document !== null ||
-        parsedRecord.issueProposal !== null ||
-        parsedRecord.issueBatchProposal !== null ||
-        parsedRecord.executionProposal !== null ||
-        parsedRecord.skillExecutionProposal !== null ||
-        parsedRecord.delegation !== null ||
-        (parsedRecord.memoryCitations !== null && parsedRecord.memoryCitations !== undefined) ||
-        (parsedRecord.memorySaveRequest !== null && parsedRecord.memorySaveRequest !== undefined)
-      ) {
-        throw new Error(
-          "Organization context lookup cannot include a channel reply or proposal",
-        );
+      if (decodedTurn.case === "memory") {
+        if (!memoryInvocation) throw new Error("memory_unavailable");
+        if (lookupRounds >= 3) throw new Error("lookup_budget_exhausted");
+        const memoryPrompt = await memoryInvocation.lookup(decodedTurn.request);
+        lookupRounds += 1;
+        conversationId = turn.conversationId;
+        const continuation =
+          `The memory lookup is complete. Use only supported evidence and return the next structured result.\n${memoryPrompt}`;
+        turnPrompt = conversationId
+          ? continuation
+          : `${prompt}\n\n${continuation}`;
+        continue;
       }
       if (!organizationContext) {
         throw new Error(
@@ -1028,7 +931,7 @@ async function runClaimedChannelReply(
         claimToken: reply.claimToken,
         snapshotAt: reply.organizationContext!.snapshotAt,
         workspacePath,
-        requests: lookup.contextRequests,
+        requests: decodedTurn.requests.contextRequests,
         signal: invocationSignal,
       });
       if (hydrated.loaded === 0) {
@@ -1041,7 +944,9 @@ async function runClaimedChannelReply(
         `Re-read the manifest at ${JSON.stringify(hydrated.manifestPath)} and the newly referenced lookup files.`,
         "Use those facts to continue. Request another smallest-possible lookup only if essential; otherwise return the normal channel reply JSON now.",
       ].join("\n\n");
-      turnPrompt = conversationId ? continuation : `${prompt}\n\n${continuation}\n${memoryInvocation?.prompt() ?? ""}`;
+      turnPrompt = conversationId
+        ? continuation
+        : `${prompt}\n\n${continuation}\n${memoryInvocation?.prompt() ?? ""}`;
     }
     if (!result) throw new Error("Agent returned no channel reply");
     const skillExecutionProposalAllowed =
@@ -1065,25 +970,19 @@ async function runClaimedChannelReply(
     ], "Channel reply");
     await memoryInvocation?.check(false);
     await cleanupContext();
-    const completion = await request<{
-      session?: { retained_until?: string } | null;
-    }>(
-      config.apiUrl,
-      `/channel-reply-claims/${reply.workId}/complete`,
-      workerToken,
-      {
-        method: "POST",
-        body: channelReplyCompleteRequestBody({
-          organizationId: reply.organizationId,
-          workerId: registered.workerId,
-          claimToken: reply.claimToken,
-          conversationId,
-          result,
-          attachments: replyAttachments,
-        }),
+    const completion = await replyCompletion.completeChannelReply({
+      projectId: project.id,
+      workerId: registered.workerId,
+      work: reply,
+      outcome: {
+        case: "success",
+        conversationId,
+        result,
+        attachments: replyAttachments,
       },
-    );
-    retainedUntil = completion.session?.retained_until ?? retainedUntil;
+      signal,
+    });
+    retainedUntil = completion.retainedUntil;
   } catch (error) {
     throw reply.memory ? dmMemoryExecutionError(error) : error;
   } finally {
@@ -1105,7 +1004,9 @@ async function runClaimedChannelReply(
         } catch (error) {
           console.error(
             `channel session worktree retention update failed for ${reply.session.id}: ${
-              reply.memory ? dmMemoryExecutionError(error).message : error instanceof Error ? error.message : String(error)
+              reply.memory
+                ? dmMemoryExecutionError(error).message
+                : error instanceof Error ? error.message : String(error)
             }`,
           );
         } finally {
@@ -1124,34 +1025,28 @@ async function runClaimedChannelReply(
 async function failClaimedChannelReply(
   config: Config,
   project: ProjectConfig,
-  reply: Pick<ClaimedChannelReply, "workId" | "organizationId" | "claimToken">,
+  reply: ClaimedChannelReply,
   workerToken: string,
   error: unknown,
-  signal?: AbortSignal,
 ) {
   const workerId = project.executionWorker?.workerId;
   if (!workerId) throw error;
-  await request(
-    config.apiUrl,
-    `/channel-reply-claims/${reply.workId}/complete`,
-    workerToken,
-    {
-      method: "POST",
-      signal,
-      body: JSON.stringify({
-        organizationId: reply.organizationId,
-        workerId,
-        claimToken: reply.claimToken,
-        error: error instanceof Error ? error.message : String(error),
-      }),
-    },
-  );
+  await createReplyCompletionClient(config.apiUrl, workerToken)
+    .completeChannelReply({
+      projectId: project.id,
+      workerId,
+      work: reply,
+      outcome: {
+        case: "failure",
+        error: reply.memory
+          ? dmMemoryExecutionError(error).message
+          : error instanceof Error ? error.message : String(error),
+      },
+    });
 }
 
 export {
   runClaimedProjectAgentTask,
-  completeClaimedProjectAgentTask,
-  failClaimedProjectAgentTask,
   runClaimedIssueReply,
   failClaimedIssueReply,
   runClaimedChannelReply,

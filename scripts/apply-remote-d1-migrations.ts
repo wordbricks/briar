@@ -1,6 +1,7 @@
 import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
+import { backfillRemoteArchiveStorage } from "./backfill-archive-storage";
 
 export interface WranglerResult {
   exitCode: number;
@@ -115,10 +116,12 @@ export async function applyRemoteD1Migrations({
   database = "briar-db",
   migrationsDirectory = join(process.cwd(), "migrations"),
   runner = runWrangler,
+  beforeMigration,
 }: {
   database?: string;
   migrationsDirectory?: string;
   runner?: WranglerRunner;
+  beforeMigration?: (migrationName: string) => Promise<number>;
 } = {}): Promise<number> {
   const initialize = await runner([
     "d1",
@@ -152,6 +155,10 @@ export async function applyRemoteD1Migrations({
   );
   try {
     for (const migrationName of pendingMigrations) {
+      if (beforeMigration) {
+        const preflightExitCode = await beforeMigration(migrationName);
+        if (preflightExitCode !== 0) return preflightExitCode;
+      }
       const migrationPath = join(migrationsDirectory, migrationName);
       const migrationSql = await readFile(migrationPath, "utf8");
       const importPath = join(temporaryDirectory, basename(migrationName));
@@ -192,7 +199,12 @@ export async function applyRemoteD1Migrations({
 }
 
 async function main(): Promise<void> {
-  const exitCode = await applyRemoteD1Migrations();
+  const exitCode = await applyRemoteD1Migrations({
+    beforeMigration: (migrationName) =>
+      migrationName.endsWith("_canonical_archive_storage.sql")
+        ? backfillRemoteArchiveStorage()
+        : Promise.resolve(0),
+  });
   if (exitCode !== 0) process.exitCode = exitCode;
 }
 

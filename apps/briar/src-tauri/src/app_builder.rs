@@ -1,6 +1,10 @@
 use super::*;
+#[cfg(desktop)]
+use tauri_specta::Event as _;
 
 pub(super) fn run() {
+    let ipc_builder = ipc::builder();
+    let invoke_handler = ipc_builder.invoke_handler();
     let builder = tauri::Builder::default()
         .manage(SleepPreventionState::default())
         .manage(AgentSessionCancellationState::default())
@@ -24,11 +28,11 @@ pub(super) fn run() {
                     let _ = main.show();
                     let _ = main.set_focus();
                 }
-                let _ = app.emit(APP_SETTINGS_MENU_EVENT, ());
+                let _ = ipc::AppMenuSettingsEvent.emit(app);
             }
             #[cfg(target_os = "macos")]
             if event.id() == APP_UPDATE_MENU_ID {
-                let _ = app.emit(APP_UPDATE_MENU_EVENT, ());
+                let _ = ipc::AppMenuUpdateEvent.emit(app);
             }
         })
         .on_window_event(|window, event| {
@@ -56,7 +60,8 @@ pub(super) fn run() {
     #[cfg(target_os = "macos")]
     let builder = builder.manage(macos_secure_input::SecureInputState::default());
     let app = builder
-        .setup(|_app| {
+        .setup(move |_app| {
+            ipc_builder.mount_events(_app);
             #[cfg(target_os = "macos")]
             if let Err(error) = macos_inbox_notifications::install(_app.handle()) {
                 eprintln!("Inbox notification install skipped: {error}");
@@ -88,7 +93,7 @@ pub(super) fn run() {
                 let schedule_poll_app = _app.handle().clone();
                 std::thread::spawn(move || loop {
                     std::thread::sleep(std::time::Duration::from_secs(60));
-                    let _ = schedule_poll_app.emit(PROJECT_AGENT_SCHEDULE_POLL_EVENT, ());
+                    let _ = ipc::ProjectAgentSchedulePollEvent.emit(&schedule_poll_app);
                 });
                 let resource_directory = _app.path().resource_dir()?;
                 let home = _app.path().home_dir()?;
@@ -133,99 +138,27 @@ pub(super) fn run() {
             }
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![
-            prepare_launch_intro,
-            show_main_window,
-            reveal_main_window,
-            finish_launch_intro,
-            set_main_window_onboarding_mode,
-            inspect_onboarding_prerequisites,
-            load_agent_provider_models,
-            inspect_open_code_terminal_path,
-            configure_open_code_terminal_path,
-            inspect_agent_browser,
-            inspect_aside_browser,
-            inspect_ego_browser,
-            open_agent_provider_login,
-            install_onboarding_prerequisite,
-            install_agent_browser,
-            setup_aside_browser,
-            read_session_token,
-            write_session_token,
-            clear_session_token,
-            set_app_badge_count,
-            validate_repository_path,
-            prepare_project_repository,
-            create_project_workspace,
-            inspect_lovable_repository_compatibility,
-            inspect_repository_readiness,
-            discover_repository_icon,
-            connected_project_ids,
-            project_llm_chat,
-            run_project_agent,
-            stop_project_agent_session,
-            prepare_for_app_update,
-            take_planned_update_agent_recoveries,
-            retry_project_auto_hunt_run,
-            start_project_auto_hunt,
-            load_auto_hunt_app_server_events,
-            load_auto_hunt_dispatch,
-            load_app_provider_settings,
-            load_openrouter_credential_status,
-            load_app_runtime_settings,
-            load_browser_automation_settings,
-            load_agent_usage,
-            update_app_provider_settings,
-            update_openrouter_api_key,
-            update_app_runtime_settings,
-            update_browser_automation_settings,
-            load_project_llm_settings,
-            update_project_llm_settings,
-            load_project_sandbox_settings,
-            update_project_sandbox_settings,
-            update_local_project_workflow,
-            update_local_project_velen_org,
-            preflight_local_project_connection,
-            project_repository_readiness,
-            disconnect_local_project,
-            connect_local_project,
-            inspect_velen,
-            auto_hunt_health,
-            repair_auto_hunt,
-            configure_execution_worker,
-            refresh_execution_worker_runtime,
-            sync_execution_worker_labels,
-            inspect_execution_workers,
-            current_execution_worker_device_id,
-            show_inbox_notification,
-            request_inbox_notification_permission,
-            inbox_notification_permission_status,
-            open_inbox_notification_settings,
-            drain_pending_inbox_notification_opens,
-            arm_macos_password_editor,
-            sync_status_tray,
-            sync_app_update_menu
-        ])
+        .invoke_handler(invoke_handler)
         .build(tauri::generate_context!())
         .expect("error while building Briar");
-    app.run(|app, event| {
+    app.run(|_app, _event| {
         #[cfg(target_os = "macos")]
         if let tauri::RunEvent::Reopen {
             has_visible_windows,
             ..
-        } = &event
+        } = &_event
         {
             if !has_visible_windows {
-                let _ = display_main_window(app, true);
+                let _ = display_main_window(_app, true);
             }
         }
         #[cfg(desktop)]
         if let tauri::RunEvent::ExitRequested {
             code: None, api, ..
-        } = event
+        } = _event
         {
             api.prevent_exit();
-            request_exit_confirmation(app);
+            request_exit_confirmation(_app);
         }
     });
 }

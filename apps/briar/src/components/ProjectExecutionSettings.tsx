@@ -245,7 +245,7 @@ export function ProjectExecutionSettings({
                             <Badge variant="outline">
                               <WorkerProviderIcons
                                 providers={
-                                  worker.providers ?? [worker.agentProvider]
+                                  worker.providers
                                 }
                               />
                             </Badge>
@@ -305,7 +305,7 @@ export function ProjectExecutionSettings({
                   },
                   ...eligibleWorkers.map((worker) => ({
                     description: `${(
-                      worker.providers ?? [worker.agentProvider]
+                      worker.providers
                     ).join(", ")} · ${t(
                       `worker.readiness.${worker.readiness}`,
                     )}`,

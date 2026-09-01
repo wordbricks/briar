@@ -1,3 +1,4 @@
+import BriarContracts
 import SwiftUI
 import UIKit
 
@@ -20,14 +21,29 @@ struct CompanionRootView: View {
     @State private var authError: String?
     @State private var projectSelectionComplete = false
 
-    private let api: any MobileAPIClientProtocol
+    private let downloadClient: any AuthenticatedDownloadClientProtocol
+    private let servicesFactory: any AuthenticatedMobileServicesFactory
+    private let realtimeClient: (any MobileRealtimeClientProtocol)?
     private let authorization: DeviceAuthorizationService
     private let presenter: any WebAuthenticationPresenting
 
     @MainActor
-    init(api: any MobileAPIClientProtocol) {
+    init(clientFactory: MobileServiceClientFactory) {
         self.init(
-            api: api,
+            downloadClient: AuthenticatedDownloadClient(
+                baseURL: clientFactory.baseURL,
+                session: clientFactory.session
+            ),
+            deviceAuthorizationClient: DeviceAuthorizationHTTPClient(
+                baseURL: clientFactory.baseURL,
+                session: clientFactory.session
+            ),
+            preparedUploadClient: PreparedUploadHTTPClient(
+                baseURL: clientFactory.baseURL,
+                session: clientFactory.session
+            ),
+            servicesFactory: clientFactory,
+            realtimeClient: clientFactory,
             session: SessionStore(),
             presenter: ASWebAuthenticationPresenter()
         )
@@ -35,27 +51,44 @@ struct CompanionRootView: View {
 
     @MainActor
     init(
-        api: any MobileAPIClientProtocol,
+        downloadClient: any AuthenticatedDownloadClientProtocol,
+        deviceAuthorizationClient: any DeviceAuthorizationClientProtocol,
+        preparedUploadClient: any PreparedUploadClientProtocol,
+        servicesFactory: any AuthenticatedMobileServicesFactory,
+        realtimeClient: (any MobileRealtimeClientProtocol)?,
         session: SessionStore,
         presenter: any WebAuthenticationPresenting
     ) {
-        self.api = api
+        self.downloadClient = downloadClient
+        self.servicesFactory = servicesFactory
+        self.realtimeClient = realtimeClient
         _session = StateObject(wrappedValue: session)
-        _companion = StateObject(wrappedValue: CompanionStore(api: api))
-        _dashboard = StateObject(wrappedValue: DashboardStore(api: api))
+        _companion = StateObject(wrappedValue: CompanionStore(servicesFactory: servicesFactory))
+        _dashboard = StateObject(wrappedValue: DashboardStore(servicesFactory: servicesFactory))
         _realtime = StateObject(
-            wrappedValue: OrganizationRealtimeStore(api: api)
+            wrappedValue: OrganizationRealtimeStore(realtime: realtimeClient)
         )
         _channels = StateObject(
-            wrappedValue: ChannelsStore(api: api, managesRealtime: false)
+            wrappedValue: ChannelsStore(
+                api: downloadClient,
+                preparedUploadClient: preparedUploadClient,
+                servicesFactory: servicesFactory,
+                realtime: realtimeClient,
+                managesRealtime: false
+            )
         )
-        _agents = StateObject(wrappedValue: AgentsStore(api: api))
+        _agents = StateObject(wrappedValue: AgentsStore(servicesFactory: servicesFactory))
         _inbox = StateObject(
-            wrappedValue: InboxStore(api: api, pollInterval: .seconds(60))
+            wrappedValue: InboxStore(
+                servicesFactory: servicesFactory,
+                pollInterval: .seconds(60)
+            )
         )
         _notifications = StateObject(wrappedValue: LocalNotificationService())
-        _remotePush = StateObject(wrappedValue: RemotePushRegistrationService(api: api))
-        authorization = DeviceAuthorizationService(api: api)
+        _remotePush = StateObject(
+            wrappedValue: RemotePushRegistrationService(servicesFactory: servicesFactory)
+        )
+        authorization = DeviceAuthorizationService(client: deviceAuthorizationClient)
         self.presenter = presenter
     }
 
@@ -318,9 +351,10 @@ struct CompanionRootView: View {
 
     private func authenticatedContent(
         token: String,
-        project: ProjectsResponse.Project
+        project: Project
     ) -> some View {
-        CompanionShellView(
+        let services = servicesFactory.authenticatedServices(token: token)
+        return CompanionShellView(
             navigation: navigation,
             agents: agents,
             inbox: inbox,
@@ -334,30 +368,28 @@ struct CompanionRootView: View {
             snapshot: dashboard.snapshot,
             errorMessage: dashboard.errorMessage,
             token: token,
-            api: api,
+            api: downloadClient,
+            services: services,
+            realtimeClient: realtimeClient,
             user: companion.user,
             refresh: { await dashboard.refresh(forceSnapshot: true) },
             ensureIssueAvailable: { projectID, runID in
-                let location: IssueHierarchyLocationResponse? = try? await api.send(
-                    MobileAPIContract.Endpoint.issueHierarchyLocation(
-                        teamID: projectID,
-                        runID: runID
-                    ),
-                    method: "GET",
-                    token: token,
-                    body: nil,
-                    as: IssueHierarchyLocationResponse.self
-                )
-                let resolvedTeamID = location?.teamId ?? projectID
+                var request = BriarAPI_ResolveIssueHierarchyLocationRequest()
+                request.sourceTeamID = coreUUIDString(projectID)
+                request.runID = coreUUIDString(runID)
+                guard let location = try? await services.project
+                    .resolveIssueHierarchyLocation(request: request, headers: [:])
+                    .briarValue(),
+                    let resolvedTeamID = UUID(uuidString: location.teamID),
+                    let planningProjectID = UUID(uuidString: location.projectID)
+                else { return false }
                 guard let target = companion.projects.first(where: {
                     $0.id == resolvedTeamID
                 }) else { return false }
                 // Keep the account selection and every project-scoped store
                 // aligned before loading the canonical dashboard.
                 companion.selectedProjectID = resolvedTeamID
-                if let planningProjectID = location?.projectId {
-                    companion.selectPlanningProject(planningProjectID)
-                }
+                companion.selectPlanningProject(planningProjectID)
                 dashboard.select(projectID: resolvedTeamID, token: token)
                 channels.select(
                     organizationID: target.organizationId,
@@ -369,7 +401,7 @@ struct CompanionRootView: View {
                     locale: locale.rawValue
                 )
                 return await dashboard.ensureRunAvailable(
-                    projectID: projectID,
+                    projectID: resolvedTeamID,
                     runID: runID,
                     token: token
                 )
@@ -380,7 +412,7 @@ struct CompanionRootView: View {
         )
     }
 
-    private var currentProject: ProjectsResponse.Project? {
+    private var currentProject: Project? {
         guard let projectID = companion.selectedProjectID else { return nil }
         return companion.projects.first(where: { $0.id == projectID })
     }
@@ -568,7 +600,7 @@ struct CompanionLoginView: View {
 }
 
 struct ProjectSelectionView: View {
-    let projects: [ProjectsResponse.Project]
+    let projects: [Project]
     @Binding var selectedProjectID: UUID?
     let continueAction: () -> Void
     let signOut: () -> Void
@@ -600,7 +632,7 @@ struct ProjectSelectionView: View {
         )
     }
 
-    private var visibleProjects: [ProjectsResponse.Project] {
+    private var visibleProjects: [Project] {
         guard let selectedOrganizationID else { return projects }
         return projects.filter { $0.organizationId == selectedOrganizationID }
     }

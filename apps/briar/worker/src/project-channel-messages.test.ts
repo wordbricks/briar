@@ -1,16 +1,19 @@
 import { createHash } from "node:crypto";
-import { Miniflare } from "miniflare";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import {
+  WorkerExecutionService,
+} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
+import { Code, createClient } from "@connectrpc/connect";
+import { createConnectTransport } from "@connectrpc/connect-web";
+import { env as cloudflareEnv } from "cloudflare:workers";
+import { beforeAll, describe, expect, it } from "vitest";
 import worker from "./index";
 import {
   addChannelAgent,
   createChannel,
   createChannelMessage,
 } from "./channels";
-import { createIsolatedTestDatabase } from "./test-helpers/d1";
 
 describe("Project Agent channel message history", () => {
-  let miniflare: Miniflare;
   const organizationId = "11000000-0000-4000-8000-000000000001";
   const projectId = "22000000-0000-4000-8000-000000000001";
   const otherProjectId = "22000000-0000-4000-8000-000000000002";
@@ -18,7 +21,6 @@ describe("Project Agent channel message history", () => {
   const agentId = "33000000-0000-4000-8000-000000000001";
   const token = "briar_agent_project_channel_history";
   const channelId = "44000000-0000-4000-8000-000000000001";
-  const forbiddenChannelId = "44000000-0000-4000-8000-000000000002";
   const rootIds = [
     "55000000-0000-4000-8000-000000000001",
     "55000000-0000-4000-8000-000000000002",
@@ -31,7 +33,7 @@ describe("Project Agent channel message history", () => {
     "77000000-0000-4000-8000-000000000002",
     "77000000-0000-4000-8000-000000000003",
   ];
-  let db: D1Database;
+  const db = cloudflareEnv.DB;
 
   const at = (minute: number) =>
     `2026-08-12T00:${String(minute).padStart(2, "0")}:00.000Z`;
@@ -39,11 +41,6 @@ describe("Project Agent channel message history", () => {
     createHash("sha256").update(value).digest("hex");
 
   beforeAll(async () => {
-    const database = await createIsolatedTestDatabase({
-      suite: "project-channel-messages",
-    });
-    miniflare = database.miniflare;
-    db = database.db;
     await db.batch([
       db.prepare(
         `insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
@@ -88,19 +85,10 @@ describe("Project Agent channel message history", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "agent-history",
       name: "Agent history",
-      topic: null,
-      visibility: "public",
-      defaultProjectId: projectId,
-      createdByUserId: ownerId,
-      createdAt: at(0),
-    });
-    await createChannel(db, {
-      id: forbiddenChannelId,
-      organizationId,
-      slug: "agent-forbidden",
-      name: "Agent forbidden",
       topic: null,
       visibility: "public",
       defaultProjectId: projectId,
@@ -181,10 +169,6 @@ describe("Project Agent channel message history", () => {
     ]);
   }, 60_000);
 
-  afterAll(async () => {
-    await miniflare.dispose();
-  });
-
   const env = () => ({
     DB: db,
     BETTER_AUTH_SECRET: "briar-test-secret-that-is-at-least-32-characters",
@@ -192,116 +176,111 @@ describe("Project Agent channel message history", () => {
     GOOGLE_CLIENT_SECRET: "google-secret",
   }) as never;
 
-  const get = (project: string, channel: string, query = "") =>
-    worker.fetch(
-      new Request(
-        `https://briar.example/projects/${project}/channels/${channel}/messages${query}`,
-        { headers: { authorization: `Bearer ${token}` } },
-      ),
-      env(),
-    );
+  const client = () => createClient(
+    WorkerExecutionService,
+    createConnectTransport({
+      baseUrl: "https://briar.example",
+      useBinaryFormat: true,
+      fetch: async (input, init) =>
+        worker.fetch(new Request(input, { ...init, redirect: "manual" }), env()),
+    }),
+  );
 
-  it("paginates roots with stable timestamp and ID boundaries", async () => {
-    const firstResponse = await get(projectId, channelId, "?limit=2");
-    expect(firstResponse.status).toBe(200);
-    expect(firstResponse.headers.get("Cache-Control")).toBe("private, no-store");
-    const first = await firstResponse.json<{
-      messages: Array<{ id: string; document: unknown; attachments: unknown[] }>;
-      nextCursor: string | null;
-    }>();
+  const list = (
+    project: string,
+    channel: string,
+    input: {
+      limit?: number;
+      cursor?: string;
+      parentMessageId?: string;
+    } = {},
+  ) => client().listProjectChannelMessages(
+    { projectId: project, channelId: channel, ...input },
+    { headers: { authorization: `Bearer ${token}` } },
+  );
+
+  it("keeps root and thread cursors isolated while mapping rich messages", async () => {
+    let responseHeaders: Headers | undefined;
+    const first = await client().listProjectChannelMessages(
+      { projectId, channelId, limit: 2 },
+      {
+        headers: { authorization: `Bearer ${token}` },
+        onHeader: (headers) => {
+          responseHeaders = headers;
+        },
+      },
+    );
+    expect(responseHeaders?.get("cache-control")).toBe("private, no-store");
     expect(first.messages.map((message) => message.id)).toEqual([
       rootIds[3],
       threadRootId,
     ]);
     expect(first.nextCursor).toBe(rootIds[3]);
+    expect(first.channel).toMatchObject({
+      id: channelId,
+      name: "Agent history",
+    });
     expect(first.messages[0]).toMatchObject({
       document: { messageId: rootIds[3], title: "History plan", projectId },
       attachments: [{
         filename: "history.png",
         contentType: "image/png",
-        byteSize: 42,
+        byteSize: BigInt(42),
       }],
     });
 
-    const secondResponse = await get(
-      projectId,
-      channelId,
-      `?limit=2&cursor=${first.nextCursor}`,
-    );
-    const second = await secondResponse.json<{
-      messages: Array<{ id: string; document: unknown; attachments: unknown[] }>;
-      nextCursor: string | null;
-    }>();
+    const second = await list(projectId, channelId, {
+      limit: 2,
+      cursor: first.nextCursor,
+    });
     expect(second.messages.map((message) => message.id)).toEqual([
       rootIds[1],
       rootIds[2],
     ]);
-
-    const thirdResponse = await get(
-      projectId,
-      channelId,
-      `?limit=2&cursor=${second.nextCursor}`,
-    );
-    const third = await thirdResponse.json<{
-      messages: Array<{ id: string }>;
-      nextCursor: string | null;
-    }>();
+    const third = await list(projectId, channelId, {
+      limit: 2,
+      cursor: second.nextCursor,
+    });
     expect(third.messages.map((message) => message.id)).toEqual([rootIds[0]]);
-    expect(third.nextCursor).toBeNull();
-  });
+    expect(third.nextCursor).toBeUndefined();
 
-  it("paginates a thread independently and includes its root", async () => {
-    const query = `?limit=2&parentMessageId=${threadRootId}`;
-    const firstResponse = await get(projectId, channelId, query);
-    const first = await firstResponse.json<{
-      messages: Array<{ id: string }>;
-      nextCursor: string | null;
-    }>();
-    expect(first.messages.map((message) => message.id)).toEqual([
+    const threadFirst = await list(projectId, channelId, {
+      limit: 2,
+      parentMessageId: threadRootId,
+    });
+    expect(threadFirst.messages.map((message) => message.id)).toEqual([
       replyIds[1],
       replyIds[2],
     ]);
-
-    const secondResponse = await get(
-      projectId,
-      channelId,
-      `${query}&cursor=${first.nextCursor}`,
-    );
-    const second = await secondResponse.json<{
-      messages: Array<{ id: string }>;
-      nextCursor: string | null;
-    }>();
-    expect(second.messages.map((message) => message.id)).toEqual([
+    const threadSecond = await list(projectId, channelId, {
+      limit: 2,
+      parentMessageId: threadRootId,
+      cursor: threadFirst.nextCursor,
+    });
+    expect(threadSecond.messages.map((message) => message.id)).toEqual([
       threadRootId,
       replyIds[0],
     ]);
-    expect(second.nextCursor).toBeNull();
+    expect(threadSecond.nextCursor).toBeUndefined();
+
+    await expect(list(projectId, channelId, {
+      parentMessageId: threadRootId,
+      cursor: rootIds[0],
+    })).rejects.toMatchObject({ code: Code.InvalidArgument });
   });
 
-  it("distinguishes missing channels from channels outside the Agent roster", async () => {
-    const forbidden = await get(projectId, forbiddenChannelId);
-    expect(forbidden.status).toBe(403);
-    await expect(forbidden.json()).resolves.toMatchObject({
-      message: "No Project Agent for this project has access to the channel",
+  it("rejects project mismatch and revokes access with the final roster Agent", async () => {
+    await expect(list(otherProjectId, channelId)).rejects.toMatchObject({
+      code: Code.PermissionDenied,
     });
 
-    const missing = await get(
-      projectId,
-      "44000000-0000-4000-8000-000000000099",
-    );
-    expect(missing.status).toBe(404);
-    await expect(missing.json()).resolves.toMatchObject({
-      message: "Channel not found",
-    });
-  });
-
-  it("revokes access as soon as the project's last roster Agent is removed", async () => {
     await db.prepare(
       `delete from briar_channel_agents where channel_id = ? and agent_id = ?`,
     ).bind(channelId, agentId).run();
     try {
-      const revoked = await get(projectId, channelId);
-      expect(revoked.status).toBe(403);
+      await expect(list(projectId, channelId)).rejects.toMatchObject({
+        code: Code.PermissionDenied,
+      });
     } finally {
       await addChannelAgent(db, {
         channelId,
@@ -310,23 +289,5 @@ describe("Project Agent channel message history", () => {
         createdAt: at(20),
       });
     }
-  });
-
-  it("rejects project mismatches and cursors outside the selected view", async () => {
-    const wrongProject = await get(otherProjectId, channelId);
-    expect(wrongProject.status).toBe(403);
-    await expect(wrongProject.json()).resolves.toMatchObject({
-      message: "Agent token is not valid for this project",
-    });
-
-    const wrongCursor = await get(
-      projectId,
-      channelId,
-      `?parentMessageId=${threadRootId}&cursor=${rootIds[0]}`,
-    );
-    expect(wrongCursor.status).toBe(400);
-    await expect(wrongCursor.json()).resolves.toMatchObject({
-      message: "Cursor does not belong to this message view",
-    });
   });
 });

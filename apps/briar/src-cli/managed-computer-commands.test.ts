@@ -38,10 +38,34 @@ describe("managed-computer sync", () => {
     let storedConfig: Config = decodeConfig({
       apiUrl: apiOrigin,
       userToken: "user-session",
+      agentProviders: {
+        codex: true,
+        claude: true,
+        cursor: true,
+        grok: true,
+        agy: true,
+        opencode: true,
+        openrouter: true,
+      },
+      appSettings: {
+        preventSleepWhileRunning: false,
+        browserAutomationProvider:
+          "LOCAL_BROWSER_AUTOMATION_PROVIDER_EGO_BROWSER",
+      },
+      managedComputer: {
+        managedComputerId: "22222222-2222-4222-8222-222222222222",
+        deviceId: "managed-22222222-2222-4222-8222-222222222222",
+        organizationId: "33333333-3333-4333-8333-333333333333",
+        credentialFile: "/var/lib/briar/worker-credential.json",
+      },
       projects: [{
         id: projectId,
         repositoryPath: "/home/briar/briar",
-        llm: { provider: "codex" },
+        apiUrl: apiOrigin,
+        llm: {
+          provider: "AGENT_PROVIDER_CODEX",
+          approvalPolicy: "LOCAL_APPROVAL_POLICY_NEVER",
+        },
         executionWorker: {
           deviceId: "managed-22222222-2222-4222-8222-222222222222",
           workerId: "worker-1",

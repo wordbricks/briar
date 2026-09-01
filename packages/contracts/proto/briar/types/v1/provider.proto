@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package briar.types.v1;
+
+option swift_prefix = "BriarTypes_";
+
+// Stable provider identity shared by every Briar-owned wire boundary.
+// Display metadata, executable discovery, and login commands remain in the
+// platform catalog because they are not wire data.
+enum AgentProvider {
+  AGENT_PROVIDER_UNSPECIFIED = 0;
+  AGENT_PROVIDER_CODEX = 1;
+  AGENT_PROVIDER_CLAUDE = 2;
+  AGENT_PROVIDER_CURSOR = 3;
+  AGENT_PROVIDER_GROK = 4;
+  AGENT_PROVIDER_AGY = 5;
+  AGENT_PROVIDER_OPENCODE = 6;
+  AGENT_PROVIDER_OPENROUTER = 7;
+}

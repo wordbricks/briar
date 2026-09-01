@@ -1,29 +1,20 @@
-import * as Schema from "effect/Schema";
-import type {
-  AgentActivityKind,
-  NormalizedAgentEvent,
-} from "./normalized-agent-event";
 import {
+  AgentActivityKind,
+  AgentActivityStatus,
+  type NormalizedAgentEvent,
+} from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
+import {
+  normalizedActivityCompleted,
+  normalizedActivityDelta,
+  normalizedActivityStarted,
   normalizedActivityText,
   normalizedActivityTitle,
+  normalizedMessageCompleted,
+  normalizedMessageDelta,
+  normalizedMessageStarted,
+  normalizedTurnCompleted,
 } from "./normalized-agent-event";
-import {
-  commonRunnerRequestFields,
-  runnerRequestDecoderOptions,
-} from "./runner-request";
-
-export const AgyRunnerRequest = Schema.Struct({
-  ...commonRunnerRequestFields,
-  effort: Schema.optional(Schema.NullOr(Schema.String)),
-  agyBinary: Schema.String,
-});
-
-export type AgyRunnerRequest = typeof AgyRunnerRequest.Type;
-
-export const decodeAgyRunnerRequest = Schema.decodeUnknownResult(
-  AgyRunnerRequest,
-  runnerRequestDecoderOptions,
-);
+import type { RunnerRequest } from "./runner-request";
 
 export type AgyBlockedRetry =
   | {
@@ -39,13 +30,6 @@ export type AgyBlockedRetry =
       nextRetryAt: null;
       statusCode: 502 | 503 | 504;
     };
-
-export type AgyRunnerOutput =
-  | { type: "session"; sessionId: string }
-  | { type: "event"; raw: unknown; event?: NormalizedAgentEvent }
-  | ({ type: "blocked" } & AgyBlockedRetry)
-  | { type: "result"; sessionId: string; message: string }
-  | { type: "error"; message: string };
 
 export type AgyEventState = {
   messageId: string;
@@ -151,10 +135,16 @@ function isAssistantStep(type: string) {
 
 function activityKind(type: string, toolName: string): AgentActivityKind {
   const value = `${type} ${toolName}`.toLowerCase();
-  if (/write|edit|patch|file_change/u.test(value)) return "fileChange";
-  if (/shell|command|terminal|run_command/u.test(value)) return "command";
-  if (/browser|web|search|fetch|read_url/u.test(value)) return "webSearch";
-  return "tool";
+  if (/write|edit|patch|file_change/u.test(value)) {
+    return AgentActivityKind.FILE_CHANGE;
+  }
+  if (/shell|command|terminal|run_command/u.test(value)) {
+    return AgentActivityKind.COMMAND;
+  }
+  if (/browser|web|search|fetch|read_url/u.test(value)) {
+    return AgentActivityKind.WEB_SEARCH;
+  }
+  return AgentActivityKind.TOOL;
 }
 
 function completeActiveActivities(state: AgyEventState): NormalizedAgentEvent[] {
@@ -162,14 +152,13 @@ function completeActiveActivities(state: AgyEventState): NormalizedAgentEvent[] 
   for (const [id, activity] of state.activities) {
     if (activity.completed) continue;
     activity.completed = true;
-    events.push({
-      type: "activityCompleted",
+    events.push(normalizedActivityCompleted({
       id,
       kind: activity.kind,
       title: activity.title,
       text: activity.text,
-      status: "completed",
-    });
+      status: AgentActivityStatus.COMPLETED,
+    }));
   }
   return events;
 }
@@ -187,28 +176,26 @@ export function normalizeAgyEvent(
     if (finalText && !state.messageStarted) {
       state.messageStarted = true;
       state.assistantText = finalText;
-      events.push({
-        type: "messageStarted",
+      events.push(normalizedMessageStarted({
         id: state.messageId,
         phase: "final",
         text: finalText,
-      });
+      }));
     } else if (finalText && finalText !== state.assistantText) {
       const delta = finalText.startsWith(state.assistantText)
         ? finalText.slice(state.assistantText.length)
         : finalText;
       state.assistantText = finalText;
-      events.push({ type: "messageDelta", id: state.messageId, delta });
+      events.push(normalizedMessageDelta({ id: state.messageId, delta }));
     }
     if (state.messageStarted) {
-      events.push({
-        type: "messageCompleted",
+      events.push(normalizedMessageCompleted({
         id: state.messageId,
         phase: "final",
         text: state.assistantText,
-      });
+      }));
     }
-    events.push({ type: "turnCompleted", status: "completed" });
+    events.push(normalizedTurnCompleted("completed"));
     return events;
   }
   if (!type.includes("step")) return [];
@@ -221,16 +208,18 @@ export function normalizeAgyEvent(
     if (!state.messageStarted) {
       state.messageStarted = true;
       state.assistantText = text;
-      return [{
-        type: "messageStarted",
+      return [normalizedMessageStarted({
         id: state.messageId,
         phase: stepType.includes("thought") ? "analysis" : "final",
         text,
-      }];
+      })];
     }
     if (textDelta !== undefined) {
       state.assistantText += textDelta;
-      return [{ type: "messageDelta", id: state.messageId, delta: textDelta }];
+      return [normalizedMessageDelta({
+        id: state.messageId,
+        delta: textDelta,
+      })];
     }
     const delta = text.startsWith(state.assistantText)
       ? text.slice(state.assistantText.length)
@@ -239,7 +228,7 @@ export function normalizeAgyEvent(
     state.assistantText = text.startsWith(state.assistantText)
       ? text
       : `${state.assistantText}${text}`;
-    return [{ type: "messageDelta", id: state.messageId, delta }];
+    return [normalizedMessageDelta({ id: state.messageId, delta })];
   }
 
   const toolInfo = recordValue(step.tool_info) ?? recordValue(step.toolInfo);
@@ -276,53 +265,50 @@ export function normalizeAgyEvent(
       completed,
     });
     if (completed) {
-      return [{
-        type: "activityCompleted",
+      return [normalizedActivityCompleted({
         id,
         kind: activityKind(stepType, toolName),
         title,
         text: activityText,
-        status: "completed",
-      }];
+        status: AgentActivityStatus.COMPLETED,
+      })];
     }
-    return [{
-      type: "activityStarted",
+    return [normalizedActivityStarted({
       id,
       kind: activityKind(stepType, toolName),
       title,
       text: activityText,
-    }];
+    })];
   }
   if (completed && !existing.completed) {
     existing.completed = true;
     existing.text = activityText || existing.text;
-    return [{
-      type: "activityCompleted",
+    return [normalizedActivityCompleted({
       id,
       kind: existing.kind,
       title: existing.title,
       text: existing.text,
-      status: "completed",
-    }];
+      status: AgentActivityStatus.COMPLETED,
+    })];
   }
   if (activityText && activityText !== existing.text) {
     const delta = activityText.startsWith(existing.text)
       ? activityText.slice(existing.text.length)
       : activityText;
     existing.text = activityText;
-    return [{ type: "activityDelta", id, delta }];
+    return [normalizedActivityDelta({ id, delta })];
   }
   return [];
 }
 
-export function mapEffortToAgy(effort: AgyRunnerRequest["effort"]) {
+export function mapEffortToAgy(effort: RunnerRequest["effort"]) {
   if (!effort) return undefined;
   return effort === "xhigh" || effort === "max" || effort === "ultra"
     ? "high"
     : effort;
 }
 
-export function buildAgyPrompt(request: AgyRunnerRequest) {
+export function buildAgyPrompt(request: RunnerRequest) {
   const sections: string[] = [];
   if (request.instructions?.trim()) {
     sections.push(`<briar_trusted_instructions>\n${request.instructions.trim()}\n</briar_trusted_instructions>`);
@@ -339,7 +325,7 @@ export function buildAgyPrompt(request: AgyRunnerRequest) {
   return sections.join("\n\n");
 }
 
-export function agyArgs(request: AgyRunnerRequest) {
+export function agyArgs(request: RunnerRequest) {
   const args = ["--output-format", "stream-json"];
   if (request.outputSchema !== null && request.outputSchema !== undefined) {
     args.push("--json-schema", JSON.stringify(request.outputSchema));

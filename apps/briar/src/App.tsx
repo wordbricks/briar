@@ -86,6 +86,7 @@ import {
 } from "./components/WindowNavigationControls";
 import { appSettingsNavigationGroups } from "./components/app-settings-navigation";
 import { useBriar, type UseBriarOptions } from "./hooks/useBriar";
+import { commands } from "./generated/tauri";
 import {
   collapseLinkedAutoHuntSessions,
   useAutoHuntSessions,
@@ -147,8 +148,8 @@ import {
   inboxNotificationTarget,
   isInboxChannelTarget,
   isInboxRunDetailTarget,
-  type InboxNotificationTarget,
 } from "./lib/inbox-notifications";
+import type { InboxNotificationTarget } from "./generated/tauri";
 import { inboxDetailTargetAtom } from "./lib/inbox-selection";
 import {
   clearFirstRunTutorialPending,
@@ -204,7 +205,6 @@ import type {
   ChannelVisibility,
 } from "./lib/channels-contract";
 import {
-  channelHasUnread,
   laterTimestamp,
   markChannelCatalogRead,
 } from "./lib/channel-unread";
@@ -457,10 +457,14 @@ export function App({
               return;
             }
             channelCatalogCursorRef.current = delta.cursor;
-            if (delta.channels.length || delta.removedChannelIds.length) {
+            if (
+              delta.reset ||
+              delta.channels.length ||
+              delta.removedChannelIds.length
+            ) {
               setOrganizationChannels((current) => {
                 const byId = new Map(
-                  current.map((channel) => [channel.id, channel]),
+                  (delta.reset ? [] : current).map((channel) => [channel.id, channel]),
                 );
                 for (const channel of delta.channels) byId.set(channel.id, channel);
                 for (const id of delta.removedChannelIds) byId.delete(id);
@@ -520,7 +524,7 @@ export function App({
       const organizationId = briar.activeOrganizationId;
       if (!token || !organizationId) return;
       const channel = organizationChannels.find((item) => item.id === channelId);
-      if (!channel || !channelHasUnread(channel)) return;
+      if (!channel?.hasUnread) return;
       const lastReadAt = laterTimestamp(
         channel.lastMessageAt,
         new Date().toISOString(),
@@ -753,11 +757,9 @@ export function App({
   ]);
   useEffect(() => {
     if (!runsOnDesktopTauri || projectWindowProjectId) return;
-    void import("@tauri-apps/api/core")
-      .then(({ invoke }) => invoke("sync_execution_worker_labels"))
-      .catch(() => {
-        // Offline startup must not block the rest of the desktop app.
-      });
+    void commands.syncExecutionWorkerLabels().catch(() => {
+      // Offline startup must not block the rest of the desktop app.
+    });
   }, [projectWindowProjectId, runsOnDesktopTauri]);
   // Preview changes the timing, not the macOS presentation surface.
   const usesNativeLaunchIntro = isMacDesktopTauri();
@@ -1856,7 +1858,7 @@ export function App({
     ? []
     : organizationChannels.filter((channel) => channel.kind === "dm");
   const unreadDirectMessageCount = organizationDirectMessages.filter(
-    channelHasUnread,
+    (channel) => channel.hasUnread,
   ).length;
   const visibleOrganizations = projectWindowProjectId
     ? projectWindowProject?.organizationId
@@ -2083,7 +2085,7 @@ export function App({
 
     let cancelled = false;
     const agents = briar.token
-      ? loadProjectAgents(briar.token, activeProject.id, locale)
+      ? loadProjectAgents(briar.token, activeProject.id)
       : Promise.resolve(demoProjectAgents(activeProject.id, locale));
     void agents
       .then((loadedAgents) => {
@@ -2468,21 +2470,22 @@ export function App({
     if (!runsOnDesktopTauri || projectWindowProjectId) return;
     let cancelled = false;
 
-    void import("@tauri-apps/api/core").then(async ({ invoke }) => {
+    void (async () => {
       if (cancelled) return;
       const shouldPrepareLaunchIntro =
         usesNativeLaunchIntro && shouldShowLaunchIntro();
-      const command = shouldPrepareLaunchIntro
-        ? "prepare_launch_intro"
-        : "show_main_window";
       try {
-        await invoke(command);
+        if (shouldPrepareLaunchIntro) {
+          await commands.prepareLaunchIntro();
+        } else {
+          await commands.showMainWindow();
+        }
         if (shouldPrepareLaunchIntro) markLaunchIntroSeen();
       } catch (error) {
         console.error("Failed to prepare the native launch experience", error);
-        await invoke("show_main_window").catch(() => undefined);
+        await commands.showMainWindow().catch(() => undefined);
       }
-    });
+    })();
 
     return () => {
       cancelled = true;
@@ -2500,10 +2503,8 @@ export function App({
     if (!compact && !hasCompactedWindowForOnboarding.current) return;
     hasCompactedWindowForOnboarding.current = compact;
 
-    void import("@tauri-apps/api/core")
-      .then(({ invoke }) =>
-        invoke("set_main_window_onboarding_mode", { compact }),
-      )
+    void commands
+      .setMainWindowOnboardingMode(compact)
       .catch((error) => {
         console.error("Failed to resize the Briar onboarding window", error);
       });
@@ -3245,7 +3246,7 @@ export function App({
   for (const project of isCommandPaletteOpen ? activeOrganizationProjects : []) {
     const organizationName = briar.organizations.find(
       (organization) => organization.id === project.organizationId,
-    )?.name ?? project.organizationName ?? "";
+    )?.name ?? project.organizationName;
     addPaletteItem({
       active: project.id === briar.activeProjectId,
       description:
@@ -3354,7 +3355,7 @@ export function App({
   for (const channel of isCommandPaletteOpen ? visibleOrganizationChannels : []) {
     const isCurrent =
       channel.id === activeChannelId && activePage === "channels";
-    const unread = channelHasUnread(channel);
+    const unread = channel.hasUnread;
     addPaletteItem({
       active: isCurrent,
       description: channel.topic?.trim() || `#${channel.slug}`,
@@ -3387,8 +3388,8 @@ export function App({
     );
     const isCurrent =
       directMessage.id === activeChannelId && activePage === "dms";
-    const unread = channelHasUnread(directMessage);
-    const participantNames = (directMessage.dmParticipants ?? [])
+    const unread = directMessage.hasUnread;
+    const participantNames = directMessage.dmParticipants
       .map((participant) => participant.name);
     addPaletteItem({
       active: isCurrent,
@@ -3470,7 +3471,7 @@ export function App({
             : [
                 ...new Set(
                   (briar.dashboard?.workers ?? []).flatMap(
-                    (worker) => worker.providers ?? [],
+                    (worker) => worker.providers,
                   ),
                 ),
               ]

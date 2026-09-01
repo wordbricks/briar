@@ -1,33 +1,22 @@
 import { issueTitleAbsoluteMaxLength } from "../../src/lib/issue-title";
-import type { BriarAuth } from "./auth";
-import { hasOrganizationCapability } from "./organization-access";
-import { getOrganizationRole } from "./organization-repository";
-import { decodeSlackOAuthInput } from "./account-organization-request-contract";
 import {
   claimSlackEvent,
   completeSlackEvent,
   consumeSlackOAuthState,
-  createSlackOAuthState,
-  deleteSlackInstallation,
   getHuntRunForProject,
   getProject,
   getSlackInstallation,
-  listSlackInstallations,
   releaseSlackEvent,
-  updateSlackInstallationProject,
   upsertSlackInstallation,
 } from "./db";
-import { HttpError, corsHeaders, json } from "./http-response";
+import { HttpError, json } from "./http-response";
 import { integrationHtml as html } from "./integration-http";
-import { createIssueWithAttachments } from "./issue-write-service";
-import { responseWithPostCommitCleanup } from "./post-commit-cleanup";
 import {
   listOrganizationProjects,
   type ProjectRow,
 } from "./project-repository";
-import { readJson } from "./request-readers";
 import { flushOrganizationInboxRealtimeOutbox } from "./realtime-scheduling";
-import { requireSession } from "./session-auth";
+import { createIssueFromServerFilesApplication } from "./server-issue-create-application";
 import {
   buildSlackCreateIssueModal,
   buildSlackIssueCreatedMessage,
@@ -38,34 +27,16 @@ import {
   exchangeSlackOAuthCode,
   parseSlackCreateIssueSubmission,
   postSlackCommandResponse,
-  randomUrlSafeToken,
   sha256Hex,
-  slackBotScopes,
   slackCreateIssueCallbackId,
   slackCreateIssueBlocks,
   slackCreateIssueShortcutCallbackId,
   SlackCreateIssueValidationError,
   slackEventClaimTtlMs,
-  slackOAuthStateTtlMs,
   type SlackCreateIssueSubmission,
 } from "./slack";
-import {
-  processSlackRevocationQueue,
-  slackConfigAvailable,
-} from "./slack-revocations";
+import { slackConfigAvailable } from "./slack-revocations";
 import { readVerifiedSlackBody } from "./slack-request";
-
-const slackInstallationJson = (
-  row: Awaited<ReturnType<typeof listSlackInstallations>>[number],
-) => ({
-  teamId: row.team_id,
-  teamName: row.team_name,
-  botUserId: row.bot_user_id,
-  defaultProjectId: row.default_project_id,
-  defaultProjectName: row.default_project_name,
-  createdAt: row.created_at,
-  updatedAt: row.updated_at,
-});
 
 const slackOAuthRedirectUri = (origin: string) =>
   `${origin}/slack/oauth/callback`;
@@ -193,6 +164,7 @@ async function processSlackCreateIssueSubmission(
   env: Env,
   submission: SlackCreateIssueSubmission,
   project: ProjectRow,
+  installedByUserId: string,
   token: string,
 ) {
   const now = new Date();
@@ -212,33 +184,37 @@ async function processSlackCreateIssueSubmission(
       submission.fileIds,
     );
     const sourceKey = `slack-create:${submission.teamId}:${submission.viewId}`;
-    const created = await createIssueWithAttachments({
+    const created = await createIssueFromServerFilesApplication({
       db: env.DB,
       attachmentsBucket: env.ATTACHMENTS,
-      project,
-      issue: {
+      signingSecret: env.BETTER_AUTH_SECRET,
+      projectId: project.id,
+      userId: installedByUserId,
+      sourceKey,
+      request: {
         title: submission.title,
         description: submission.description,
         priority: null,
         status: "queued",
         checkpoints: [],
       },
-      attachments,
-      sourceKey,
-      actor: `slack:${submission.userId}`,
-      detail:
-        submission.source === "shortcut"
-          ? "Slack Briar shortcut으로 생성된 이슈가 처리를 기다리고 있습니다."
-          : "Slack /create 명령으로 생성된 이슈가 처리를 기다리고 있습니다.",
-      context: {
-        origin:
+      files: attachments,
+      attribution: {
+        actor: `slack:${submission.userId}`,
+        detail:
           submission.source === "shortcut"
-            ? "slack-shortcut"
-            : "slack-command",
-        slackTeamId: submission.teamId,
-        slackChannelId: submission.channelId,
-        slackUserId: submission.userId,
-        slackViewId: submission.viewId,
+            ? "Slack Briar shortcut으로 생성된 이슈가 처리를 기다리고 있습니다."
+            : "Slack /create 명령으로 생성된 이슈가 처리를 기다리고 있습니다.",
+        context: {
+          origin:
+            submission.source === "shortcut"
+              ? "slack-shortcut"
+              : "slack-command",
+          slackTeamId: submission.teamId,
+          slackChannelId: submission.channelId,
+          slackUserId: submission.userId,
+          slackViewId: submission.viewId,
+        },
       },
     });
     await completeSlackEvent(
@@ -412,6 +388,7 @@ async function handleSlackInteractionRequest(
     env,
     submission,
     project,
+    installation.installed_by_user_id,
     token,
   ).finally(() =>
     flushOrganizationInboxRealtimeOutbox(env, env.DB).catch((error) => {
@@ -499,162 +476,6 @@ async function handleSlackOAuthCallback(request: Request, env: Env) {
       502,
     );
   }
-}
-
-
-export async function handleOrganizationSlackRoute(input: {
-  request: Request;
-  url: URL;
-  auth: BriarAuth;
-  db: D1Database;
-  env: Env;
-  context?: ExecutionContext;
-}): Promise<Response | undefined> {
-  const { request, url, auth, db, env, context } = input;
-
-  const organizationSlackMatch = url.pathname.match(
-    /^\/organizations\/([0-9a-f-]+)\/slack$/u,
-  );
-  if (organizationSlackMatch && request.method === "GET") {
-    const session = await requireSession(auth, request);
-    const role = await getOrganizationRole(
-      db,
-      organizationSlackMatch[1],
-      session.user.id,
-    );
-    if (!hasOrganizationCapability(role, "organization:read")) {
-      throw new HttpError(404, "Organization not found");
-    }
-    const [projects, installations] = await Promise.all([
-      listOrganizationProjects(db, organizationSlackMatch[1]),
-      listSlackInstallations(db, organizationSlackMatch[1]),
-    ]);
-    return json({
-      configured: slackConfigAvailable(env),
-      canManage: hasOrganizationCapability(role, "organization:update"),
-      projects: projects.map((project) => ({
-        id: project.id,
-        name: project.name,
-      })),
-      installations: installations.map(slackInstallationJson),
-    });
-  }
-  if (organizationSlackMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    const role = await getOrganizationRole(
-      db,
-      organizationSlackMatch[1],
-      session.user.id,
-    );
-    if (!hasOrganizationCapability(role, "organization:update")) {
-      throw new HttpError(403, "Organization management permission required");
-    }
-    if (!slackConfigAvailable(env)) {
-      throw new HttpError(503, "Slack integration is not configured");
-    }
-    const input = decodeSlackOAuthInput(await readJson(request));
-    const project = await getProject(db, input.defaultProjectId, session.user.id);
-    if (
-      !project ||
-      project.organization_id !== organizationSlackMatch[1]
-    ) {
-      throw new HttpError(404, "Project not found");
-    }
-    const state = randomUrlSafeToken();
-    const createdAt = new Date();
-    await createSlackOAuthState(db, {
-      stateHash: await sha256Hex(state),
-      organizationId: organizationSlackMatch[1],
-      defaultProjectId: project.id,
-      userId: session.user.id,
-      expiresAt: new Date(
-        createdAt.getTime() + slackOAuthStateTtlMs,
-      ).toISOString(),
-      createdAt: createdAt.toISOString(),
-    });
-    const installUrl = new URL("https://slack.com/oauth/v2/authorize");
-    installUrl.searchParams.set("client_id", env.SLACK_CLIENT_ID);
-    installUrl.searchParams.set("scope", slackBotScopes.join(","));
-    installUrl.searchParams.set(
-      "redirect_uri",
-      slackOAuthRedirectUri(new URL(request.url).origin),
-    );
-    installUrl.searchParams.set("state", state);
-    return json({ installUrl: installUrl.toString() }, 201);
-  }
-
-  const organizationSlackInstallationMatch = url.pathname.match(
-    /^\/organizations\/([0-9a-f-]+)\/slack\/installations\/([^/]+)$/u,
-  );
-  if (
-    organizationSlackInstallationMatch &&
-    (request.method === "PUT" || request.method === "DELETE")
-  ) {
-    const session = await requireSession(auth, request);
-    const role = await getOrganizationRole(
-      db,
-      organizationSlackInstallationMatch[1],
-      session.user.id,
-    );
-    if (!hasOrganizationCapability(role, "organization:update")) {
-      throw new HttpError(403, "Organization management permission required");
-    }
-    const teamId = decodeURIComponent(
-      organizationSlackInstallationMatch[2],
-    );
-    if (request.method === "DELETE") {
-      const observedAt = new Date().toISOString();
-      const outcome = await deleteSlackInstallation(db, {
-        organizationId: organizationSlackInstallationMatch[1],
-        teamId,
-        actorUserId: session.user.id,
-        observedAt,
-      });
-      if (outcome === "forbidden") {
-        throw new HttpError(403, "Organization management permission required");
-      }
-      if (outcome === "not_found") {
-        throw new HttpError(404, "Slack workspace not found");
-      }
-      // Credential durability is already committed. A missing encryption key
-      // or Slack outage leaves the row due for scheduled retry instead of
-      // risking credential loss; no OAuth/signing configuration is required.
-      return responseWithPostCommitCleanup(
-        new Response(null, { status: 204, headers: corsHeaders }),
-        {
-          context,
-          operation: "slack_uninstall",
-          observedAt,
-          tasks: [{
-            queue: "slack",
-            run: () => processSlackRevocationQueue(db, env, observedAt, 1),
-          }],
-        },
-      );
-    }
-    const input = decodeSlackOAuthInput(await readJson(request));
-    const updated = await updateSlackInstallationProject(
-      db,
-      organizationSlackInstallationMatch[1],
-      teamId,
-      input.defaultProjectId,
-    );
-    if (!updated) {
-      throw new HttpError(404, "Slack workspace or project not found");
-    }
-    const installations = await listSlackInstallations(
-      db,
-      organizationSlackInstallationMatch[1],
-    );
-    const installation = installations.find(
-      (candidate) => candidate.team_id === teamId,
-    );
-    if (!installation) throw new HttpError(404, "Slack workspace not found");
-    return json({ installation: slackInstallationJson(installation) });
-  }
-
-
-  return undefined;
 }
 
 export async function handleSlackAppPublicRoute(input: {

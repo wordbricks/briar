@@ -27,6 +27,7 @@ const channelPublishPayload = {
   attempt: 1,
   workerId: "worker-a",
   deviceId: "device-a",
+  claimTokenHash: "a".repeat(64),
   expiresAt: 1,
   nonce: "nonce-a",
 } as const;

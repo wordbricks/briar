@@ -1,9 +1,8 @@
-import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import { normalizeAutoHuntWorkflow } from "../../src/lib/auto-hunt-contract";
-import { decodeStructuredAgentResultOption } from "../../src/lib/agent-result";
 import { IsoDateTimeWithOffset } from "../../src/lib/date-time-schema";
 import type { OrganizationAgentContextLookupRequest } from "../../src/lib/organization-agent-context-contract";
+import { parseStructuredResult } from "./agent-result-json";
 import {
   type ArchiveBucket,
   type ArchiveMetadataRow,
@@ -14,16 +13,15 @@ import {
 } from "./db";
 import { hydrateAgentSkills } from "./agent-skills";
 import type { OrganizationAgentRow } from "./organization-agents";
+import { decodeStoredProjectAgentSessionPayload } from "./project-request-contract";
 
 export const organizationAgentContextDefaultPageSize = 25;
 export const organizationAgentContextMaxPageSize = 50;
 export const organizationAgentContextMaxEncodedPageBytes = 1_500_000;
 
 type ContextResource =
-  | "projects"
   | "agents"
   | "issues"
-  | "issue-pull-requests"
   | "agent-sessions";
 
 type ContextPageInput = {
@@ -59,24 +57,6 @@ const agentCursorSchema = strictCursor(Schema.Struct({
 }));
 type AgentCursor = typeof agentCursorSchema.Type;
 
-const issuePullRequestCursorSchema = strictCursor(Schema.Struct({
-  ...contextCursorBaseFields,
-  resource: Schema.Literal("issue-pull-requests"),
-  projectId: cursorUuid,
-  runNumber: Schema.Natural,
-  position: Schema.Natural,
-}));
-type IssuePullRequestCursor = typeof issuePullRequestCursorSchema.Type;
-
-const projectCursorSchema = strictCursor(Schema.Struct({
-  ...contextCursorBaseFields,
-  resource: Schema.Literal("projects"),
-  projectId: Schema.Null,
-  createdAt: IsoDateTimeWithOffset,
-  id: cursorUuid,
-}));
-type ProjectCursor = typeof projectCursorSchema.Type;
-
 const issueCursorSchema = strictCursor(Schema.Struct({
   ...contextCursorBaseFields,
   resource: Schema.Literal("issues"),
@@ -95,8 +75,6 @@ type SessionCursor = typeof sessionCursorSchema.Type;
 
 const contextCursorSchema = Schema.Union([
   agentCursorSchema,
-  issuePullRequestCursorSchema,
-  projectCursorSchema,
   issueCursorSchema,
   sessionCursorSchema,
 ]);
@@ -220,13 +198,6 @@ const parseJson = (value: string | null) => {
   }
 };
 
-const parseJsonObject = (value: string | null) => {
-  const parsed = parseJson(value);
-  return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-    ? parsed as Record<string, unknown>
-    : null;
-};
-
 const projectAgentContextJson = (
   agent: OrganizationAgentRow & {
     skills: NonNullable<OrganizationAgentRow["skills"]>;
@@ -270,184 +241,6 @@ type ContextProjectRow = {
   github_repository: string | null;
   workflow_json: string | null;
 };
-
-export async function listOrganizationAgentContextProjectsPage(
-  db: D1Database,
-  input: ContextPageInput,
-) {
-  const limit = pageLimit(input.limit);
-  const cursor = decodeCursor(input.cursor, {
-    organizationId: input.organizationId,
-    workId: input.workId,
-    snapshotAt: input.snapshotAt,
-    resource: "projects",
-    projectId: null,
-  }) as ProjectCursor | null;
-  const [count, result] = await Promise.all([
-    db.prepare(
-      `select count(*) as count
-       from briar_teams
-       where organization_id = ? and created_at <= ?`,
-    ).bind(input.organizationId, input.snapshotAt).first<{ count: number }>(),
-    db.prepare(
-      `select project.id, project.name, project.issue_key_prefix,
-              project.created_at, settings.velen_org, settings.data_source,
-              settings.linear_enabled, settings.linear_source,
-              settings.linear_team_key, settings.github_repository,
-              settings.workflow_json
-       from briar_teams project
-       left join briar_project_settings settings
-         on settings.project_id = project.id
-       where project.organization_id = ? and project.created_at <= ?
-         and (
-           ? is null or project.created_at > ?
-           or (project.created_at = ? and project.id > ?)
-         )
-       order by project.created_at, project.id
-       limit ?`,
-    ).bind(
-      input.organizationId,
-      input.snapshotAt,
-      cursor?.createdAt ?? null,
-      cursor?.createdAt ?? null,
-      cursor?.createdAt ?? null,
-      cursor?.id ?? null,
-      limit + 1,
-    ).all<ContextProjectRow>(),
-  ]);
-  const hasMore = result.results.length > limit;
-  const rows = result.results.slice(0, limit);
-  const items = rows.map((row) => ({
-      id: row.id,
-      name: row.name,
-      issueKeyPrefix: row.issue_key_prefix,
-      createdAt: row.created_at,
-      settings: {
-        velenOrg: row.velen_org,
-        dataSource: row.data_source,
-        linear: {
-          enabled: row.linear_enabled === 1,
-          source: row.linear_source,
-          teamKey: row.linear_team_key,
-        },
-        githubRepository: row.github_repository,
-        workflow: row.workflow_json
-          ? normalizeAutoHuntWorkflow(JSON.parse(row.workflow_json))
-          : null,
-      },
-    }));
-  return fitPageToByteBudget({
-    base: {
-      schemaVersion: 1 as const,
-      organizationId: input.organizationId,
-      workId: input.workId,
-      resource: "projects" as const,
-      projectId: null,
-      snapshotAt: input.snapshotAt,
-      total: count?.count ?? 0,
-    },
-    items,
-    hasMore,
-    cursorForLast: (index) => {
-      const row = rows[index];
-      return encodeCursor({
-        schemaVersion: 1,
-        organizationId: input.organizationId,
-        workId: input.workId,
-        snapshotAt: input.snapshotAt,
-        resource: "projects",
-        projectId: null,
-        createdAt: row.created_at,
-        id: row.id,
-      });
-    },
-  });
-}
-
-export async function listOrganizationAgentContextAgentsPage(
-  db: D1Database,
-  input: ProjectContextPageInput,
-) {
-  const limit = pageLimit(input.limit);
-  const cursor = decodeCursor(input.cursor, {
-    organizationId: input.organizationId,
-    workId: input.workId,
-    snapshotAt: input.snapshotAt,
-    resource: "agents",
-    projectId: input.projectId,
-  }) as AgentCursor | null;
-  const [count, result] = await Promise.all([
-    db.prepare(
-      `select count(*) as count
-       from briar_project_agents agent
-       join briar_teams project on project.id = agent.project_id
-       where agent.organization_id = ? and agent.project_id = ?
-         and project.organization_id = ? and agent.created_at <= ?`,
-    ).bind(
-      input.organizationId,
-      input.projectId,
-      input.organizationId,
-      input.snapshotAt,
-    ).first<{ count: number }>(),
-    db.prepare(
-      `select agent.id, agent.organization_id, agent.project_id,
-              project.name as project_name, agent.name,
-              null as avatar, agent.provider, agent.model,
-              agent.description, agent.responsibility,
-              null as skill_markdown, agent.effort,
-              agent.created_at, agent.updated_at
-       from briar_project_agents agent
-       join briar_teams project on project.id = agent.project_id
-       where agent.organization_id = ? and agent.project_id = ?
-         and project.organization_id = ? and agent.created_at <= ?
-         and (
-           ? is null or agent.created_at > ?
-           or (agent.created_at = ? and agent.id > ?)
-         )
-       order by agent.created_at, agent.id
-       limit ?`,
-    ).bind(
-      input.organizationId,
-      input.projectId,
-      input.organizationId,
-      input.snapshotAt,
-      cursor?.createdAt ?? null,
-      cursor?.createdAt ?? null,
-      cursor?.createdAt ?? null,
-      cursor?.id ?? null,
-      limit + 1,
-    ).all<OrganizationAgentRow>(),
-  ]);
-  const hasMore = result.results.length > limit;
-  const rows = result.results.slice(0, limit);
-  const hydrated = await hydrateAgentSkills(db, rows);
-  const items = hydrated.map((agent) =>
-    projectAgentContextJson(agent, input.snapshotAt)
-  );
-  return fitPageToByteBudget({
-    base: {
-      schemaVersion: 1 as const,
-      organizationId: input.organizationId,
-      workId: input.workId,
-      resource: "agents" as const,
-      projectId: input.projectId,
-      snapshotAt: input.snapshotAt,
-      total: count?.count ?? 0,
-    },
-    items,
-    hasMore,
-    cursorForLast: (index) => encodeCursor({
-      schemaVersion: 1,
-      organizationId: input.organizationId,
-      workId: input.workId,
-      snapshotAt: input.snapshotAt,
-      resource: "agents",
-      projectId: input.projectId,
-      createdAt: rows[index].created_at,
-      id: rows[index].id,
-    }),
-  });
-}
 
 type ContextIssueRow = {
   id: string;
@@ -496,9 +289,7 @@ type ContextIssueRow = {
 };
 
 const contextIssueJson = (row: ContextIssueRow) => {
-  const structuredResult = Option.getOrNull(
-    decodeStructuredAgentResultOption(parseJson(row.structured_result_json)),
-  );
+  const structuredResult = parseStructuredResult(row.structured_result_json);
   return {
     id: row.id,
     projectId: row.project_id,
@@ -549,102 +340,6 @@ const contextIssueJson = (row: ContextIssueRow) => {
   };
 };
 
-export async function listOrganizationAgentContextIssuesPage(
-  db: D1Database,
-  input: ProjectContextPageInput,
-) {
-  const limit = pageLimit(input.limit);
-  const cursor = decodeCursor(input.cursor, {
-    organizationId: input.organizationId,
-    workId: input.workId,
-    snapshotAt: input.snapshotAt,
-    resource: "issues",
-    projectId: input.projectId,
-  }) as IssueCursor | null;
-  const [count, result] = await Promise.all([
-    db.prepare(
-      `select count(*) as count
-       from briar_hunt_runs run
-       join briar_teams project on project.id = run.project_id
-       where run.project_id = ? and project.organization_id = ?
-         and run.created_at <= ?`,
-    ).bind(
-      input.projectId,
-      input.organizationId,
-      input.snapshotAt,
-    ).first<{ count: number }>(),
-    db.prepare(
-      `select run.id, run.project_id, run.run_number, run.source,
-              run.source_key, run.title, run.status, run.paused_at,
-              run.workflow_stage, run.detail, run.priority,
-              run.assignee_user_id, run.repository, run.branch, run.commit_sha,
-              run.tracker_provider, run.tracker_issue_id,
-              run.tracker_issue_identifier, run.tracker_issue_url,
-              run.tracker_issue_state, run.issue_description,
-              run.result_summary, run.structured_result_json,
-              run.target_sha, run.staging_qa_status,
-              run.production_qa_status, run.staging_qa_detail,
-              run.production_qa_detail, run.agent_id,
-              run.preferred_agent_provider, run.preferred_agent_model,
-              run.preferred_agent_effort, run.requested_agent_provider,
-              run.requested_agent_model, run.requested_agent_effort,
-              run.source_created_at,
-              run.started_at, run.created_at, run.updated_at, run.completed_at,
-              run.last_event_at,
-              run.event_count + coalesce((
-                select sum(archive.row_count)
-                from briar_log_archives archive
-                where archive.run_id = run.id
-                  and archive.archive_kind = 'run_events'
-                  and archive.status = 'complete'
-              ), 0) as event_count,
-              not exists (
-                select 1 from briar_log_archives archive
-                where archive.run_id = run.id
-                  and archive.archive_kind = 'run_events'
-                  and archive.status = 'verified'
-              ) as event_count_stable
-       from briar_hunt_runs run
-       join briar_teams project on project.id = run.project_id
-       where run.project_id = ? and project.organization_id = ?
-         and run.created_at <= ? and run.run_number > ?
-       order by run.run_number
-       limit ?`,
-    ).bind(
-      input.projectId,
-      input.organizationId,
-      input.snapshotAt,
-      cursor?.runNumber ?? -1,
-      limit + 1,
-    ).all<ContextIssueRow>(),
-  ]);
-  const hasMore = result.results.length > limit;
-  const rows = result.results.slice(0, limit);
-  const items = rows.map(contextIssueJson);
-  return fitPageToByteBudget({
-    base: {
-      schemaVersion: 1 as const,
-      organizationId: input.organizationId,
-      workId: input.workId,
-      resource: "issues" as const,
-      projectId: input.projectId,
-      snapshotAt: input.snapshotAt,
-      total: count?.count ?? 0,
-    },
-    items,
-    hasMore,
-    cursorForLast: (index) => encodeCursor({
-      schemaVersion: 1,
-      organizationId: input.organizationId,
-      workId: input.workId,
-      snapshotAt: input.snapshotAt,
-      resource: "issues",
-      projectId: input.projectId,
-      runNumber: rows[index].run_number,
-    }),
-  });
-}
-
 type ContextIssuePullRequestRow = {
   issue_id: string;
   project_id: string;
@@ -653,122 +348,9 @@ type ContextIssuePullRequestRow = {
   url: string;
 };
 
-export async function listOrganizationAgentContextIssuePullRequestsPage(
-  db: D1Database,
-  input: ProjectContextPageInput,
-) {
-  const limit = pageLimit(input.limit);
-  const cursor = decodeCursor(input.cursor, {
-    organizationId: input.organizationId,
-    workId: input.workId,
-    snapshotAt: input.snapshotAt,
-    resource: "issue-pull-requests",
-    projectId: input.projectId,
-  }) as IssuePullRequestCursor | null;
-  const [count, result] = await Promise.all([
-    db.prepare(
-      `select coalesce(sum(json_array_length(run.pull_request_urls)), 0) as count
-       from briar_hunt_runs run
-       join briar_teams project on project.id = run.project_id
-       where run.project_id = ? and project.organization_id = ?
-         and run.created_at <= ?`,
-    ).bind(
-      input.projectId,
-      input.organizationId,
-      input.snapshotAt,
-    ).first<{ count: number }>(),
-    db.prepare(
-      `select run.id as issue_id, run.project_id,
-              run.run_number, cast(link.key as integer) as position,
-              cast(link.value as text) as url
-       from briar_hunt_runs run
-       join briar_teams project on project.id = run.project_id
-       join json_each(run.pull_request_urls) link
-       where run.project_id = ? and project.organization_id = ?
-         and run.created_at <= ?
-         and (
-           run.run_number > ?
-           or (run.run_number = ? and cast(link.key as integer) > ?)
-         )
-       order by run.run_number, cast(link.key as integer)
-       limit ?`,
-    ).bind(
-      input.projectId,
-      input.organizationId,
-      input.snapshotAt,
-      cursor?.runNumber ?? -1,
-      cursor?.runNumber ?? -1,
-      cursor?.position ?? -1,
-      limit + 1,
-    ).all<ContextIssuePullRequestRow>(),
-  ]);
-  const hasMore = result.results.length > limit;
-  const rows = result.results.slice(0, limit);
-  const items = rows.map((row) => ({
-    issueId: row.issue_id,
-    projectId: row.project_id,
-    runNumber: row.run_number,
-    position: row.position,
-    url: row.url,
-  }));
-  return fitPageToByteBudget({
-    base: {
-      schemaVersion: 1 as const,
-      organizationId: input.organizationId,
-      workId: input.workId,
-      resource: "issue-pull-requests" as const,
-      projectId: input.projectId,
-      snapshotAt: input.snapshotAt,
-      total: count?.count ?? 0,
-    },
-    items,
-    hasMore,
-    cursorForLast: (index) => encodeCursor({
-      schemaVersion: 1,
-      organizationId: input.organizationId,
-      workId: input.workId,
-      snapshotAt: input.snapshotAt,
-      resource: "issue-pull-requests",
-      projectId: input.projectId,
-      runNumber: rows[index].run_number,
-      position: rows[index].position,
-    }),
-  });
-}
-
-type SessionKeyRow = { id: string };
-
-const sessionPayloadKeys = [
-  "dispatchGroupId",
-  "agentId",
-  "agentName",
-  "skillId",
-  "sessionType",
-  "trigger",
-  "scheduleId",
-  "scheduleRunId",
-  "parentSessionId",
-  "request",
-  "followUps",
-  "status",
-  "issues",
-  "startedAt",
-  "completedAt",
-  "conversationId",
-  "summary",
-  "error",
-  "requestedWorkerId",
-  "workerId",
-  "events",
-  "updatedAt",
-] as const;
-
 const sessionContextJson = (row: ProjectAgentSessionRow) => {
-  const raw = parseJsonObject(row.payload_json) ?? {};
-  const payload: Record<string, unknown> = {};
-  for (const key of sessionPayloadKeys) {
-    if (Object.prototype.hasOwnProperty.call(raw, key)) payload[key] = raw[key];
-  }
+  const payload = { ...decodeStoredProjectAgentSessionPayload(row.payload_json) };
+  delete payload.requestedByUserId;
   return {
     id: row.id,
     projectId: row.project_id,
@@ -835,103 +417,6 @@ const getContextSession = async (
   }
   return readArchivedProjectAgentSession(archives, metadata);
 };
-
-export async function listOrganizationAgentContextSessionsPage(
-  db: D1Database,
-  archives: ArchiveBucket,
-  input: ProjectContextPageInput,
-) {
-  const limit = pageLimit(input.limit);
-  const cursor = decodeCursor(input.cursor, {
-    organizationId: input.organizationId,
-    workId: input.workId,
-    snapshotAt: input.snapshotAt,
-    resource: "agent-sessions",
-    projectId: input.projectId,
-  }) as SessionCursor | null;
-  const candidateSql = `
-    select session.id
-    from briar_project_agent_sessions session
-    join briar_project_agent_session_context_membership membership
-      on membership.project_id = session.project_id
-     and membership.session_id = session.id
-    where session.project_id = ? and membership.visible_at <= ?
-      and exists (
-        select 1 from briar_teams project
-        where project.id = session.project_id and project.organization_id = ?
-      )
-    union
-    select archive.scope_id as id
-    from briar_log_archives archive
-    join briar_project_agent_session_context_membership membership
-      on membership.project_id = archive.project_id
-     and membership.session_id = archive.scope_id
-    where archive.project_id = ?
-      and archive.archive_kind = 'project_agent_sessions'
-      and archive.status in ('verified', 'complete')
-      and membership.visible_at <= ?
-      and exists (
-        select 1 from briar_teams project
-        where project.id = archive.project_id and project.organization_id = ?
-      )`;
-  const [count, result] = await Promise.all([
-    db.prepare(
-      `select count(*) as count from (${candidateSql}) candidates`,
-    ).bind(
-      input.projectId,
-      input.snapshotAt,
-      input.organizationId,
-      input.projectId,
-      input.snapshotAt,
-      input.organizationId,
-    ).first<{ count: number }>(),
-    db.prepare(
-      `select id from (${candidateSql}) candidates
-       where id > ? order by id limit ?`,
-    ).bind(
-      input.projectId,
-      input.snapshotAt,
-      input.organizationId,
-      input.projectId,
-      input.snapshotAt,
-      input.organizationId,
-      cursor?.id ?? "",
-      limit + 1,
-    ).all<SessionKeyRow>(),
-  ]);
-  const hasMore = result.results.length > limit;
-  const keys = result.results.slice(0, limit);
-  const rows = await Promise.all(keys.map((key) =>
-    getContextSession(db, archives, {
-      projectId: input.projectId,
-      sessionId: key.id,
-      snapshotAt: input.snapshotAt,
-    })
-  ));
-  const items = rows.map(sessionContextJson);
-  return fitPageToByteBudget({
-    base: {
-      schemaVersion: 1 as const,
-      organizationId: input.organizationId,
-      workId: input.workId,
-      resource: "agent-sessions" as const,
-      projectId: input.projectId,
-      snapshotAt: input.snapshotAt,
-      total: count?.count ?? 0,
-    },
-    items,
-    hasMore,
-    cursorForLast: (index) => encodeCursor({
-      schemaVersion: 1,
-      organizationId: input.organizationId,
-      workId: input.workId,
-      snapshotAt: input.snapshotAt,
-      resource: "agent-sessions",
-      projectId: input.projectId,
-      id: keys[index].id,
-    }),
-  });
-}
 
 type ContextManifestRow = {
   id: string;
@@ -1028,7 +513,7 @@ export async function organizationAgentContextManifest(
             coalesce(session_stats.archived_session_count, 0)
               as archived_session_count,
             session_stats.revision as session_revision
-     from briar_teams project
+     from briar_projects project
      left join briar_project_settings settings on settings.project_id = project.id
      left join agent_stats on agent_stats.project_id = project.id
      left join issue_stats on issue_stats.project_id = project.id
@@ -1103,7 +588,7 @@ async function organizationAgentContextProjectSettings(
             settings.linear_enabled, settings.linear_source,
             settings.linear_team_key, settings.github_repository,
             settings.workflow_json
-     from briar_teams project
+     from briar_projects project
      left join briar_project_settings settings on settings.project_id = project.id
      where project.id = ? and project.organization_id = ?
        and project.created_at <= ?`,
@@ -1150,7 +635,7 @@ async function organizationAgentContextAgentSummaries(
     db.prepare(
       `select count(*) as count
        from briar_project_agents agent
-       join briar_teams project on project.id = agent.project_id
+       join briar_projects project on project.id = agent.project_id
        where agent.project_id = ? and project.organization_id = ?
          and agent.created_at <= ?`,
     ).bind(
@@ -1164,7 +649,7 @@ async function organizationAgentContextAgentSummaries(
               agent.created_at,
               agent.updated_at
        from briar_project_agents agent
-       join briar_teams project on project.id = agent.project_id
+       join briar_projects project on project.id = agent.project_id
        where agent.project_id = ? and project.organization_id = ?
          and agent.created_at <= ?
          and (? is null or agent.created_at > ?
@@ -1269,7 +754,7 @@ async function organizationAgentContextAgentDetails(
             null as skill_markdown, agent.effort,
             agent.created_at, agent.updated_at
      from briar_project_agents agent
-     join briar_teams project on project.id = agent.project_id
+     join briar_projects project on project.id = agent.project_id
      where agent.project_id = ? and project.organization_id = ?
        and agent.created_at <= ?
        and agent.id in (${sqlPlaceholders(input.ids)})`,
@@ -1296,7 +781,7 @@ async function organizationAgentContextSkillDetails(
             skill.updated_at
      from briar_agent_skills skill
      join briar_project_agents agent on agent.id = skill.agent_id
-     join briar_teams project on project.id = agent.project_id
+     join briar_projects project on project.id = agent.project_id
      where agent.project_id = ? and project.organization_id = ?
        and skill.created_at <= ?
        and skill.id in (${sqlPlaceholders(input.ids)})`,
@@ -1350,7 +835,7 @@ async function organizationAgentContextIssueSummaries(
     db.prepare(
       `select count(*) as count
        from briar_hunt_runs run
-       join briar_teams project on project.id = run.project_id
+       join briar_projects project on project.id = run.project_id
        where run.project_id = ? and project.organization_id = ?
          and run.created_at <= ?`,
     ).bind(
@@ -1365,7 +850,7 @@ async function organizationAgentContextIssueSummaries(
               run.updated_at, run.completed_at, run.last_event_at,
               json_array_length(run.pull_request_urls) as pull_request_count
        from briar_hunt_runs run
-       join briar_teams project on project.id = run.project_id
+       join briar_projects project on project.id = run.project_id
        where run.project_id = ? and project.organization_id = ?
          and run.created_at <= ? and run.run_number > ?
        order by run.run_number limit ?`,
@@ -1470,7 +955,7 @@ async function organizationAgentContextIssueDetails(
                 and archive.status = 'verified'
             ) as event_count_stable
      from briar_hunt_runs run
-     join briar_teams project on project.id = run.project_id
+     join briar_projects project on project.id = run.project_id
      where run.project_id = ? and project.organization_id = ?
        and run.created_at <= ?
        and run.id in (${sqlPlaceholders(input.ids)})`,
@@ -1494,7 +979,7 @@ async function organizationAgentContextIssuePullRequests(
     `select run.id as issue_id, run.project_id, run.run_number,
             cast(link.key as integer) as position, cast(link.value as text) as url
      from briar_hunt_runs run
-     join briar_teams project on project.id = run.project_id
+     join briar_projects project on project.id = run.project_id
      join json_each(run.pull_request_urls) link
      where run.project_id = ? and project.organization_id = ?
        and run.created_at <= ?
@@ -1520,7 +1005,7 @@ type ContextSessionSummaryRow = {
   agent_id: string | null;
   status: string | null;
   session_type: string | null;
-  summary: string | null;
+  payload_json: string | null;
   started_at: string | null;
   completed_at: string | null;
   updated_at: string;
@@ -1541,7 +1026,7 @@ async function organizationAgentContextSessionSummaries(
   }) as SessionCursor | null;
   const candidateSql = `
     select session.id, session.agent_id, session.status, session.session_type,
-           json_extract(session.payload_json, '$.summary') as summary,
+           session.payload_json,
            session.started_at, session.completed_at, session.updated_at,
            0 as archived
     from briar_project_agent_sessions session
@@ -1551,7 +1036,7 @@ async function organizationAgentContextSessionSummaries(
     where session.project_id = ? and membership.visible_at <= ?
     union all
     select archive.scope_id as id, null as agent_id, null as status,
-           null as session_type, null as summary,
+           null as session_type, null as payload_json,
            archive.period_start as started_at,
            archive.period_end as completed_at,
            coalesce(archive.completed_at, archive.verified_at,
@@ -1600,7 +1085,9 @@ async function organizationAgentContextSessionSummaries(
     agentId: row.agent_id,
     status: row.status,
     sessionType: row.session_type,
-    summary: row.summary,
+    summary: row.payload_json === null
+      ? null
+      : decodeStoredProjectAgentSessionPayload(row.payload_json).summary,
     archived: row.archived === 1,
     startedAt: row.started_at,
     completedAt: row.completed_at,

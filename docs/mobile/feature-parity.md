@@ -6,7 +6,7 @@
 | --- | --- | --- | --- |
 | 앱 실행 및 독립 설치 | 제공 | 제공 | iOS 개발 scheme은 프로덕션 앱과 다른 bundle ID를 사용 |
 | Device Authorization 로그인 | 제공 (`briar-android`) | 제공 (`briar-mobile`) | iOS는 `ASWebAuthenticationSession`, 두 플랫폼 모두 device code 시작/폴링과 4개 종료·대기 오류를 사용 |
-| 현재 사용자 조회 | 제공 | 제공 | `GET /me`, bearer token, `401` 시 저장 세션을 비우고 재로그인 |
+| 현재 사용자 조회 | 제공 | 제공 | generated `AccountService.GetCurrentUser`, bearer token, `Unauthenticated` 시 저장 세션을 비우고 재로그인 |
 | 프로젝트 목록 조회 | 제공 | 제공 | 사용자·조직·프로젝트 저장소가 선택 상태를 관리 |
 | Home/Tasks/DMs/Inbox 앱 셸 | 제공 | 제공 | Android React와 SwiftUI iOS에서 같은 4개 주요 탭을 유지 |
 | 프로젝트 로비 진입·모바일 요약 | 제공 | 제공 | Home 최상단에서 진입하며, 현재 프로젝트의 핵심 상태·최근 작업·새로고침·이슈 이동을 휴대폰 레이아웃으로 제공 |
@@ -28,7 +28,7 @@
 | 아이디어 문서·대화·이슈 계획 | 제공 | 제공 | D1 아이디어 계약, 온라인 실행 워커, 모바일 대화/문서 전환 UI를 공유 |
 | 채널 Agent 실시간 활동 | 제공 | 제공 | 권한 확인 WebSocket과 휘발성 Durable Object를 공유하고 연결 실패 시 기존 입력 중 표시로 대체 |
 | 알림 및 딥 링크 | 제공 | 제공 | `briar-companion` 딥링크, Universal Link, Inbox 읽음, WebSocket 알림, 복구 polling, app badge를 공유 |
-| Agent·Session 목록/상세 | 제공 | 제공 | `GET /projects/{id}/agents`, `GET /projects/{id}/agent-sessions` 원격 snapshot 동기화 |
+| Agent·Session 목록/상세 | 제공 | 제공 | generated `AgentService`의 project Agent/session RPC로 원격 snapshot 동기화 |
 | 대체 앱 아이콘 | 제공 | 제공 | purple/gray/pink/green alternate icons |
 | 공유·클립보드 링크 | 제공 | 제공 | 플랫폼 공유 UI와 이슈/세션 HTTPS 링크 복사 |
 | 앱 설정/테마 | 제공 | 제공 | system/light/dark를 로컬 저장하고 읽기 전용 권한 경계를 설정 화면에 명시 |
@@ -40,8 +40,8 @@
 ## 병합 기준
 
 - 네이티브 iOS 기능은 Android에서 대응 기능이 이미 제공되는지 확인하고 표를 갱신한다.
-- 서버 필드가 필요하면 먼저 OpenAPI, fixture, Worker 계약 테스트를 함께 변경한다.
-- 읽기·쓰기 계약은 두 모바일 client ID에 공통이며 Android의 기존 React 경로도 같은 fixture와 `mobile:ci`로 회귀 검증한다.
+- 서버 필드가 필요하면 `@briar/contracts/proto/briar/app/v1`의 message/service를 먼저 변경한다. Buf descriptor image에서 TypeScript와 Swift DTO/client/mock을 함께 생성한다.
+- 읽기·쓰기 계약은 두 모바일 client ID에 공통이며, descriptor/생성물 currentness와 실제 generated client↔Worker service의 대표 테스트 및 `mobile:ci`로 검증한다.
 - Android Tauri 릴리스 설정을 변경할 때는 Android 회귀 빌드와 공통 계약을 함께 검증한다.
 
 ## 세션 전환 경계

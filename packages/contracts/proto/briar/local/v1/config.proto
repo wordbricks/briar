@@ -1,0 +1,147 @@
+syntax = "proto3";
+
+package briar.local.v1;
+
+import "briar/types/v1/provider.proto";
+import "briar/types/v1/workflow.proto";
+import "google/protobuf/timestamp.proto";
+
+option swift_prefix = "BriarLocal_";
+
+// Canonical ProtoJSON persisted at ~/.config/briar/config.json.
+//
+// This descriptor owns the cross-process storage shape shared by the Bun CLI
+// and the Rust desktop process. Application and workflow invariants remain at
+// the domain boundary in each runtime. The file deliberately contains local
+// credentials and must always be stored with owner-only permissions.
+message LocalConfig {
+  string api_url = 1;
+  optional string user_token = 2;
+  LocalAgentProviderSettings agent_providers = 3;
+  optional string openrouter_api_key = 4;
+  LocalAppSettings app_settings = 5;
+  optional string worker_device_identity = 6;
+  optional LocalManagedComputerConfig managed_computer = 7;
+  repeated LocalProjectConfig projects = 8;
+}
+
+// Omitted boolean fields are disabled. New configs explicitly enable the
+// product defaults, so parsing never needs a legacy "missing means true" rule.
+message LocalAgentProviderSettings {
+  bool codex = 1;
+  bool claude = 2;
+  bool cursor = 3;
+  bool grok = 4;
+  bool agy = 5;
+  bool opencode = 6;
+  bool openrouter = 7;
+}
+
+enum LocalBrowserAutomationProvider {
+  LOCAL_BROWSER_AUTOMATION_PROVIDER_UNSPECIFIED = 0;
+  LOCAL_BROWSER_AUTOMATION_PROVIDER_EGO_BROWSER = 1;
+  LOCAL_BROWSER_AUTOMATION_PROVIDER_AGENT_BROWSER = 2;
+  LOCAL_BROWSER_AUTOMATION_PROVIDER_ASIDE = 3;
+}
+
+message LocalAppSettings {
+  bool prevent_sleep_while_running = 1;
+  optional LocalBrowserAutomationProvider browser_automation_provider = 2;
+}
+
+message LocalManagedComputerConfig {
+  string managed_computer_id = 1;
+  string device_id = 2;
+  string organization_id = 3;
+  string credential_file = 4;
+}
+
+message LocalProjectConfig {
+  string id = 1;
+  string repository_path = 2;
+  optional string agent_token = 3;
+  string api_url = 4;
+  optional string repository_remote = 5;
+  optional LocalProjectLlmConfig llm = 6;
+  optional LocalAutoHuntConfig auto_hunt = 7;
+  optional LocalExecutionWorkerConfig execution_worker = 8;
+  optional LocalActiveClaimConfig active_claim = 9;
+}
+
+enum LocalApprovalPolicy {
+  LOCAL_APPROVAL_POLICY_UNSPECIFIED = 0;
+  LOCAL_APPROVAL_POLICY_UNTRUSTED = 1;
+  LOCAL_APPROVAL_POLICY_ON_REQUEST = 2;
+  LOCAL_APPROVAL_POLICY_NEVER = 3;
+}
+
+message LocalProjectLlmConfig {
+  optional briar.types.v1.AgentProvider provider = 1;
+  optional string model = 2;
+  optional string effort = 3;
+  optional LocalApprovalPolicy approval_policy = 4;
+}
+
+message LocalAutoHuntConfig {
+  optional string velen_org = 1;
+  optional string data_source = 2;
+  optional LocalWorktreeConfig worktrees = 3;
+  optional LocalSandboxConfig sandbox = 4;
+  optional LocalLinearConfig linear = 5;
+  optional string github_repository = 6;
+  optional uint64 github_repository_id = 7;
+  optional briar.types.v1.AutoHuntWorkflow workflow = 8;
+}
+
+message LocalWorktreeConfig {
+  // Absence intentionally means enabled for the domain's default policy.
+  optional bool enabled = 1;
+  optional string root = 2;
+  optional string branch_prefix = 3;
+}
+
+message LocalSandboxConfig {
+  // Absence intentionally means full access for the domain's default policy.
+  optional bool full_access = 1;
+}
+
+message LocalLinearConfig {
+  bool enabled = 1;
+  optional string source = 2;
+  optional string team_key = 3;
+}
+
+message LocalExecutionWorkerConfig {
+  string device_id = 1;
+  string worker_id = 2;
+  string organization_id = 3;
+  optional string token = 4;
+  string label = 5;
+  uint32 max_concurrent_sessions = 6;
+}
+
+enum LocalClaimTerminalStatus {
+  LOCAL_CLAIM_TERMINAL_STATUS_UNSPECIFIED = 0;
+  LOCAL_CLAIM_TERMINAL_STATUS_COMPLETED = 1;
+  LOCAL_CLAIM_TERMINAL_STATUS_CANCELLED = 2;
+  LOCAL_CLAIM_TERMINAL_STATUS_BLOCKED = 3;
+  LOCAL_CLAIM_TERMINAL_STATUS_FAILED = 4;
+}
+
+message LocalActiveClaimConfig {
+  string run_id = 1;
+  string source_key = 2;
+  optional string token = 3;
+  google.protobuf.Timestamp lease_expires_at = 4;
+  optional LocalClaimWorktreeConfig worktree = 5;
+  optional bool finished = 6;
+  optional LocalClaimTerminalStatus terminal_status = 7;
+  optional google.protobuf.Timestamp finished_at = 8;
+}
+
+message LocalClaimWorktreeConfig {
+  string path = 1;
+  string branch = 2;
+  string base_ref = 3;
+  string base_sha = 4;
+}

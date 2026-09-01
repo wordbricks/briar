@@ -5,10 +5,10 @@ struct InboxHomeView: View {
     @ObservedObject var navigation: CompanionNavigationModel
     @AppStorage("companion-locale") private var localeRaw = CompanionLocale.ko.rawValue
 
-    let project: ProjectsResponse.Project
+    let project: Project
     let snapshot: DashboardSnapshot?
     let token: String
-    let api: any MobileAPIClientProtocol
+    let api: any AuthenticatedDownloadClientProtocol
     let refresh: () async -> Void
 
     private var locale: CompanionLocale {

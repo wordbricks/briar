@@ -1,0 +1,134 @@
+syntax = "proto3";
+
+package briar.worker.v1;
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+// Claim-scoped, lazily hydrated context for Organization Agents. The Worker
+// credential authenticates the machine; the claim capability in each request
+// authorizes one active channel reply.
+service OrganizationAgentContextService {
+  rpc GetManifest(OrganizationAgentContextServiceGetManifestRequest) returns (OrganizationAgentContextServiceGetManifestResponse);
+  rpc Lookup(OrganizationAgentContextServiceLookupRequest) returns (OrganizationAgentContextServiceLookupResponse);
+}
+
+message OrganizationAgentContextClaim {
+  string organization_id = 1;
+  string work_id = 2;
+  string worker_id = 3;
+  string claim_token = 4;
+}
+
+message OrganizationAgentContextServiceGetManifestRequest {
+  OrganizationAgentContextClaim claim = 1;
+  optional string known_revision = 2;
+}
+
+message OrganizationAgentContextServiceGetManifestResponse {
+  oneof result {
+    OrganizationAgentContextManifest manifest = 1;
+    OrganizationAgentContextManifestUnchanged unchanged = 2;
+  }
+}
+
+message OrganizationAgentContextManifestUnchanged {
+  string organization_id = 1;
+  string work_id = 2;
+  google.protobuf.Timestamp snapshot_at = 3;
+  string revision = 4;
+}
+
+message OrganizationAgentContextManifest {
+  string organization_id = 1;
+  string work_id = 2;
+  google.protobuf.Timestamp snapshot_at = 3;
+  string revision = 4;
+  repeated OrganizationAgentContextManifestProject projects = 5;
+}
+
+message OrganizationAgentContextManifestProject {
+  string id = 1;
+  string name = 2;
+  string issue_key_prefix = 3;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp updated_at = 5;
+  optional google.protobuf.Timestamp settings_revision = 6;
+  OrganizationAgentContextResourceRevision agents = 7;
+  OrganizationAgentContextIssueRevision issues = 8;
+  OrganizationAgentContextSessionRevision sessions = 9;
+}
+
+message OrganizationAgentContextResourceRevision {
+  uint32 count = 1;
+  optional google.protobuf.Timestamp revision = 2;
+}
+
+message OrganizationAgentContextIssueRevision {
+  uint32 count = 1;
+  uint32 open_count = 2;
+  uint32 pull_request_count = 3;
+  optional google.protobuf.Timestamp revision = 4;
+}
+
+message OrganizationAgentContextSessionRevision {
+  uint32 count = 1;
+  uint32 archived_count = 2;
+  optional google.protobuf.Timestamp revision = 3;
+}
+
+message OrganizationAgentContextServiceLookupRequest {
+  OrganizationAgentContextClaim claim = 1;
+  repeated OrganizationAgentContextLookup queries = 2;
+  string request_id = 3;
+}
+
+message OrganizationAgentContextLookup {
+  oneof query {
+    OrganizationAgentContextProjectLookup project_settings = 1;
+    OrganizationAgentContextSummaryLookup agent_summaries = 2;
+    OrganizationAgentContextDetailLookup agent_details = 3;
+    OrganizationAgentContextSummaryLookup issue_summaries = 4;
+    OrganizationAgentContextDetailLookup issue_details = 5;
+    OrganizationAgentContextSummaryLookup session_summaries = 6;
+    OrganizationAgentContextDetailLookup session_details = 7;
+    OrganizationAgentContextDetailLookup skills = 8;
+    OrganizationAgentContextPullRequestLookup issue_pull_requests = 9;
+  }
+}
+
+message OrganizationAgentContextProjectLookup {
+  string project_id = 1;
+}
+
+message OrganizationAgentContextSummaryLookup {
+  string project_id = 1;
+  uint32 limit = 2;
+  optional string cursor = 3;
+}
+
+message OrganizationAgentContextDetailLookup {
+  string project_id = 1;
+  repeated string ids = 2;
+}
+
+message OrganizationAgentContextPullRequestLookup {
+  string project_id = 1;
+  repeated string issue_ids = 2;
+}
+
+message OrganizationAgentContextServiceLookupResponse {
+  string organization_id = 1;
+  string work_id = 2;
+  google.protobuf.Timestamp snapshot_at = 3;
+  repeated OrganizationAgentContextLookupResult results = 4;
+}
+
+message OrganizationAgentContextLookupResult {
+  OrganizationAgentContextLookup query = 1;
+
+  // Lookup payloads are written verbatim into LLM-facing context files. Their
+  // resource-specific domain shapes intentionally remain an extensible JSON
+  // value; the request, scope, ordering, and transport envelope are canonical.
+  google.protobuf.Value data = 2;
+}

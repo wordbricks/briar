@@ -1,18 +1,28 @@
-import { dmMemoryCitationsCurrent, dmMemoryCitationStatement, readDmMemoryCitations } from "./dm-memory-citations";
-import { dmMemoryReplyFenceCurrent, requireDmMemoryReplyFence } from "./dm-memory-reply-fence";
+import * as Schema from "effect/Schema";
+import {
+  dmMemoryCitationsCurrent,
+  dmMemoryCitationStatement,
+  readDmMemoryCitations,
+} from "./dm-memory-citations";
+import {
+  dmMemoryReplyFenceCurrent,
+  requireDmMemoryReplyFence,
+} from "./dm-memory-reply-fence";
 import { dmLearningReplyOutboxStatements } from "./dm-memory-learning-queue";
 import {
   channelReplyAssignedWorkerUnavailableError,
   channelReplyNoAvailableWorkerError,
   type ChannelReplyUnavailableReason,
-  type ChannelActionType,
   type ChannelAgentProvider as AgentProvider,
   type ChannelAgentReply,
   type ChannelExecutionProposal,
+  channelIssueBatchResultItemSchema,
   type ChannelIssueBatchProposalPayload,
   type ChannelKind,
   type ChannelMessage,
   type ChannelMessageBlock,
+  channelMessageBlockSchema,
+  channelStoredProposalPayloadSchema,
   type ChannelMessageAttachment,
   type ChannelMessageReaction,
   type ChannelMessageReactionPerson,
@@ -25,6 +35,7 @@ import {
   type DirectMessageParticipant,
 } from "../../src/lib/channels-contract";
 import { agentReplyDisplayParentMessageId } from "../../src/lib/issue-reply-decision";
+import { agentProviderSupportsSelection } from "../../src/lib/agent-provider-contract";
 import { isWorkerEmoji } from "../../src/lib/worker-icon-validation";
 import type { AgentSkillEffort, AgentSkillKind } from "./agent-skills";
 import type {
@@ -33,9 +44,54 @@ import type {
 } from "./db";
 import {
   channelReplyWorkerAvailability,
-  executionWorkerSupportsSelection,
   hasAvailableChannelReplyWorker,
 } from "./workers";
+import type { WorkerRuntimeMetadata } from "./worker-runtime-mappers";
+import { encodeApprovedProjectAgentTaskSession } from "./project-agent-session-materialization";
+import {
+  consumeReplyAttachmentStatements,
+  replyAttachmentAvailabilityGuard,
+  replyCompletionReceiptStatement,
+  type ReplyCompletionCommit,
+} from "./reply-completion-repository";
+import {
+  channelMessageMutationReceiptStatement,
+  channelMessageUploadAvailabilityGuard,
+  channelMessageUploadConsumeStatements,
+  type ChannelMessageUploadScope,
+} from "./channel-message-upload-repository";
+
+const strictStoredChannelMessageBlockOptions = {
+  errors: "all",
+  onExcessProperty: "error",
+} as const;
+const StoredChannelMessageBlocksJson = Schema.fromJsonString(
+  Schema.mutable(Schema.Array(channelMessageBlockSchema)).check(
+    Schema.isLengthBetween(1, 50),
+  ),
+);
+const decodeStoredChannelMessageBlocks = Schema.decodeUnknownSync(
+  StoredChannelMessageBlocksJson,
+  strictStoredChannelMessageBlockOptions,
+);
+const encodeStoredChannelMessageBlocks = Schema.encodeSync(
+  StoredChannelMessageBlocksJson,
+  strictStoredChannelMessageBlockOptions,
+);
+const StoredChannelProposalPayloadJson = Schema.fromJsonString(
+  channelStoredProposalPayloadSchema,
+);
+export const decodeStoredChannelProposalPayload = Schema.decodeUnknownSync(
+  StoredChannelProposalPayloadJson,
+  strictStoredChannelMessageBlockOptions,
+);
+const StoredChannelIssueBatchResultItemsJson = Schema.fromJsonString(
+  Schema.mutable(Schema.Array(channelIssueBatchResultItemSchema)),
+);
+const decodeStoredChannelIssueBatchResultItems = Schema.decodeUnknownSync(
+  StoredChannelIssueBatchResultItemsJson,
+  strictStoredChannelMessageBlockOptions,
+);
 
 export type ChannelRow = {
   id: string;
@@ -84,7 +140,6 @@ export type ChannelMessageRow = {
   document_title: string | null;
   document_project_id: string | null;
   proposal_id: string | null;
-  proposal_action_type: ChannelActionType | null;
   proposal_status: "pending" | "accepted" | "declined" | null;
   proposal_project_id: string | null;
   proposal_payload_json: string | null;
@@ -191,6 +246,28 @@ export type ChannelMessageAttachmentInput = Pick<
   ChannelMessageAttachmentRow,
   "id" | "organization_id" | "object_key" | "filename" | "content_type" | "byte_size"
 >;
+
+export type ChannelMessageMutationCommit = ChannelMessageUploadScope & {
+  uploadIds: readonly string[];
+  requestHash: string;
+  committedAt: string;
+};
+
+export type ChannelAgentReplyEnqueueInput = {
+  organizationId: string;
+  channelId: string;
+  triggerMessageId: string;
+  parentMessageId: string;
+  agents: Array<{
+    id: string;
+    projectId: string | null;
+    skillId?: string | null;
+    provider: AgentProvider;
+    unavailableReason?: ChannelReplyUnavailableReason | null;
+  }>;
+  preferredDeviceId?: string | null;
+  createdAt: string;
+};
 
 export type ChannelReplyJobRow = {
   id: string;
@@ -403,11 +480,7 @@ const visibleToUser = `(
   )
 )`;
 
-const messageSelect = (
-  withExecutionProposals: boolean,
-  withSkillExecutionProposals: boolean,
-  withIssueBatchProposals: boolean,
-) => `
+const messageSelect = `
   select message.id, message.channel_id, message.parent_message_id,
          message.author_user_id, author.name as author_name,
          author.email as author_email, author.image as author_image,
@@ -424,7 +497,6 @@ const messageSelect = (
          document.title as document_title,
          document.project_id as document_project_id,
          proposal.id as proposal_id,
-         proposal.action_type as proposal_action_type,
          case
            when proposal.declined_at is not null then 'declined'
            else proposal.status
@@ -432,8 +504,7 @@ const messageSelect = (
          proposal.project_id as proposal_project_id,
          proposal.payload_json as proposal_payload_json,
          proposal.result_run_id as proposal_result_run_id,
-         ${withIssueBatchProposals
-           ? `(
+         (
              select coalesce(json_group_array(json_object(
                'localKey', batch_item.local_key,
                'runId', batch_item.run_id
@@ -444,9 +515,7 @@ const messageSelect = (
                where proposal_id = proposal.id
                order by position
              ) batch_item
-           )`
-           : "null"} as proposal_result_items_json,
-         ${withExecutionProposals ? `
+           ) as proposal_result_items_json,
          proposal.execute_after_create as proposal_execute_after_create,
          execution.id as execution_proposal_id,
          execution.project_id as execution_proposal_project_id,
@@ -460,24 +529,7 @@ const messageSelect = (
          execution.requested_effort as execution_requested_effort,
          execution.requested_worker_id as execution_requested_worker_id,
          execution.delegated_by_agent_id as execution_delegated_by_agent_id,
-         execution.delegated_by_agent_name as execution_delegated_by_agent_name
-         ` : `
-         null as proposal_execute_after_create,
-         null as execution_proposal_id,
-         null as execution_proposal_project_id,
-         null as execution_proposal_run_id,
-         null as execution_proposal_title,
-         null as execution_proposal_status,
-         null as execution_proposal_created_at,
-         null as execution_proposal_accepted_at,
-         null as execution_requested_provider,
-         null as execution_requested_model,
-         null as execution_requested_effort,
-         null as execution_requested_worker_id,
-         null as execution_delegated_by_agent_id,
-         null as execution_delegated_by_agent_name
-         `},
-         ${withSkillExecutionProposals ? `
+         execution.delegated_by_agent_name as execution_delegated_by_agent_name,
          skill_execution.id as skill_execution_proposal_id,
          skill_execution.project_id as skill_execution_project_id,
          skill_execution.agent_id as skill_execution_agent_id,
@@ -526,32 +578,7 @@ const messageSelect = (
          skill_execution.delegated_by_agent_id
            as skill_execution_delegated_by_agent_id,
          skill_execution.delegated_by_agent_name
-           as skill_execution_delegated_by_agent_name
-         ` : `
-         null as skill_execution_proposal_id,
-         null as skill_execution_project_id,
-         null as skill_execution_agent_id,
-         null as skill_execution_agent_name,
-         null as skill_execution_skill_id,
-         null as skill_execution_skill_name,
-         null as skill_execution_provider,
-         null as skill_execution_model,
-         null as skill_execution_effort,
-         null as skill_execution_execution_mode,
-         null as skill_execution_approval_policy,
-         null as skill_execution_execution_status,
-         null as skill_execution_error,
-         null as skill_execution_request,
-         null as skill_execution_status,
-         null as skill_execution_requested_worker_id,
-         null as skill_execution_requested_worker_label,
-         null as skill_execution_result_session_id,
-         null as skill_execution_result_message_id,
-         null as skill_execution_created_at,
-         null as skill_execution_accepted_at,
-         null as skill_execution_delegated_by_agent_id,
-         null as skill_execution_delegated_by_agent_name
-         `},
+           as skill_execution_delegated_by_agent_name,
          message.created_at
   from briar_channel_messages message
   left join "user" author on author.id = message.author_user_id
@@ -561,65 +588,14 @@ const messageSelect = (
     on document.message_id = message.id
   left join briar_channel_action_proposals proposal
     on proposal.reply_message_id = message.id
-  ${withExecutionProposals ? `left join briar_issue_execution_proposals execution
+  left join briar_issue_execution_proposals execution
     on execution.reply_message_id = message.id
    and execution.source_kind = 'channel'
-   and execution.status in ('pending', 'accepted')` : ""}
-  ${withSkillExecutionProposals
-    ? `left join briar_agent_skill_execution_proposals skill_execution
+   and execution.status in ('pending', 'accepted')
+  left join briar_agent_skill_execution_proposals skill_execution
     on skill_execution.reply_message_id = message.id
    and skill_execution.source_kind = 'channel'
-   and skill_execution.status in ('pending', 'accepted')`
-    : ""}`;
-
-export async function channelExecutionProposalTablesAvailable(db: D1Database) {
-  return Boolean(await db
-    .prepare(
-      `select 1 as available from sqlite_master
-       where type = 'table' and name = 'briar_issue_execution_proposals'`,
-    )
-    .first<{ available: number }>());
-}
-
-export async function channelSkillExecutionProposalTablesAvailable(
-  db: D1Database,
-) {
-  return Boolean(await db
-    .prepare(
-      `select 1 as available
-       where exists (
-         select 1 from sqlite_master
-         where type = 'table'
-           and name = 'briar_agent_skill_execution_proposals'
-       ) and exists (
-         select 1 from pragma_table_info(
-           'briar_agent_skill_execution_proposals'
-         ) where name = 'execution_mode'
-       )`,
-    )
-    .first<{ available: number }>());
-}
-
-export async function channelIssueBatchProposalTablesAvailable(
-  db: D1Database,
-) {
-  return Boolean(await db
-    .prepare(
-      `select 1 as available from sqlite_master
-       where type = 'table'
-         and name = 'briar_channel_issue_batch_items'`,
-    )
-    .first<{ available: number }>());
-}
-
-const messageSelectFor = async (db: D1Database) => {
-  const [execution, skillExecution, issueBatch] = await Promise.all([
-    channelExecutionProposalTablesAvailable(db),
-    channelSkillExecutionProposalTablesAvailable(db),
-    channelIssueBatchProposalTablesAvailable(db),
-  ]);
-  return messageSelect(execution, skillExecution, issueBatch);
-};
+   and skill_execution.status in ('pending', 'accepted')`;
 
 const channelExecutionProposalJson = (
   row: ChannelMessageRow,
@@ -644,34 +620,41 @@ const channelExecutionProposalJson = (
 
 const channelSkillExecutionProposalJson = (
   row: ChannelMessageRow,
-): ChannelSkillExecutionProposal | null => row.skill_execution_proposal_id
-  ? {
-      id: row.skill_execution_proposal_id,
-      type: "request_agent_skill_execute",
-      status: row.skill_execution_status ?? "pending",
-      projectId: row.skill_execution_project_id ?? "",
-      agentId: row.skill_execution_agent_id ?? "",
-      agentName: row.skill_execution_agent_name ?? "",
-      skillId: row.skill_execution_skill_id ?? "",
-      skillName: row.skill_execution_skill_name ?? "",
-      provider: row.skill_execution_provider ?? "codex",
-      model: row.skill_execution_model,
-      effort: row.skill_execution_effort,
-      executionMode: row.skill_execution_execution_mode ?? "task",
-      approvalPolicy: row.skill_execution_approval_policy ?? "explicit",
-      executionStatus: row.skill_execution_execution_status ?? "waiting",
-      request: row.skill_execution_request ?? "",
-      delegatedByAgentId: row.skill_execution_delegated_by_agent_id,
-      delegatedByAgentName: row.skill_execution_delegated_by_agent_name,
-      requestedWorkerId: row.skill_execution_requested_worker_id,
-      requestedWorkerLabel: row.skill_execution_requested_worker_label,
-      resultSessionId: row.skill_execution_result_session_id,
-      resultMessageId: row.skill_execution_result_message_id,
-      error: row.skill_execution_error,
-      createdAt: row.skill_execution_created_at ?? row.created_at,
-      acceptedAt: row.skill_execution_accepted_at,
-    }
-  : null;
+): ChannelSkillExecutionProposal | null => {
+  if (!row.skill_execution_proposal_id) return null;
+  if (
+    row.skill_execution_execution_mode === null ||
+    row.skill_execution_approval_policy === null
+  ) {
+    throw new Error("Agent Skill execution contract is missing");
+  }
+  return {
+    id: row.skill_execution_proposal_id,
+    type: "request_agent_skill_execute",
+    status: row.skill_execution_status ?? "pending",
+    projectId: row.skill_execution_project_id ?? "",
+    agentId: row.skill_execution_agent_id ?? "",
+    agentName: row.skill_execution_agent_name ?? "",
+    skillId: row.skill_execution_skill_id ?? "",
+    skillName: row.skill_execution_skill_name ?? "",
+    provider: row.skill_execution_provider ?? "codex",
+    model: row.skill_execution_model,
+    effort: row.skill_execution_effort,
+    executionMode: row.skill_execution_execution_mode,
+    approvalPolicy: row.skill_execution_approval_policy,
+    executionStatus: row.skill_execution_execution_status ?? "waiting",
+    request: row.skill_execution_request ?? "",
+    delegatedByAgentId: row.skill_execution_delegated_by_agent_id,
+    delegatedByAgentName: row.skill_execution_delegated_by_agent_name,
+    requestedWorkerId: row.skill_execution_requested_worker_id,
+    requestedWorkerLabel: row.skill_execution_requested_worker_label,
+    resultSessionId: row.skill_execution_result_session_id,
+    resultMessageId: row.skill_execution_result_message_id,
+    error: row.skill_execution_error,
+    createdAt: row.skill_execution_created_at ?? row.created_at,
+    acceptedAt: row.skill_execution_accepted_at,
+  };
+};
 
 const channelHasUnreadFromRow = (row: ChannelRow) => Boolean(
   row.last_unread_message_at &&
@@ -699,7 +682,7 @@ export const channelJson = (row: ChannelRow): ChannelSummary => ({
   hasUnread: channelHasUnreadFromRow(row),
   dmParticipants: row.dm_participants_json
     ? JSON.parse(row.dm_participants_json) as DirectMessageParticipant[]
-    : undefined,
+    : [],
 });
 
 export const channelReplyJson = (
@@ -718,7 +701,17 @@ export const channelReplyJson = (
   updatedAt: row.updated_at,
 });
 
-const channelMessageAuthorJson = (
+const requiredChannelMessageAuthorField = (
+  value: string | null,
+  field: string,
+): string => {
+  if (value === null || value.trim().length === 0) {
+    throw new Error(`Channel message author ${field} is missing`);
+  }
+  return value;
+};
+
+export const channelMessageAuthorJson = (
   row: Pick<
     ChannelMessageRow,
     | "author_user_id"
@@ -732,28 +725,91 @@ const channelMessageAuthorJson = (
     | "author_webhook_id"
     | "author_webhook_name"
   >,
-) =>
-  row.author_webhook_name
-    ? {
-        type: "webhook" as const,
-        id: row.author_webhook_id,
-        name: row.author_webhook_name,
-      }
-    : row.author_agent_name
-    ? {
-        type: "agent" as const,
-        id: row.author_agent_id,
-        name: row.author_agent_name,
-        provider: row.author_agent_provider,
-        image: row.author_agent_image,
-      }
-    : {
-        type: "user" as const,
-        id: row.author_user_id ?? "",
-        name: row.author_name ?? "",
-        email: row.author_email ?? "",
-        image: row.author_image,
-      };
+): ChannelMessage["author"] => {
+  const variantCount = Number(row.author_user_id !== null) +
+    Number(row.author_agent_name !== null) +
+    Number(row.author_webhook_name !== null);
+  if (variantCount !== 1) {
+    throw new Error("Channel message must have exactly one author variant");
+  }
+
+  if (row.author_webhook_name !== null) {
+    return {
+      type: "webhook" as const,
+      id: row.author_webhook_id,
+      name: requiredChannelMessageAuthorField(
+        row.author_webhook_name,
+        "webhook name",
+      ),
+    };
+  }
+  if (row.author_agent_name !== null) {
+    return {
+      type: "agent" as const,
+      id: row.author_agent_id,
+      name: requiredChannelMessageAuthorField(
+        row.author_agent_name,
+        "agent name",
+      ),
+      provider: row.author_agent_provider,
+      image: row.author_agent_image,
+    };
+  }
+  return {
+    type: "user",
+    id: requiredChannelMessageAuthorField(row.author_user_id, "user id"),
+    name: requiredChannelMessageAuthorField(row.author_name, "user name"),
+    email: requiredChannelMessageAuthorField(row.author_email, "user email"),
+    image: row.author_image,
+  };
+};
+
+const requiredChannelMessageProposalField = <T>(
+  value: T | null,
+  field: string,
+): T => {
+  if (value === null) {
+    throw new Error(`Channel message proposal ${field} is missing`);
+  }
+  return value;
+};
+
+const channelMessageProposalJson = (
+  row: ChannelMessageRow,
+): ChannelMessage["proposal"] => {
+  if (!row.proposal_id) return null;
+  const storedPayload = decodeStoredChannelProposalPayload(
+    requiredChannelMessageProposalField(
+      row.proposal_payload_json,
+      "payload",
+    ),
+  );
+  const executeAfterCreate = requiredChannelMessageProposalField(
+    row.proposal_execute_after_create,
+    "execution intent",
+  ) === 1;
+  if ("batch" in storedPayload && executeAfterCreate) {
+    throw new Error("Channel issue batch proposal cannot request execution");
+  }
+  return {
+    id: row.proposal_id,
+    status: requiredChannelMessageProposalField(
+      row.proposal_status,
+      "status",
+    ),
+    projectId: row.proposal_project_id,
+    payload: "batch" in storedPayload
+      ? { ...storedPayload, executeAfterCreate: false }
+      : { ...storedPayload, executeAfterCreate },
+    resultRunId: row.proposal_result_run_id,
+    resultItems: decodeStoredChannelIssueBatchResultItems(
+      requiredChannelMessageProposalField(
+        row.proposal_result_items_json,
+        "result items",
+      ),
+    ),
+  };
+};
 
 export const channelMessageJson = (
   row: ChannelMessageRow,
@@ -770,8 +826,8 @@ export const channelMessageJson = (
   author: channelMessageAuthorJson(row),
   body: row.deleted_at ? "[deleted]" : row.body,
   blocks: !row.deleted_at && row.blocks_json
-    ? JSON.parse(row.blocks_json) as ChannelMessageBlock[]
-    : null,
+    ? decodeStoredChannelMessageBlocks(row.blocks_json)
+    : [],
   mentionedUserIds: row.deleted_at ? [] : mentions.users,
   mentionedAgentIds: row.deleted_at ? [] : mentions.agents,
   attachments: row.deleted_at ? [] : attachments,
@@ -788,22 +844,7 @@ export const channelMessageJson = (
         projectId: row.document_project_id,
       }
     : null,
-  proposal: !row.deleted_at && row.proposal_id
-    ? {
-        id: row.proposal_id,
-        actionType: row.proposal_action_type ?? "request_issue_create",
-        status: row.proposal_status ?? "pending",
-        projectId: row.proposal_project_id,
-        payload: {
-          ...JSON.parse(row.proposal_payload_json ?? "{}"),
-          executeAfterCreate: row.proposal_execute_after_create === 1,
-        },
-        resultRunId: row.proposal_result_run_id,
-        resultItems: row.proposal_result_items_json
-          ? JSON.parse(row.proposal_result_items_json)
-          : undefined,
-    }
-    : null,
+  proposal: row.deleted_at ? null : channelMessageProposalJson(row),
   executionProposal: row.deleted_at ? null : channelExecutionProposalJson(row),
   skillExecutionProposal: row.deleted_at
     ? null
@@ -1019,8 +1060,6 @@ export async function createChannel(
   input: {
     id: string;
     organizationId: string;
-    kind?: ChannelKind;
-    dmKey?: string | null;
     slug: string;
     name: string;
     topic: string | null;
@@ -1030,43 +1069,15 @@ export async function createChannel(
     memberIds?: string[];
     agentIds?: string[];
     createdAt: string;
-  },
+  } & (
+    | { kind: "channel"; dmKey: null }
+    | { kind: "dm"; dmKey: string | null }
+  ),
 ) {
   const memberIds = [...new Set(input.memberIds ?? [])].filter(
     (userId) => userId !== input.createdByUserId,
   );
   const agentIds = [...new Set(input.agentIds ?? [])];
-  const supportsDirectMessages = Boolean(await db.prepare(
-    `select 1 as available from pragma_table_info('briar_channels')
-     where name = 'kind'`,
-  ).first<{ available: number }>());
-  if (!supportsDirectMessages) {
-    await db.batch([
-      db.prepare(
-        `insert into briar_channels (
-           id, organization_id, slug, name, topic, visibility,
-           default_project_id, created_by_user_id, created_at, updated_at
-         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      ).bind(
-        input.id,
-        input.organizationId,
-        input.slug,
-        input.name,
-        input.topic,
-        input.visibility,
-        input.defaultProjectId,
-        input.createdByUserId,
-        input.createdAt,
-        input.createdAt,
-      ),
-      db.prepare(
-        `insert into briar_channel_members (
-           channel_id, user_id, role, created_at
-         ) values (?, ?, 'owner', ?)`,
-      ).bind(input.id, input.createdByUserId, input.createdAt),
-    ]);
-    return null;
-  }
   await db.batch([
     db
       .prepare(
@@ -1078,8 +1089,8 @@ export async function createChannel(
       .bind(
         input.id,
         input.organizationId,
-        input.kind ?? "channel",
-        input.dmKey ?? null,
+        input.kind,
+        input.dmKey,
         input.slug,
         input.name,
         input.topic,
@@ -1824,7 +1835,7 @@ export async function listChannelRootMessages(
   } = {},
 ) {
   const limit = options.limit ?? 200;
-  const select = await messageSelectFor(db);
+  const select = messageSelect;
   const rows = await db
     .prepare(
       `${select}
@@ -1847,7 +1858,7 @@ export async function listChannelThreadMessages(
   channelId: string,
   parentMessageId: string,
 ) {
-  const select = await messageSelectFor(db);
+  const select = messageSelect;
   const rows = await db
     .prepare(
       `${select}
@@ -1909,7 +1920,7 @@ export async function listChannelMessagePage(
     : null;
   if (input.cursor && !cursor) return null;
 
-  const select = await messageSelectFor(db);
+  const select = messageSelect;
   const scope = input.parentMessageId
     ? `(message.id = ? or message.parent_message_id = ?)`
     : includesReplies
@@ -2046,7 +2057,7 @@ export async function getChannelMessage(
   channelId: string,
   messageId: string,
 ) {
-  const select = await messageSelectFor(db);
+  const select = messageSelect;
   const row = await db
     .prepare(`${select} where message.channel_id = ? and message.id = ?`)
     .bind(channelId, messageId)
@@ -2350,9 +2361,20 @@ export async function createChannelMessage(
     mentionedUserIds: string[];
     mentionedAgentIds: string[];
     attachments?: ChannelMessageAttachmentInput[];
+    mutationCommit?: ChannelMessageMutationCommit;
+    agentReplyEnqueue?: ChannelAgentReplyEnqueueInput;
     createdAt: string;
   },
 ) {
+  const uploadGuard = input.mutationCommit
+    ? channelMessageUploadAvailabilityGuard({
+        ...input.mutationCommit,
+        observedAt: input.mutationCommit.committedAt,
+      })
+    : { sql: "", bindings: [] as unknown[] };
+  const agentReplyStatements = input.agentReplyEnqueue
+    ? await channelAgentReplyEnqueueStatements(db, input.agentReplyEnqueue)
+    : [];
   const statements = [
     db
       .prepare(
@@ -2370,7 +2392,8 @@ export async function createChannelMessage(
                where parent.id = ? and parent.channel_id = ?
                  and parent.parent_message_id is null
              )
-           )`,
+           )
+           ${uploadGuard.sql}`,
       )
       .bind(
         input.id,
@@ -2390,6 +2413,7 @@ export async function createChannelMessage(
         input.parentMessageId,
         input.parentMessageId,
         input.channelId,
+        ...uploadGuard.bindings,
       ),
     ...input.mentionedUserIds.map((userId) =>
       db
@@ -2441,6 +2465,19 @@ export async function createChannelMessage(
           input.channelId,
         ),
     ),
+    ...(input.mutationCommit
+      ? [
+          channelMessageMutationReceiptStatement(db, {
+            ...input.mutationCommit,
+            createdAt: input.mutationCommit.committedAt,
+          }),
+          ...channelMessageUploadConsumeStatements(db, {
+            ...input.mutationCommit,
+            consumedAt: input.mutationCommit.committedAt,
+          }),
+        ]
+      : []),
+    ...agentReplyStatements,
   ];
   await db.batch(statements);
   return getChannelMessage(db, input.channelId, input.id);
@@ -2477,7 +2514,7 @@ export async function createIncomingChannelWebhookMessage(
     input.webhookName,
     input.eventId,
     input.body,
-    input.blocks ? JSON.stringify(input.blocks) : null,
+    input.blocks ? encodeStoredChannelMessageBlocks(input.blocks) : null,
     input.createdAt,
     input.createdAt,
   ).first<{ id: string }>();
@@ -2598,49 +2635,28 @@ export async function getClaimedChannelReplyAttachment(
  * independent replies. Organization agents leave project_id null, which is what
  * makes them claimable by any device in the organization.
  */
-export async function enqueueChannelAgentReplies(
+async function channelAgentReplyEnqueueStatements(
   db: D1Database,
-  input: {
-    organizationId: string;
-    channelId: string;
-    triggerMessageId: string;
-    parentMessageId: string;
-    agents: Array<{
-      id: string;
-      projectId: string | null;
-      skillId?: string | null;
-      provider: AgentProvider;
-      unavailableReason?: ChannelReplyUnavailableReason | null;
-    }>;
-    preferredDeviceId?: string | null;
-    createdAt: string;
-  },
+  input: ChannelAgentReplyEnqueueInput,
 ) {
   if (input.agents.length === 0) return [];
   const retainedUntil = channelReplySessionRetentionUntil(input.createdAt);
-  const skillSnapshotsAvailable =
-    await channelSkillExecutionProposalTablesAvailable(db);
-  const skillSnapshotColumns = skillSnapshotsAvailable
-    ? `,
+  const skillSnapshotColumns = `,
        selected_agent_name_snapshot,
        selected_agent_responsibility_snapshot,
        selected_skill_name_snapshot, selected_skill_instructions_snapshot,
        selected_skill_kind_snapshot,
        selected_skill_provider_snapshot, selected_skill_model_snapshot,
-       selected_skill_effort_snapshot, skill_execution_request_snapshot`
-    : "";
-  const skillSnapshotValues = skillSnapshotsAvailable
-    ? `,
+       selected_skill_effort_snapshot, skill_execution_request_snapshot`;
+  const skillSnapshotValues = `,
        case when current_skill.id is null then null else current_agent.name end,
        case when current_skill.id is null then null
          else current_agent.responsibility end,
        current_skill.name, current_skill.body, current_skill.kind,
        current_skill.provider,
        current_skill.model, current_skill.effort,
-       case when current_skill.id is null then null else trigger_message.body end`
-    : "";
-  await db.batch(
-    input.agents.flatMap((agent) => {
+       case when current_skill.id is null then null else trigger_message.body end`;
+  return input.agents.flatMap((agent) => {
       const sessionId = crypto.randomUUID();
       return [
         db.prepare(
@@ -2853,17 +2869,16 @@ export async function enqueueChannelAgentReplies(
           agent.id,
         ),
       ];
-    }),
-  );
-  const rows = await db
-    .prepare(
-      `select * from briar_channel_agent_reply_jobs
-       where channel_id = ? and trigger_message_id = ?
-       order by created_at, id`,
-    )
-    .bind(input.channelId, input.triggerMessageId)
-    .all<ChannelReplyJobRow>();
-  return rows.results;
+    });
+}
+
+export async function enqueueChannelAgentReplies(
+  db: D1Database,
+  input: ChannelAgentReplyEnqueueInput,
+) {
+  const statements = await channelAgentReplyEnqueueStatements(db, input);
+  if (statements.length > 0) await db.batch(statements);
+  return listChannelAgentReplies(db, input.channelId, input.triggerMessageId);
 }
 
 export async function listChannelAgentReplies(
@@ -2988,7 +3003,7 @@ export async function checkpointChannelReplySession(
        where job.id = ? and job.claimed_device_id = ?
          and job.claimed_worker_id = ? and job.claim_token_hash = ?
          and job.status = 'running' and job.lease_expires_at > ?
-             and ${liveChannelReplyRuntime("job")} and ${dmMemoryReplyFenceCurrent("job")}
+         and ${liveChannelReplyRuntime("job")} and ${dmMemoryReplyFenceCurrent("job")}
          and session.updated_at = ? and session.owner_worker_id = ?`,
     ).bind(
       crypto.randomUUID(),
@@ -3081,10 +3096,7 @@ export async function claimNextChannelAgentReply(
   input: {
     deviceId: string;
     workerId: string;
-    providers: AgentProvider[];
-    workerAgentProvider?: AgentProvider;
-    workerCapabilitiesJson?: string;
-    supportsOrganizationAgentContext: boolean;
+    runtime: WorkerRuntimeMetadata;
     claimTokenHash: string;
     claimedAt: string;
     leaseExpiresAt: string;
@@ -3313,14 +3325,12 @@ export async function claimNextChannelAgentReply(
        )
        and ${liveChannelReplyRuntime("job")}
        and ${liveSkillSnapshot("job")}
-       and (job.project_id is not null or ? = 1)
-       and ((job.agent_provider = 'codex' and ? = 1)
-         or (job.agent_provider = 'claude' and ? = 1)
-         or (job.agent_provider = 'cursor' and ? = 1)
-         or (job.agent_provider = 'grok' and ? = 1)
-         or (job.agent_provider = 'agy' and ? = 1)
-         or (job.agent_provider = 'opencode' and ? = 1)
-         or (job.agent_provider = 'openrouter' and ? = 1))
+       and exists (
+         select 1
+         from briar_execution_worker_healthy_providers healthy
+         where healthy.worker_id = ?
+           and healthy.provider = job.agent_provider
+       )
        and exists (
          select 1 from briar_execution_workers binding
          where binding.id = ? and binding.device_id = ?
@@ -3339,24 +3349,6 @@ export async function claimNextChannelAgentReply(
                  and allowed.worker_id = binding.id
              )
            )
-           and (
-             job.project_id is not null
-             or (
-               json_valid(binding.capabilities_json)
-               and json_type(
-                 binding.capabilities_json,
-                 '$.organizationAgentContext'
-               ) = 'object'
-               and json_type(
-                 binding.capabilities_json,
-                 '$.organizationAgentContext.protocol'
-               ) = 'integer'
-               and json_extract(
-                 binding.capabilities_json,
-                 '$.organizationAgentContext.protocol'
-               ) = 1
-             )
-           )
        )
      order by job.created_at, job.id`,
   ).bind(
@@ -3364,14 +3356,7 @@ export async function claimNextChannelAgentReply(
     MAX_REPLY_ATTEMPTS,
     input.claimedAt,
     input.claimedAt,
-    input.supportsOrganizationAgentContext ? 1 : 0,
-    input.providers.includes("codex") ? 1 : 0,
-    input.providers.includes("claude") ? 1 : 0,
-    input.providers.includes("cursor") ? 1 : 0,
-    input.providers.includes("grok") ? 1 : 0,
-    input.providers.includes("agy") ? 1 : 0,
-    input.providers.includes("opencode") ? 1 : 0,
-    input.providers.includes("openrouter") ? 1 : 0,
+    input.workerId,
     input.workerId,
     input.deviceId,
   ).all<ChannelReplyJobRow & {
@@ -3391,21 +3376,11 @@ export async function claimNextChannelAgentReply(
   const preferredAvailability = new Map<string, boolean>();
   for (const candidate of candidates.results) {
     if (!candidate.agent_provider) continue;
-    const supportsSelection = input.workerCapabilitiesJson &&
-        input.workerAgentProvider
-      ? executionWorkerSupportsSelection(
-          {
-            agent_provider: input.workerAgentProvider,
-            capabilities_json: input.workerCapabilitiesJson,
-          },
-          candidate.agent_provider,
-          candidate.runtime_model,
-          candidate.runtime_effort,
-        )
-      // Direct database callers predate capability snapshots. The production
-      // claim route always supplies them; retain provider-only compatibility
-      // for those internal callers while enforcing exact selection at the API.
-      : input.providers.includes(candidate.agent_provider);
+    const supportsSelection = agentProviderSupportsSelection(
+      input.runtime.providerCapabilities[candidate.agent_provider],
+      candidate.runtime_model,
+      candidate.runtime_effort,
+    );
     if (!supportsSelection) continue;
 
     const sessionExpired = candidate.session_retained_until <= input.claimedAt;
@@ -3714,7 +3689,7 @@ export async function snapshotChannelReplyExecutionTargets(
 
 /**
  * Revalidates the complete authority chain for one Organization Agent context
- * page. A valid token alone is insufficient: the claim, Worker binding,
+ * request. A valid token alone is insufficient: the claim, Worker binding,
  * device, organization scope, Agent scope, and live lease must still agree.
  */
 export async function getActiveOrganizationChannelReplyContextClaim(
@@ -3750,24 +3725,11 @@ export async function getActiveOrganizationChannelReplyContextClaim(
            and current_roster.agent_id = job.agent_id
        )
        and ${liveChannelReplyRuntime("job")}
-         and ${dmMemoryReplyFenceCurrent("job")}
+       and ${dmMemoryReplyFenceCurrent("job")}
        and job.claimed_device_id = ? and job.claimed_worker_id = ?
        and job.claim_token_hash = ? and job.status = 'running'
        and job.lease_expires_at > ?
        and binding.state <> 'disabled'
-       and json_valid(binding.capabilities_json)
-       and json_type(
-         binding.capabilities_json,
-         '$.organizationAgentContext'
-       ) = 'object'
-       and json_type(
-         binding.capabilities_json,
-         '$.organizationAgentContext.protocol'
-       ) = 'integer'
-       and json_extract(
-         binding.capabilities_json,
-         '$.organizationAgentContext.protocol'
-       ) = 1
        and device.organization_id = job.organization_id
        and device.state <> 'disabled'
        and binding_project.organization_id = job.organization_id`,
@@ -3855,7 +3817,7 @@ export async function renewChannelReplyLease(
              and current_roster.agent_id = briar_channel_agent_reply_jobs.agent_id
          )
          and ${liveChannelReplyRuntime("briar_channel_agent_reply_jobs")}
-           and ${dmMemoryReplyFenceCurrent("briar_channel_agent_reply_jobs")}
+         and ${dmMemoryReplyFenceCurrent("briar_channel_agent_reply_jobs")}
          and exists (
            select 1 from briar_execution_workers binding
            where binding.id = briar_channel_agent_reply_jobs.claimed_worker_id
@@ -3934,6 +3896,7 @@ export async function failChannelReply(
     claimTokenHash: string;
     error: string;
     updatedAt: string;
+    commit?: ReplyCompletionCommit;
   },
 ) {
   const claimed = await getClaimedChannelReply(db, {
@@ -3942,13 +3905,16 @@ export async function failChannelReply(
   });
   if (!claimed) return null;
   const retainedUntil = channelReplySessionRetentionUntil(input.updatedAt);
-  const [failed] = await db.batch([
+  const statements: D1PreparedStatement[] = [
     db.prepare(
       `update briar_channel_agent_reply_jobs
        set status = case when attempts >= (? + memory_restart_count) then 'failed' else 'queued' end,
-           error = ?, claimed_device_id = null, claimed_worker_id = null,
-           preferred_device_id = null,
-           claim_token_hash = null, lease_expires_at = null,
+           error = ?,
+           ${input.commit
+             ? ""
+             : `claimed_device_id = null, claimed_worker_id = null,
+                preferred_device_id = null,
+                claim_token_hash = null, lease_expires_at = null,`}
            completed_at = case when attempts >= (? + memory_restart_count) then ? else completed_at end,
            updated_at = ?
        where id = ? and claimed_device_id = ? and claimed_worker_id = ?
@@ -3972,6 +3938,15 @@ export async function failChannelReply(
       input.claimTokenHash,
       input.updatedAt,
     ),
+  ];
+  if (input.commit) {
+    statements.push(replyCompletionReceiptStatement(db, {
+      ...input.commit,
+      retainedUntil,
+      createdAt: input.updatedAt,
+    }));
+  }
+  statements.push(
     db.prepare(
       `insert into briar_channel_messages (
          id, channel_id, parent_message_id, author_user_id, author_agent_id,
@@ -4040,13 +4015,50 @@ export async function failChannelReply(
       input.updatedAt,
       input.updatedAt,
     ),
-  ]);
-  return (failed.results[0] as ChannelReplyJobRow | undefined) ?? null;
+  );
+  if (input.commit) {
+    statements.push(db.prepare(
+      `update briar_channel_agent_reply_jobs
+       set claimed_device_id = null, claimed_worker_id = null,
+           preferred_device_id = null,
+           claim_token_hash = null, lease_expires_at = null
+       where id = ? and claimed_device_id = ? and claimed_worker_id = ?
+         and claim_token_hash = ? and status in ('queued', 'failed')
+         and updated_at = ?`,
+    ).bind(
+      input.jobId,
+      input.deviceId,
+      input.workerId,
+      input.claimTokenHash,
+      input.updatedAt,
+    ));
+  }
+  const results = await db.batch(statements);
+  const failed = results[0]?.results[0] as ChannelReplyJobRow | undefined;
+  if (failed && input.commit && !results[1]?.results[0]) {
+    throw new Error("Channel reply failure receipt was not committed atomically");
+  }
+  return failed
+    ? {
+        ...failed,
+        ...(input.commit
+          ? {
+              claimed_device_id: null,
+              claimed_worker_id: null,
+              preferred_device_id: null,
+              claim_token_hash: null,
+              lease_expires_at: null,
+            }
+          : {}),
+      }
+    : null;
 }
 
 export type ChannelReplyCompletionInput = {
   memoryCitations?: readonly { documentId: string; version: number }[] | null;
-  memorySaveRequest?: { readonly documents: readonly { documentId: string; version: number }[] } | null;
+  memorySaveRequest?: {
+    readonly documents: readonly { documentId: string; version: number }[];
+  } | null;
   jobId: string;
   deviceId: string;
   workerId: string;
@@ -4079,6 +4091,7 @@ export type ChannelReplyCompletionInput = {
   completedAt: string;
   conversationId?: string | null;
   attachments?: ChannelMessageAttachmentInput[];
+  commit?: ReplyCompletionCommit;
 };
 
 /**
@@ -4103,24 +4116,6 @@ export async function completeChannelReply(
       parentMessageId: job.parent_message_id,
     },
   );
-  const executionApprovalsAvailable =
-    await channelExecutionProposalTablesAvailable(db);
-  const skillExecutionApprovalsAvailable =
-    await channelSkillExecutionProposalTablesAvailable(db);
-  const issueBatchProposalsAvailable =
-    await channelIssueBatchProposalTablesAvailable(db);
-  if (
-    !executionApprovalsAvailable &&
-    (input.executionProposal || input.issueProposal?.executeAfterCreate)
-  ) {
-    throw new Error("issue execution approval schema is unavailable");
-  }
-  if (input.skillExecutionProposal && !skillExecutionApprovalsAvailable) {
-    throw new Error("Agent Skill execution approval schema is unavailable");
-  }
-  if (input.issueBatchProposal && !issueBatchProposalsAvailable) {
-    throw new Error("channel issue batch approval schema is unavailable");
-  }
   const delegation = input.delegation ?? null;
   if (
     job.project_id !== null &&
@@ -4193,8 +4188,7 @@ export async function completeChannelReply(
         delegation.provider,
       ]
     : [0, null, null, null, null, null, null];
-  const executionGuardSql = executionApprovalsAvailable
-    ? `and (
+  const executionGuardSql = `and (
          ? = 0
          or (
            briar_channel_agent_reply_jobs.project_id = ?
@@ -4223,19 +4217,15 @@ export async function completeChannelReply(
                and target.resume_requested_at is null
            )
          )
-       )`
-    : "and ? = 0";
-  const executionGuardBindings = executionApprovalsAvailable
-    ? input.executionProposal
-      ? [
-          1,
-          input.executionProposal.projectId,
-          input.executionProposal.runId,
-        ]
-      : [0, null, null]
-    : [0];
-  const skillExecutionGuardSql = skillExecutionApprovalsAvailable
-    ? `and (
+       )`;
+  const executionGuardBindings = input.executionProposal
+    ? [
+        1,
+        input.executionProposal.projectId,
+        input.executionProposal.runId,
+      ]
+    : [0, null, null];
+  const skillExecutionGuardSql = `and (
          ? = 0
          or exists (
            select 1
@@ -4300,17 +4290,55 @@ export async function completeChannelReply(
                      briar_channel_agent_reply_jobs.delegation_request)
              )
          )
-       )`
-    : "and ? = 0";
+       )`;
   const skillExecutionGuardBindings = [
     input.skillExecutionProposal ? 1 : 0,
   ];
+  const attachmentGuard = input.commit
+    ? replyAttachmentAvailabilityGuard(input.commit)
+    : { sql: "", bindings: [] as unknown[] };
   const retainedUntil = channelReplySessionRetentionUntil(input.completedAt);
   const skillExecutionProposalId = input.skillExecutionProposal
     ? crypto.randomUUID()
     : null;
   const consentTaskSessionId = input.skillExecutionProposal
     ? crypto.randomUUID()
+    : null;
+  const consentTaskPolicy = input.skillExecutionProposal && job.skill_id
+    ? await db.prepare(
+      `select trigger_message.author_user_id as requested_by_user_id,
+              skill.execution_mode, skill.approval_policy
+       from briar_channel_messages trigger_message
+       join briar_agent_skills skill
+         on skill.id = ? and skill.agent_id = ?
+       where trigger_message.id = ? and trigger_message.channel_id = ?`,
+    ).bind(
+      job.skill_id,
+      job.agent_id,
+      job.trigger_message_id,
+      job.channel_id,
+    ).first<{
+      requested_by_user_id: string | null;
+      execution_mode: "conversation" | "task";
+      approval_policy: "explicit" | "invoke_is_consent";
+    }>()
+    : null;
+  const consentTaskPayloadJson = consentTaskSessionId &&
+      consentTaskPolicy?.execution_mode === "task" &&
+      consentTaskPolicy.approval_policy === "invoke_is_consent" &&
+      consentTaskPolicy.requested_by_user_id && job.claimed_worker_id &&
+      job.selected_agent_name_snapshot && job.skill_id &&
+      job.skill_execution_request_snapshot
+    ? encodeApprovedProjectAgentTaskSession({
+      sessionId: consentTaskSessionId,
+      agentId: job.agent_id,
+      agentName: job.selected_agent_name_snapshot,
+      skillId: job.skill_id,
+      request: job.skill_execution_request_snapshot,
+      workerId: job.claimed_worker_id,
+      requestedByUserId: consentTaskPolicy.requested_by_user_id,
+      acceptedAt: input.completedAt,
+    })
     : null;
   const statements = [
     db
@@ -4375,6 +4403,7 @@ export async function completeChannelReply(
            )
            ${executionGuardSql}
            ${skillExecutionGuardSql}
+           ${attachmentGuard.sql}
          returning *`,
       )
       .bind(
@@ -4385,11 +4414,30 @@ export async function completeChannelReply(
         input.workerId,
         input.claimTokenHash,
         input.completedAt,
-        JSON.stringify([...(input.memoryCitations ?? []), ...(input.memorySaveRequest?.documents ?? [])]),
+        JSON.stringify([
+          ...(input.memoryCitations ?? []),
+          ...(input.memorySaveRequest?.documents ?? []),
+        ]),
         ...delegationGuardBindings,
         ...executionGuardBindings,
         ...skillExecutionGuardBindings,
+        ...attachmentGuard.bindings,
       ),
+  ];
+  if (input.commit) {
+    statements.push(
+      replyCompletionReceiptStatement(db, {
+        ...input.commit,
+        retainedUntil,
+        createdAt: input.completedAt,
+      }),
+      ...consumeReplyAttachmentStatements(db, {
+        ...input.commit,
+        consumedAt: input.completedAt,
+      }),
+    );
+  }
+  statements.push(
     db
       .prepare(
         `insert into briar_channel_messages (
@@ -4418,14 +4466,23 @@ export async function completeChannelReply(
         input.claimTokenHash,
         input.completedAt,
       ),
-  ];
-  if (input.memoryCitations?.length) statements.push(dmMemoryCitationStatement(db, {
-    jobId: input.jobId, claimTokenHash: input.claimTokenHash, messageId: job.reply_message_id,
-    completedAt: input.completedAt, references: input.memoryCitations,
+  );
+  if (input.memoryCitations?.length) {
+    statements.push(dmMemoryCitationStatement(db, {
+      jobId: input.jobId,
+      claimTokenHash: input.claimTokenHash,
+      messageId: job.reply_message_id,
+      completedAt: input.completedAt,
+      references: input.memoryCitations,
+    }));
+  }
+  statements.push(...dmLearningReplyOutboxStatements(db, {
+    jobId: input.jobId,
+    claimTokenHash: input.claimTokenHash,
+    completedAt: input.completedAt,
+    explicitRequested: input.memorySaveRequest != null,
+    requestTargets: input.memorySaveRequest?.documents,
   }));
-  statements.push(...dmLearningReplyOutboxStatements(db, { jobId: input.jobId,
-    claimTokenHash: input.claimTokenHash, completedAt: input.completedAt,
-    explicitRequested: input.memorySaveRequest != null, requestTargets: input.memorySaveRequest?.documents }));
   for (const attachment of input.attachments ?? []) {
     statements.push(
       db
@@ -4442,7 +4499,16 @@ export async function completeChannelReply(
              and exists (
                select 1 from briar_channel_messages
                where id = ? and channel_id = ?
-             )`,
+             )
+             ${input.commit
+               ? `and exists (
+                    select 1 from briar_uploads upload
+                    where upload.upload_id = ?
+                      and upload.consumer_kind = 'reply_completion'
+                      and upload.consumer_id = ?
+                      and upload.consumed_at = ?
+                  )`
+               : ""}`,
         )
         .bind(
           attachment.id,
@@ -4461,6 +4527,9 @@ export async function completeChannelReply(
           input.completedAt,
           job.reply_message_id,
           job.channel_id,
+          ...(input.commit
+            ? [attachment.id, input.commit.requestId, input.completedAt]
+            : []),
         ),
     );
   }
@@ -4501,8 +4570,7 @@ export async function completeChannelReply(
     statements.push(
       db
         .prepare(
-          executionApprovalsAvailable
-            ? `insert into briar_channel_action_proposals (
+          `insert into briar_channel_action_proposals (
              id, channel_id, project_id, trigger_message_id, reply_message_id,
              action_type, payload_json, execute_after_create,
              execution_proposal_id, created_at, updated_at
@@ -4512,53 +4580,25 @@ export async function completeChannelReply(
            where claim.id = ? and claim.claimed_device_id = ?
              and claim.claimed_worker_id = ? and claim.claim_token_hash = ?
              and claim.status = 'completed' and claim.completed_at = ?
-           on conflict (channel_id, trigger_message_id) do nothing`
-            : `insert into briar_channel_action_proposals (
-             id, channel_id, project_id, trigger_message_id, reply_message_id,
-             action_type, payload_json, created_at, updated_at
-           )
-           select ?, ?, ?, ?, ?, 'request_issue_create', ?, ?, ?
-           from briar_channel_agent_reply_jobs claim
-           where claim.id = ? and claim.claimed_device_id = ?
-             and claim.claimed_worker_id = ? and claim.claim_token_hash = ?
-             and claim.status = 'completed' and claim.completed_at = ?
            on conflict (channel_id, trigger_message_id) do nothing`,
         )
-        .bind(...(
-          executionApprovalsAvailable
-            ? [
-                crypto.randomUUID(),
-                job.channel_id,
-                input.issueProposal.projectId,
-                job.trigger_message_id,
-                job.reply_message_id,
-                JSON.stringify({ issue: input.issueProposal.issue }),
-                input.issueProposal.executeAfterCreate ? 1 : 0,
-                executionProposalId,
-                input.completedAt,
-                input.completedAt,
-                input.jobId,
-                input.deviceId,
-                input.workerId,
-                input.claimTokenHash,
-                input.completedAt,
-              ]
-            : [
-                crypto.randomUUID(),
-                job.channel_id,
-                input.issueProposal.projectId,
-                job.trigger_message_id,
-                job.reply_message_id,
-                JSON.stringify({ issue: input.issueProposal.issue }),
-                input.completedAt,
-                input.completedAt,
-                input.jobId,
-                input.deviceId,
-                input.workerId,
-                input.claimTokenHash,
-                input.completedAt,
-              ]
-        )),
+        .bind(
+          crypto.randomUUID(),
+          job.channel_id,
+          input.issueProposal.projectId,
+          job.trigger_message_id,
+          job.reply_message_id,
+          JSON.stringify({ issue: input.issueProposal.issue }),
+          input.issueProposal.executeAfterCreate ? 1 : 0,
+          executionProposalId,
+          input.completedAt,
+          input.completedAt,
+          input.jobId,
+          input.deviceId,
+          input.workerId,
+          input.claimTokenHash,
+          input.completedAt,
+        ),
     );
   }
   if (input.issueBatchProposal) {
@@ -4768,7 +4808,8 @@ export async function completeChannelReply(
                 and trigger_message.channel_id = job.channel_id
                where job.id = source_reply_job_id
              ),
-             accepted_at = ?, updated_at = ?
+             accepted_at = ?, updated_at = ?,
+             materialized_session_payload_json = ?
          where id = ? and status = 'pending' and execution_mode = 'task'
            and approval_policy = 'invoke_is_consent'
            and exists (
@@ -4786,6 +4827,7 @@ export async function completeChannelReply(
         consentTaskSessionId,
         input.completedAt,
         input.completedAt,
+        consentTaskPayloadJson,
         skillExecutionProposalId,
       ),
     );
@@ -4793,25 +4835,21 @@ export async function completeChannelReply(
   if (delegation) {
     const delegatedSessionId = crypto.randomUUID();
     const delegatedJobId = crypto.randomUUID();
-    const delegatedSkillSnapshotColumns = skillExecutionApprovalsAvailable
-      ? `,
+    const delegatedSkillSnapshotColumns = `,
          selected_agent_name_snapshot,
          selected_agent_responsibility_snapshot,
          selected_skill_name_snapshot, selected_skill_instructions_snapshot,
          selected_skill_kind_snapshot,
          selected_skill_provider_snapshot, selected_skill_model_snapshot,
-         selected_skill_effort_snapshot, skill_execution_request_snapshot`
-      : "";
-    const delegatedSkillSnapshotValues = skillExecutionApprovalsAvailable
-      ? `,
+         selected_skill_effort_snapshot, skill_execution_request_snapshot`;
+    const delegatedSkillSnapshotValues = `,
          case when target_skill.id is null then null else target.name end,
          case when target_skill.id is null then null
            else target.responsibility end,
          target_skill.name, target_skill.body, target_skill.kind,
          target_skill.provider,
          target_skill.model, target_skill.effort,
-         case when target_skill.id is null then null else ? end`
-      : "";
+         case when target_skill.id is null then null else ? end`;
     statements.push(
       db.prepare(
         `insert into briar_channel_reply_sessions (
@@ -4986,7 +5024,7 @@ export async function completeChannelReply(
           delegatedJobId,
           delegation.skillId,
           delegation.skillId,
-          ...(skillExecutionApprovalsAvailable ? [delegation.request] : []),
+          delegation.request,
           crypto.randomUUID(),
           delegation.request,
           input.completedAt,
@@ -5099,6 +5137,13 @@ export async function completeChannelReply(
   // read as well: Miniflare can expose that read across a visibility boundary
   // even though the batch has committed successfully.
   const transitioned = results[0]?.results[0] as ChannelReplyJobRow | undefined;
+  if (transitioned && input.commit) {
+    const receipt = results[1]?.results[0];
+    const consumed = results.slice(2, 2 + input.commit.attachmentIds.length);
+    if (!receipt || consumed.some((result) => result.results.length !== 1)) {
+      throw new Error("Channel reply completion receipt was not committed atomically");
+    }
+  }
   return transitioned
     ? {
         ...transitioned,
@@ -5136,7 +5181,6 @@ export async function getChannelActionProposal(
       trigger_message_id: string;
       reply_message_id: string;
       reply_parent_message_id: string | null;
-      action_type: ChannelActionType;
       payload_json: string;
       status: "pending" | "accepted";
       accepted_by_user_id: string | null;
@@ -5243,16 +5287,6 @@ export async function reserveChannelActionProposalApproval(
        where id = ? and channel_id = ? and status = 'pending'
          and action_type = 'request_issue_create'
          and (project_id is null or project_id = ?)
-         and not exists (
-           select 1 from briar_hunt_runs legacy_run
-           where legacy_run.source = 'issue'
-             and legacy_run.source_key =
-               'briar-channel-proposal:' || briar_channel_action_proposals.id
-             and not exists (
-               select 1 from briar_channel_issue_approval_reconciliation finding
-               where finding.run_id = legacy_run.id
-             )
-         )
          and exists (
            select 1
            from briar_channels channel
@@ -5631,11 +5665,6 @@ export async function loadChannelDelta(
     };
   }
 
-  const executionProposalsAvailable =
-    await channelExecutionProposalTablesAvailable(db);
-  const skillExecutionProposalsAvailable =
-    await channelSkillExecutionProposalTablesAvailable(db);
-
   const visible = new Set(
     (
       await db
@@ -5670,15 +5699,11 @@ export async function loadChannelDelta(
       const proposalSelects = [
         `select reply_message_id from briar_channel_action_proposals
          where id = ?`,
-        ...(executionProposalsAvailable
-          ? [`select reply_message_id from briar_issue_execution_proposals
-              where id = ? and source_kind = 'channel'`]
-          : []),
-        ...(skillExecutionProposalsAvailable
-          ? [`select reply_message_id
-              from briar_agent_skill_execution_proposals
-              where id = ? and source_kind = 'channel'`]
-          : []),
+        `select reply_message_id from briar_issue_execution_proposals
+         where id = ? and source_kind = 'channel'`,
+        `select reply_message_id
+         from briar_agent_skill_execution_proposals
+         where id = ? and source_kind = 'channel'`,
       ];
       const proposal = await db
         .prepare(
@@ -5718,7 +5743,7 @@ export async function loadChannelDelta(
     ? (
         await db
           .prepare(
-            `${await messageSelectFor(db)} where message.id in (${[...messageIds]
+            `${messageSelect} where message.id in (${[...messageIds]
               .map(() => "?")
               .join(", ")})`,
           )

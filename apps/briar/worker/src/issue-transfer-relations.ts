@@ -1,81 +1,13 @@
-export const transferredIssueRelationStatements = async (
+export const transferredIssueRelationStatements = (
   db: D1Database,
   input: {
     sourceProjectId: string;
     targetProjectId: string;
     runId: string;
     observedAt: string;
-    resetExecutionApproval: boolean;
   },
 ) => {
-  const transcriptQuarantineAvailable = Boolean(await db
-    .prepare(
-      `select 1 as available from sqlite_master
-       where type = 'table'
-         and name = 'briar_channel_issue_transfer_quarantine'`,
-    )
-    .first<{ available: number }>());
-  const channelProposalsAvailable = Boolean(await db
-    .prepare(
-      `select 1 as available from sqlite_master
-       where type = 'table' and name = 'briar_channel_action_proposals'`,
-    )
-    .first<{ available: number }>());
-  const issueHierarchyAvailable = Boolean(await db
-    .prepare(
-      `select 1 as available from sqlite_master
-       where type = 'table' and name = 'briar_issue_parent_links'`,
-    )
-    .first<{ available: number }>());
-  const issueRelationsAvailable = Boolean(await db
-    .prepare(
-      `select 1 as available from sqlite_master
-       where type = 'table' and name = 'briar_issue_relations'`,
-    )
-    .first<{ available: number }>());
-  const transcriptSessionQuarantineGuard = transcriptQuarantineAvailable
-    ? `and not exists (
-         select 1 from briar_channel_issue_transfer_quarantine quarantine
-         where quarantine.entity_kind = 'agent_transcript_session'
-           and quarantine.entity_id = briar_agent_transcript_sessions.session_id
-       )`
-    : "";
-  const transcriptArchiveQuarantineGuard = transcriptQuarantineAvailable
-    ? `and (
-         archive_kind <> 'agent_transcript'
-         or not exists (
-           select 1 from briar_channel_issue_transfer_quarantine quarantine
-           where quarantine.entity_kind = 'agent_transcript_archive'
-             and quarantine.entity_id = briar_log_archives.id
-         )
-       )`
-    : "";
   const statements = [
-    // Older transfer attempts cleared dispatch identity but could leave a
-    // retryable run queued, blocked, or failed. Repair that partial state
-    // before any retry can be claimed in the target project without a fresh
-    // dispatch approval.
-    db
-      .prepare(
-        `update briar_hunt_runs
-         set status = 'backlog', stage = 'queued', workflow_stage = null,
-             paused_at = null, resume_requested_at = null,
-             completed_at = null,
-             updated_at = ?
-         where id = ? and project_id = ?
-           and status in ('queued', 'blocked', 'failed')
-           and ? = 1
-           and requested_by_user_id is null
-           and dispatch_request_id is null
-           and claim_token_hash is null and claimed_by is null
-           and claimed_at is null and lease_expires_at is null`,
-      )
-      .bind(
-        input.observedAt,
-        input.runId,
-        input.targetProjectId,
-        input.resetExecutionApproval ? 1 : 0,
-      ),
     db
       .prepare(
         `insert into briar_dashboard_changes (
@@ -120,44 +52,40 @@ export const transferredIssueRelationStatements = async (
         input.runId,
         input.targetProjectId,
       ),
-    ...(issueHierarchyAvailable
-      ? [db
-          .prepare(
-            `delete from briar_issue_parent_links
-             where project_id = ?
-               and (parent_run_id = ? or child_run_id = ?)
-               and exists (
-                 select 1 from briar_hunt_runs run
-                 where run.id = ? and run.project_id = ?
-               )`,
-          )
-          .bind(
-            input.sourceProjectId,
-            input.runId,
-            input.runId,
-            input.runId,
-            input.targetProjectId,
-          )]
-      : []),
-    ...(issueRelationsAvailable
-      ? [db
-          .prepare(
-            `delete from briar_issue_relations
-             where project_id = ?
-               and (first_run_id = ? or second_run_id = ?)
-               and exists (
-                 select 1 from briar_hunt_runs run
-                 where run.id = ? and run.project_id = ?
-               )`,
-          )
-          .bind(
-            input.sourceProjectId,
-            input.runId,
-            input.runId,
-            input.runId,
-            input.targetProjectId,
-          )]
-      : []),
+    db
+      .prepare(
+        `delete from briar_issue_parent_links
+         where project_id = ?
+           and (parent_run_id = ? or child_run_id = ?)
+           and exists (
+             select 1 from briar_hunt_runs run
+             where run.id = ? and run.project_id = ?
+           )`,
+      )
+      .bind(
+        input.sourceProjectId,
+        input.runId,
+        input.runId,
+        input.runId,
+        input.targetProjectId,
+      ),
+    db
+      .prepare(
+        `delete from briar_issue_relations
+         where project_id = ?
+           and (first_run_id = ? or second_run_id = ?)
+           and exists (
+             select 1 from briar_hunt_runs run
+             where run.id = ? and run.project_id = ?
+           )`,
+      )
+      .bind(
+        input.sourceProjectId,
+        input.runId,
+        input.runId,
+        input.runId,
+        input.targetProjectId,
+      ),
     db
       .prepare(
         `update briar_issue_attachments
@@ -249,7 +177,14 @@ export const transferredIssueRelationStatements = async (
          set project_id = ?
          where project_id = ? and run_id = ?
            and archive_kind <> 'execution_audit'
-           ${transcriptArchiveQuarantineGuard}
+           and (
+             archive_kind <> 'agent_transcript'
+             or not exists (
+               select 1 from briar_channel_issue_transfer_quarantine quarantine
+               where quarantine.entity_kind = 'agent_transcript_archive'
+                 and quarantine.entity_id = briar_log_archives.id
+             )
+           )
            and exists (
              select 1 from briar_hunt_runs run
              where run.id = ? and run.project_id = ?
@@ -301,7 +236,11 @@ export const transferredIssueRelationStatements = async (
         `update briar_agent_transcript_sessions
          set project_id = ?
          where project_id = ? and run_id = ?
-           ${transcriptSessionQuarantineGuard}
+           and not exists (
+             select 1 from briar_channel_issue_transfer_quarantine quarantine
+             where quarantine.entity_kind = 'agent_transcript_session'
+               and quarantine.entity_id = briar_agent_transcript_sessions.session_id
+           )
            and exists (
              select 1 from briar_hunt_runs run
              where run.id = ? and run.project_id = ?
@@ -356,34 +295,27 @@ export const transferredIssueRelationStatements = async (
         input.targetProjectId,
       ),
   );
-  if (channelProposalsAvailable) {
-    // Channel proposal cards point at the accepted issue. Keep their target
-    // project aligned so retries and "View issue" deep links survive transfer;
-    // the proposal UPDATE trigger also publishes a channel delta.
-    statements.push(
-      db
-        .prepare(
-          `update briar_channel_action_proposals
-           set project_id = ?, updated_at = ?
-           where result_run_id = ? and status = 'accepted'
-             and exists (
-               select 1 from briar_hunt_runs run
-               where run.id = ? and run.project_id = ?
-             )`,
-        )
-        .bind(
-          input.targetProjectId,
-          input.observedAt,
-          input.runId,
-          input.runId,
-          input.targetProjectId,
-        ),
-    );
-  }
+  // Channel proposal cards point at the accepted issue. Keep their target
+  // project aligned so retries and "View issue" deep links survive transfer;
+  // the proposal UPDATE trigger also publishes a channel delta.
+  statements.push(
+    db
+      .prepare(
+        `update briar_channel_action_proposals
+         set project_id = ?, updated_at = ?
+         where result_run_id = ? and status = 'accepted'
+           and exists (
+             select 1 from briar_hunt_runs run
+             where run.id = ? and run.project_id = ?
+           )`,
+      )
+      .bind(
+        input.targetProjectId,
+        input.observedAt,
+        input.runId,
+        input.runId,
+        input.targetProjectId,
+      ),
+  );
   return statements;
 };
-
-export const repairTransferredIssueRelations = async (
-  db: D1Database,
-  input: Parameters<typeof transferredIssueRelationStatements>[1],
-) => db.batch(await transferredIssueRelationStatements(db, input));

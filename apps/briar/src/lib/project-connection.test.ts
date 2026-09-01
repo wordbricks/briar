@@ -133,14 +133,14 @@ describe("configured project repository preparation", () => {
     completedSteps: ["clone"],
   };
 
-  it("lets the server backfill a legacy repository without an immutable ID", async () => {
+  it("prepares a selected repository with its immutable identity", async () => {
     const createCredential = vi.fn(async () => credential);
     const prepareRepository = vi.fn(async () => prepared);
 
     await expect(prepareConfiguredProjectRepository(
       {
         githubRepository: credential.repository.fullName,
-        githubRepositoryId: null,
+        githubRepositoryId: credential.repository.id,
       },
       createCredential,
       prepareRepository,
@@ -150,7 +150,7 @@ describe("configured project repository preparation", () => {
     expect(prepareRepository).toHaveBeenCalledWith(credential);
   });
 
-  it("still blocks a project that has no selected repository", async () => {
+  it("rejects an incomplete repository identity before requesting credentials", async () => {
     const createCredential = vi.fn(async () => credential);
     const prepareRepository = vi.fn(async () => prepared);
 
@@ -168,7 +168,7 @@ describe("configured project repository preparation", () => {
     await expect(prepareConfiguredProjectRepository(
       {
         githubRepository: credential.repository.fullName,
-        githubRepositoryId: null,
+        githubRepositoryId: credential.repository.id,
       },
       async () => credential,
       async () => ({ ...prepared, repositoryId: 987654321 }),

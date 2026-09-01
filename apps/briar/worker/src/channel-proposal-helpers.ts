@@ -65,8 +65,8 @@ export function approvedIssueCreation<T extends Record<string, unknown>>(
 ) {
   return {
     ...issue,
-    // Creating and executing are separate approvals. A creation proposal can
-    // never enter the worker queue, including proposals stored by older builds.
+    // Creating and executing are separate approvals. A creation proposal
+    // always starts in the backlog and never enters the worker queue.
     status: "backlog" as const,
     checkpoints: [] as never[],
   };

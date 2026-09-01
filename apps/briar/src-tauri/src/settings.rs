@@ -1,16 +1,20 @@
 use super::*;
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn load_app_provider_settings(
     app: tauri::AppHandle,
 ) -> Result<AppProviderSettings, String> {
     let config_path = cli_config_path(&app)?;
-    tauri::async_runtime::spawn_blocking(move || app_provider_settings_from(&config_path))
-        .await
-        .map_err(|error| error.to_string())?
+    tauri::async_runtime::spawn_blocking(move || {
+        app_provider_settings_from(&config_path).map(AppProviderSettings::from)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn load_openrouter_credential_status(
     app: tauri::AppHandle,
 ) -> Result<OpenRouterCredentialStatus, String> {
@@ -25,6 +29,7 @@ pub(super) async fn load_openrouter_credential_status(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn update_openrouter_api_key(
     app: tauri::AppHandle,
     api_key: Option<String>,
@@ -38,6 +43,7 @@ pub(super) async fn update_openrouter_api_key(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn load_app_runtime_settings(
     app: tauri::AppHandle,
 ) -> Result<AppRuntimeSettings, String> {
@@ -50,6 +56,7 @@ pub(super) async fn load_app_runtime_settings(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn load_browser_automation_settings(
     app: tauri::AppHandle,
 ) -> Result<BrowserAutomationSettings, String> {
@@ -60,6 +67,7 @@ pub(super) async fn load_browser_automation_settings(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn load_agent_usage(
     app: tauri::AppHandle,
 ) -> Result<agent_usage::AgentUsageSnapshot, String> {
@@ -74,19 +82,22 @@ pub(super) async fn load_agent_usage(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn update_app_provider_settings(
     app: tauri::AppHandle,
     settings: AppProviderSettings,
 ) -> Result<AppProviderSettings, String> {
     let config_path = cli_config_path(&app)?;
     tauri::async_runtime::spawn_blocking(move || {
-        update_app_provider_settings_at(&config_path, settings)
+        update_app_provider_settings_at(&config_path, settings.into())
+            .map(AppProviderSettings::from)
     })
     .await
     .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn update_app_runtime_settings(
     app: tauri::AppHandle,
     sleep_prevention: tauri::State<'_, SleepPreventionState>,
@@ -103,6 +114,7 @@ pub(super) async fn update_app_runtime_settings(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn update_browser_automation_settings(
     app: tauri::AppHandle,
     settings: BrowserAutomationSettings,
@@ -116,6 +128,7 @@ pub(super) async fn update_browser_automation_settings(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn load_project_llm_settings(
     app: tauri::AppHandle,
     project_id: String,
@@ -129,6 +142,7 @@ pub(super) async fn load_project_llm_settings(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn update_project_llm_settings(
     app: tauri::AppHandle,
     project_id: String,
@@ -143,6 +157,7 @@ pub(super) async fn update_project_llm_settings(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn load_project_sandbox_settings(
     app: tauri::AppHandle,
     project_id: String,
@@ -156,6 +171,7 @@ pub(super) async fn load_project_sandbox_settings(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn update_project_sandbox_settings(
     app: tauri::AppHandle,
     project_id: String,
@@ -170,6 +186,7 @@ pub(super) async fn update_project_sandbox_settings(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn update_local_project_workflow(
     app: tauri::AppHandle,
     project_id: String,
@@ -184,6 +201,7 @@ pub(super) async fn update_local_project_workflow(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn update_local_project_velen_org(
     app: tauri::AppHandle,
     project_id: String,
@@ -198,6 +216,7 @@ pub(super) async fn update_local_project_velen_org(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn disconnect_local_project(
     app: tauri::AppHandle,
     project_id: String,
@@ -285,6 +304,7 @@ fn prepare_local_project_connection_on(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn preflight_local_project_connection(
     app: tauri::AppHandle,
     repository_path: String,
@@ -312,6 +332,7 @@ pub(super) async fn preflight_local_project_connection(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn connect_local_project(
     app: tauri::AppHandle,
     api_url: String,

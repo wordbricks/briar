@@ -1,5 +1,5 @@
-import { Miniflare } from "miniflare";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { env } from "cloudflare:workers";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import worker from "./index";
 import {
   connectGithubInstallation,
@@ -15,11 +15,9 @@ import {
   syncGithubConnectionRepositories,
 } from "./db";
 import { githubSha256Hex } from "./github";
-import { createIsolatedTestDatabase } from "./test-helpers/d1";
 
 describe("GitHub integration D1 state", () => {
-  let miniflare: Miniflare;
-  let db: D1Database;
+  const db = env.DB;
   const firstOrganizationId = "11111111-1111-4111-8111-111111111111";
   const secondOrganizationId = "22222222-2222-4222-8222-222222222222";
   const thirdOrganizationId = "33333333-3333-4333-8333-333333333333";
@@ -28,11 +26,6 @@ describe("GitHub integration D1 state", () => {
   const now = "2026-08-05T00:00:00.000Z";
 
   beforeAll(async () => {
-    const database = await createIsolatedTestDatabase({
-      suite: "github-integration-db",
-    });
-    miniflare = database.miniflare;
-    db = database.db;
     await db.prepare(
       `insert into user (id, name, email, emailVerified, createdAt, updatedAt)
        values (?, 'Owner', 'owner@example.com', 1, ?, ?)`,
@@ -60,10 +53,6 @@ describe("GitHub integration D1 state", () => {
          ) values (?, ?, 'owner', ?, ?)`,
       ).bind(id, ownerId, now, now).run();
     }
-  });
-
-  afterAll(async () => {
-    await miniflare.dispose();
   });
 
   afterEach(() => {
@@ -510,59 +499,4 @@ describe("GitHub integration D1 state", () => {
     ]);
   });
 
-  it("serves the authenticated organization-scoped API contract", async () => {
-    const env = {
-      DB: db,
-      BETTER_AUTH_SECRET: "briar-test-secret-that-is-at-least-32-characters",
-      GOOGLE_CLIENT_ID: "google-client",
-      GOOGLE_CLIENT_SECRET: "google-secret",
-      GITHUB_WEBHOOK_SECRET: "webhook-secret",
-      GITHUB_APP_CLIENT_ID: "Iv1.client",
-      GITHUB_APP_ID: "12345",
-      GITHUB_APP_PRIVATE_KEY: "test-private-key",
-      GITHUB_APP_CLIENT_SECRET: "client-secret",
-      GITHUB_APP_SLUG: "briar-app",
-      GITHUB_CALLBACK_ORIGIN: "https://briar.example",
-    } as never;
-    const headers = {
-      authorization: "Bearer github-integration-session-token",
-    };
-    const statusResponse = await worker.fetch(new Request(
-      `https://briar.example/organizations/${firstOrganizationId}/integrations/github`,
-      { headers },
-    ), env);
-
-    expect(statusResponse.status).toBe(200);
-    await expect(statusResponse.json()).resolves.toMatchObject({
-      configured: true,
-      canManage: true,
-      connected: true,
-      accountLogin: "wordbricks",
-      installationId: 902,
-      repositories: [{
-        id: 502,
-        owner: "wordbricks",
-        name: "briar",
-        fullName: "wordbricks/briar",
-      }],
-    });
-
-    const disconnectResponse = await worker.fetch(new Request(
-      `https://briar.example/organizations/${firstOrganizationId}/integrations/github`,
-      { method: "DELETE", headers },
-    ), env);
-    expect(disconnectResponse.status).toBe(204);
-
-    const installResponse = await worker.fetch(new Request(
-      `https://briar.example/organizations/${firstOrganizationId}/integrations/github/install-url`,
-      { method: "POST", headers },
-    ), env);
-    expect(installResponse.status).toBe(201);
-    const install = await installResponse.json() as { installUrl: string };
-    const installUrl = new URL(install.installUrl);
-    expect(installUrl.origin + installUrl.pathname).toBe(
-      "https://github.com/apps/briar-app/installations/new",
-    );
-    expect(installUrl.searchParams.get("state")).toBeTruthy();
-  });
 });

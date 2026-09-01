@@ -1,0 +1,198 @@
+syntax = "proto3";
+
+package briar.app.v1;
+
+import "briar/app/v1/common.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+option swift_prefix = "BriarAPI_";
+
+service OrganizationService {
+  rpc ListOrganizations(ListOrganizationsRequest) returns (ListOrganizationsResponse);
+  rpc CreateOrganization(CreateOrganizationRequest) returns (CreateOrganizationResponse);
+  rpc CheckOrganizationHandleAvailability(CheckOrganizationHandleAvailabilityRequest) returns (CheckOrganizationHandleAvailabilityResponse);
+  rpc UpdateOrganization(UpdateOrganizationRequest) returns (UpdateOrganizationResponse);
+  rpc UpdateOrganizationLogo(UpdateOrganizationLogoRequest) returns (UpdateOrganizationLogoResponse);
+  rpc ListOrganizationInvitations(ListOrganizationInvitationsRequest) returns (ListOrganizationInvitationsResponse);
+  rpc CreateOrganizationInvitation(CreateOrganizationInvitationRequest) returns (CreateOrganizationInvitationResponse);
+  rpc RevokeOrganizationInvitation(RevokeOrganizationInvitationRequest) returns (RevokeOrganizationInvitationResponse);
+  rpc GetOrganizationInvitation(GetOrganizationInvitationRequest) returns (GetOrganizationInvitationResponse);
+  rpc AcceptOrganizationInvitation(AcceptOrganizationInvitationRequest) returns (AcceptOrganizationInvitationResponse);
+  rpc ListOrganizationMembers(ListOrganizationMembersRequest) returns (ListOrganizationMembersResponse);
+  rpc UpdateOrganizationMemberRole(UpdateOrganizationMemberRoleRequest) returns (UpdateOrganizationMemberRoleResponse);
+  rpc UpdateOrganizationMemberProjects(UpdateOrganizationMemberProjectsRequest) returns (UpdateOrganizationMemberProjectsResponse);
+  rpc RemoveOrganizationMember(RemoveOrganizationMemberRequest) returns (RemoveOrganizationMemberResponse);
+}
+
+enum OrganizationInvitationStatus {
+  ORGANIZATION_INVITATION_STATUS_UNSPECIFIED = 0;
+  ORGANIZATION_INVITATION_STATUS_PENDING = 1;
+  ORGANIZATION_INVITATION_STATUS_ACCEPTED = 2;
+  ORGANIZATION_INVITATION_STATUS_EXPIRED = 3;
+  ORGANIZATION_INVITATION_STATUS_REVOKED = 4;
+}
+
+message Organization {
+  string id = 1;
+  string name = 2;
+  string handle = 3;
+  optional string logo = 4;
+  ProjectRole role = 5;
+  google.protobuf.Timestamp created_at = 6;
+}
+
+message OrganizationInvitation {
+  string id = 1;
+  string organization_id = 2;
+  string organization_name = 3;
+  string initial_project_id = 4;
+  string initial_project_name = 5;
+  string email = 6;
+  string email_hint = 7;
+  ProjectRole role = 8;
+  OrganizationInvitationStatus status = 9;
+  google.protobuf.Timestamp expires_at = 10;
+  optional google.protobuf.Timestamp accepted_at = 11;
+  google.protobuf.Timestamp created_at = 12;
+}
+
+// Public invitation data deliberately has no email field. The server must never
+// expose the invited address to a caller that only possesses an invitation token.
+message OrganizationInvitationPreview {
+  string id = 1;
+  string organization_id = 2;
+  string organization_name = 3;
+  string initial_project_id = 4;
+  string initial_project_name = 5;
+  string email_hint = 6;
+  ProjectRole role = 7;
+  OrganizationInvitationStatus status = 8;
+  google.protobuf.Timestamp expires_at = 9;
+  optional google.protobuf.Timestamp accepted_at = 10;
+  google.protobuf.Timestamp created_at = 11;
+}
+
+message ListOrganizationsRequest {}
+
+message ListOrganizationsResponse {
+  repeated Organization organizations = 1;
+}
+
+message CreateOrganizationRequest {
+  string name = 1;
+  string handle = 2;
+}
+
+message CreateOrganizationResponse {
+  Organization organization = 1;
+}
+
+message CheckOrganizationHandleAvailabilityRequest {
+  string handle = 1;
+}
+
+message CheckOrganizationHandleAvailabilityResponse {
+  bool available = 1;
+}
+
+message UpdateOrganizationRequest {
+  string organization_id = 1;
+  string name = 2;
+}
+
+message UpdateOrganizationResponse {
+  Organization organization = 1;
+}
+
+message UpdateOrganizationLogoRequest {
+  string organization_id = 1;
+
+  oneof logo_update {
+    string logo = 2;
+    google.protobuf.Empty clear_logo = 3;
+  }
+}
+
+message UpdateOrganizationLogoResponse {
+  Organization organization = 1;
+}
+
+message ListOrganizationInvitationsRequest {
+  string organization_id = 1;
+}
+
+message ListOrganizationInvitationsResponse {
+  repeated OrganizationInvitation invitations = 1;
+}
+
+message CreateOrganizationInvitationRequest {
+  string organization_id = 1;
+  string email = 2;
+  ProjectRole role = 3;
+  string initial_project_id = 4;
+}
+
+message CreateOrganizationInvitationResponse {
+  OrganizationInvitation invitation = 1;
+  string invite_path = 2;
+}
+
+message RevokeOrganizationInvitationRequest {
+  string organization_id = 1;
+  string invitation_id = 2;
+}
+
+message RevokeOrganizationInvitationResponse {}
+
+message GetOrganizationInvitationRequest {
+  string token = 1;
+}
+
+message GetOrganizationInvitationResponse {
+  OrganizationInvitationPreview invitation = 1;
+}
+
+message AcceptOrganizationInvitationRequest {
+  string token = 1;
+}
+
+message AcceptOrganizationInvitationResponse {
+  OrganizationInvitationPreview invitation = 1;
+  bool already_accepted = 2;
+}
+
+message ListOrganizationMembersRequest {
+  string organization_id = 1;
+}
+
+message ListOrganizationMembersResponse {
+  repeated OrganizationMember members = 1;
+}
+
+message UpdateOrganizationMemberRoleRequest {
+  string organization_id = 1;
+  string user_id = 2;
+  ProjectRole role = 3;
+}
+
+message UpdateOrganizationMemberRoleResponse {
+  repeated OrganizationMember members = 1;
+}
+
+message UpdateOrganizationMemberProjectsRequest {
+  string organization_id = 1;
+  string user_id = 2;
+  repeated string project_ids = 3;
+}
+
+message UpdateOrganizationMemberProjectsResponse {
+  repeated OrganizationMember members = 1;
+}
+
+message RemoveOrganizationMemberRequest {
+  string organization_id = 1;
+  string user_id = 2;
+}
+
+message RemoveOrganizationMemberResponse {}

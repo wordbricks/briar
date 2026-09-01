@@ -8,10 +8,9 @@ import {
   listRunStageRevisions,
   type RunEvidenceImageRow,
 } from "./db";
-import { HttpError, json } from "./http-response";
+import { HttpError } from "./http-response";
 import { issueAttachmentResponse } from "./issue-attachment-service";
 import { runEvidenceJson } from "./run-evidence-json";
-import { requireSession } from "./session-auth";
 
 type RequireRunExecutionProject = (
   db: D1Database,
@@ -30,6 +29,77 @@ const isWorkerRequest = (request: Request) =>
   request.headers.get("authorization")?.startsWith(
     "Bearer briar_worker_",
   ) ?? false;
+
+export async function listProjectRunEvidence(input: {
+  db: D1Database;
+  archivesBucket: R2Bucket;
+  projectId: string;
+  runId: string;
+  userId: string;
+}) {
+  const project = await getProject(input.db, input.projectId, input.userId);
+  if (!project) throw new HttpError(404, "Project not found");
+  return listRunEvidenceForProject({
+    db: input.db,
+    archivesBucket: input.archivesBucket,
+    projectId: project.id,
+    runId: input.runId,
+  });
+}
+
+export async function listRunEvidenceForProject(input: {
+  db: D1Database;
+  archivesBucket: R2Bucket;
+  projectId: string;
+  runId: string;
+}) {
+  const [hotEvidence, revisions, hotImages, archived] = await Promise.all([
+    listRunEvidence(input.db, input.projectId, input.runId),
+    listRunStageRevisions(input.db, input.projectId, input.runId),
+    listRunEvidenceImages(input.db, input.projectId, input.runId),
+    listArchivedRunEvidence(
+      input.db,
+      input.archivesBucket,
+      input.projectId,
+      input.runId,
+    ),
+  ]);
+  if (!hotEvidence || !revisions || !hotImages) {
+    throw new HttpError(404, "Run not found");
+  }
+  const evidence = [
+    ...new Map(
+      [...archived.evidence, ...hotEvidence].map((item) => [item.id, item]),
+    ).values(),
+  ].sort(
+    (left, right) =>
+      left.observed_at.localeCompare(right.observed_at) ||
+      left.id.localeCompare(right.id),
+  );
+  const images = [
+    ...new Map(
+      [...archived.images, ...hotImages].map((item) => [item.id, item]),
+    ).values(),
+  ];
+  const imagesByEvidence = new Map<string, RunEvidenceImageRow[]>();
+  for (const image of images) {
+    const evidenceImages = imagesByEvidence.get(image.evidence_id) ?? [];
+    evidenceImages.push(image);
+    imagesByEvidence.set(image.evidence_id, evidenceImages);
+  }
+  return {
+    runId: input.runId,
+    attempt: revisions.attempt,
+    revision: revisions.revision,
+    evidence: evidence.map((item) =>
+      runEvidenceJson(
+        item,
+        revisions.requirements.get(item.workflow_stage) ?? 1,
+        imagesByEvidence.get(item.id) ?? [],
+      )
+    ),
+  };
+}
 
 export async function handleRunEvidenceRoute(input: {
   request: Request;
@@ -51,65 +121,6 @@ export async function handleRunEvidenceRoute(input: {
     requireRunExecutionProject,
     requireProjectAccess,
   } = input;
-
-  const projectRunEvidenceMatch = url.pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/evidence$/u,
-  );
-  if (projectRunEvidenceMatch && request.method === "GET") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(
-      db,
-      projectRunEvidenceMatch[1],
-      session.user.id,
-    );
-    if (!project) throw new HttpError(404, "Project not found");
-    const [hotEvidence, revisions, hotImages, archived] = await Promise.all([
-      listRunEvidence(db, project.id, projectRunEvidenceMatch[2]),
-      listRunStageRevisions(db, project.id, projectRunEvidenceMatch[2]),
-      listRunEvidenceImages(db, project.id, projectRunEvidenceMatch[2]),
-      listArchivedRunEvidence(
-        db,
-        archivesBucket,
-        project.id,
-        projectRunEvidenceMatch[2],
-      ),
-    ]);
-    if (!hotEvidence || !revisions || !hotImages) {
-      throw new HttpError(404, "Run not found");
-    }
-    const evidence = [
-      ...new Map(
-        [...archived.evidence, ...hotEvidence].map((item) => [item.id, item]),
-      ).values(),
-    ].sort(
-      (left, right) =>
-        left.observed_at.localeCompare(right.observed_at) ||
-        left.id.localeCompare(right.id),
-    );
-    const images = [
-      ...new Map(
-        [...archived.images, ...hotImages].map((item) => [item.id, item]),
-      ).values(),
-    ];
-    const imagesByEvidence = new Map<string, RunEvidenceImageRow[]>();
-    for (const image of images) {
-      const evidenceImages = imagesByEvidence.get(image.evidence_id) ?? [];
-      evidenceImages.push(image);
-      imagesByEvidence.set(image.evidence_id, evidenceImages);
-    }
-    return json({
-      runId: projectRunEvidenceMatch[2],
-      attempt: revisions.attempt,
-      revision: revisions.revision,
-      evidence: evidence.map((item) =>
-        runEvidenceJson(
-          item,
-          revisions.requirements.get(item.workflow_stage) ?? 1,
-          imagesByEvidence.get(item.id) ?? [],
-        )
-      ),
-    });
-  }
 
   const projectEvidenceImageMatch = url.pathname.match(
     /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/evidence\/images\/([0-9a-f-]+)$/u,

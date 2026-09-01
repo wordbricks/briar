@@ -1,4 +1,5 @@
 import {
+  decodeAutoHuntWorkflowCheckpointsJson,
   normalizeAutoHuntWorkflow,
   progressForAutoHuntRun,
   type AutoHuntRunStatus,
@@ -17,8 +18,8 @@ import type {
   IssueHierarchyRow,
   IssueRelationRow,
   IssueResultReviewRow,
-  OrganizationStatusTrayRunRow,
 } from "./db";
+import { runIsFullAuto } from "./hunt-run-codec";
 import { issueAttachmentJson } from "./issue-conversation-json";
 
 const parseJsonArray = (value: string) => {
@@ -154,10 +155,10 @@ export function dashboardRunJson(
           terminalReviewOnly,
         }
       : null,
-    issueCheckpoints: JSON.parse(run.issue_checkpoints_json || "[]"),
-    fullAuto:
-      context !== null &&
-      (context as Record<string, unknown>).fullAuto === true,
+    issueCheckpoints: decodeAutoHuntWorkflowCheckpointsJson(
+      run.issue_checkpoints_json,
+    ),
+    fullAuto: runIsFullAuto(run),
     detail: run.detail,
     priority: run.priority,
     difficulty: run.difficulty,
@@ -277,25 +278,5 @@ export function dashboardRunJson(
     completedAt: run.completed_at,
     lastEventAt: run.last_event_at,
     eventCount: run.event_count,
-  };
-}
-
-export function statusTrayRunJson(run: OrganizationStatusTrayRunRow) {
-  const workflow = normalizeAutoHuntWorkflow(
-    JSON.parse(run.workflow_snapshot_json),
-  );
-  return {
-    projectId: run.project_id,
-    projectName: run.project_name,
-    id: run.id,
-    title: run.title,
-    status: run.status,
-    workflowStage: run.workflow_stage,
-    workflowStageLabel:
-      workflow.stages.find((stage) => stage.id === run.workflow_stage)?.label ??
-      null,
-    startedAt: run.started_at,
-    updatedAt: run.updated_at,
-    lastEventAt: run.last_event_at,
   };
 }

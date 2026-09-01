@@ -1,0 +1,84 @@
+syntax = "proto3";
+
+package briar.app.v1;
+
+import "briar/app/v1/common.proto";
+import "google/protobuf/empty.proto";
+
+option swift_prefix = "BriarAPI_";
+
+service AccountService {
+  rpc GetCurrentUser(GetCurrentUserRequest) returns (GetCurrentUserResponse);
+  rpc UpdateAccountProfile(UpdateAccountProfileRequest) returns (UpdateAccountProfileResponse);
+  rpc DeleteAccount(DeleteAccountRequest) returns (DeleteAccountResponse);
+  rpc RegisterMobilePushDevice(RegisterMobilePushDeviceRequest) returns (RegisterMobilePushDeviceResponse);
+  rpc UnregisterMobilePushDevice(UnregisterMobilePushDeviceRequest) returns (UnregisterMobilePushDeviceResponse);
+}
+
+enum MobilePushEndpoint {
+  MOBILE_PUSH_ENDPOINT_UNSPECIFIED = 0;
+  MOBILE_PUSH_ENDPOINT_APNS_DEVELOPMENT = 1;
+  MOBILE_PUSH_ENDPOINT_APNS_PRODUCTION = 2;
+  MOBILE_PUSH_ENDPOINT_FCM = 3;
+}
+
+enum MobilePushLocale {
+  MOBILE_PUSH_LOCALE_UNSPECIFIED = 0;
+  MOBILE_PUSH_LOCALE_KO = 1;
+  MOBILE_PUSH_LOCALE_EN = 2;
+  MOBILE_PUSH_LOCALE_ZH = 3;
+}
+
+message GetCurrentUserRequest {}
+
+message GetCurrentUserResponse {
+  User user = 1;
+}
+
+message UpdateAccountProfileRequest {
+  oneof username_update {
+    string username = 1;
+    google.protobuf.Empty clear_username = 2;
+  }
+
+  string name = 3;
+
+  oneof image_update {
+    string image = 4;
+    google.protobuf.Empty clear_image = 5;
+  }
+}
+
+message UpdateAccountProfileResponse {
+  User user = 1;
+}
+
+message DeleteAccountRequest {
+  string confirmation = 1;
+}
+
+message DeleteAccountResponse {}
+
+message MobilePushPreferences {
+  bool play_sound = 1;
+  bool urgent = 2;
+  bool action_required = 3;
+  bool important = 4;
+  bool activity = 5;
+}
+
+message RegisterMobilePushDeviceRequest {
+  MobilePushEndpoint endpoint = 1;
+  string token = 2;
+  MobilePushLocale locale = 3;
+  MobilePushPreferences preferences = 4;
+}
+
+message RegisterMobilePushDeviceResponse {}
+
+message UnregisterMobilePushDeviceRequest {
+  MobilePushEndpoint endpoint = 1;
+  string token = 2;
+}
+
+message UnregisterMobilePushDeviceResponse {}

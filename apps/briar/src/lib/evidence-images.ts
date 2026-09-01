@@ -10,8 +10,6 @@ export const evidenceImageMimeTypes = [
 export const maxEvidenceImageCount = 5;
 export const maxEvidenceImageBytes = 20 * 1024 * 1024;
 export const maxEvidenceImageTotalBytes = 25 * 1024 * 1024;
-export const maxEvidenceMultipartBytes =
-  maxEvidenceImageTotalBytes + 1024 * 1024;
 
 const allowedMimeTypes = new Set<string>(evidenceImageMimeTypes);
 

@@ -66,8 +66,15 @@ const channel = (id: string): ChannelSummary => ({
   archivedAt: null,
   memberCount: 1,
   agentCount: 0,
+  kind: "channel",
+  createdByUserId: null,
   createdAt: "2026-08-01T00:00:00.000Z",
   updatedAt: "2026-08-01T00:00:00.000Z",
+  lastMessageAt: null,
+  lastMessagePreview: null,
+  lastReadAt: null,
+  hasUnread: false,
+  dmParticipants: [],
 });
 
 const member: ChannelMember = {
@@ -105,6 +112,10 @@ const message = (
   executionProposal: null,
   createdAt: "2026-08-01T01:00:00.000Z",
   ...input,
+  blocks: input.blocks ?? [],
+  replyAuthors: input.replyAuthors ?? [],
+  subscribers: input.subscribers ?? [],
+  skillExecutionProposal: input.skillExecutionProposal ?? null,
 });
 
 const agentReply = (
@@ -389,6 +400,7 @@ describe("useChannelConversation", () => {
     api.loadChannelDelta.mockResolvedValueOnce({
       cursor: 1,
       hasMore: false,
+      reset: false,
       channels: [],
       removedChannelIds: [],
       messages: [message("realtime")],
@@ -412,6 +424,35 @@ describe("useChannelConversation", () => {
       expect.any(AbortSignal),
     );
     expect(current().messages.map((item) => item.id)).toEqual(["realtime"]);
+  });
+
+  it("replaces stale messages and replies on a reset delta", async () => {
+    const freshReply = agentReply("reply-fresh", { status: "running" });
+    api.loadChannelDelta.mockResolvedValueOnce({
+      cursor: 8,
+      hasMore: false,
+      reset: true,
+      channels: [channel("channel-a")],
+      removedChannelIds: [],
+      messages: [message("fresh")],
+      removedMessageIds: [],
+      agentReplies: [freshReply],
+    });
+    ({ cleanup, root } = await renderHarness({
+      activeChannel: channel("channel-a"),
+      initialMessages: [message("stale")],
+      initialReplies: [agentReply("reply-stale")],
+      realtimeEnabled: true,
+    }));
+
+    await act(async () => {
+      realtimeTransport.emit({ topic: "channels", cursor: 8 });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(current().messages.map((item) => item.id)).toEqual(["fresh"]);
+    expect(current().replies).toEqual([freshReply]);
   });
 
   it("replaces active replies from an authoritative detail and tombstones absences", async () => {
@@ -485,6 +526,7 @@ describe("useChannelConversation", () => {
     api.loadChannelDelta.mockResolvedValueOnce({
       cursor: 1,
       hasMore: false,
+      reset: false,
       channels: [],
       removedChannelIds: [],
       messages: [],
@@ -653,7 +695,6 @@ describe("useChannelConversation", () => {
     const proposalMessage = message("proposal", {
       proposal: {
         id: "proposal-1",
-        actionType: "request_issue_create",
         status: "pending",
         projectId: "project-1",
         payload: {
@@ -661,11 +702,11 @@ describe("useChannelConversation", () => {
             title: "Follow-up",
             description: null,
             priority: 2,
-            status: "backlog",
           },
           executeAfterCreate: false,
         },
         resultRunId: null,
+        resultItems: [],
       },
     });
     api.acceptChannelProposal.mockResolvedValueOnce({
@@ -693,7 +734,6 @@ describe("useChannelConversation", () => {
     const proposalMessage = message("proposal", {
       proposal: {
         id: "proposal-1",
-        actionType: "request_issue_create",
         status: "pending",
         projectId: "project-1",
         payload: {
@@ -701,11 +741,11 @@ describe("useChannelConversation", () => {
             title: "Follow-up",
             description: null,
             priority: 2,
-            status: "backlog",
           },
           executeAfterCreate: true,
         },
         resultRunId: null,
+        resultItems: [],
       },
     });
     api.declineChannelProposal.mockResolvedValueOnce({ outcome: "declined" });
@@ -731,7 +771,6 @@ describe("useChannelConversation", () => {
     const proposalMessage = message("proposal", {
       proposal: {
         id: "proposal-1",
-        actionType: "request_issue_create",
         status: "pending",
         projectId: "project-1",
         payload: {
@@ -739,11 +778,11 @@ describe("useChannelConversation", () => {
             title: "Follow-up",
             description: null,
             priority: 2,
-            status: "backlog",
           },
           executeAfterCreate: false,
         },
         resultRunId: null,
+        resultItems: [],
       },
     });
     const pending = deferred<{

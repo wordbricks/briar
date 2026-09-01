@@ -4,88 +4,10 @@ import {
   isRepositoryWorkflowPending,
   type AutoHuntWorkflow,
 } from "./auto-hunt-contract";
+import { commands, type PreparedProjectRepository } from "../generated/tauri";
 import type { OrganizationRole, ProjectSettings } from "../types";
 import type { ProjectGithubCredential } from "./api";
-import type { AgentProvider } from "./agent-provider";
 import { hasOrganizationCapability } from "./organization-role";
-
-export type VelenOrganization = { name: string; slug: string };
-export type VelenSource = {
-  sourceKey: string;
-  sourceRef: string;
-  provider: string;
-  status: string;
-};
-export type VelenInspection = {
-  authenticated: boolean;
-  email: string | null;
-  currentOrg: string | null;
-  organizations: VelenOrganization[];
-  sources: VelenSource[];
-};
-
-export type AutoHuntHealth = {
-  projectId: string;
-  healthy: boolean;
-  repositoryPath: string | null;
-  repositoryRemote: string | null;
-  repositoryHealthy: boolean;
-  cliPath: string;
-  cliInstalled: boolean;
-  cliVersion: string | null;
-  cliExpectedVersion: string;
-  cliCurrent: boolean;
-  skillPath: string;
-  skillInstalled: boolean;
-  skillVersion: string | null;
-  skillExpectedVersion: string;
-  skillCurrent: boolean;
-  velenOrg: string | null;
-  velenAuthenticated: boolean;
-  velenEmail: string | null;
-  velenHealthy: boolean;
-  requirements?: WorkflowRequirementHealth[];
-  issues: string[];
-};
-
-export type WorkflowRequirementHealth = {
-  id: string;
-  label: string;
-  kind: NonNullable<AutoHuntWorkflow["requirements"]>[number]["kind"];
-  tool: string;
-  reason: string;
-  healthy: boolean;
-  detail: string;
-};
-
-export type RepositoryReadiness = {
-  repositoryPath: string;
-  gitInstalled: boolean;
-  gitVersion: string | null;
-  repositoryHealthy: boolean;
-  remote: string | null;
-  remoteReachable: boolean;
-  pushAccess: boolean;
-  requiresGithub: boolean;
-  githubRepositoryId?: number | null;
-  githubRepository: string | null;
-  ghInstalled: boolean;
-  ghVersion: string | null;
-  ghAuthenticated: boolean;
-  ghAccount: string | null;
-  githubWriteAccess: boolean;
-  gitReady: boolean;
-  prReady: boolean;
-  issues: string[];
-};
-
-export type LovableRepositoryCompatibility = {
-  compatible: boolean;
-  stack: "tanstack-start" | "vite-react" | null;
-  packageManager: "bun" | "npm" | "pnpm" | "yarn" | null;
-  scripts: string[];
-  issues: string[];
-};
 
 export type LocalAutoHuntConfig = {
   velenOrg: string | null;
@@ -98,19 +20,6 @@ export type LocalAutoHuntConfig = {
   workflow: AutoHuntWorkflow;
 };
 
-export type CreatedProjectWorkspace = {
-  repositoryPath: string;
-  created: boolean;
-};
-
-export type PreparedProjectRepository = {
-  repositoryPath: string;
-  repositoryId: number;
-  repository: string;
-  reused: boolean;
-  completedSteps: string[];
-};
-
 export async function prepareConfiguredProjectRepository(
   settings: Pick<ProjectSettings, "githubRepository" | "githubRepositoryId">,
   createCredential: () => Promise<ProjectGithubCredential>,
@@ -118,13 +27,20 @@ export async function prepareConfiguredProjectRepository(
     credential: ProjectGithubCredential,
   ) => Promise<PreparedProjectRepository>,
 ) {
-  if (!settings.githubRepository) {
+  if (!settings.githubRepository || settings.githubRepositoryId === null) {
     throw new Error(
       "조직의 GitHub App에서 프로젝트 저장소를 먼저 선택해 주세요.",
     );
   }
 
   const credential = await createCredential();
+  if (
+    credential.repository.id !== settings.githubRepositoryId ||
+    credential.repository.fullName.toLowerCase() !==
+      settings.githubRepository.toLowerCase()
+  ) {
+    throw new Error("GitHub 자격 증명이 프로젝트 저장소와 일치하지 않습니다.");
+  }
   const prepared = await prepareRepository(credential);
   if (
     prepared.repositoryId !== credential.repository.id ||
@@ -136,18 +52,6 @@ export async function prepareConfiguredProjectRepository(
 
   return { credential, prepared };
 }
-
-export type ConnectedLocalProject = {
-  repositoryPath: string;
-  workflow: AutoHuntWorkflow;
-};
-
-export type LocalProjectConnectionPreflight = {
-  repositoryPath: string;
-  repositoryRemote: string | null;
-  provider: AgentProvider;
-};
-
 export async function preflightThenCreateProject<T>(
   preflight: () => Promise<T>,
   create?: () => Promise<unknown>,
@@ -199,49 +103,38 @@ const isTauri = () => "__TAURI_INTERNALS__" in window;
 
 export async function loadConnectedProjectIds(): Promise<string[] | null> {
   if (!isTauri()) return null;
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<string[]>("connected_project_ids");
+  return commands.connectedProjectIds();
 }
 
 export async function pickGitRepository(): Promise<string | null> {
   if (!isTauri()) {
     throw new Error("저장소 선택은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
   }
-  const [{ open }, { invoke }] = await Promise.all([
-    import("@tauri-apps/plugin-dialog"),
-    import("@tauri-apps/api/core"),
-  ]);
+  const { open } = await import("@tauri-apps/plugin-dialog");
   const selected = await open({
     directory: true,
     multiple: false,
     title: "Briar에 연결할 Git 저장소 선택",
   });
   if (!selected) return null;
-  return invoke<string>("validate_repository_path", { path: selected });
+  return commands.validateRepositoryPath(selected);
 }
 
-export async function createProjectWorkspace(
-  name: string,
-): Promise<CreatedProjectWorkspace> {
+export async function createProjectWorkspace(name: string) {
   if (!isTauri()) {
     throw new Error("새 프로젝트 폴더 만들기는 Briar 데스크톱 앱에서 사용할 수 있습니다.");
   }
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<CreatedProjectWorkspace>("create_project_workspace", { name });
+  return commands.createProjectWorkspace(name);
 }
 
 export async function prepareProjectRepository(
   projectId: string,
   credential: ProjectGithubCredential,
-): Promise<PreparedProjectRepository> {
+) {
   if (!isTauri()) {
     throw new Error("이 컴퓨터에서 작업 시작은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
   }
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<PreparedProjectRepository>("prepare_project_repository", {
-    projectId,
-    credential,
-  });
+  return commands.prepareProjectRepository(projectId, credential);
 }
 
 export async function inspectRepositoryReadiness(
@@ -251,11 +144,7 @@ export async function inspectRepositoryReadiness(
   if (!isTauri()) {
     throw new Error("Git 저장소 검사는 Briar 데스크톱 앱에서 사용할 수 있습니다.");
   }
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<RepositoryReadiness>("inspect_repository_readiness", {
-    repositoryPath,
-    workflow,
-  });
+  return commands.inspectRepositoryReadiness(repositoryPath, workflow);
 }
 
 export async function inspectLovableRepositoryCompatibility(
@@ -264,29 +153,19 @@ export async function inspectLovableRepositoryCompatibility(
   if (!isTauri()) {
     throw new Error("Lovable 저장소 검사는 Briar 데스크톱 앱에서 사용할 수 있습니다.");
   }
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<LovableRepositoryCompatibility>(
-    "inspect_lovable_repository_compatibility",
-    { repositoryPath },
-  );
+  return commands.inspectLovableRepositoryCompatibility(repositoryPath);
 }
 
 export async function discoverRepositoryIcon(
   repositoryPath: string,
 ): Promise<string | null> {
   if (!isTauri()) return null;
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<string | null>("discover_repository_icon", {
-    repositoryPath,
-  });
+  return commands.discoverRepositoryIcon(repositoryPath);
 }
 
 export async function loadProjectRepositoryReadiness(projectId: string) {
   if (!isTauri()) return null;
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<RepositoryReadiness>("project_repository_readiness", {
-    projectId,
-  });
+  return commands.projectRepositoryReadiness(projectId);
 }
 
 export async function preflightLocalProjectConnection(input: {
@@ -296,13 +175,9 @@ export async function preflightLocalProjectConnection(input: {
   if (!isTauri()) {
     throw new Error("프로젝트 연결 검사는 Briar 데스크톱 앱에서 사용할 수 있습니다.");
   }
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<LocalProjectConnectionPreflight>(
-    "preflight_local_project_connection",
-    {
-      repositoryPath: input.repositoryPath,
-      autoHunt: input.autoHunt,
-    },
+  return commands.preflightLocalProjectConnection(
+    input.repositoryPath,
+    input.autoHunt,
   );
 }
 
@@ -315,14 +190,17 @@ export async function connectLocalProject(input: {
   if (!isTauri()) {
     throw new Error("프로젝트 연결은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
   }
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<ConnectedLocalProject>("connect_local_project", {
-    apiUrl: briarApiUrl,
-    projectId: input.projectId,
-    agentToken: input.agentToken,
-    repositoryPath: input.repositoryPath,
-    autoHunt: input.autoHunt,
-  });
+  const connected = await commands.connectLocalProject(
+    briarApiUrl,
+    input.projectId,
+    input.agentToken,
+    input.repositoryPath,
+    input.autoHunt,
+  );
+  return {
+    ...connected,
+    workflow: canonicalizeProjectWorkflow(connected.workflow),
+  };
 }
 
 export async function configureLocalExecutionWorker(
@@ -333,13 +211,8 @@ export async function configureLocalExecutionWorker(
   if (!isTauri()) {
     throw new Error("Worker 설정은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
   }
-  const { invoke } = await import("@tauri-apps/api/core");
   try {
-    return await invoke("configure_execution_worker", {
-      projectId,
-      userToken,
-      enabled,
-    });
+    return await commands.configureExecutionWorker(projectId, userToken, enabled);
   } catch (caught) {
     const message = caught instanceof Error ? caught.message : String(caught);
     const cleanupIncompletePrefix = "BRIAR_WORKER_CLEANUP_INCOMPLETE: ";
@@ -352,8 +225,7 @@ export async function configureLocalExecutionWorker(
 
 export async function disconnectLocalProject(projectId: string) {
   if (!isTauri()) return;
-  const { invoke } = await import("@tauri-apps/api/core");
-  await invoke("disconnect_local_project", { projectId });
+  await commands.disconnectLocalProject(projectId);
 }
 
 export async function updateLocalProjectWorkflow(
@@ -363,11 +235,9 @@ export async function updateLocalProjectWorkflow(
   if (!isTauri()) {
     throw new Error("워크플로우 갱신은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
   }
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<AutoHuntWorkflow>("update_local_project_workflow", {
-    projectId,
-    workflow,
-  });
+  return canonicalizeProjectWorkflow(
+    await commands.updateLocalProjectWorkflow(projectId, workflow),
+  );
 }
 
 export async function updateLocalProjectVelenOrg(
@@ -377,33 +247,24 @@ export async function updateLocalProjectVelenOrg(
   if (!isTauri()) {
     throw new Error("Velen 연결 갱신은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
   }
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<string | null>("update_local_project_velen_org", {
-    projectId,
-    org,
-  });
+  return commands.updateLocalProjectVelenOrg(projectId, org);
 }
 
 export async function inspectVelen(org?: string | null) {
   if (!isTauri()) {
     throw new Error("Velen 설정은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
   }
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<VelenInspection>("inspect_velen", {
-    org: org || null,
-  });
+  return commands.inspectVelen(org || null);
 }
 
 export async function loadAutoHuntHealth(projectId: string) {
   if (!isTauri()) return null;
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<AutoHuntHealth>("auto_hunt_health", { projectId });
+  return commands.autoHuntHealth(projectId);
 }
 
 export async function repairAutoHunt(projectId: string) {
   if (!isTauri()) {
     throw new Error("복구 설치는 Briar 데스크톱 앱에서 사용할 수 있습니다.");
   }
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<AutoHuntHealth>("repair_auto_hunt", { projectId });
+  return commands.repairAutoHunt(projectId);
 }

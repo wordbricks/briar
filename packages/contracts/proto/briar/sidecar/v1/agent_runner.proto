@@ -1,0 +1,149 @@
+syntax = "proto3";
+
+package briar.sidecar.v1;
+
+import "briar/types/v1/agent_event.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+// This protocol is carried as length-delimited protobuf messages over a
+// runner process's stdin and stdout. Diagnostics belong on stderr.
+//
+// A parent sends exactly one RunRequest, may answer ApprovalRequest messages,
+// and reads RunnerOutput messages until Result, Blocked, or Error terminates
+// the turn. The process boundary is deliberately not modeled as a Connect
+// service: it is a private duplex byte stream rather than HTTP.
+
+enum ApprovalPolicy {
+  APPROVAL_POLICY_UNSPECIFIED = 0;
+  APPROVAL_POLICY_UNTRUSTED = 1;
+  APPROVAL_POLICY_ON_REQUEST = 2;
+  APPROVAL_POLICY_NEVER = 3;
+}
+
+enum SandboxMode {
+  SANDBOX_MODE_UNSPECIFIED = 0;
+  SANDBOX_MODE_READ_ONLY = 1;
+  SANDBOX_MODE_WORKSPACE_WRITE = 2;
+  SANDBOX_MODE_DANGER_FULL_ACCESS = 3;
+}
+
+enum BlockReason {
+  BLOCK_REASON_UNSPECIFIED = 0;
+  BLOCK_REASON_MCP_AUTH_REQUIRED = 1;
+  BLOCK_REASON_USAGE_EXHAUSTED = 2;
+  BLOCK_REASON_UPSTREAM_OVERLOADED = 3;
+  BLOCK_REASON_FREE_TIER_LIMIT = 4;
+}
+
+enum RunErrorCode {
+  RUN_ERROR_CODE_UNSPECIFIED = 0;
+  RUN_ERROR_CODE_INVALID_REQUEST = 1;
+  RUN_ERROR_CODE_PROVIDER_START_FAILED = 2;
+  RUN_ERROR_CODE_PROVIDER_PROTOCOL_ERROR = 3;
+  RUN_ERROR_CODE_PROVIDER_FAILED = 4;
+  RUN_ERROR_CODE_INTERNAL = 5;
+}
+
+message ParentToRunner {
+  oneof payload {
+    RunRequest run = 1;
+    ApprovalResponse approval_response = 2;
+  }
+}
+
+message RunnerToParent {
+  oneof payload {
+    SessionStarted session_started = 1;
+    ProviderEvent event = 2;
+    ApprovalRequest approval = 3;
+    RunResult result = 4;
+    RunBlocked blocked = 5;
+    RunError error = 6;
+  }
+}
+
+message RunRequest {
+  string message = 1;
+  string workspace_root = 2;
+  optional string conversation_id = 3;
+  optional string instructions = 4;
+  optional JsonSchema output_schema = 5;
+  optional string model = 6;
+  optional string effort = 7;
+  ApprovalPolicy approval_policy = 8;
+  SandboxMode sandbox_mode = 9;
+  bool network_access = 10;
+  repeated ImageAttachment attachments = 11;
+  repeated string additional_directories = 12;
+  optional bool external_tools = 13;
+
+  // The runner bundle is provider-specific, so it needs only the executable
+  // it must launch. Keeping the field provider-neutral removes six request
+  // shapes whose only structural difference was the executable field name.
+  string provider_binary_path = 14;
+
+  // SHA-256 of the canonical compiled Briar descriptor image used to generate
+  // both endpoints.
+  // A runner must reject an empty or mismatched fingerprint; there is no
+  // protocol negotiation or legacy fallback between co-shipped binaries.
+  bytes protocol_fingerprint = 15;
+}
+
+message JsonSchema {
+  oneof value {
+    google.protobuf.Struct object = 1;
+    bool boolean = 2;
+  }
+}
+
+message ImageAttachment {
+  string path = 1;
+  string name = 2;
+  string mime_type = 3;
+}
+
+message ApprovalResponse {
+  string id = 1;
+  bool approved = 2;
+}
+
+message SessionStarted {
+  string session_id = 1;
+}
+
+message ProviderEvent {
+  // Provider SDK messages are not Briar-owned. They remain the sole open
+  // escape hatch while the normalized event beside them is fully typed.
+  google.protobuf.Value raw = 1;
+  optional briar.types.v1.NormalizedAgentEvent normalized = 2;
+  briar.types.v1.AgentEventDirection direction = 3;
+}
+
+message ApprovalRequest {
+  string id = 1;
+  string tool_name = 2;
+  google.protobuf.Struct input = 3;
+  optional string title = 4;
+}
+
+message RunResult {
+  string session_id = 1;
+  string message = 2;
+}
+
+message RunBlocked {
+  BlockReason reason = 1;
+  string message = 2;
+  // Provider-specific block diagnostics may name an upstream model provider,
+  // not one of Briar's configured runner providers.
+  optional string provider = 3;
+  repeated string server_names = 4;
+  optional google.protobuf.Timestamp next_retry_at = 5;
+  optional uint32 status_code = 6;
+}
+
+message RunError {
+  RunErrorCode code = 1;
+  string message = 2;
+}

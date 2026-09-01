@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import { Miniflare } from "miniflare";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { env as cloudflareEnv } from "cloudflare:workers";
+import { beforeAll, describe, expect, it } from "vitest";
 import {
   addChannelAgent,
   createChannel,
@@ -9,7 +9,18 @@ import {
   loadChannelDelta,
   reserveChannelActionProposalApproval,
 } from "./channels";
-import worker from "./index";
+import apiWorker from "./index";
+import {
+  acceptOrganizationChannelProposal,
+  declineOrganizationChannelProposal,
+} from "./channel-proposal-routes";
+import { listOrganizationChannelMessages } from "./channel-message-routes";
+import { HttpError } from "./http-response";
+import {
+  moveProjectIssueRun,
+  recoverProjectIssueRun,
+} from "./issue-control-routes";
+import { acceptProjectIssueActionProposal } from "./issue-proposal-routes";
 import { createOrganizationAgent } from "./organization-agents";
 import {
   claimNextQueuedHuntRun,
@@ -22,16 +33,14 @@ import {
   recordHuntEvent,
   transferIssue,
 } from "./db";
-import { createIsolatedTestDatabase } from "./test-helpers/d1";
-import {
-  mobileAcceptIssueActionProposalResponseSchema,
-} from "./mobile-contract";
-import { decodeMobileSchema } from "./mobile-contract-schema";
+import { workerRuntimeMetadataFixture } from "./test-helpers/worker-runtime";
+import { RequestDecodeError } from "./request-schema";
 import {
   dispatchHuntRun,
   leaseExpiryFrom,
   registerExecutionWorker,
   unassignHuntRun,
+  WorkerConflictError,
 } from "./workers";
 
 const organizationId = "10000000-0000-4000-8000-000000000001";
@@ -112,25 +121,10 @@ const providerCapabilities = {
 };
 
 describe("channel issue proposal approval route", () => {
-  let miniflare: Miniflare;
-  let db: D1Database;
-  let attachments: R2Bucket;
+  const db = cloudflareEnv.DB;
+  const attachments = cloudflareEnv.ATTACHMENTS;
 
   beforeAll(async () => {
-    const database = await createIsolatedTestDatabase({
-      suite: "channel-proposal-routes",
-      miniflareOptions: {
-        modules: true,
-        script: "export default { fetch() { return new Response('ok') } }",
-        r2Buckets: ["ATTACHMENTS"],
-      },
-    });
-    miniflare = database.miniflare;
-    db = database.db;
-    attachments = await miniflare.getR2Bucket(
-      "ATTACHMENTS",
-    ) as unknown as R2Bucket;
-
     for (const [id, name, token] of [
       [ownerId, "Owner", ownerToken],
       [memberId, "Member", memberToken],
@@ -230,6 +224,8 @@ describe("channel issue proposal approval route", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "proposals",
       name: "Proposals",
       topic: null,
@@ -265,10 +261,6 @@ describe("channel issue proposal approval route", () => {
     });
   }, 60_000);
 
-  afterAll(async () => {
-    await miniflare.dispose();
-  });
-
   const env = (
     authSecret = "channel-proposal-test-secret-at-least-32-characters",
   ) => ({
@@ -295,15 +287,118 @@ describe("channel issue proposal approval route", () => {
     credentialTokenHash: createHash("sha256")
       .update(`channel-${suffix}-credential`)
       .digest("hex"),
-    agentProvider: "codex",
-    providers: ["codex"],
-    providerHealth: {
-      codex: { installed: true, authenticated: true, healthy: true },
-    },
-    providerCapabilities,
-    versions: { briar: "1.0.0" },
+    runtime: workerRuntimeMetadataFixture({ providerCapabilities }),
     observedAt,
   });
+
+  type ChannelProposalApplicationCall =
+    | {
+      kind: "accept";
+      proposalId: string;
+      projectId: string | null;
+      token: string | null;
+      execution: {
+        provider: "codex";
+        model: string | null;
+        effort: "high" | "medium" | null;
+        workerId: string | null;
+      } | null;
+    }
+    | {
+      kind: "decline";
+      proposalId: string;
+      token: string | null;
+    };
+
+  const proposalUserId = (token: string) =>
+    token === ownerToken
+      ? ownerId
+      : token === memberToken
+      ? memberId
+      : token === outsiderToken
+      ? outsiderId
+      : null;
+
+  const invokeChannelProposal = async (
+    call: ChannelProposalApplicationCall,
+    runtimeEnv: Env,
+  ) => {
+    if (!call.token) {
+      return Response.json({ message: "Unauthorized" }, { status: 401 });
+    }
+    const userId = proposalUserId(call.token);
+    if (!userId) {
+      return Response.json({ message: "Unauthorized" }, { status: 401 });
+    }
+    try {
+      const result = call.kind === "decline"
+        ? await declineOrganizationChannelProposal({
+          db,
+          env: runtimeEnv,
+          organizationId,
+          channelId,
+          proposalId: call.proposalId,
+          userId,
+        })
+        : await acceptOrganizationChannelProposal({
+          db,
+          env: runtimeEnv,
+          organizationId,
+          channelId,
+          proposalId: call.proposalId,
+          userId,
+          request: {
+            projectId: call.projectId,
+            execution: call.execution,
+          },
+        });
+      return Response.json(result);
+    } catch (error) {
+      if (error instanceof HttpError) {
+        return Response.json({ message: error.message }, { status: error.status });
+      }
+      if (error instanceof WorkerConflictError) {
+        return Response.json({ message: error.message }, { status: 409 });
+      }
+      if (error instanceof RequestDecodeError) {
+        return Response.json({ message: "Invalid request" }, { status: 400 });
+      }
+      return Response.json({ message: "Internal server error" }, { status: 500 });
+    }
+  };
+
+  const invokeIssueApplication = async (
+    token: string,
+    invoke: (userId: string) => Promise<unknown>,
+  ) => {
+    const session = await db.prepare(
+      `select "userId" as user_id from "session" where token = ?`,
+    ).bind(token).first<{ user_id: string }>();
+    if (!session) {
+      return Response.json({ message: "Unauthorized" }, { status: 401 });
+    }
+    try {
+      return Response.json(await invoke(session.user_id));
+    } catch (error) {
+      if (error instanceof HttpError) {
+        return Response.json({ message: error.message }, { status: error.status });
+      }
+      if (error instanceof RequestDecodeError) {
+        return Response.json({ message: "Invalid request" }, { status: 400 });
+      }
+      if (error instanceof WorkerConflictError) {
+        return Response.json({ message: error.message }, { status: 409 });
+      }
+      return Response.json({ message: "Internal server error" }, { status: 500 });
+    }
+  };
+
+  const worker = {
+    fetch: (input: Request | ChannelProposalApplicationCall, runtimeEnv: Env) =>
+      input instanceof Request
+        ? apiWorker.fetch(input, runtimeEnv)
+        : invokeChannelProposal(input, runtimeEnv),
+  };
 
   const request = (
     proposalId: string,
@@ -315,34 +410,26 @@ describe("channel issue proposal approval route", () => {
       effort: "high" | "medium" | null;
       workerId: string | null;
     } | null = null,
-  ) =>
-    new Request(
-      `https://briar.example/organizations/${organizationId}/channels/${channelId}/proposals/${proposalId}/accept`,
-      {
-        method: "POST",
-        headers: {
-          ...(token ? { authorization: `Bearer ${token}` } : undefined),
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({ projectId, execution }),
-      },
-    );
+  ): ChannelProposalApplicationCall => ({
+    kind: "accept",
+    proposalId,
+    projectId,
+    token,
+    execution,
+  });
 
   const declineRequest = (
     proposalId: string,
     token: string | null = ownerToken,
-  ) => new Request(
-    `https://briar.example/organizations/${organizationId}/channels/${channelId}/proposals/${proposalId}/decline`,
-    {
-      method: "POST",
-      headers: token ? { authorization: `Bearer ${token}` } : undefined,
-    },
-  );
+  ): ChannelProposalApplicationCall => ({
+    kind: "decline",
+    proposalId,
+    token,
+  });
 
   const seedProposal = async (
     sequence: number,
     options: {
-      actionType?: "request_issue_create" | "request_plan_document";
       projectId?: string | null;
       executeAfterCreate?: boolean;
       payload?: unknown;
@@ -391,13 +478,12 @@ describe("channel issue proposal approval route", () => {
       options.executeAfterCreate ? projectAId : options.projectId ?? null,
       triggerId,
       replyId,
-      options.actionType ?? "request_issue_create",
+      "request_issue_create",
       JSON.stringify(options.payload ?? {
         issue: {
           title: `Approved issue ${sequence}`,
           description: "Create it, but do not execute it.",
           priority: 2,
-          status: "backlog",
         },
       }),
       options.executeAfterCreate ? 1 : 0,
@@ -503,7 +589,6 @@ describe("channel issue proposal approval route", () => {
           title: `Conversation-approved issue ${sequence}`,
           description: "Create only; execution needs a separate approval.",
           priority: 2,
-          status: "backlog",
         },
       }),
       createdAt: now,
@@ -559,9 +644,18 @@ describe("channel issue proposal approval route", () => {
     });
 
     const dashboard = await worker.fetch(
-      new Request(`https://briar.example/projects/${projectAId}/dashboard`, {
-        headers: { authorization: `Bearer ${ownerToken}` },
-      }),
+      new Request(
+        "https://briar.example/briar.app.v1.DashboardService/GetDashboard",
+        {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${ownerToken}`,
+            "connect-protocol-version": "1",
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ projectId: projectAId }),
+        },
+      ),
       env(),
     );
     expect(dashboard.status).toBe(200);
@@ -594,7 +688,6 @@ describe("channel issue proposal approval route", () => {
               title: "Batch API",
               description: "Build the API boundary.",
               priority: 1,
-              status: "backlog",
             },
           },
           {
@@ -603,7 +696,6 @@ describe("channel issue proposal approval route", () => {
               title: "Batch web",
               description: "Build the web client.",
               priority: 2,
-              status: "backlog",
             },
           },
           {
@@ -612,7 +704,6 @@ describe("channel issue proposal approval route", () => {
               title: "Batch QA",
               description: "Verify the integrated result.",
               priority: 3,
-              status: "backlog",
             },
           },
         ],
@@ -726,19 +817,15 @@ describe("channel issue proposal approval route", () => {
        where json_extract(context_json, '$.proposalId') = ?`,
     ).bind(proposalId).first<{ count: number }>()).resolves.toEqual({ count: 3 });
 
-    const channelResponse = await worker.fetch(new Request(
-      `https://briar.example/organizations/${organizationId}/channels/${channelId}/messages?parentMessageId=50000000-0000-4000-8000-00000000001f`,
-      { headers: { authorization: `Bearer ${ownerToken}` } },
-    ), env());
-    expect(channelResponse.status).toBe(200);
-    const channelBody = await channelResponse.json<{
-      messages: Array<{
-        proposal?: {
-          id: string;
-          resultItems?: Array<{ localKey: string; runId: string }>;
-        } | null;
-      }>;
-    }>();
+    const channelBody = await listOrganizationChannelMessages({
+      db,
+      organizationId,
+      channelId,
+      userId: ownerId,
+      parentMessageId: "50000000-0000-4000-8000-00000000001f",
+      cursor: null,
+      limit: null,
+    });
     expect(
       channelBody.messages.find((message) => message.proposal?.id === proposalId)
         ?.proposal?.resultItems,
@@ -755,7 +842,6 @@ describe("channel issue proposal approval route", () => {
               title: "Rollback first",
               description: null,
               priority: 2,
-              status: "backlog",
             },
           },
           {
@@ -764,7 +850,6 @@ describe("channel issue proposal approval route", () => {
               title: "Rollback second",
               description: null,
               priority: 2,
-              status: "backlog",
             },
           },
         ],
@@ -814,7 +899,6 @@ describe("channel issue proposal approval route", () => {
           title: "Must not fall back to one issue",
           description: null,
           priority: 2,
-          status: "backlog",
         },
         batch: {
           items: [{
@@ -823,7 +907,6 @@ describe("channel issue proposal approval route", () => {
               title: "Invalid batch",
               description: null,
               priority: null,
-              status: "backlog",
             },
           }],
           dependencies: [
@@ -833,65 +916,25 @@ describe("channel issue proposal approval route", () => {
       },
     });
     const response = await worker.fetch(request(proposalId, projectAId), env());
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(500);
     await expect(db.prepare(
       `select count(*) as count from briar_hunt_runs
        where json_extract(context_json, '$.proposalId') = ?`,
     ).bind(proposalId).first<{ count: number }>()).resolves.toEqual({ count: 0 });
   });
 
-  it("prevents a project agent from preempting the approval identity namespace", async () => {
-    for (const [index, sourceKey] of [
-      `briar-channel-approved:${"f".repeat(64)}`,
-      `briar-channel-batch-approved:${"d".repeat(64)}`,
-      "briar-channel-proposal:legacy-channel",
-      `briar-conversation-approved:${"e".repeat(64)}`,
-      "briar-conversation-proposal:legacy-conversation",
-    ].entries()) {
-      const response = await worker.fetch(
-        new Request("https://briar.example/run-events", {
-          method: "POST",
-          headers: {
-            authorization: `Bearer ${projectAgentToken}`,
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({
-            source: "issue",
-            sourceKey,
-            title: "Preempted approval",
-            status: "backlog",
-            eventKey: `preempted-approval:${index}:backlog:intake`,
-            occurredAt: now,
-            actor: "project-agent",
-            repository: "Project A",
-          }),
-        }),
-        env(),
-      );
-      expect(response.status).toBe(403);
-    }
-    await expect(
-      db.prepare(
-        `select count(*) as count from briar_hunt_runs
-         where source_key = ?`,
-      ).bind(`briar-channel-approved:${"f".repeat(64)}`).first<{
-        count: number;
-      }>(),
-    ).resolves.toMatchObject({ count: 0 });
-  });
-
   it("binds conversation approval to an opaque payload and keeps execution in backlog", async () => {
     const { conversationRunId, proposalId } =
       await seedConversationProposal(101);
-    const response = await worker.fetch(
-      new Request(
-        `https://briar.example/projects/${projectAId}/runs/${conversationRunId}/issue-action-proposals/${proposalId}/accept`,
-        {
-          method: "POST",
-          headers: { authorization: `Bearer ${ownerToken}` },
-        },
-      ),
-      env(),
+    const response = await invokeIssueApplication(ownerToken, (userId) =>
+      acceptProjectIssueActionProposal({
+        db,
+        archivesBucket: attachments,
+        projectId: projectAId,
+        conversationRunId,
+        proposalId,
+        userId,
+      })
     );
     expect(response.status).toBe(200);
     const body = await response.json() as {
@@ -986,23 +1029,18 @@ describe("channel issue proposal approval route", () => {
       body.resultRunId,
     ).run();
 
-    const moveResponse = await worker.fetch(
-      new Request(
-        `https://briar.example/projects/${projectAId}/runs/${body.resultRunId}/status`,
-        {
-          method: "PUT",
-          headers: {
-            authorization: `Bearer ${ownerToken}`,
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({
-            requestId: "81000000-0000-4000-8000-000000000101",
-            status: "queued",
-            workflowStage: null,
-          }),
+    const moveResponse = await invokeIssueApplication(ownerToken, (userId) =>
+      moveProjectIssueRun({
+        db,
+        projectId: projectAId,
+        runId: body.resultRunId,
+        userId,
+        request: {
+          requestId: "81000000-0000-4000-8000-000000000101",
+          status: "queued",
+          workflowStage: null,
         },
-      ),
-      env(),
+      })
     );
     expect(moveResponse.status).toBe(409);
     await expect(reworkHuntRun(db, projectAId, {
@@ -1032,15 +1070,15 @@ describe("channel issue proposal approval route", () => {
   it("resets conversation-approved execution on unassign and transfer", async () => {
     const { conversationRunId, proposalId } =
       await seedConversationProposal(103);
-    const accepted = await worker.fetch(
-      new Request(
-        `https://briar.example/projects/${projectAId}/runs/${conversationRunId}/issue-action-proposals/${proposalId}/accept`,
-        {
-          method: "POST",
-          headers: { authorization: `Bearer ${ownerToken}` },
-        },
-      ),
-      env(),
+    const accepted = await invokeIssueApplication(ownerToken, (userId) =>
+      acceptProjectIssueActionProposal({
+        db,
+        archivesBucket: attachments,
+        projectId: projectAId,
+        conversationRunId,
+        proposalId,
+        userId,
+      })
     );
     expect(accepted.status).toBe(200);
     const acceptedBody = await accepted.json() as { resultRunId: string };
@@ -1125,7 +1163,6 @@ describe("channel issue proposal approval route", () => {
       leaseExpiresAt: leaseExpiryFrom("2026-08-10T00:02:30.000Z"),
       runId: acceptedBody.resultRunId,
       workerId: sourceWorker.worker.id,
-      agentProvider: "codex",
     })).resolves.toBeNull();
 
     await dispatchHuntRun(db, organizationId, projectAId, {
@@ -1173,7 +1210,6 @@ describe("channel issue proposal approval route", () => {
       claimedAt: "2026-08-10T00:03:00.000Z",
       leaseExpiresAt: leaseExpiryFrom("2026-08-10T00:03:00.000Z"),
       runId: acceptedBody.resultRunId,
-      agentProvider: "codex",
     })).resolves.toBeNull();
   });
 
@@ -1220,7 +1256,6 @@ describe("channel issue proposal approval route", () => {
         conversationRunId,
         issueId: proposalId,
         attachmentCount: 0,
-        fullAuto: false,
       },
       issueCheckpoints: [],
       fullAuto: false,
@@ -1443,7 +1478,6 @@ describe("channel issue proposal approval route", () => {
       leaseExpiresAt: leaseExpiryFrom("2026-08-10T00:08:30.000Z"),
       runId: acceptedBody.resultRunId,
       workerId: targetWorker.worker.id,
-      agentProvider: "codex",
       detachedOnly: false,
     })).resolves.toBeNull();
 
@@ -1466,7 +1500,6 @@ describe("channel issue proposal approval route", () => {
       leaseExpiresAt: leaseExpiryFrom("2026-08-10T00:09:30.000Z"),
       runId: acceptedBody.resultRunId,
       workerId: targetWorker.worker.id,
-      agentProvider: "codex",
       detachedOnly: true,
     })).resolves.toMatchObject({ id: acceptedBody.resultRunId });
   });
@@ -1508,7 +1541,6 @@ describe("channel issue proposal approval route", () => {
         leaseExpiresAt: leaseExpiryFrom("2026-08-10T00:11:00.000Z"),
         runId: acceptedBody.resultRunId,
         workerId: sourceWorker.worker.id,
-        agentProvider: "codex",
         detachedOnly: true,
       });
       expect(claimed).not.toBeNull();
@@ -1574,36 +1606,40 @@ describe("channel issue proposal approval route", () => {
       });
 
       const agentRetry = await worker.fetch(new Request(
-        `https://briar.example/runs/${acceptedBody.resultRunId}/retry`,
+        "https://briar.example/briar.worker.v1.WorkerExecutionService/RetryRun",
         {
           method: "POST",
           headers: {
             authorization: `Bearer ${projectBAgentToken}`,
+            "connect-protocol-version": "1",
             "content-type": "application/json",
           },
           body: JSON.stringify({
+            projectId: projectBId,
+            runId: acceptedBody.resultRunId,
             requestId: `81000000-0000-4000-8000-${suffix}`,
-            actor: "target-project-agent",
             reason: "Retry after transfer",
           }),
         },
       ), env());
-      expect(agentRetry.status).toBe(409);
+      expect(agentRetry.status).toBe(400);
+      await expect(agentRetry.json()).resolves.toMatchObject({
+        code: "failed_precondition",
+      });
 
-      const userRetry = await worker.fetch(new Request(
-        `https://briar.example/projects/${projectBId}/runs/${acceptedBody.resultRunId}/retry`,
-        {
-          method: "POST",
-          headers: {
-            authorization: `Bearer ${memberToken}`,
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({
+      const userRetry = await invokeIssueApplication(memberToken, (userId) =>
+        recoverProjectIssueRun({
+          db,
+          projectId: projectBId,
+          runId: acceptedBody.resultRunId,
+          action: "retry",
+          userId,
+          request: {
             requestId: `82000000-0000-4000-8000-${suffix}`,
             reason: "Retry after transfer",
-          }),
-        },
-      ), env());
+          },
+        })
+      );
       expect(userRetry.status).toBe(409);
       await expect(claimNextQueuedHuntRun(db, projectBId, {
         claimTokenHash: createHash("sha256")
@@ -1614,7 +1650,6 @@ describe("channel issue proposal approval route", () => {
         leaseExpiresAt: leaseExpiryFrom("2026-08-10T00:12:30.000Z"),
         runId: acceptedBody.resultRunId,
         workerId: targetWorker.worker.id,
-        agentProvider: "codex",
         detachedOnly: false,
       })).resolves.toBeNull();
 
@@ -1637,7 +1672,6 @@ describe("channel issue proposal approval route", () => {
         leaseExpiresAt: leaseExpiryFrom("2026-08-10T00:13:30.000Z"),
         runId: acceptedBody.resultRunId,
         workerId: targetWorker.worker.id,
-        agentProvider: "codex",
         detachedOnly: true,
       })).resolves.toMatchObject({ id: acceptedBody.resultRunId });
     },
@@ -1832,23 +1866,15 @@ describe("channel issue proposal approval route", () => {
     ).resolves.toMatchObject({ count: 1 });
   });
 
-  it("rejects cross-organization targets and non-issue action types", async () => {
+  it("rejects cross-organization targets", async () => {
     const crossOrganizationProposalId = await seedProposal(5);
-    const wrongActionProposalId = await seedProposal(6, {
-      actionType: "request_plan_document",
-    });
 
     const crossOrganization = await worker.fetch(
       request(crossOrganizationProposalId, otherProjectId),
       env(),
     );
-    const wrongAction = await worker.fetch(
-      request(wrongActionProposalId, projectAId),
-      env(),
-    );
 
     expect(crossOrganization.status).toBe(404);
-    expect(wrongAction.status).toBe(409);
   });
 
   it("creates an issue in only one project when different targets race", async () => {

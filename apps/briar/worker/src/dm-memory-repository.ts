@@ -191,7 +191,12 @@ export async function saveDmMemory(
   const payloadHash = await sha256(JSON.stringify({ ...input, body, documentId: documentId ?? null }));
   const previous = await findCommit(db, space.id, input.requestId);
   if (previous) {
-    if (previous.payload_hash !== payloadHash || !previous.applied || !previous.document_id) {
+    if (
+      previous.payload_hash !== payloadHash
+      || !previous.applied
+      || !previous.document_id
+      || previous.result_version === null
+    ) {
       throw new HttpError(409, "Request ID was already used", "idempotency_conflict");
     }
     return { documentId: previous.document_id, version: previous.result_version, replayed: true };
@@ -267,7 +272,12 @@ export async function saveDmMemory(
   statements.push(finishCommit(db, commitId));
   await db.batch(statements);
   const committed = await findCommit(db, space.id, input.requestId);
-  if (!committed?.applied || committed.payload_hash !== payloadHash) {
+  if (
+    !committed?.applied
+    || committed.payload_hash !== payloadHash
+    || !committed.document_id
+    || committed.result_version === null
+  ) {
     throw new HttpError(409, "Memory or its permissions changed; reload", "version_conflict");
   }
   return { documentId: committed.document_id, version: committed.result_version, replayed: committed.id !== commitId };

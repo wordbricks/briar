@@ -1,11 +1,13 @@
 import * as Equivalence from "effect/Equivalence";
+import { encodeStructuredAgentResultJson } from "../../src/lib/agent-result";
 import {
   isTerminalTrackerState,
   additionalWorkflowCheckpoints,
+  decodeAutoHuntWorkflowCheckpointsJson,
+  encodeAutoHuntWorkflowCheckpointsJson,
   isRepositoryWorkflowPending,
   requiredWorkflowStages,
   workflowWithAdditionalCheckpoints,
-  type AutoHuntWorkflowCheckpoint,
 } from "../../src/lib/auto-hunt-contract";
 import { workflowSnapshotForRun } from "./workflow-policy";
 
@@ -37,7 +39,6 @@ import {
 } from "./run-identity";
 import { loadStageRevisionRequirements } from "./run-stage-revision-repository";
 import { assertWorkflowRunCompletion } from "./workflow-completion-repository";
-import { defaultIssueDifficulty } from "../../src/lib/issue-difficulty";
 
 type ComparableHuntEvent = Pick<
   HuntEventRow,
@@ -266,6 +267,13 @@ export async function recordHuntEvent(
   db: D1Database,
   projectId: string,
   input: HuntEventInput,
+  options: {
+    newRunId?: string;
+    additionalStatements?: (context: {
+      runId: string;
+      recordedAt: string;
+    }) => readonly D1PreparedStatement[];
+  } = {},
 ) {
   const normalizedInput = {
     ...input,
@@ -291,9 +299,9 @@ export async function recordHuntEvent(
         normalizedInput.fullAuto === true,
       );
   const issueCheckpointSnapshot = existingRun
-    ? (JSON.parse(
-        existingRun.issue_checkpoints_json || "[]",
-      ) as AutoHuntWorkflowCheckpoint[])
+    ? decodeAutoHuntWorkflowCheckpointsJson(
+      existingRun.issue_checkpoints_json,
+    )
     : normalizedInput.fullAuto
       ? []
       : additionalWorkflowCheckpoints(
@@ -362,8 +370,7 @@ export async function recordHuntEvent(
     }
   }
 
-  const runId =
-    existingRun?.id ??
+  const runId = existingRun?.id ?? options.newRunId ??
     (await digestRunId(
       projectId,
       normalizedInput.source,
@@ -389,13 +396,7 @@ export async function recordHuntEvent(
     normalizedInput.stage === "production_qa" && qaStatus === "pending"
       ? "pending"
       : null;
-  // Difficulty is issue metadata, so a newly-created issue stays unset when
-  // its caller omits the field. Preserve the legacy fallback for non-issue
-  // event callers that still rely on it.
-  const storedDifficulty =
-    normalizedInput.difficulty === undefined && normalizedInput.source !== "issue"
-      ? defaultIssueDifficulty
-      : normalizedInput.difficulty ?? null;
+  const storedDifficulty = normalizedInput.difficulty ?? null;
   const results = await db.batch([
     db
       .prepare(
@@ -410,10 +411,11 @@ export async function recordHuntEvent(
            structured_result_json,
            pull_request_urls, target_sha, source_created_at,
            staging_qa_status, production_qa_status, staging_qa_detail,
-           production_qa_detail, context_json, started_at, completed_at,
+           production_qa_detail, context_json, full_auto,
+           requires_claim_token, started_at, completed_at,
            last_event_at, created_at, updated_at,
            preferred_agent_provider, preferred_agent_model, preferred_agent_effort
-         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          on conflict(project_id, source, source_key) do nothing`,
       )
       .bind(
@@ -426,7 +428,7 @@ export async function recordHuntEvent(
         normalizedInput.status,
         normalizedInput.workflowStage,
         stableJson(workflowSnapshot),
-        stableJson(issueCheckpointSnapshot),
+        encodeAutoHuntWorkflowCheckpointsJson(issueCheckpointSnapshot),
         normalizedInput.detail,
         normalizedInput.priority,
         storedDifficulty,
@@ -443,7 +445,7 @@ export async function recordHuntEvent(
         normalizedInput.issueDescription,
         normalizedInput.resultSummary,
         normalizedInput.structuredResult
-          ? stableJson(normalizedInput.structuredResult)
+          ? encodeStructuredAgentResultJson(normalizedInput.structuredResult)
           : null,
         stableJson(mergedPullRequestUrls),
         normalizedInput.targetSha,
@@ -453,6 +455,8 @@ export async function recordHuntEvent(
         normalizedInput.stagingQaDetail,
         normalizedInput.productionQaDetail,
         normalizedInput.context ? stableJson(normalizedInput.context) : null,
+        normalizedInput.fullAuto === true ? 1 : 0,
+        normalizedInput.requiresClaimToken === true ? 1 : 0,
         normalizedInput.occurredAt,
         completedAt,
         normalizedInput.occurredAt,
@@ -591,7 +595,7 @@ export async function recordHuntEvent(
         normalizedInput.resultSummary,
         normalizedInput.occurredAt,
         normalizedInput.structuredResult
-          ? stableJson(normalizedInput.structuredResult)
+          ? encodeStructuredAgentResultJson(normalizedInput.structuredResult)
           : null,
         stableJson(mergedPullRequestUrls),
         normalizedInput.occurredAt,
@@ -637,6 +641,7 @@ export async function recordHuntEvent(
               projectId,
             ),
         ]),
+    ...(options.additionalStatements?.({ runId, recordedAt }) ?? []),
   ]);
 
   if (

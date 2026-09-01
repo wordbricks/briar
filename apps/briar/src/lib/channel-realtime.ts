@@ -1,4 +1,4 @@
-import { briarApiUrl } from "./api-config";
+import { createOrganizationRealtimeTicket } from "./app-rpc/realtime";
 import {
   WebSocketRealtimeTransport,
   type RealtimeTransport,
@@ -20,9 +20,16 @@ const organizationRealtimeTransports = new Map<
   SharedOrganizationRealtime
 >();
 
+export type OrganizationRealtimeTicketFactory = (
+  token: string,
+  organizationId: string,
+  signal: AbortSignal,
+) => Promise<string>;
+
 function createOrganizationRealtimeTransport(
   token: string,
   organizationId: string,
+  createTicket: OrganizationRealtimeTicketFactory,
 ): RealtimeTransport {
   const key = `${organizationId}\0${token}`;
   let shared = organizationRealtimeTransports.get(key);
@@ -30,8 +37,8 @@ function createOrganizationRealtimeTransport(
     shared = {
       consumers: 0,
       transport: new WebSocketRealtimeTransport({
-        url: `${briarApiUrl}/organizations/${organizationId}/channel-events`,
-        token,
+        createTicket: (signal) =>
+          createTicket(token, organizationId, signal),
       }),
     };
     organizationRealtimeTransports.set(key, shared);
@@ -62,20 +69,30 @@ function createOrganizationRealtimeTransport(
 export function createChannelRealtimeTransport(
   token: string,
   organizationId: string,
+  createTicket: OrganizationRealtimeTicketFactory =
+    createOrganizationRealtimeTicket,
 ) {
-  return createOrganizationRealtimeTransport(token, organizationId);
+  return createOrganizationRealtimeTransport(
+    token,
+    organizationId,
+    createTicket,
+  );
 }
 
 export function createProjectRealtimeTransport(
   token: string,
   organizationId: string,
+  createTicket: OrganizationRealtimeTicketFactory =
+    createOrganizationRealtimeTicket,
 ) {
-  return createChannelRealtimeTransport(token, organizationId);
+  return createChannelRealtimeTransport(token, organizationId, createTicket);
 }
 
 export function createInboxRealtimeTransport(
   token: string,
   organizationId: string,
+  createTicket: OrganizationRealtimeTicketFactory =
+    createOrganizationRealtimeTicket,
 ) {
-  return createChannelRealtimeTransport(token, organizationId);
+  return createChannelRealtimeTransport(token, organizationId, createTicket);
 }

@@ -1,8 +1,23 @@
 import { createHash } from "node:crypto";
-import { Miniflare } from "miniflare";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
-  channelReplyClaimTokenHeader,
+  create,
+  fromJson,
+  toJson,
+} from "@bufbuild/protobuf";
+import { ValueSchema } from "@bufbuild/protobuf/wkt";
+import {
+  OrganizationAgentContextService,
+  OrganizationAgentContextServiceGetManifestRequestSchema,
+  OrganizationAgentContextServiceGetManifestResponseSchema,
+  OrganizationAgentContextServiceLookupRequestSchema,
+  OrganizationAgentContextServiceLookupResponseSchema,
+} from "@briar/contracts/gen/briar/worker/v1/organization_agent_context_pb";
+import { createMethodUrl } from "@connectrpc/connect/protocol";
+import { env as cloudflareEnv } from "cloudflare:workers";
+import { beforeAll, describe, expect, it } from "vitest";
+import { channelReplyAttachmentPath } from "../../src/lib/channel-reply-attachment-path";
+import { emptyAgentProviderCapabilityCatalog } from "../../src/lib/agent-provider-contract";
+import {
   channelReplyNoAvailableWorkerError,
   channelReplyProviderUsageExhaustedError,
 } from "../../src/lib/channels-contract";
@@ -17,7 +32,6 @@ import {
   completeChannelReply,
   createChannel,
   createChannelMessage,
-  createChannelWebhook,
   createIncomingChannelWebhookMessage,
   deleteChannel,
   deleteChannelMessage,
@@ -32,7 +46,6 @@ import {
   getChannelReplySession,
   getChannelMessage,
   getChannelMessageAttachment,
-  getChannelMessageDocument,
   getChannelSyncCursor,
   getIncomingChannelWebhook,
   listChannelAgents,
@@ -47,8 +60,6 @@ import {
   markChannelRead,
   consumeChannelWebhookRateLimit,
   renewChannelReplyLease,
-  revokeChannelWebhook,
-  rotateChannelWebhook,
   subscribeChannelThread,
   toggleChannelMessageReaction,
   unsubscribeChannelThread,
@@ -56,11 +67,36 @@ import {
 import { listChannelConversationNotifications } from "./db";
 import { processArchiveCleanupQueue } from "./archive";
 import {
+  deleteChannelApplication,
+  setChannelMemberApplication,
+} from "./channel-administration-application";
+import { claimNextChannelReplyWork } from "./channel-reply-claim-routes";
+import {
+  createChannelWebhookApplication,
+  listChannelWebhooksApplication,
+  revokeChannelWebhookApplication,
+  rotateChannelWebhookApplication,
+} from "./channel-webhook-application";
+import {
+  createOrganizationChannelMessage,
+  deleteOrganizationChannelMessage,
+} from "./channel-message-routes";
+import { decodeChannelMessageApplicationInput } from "./app-mutation-request-mappers";
+import {
   createOrganizationAgent,
   listOrganizationAgents,
 } from "./organization-agents";
+import {
+  createOrganizationDirectMessage,
+  getOrganizationChannelDetail,
+  listOrganizationChannels,
+} from "./organization-channel-routes";
 import { channelReplyWorkerAvailability } from "./workers";
-import { createIsolatedTestDatabase } from "./test-helpers/d1";
+import {
+  workerClaimRuntimeFixture,
+  workerRuntimeProtoJsonFixture,
+} from "./test-helpers/worker-runtime";
+import { requireWorkerProjectBinding } from "./worker-route-auth";
 
 const organizationId = "a0000000-0000-4000-8000-000000000001";
 const otherOrganizationId = "a0000000-0000-4000-8000-000000000002";
@@ -80,23 +116,10 @@ const at = (minute: number) =>
   new Date(Date.UTC(2026, 0, 1, 0, minute)).toISOString();
 
 describe("organization channels", () => {
-  let miniflare: Miniflare;
-  let db: D1Database;
-  let archives: R2Bucket;
+  const db = cloudflareEnv.DB;
+  const archives = cloudflareEnv.ARCHIVES;
 
   beforeAll(async () => {
-    const database = await createIsolatedTestDatabase({
-      suite: "channels",
-      miniflareOptions: {
-        modules: true,
-        script: "export default { fetch() { return new Response('ok') } }",
-        r2Buckets: ["ARCHIVES"],
-      },
-    });
-    miniflare = database.miniflare;
-    db = database.db;
-    archives = await miniflare.getR2Bucket("ARCHIVES") as unknown as R2Bucket;
-
     for (const [id, name] of [
       [ownerId, "Owner"],
       [outsiderId, "Outsider"],
@@ -183,13 +206,17 @@ describe("organization channels", () => {
       ),
       db.prepare(
         `insert into briar_execution_workers (
-           id, project_id, label, host_fingerprint, agent_provider, state,
+           id, project_id, label, host_fingerprint, runtime_proto_json, state,
            last_heartbeat_at, created_at, updated_at, device_id
-         ) values (?, ?, 'Other Worker', ?, 'claude', 'online', ?, ?, ?, ?)`,
+         ) values (?, ?, 'Other Worker', ?, ?, 'online', ?, ?, ?, ?)`,
       ).bind(
         otherWorkerId,
         otherProjectId,
         "c".repeat(64),
+        workerRuntimeProtoJsonFixture({
+          agentProvider: "claude",
+          providers: ["claude"],
+        }),
         at(0),
         at(0),
         at(0),
@@ -198,20 +225,57 @@ describe("organization channels", () => {
     ]);
   }, 60_000);
 
-  afterAll(async () => {
-    await miniflare.dispose();
+  const createDirectMessageThroughApplication = (
+    request: { memberIds: string[]; agentIds: string[] },
+    userId = ownerId,
+  ) => createOrganizationDirectMessage({
+    db,
+    organizationId,
+    userId,
+    request,
   });
+
+  const createMessageThroughApplication = (
+    channelId: string,
+    request: Parameters<typeof decodeChannelMessageApplicationInput>[0],
+    userId = ownerId,
+  ) => {
+    const decoded = decodeChannelMessageApplicationInput(request);
+    return createOrganizationChannelMessage({
+      db,
+      organizationId,
+      channelId,
+      userId,
+      request: {
+        ...decoded,
+        clientMessageId: decoded.clientMessageId ?? crypto.randomUUID(),
+      },
+      attachmentIds: [],
+    });
+  };
 
   const bindWorkerToProject = async () => {
     await db
       .prepare(
         `insert into briar_execution_workers (
-           id, project_id, label, host_fingerprint, agent_provider, state,
+           id, project_id, label, host_fingerprint, runtime_proto_json, state,
            last_heartbeat_at, created_at, updated_at, device_id
-         ) values (?, ?, 'Worker', ?, 'claude', 'online', ?, ?, ?, ?)
+         ) values (?, ?, 'Worker', ?, ?, 'online', ?, ?, ?, ?)
          on conflict (id) do nothing`,
       )
-      .bind(boundWorkerId, projectId, "b".repeat(64), at(0), at(0), at(0), deviceId)
+      .bind(
+        boundWorkerId,
+        projectId,
+        "b".repeat(64),
+        workerRuntimeProtoJsonFixture({
+          agentProvider: "claude",
+          providers: ["claude"],
+        }),
+        at(0),
+        at(0),
+        at(0),
+        deviceId,
+      )
       .run();
   };
 
@@ -220,6 +284,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "private-room",
       name: "Private room",
       topic: null,
@@ -252,6 +318,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "alerts",
       name: "Alerts",
       topic: null,
@@ -324,6 +392,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "general",
       name: "General",
       topic: "Everything",
@@ -406,6 +476,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "thread-subscribe",
       name: "Thread subscribe",
       topic: null,
@@ -518,6 +590,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "paged-history",
       name: "Paged history",
       topic: null,
@@ -577,6 +651,7 @@ describe("organization channels", () => {
       id: channelId,
       organizationId,
       kind: "dm",
+      dmKey: null,
       slug: "paged-dm-history",
       name: "Paged DM history",
       topic: null,
@@ -638,14 +713,11 @@ describe("organization channels", () => {
 
   it("authenticates, rate limits, deduplicates, rotates, and revokes incoming webhooks", async () => {
     const channelId = "e0000000-0000-4000-8000-000000000060";
-    const webhookId = "f0000000-0000-4000-8000-000000000060";
-    const firstSecret = "s".repeat(43);
-    const secondSecret = "t".repeat(43);
-    const firstSecretHash = sha256Hex(firstSecret);
-    const secondSecretHash = sha256Hex(secondSecret);
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "incoming-webhooks",
       name: "Incoming webhooks",
       topic: null,
@@ -654,14 +726,22 @@ describe("organization channels", () => {
       createdByUserId: ownerId,
       createdAt: at(56),
     });
-    await createChannelWebhook(db, {
-      id: webhookId,
+    await expect(listChannelWebhooksApplication({
+      db,
+      organizationId,
       channelId,
+      userId: outsiderId,
+    })).rejects.toMatchObject({ status: 403 });
+    const createdWebhook = await createChannelWebhookApplication({
+      db,
+      organizationId,
+      channelId,
+      userId: ownerId,
       name: "Deploy notifier",
-      secretHash: firstSecretHash,
-      createdByUserId: ownerId,
-      createdAt: at(57),
     });
+    const webhookId = createdWebhook.webhook.id;
+    const firstSecret = createdWebhook.secret;
+    const firstSecretHash = sha256Hex(firstSecret);
 
     expect(await listChannelWebhooks(db, channelId)).toMatchObject([
       { id: webhookId, name: "Deploy notifier", revoked_at: null },
@@ -754,7 +834,10 @@ describe("organization channels", () => {
       }),
     }), apiEnv);
     expect(blockResponse.status).toBe(201);
-    await expect(blockResponse.json()).resolves.toMatchObject({
+    const blockPayload = await blockResponse.json() as {
+      message: { id: string };
+    };
+    expect(blockPayload).toMatchObject({
       duplicate: false,
       message: {
         body: "Deploy complete\n*Production* is healthy.",
@@ -766,6 +849,19 @@ describe("organization channels", () => {
         author: { type: "webhook", id: webhookId, name: "Deploy notifier" },
       },
     });
+    const storedBlocks = await db.prepare(
+      `select blocks_json from briar_channel_messages where id = ?`,
+    ).bind(blockPayload.message.id).first<string>("blocks_json");
+    expect(storedBlocks).not.toBeNull();
+    await db.prepare(
+      `update briar_channel_messages set blocks_json = ? where id = ?`,
+    ).bind('[{"type":"actions","elements":[]}]', blockPayload.message.id)
+      .run();
+    await expect(getChannelMessage(db, channelId, blockPayload.message.id))
+      .rejects.toThrow();
+    await db.prepare(
+      `update briar_channel_messages set blocks_json = ? where id = ?`,
+    ).bind(storedBlocks, blockPayload.message.id).run();
 
     const first = await createIncomingChannelWebhookMessage(db, {
       id: "f1000000-0000-4000-8000-000000000060",
@@ -803,21 +899,25 @@ describe("organization channels", () => {
        where trigger_message_id = ?`,
     ).bind(first?.message?.id).first()).resolves.toEqual({ count: 0 });
 
-    await rotateChannelWebhook(db, {
+    const rotatedWebhook = await rotateChannelWebhookApplication({
+      db,
+      organizationId,
       channelId,
       webhookId,
-      secretHash: secondSecretHash,
-      updatedAt: at(61),
+      userId: ownerId,
     });
+    const secondSecretHash = sha256Hex(rotatedWebhook.secret);
     expect(await getIncomingChannelWebhook(db, webhookId, firstSecretHash))
       .toBeNull();
     expect(await getIncomingChannelWebhook(db, webhookId, secondSecretHash))
       .not.toBeNull();
 
-    await revokeChannelWebhook(db, {
+    await revokeChannelWebhookApplication({
+      db,
+      organizationId,
       channelId,
       webhookId,
-      revokedAt: at(62),
+      userId: ownerId,
     });
     expect(await getIncomingChannelWebhook(db, webhookId, secondSecretHash))
       .toBeNull();
@@ -830,6 +930,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "other-room",
       name: "Other room",
       topic: null,
@@ -862,6 +964,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "image-room",
       name: "Image room",
       topic: null,
@@ -911,12 +1015,14 @@ describe("organization channels", () => {
     ).resolves.toMatchObject({ object_key: expect.stringContaining(attachmentId) });
   });
 
-  it("returns a channel document body only through the authenticated document route", async () => {
+  it("returns a channel document through the authenticated Connect boundary", async () => {
     const channelId = "e0000000-0000-4000-8000-000000000150";
     const messageId = "f0000000-0000-4000-8000-000000000150";
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "document-room",
       name: "Document room",
       topic: null,
@@ -944,13 +1050,6 @@ describe("organization channels", () => {
        ) values (?, ?, null, 'Rollout plan', '# Rollout\n\n- Verify access', ?, ?)`,
     ).bind(messageId, channelId, at(8), at(8)).run();
 
-    await expect(getChannelMessageDocument(db, channelId, messageId))
-      .resolves.toMatchObject({
-        message_id: messageId,
-        title: "Rollout plan",
-        markdown: "# Rollout\n\n- Verify access",
-      });
-
     const apiEnv = {
       DB: db,
       ARCHIVES: archives,
@@ -959,18 +1058,24 @@ describe("organization channels", () => {
       GOOGLE_CLIENT_SECRET: "google-secret-test",
     } as unknown as Env;
     const response = await apiWorker.fetch(new Request(
-      `https://briar-api.example/organizations/${organizationId}/channels/${channelId}/messages/${messageId}/document`,
-      { headers: { authorization: `Bearer ${ownerSessionToken}` } },
+      "https://briar-api.example/briar.app.v1.ChannelService/GetChannelMessageDocument",
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${ownerSessionToken}`,
+          "connect-protocol-version": "1",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ organizationId, channelId, messageId }),
+      },
     ), apiEnv);
 
     expect(response.status).toBe(200);
-    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     await expect(response.json()).resolves.toEqual({
       document: {
         messageId,
         title: "Rollout plan",
         markdown: "# Rollout\n\n- Verify access",
-        projectId: null,
       },
     });
   });
@@ -984,6 +1089,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "delete-image-room",
       name: "Delete image room",
       topic: null,
@@ -1051,6 +1158,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "role-race-room",
       name: "Role race room",
       topic: null,
@@ -1090,21 +1199,12 @@ describe("organization channels", () => {
       .bind(at(9), organizationId, outsiderId)
       .run();
 
-    const apiEnv = {
-      DB: db,
-      ARCHIVES: archives,
-      BETTER_AUTH_SECRET: "channels-admin-delete-test-admin-delete-test",
-      GOOGLE_CLIENT_ID: "google-client-test",
-      GOOGLE_CLIENT_SECRET: "google-secret-test",
-    } as unknown as Env;
-    const formerCoOwnerResponse = await apiWorker.fetch(new Request(
-      `https://briar-api.example/organizations/${organizationId}/channels/${channelId}`,
-      {
-        method: "DELETE",
-        headers: { authorization: `Bearer ${outsiderSessionToken}` },
-      },
-    ), apiEnv);
-    expect(formerCoOwnerResponse.status).toBe(403);
+    await expect(deleteChannelApplication({
+      db,
+      organizationId,
+      channelId,
+      userId: outsiderId,
+    })).rejects.toMatchObject({ status: 403 });
 
     await expect(
       deleteChannel(db, organizationId, channelId, outsiderId, at(8)),
@@ -1146,11 +1246,13 @@ describe("organization channels", () => {
       .run();
   });
 
-  it("lets a channel creator delete through the authenticated API route", async () => {
+  it("lets a channel creator delete through the application boundary", async () => {
     const channelId = "e0000000-0000-4000-8000-000000000019";
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "creator-api-delete-room",
       name: "Creator API delete room",
       topic: null,
@@ -1159,24 +1261,12 @@ describe("organization channels", () => {
       createdByUserId: outsiderId,
       createdAt: at(12),
     });
-    const apiEnv = {
-      DB: db,
-      ARCHIVES: archives,
-      BETTER_AUTH_SECRET: "channels-creator-delete-test-creator-delete-test",
-      GOOGLE_CLIENT_ID: "google-client-test",
-      GOOGLE_CLIENT_SECRET: "google-secret-test",
-    } as unknown as Env;
-
-    const response = await apiWorker.fetch(new Request(
-      `https://briar-api.example/organizations/${organizationId}/channels/${channelId}`,
-      {
-        method: "DELETE",
-        headers: { authorization: `Bearer ${outsiderSessionToken}` },
-      },
-    ), apiEnv);
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ deleted: true });
+    await expect(deleteChannelApplication({
+      db,
+      organizationId,
+      channelId,
+      userId: outsiderId,
+    })).resolves.toMatchObject({ channelId });
     await expect(getChannelById(db, organizationId, channelId)).resolves.toBeNull();
   });
 
@@ -1190,6 +1280,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "vision-room",
       name: "Vision room",
       topic: null,
@@ -1267,20 +1359,22 @@ describe("organization channels", () => {
     const claimRequestedAt = new Date().toISOString();
     await db.prepare(
       `update briar_execution_workers
-       set capabilities_json = ?, last_heartbeat_at = ? where id = ?`,
+       set runtime_proto_json = ?, last_heartbeat_at = ? where id = ?`,
     ).bind(
-      JSON.stringify({
-        providerHealth: { claude: { healthy: true } },
-        organizationAgentContext: { protocol: 1 },
-      }),
+      workerClaimRuntimeFixture({
+        agentProvider: "grok",
+        providers: ["grok"],
+      }).runtimeProtoJson,
       claimRequestedAt,
       otherWorkerId,
     ).run();
     const claimed = await claimNextChannelAgentReply(db, organizationId, {
       deviceId,
       workerId: otherWorkerId,
-      providers: ["grok"],
-      supportsOrganizationAgentContext: true,
+      ...workerClaimRuntimeFixture({
+        agentProvider: "grok",
+        providers: ["grok"],
+      }),
       claimTokenHash,
       claimedAt: at(9),
       leaseExpiresAt: at(19),
@@ -1333,6 +1427,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "ideation",
       name: "Ideation",
       topic: null,
@@ -1360,6 +1456,8 @@ describe("organization channels", () => {
           model: null,
           effort: null,
           kind: "custom",
+          executionMode: "task",
+          approvalPolicy: "explicit",
           position: 0,
         },
         {
@@ -1371,6 +1469,8 @@ describe("organization channels", () => {
           model: null,
           effort: "high",
           kind: "custom",
+          executionMode: "task",
+          approvalPolicy: "explicit",
           position: 1,
         },
       ],
@@ -1394,6 +1494,7 @@ describe("organization channels", () => {
     });
 
     const triggerId = "f0000000-0000-4000-8000-000000000004";
+    const triggerAttachmentId = "f1000000-0000-4000-8000-000000000004";
     await createChannelMessage(db, {
       id: triggerId,
       channelId,
@@ -1405,6 +1506,15 @@ describe("organization channels", () => {
       body: "@Honey write the plan",
       mentionedUserIds: [],
       mentionedAgentIds: [agent!.id],
+      attachments: [{
+        id: triggerAttachmentId,
+        organization_id: organizationId,
+        object_key:
+          `channel-attachments/${organizationId}/${channelId}/${triggerId}/${triggerAttachmentId}`,
+        filename: "private-plan.png",
+        content_type: "image/png",
+        byte_size: 42,
+      }],
       createdAt: at(9),
     });
     const agentReplyId = "f5000000-0000-4000-8000-000000000004";
@@ -1439,17 +1549,16 @@ describe("organization channels", () => {
     // Organization work still requires the exact host binding to be enabled at
     // the atomic claim boundary.
     await db.prepare(
-      `update briar_execution_workers set capabilities_json = '{}' where id = ?`,
-    ).bind(otherWorkerId).run();
-    await db.prepare(
       `update briar_execution_workers set state = 'disabled' where id = ?`,
     ).bind(otherWorkerId).run();
     await expect(
       claimNextChannelAgentReply(db, organizationId, {
         deviceId,
         workerId: otherWorkerId,
-        providers: ["claude"],
-        supportsOrganizationAgentContext: true,
+        ...workerClaimRuntimeFixture({
+          agentProvider: "claude",
+          providers: ["claude"],
+        }),
         claimTokenHash: "0".repeat(64),
         claimedAt: at(9),
         leaseExpiresAt: at(19),
@@ -1459,57 +1568,18 @@ describe("organization channels", () => {
       `update briar_execution_workers set state = 'online' where id = ?`,
     ).bind(otherWorkerId).run();
 
-    await expect(
-      claimNextChannelAgentReply(db, organizationId, {
-        deviceId,
-        workerId: otherWorkerId,
-        providers: ["claude"],
-        supportsOrganizationAgentContext: true,
-        claimTokenHash: "0".repeat(64),
-        claimedAt: at(10),
-        leaseExpiresAt: at(20),
-      }),
-    ).resolves.toBeNull();
-    await db.prepare(
-      `update briar_execution_workers set capabilities_json = ? where id = ?`,
-    ).bind(
-      JSON.stringify({ organizationAgentContext: { protocol: true } }),
-      otherWorkerId,
-    ).run();
-    await expect(
-      claimNextChannelAgentReply(db, organizationId, {
-        deviceId,
-        workerId: otherWorkerId,
-        providers: ["claude"],
-        supportsOrganizationAgentContext: true,
-        claimTokenHash: "0".repeat(64),
-        claimedAt: at(10),
-        leaseExpiresAt: at(20),
-      }),
-    ).resolves.toBeNull();
     const claimRequestedAt = new Date().toISOString();
     await db.prepare(
       `update briar_execution_workers
-       set capabilities_json = ?, last_heartbeat_at = ? where id = ?`,
+       set runtime_proto_json = ?, last_heartbeat_at = ? where id = ?`,
     ).bind(
-      JSON.stringify({
-        providerHealth: { claude: { healthy: true } },
-        organizationAgentContext: { protocol: 1 },
-      }),
+      workerClaimRuntimeFixture({
+        agentProvider: "claude",
+        providers: ["claude"],
+      }).runtimeProtoJson,
       claimRequestedAt,
       otherWorkerId,
     ).run();
-    await expect(
-      claimNextChannelAgentReply(db, organizationId, {
-        deviceId,
-        workerId: otherWorkerId,
-        providers: ["claude"],
-        supportsOrganizationAgentContext: false,
-        claimTokenHash: "0".repeat(64),
-        claimedAt: at(10),
-        leaseExpiresAt: at(20),
-      }),
-    ).resolves.toBeNull();
     // A normal execution may occupy the Worker while a reply still claims
     // the same provider; replies must not consume the regular slot.
     await db.prepare(
@@ -1523,50 +1593,49 @@ describe("organization channels", () => {
       GOOGLE_CLIENT_ID: "google-client-test",
       GOOGLE_CLIENT_SECRET: "google-secret-test",
     } as unknown as Env;
-    const claimResponse = await apiWorker.fetch(
-      new Request("https://briar-api.example/channel-reply-claims", {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${contextWorkerToken}`,
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({ organizationId, workerId: otherWorkerId }),
+    const authenticatedWorker = await requireWorkerProjectBinding(
+      db,
+      new Request("https://briar-api.example", {
+        headers: { authorization: `Bearer ${contextWorkerToken}` },
       }),
-      apiEnv,
+      otherProjectId,
+      otherWorkerId,
     );
-    expect(claimResponse.status).toBe(200);
-    const claimPayload = await claimResponse.json() as {
-      work: {
-        workId: string;
-        claimToken: string;
-        claimedAt: string;
-        leaseExpiresAt: string;
-        organizationContext: { schemaVersion: 1; snapshotAt: string };
-        snapshot: {
-          projectTargets: Array<{ id: string; name: string }>;
-          messages: Array<Record<string, unknown>>;
-        };
-      };
-    };
-    expect(claimPayload.work).toMatchObject({
+    const claimPayload = await claimNextChannelReplyWork({
+      input: { organizationId, workerId: otherWorkerId },
+      db,
+      env: apiEnv,
+      authenticatedWorker,
+    });
+    expect(claimPayload).toMatchObject({
       workId: jobs[0].id,
       organizationContext: {
-        schemaVersion: 1,
-        snapshotAt: claimPayload.work.claimedAt,
+        snapshotAt: claimPayload!.claimedAt,
       },
+      triggerAttachments: [{
+        id: triggerAttachmentId,
+        filename: "private-plan.png",
+        contentType: "image/png",
+        byteSize: 42,
+        url: channelReplyAttachmentPath({
+          organizationId,
+          workId: jobs[0].id,
+          attachmentId: triggerAttachmentId,
+        }),
+      }],
       snapshot: { projectTargets: [] },
     });
-    expect(claimPayload.work.snapshot.messages).toHaveLength(2);
-    expect(claimPayload.work.snapshot.messages[1]).toMatchObject({
+    expect(claimPayload!.snapshot.messages).toHaveLength(2);
+    expect(claimPayload!.snapshot.messages[1]).toMatchObject({
       id: agentReplyId,
       parentMessageId: triggerId,
       author: { type: "agent", id: agent!.id, name: "Honey" },
       body: "I can write that plan.",
     });
-    expect(Object.keys(claimPayload.work.snapshot.messages[1]!.author as object))
+    expect(Object.keys(claimPayload!.snapshot.messages[1]!.author as object))
       .toEqual(["type", "id", "name"]);
     const serializedReplyContext = JSON.stringify(
-      claimPayload.work.snapshot.messages,
+      claimPayload!.snapshot.messages,
     );
     expect(serializedReplyContext).not.toContain(avatar);
     expect(serializedReplyContext).not.toContain("owner@example.com");
@@ -1576,7 +1645,7 @@ describe("organization channels", () => {
     const claimed = await getChannelAgentReplyJob(
       db,
       organizationId,
-      claimPayload.work.workId,
+      claimPayload!.workId,
     );
     expect(claimed).toMatchObject({
       agent_id: agent!.id,
@@ -1593,31 +1662,10 @@ describe("organization channels", () => {
         jobId: claimed!.id,
         deviceId,
         workerId: otherWorkerId,
-        claimTokenHash: sha256Hex(claimPayload.work.claimToken),
-        observedAt: claimPayload.work.claimedAt,
+        claimTokenHash: sha256Hex(claimPayload!.claimToken),
+        observedAt: claimPayload!.claimedAt!,
         ...overrides,
       });
-    // Claim-time capability gating is repeated for every context page.
-    await db.prepare(
-      `update briar_execution_workers set capabilities_json = ? where id = ?`,
-    ).bind(
-      JSON.stringify({ organizationAgentContext: { protocol: true } }),
-      otherWorkerId,
-    ).run();
-    await expect(contextClaim()).resolves.toBeNull();
-    await db.prepare(
-      `update briar_execution_workers set capabilities_json = ? where id = ?`,
-    ).bind(
-      JSON.stringify({ organizationAgentContext: { protocol: 2 } }),
-      otherWorkerId,
-    ).run();
-    await expect(contextClaim()).resolves.toBeNull();
-    await db.prepare(
-      `update briar_execution_workers set capabilities_json = ? where id = ?`,
-    ).bind(
-      JSON.stringify({ organizationAgentContext: { protocol: 1 } }),
-      otherWorkerId,
-    ).run();
     await expect(contextClaim()).resolves.toMatchObject({ id: claimed!.id });
     await expect(contextClaim({
       organizationId: otherOrganizationId,
@@ -1626,104 +1674,130 @@ describe("organization channels", () => {
       claimTokenHash: "9".repeat(64),
     })).resolves.toBeNull();
     await expect(contextClaim({
-      observedAt: claimPayload.work.leaseExpiresAt,
+      observedAt: claimPayload!.leaseExpiresAt ?? undefined,
     })).resolves.toBeNull();
 
-    const contextResponse = await apiWorker.fetch(
-      new Request(
-        `https://briar-api.example/organizations/${organizationId}/channel-reply-claims/${claimed!.id}/organization-context/projects?workerId=${otherWorkerId}&limit=1`,
-        {
-          headers: {
-            authorization: `Bearer ${contextWorkerToken}`,
-            [channelReplyClaimTokenHeader]: claimPayload.work.claimToken,
-          },
-        },
-      ),
-      apiEnv,
-    );
-    expect(contextResponse.status).toBe(200);
-    expect(contextResponse.headers.get("Cache-Control")).toBe(
-      "private, no-store",
-    );
-    await expect(contextResponse.json()).resolves.toMatchObject({
-      schemaVersion: 1,
+    const claim = {
       organizationId,
       workId: claimed!.id,
-      resource: "projects",
-      snapshotAt: claimPayload.work.claimedAt,
-      total: 2,
-      items: [{ id: projectId }],
-      complete: false,
-    });
-
-    const manifestUrl =
-      `https://briar-api.example/organizations/${organizationId}/channel-reply-claims/${claimed!.id}/organization-context/manifest?workerId=${otherWorkerId}`;
+      workerId: otherWorkerId,
+      claimToken: claimPayload!.claimToken,
+    };
+    const connectHeaders = {
+      authorization: `Bearer ${contextWorkerToken}`,
+      "connect-protocol-version": "1",
+      "content-type": "application/json",
+    };
+    const manifestRequest = create(
+      OrganizationAgentContextServiceGetManifestRequestSchema,
+      { claim },
+    );
     const manifestResponse = await apiWorker.fetch(
-      new Request(manifestUrl, {
-        headers: {
-          authorization: `Bearer ${contextWorkerToken}`,
-          [channelReplyClaimTokenHeader]: claimPayload.work.claimToken,
-        },
+      new Request(createMethodUrl(
+        "https://briar-api.example",
+        OrganizationAgentContextService.method.getManifest,
+      ), {
+        method: "POST",
+        headers: connectHeaders,
+        body: JSON.stringify(toJson(
+          OrganizationAgentContextServiceGetManifestRequestSchema,
+          manifestRequest,
+        )),
       }),
       apiEnv,
     );
     expect(manifestResponse.status).toBe(200);
-    expect(manifestResponse.headers.get("ETag")).toMatch(
-      /^"[0-9a-f]{64}"$/u,
+    const manifest = fromJson(
+      OrganizationAgentContextServiceGetManifestResponseSchema,
+      await manifestResponse.json(),
     );
-    await expect(manifestResponse.json()).resolves.toMatchObject({
-      schemaVersion: 2,
+    expect(manifest.result.case).toBe("manifest");
+    if (manifest.result.case !== "manifest") return;
+    expect(manifest.result.value).toMatchObject({
       organizationId,
       workId: claimed!.id,
-      projects: expect.arrayContaining([
-        expect.objectContaining({ id: projectId }),
-      ]),
-      loadedQueries: [],
+      projects: expect.arrayContaining([expect.objectContaining({
+        id: projectId,
+      })]),
     });
+    expect(manifest.result.value.revision).toMatch(/^[0-9a-f]{64}$/u);
+
+    const unchangedRequest = create(
+      OrganizationAgentContextServiceGetManifestRequestSchema,
+      { claim, knownRevision: manifest.result.value.revision },
+    );
     const unchangedManifest = await apiWorker.fetch(
-      new Request(manifestUrl, {
-        headers: {
-          authorization: `Bearer ${contextWorkerToken}`,
-          [channelReplyClaimTokenHeader]: claimPayload.work.claimToken,
-          "If-None-Match": manifestResponse.headers.get("ETag")!,
-        },
+      new Request(createMethodUrl(
+        "https://briar-api.example",
+        OrganizationAgentContextService.method.getManifest,
+      ), {
+        method: "POST",
+        headers: connectHeaders,
+        body: JSON.stringify(toJson(
+          OrganizationAgentContextServiceGetManifestRequestSchema,
+          unchangedRequest,
+        )),
       }),
       apiEnv,
     );
-    expect(unchangedManifest.status).toBe(304);
+    expect(unchangedManifest.status).toBe(200);
+    expect(fromJson(
+      OrganizationAgentContextServiceGetManifestResponseSchema,
+      await unchangedManifest.json(),
+    ).result).toMatchObject({
+      case: "unchanged",
+      value: { organizationId, workId: claimed!.id },
+    });
 
+    const lookupRequest = create(
+      OrganizationAgentContextServiceLookupRequestSchema,
+      {
+        claim,
+        requestId: crypto.randomUUID(),
+        queries: [{
+          query: {
+            case: "projectSettings",
+            value: { projectId },
+          },
+        }],
+      },
+    );
     const lookupResponse = await apiWorker.fetch(
       new Request(
-        `https://briar-api.example/organizations/${organizationId}/channel-reply-claims/${claimed!.id}/organization-context/lookup`,
+        createMethodUrl(
+          "https://briar-api.example",
+          OrganizationAgentContextService.method.lookup,
+        ),
         {
           method: "POST",
-          headers: {
-            authorization: `Bearer ${contextWorkerToken}`,
-            "content-type": "application/json",
-            [channelReplyClaimTokenHeader]: claimPayload.work.claimToken,
-          },
-          body: JSON.stringify({
-            workerId: otherWorkerId,
-            requests: [{ resource: "project-settings", projectId }],
-          }),
+          headers: connectHeaders,
+          body: JSON.stringify(toJson(
+            OrganizationAgentContextServiceLookupRequestSchema,
+            lookupRequest,
+          )),
         },
       ),
       apiEnv,
     );
     expect(lookupResponse.status).toBe(200);
-    await expect(lookupResponse.json()).resolves.toMatchObject({
-      schemaVersion: 2,
-      results: [{
-        request: { resource: "project-settings", projectId },
-        data: { id: projectId, settings: expect.any(Object) },
-      }],
+    const lookup = fromJson(
+      OrganizationAgentContextServiceLookupResponseSchema,
+      await lookupResponse.json(),
+    );
+    expect(lookup.results[0].query?.query).toMatchObject({
+      case: "projectSettings",
+      value: { projectId },
     });
+    expect(toJson(
+      ValueSchema,
+      lookup.results[0].data!,
+    )).toMatchObject({ id: projectId, settings: expect.any(Object) });
 
     const completed = await completeChannelReply(db, claimed!, {
       jobId: claimed!.id,
       deviceId,
       workerId: otherWorkerId,
-      claimTokenHash: sha256Hex(claimPayload.work.claimToken),
+      claimTokenHash: sha256Hex(claimPayload!.claimToken),
       body: "Here is the plan.",
       document: {
         title: "Onboarding plan",
@@ -1737,14 +1811,13 @@ describe("organization channels", () => {
           title: "Build onboarding",
           description: null,
           priority: null,
-          status: "backlog",
         },
       },
       executionProposal: null,
       agentName: "Honey",
       agentProvider: "claude",
       completedAt: new Date(
-        Date.parse(claimPayload.work.claimedAt) + 1_000,
+        Date.parse(claimPayload!.claimedAt!) + 1_000,
       ).toISOString(),
     });
     expect(completed).toMatchObject({ status: "completed" });
@@ -1768,7 +1841,6 @@ describe("organization channels", () => {
       projectId: null,
     });
     expect(reply?.proposal).toMatchObject({
-      actionType: "request_issue_create",
       status: "pending",
       projectId,
     });
@@ -1799,6 +1871,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "reply-images",
       name: "Reply images",
       topic: null,
@@ -1861,11 +1935,11 @@ describe("organization channels", () => {
     });
     await db.prepare(
       `update briar_execution_workers
-       set capabilities_json = ?, last_heartbeat_at = ? where id = ?`,
+       set runtime_proto_json = ?, last_heartbeat_at = ? where id = ?`,
     ).bind(
-      JSON.stringify({
-        providerHealth: { claude: { healthy: true } },
-        organizationAgentContext: { protocol: 1 },
+      workerRuntimeProtoJsonFixture({
+        agentProvider: "claude",
+        providers: ["claude"],
       }),
       at(72),
       otherWorkerId,
@@ -1873,8 +1947,10 @@ describe("organization channels", () => {
     const claimed = await claimNextChannelAgentReply(db, organizationId, {
       deviceId,
       workerId: otherWorkerId,
-      providers: ["claude"],
-      supportsOrganizationAgentContext: true,
+      ...workerClaimRuntimeFixture({
+        agentProvider: "claude",
+        providers: ["claude"],
+      }),
       claimTokenHash: "7".repeat(64),
       claimedAt: at(72),
       leaseExpiresAt: at(82),
@@ -1934,6 +2010,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "project-room",
       name: "Project room",
       topic: null,
@@ -2002,8 +2080,10 @@ describe("organization channels", () => {
       await claimNextChannelAgentReply(db, organizationId, {
         deviceId,
         workerId: otherWorkerId,
-        providers: ["claude"],
-        supportsOrganizationAgentContext: false,
+        ...workerClaimRuntimeFixture({
+          agentProvider: "claude",
+          providers: ["claude"],
+        }),
         claimTokenHash: "2".repeat(64),
         claimedAt: at(14),
         leaseExpiresAt: at(24),
@@ -2014,8 +2094,10 @@ describe("organization channels", () => {
     const claimed = await claimNextChannelAgentReply(db, organizationId, {
       deviceId,
       workerId: boundWorkerId,
-      providers: ["claude"],
-      supportsOrganizationAgentContext: false,
+      ...workerClaimRuntimeFixture({
+        agentProvider: "claude",
+        providers: ["claude"],
+      }),
       claimTokenHash: "2".repeat(64),
       claimedAt: at(15),
       leaseExpiresAt: at(25),
@@ -2159,7 +2241,6 @@ describe("organization channels", () => {
             title: "Wrong project",
             description: null,
             priority: null,
-            status: "backlog",
           },
         },
         executionProposal: null,
@@ -2221,9 +2302,11 @@ describe("organization channels", () => {
     const fallbackWorkerId = "d0000000-0000-4000-8000-000000000109";
     const observedAt = new Date().toISOString();
     const leaseExpiresAt = new Date(Date.parse(observedAt) + 60_000).toISOString();
-    const capabilities = JSON.stringify({
-      providerHealth: { claude: { healthy: true } },
+    const claimRuntime = workerClaimRuntimeFixture({
+      agentProvider: "claude",
+      providers: ["claude"],
       providerCapabilities: {
+        ...emptyAgentProviderCapabilityCatalog(),
         claude: {
           models: [{
             id: "claude-sonnet-local",
@@ -2236,6 +2319,7 @@ describe("organization channels", () => {
         },
       },
     });
+    const runtimeProtoJson = claimRuntime.runtimeProtoJson;
     // The preceding lease lifecycle test intentionally leaves its historical
     // job queued. Close that fixture so this test observes only its own job.
     await db.prepare(
@@ -2246,6 +2330,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "project-local-preference",
       name: "Project local preference",
       topic: null,
@@ -2284,16 +2370,16 @@ describe("organization channels", () => {
       db.prepare(
         `insert into briar_execution_workers (
            id, project_id, device_id, label, host_fingerprint,
-           agent_provider, capabilities_json, state, accepting_work,
+           runtime_proto_json, state, accepting_work,
            readiness_state, last_heartbeat_at, created_at, updated_at
-         ) values (?, ?, ?, 'Fallback binding', ?, 'claude', ?, 'online', 1,
+         ) values (?, ?, ?, 'Fallback binding', ?, ?, 'online', 1,
                    'ready', ?, ?, ?)`,
       ).bind(
         fallbackWorkerId,
         projectId,
         fallbackDeviceId,
         "9".repeat(64),
-        capabilities,
+        runtimeProtoJson,
         observedAt,
         observedAt,
         observedAt,
@@ -2305,10 +2391,10 @@ describe("organization channels", () => {
       ).bind(observedAt, observedAt, deviceId),
       db.prepare(
         `update briar_execution_workers
-         set capabilities_json = ?, state = 'online', accepting_work = 1,
+         set runtime_proto_json = ?, state = 'online', accepting_work = 1,
              readiness_state = 'ready', last_heartbeat_at = ?, updated_at = ?
          where id = ?`,
-      ).bind(capabilities, observedAt, observedAt, boundWorkerId),
+      ).bind(runtimeProtoJson, observedAt, observedAt, boundWorkerId),
     ]);
     await addChannelAgent(db, {
       channelId,
@@ -2347,10 +2433,7 @@ describe("organization channels", () => {
     } = {}) => claimNextChannelAgentReply(db, organizationId, {
       deviceId: overrides.deviceId ?? fallbackDeviceId,
       workerId: overrides.workerId ?? fallbackWorkerId,
-      providers: ["claude"],
-      workerAgentProvider: "claude",
-      workerCapabilitiesJson: capabilities,
-      supportsOrganizationAgentContext: false,
+      ...claimRuntime,
       claimTokenHash: overrides.claimTokenHash ?? "1".repeat(64),
       claimedAt: observedAt,
       leaseExpiresAt,
@@ -2475,9 +2558,11 @@ describe("organization channels", () => {
     const startedAt = new Date().toISOString();
     const time = (minutes: number) =>
       new Date(Date.parse(startedAt) + minutes * 60_000).toISOString();
-    const capabilities = JSON.stringify({
-      providerHealth: { claude: { healthy: true } },
+    const claimRuntime = workerClaimRuntimeFixture({
+      agentProvider: "claude",
+      providers: ["claude"],
       providerCapabilities: {
+        ...emptyAgentProviderCapabilityCatalog(),
         claude: {
           models: [],
           defaultEfforts: [],
@@ -2486,6 +2571,7 @@ describe("organization channels", () => {
         },
       },
     });
+    const runtimeProtoJson = claimRuntime.runtimeProtoJson;
     await db.prepare(
       `update briar_channel_agent_reply_jobs
        set status = 'failed', completed_at = ?, updated_at = ?
@@ -2511,20 +2597,20 @@ describe("organization channels", () => {
       db.prepare(
         `insert into briar_execution_workers (
            id, project_id, device_id, label, host_fingerprint,
-           agent_provider, capabilities_json, state, accepting_work,
+           runtime_proto_json, state, accepting_work,
            readiness_state, last_heartbeat_at, created_at, updated_at
-         ) values (?, ?, ?, 'Session owner Worker', ?, 'claude', ?,
+         ) values (?, ?, ?, 'Session owner Worker', ?, ?,
                    'online', 1, 'ready', ?, ?, ?)
          on conflict (id) do update set label = excluded.label,
            state = 'online', accepting_work = 1,
-           readiness_state = 'ready', capabilities_json = excluded.capabilities_json,
+           readiness_state = 'ready', runtime_proto_json = excluded.runtime_proto_json,
            last_heartbeat_at = excluded.last_heartbeat_at`,
       ).bind(
         boundWorkerId,
         projectId,
         deviceId,
         "5".repeat(64),
-        capabilities,
+        runtimeProtoJson,
         startedAt,
         startedAt,
         startedAt,
@@ -2537,19 +2623,19 @@ describe("organization channels", () => {
       db.prepare(
         `insert into briar_execution_workers (
            id, project_id, device_id, label, host_fingerprint,
-           agent_provider, capabilities_json, state, accepting_work,
+           runtime_proto_json, state, accepting_work,
            readiness_state, last_heartbeat_at, created_at, updated_at
-         ) values (?, ?, ?, 'Session fallback Worker', ?, 'claude', ?,
+         ) values (?, ?, ?, 'Session fallback Worker', ?, ?,
                    'online', 1, 'ready', ?, ?, ?)
          on conflict (id) do update set state = 'online', accepting_work = 1,
-           readiness_state = 'ready', capabilities_json = excluded.capabilities_json,
+           readiness_state = 'ready', runtime_proto_json = excluded.runtime_proto_json,
            last_heartbeat_at = excluded.last_heartbeat_at`,
       ).bind(
         fallbackWorkerId,
         projectId,
         fallbackDeviceId,
         "6".repeat(64),
-        capabilities,
+        runtimeProtoJson,
         startedAt,
         startedAt,
         startedAt,
@@ -2557,9 +2643,9 @@ describe("organization channels", () => {
       db.prepare(
         `update briar_execution_workers
          set state = 'online', accepting_work = 1, readiness_state = 'ready',
-             capabilities_json = ?, last_heartbeat_at = ?
+             runtime_proto_json = ?, last_heartbeat_at = ?
          where id in (?, ?)`,
-      ).bind(capabilities, startedAt, boundWorkerId, fallbackWorkerId),
+      ).bind(runtimeProtoJson, startedAt, boundWorkerId, fallbackWorkerId),
       db.prepare(
         `update briar_execution_worker_devices
          set state = 'online', last_heartbeat_at = ?
@@ -2576,6 +2662,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "thread-session-lifecycle",
       name: "Thread session lifecycle",
       topic: null,
@@ -2621,10 +2709,7 @@ describe("organization channels", () => {
     ) => claimNextChannelAgentReply(db, organizationId, {
       deviceId: device,
       workerId,
-      providers: ["claude"],
-      workerAgentProvider: "claude",
-      workerCapabilitiesJson: capabilities,
-      supportsOrganizationAgentContext: false,
+      ...claimRuntime,
       claimTokenHash,
       claimedAt,
       leaseExpiresAt: new Date(Date.parse(claimedAt) + 15 * 60_000).toISOString(),
@@ -3021,6 +3106,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "codex-room",
       name: "Codex room",
       topic: null,
@@ -3073,8 +3160,10 @@ describe("organization channels", () => {
       await claimNextChannelAgentReply(db, organizationId, {
         deviceId,
         workerId: otherWorkerId,
-        providers: ["grok"],
-        supportsOrganizationAgentContext: true,
+        ...workerClaimRuntimeFixture({
+          agentProvider: "grok",
+          providers: ["grok"],
+        }),
         claimTokenHash: "3".repeat(64),
         claimedAt: at(19),
         leaseExpiresAt: at(29),
@@ -3082,20 +3171,23 @@ describe("organization channels", () => {
     ).toBeNull();
   });
 
-  it("falls back immediately when the preferred device lacks organization Agent context support", async () => {
+  it("keeps an organization reply on an available preferred device", async () => {
     const channelId = "e0000000-0000-4000-8000-000000000111";
     const agentId = "aa000000-0000-4000-8000-000000000111";
     const triggerId = "f0000000-0000-4000-8000-000000000111";
     const fallbackDeviceId = "c0000000-0000-4000-8000-000000000111";
     const fallbackWorkerId = "d0000000-0000-4000-8000-000000000111";
     const observedAt = new Date().toISOString();
-    const capabilities = JSON.stringify({
-      providerHealth: { claude: { healthy: true } },
-      organizationAgentContext: { protocol: 1 },
+    const claimRuntime = workerClaimRuntimeFixture({
+      agentProvider: "claude",
+      providers: ["claude"],
     });
+    const runtimeProtoJson = claimRuntime.runtimeProtoJson;
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "organization-context-fallback",
       name: "Organization context fallback",
       topic: null,
@@ -3128,10 +3220,10 @@ describe("organization channels", () => {
       db.prepare(
         `update briar_execution_workers
          set state = 'online', accepting_work = 1, readiness_state = 'ready',
-             capabilities_json = ?, last_heartbeat_at = ?, updated_at = ?
+             runtime_proto_json = ?, last_heartbeat_at = ?, updated_at = ?
          where id = ?`,
       ).bind(
-        JSON.stringify({ providerHealth: { claude: { healthy: true } } }),
+        runtimeProtoJson,
         observedAt,
         observedAt,
         otherWorkerId,
@@ -3158,16 +3250,16 @@ describe("organization channels", () => {
       db.prepare(
         `insert into briar_execution_workers (
            id, project_id, device_id, label, host_fingerprint,
-           agent_provider, capabilities_json, state, accepting_work,
+           runtime_proto_json, state, accepting_work,
            readiness_state, last_heartbeat_at, created_at, updated_at
-         ) values (?, ?, ?, 'Organization fallback binding', ?, 'claude', ?,
+         ) values (?, ?, ?, 'Organization fallback binding', ?, ?,
                    'online', 1, 'ready', ?, ?, ?)`,
       ).bind(
         fallbackWorkerId,
         otherProjectId,
         fallbackDeviceId,
         "c1".repeat(32),
-        capabilities,
+        runtimeProtoJson,
         observedAt,
         observedAt,
         observedAt,
@@ -3198,32 +3290,13 @@ describe("organization channels", () => {
     const claimed = await claimNextChannelAgentReply(db, organizationId, {
       deviceId: fallbackDeviceId,
       workerId: fallbackWorkerId,
-      providers: ["claude"],
-      workerAgentProvider: "claude",
-      workerCapabilitiesJson: capabilities,
-      supportsOrganizationAgentContext: true,
+      ...claimRuntime,
       claimTokenHash: "5".repeat(64),
       claimedAt: observedAt,
       leaseExpiresAt: new Date(Date.parse(observedAt) + 60_000).toISOString(),
     });
-    expect(claimed).toMatchObject({
-      id: job.id,
-      preferred_device_id: deviceId,
-      claimed_device_id: fallbackDeviceId,
-    });
-    await completeChannelReply(db, claimed!, {
-      jobId: claimed!.id,
-      deviceId: fallbackDeviceId,
-      workerId: fallbackWorkerId,
-      claimTokenHash: "5".repeat(64),
-      body: "Organization fallback completed.",
-      document: null,
-      issueProposal: null,
-      executionProposal: null,
-      agentName: "Organization Fallback",
-      agentProvider: "claude",
-      completedAt: observedAt,
-    });
+    expect(job.preferred_device_id).toBe(deviceId);
+    expect(claimed).toBeNull();
   });
 
   it("gives every mentioned Agent its own reply job", async () => {
@@ -3231,6 +3304,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "intro",
       name: "Intro",
       topic: null,
@@ -3313,42 +3388,12 @@ describe("organization channels", () => {
   });
 
   it("creates an isolated, idempotent self-DM and clears its key when expanded", async () => {
-    const apiEnv = {
-      DB: db,
-      ARCHIVES: archives,
-      BETTER_AUTH_SECRET: "channels-context-test-secret-channels-context-test",
-      GOOGLE_CLIENT_ID: "google-client-test",
-      GOOGLE_CLIENT_SECRET: "google-secret-test",
-    } as unknown as Env;
-    const directMessagesEndpoint =
-      `https://briar-api.example/organizations/${organizationId}/dms`;
-    const createSelfRequest = () => new Request(directMessagesEndpoint, {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${ownerSessionToken}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({ memberIds: [ownerId], agentIds: [] }),
+    const createSelf = () => createDirectMessageThroughApplication({
+      memberIds: [ownerId],
+      agentIds: [],
     });
 
-    const created = await apiWorker.fetch(createSelfRequest(), apiEnv);
-    expect(created.status).toBe(201);
-    const createdBody = await created.json() as {
-      channel: {
-        id: string;
-        kind: string;
-        name: string;
-        visibility: string;
-        memberCount: number;
-        agentCount: number;
-        dmParticipants: Array<{
-          type: string;
-          id: string;
-          name: string;
-          image: string | null;
-        }>;
-      };
-    };
+    const createdBody = await createSelf();
     expect(createdBody.channel).toMatchObject({
       kind: "dm",
       name: "Owner",
@@ -3363,19 +3408,15 @@ describe("organization channels", () => {
       }],
     });
 
-    const repeated = await apiWorker.fetch(createSelfRequest(), apiEnv);
-    expect(repeated.status).toBe(200);
-    expect((await repeated.json() as { channel: { id: string } }).channel.id)
-      .toBe(createdBody.channel.id);
+    const repeated = await createSelf();
+    expect(repeated.channel.id).toBe(createdBody.channel.id);
 
-    const listed = await apiWorker.fetch(new Request(
-      `https://briar-api.example/organizations/${organizationId}/channels`,
-      { headers: { authorization: `Bearer ${ownerSessionToken}` } },
-    ), apiEnv);
-    expect(listed.status).toBe(200);
-    expect((await listed.json() as {
-      channels: Array<{ id: string; kind: string; name: string }>;
-    }).channels).toEqual(expect.arrayContaining([
+    const listed = await listOrganizationChannels({
+      db,
+      organizationId,
+      userId: ownerId,
+    });
+    expect(listed.channels).toEqual(expect.arrayContaining([
       expect.objectContaining({
         id: createdBody.channel.id,
         kind: "dm",
@@ -3383,63 +3424,49 @@ describe("organization channels", () => {
       }),
     ]));
 
-    const message = await apiWorker.fetch(new Request(
-      `${directMessagesEndpoint.replace(/\/dms$/u, "")}/channels/${createdBody.channel.id}/messages`,
-      {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${ownerSessionToken}`,
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({ body: "A private note to myself" }),
-      },
-    ), apiEnv);
-    expect(message.status).toBe(201);
-    expect((await message.json() as {
-      message: { body: string; author: { type: string; id: string } };
-    }).message).toMatchObject({
+    const message = await createMessageThroughApplication(
+      createdBody.channel.id,
+      { body: "A private note to myself" },
+    );
+    expect(message.message).toMatchObject({
       body: "A private note to myself",
       author: { type: "user", id: ownerId },
     });
 
-    const timeline = await apiWorker.fetch(new Request(
-      `${directMessagesEndpoint.replace(/\/dms$/u, "")}/channels/${createdBody.channel.id}?limit=20`,
-      { headers: { authorization: `Bearer ${ownerSessionToken}` } },
-    ), apiEnv);
-    expect(timeline.status).toBe(200);
-    expect((await timeline.json() as {
-      messages: Array<{ body: string }>;
-    }).messages).toEqual(expect.arrayContaining([
+    const timeline = await getOrganizationChannelDetail({
+      db,
+      organizationId,
+      channelId: createdBody.channel.id,
+      userId: ownerId,
+      messageLimit: 20,
+    });
+    expect(timeline.messages).toEqual(expect.arrayContaining([
       expect.objectContaining({ body: "A private note to myself" }),
     ]));
 
-    const outsiderTimeline = await apiWorker.fetch(new Request(
-      `${directMessagesEndpoint.replace(/\/dms$/u, "")}/channels/${createdBody.channel.id}?limit=20`,
-      { headers: { authorization: `Bearer ${outsiderSessionToken}` } },
-    ), apiEnv);
-    expect(outsiderTimeline.status).toBe(404);
+    await expect(getOrganizationChannelDetail({
+      db,
+      organizationId,
+      channelId: createdBody.channel.id,
+      userId: outsiderId,
+      messageLimit: 20,
+    })).rejects.toMatchObject({ status: 404 });
 
-    const expanded = await apiWorker.fetch(new Request(
-      `${directMessagesEndpoint.replace(/\/dms$/u, "")}/channels/${createdBody.channel.id}/members/${outsiderId}`,
-      {
-        method: "PUT",
-        headers: {
-          authorization: `Bearer ${ownerSessionToken}`,
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({ role: "member" }),
-      },
-    ), apiEnv);
-    expect(expanded.status).toBe(200);
+    await setChannelMemberApplication({
+      db,
+      organizationId,
+      channelId: createdBody.channel.id,
+      userId: ownerId,
+      targetUserId: outsiderId,
+      change: { case: "add" },
+    });
     await expect(db.prepare(
       "select dm_key from briar_channels where id = ?",
     ).bind(createdBody.channel.id).first<{ dm_key: string | null }>()).resolves
       .toEqual({ dm_key: null });
 
-    const recreated = await apiWorker.fetch(createSelfRequest(), apiEnv);
-    expect(recreated.status).toBe(201);
-    expect((await recreated.json() as { channel: { id: string } }).channel.id)
-      .not.toBe(createdBody.channel.id);
+    const recreated = await createSelf();
+    expect(recreated.channel.id).not.toBe(createdBody.channel.id);
   });
 
   it("creates idempotent DMs and lets a busy preferred Worker answer", async () => {
@@ -3474,27 +3501,12 @@ describe("organization channels", () => {
       GOOGLE_CLIENT_ID: "google-client-test",
       GOOGLE_CLIENT_SECRET: "google-secret-test",
     } as unknown as Env;
-    const directMessagesEndpoint =
-      `https://briar-api.example/organizations/${organizationId}/dms`;
-    const createRequest = () => new Request(directMessagesEndpoint, {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${ownerSessionToken}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({ memberIds: [], agentIds: [agentId.toUpperCase()] }),
+    const createDirect = () => createDirectMessageThroughApplication({
+      memberIds: [],
+      agentIds: [agentId.toUpperCase()],
     });
 
-    const created = await apiWorker.fetch(createRequest(), apiEnv);
-    expect(created.status).toBe(201);
-    const createdBody = await created.json() as {
-      channel: {
-        id: string;
-        kind: string;
-        visibility: string;
-        dmParticipants: Array<{ type: string; id: string; name: string }>;
-      };
-    };
+    const createdBody = await createDirect();
     expect(createdBody.channel).toMatchObject({
       kind: "dm",
       visibility: "private",
@@ -3504,15 +3516,13 @@ describe("organization channels", () => {
       expect.objectContaining({ type: "agent", id: agentId, name: "Direct Falcon" }),
     ]));
 
-    const repeated = await apiWorker.fetch(createRequest(), apiEnv);
-    expect(repeated.status).toBe(200);
-    expect((await repeated.json() as { channel: { id: string } }).channel.id)
-      .toBe(createdBody.channel.id);
+    const repeated = await createDirect();
+    expect(repeated.channel.id).toBe(createdBody.channel.id);
 
     const claimedAt = new Date().toISOString();
-    const workerCapabilitiesJson = JSON.stringify({
-      providerHealth: { claude: { healthy: true } },
-      organizationAgentContext: { protocol: 1 },
+    const { runtimeProtoJson } = workerClaimRuntimeFixture({
+      agentProvider: "claude",
+      providers: ["claude"],
     });
     await db.batch([
       db.prepare(
@@ -3523,10 +3533,10 @@ describe("organization channels", () => {
       db.prepare(
         `update briar_execution_workers
          set state = 'online', accepting_work = 1, readiness_state = 'busy',
-             capabilities_json = ?, last_heartbeat_at = ?, updated_at = ?
+             runtime_proto_json = ?, last_heartbeat_at = ?, updated_at = ?
          where id = ?`,
       ).bind(
-        workerCapabilitiesJson,
+        runtimeProtoJson,
         claimedAt,
         claimedAt,
         otherWorkerId,
@@ -3582,16 +3592,13 @@ describe("organization channels", () => {
         ).toISOString(),
       });
     }
-    const dmTimelineResponse = await apiWorker.fetch(new Request(
-      `${directMessagesEndpoint.replace(/\/dms$/u, "")}/channels/${createdBody.channel.id}?limit=20`,
-      {
-        headers: { authorization: `Bearer ${ownerSessionToken}` },
-      },
-    ), apiEnv);
-    expect(dmTimelineResponse.status).toBe(200);
-    const dmTimeline = await dmTimelineResponse.json() as {
-      messages: Array<{ id: string; parentMessageId: string | null }>;
-    };
+    const dmTimeline = await getOrganizationChannelDetail({
+      db,
+      organizationId,
+      channelId: createdBody.channel.id,
+      userId: ownerId,
+      messageLimit: 20,
+    });
     expect(dmTimeline.messages).toEqual(expect.arrayContaining([
       expect.objectContaining({
         id: earlierDmMessageId,
@@ -3602,30 +3609,13 @@ describe("organization channels", () => {
         parentMessageId: earlierDmMessageId,
       }),
     ]));
-    const message = await apiWorker.fetch(new Request(
-      `${directMessagesEndpoint.replace(/\/dms$/u, "")}/channels/${createdBody.channel.id}/messages`,
+    const messageBody = await createMessageThroughApplication(
+      createdBody.channel.id,
       {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${ownerSessionToken}`,
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          body: "Direct response without a mention",
-          preferredDeviceId: deviceId,
-        }),
+        body: "Direct response without a mention",
+        preferredDeviceId: deviceId,
       },
-    ), apiEnv);
-    expect(message.status).toBe(201);
-    const messageBody = await message.json() as {
-      message: { id: string; mentionedAgentIds: string[] };
-      agentReplies: Array<{
-        id: string;
-        agentId: string;
-        status: string;
-        error: string | null;
-      }>;
-    };
+    );
     expect(messageBody.message.mentionedAgentIds).toEqual([]);
     expect(messageBody.agentReplies).toHaveLength(1);
     expect(messageBody.agentReplies[0]).toMatchObject({
@@ -3652,30 +3642,22 @@ describe("organization channels", () => {
        set created_at = ?, updated_at = ? where id = ?`,
     ).bind(new Date(0).toISOString(), claimedAt, dmReplyJob!.id).run();
 
-    const dmClaimResponse = await apiWorker.fetch(
-      new Request("https://briar-api.example/channel-reply-claims", {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${contextWorkerToken}`,
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({ organizationId, workerId: otherWorkerId }),
+    const authenticatedWorker = await requireWorkerProjectBinding(
+      db,
+      new Request("https://briar-api.example", {
+        headers: { authorization: `Bearer ${contextWorkerToken}` },
       }),
-      apiEnv,
+      otherProjectId,
+      otherWorkerId,
     );
-    expect(dmClaimResponse.status).toBe(200);
-    const dmClaimPayload = await dmClaimResponse.json() as {
-      work: {
-        workId: string;
-        claimToken: string;
-        claimedAt: string;
-        snapshot: {
-          messages: Array<{ id: string; parentMessageId: string | null }>;
-        };
-      };
-    };
-    expect(dmClaimPayload.work.workId).toBe(dmReplyJob!.id);
-    expect(dmClaimPayload.work.snapshot.messages.map((item) => item.id)).toEqual([
+    const dmClaimPayload = await claimNextChannelReplyWork({
+      input: { organizationId, workerId: otherWorkerId },
+      db,
+      env: apiEnv,
+      authenticatedWorker,
+    });
+    expect(dmClaimPayload?.workId).toBe(dmReplyJob!.id);
+    expect(dmClaimPayload!.snapshot.messages.map((item) => item.id)).toEqual([
       ...recentDmMessageIds.slice(-9),
       messageBody.message.id,
     ]);
@@ -3685,19 +3667,19 @@ describe("organization channels", () => {
       ...recentDmMessageIds.slice(0, 2),
     ];
     for (const excludedMessageId of excludedDmMessageIds) {
-      expect(dmClaimPayload.work.snapshot.messages.map((item) => item.id))
+      expect(dmClaimPayload!.snapshot.messages.map((item) => item.id))
         .not.toContain(excludedMessageId);
     }
-    expect(dmClaimPayload.work.snapshot.messages.every(
+    expect(dmClaimPayload!.snapshot.messages.every(
       (item) => item.parentMessageId === null,
     )).toBe(true);
-    const dmClaimTokenHash = sha256Hex(dmClaimPayload.work.claimToken);
+    const dmClaimTokenHash = sha256Hex(dmClaimPayload!.claimToken);
     const claimed = await getClaimedChannelReply(db, {
       jobId: dmReplyJob!.id,
       deviceId,
       workerId: otherWorkerId,
       claimTokenHash: dmClaimTokenHash,
-      observedAt: dmClaimPayload.work.claimedAt,
+      observedAt: dmClaimPayload!.claimedAt!,
     });
     expect(claimed).toMatchObject({
       trigger_message_id: messageBody.message.id,
@@ -3715,7 +3697,7 @@ describe("organization channels", () => {
       agentName: "Direct Falcon",
       agentProvider: "claude",
       completedAt: new Date(
-        Date.parse(dmClaimPayload.work.claimedAt) + 1_000,
+        Date.parse(dmClaimPayload!.claimedAt!) + 1_000,
       ).toISOString(),
     });
     const dmReply = await getChannelMessage(
@@ -3740,30 +3722,13 @@ describe("organization channels", () => {
       )).map((candidate) => candidate.id),
     ).not.toContain(claimed!.reply_message_id);
 
-    const selectedSkillMessage = await apiWorker.fetch(new Request(
-      `${directMessagesEndpoint.replace(/\/dms$/u, "")}/channels/${createdBody.channel.id}/messages`,
+    const selectedSkillBody = await createMessageThroughApplication(
+      createdBody.channel.id,
       {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${ownerSessionToken}`,
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          body: "/Direct response Summarize the update",
-          skillId: "ab000000-0000-4000-8000-000000000120",
-        }),
+        body: "/Direct response Summarize the update",
+        skillId: "ab000000-0000-4000-8000-000000000120",
       },
-    ), apiEnv);
-    expect(selectedSkillMessage.status).toBe(201);
-    const selectedSkillBody = await selectedSkillMessage.json() as {
-      message: { mentionedAgentIds: string[] };
-      agentReplies: Array<{
-        id: string;
-        agentId: string;
-        status: string;
-        error: string | null;
-      }>;
-    };
+    );
     expect(selectedSkillBody.message.mentionedAgentIds).toEqual([]);
     expect(selectedSkillBody.agentReplies).toHaveLength(1);
     expect(selectedSkillBody.agentReplies[0]).toMatchObject({
@@ -3784,83 +3749,43 @@ describe("organization channels", () => {
         "/Direct response Summarize the update",
     });
 
-    const unknownSkillMessage = await apiWorker.fetch(new Request(
-      `${directMessagesEndpoint.replace(/\/dms$/u, "")}/channels/${createdBody.channel.id}/messages`,
+    await expect(createMessageThroughApplication(
+      createdBody.channel.id,
       {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${ownerSessionToken}`,
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          body: "/Unknown skill Try this",
-          skillId: "ab000000-0000-4000-8000-000000000999",
-        }),
+        body: "/Unknown skill Try this",
+        skillId: "ab000000-0000-4000-8000-000000000999",
       },
-    ), apiEnv);
-    expect(unknownSkillMessage.status).toBe(400);
+    )).rejects.toMatchObject({ status: 400 });
 
-    const expanded = await apiWorker.fetch(new Request(
-      `${directMessagesEndpoint.replace(/\/dms$/u, "")}/channels/${createdBody.channel.id}/members/${outsiderId}`,
-      {
-        method: "PUT",
-        headers: {
-          authorization: `Bearer ${ownerSessionToken}`,
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({ role: "member" }),
-      },
-    ), apiEnv);
-    expect(expanded.status).toBe(200);
-    const recreatedDirect = await apiWorker.fetch(createRequest(), apiEnv);
-    expect(recreatedDirect.status).toBe(201);
-    expect(
-      (await recreatedDirect.json() as { channel: { id: string } }).channel.id,
-    ).not.toBe(createdBody.channel.id);
+    await setChannelMemberApplication({
+      db,
+      organizationId,
+      channelId: createdBody.channel.id,
+      userId: ownerId,
+      targetUserId: outsiderId,
+      change: { case: "add" },
+    });
+    const recreatedDirect = await createDirect();
+    expect(recreatedDirect.channel.id).not.toBe(createdBody.channel.id);
 
-    const group = await apiWorker.fetch(new Request(directMessagesEndpoint, {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${ownerSessionToken}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({ memberIds: [outsiderId], agentIds: [agentId] }),
-    }), apiEnv);
-    expect(group.status).toBe(201);
-    const groupId = (await group.json() as { channel: { id: string } }).channel.id;
-    const groupMessage = await apiWorker.fetch(new Request(
-      `${directMessagesEndpoint.replace(/\/dms$/u, "")}/channels/${groupId}/messages`,
-      {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${ownerSessionToken}`,
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({ body: "Hello group" }),
-      },
-    ), apiEnv);
-    expect(groupMessage.status).toBe(201);
-    expect((await groupMessage.json() as { agentReplies: unknown[] }).agentReplies)
-      .toEqual([]);
+    const group = await createDirectMessageThroughApplication({
+      memberIds: [outsiderId],
+      agentIds: [agentId],
+    });
+    const groupId = group.channel.id;
+    const groupMessage = await createMessageThroughApplication(
+      groupId,
+      { body: "Hello group" },
+    );
+    expect(groupMessage.agentReplies).toEqual([]);
 
-    const mentionedMessage = await apiWorker.fetch(new Request(
-      `${directMessagesEndpoint.replace(/\/dms$/u, "")}/channels/${groupId}/messages`,
+    const mentionedBody = await createMessageThroughApplication(
+      groupId,
       {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${ownerSessionToken}`,
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          body: "Please use Direct response here",
-          mentionedAgentIds: [agentId],
-        }),
+        body: "Please use Direct response here",
+        mentionedAgentIds: [agentId],
       },
-    ), apiEnv);
-    expect(mentionedMessage.status).toBe(201);
-    const mentionedBody = await mentionedMessage.json() as {
-      agentReplies: Array<{ id: string; agentId: string }>;
-    };
+    );
     expect(mentionedBody.agentReplies).toHaveLength(1);
     await expect(getChannelAgentReplyJob(
       db,
@@ -3878,6 +3803,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "preferred-device-api",
       name: "Preferred device API",
       topic: null,
@@ -3916,13 +3843,13 @@ describe("organization channels", () => {
       db.prepare(
         `update briar_execution_workers
          set state = 'online', accepting_work = 1, readiness_state = 'ready',
-             capabilities_json = ?, last_heartbeat_at = ?, updated_at = ?
+             runtime_proto_json = ?, last_heartbeat_at = ?, updated_at = ?
          where id = ?`,
       ).bind(
-        JSON.stringify({
-          providerHealth: { claude: { healthy: true } },
-          organizationAgentContext: { protocol: 1 },
-        }),
+        workerClaimRuntimeFixture({
+          agentProvider: "claude",
+          providers: ["claude"],
+        }).runtimeProtoJson,
         observedAt,
         observedAt,
         otherWorkerId,
@@ -3942,35 +3869,17 @@ describe("organization channels", () => {
         observedAt,
       ),
     ]);
-    const apiEnv = {
-      DB: db,
-      ARCHIVES: archives,
-      BETTER_AUTH_SECRET: "channels-context-test-secret-channels-context-test",
-      GOOGLE_CLIENT_ID: "google-client-test",
-      GOOGLE_CLIENT_SECRET: "google-secret-test",
-    } as unknown as Env;
-    const endpoint =
-      `https://briar-api.example/organizations/${organizationId}/channels/${channelId}/messages`;
-    const accepted = await apiWorker.fetch(new Request(endpoint, {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${ownerSessionToken}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
+    const acceptedBody = await createMessageThroughApplication(
+      channelId,
+      {
         body: "@Local-One @Local-Two answer",
         mentionedAgentIds: [
           firstAgentId.toUpperCase(),
           secondAgentId.toUpperCase(),
         ],
         preferredDeviceId: deviceId,
-      }),
-    }), apiEnv);
-    expect(accepted.status).toBe(201);
-    const acceptedBody = await accepted.json() as {
-      message: { id: string };
-      agentReplies: Array<{ id: string }>;
-    };
+      },
+    );
     expect(acceptedBody.agentReplies).toHaveLength(2);
     const stored = await db.prepare(
       `select agent_id, preferred_device_id
@@ -3985,18 +3894,13 @@ describe("organization channels", () => {
       { agent_id: secondAgentId, preferred_device_id: deviceId },
     ]);
 
-    const rejected = await apiWorker.fetch(new Request(endpoint, {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${ownerSessionToken}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
+    await expect(createMessageThroughApplication(
+      channelId,
+      {
         body: "Do not accept this preference",
         preferredDeviceId: outsiderDeviceId,
-      }),
-    }), apiEnv);
-    expect(rejected.status).toBe(403);
+      },
+    )).rejects.toMatchObject({ status: 403 });
   });
 
   it("stores one ordinary reply and Inbox notification on final AI failure", async () => {
@@ -4016,6 +3920,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "final-reply-failure",
       name: "Final reply failure",
       topic: null,
@@ -4223,6 +4129,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "unavailable-worker",
       name: "Unavailable Worker",
       topic: null,
@@ -4279,9 +4187,11 @@ describe("organization channels", () => {
     const fallbackDeviceId = "c0000000-0000-4000-8000-000000000098";
     const fallbackWorkerId = "d0000000-0000-4000-8000-000000000098";
     const observedAt = new Date().toISOString();
-    const capabilities = JSON.stringify({
-      providerHealth: { claude: { healthy: true } },
+    const runtimeProtoJson = workerRuntimeProtoJsonFixture({
+      agentProvider: "claude",
+      providers: ["claude"],
       providerCapabilities: {
+        ...emptyAgentProviderCapabilityCatalog(),
         claude: {
           models: [],
           defaultEfforts: [],
@@ -4299,9 +4209,9 @@ describe("organization channels", () => {
       db.prepare(
         `update briar_execution_workers
          set label = 'Pinned Mac', state = 'disabled', accepting_work = 1,
-             readiness_state = 'ready', capabilities_json = ?,
+             readiness_state = 'ready', runtime_proto_json = ?,
              last_heartbeat_at = ? where id = ?`,
-      ).bind(capabilities, observedAt, boundWorkerId),
+      ).bind(runtimeProtoJson, observedAt, boundWorkerId),
       db.prepare(
         `insert into briar_execution_worker_devices (
            id, organization_id, owner_user_id, label, device_identity_hash,
@@ -4324,16 +4234,16 @@ describe("organization channels", () => {
       db.prepare(
         `insert into briar_execution_workers (
            id, project_id, device_id, label, host_fingerprint,
-           agent_provider, capabilities_json, state, accepting_work,
+           runtime_proto_json, state, accepting_work,
            readiness_state, last_heartbeat_at, created_at, updated_at
-         ) values (?, ?, ?, 'Eligible Mac', ?, 'claude', ?, 'online', 1,
+         ) values (?, ?, ?, 'Eligible Mac', ?, ?, 'online', 1,
                    'ready', ?, ?, ?)`,
       ).bind(
         fallbackWorkerId,
         projectId,
         fallbackDeviceId,
         sha256Hex(`${fallbackWorkerId}:host`),
-        capabilities,
+        runtimeProtoJson,
         observedAt,
         observedAt,
         observedAt,
@@ -4357,6 +4267,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "designated-worker-error",
       name: "Designated Worker error",
       topic: null,
@@ -4372,31 +4284,10 @@ describe("organization channels", () => {
       createdAt: observedAt,
     });
 
-    const response = await apiWorker.fetch(new Request(
-      `https://briar-api.example/organizations/${organizationId}/channels/${channelId}/messages`,
-      {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${ownerSessionToken}`,
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          body: "@Pinned-Agent stay pinned",
-          mentionedAgentIds: [agentId],
-        }),
-      },
-    ), {
-      DB: db,
-      ARCHIVES: archives,
-      BETTER_AUTH_SECRET: "channels-context-test-secret-channels-context-test",
-      GOOGLE_CLIENT_ID: "google-client-test",
-      GOOGLE_CLIENT_SECRET: "google-secret-test",
-    } as unknown as Env);
-
-    expect(response.status).toBe(201);
-    const body = await response.json() as {
-      agentReplies: Array<{ status: string; error: string | null }>;
-    };
+    const body = await createMessageThroughApplication(channelId, {
+      body: "@Pinned-Agent stay pinned",
+      mentionedAgentIds: [agentId],
+    });
     expect(body.agentReplies).toEqual([
       expect.objectContaining({
         status: "failed",
@@ -4423,10 +4314,12 @@ describe("organization channels", () => {
       db.prepare(
         `update briar_execution_workers
          set state = 'online', accepting_work = 0,
-             readiness_state = 'needs_attention', capabilities_json = ?,
+             readiness_state = 'needs_attention', runtime_proto_json = ?,
              last_heartbeat_at = ?, updated_at = ? where id = ?`,
       ).bind(
-        JSON.stringify({
+        workerRuntimeProtoJsonFixture({
+          agentProvider: "grok",
+          providers: ["grok"],
           providerHealth: {
             grok: {
               installed: true,
@@ -4438,6 +4331,7 @@ describe("organization channels", () => {
             },
           },
           providerCapabilities: {
+            ...emptyAgentProviderCapabilityCatalog(),
             grok: {
               models: [{
                 id: "grok-4.6",
@@ -4465,6 +4359,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "usage-limit-error",
       name: "Usage limit error",
       topic: null,
@@ -4480,31 +4376,10 @@ describe("organization channels", () => {
       createdAt: observedAt,
     });
 
-    const response = await apiWorker.fetch(new Request(
-      `https://briar-api.example/organizations/${organizationId}/channels/${channelId}/messages`,
-      {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${ownerSessionToken}`,
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          body: "@Limit-Agent help",
-          mentionedAgentIds: [agentId],
-        }),
-      },
-    ), {
-      DB: db,
-      ARCHIVES: archives,
-      BETTER_AUTH_SECRET: "channels-context-test-secret-channels-context-test",
-      GOOGLE_CLIENT_ID: "google-client-test",
-      GOOGLE_CLIENT_SECRET: "google-secret-test",
-    } as unknown as Env);
-
-    expect(response.status).toBe(201);
-    const body = await response.json() as {
-      agentReplies: Array<{ status: string; error: string | null }>;
-    };
+    const body = await createMessageThroughApplication(channelId, {
+      body: "@Limit-Agent help",
+      mentionedAgentIds: [agentId],
+    });
     expect(body.agentReplies).toEqual([
       expect.objectContaining({
         status: "failed",
@@ -4518,6 +4393,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: hiddenId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "leadership",
       name: "Leadership",
       topic: null,
@@ -4580,6 +4457,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "reactions",
       name: "Reactions",
       topic: null,
@@ -4693,6 +4572,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "deletion-thread",
       name: "Deletion thread",
       topic: null,
@@ -4748,7 +4629,13 @@ describe("organization channels", () => {
       projectId,
       rootId,
       replyId,
-      JSON.stringify({ title: "Must not remain actionable" }),
+      JSON.stringify({
+        issue: {
+          title: "Must not remain actionable",
+          description: null,
+          priority: null,
+        },
+      }),
       at(62),
       at(62),
     ).run();
@@ -4832,6 +4719,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "deletion-hard",
       name: "Deletion hard",
       topic: null,
@@ -4910,12 +4799,14 @@ describe("organization channels", () => {
     expect(await getChannelMessage(db, channelId, standaloneId)).toBeNull();
   });
 
-  it("enforces message deletion through the authenticated HTTP route", async () => {
+  it("enforces message deletion permissions at the application boundary", async () => {
     const channelId = "e0000000-0000-4000-8000-0000000000f1";
     const messageId = "f0000000-0000-4000-8000-0000000000f1";
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "deletion-route",
       name: "Deletion route",
       topic: null,
@@ -4937,8 +4828,6 @@ describe("organization channels", () => {
       mentionedAgentIds: [],
       createdAt: at(74),
     });
-    const endpoint =
-      `https://briar-api.example/organizations/${organizationId}/channels/${channelId}/messages/${messageId}`;
     const apiEnv = {
       DB: db,
       ARCHIVES: archives,
@@ -4947,27 +4836,29 @@ describe("organization channels", () => {
       GOOGLE_CLIENT_ID: "google-client-test",
       GOOGLE_CLIENT_SECRET: "google-secret-test",
     } as unknown as Env;
-    const remove = (token: string) => apiWorker.fetch(new Request(endpoint, {
-      method: "DELETE",
-      headers: { authorization: `Bearer ${token}` },
-    }), apiEnv);
+    const remove = (userId: string) => deleteOrganizationChannelMessage({
+      db,
+      organizationId,
+      channelId,
+      messageId,
+      userId,
+      attachmentsBucket: archives,
+      env: apiEnv,
+    });
 
-    const forbidden = await remove(outsiderSessionToken);
-    expect(forbidden.status).toBe(403);
+    await expect(remove(outsiderId)).rejects.toMatchObject({ status: 403 });
     expect(await getChannelMessage(db, channelId, messageId)).not.toBeNull();
 
-    const deleted = await remove(ownerSessionToken);
-    expect(deleted.status).toBe(200);
-    await expect(deleted.json()).resolves.toEqual({
+    const deleted = await remove(ownerId);
+    expect(deleted).toEqual({
       deleted: true,
       message: null,
       parentMessage: null,
     });
     expect(await getChannelMessage(db, channelId, messageId)).toBeNull();
 
-    const repeated = await remove(ownerSessionToken);
-    expect(repeated.status).toBe(200);
-    await expect(repeated.json()).resolves.toEqual({
+    const repeated = await remove(ownerId);
+    expect(repeated).toEqual({
       deleted: false,
       message: null,
       parentMessage: null,

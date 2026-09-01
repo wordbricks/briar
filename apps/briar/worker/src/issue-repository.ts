@@ -1,5 +1,7 @@
 import {
   additionalWorkflowCheckpoints,
+  decodeAutoHuntWorkflowCheckpointsJson,
+  encodeAutoHuntWorkflowCheckpointsJson,
   normalizeAutoHuntWorkflow,
   workflowWithAdditionalCheckpoints,
   type AutoHuntWorkflowCheckpoint,
@@ -17,23 +19,6 @@ import {
   type ProjectAgentProvider,
 } from "./project-agent-model";
 import type { IssueDifficulty } from "../../src/lib/issue-difficulty";
-
-export async function rollbackNewAppIssue(
-  db: D1Database,
-  projectId: string,
-  runId: string,
-) {
-  const result = await db
-    .prepare(
-      `delete from briar_hunt_runs
-       where id = ? and project_id = ? and source = 'issue'
-         and status = 'queued' and claim_attempts = 0
-         and event_count = 1`,
-    )
-    .bind(runId, projectId)
-    .run();
-  return result.meta.changes > 0;
-}
 
 export async function updateIssue(
   db: D1Database,
@@ -126,9 +111,9 @@ export async function updateIssueCheckpoints(
   const currentWorkflow = normalizeAutoHuntWorkflow(
     JSON.parse(run.workflow_snapshot_json),
   );
-  const previousIssueCheckpoints = JSON.parse(
-    run.issue_checkpoints_json || "[]",
-  ) as AutoHuntWorkflowCheckpoint[];
+  const previousIssueCheckpoints = decodeAutoHuntWorkflowCheckpointsJson(
+    run.issue_checkpoints_json,
+  );
   const previousBoundaries = new Set(
     previousIssueCheckpoints.map(
       (checkpoint) => `${checkpoint.stage}:${checkpoint.position}`,
@@ -163,7 +148,7 @@ export async function updateIssueCheckpoints(
     )
     .bind(
       stableJson(nextWorkflow),
-      stableJson(normalizedCheckpoints),
+      encodeAutoHuntWorkflowCheckpointsJson(normalizedCheckpoints),
       updatedAt,
       runId,
       projectId,

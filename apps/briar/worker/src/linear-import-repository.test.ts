@@ -1,16 +1,12 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { Miniflare } from "miniflare";
+import { env } from "cloudflare:workers";
+import { beforeAll, describe, expect, it } from "vitest";
 import {
   importLinearHuntRuns,
   type LinearImportRunInput,
 } from "./linear-import-repository";
-import {
-  createIsolatedTestDatabase,
-  executeD1Sql,
-} from "./test-helpers/d1";
+import { executeD1Sql } from "./test-helpers/d1";
 
 describe("two-phase Linear relationship import", () => {
-  let miniflare: Miniflare;
   let db: D1Database;
   const userID = "11111111-1111-4111-8111-111111111111";
   const organizationID = "22222222-2222-4222-8222-222222222222";
@@ -18,11 +14,7 @@ describe("two-phase Linear relationship import", () => {
   const now = "2026-09-01T00:00:00.000Z";
 
   beforeAll(async () => {
-    const database = await createIsolatedTestDatabase({
-      suite: "linear-relationship-import",
-    });
-    miniflare = database.miniflare;
-    db = database.db;
+    db = env.DB;
     const workflow = JSON.stringify({
       version: 2,
       stages: [{ id: "implementing", label: "Implement", required: true }],
@@ -53,10 +45,6 @@ describe("two-phase Linear relationship import", () => {
         '${workflow.replaceAll("'", "''")}', '[]', '${now}', '${now}'
       );
     `);
-  });
-
-  afterAll(async () => {
-    await miniflare.dispose();
   });
 
   it("links supported relationships after creating all issues and skips duplicates on reimport", async () => {

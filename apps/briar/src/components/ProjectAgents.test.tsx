@@ -10,6 +10,9 @@ import { I18nProvider } from "../i18n";
 const project: Project = {
   id: "project-1",
   name: "Briar",
+  issueKeyPrefix: "BR",
+  scheduleTabEnabled: true,
+  icon: null,
   organizationId: "org-1",
   organizationName: "Briar Org",
   role: "owner",
@@ -18,7 +21,7 @@ const project: Project = {
 
 const session: AutoHuntSession = {
   id: "session-1",
-  dispatchGroupId: "",
+  dispatchGroupId: "session-1",
   projectId: "project-1",
   agentId: "demo-agent-auto-hunt",
   sessionType: "task",
@@ -26,6 +29,7 @@ const session: AutoHuntSession = {
   status: "running",
   issues: [],
   startedAt: "2026-07-28T01:00:00.000Z",
+  updatedAt: "2026-07-28T01:00:00.000Z",
   completedAt: null,
   conversationId: "thread-1",
   workspaceRoot: "/repo",

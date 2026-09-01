@@ -3,12 +3,23 @@ import { chmod, lstat, mkdtemp, open, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import { fromJson, toJson, type JsonValue } from "@bufbuild/protobuf";
+import { ValueSchema } from "@bufbuild/protobuf/wkt";
+import { ConnectError } from "@connectrpc/connect";
+import { ApplicationErrorDetailSchema } from "@briar/contracts/gen/briar/types/v1/error_pb";
 import * as Schema from "effect/Schema";
-import { channelReplyClaimTokenHeader } from "../src/lib/channels-contract";
 import {
   dmMemoryBriefResponseSchema, dmMemoryDescriptorSchema, dmMemoryLookupResponseSchema, dmMemoryRequestSchema,
   type DmMemoryBrief, type DmMemoryDescriptor, type DmMemoryLookupResponse, type DmMemoryRequest,
 } from "../src/lib/dm-memory-query-contract";
+import {
+  type WorkerQueueClient,
+  workClaimIdentityToProto,
+} from "./worker-queue-client";
+import {
+  dmMemoryDescriptorFromProto,
+  type ClaimedChannelReply,
+} from "./worker-queue-contract";
 
 const decodeTurn = Schema.decodeUnknownSync(Schema.Struct({
   body: Schema.optional(Schema.Null), attachments: Schema.optional(Schema.Array(Schema.Never)),
@@ -25,37 +36,26 @@ export function decodeDmMemoryTurn(value: unknown): DmMemoryRequest {
 }
 
 type InvocationInput = {
-  apiUrl: string; organizationId: string; workId: string; workerId: string;
-  workerToken: string; claimToken: string; memory: DmMemoryDescriptor;
-  signal?: AbortSignal; fetcher?: (url: URL, init?: RequestInit) => Promise<Response>;
+  queue: Pick<WorkerQueueClient, "checkDmMemoryClaim" | "getDmMemoryBrief" | "lookupDmMemory">;
+  projectId: string;
+  workerId: string;
+  work: ClaimedChannelReply;
+  memory: DmMemoryDescriptor;
+  signal?: AbortSignal;
 };
 const decodeResponse = <S extends Schema.Top & { readonly DecodingServices: never }>(schema: S, value: unknown): S["Type"] => {
   try { return Schema.decodeUnknownSync(schema)(value); } catch { throw new Error("memory_response_invalid"); }
 };
 const checkSchema = Schema.Struct({ memory: dmMemoryDescriptorSchema });
-const safeError = Schema.Struct({ code: Schema.optional(Schema.String.check(Schema.isPattern(/^[a-z_]{1,64}$/u))) });
+const required = <T>(value: T | undefined, field: string): T => {
+  if (value === undefined) throw new Error(`memory_response_missing_${field}`);
+  return value;
+};
 
-/** Reads a bounded wire response. Errors never include private response text or credentials. */
-async function responseJson(response: Response, maximum: number): Promise<unknown> {
-  const reader = response.body?.getReader();
-  if (!reader) throw new Error("memory_response_missing");
-  const chunks: Uint8Array[] = [];
-  let bytes = 0;
-  try {
-    for (;;) {
-      const next = await reader.read();
-      if (next.done) break;
-      bytes += next.value.length;
-      if (bytes > maximum) { await reader.cancel(); throw new Error("memory_response_too_large"); }
-      chunks.push(next.value);
-    }
-  } finally { reader.releaseLock(); }
-  const payload = new Uint8Array(bytes);
-  let offset = 0;
-  for (const chunk of chunks) { payload.set(chunk, offset); offset += chunk.length; }
-  try { return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(payload)); }
-  catch { throw new Error("memory_response_invalid"); }
-}
+const applicationErrorCode = (error: unknown) => {
+  if (!(error instanceof ConnectError)) return null;
+  return error.findDetails(ApplicationErrorDetailSchema)[0]?.code || null;
+};
 
 /** Files are disposable views of D1, never a writable memory store or reply artifact. */
 export class DmMemoryInvocation {
@@ -77,29 +77,24 @@ export class DmMemoryInvocation {
     }
     catch (error) { await invocation.cleanup(); throw error; }
   }
-  private async request(resource: "brief" | "check" | "lookup", body?: unknown) {
+  private claim() {
+    return {
+      projectId: this.input.projectId,
+      workerId: this.input.workerId,
+      work: workClaimIdentityToProto(this.input.work),
+      revocationEpoch: BigInt(this.descriptor.revocationEpoch),
+    };
+  }
+  private async rpc<T>(call: (signal: AbortSignal) => Promise<T>): Promise<T> {
     if (this.closed) throw new Error("memory_invocation_closed");
-    const url = new URL(`/organizations/${this.input.organizationId}/channel-reply-claims/${this.input.workId}/memory/${resource}`, this.input.apiUrl);
-    if (resource !== "lookup") {
-      url.searchParams.set("workerId", this.input.workerId);
-      url.searchParams.set("revocationEpoch", String(this.descriptor.revocationEpoch));
-    }
     const signal = AbortSignal.any([...(this.input.signal ? [this.input.signal] : []), AbortSignal.timeout(7_000)]);
-    let response: Response;
     try {
-      response = await (this.input.fetcher ?? fetch)(url, {
-        method: resource === "lookup" ? "POST" : "GET", signal,
-        headers: { Authorization: `Bearer ${this.input.workerToken}`, [channelReplyClaimTokenHeader]: this.input.claimToken,
-          "Content-Type": "application/json" },
-        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-      });
-    } catch { throw new Error(this.input.signal?.aborted ? "memory_invocation_aborted" : "memory_transport_failed"); }
-    const json = await responseJson(response, resource === "lookup" ? 32768 : 10000);
-    if (!response.ok) {
-      const error = decodeResponse(safeError, json);
-      throw new Error(error.code ?? `memory_request_failed_${response.status}`);
+      return await call(signal);
+    } catch (error) {
+      const code = applicationErrorCode(error);
+      if (code) throw new Error(code);
+      throw new Error(this.input.signal?.aborted ? "memory_invocation_aborted" : "memory_transport_failed");
     }
-    return json;
   }
   private async write(filename: string, value: unknown) {
     const file = await open(join(this.directory, filename), constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
@@ -118,7 +113,14 @@ export class DmMemoryInvocation {
     this.descriptor = descriptor;
   }
   private async refresh() {
-    const response = decodeResponse(dmMemoryBriefResponseSchema, await this.request("brief"));
+    const wire = await this.rpc((signal) => this.input.queue.getDmMemoryBrief(
+      { claim: this.claim() },
+      { signal },
+    ));
+    const response = decodeResponse(dmMemoryBriefResponseSchema, {
+      memory: dmMemoryDescriptorFromProto(required(wire.memory, "memory")),
+      brief: wire.brief ? toJson(ValueSchema, wire.brief) : null,
+    });
     this.accept(response.memory);
     await this.clearFiles();
     this.brief = response.brief;
@@ -127,7 +129,13 @@ export class DmMemoryInvocation {
   }
   /** A changed revision requires a fresh prompt; a changed epoch aborts the claim. */
   async check(refreshIfChanged = true): Promise<boolean> {
-    const { memory } = decodeResponse(checkSchema, await this.request("check"));
+    const wire = await this.rpc((signal) => this.input.queue.checkDmMemoryClaim(
+      { claim: this.claim() },
+      { signal },
+    ));
+    const { memory } = decodeResponse(checkSchema, {
+      memory: dmMemoryDescriptorFromProto(required(wire.memory, "memory")),
+    });
     const changed = memory.memoryRevision !== this.descriptor.memoryRevision || memory.searchEnabled !== this.descriptor.searchEnabled;
     if (memory.memorySpaceId !== this.descriptor.memorySpaceId || memory.revocationEpoch !== this.descriptor.revocationEpoch) throw new Error("memory_scope_revoked");
     if (changed && refreshIfChanged) { this.accept(memory); await this.refresh(); }
@@ -136,11 +144,20 @@ export class DmMemoryInvocation {
   }
   async lookup(request: DmMemoryRequest) {
     const requestId = crypto.randomUUID();
-    const payload = { workerId: this.input.workerId, requestId,
-      revocationEpoch: this.descriptor.revocationEpoch, request };
+    const payload = { requestId, request };
     let received: unknown;
     for (let attempt = 0; attempt < 3; attempt++) {
-      try { received = await this.request("lookup", payload); break; }
+      try {
+        received = await this.rpc((signal) => this.input.queue.lookupDmMemory({
+          claim: this.claim(),
+          requestId: payload.requestId,
+          request: fromJson(
+            ValueSchema,
+            JSON.parse(JSON.stringify(payload.request)) as JsonValue,
+          ),
+        }, { signal }));
+        break;
+      }
       catch (error) {
         const code = error instanceof Error ? error.message : "memory_request_failed";
         if (attempt === 2 || !["memory_transport_failed", "lookup_in_progress"].includes(code)) throw error;
@@ -148,7 +165,10 @@ export class DmMemoryInvocation {
         await delay(code === "lookup_in_progress" ? 7_100 : 300, undefined, { signal: this.input.signal });
       }
     }
-    const response = decodeResponse(dmMemoryLookupResponseSchema, received);
+    const response = decodeResponse(
+      dmMemoryLookupResponseSchema,
+      toJson(ValueSchema, required((received as Awaited<ReturnType<InvocationInput["queue"]["lookupDmMemory"]>>).response, "response")),
+    );
     if (response.revocationEpoch !== this.descriptor.revocationEpoch) throw new Error("memory_scope_revoked");
     const filename = `lookup-${requestId}.json`;
     await this.write(filename, response);

@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createIsolatedTestDatabase } from "./test-helpers/d1";
+import { env } from "cloudflare:workers";
+import { beforeAll, describe, expect, it } from "vitest";
 import {
   blockMergeBatch,
   claimNextMergeBatch,
@@ -21,6 +21,7 @@ import {
   selectAuthoritativeMergeGroupHead,
 } from "./merge-batches";
 import { getMergeQueueStatus } from "./merge-queue-status";
+import { workerRuntimeProtoJsonFixture } from "./test-helpers/worker-runtime";
 
 const baseTime = Date.parse("2026-08-21T00:00:00.000Z");
 const installationId = 901;
@@ -74,13 +75,10 @@ type ReadyRun = {
 };
 
 describe("repository merge queue coordinator", () => {
-  let fixture: Awaited<ReturnType<typeof createIsolatedTestDatabase>>;
-  let db: D1Database;
+  const db = env.DB;
   let runSequence = 0;
 
   beforeAll(async () => {
-    fixture = await createIsolatedTestDatabase({ suite: "merge-batches-v2" });
-    db = fixture.db;
     await db.batch([
       db.prepare(
         `insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
@@ -107,8 +105,6 @@ describe("repository merge queue coordinator", () => {
       ).bind(installationId, at(0, 0), at(0, 0)),
     ]);
   });
-
-  afterAll(async () => fixture.dispose());
 
   const setupLane = async (
     scenario: number,
@@ -196,10 +192,10 @@ describe("repository merge queue coordinator", () => {
       ),
       db.prepare(
         `insert into briar_execution_workers (
-           id, project_id, device_id, label, host_fingerprint, agent_provider,
-           versions_json, capabilities_json, state, accepting_work,
+           id, project_id, device_id, label, host_fingerprint,
+           runtime_proto_json, state, accepting_work,
            readiness_state, last_heartbeat_at, created_at, updated_at
-         ) values (?, ?, ?, ?, ?, 'codex', '{}', '{}', 'online', 1, 'ready',
+         ) values (?, ?, ?, ?, ?, ?, 'online', 1, 'ready',
                    ?, ?, ?)`,
       ).bind(
         workerId,
@@ -207,6 +203,7 @@ describe("repository merge queue coordinator", () => {
         deviceId,
         `Merge worker ${scenario}`,
         (scenario + 200).toString(16).padStart(64, "0"),
+        workerRuntimeProtoJsonFixture(),
         at(scenario, 0),
         at(scenario, 0),
         at(scenario, 0),

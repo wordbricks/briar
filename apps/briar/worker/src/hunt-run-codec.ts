@@ -20,17 +20,5 @@ export const parseUrls = (value: string | null | undefined) => {
     : [];
 };
 
-export const runIsFullAuto = (run: Pick<HuntRunRow, "context_json">) => {
-  if (!run.context_json) return false;
-  try {
-    const context: unknown = JSON.parse(run.context_json);
-    return Boolean(
-      context &&
-        typeof context === "object" &&
-        !Array.isArray(context) &&
-        (context as Record<string, unknown>).fullAuto === true,
-    );
-  } catch {
-    return false;
-  }
-};
+export const runIsFullAuto = (run: Pick<HuntRunRow, "full_auto">) =>
+  run.full_auto === 1;

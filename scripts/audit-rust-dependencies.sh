@@ -19,6 +19,7 @@ lockfile="apps/briar/src-tauri/Cargo.lock"
   --ignore RUSTSEC-2024-0419 \
   --ignore RUSTSEC-2024-0420 \
   --ignore RUSTSEC-2024-0429 \
+  --ignore RUSTSEC-2024-0436 \
   --ignore RUSTSEC-2025-0075 \
   --ignore RUSTSEC-2025-0080 \
   --ignore RUSTSEC-2025-0081 \

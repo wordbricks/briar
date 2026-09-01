@@ -39,48 +39,34 @@ const project = {
 } as ProjectConfig;
 
 function dependencies() {
-  const calls: Array<{
-    path: string;
-    token: string | null;
-    init?: RequestInit;
-  }> = [];
+  const updates: Array<unknown> = [];
   const writeLine = vi.fn();
-  const request: IssueUpdateCommandDependencies["request"] = async <T>(
-    _apiUrl: string,
-    path: string,
-    token: string | null,
-    init?: RequestInit,
-  ) => {
-    calls.push({ path, token, init });
-    if (path.endsWith("/dashboard")) {
-      return {
-        runs: [{
-          id: runId,
-          title: "Current title",
-          issueDescription: "Current description",
-          priority: 3,
-          difficulty: "normal",
-          assigneeUserId: "user-1",
-        }],
-      } as T;
-    }
-    return {
-      runId,
-      title: "Updated title",
-      description: null,
-      priority: 3,
-      difficulty: "hard",
-      assigneeUserId: "user-1",
-      attachments: [],
-    } as T;
-  };
   return {
-    calls,
+    updates,
     writeLine,
     dependencies: {
       loadConfig: async () => config,
       currentProject: async () => project,
-      request,
+      loadRun: async () => ({
+        title: "Current title",
+        description: "Current description",
+        priority: 3,
+        difficulty: "normal" as const,
+        assigneeUserId: "user-1",
+      }),
+      updateRun: async (_config, _project, receivedRunId, input) => {
+        updates.push({ runId: receivedRunId, input });
+        return {
+          $typeName: "briar.app.v1.UpdateIssueResponse" as const,
+          runId,
+          title: input.title,
+          description: input.description ?? undefined,
+          priority: input.priority ?? undefined,
+          difficulty: undefined,
+          assigneeUserId: input.assigneeUserId ?? undefined,
+          attachments: [],
+        };
+      },
       readFile: async () => "Description from file",
       writeLine,
     } satisfies IssueUpdateCommandDependencies,
@@ -118,23 +104,16 @@ describe("briar issue update", () => {
       state.dependencies,
     );
 
-    expect(state.calls).toHaveLength(2);
-    expect(state.calls[0]).toMatchObject({
-      path: `/projects/${projectId}/dashboard`,
-      token: "user-token",
-    });
-    expect(state.calls[1]).toMatchObject({
-      path: `/projects/${projectId}/runs/${runId}`,
-      token: "user-token",
-      init: { method: "PATCH" },
-    });
-    expect(JSON.parse(String(state.calls[1].init?.body))).toEqual({
+    expect(state.updates).toEqual([{
+      runId,
+      input: {
       title: "Updated title",
       description: null,
       priority: 3,
       difficulty: "hard",
       assigneeUserId: "user-1",
-    });
+      },
+    }]);
     expect(state.writeLine).toHaveBeenCalledWith(
       expect.stringContaining(`"runId":"${runId}"`),
     );
@@ -168,6 +147,6 @@ describe("briar issue update", () => {
         state.dependencies,
       ),
     ).rejects.toThrow("--priority cannot be combined with --clear-priority");
-    expect(state.calls).toHaveLength(0);
+    expect(state.updates).toHaveLength(0);
   });
 });

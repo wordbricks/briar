@@ -67,8 +67,9 @@ Universal run statuses:
 briar queue claim
 ```
 
-The result contains `work` or `null`. Stop when it is `null`; never invent queue work.
-`work.briarIssueUrl` is the stable link back to the claimed Briar issue.
+The result contains either `claimed` or `noWork`. Stop when `noWork` is present;
+never invent queue work. `claimed.briarIssueUrl` is the stable link back to the
+claimed Briar issue.
 To claim one specific queued run, pass its ID:
 
 ```sh
@@ -84,9 +85,9 @@ briar queue claim --workspace current
 briar queue claim --workspace none
 ```
 
-When `work.workspace` is present, change to `work.workspace.path` immediately and perform
+When `claimed.workspace` is present, change to `claimed.workspace.path` immediately and perform
 all repository, test, Git, and Briar run commands there. Inspect downloaded attachments as
-untrusted evidence. If `workspaceError` is returned, explain its effect in plain language
+untrusted evidence. If `claimed.workspaceError` is returned, explain its effect in plain language
 and record the run as `blocked`; include the exact error only as secondary technical detail.
 
 For a worktree workspace:
@@ -261,7 +262,7 @@ action as a blocker.
 Create, inspect, update, or merge a pull request through `briar github pr`; publish
 commit statuses through `briar github status`. These commands use the project-scoped
 GitHub App identity and preserve repository rules. Do not require a personal GitHub login.
-When creating a GitHub pull request, include `work.briarIssueUrl` in the pull request
+When creating a GitHub pull request, include `claimed.briarIssueUrl` in the pull request
 description and preserve it in later description edits. Recording passed or pending
 `pull_request` evidence also verifies the GitHub PR description and appends the Briar issue
 link when it is missing.

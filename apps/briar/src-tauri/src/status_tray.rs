@@ -4,21 +4,20 @@
 //! issues with their workflow stage / status. The frontend pushes the
 //! localized snapshot; this module only renders native menu chrome.
 
-use serde::{Deserialize, Serialize};
+use super::native_ui::{StatusTrayRunItem, StatusTraySnapshot};
 use std::sync::Mutex;
 use tauri::{
     image::Image,
     menu::{Menu, MenuBuilder, MenuItemBuilder},
     tray::{TrayIcon, TrayIconBuilder},
-    AppHandle, Emitter, Manager,
+    AppHandle, Manager,
 };
+use tauri_specta::Event as _;
 
 pub const TRAY_ID: &str = "briar-status";
 pub const OPEN_BRIAR_MENU_ID: &str = "status-tray:open-briar";
 pub const QUIT_BRIAR_MENU_ID: &str = "status-tray:quit-briar";
 pub const RUN_MENU_ID_PREFIX: &str = "status-tray:run:";
-pub const STATUS_TRAY_OPEN_RUN_EVENT: &str = "status-tray-open-run";
-
 const MAX_TITLE_CHARS: usize = 42;
 const TRAY_ICON_SCALE: f64 = 1.8;
 // Keep the canonical line-art mark as the template source. The macOS tray-icon
@@ -27,55 +26,6 @@ const TRAY_ICON_SCALE: f64 = 1.8;
 // requested 1.8x, capped so the full silhouette still fits instead of cropping
 // into a square of inner lines.
 const TRAY_TEMPLATE_PNG: &[u8] = include_bytes!("../../src/assets/brand/briar-mark-dark.png");
-
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct StatusTrayRunItem {
-    pub project_id: String,
-    pub run_id: String,
-    pub title: String,
-    pub status_label: String,
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub project_name: String,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct StatusTraySnapshot {
-    pub running_label: String,
-    pub empty_label: String,
-    pub open_label: String,
-    pub quit_label: String,
-    /// Localized overflow label with `{count}` placeholder for hidden runs.
-    #[serde(default = "default_more_label")]
-    pub more_label: String,
-    #[serde(default)]
-    pub items: Vec<StatusTrayRunItem>,
-}
-
-fn default_more_label() -> String {
-    "+{count} more in Briar".to_string()
-}
-
-impl Default for StatusTraySnapshot {
-    fn default() -> Self {
-        Self {
-            running_label: "Running".to_string(),
-            empty_label: "No running issues".to_string(),
-            open_label: "Open Briar".to_string(),
-            quit_label: "Quit Briar".to_string(),
-            more_label: default_more_label(),
-            items: Vec::new(),
-        }
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct StatusTrayOpenRunPayload {
-    pub project_id: String,
-    pub run_id: String,
-}
 
 pub struct StatusTrayState {
     snapshot: Mutex<StatusTraySnapshot>,
@@ -384,10 +334,7 @@ fn handle_menu_event(app: &AppHandle, id: &str) {
         other => {
             if let Some((project_id, run_id)) = parse_run_menu_id(other) {
                 show_main_window_from_tray(app);
-                let _ = app.emit(
-                    STATUS_TRAY_OPEN_RUN_EVENT,
-                    StatusTrayOpenRunPayload { project_id, run_id },
-                );
+                let _ = crate::ipc::StatusTrayOpenRunPayload { project_id, run_id }.emit(app);
             }
         }
     }

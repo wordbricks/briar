@@ -326,7 +326,7 @@ struct DashboardWorker: Codable, Equatable, Identifiable, Sendable {
     let label: String
     let icon: Icon?
     let agentProvider: AgentProvider?
-    let providers: [AgentProvider]?
+    let providers: [AgentProvider]
     let capabilities: Capabilities?
     let readiness: String
     let acceptingWork: Bool
@@ -339,7 +339,7 @@ struct DashboardWorker: Codable, Equatable, Identifiable, Sendable {
         label: String,
         icon: Icon? = nil,
         agentProvider: AgentProvider? = nil,
-        providers: [AgentProvider]? = nil,
+        providers: [AgentProvider],
         capabilities: Capabilities? = nil,
         readiness: String,
         acceptingWork: Bool,
@@ -377,7 +377,7 @@ struct ProjectExecutionWorkerPolicy: Codable, Equatable, Sendable {
     }
 }
 
-struct ConversationNotification: Codable, Equatable, Identifiable, Sendable {
+struct ConversationNotification: Equatable, Identifiable, Sendable {
     let id: UUID
     let runId: UUID
     let runTitle: String
@@ -388,7 +388,7 @@ struct ConversationNotification: Codable, Equatable, Identifiable, Sendable {
     let createdAt: Date
 }
 
-struct ChannelNotification: Codable, Equatable, Identifiable, Sendable {
+struct ChannelNotification: Equatable, Identifiable, Sendable {
     let id: UUID
     let channelId: UUID
     let channelName: String
@@ -410,8 +410,56 @@ struct OrganizationMember: Codable, Equatable, Identifiable, Sendable {
     var id: String { userId }
 }
 
-struct DashboardSnapshot: Codable, Equatable, Sendable {
-    var project: ProjectsResponse.Project
+struct ProjectSettings: Equatable, Sendable {
+    struct Linear: Equatable, Sendable {
+        let enabled: Bool
+        let source: String?
+        let teamKey: String?
+    }
+
+    struct CheckpointPolicy: Equatable, Sendable {
+        struct Boundary: Equatable, Sendable {
+            let stage: String
+            let stageLabel: String
+            let position: WorkflowCheckpoint.Position
+        }
+
+        struct Checkpoint: Equatable, Sendable {
+            let key: String
+            let stage: String
+            let position: WorkflowCheckpoint.Position
+        }
+
+        let availableBoundaries: [Boundary]
+        let projectMandatory: [Checkpoint]
+        let userDefaults: [Checkpoint]
+        let effective: [Checkpoint]
+        let projectRevision: Int
+        let userRevision: Int
+    }
+
+    let velenOrg: String?
+    let dataSource: String?
+    let linear: Linear
+    let githubRepositoryId: Int?
+    let githubRepository: String?
+    let workflow: AutoHuntWorkflow
+    let checkpointPolicy: CheckpointPolicy?
+
+    static let empty = Self(
+        velenOrg: nil,
+        dataSource: nil,
+        linear: .init(enabled: false, source: nil, teamKey: nil),
+        githubRepositoryId: nil,
+        githubRepository: nil,
+        workflow: .init(version: 2, stages: []),
+        checkpointPolicy: nil
+    )
+}
+
+struct DashboardSnapshot: Equatable, Sendable {
+    var project: Project
+    var settings: ProjectSettings
     var runs: [DashboardRun]
     var workers: [DashboardWorker]?
     var organizationProviders: [AgentProvider]?
@@ -423,7 +471,8 @@ struct DashboardSnapshot: Codable, Equatable, Sendable {
     var generatedAt: Date
 
     init(
-        project: ProjectsResponse.Project,
+        project: Project,
+        settings: ProjectSettings = .empty,
         runs: [DashboardRun],
         workers: [DashboardWorker]? = nil,
         organizationProviders: [AgentProvider]? = nil,
@@ -435,6 +484,7 @@ struct DashboardSnapshot: Codable, Equatable, Sendable {
         generatedAt: Date
     ) {
         self.project = project
+        self.settings = settings
         self.runs = runs
         self.workers = workers
         self.organizationProviders = organizationProviders
@@ -447,12 +497,14 @@ struct DashboardSnapshot: Codable, Equatable, Sendable {
     }
 }
 
-struct DashboardDelta: Codable, Equatable, Sendable {
+struct DashboardDelta: Equatable, Sendable {
     let cursor: Int
     let hasMore: Bool
+    let reset: Bool
     let runs: [DashboardRun]
     let deletedRunIds: [UUID]
-    let project: ProjectsResponse.Project?
+    let project: Project?
+    let settings: ProjectSettings?
     let workers: [DashboardWorker]?
     let organizationProviders: [AgentProvider]?
     let executionPolicy: ProjectExecutionWorkerPolicy?
@@ -464,9 +516,11 @@ struct DashboardDelta: Codable, Equatable, Sendable {
     init(
         cursor: Int,
         hasMore: Bool,
+        reset: Bool = false,
         runs: [DashboardRun],
         deletedRunIds: [UUID],
-        project: ProjectsResponse.Project?,
+        project: Project?,
+        settings: ProjectSettings? = nil,
         workers: [DashboardWorker]? = nil,
         organizationProviders: [AgentProvider]? = nil,
         executionPolicy: ProjectExecutionWorkerPolicy? = nil,
@@ -477,9 +531,11 @@ struct DashboardDelta: Codable, Equatable, Sendable {
     ) {
         self.cursor = cursor
         self.hasMore = hasMore
+        self.reset = reset
         self.runs = runs
         self.deletedRunIds = deletedRunIds
         self.project = project
+        self.settings = settings
         self.workers = workers
         self.organizationProviders = organizationProviders
         self.executionPolicy = executionPolicy
@@ -490,11 +546,7 @@ struct DashboardDelta: Codable, Equatable, Sendable {
     }
 }
 
-struct RunEventsResponse: Codable, Equatable, Sendable {
-    let events: [RunEvent]
-}
-
-struct RunEvent: Codable, Equatable, Identifiable, Sendable {
+struct RunEvent: Equatable, Identifiable, Sendable {
     let id: UUID
     let status: DashboardRun.Status
     let workflowStage: String?
@@ -502,9 +554,16 @@ struct RunEvent: Codable, Equatable, Identifiable, Sendable {
     let actor: String
     let actorName: String?
     let occurredAt: Date
+    let attempt: Int
+    let revision: Int
+    let qaStatus: String?
+    let trackerState: String?
+    let pullRequestUrls: [URL]
+    let targetSha: String?
+    let recordedAt: Date
 }
 
-struct IssueMessagesResponse: Codable, Equatable, Sendable {
+struct IssueMessagesResponse: Equatable, Sendable {
     let cursor: Int?
     let messages: [IssueMessage]
     let agentReplies: [IssueAgentReplyJob]
@@ -519,27 +578,13 @@ struct IssueMessagesResponse: Codable, Equatable, Sendable {
         self.agentReplies = agentReplies
     }
 
-    private enum CodingKeys: String, CodingKey {
-        case cursor
-        case messages
-        case agentReplies
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        cursor = try container.decodeIfPresent(Int.self, forKey: .cursor)
-        messages = try container.decode([IssueMessage].self, forKey: .messages)
-        agentReplies = try container.decodeIfPresent(
-            [IssueAgentReplyJob].self,
-            forKey: .agentReplies
-        ) ?? []
-    }
 }
 
-struct IssueMessagesDeltaResponse: Codable, Equatable, Sendable {
+struct IssueMessagesDeltaResponse: Equatable, Sendable {
     let cursor: Int
     let hasMore: Bool
     let changed: Bool
+    let reset: Bool
     let messages: [IssueMessage]?
     let agentReplies: [IssueAgentReplyJob]?
 
@@ -547,18 +592,20 @@ struct IssueMessagesDeltaResponse: Codable, Equatable, Sendable {
         cursor: Int,
         hasMore: Bool,
         changed: Bool,
+        reset: Bool = false,
         messages: [IssueMessage]? = nil,
         agentReplies: [IssueAgentReplyJob]? = nil
     ) {
         self.cursor = cursor
         self.hasMore = hasMore
         self.changed = changed
+        self.reset = reset
         self.messages = messages
         self.agentReplies = agentReplies
     }
 }
 
-struct IssueMessage: Codable, Equatable, Identifiable, Sendable {
+struct IssueMessage: Equatable, Identifiable, Sendable {
     let id: UUID
     let runId: UUID
     let parentMessageId: UUID?
@@ -576,16 +623,30 @@ struct IssueMessage: Codable, Equatable, Identifiable, Sendable {
     let createdAt: Date
     let updatedAt: Date
 
-    struct Author: Codable, Equatable, Sendable {
+    struct Author: Equatable, Sendable {
         let id: String?
-        let agentId: UUID? = nil
+        let agentId: UUID?
         let name: String
         let image: String?
         let provider: String?
+
+        init(
+            id: String?,
+            agentId: UUID? = nil,
+            name: String,
+            image: String?,
+            provider: String?
+        ) {
+            self.id = id
+            self.agentId = agentId
+            self.name = name
+            self.image = image
+            self.provider = provider
+        }
     }
 }
 
-struct IssueProposedAction: Codable, Equatable, Identifiable, Sendable {
+struct IssueProposedAction: Equatable, Identifiable, Sendable {
     let id: UUID
     let type: ActionType
     let workflowStage: String?
@@ -646,7 +707,6 @@ struct IssueProposedAction: Codable, Equatable, Identifiable, Sendable {
         let title: String
         let description: String?
         let priority: Int?
-        let status: String
     }
 
     enum Status: String, Codable, Sendable {
@@ -657,7 +717,7 @@ struct IssueProposedAction: Codable, Equatable, Identifiable, Sendable {
 
 /// Separate from issue create/update/rework proposals so creation evidence and
 /// execution approval may coexist on one message.
-struct IssueExecutionProposal: Codable, Equatable, Hashable, Identifiable, Sendable {
+struct IssueExecutionProposal: Equatable, Hashable, Identifiable, Sendable {
     let id: UUID
     let type: Kind
     let status: Status
@@ -680,12 +740,6 @@ struct IssueExecutionProposal: Codable, Equatable, Hashable, Identifiable, Senda
     enum Status: String, Codable, Sendable {
         case pending
         case accepted
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case id, type, status, projectId, runId, title, createdAt, acceptedAt
-        case requestedProvider, requestedModel, requestedEffort, requestedWorkerId
-        case delegatedByAgentId, delegatedByAgentName
     }
 
     init(
@@ -720,50 +774,9 @@ struct IssueExecutionProposal: Codable, Equatable, Hashable, Identifiable, Senda
         self.delegatedByAgentName = delegatedByAgentName
     }
 
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = try container.decode(UUID.self, forKey: .id)
-        type = try container.decode(Kind.self, forKey: .type)
-        status = try container.decode(Status.self, forKey: .status)
-        projectId = try container.decode(UUID.self, forKey: .projectId)
-        runId = try container.decode(UUID.self, forKey: .runId)
-        title = try container.decode(String.self, forKey: .title)
-        createdAt = try container.decode(Date.self, forKey: .createdAt)
-        // These nullable fields are nevertheless required by the canonical
-        // server snapshot. `decode(Optional.self)` accepts JSON null but rejects
-        // a missing key, matching the strict mobile Zod/OpenAPI contract.
-        acceptedAt = try container.decode(Date?.self, forKey: .acceptedAt)
-        requestedProvider = try container.decode(
-            AgentProvider?.self,
-            forKey: .requestedProvider
-        )
-        requestedModel = try container.decode(String?.self, forKey: .requestedModel)
-        requestedEffort = try container.decode(ModelEffort?.self, forKey: .requestedEffort)
-        requestedWorkerId = try container.decode(String?.self, forKey: .requestedWorkerId)
-        delegatedByAgentId = try container.decode(UUID?.self, forKey: .delegatedByAgentId)
-        delegatedByAgentName = try container.decode(String?.self, forKey: .delegatedByAgentName)
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(id, forKey: .id)
-        try container.encode(type, forKey: .type)
-        try container.encode(status, forKey: .status)
-        try container.encode(projectId, forKey: .projectId)
-        try container.encode(runId, forKey: .runId)
-        try container.encode(title, forKey: .title)
-        try container.encode(createdAt, forKey: .createdAt)
-        try container.encode(acceptedAt, forKey: .acceptedAt)
-        try container.encode(requestedProvider, forKey: .requestedProvider)
-        try container.encode(requestedModel, forKey: .requestedModel)
-        try container.encode(requestedEffort, forKey: .requestedEffort)
-        try container.encode(requestedWorkerId, forKey: .requestedWorkerId)
-        try container.encode(delegatedByAgentId, forKey: .delegatedByAgentId)
-        try container.encode(delegatedByAgentName, forKey: .delegatedByAgentName)
-    }
 }
 
-struct AcceptIssueExecutionProposalResponse: Codable, Sendable {
+struct AcceptIssueExecutionProposalResponse: Sendable {
     let proposal: IssueExecutionProposal
     let outcome: Outcome
     let projectId: UUID
@@ -776,25 +789,13 @@ struct AcceptIssueExecutionProposalResponse: Codable, Sendable {
     }
 }
 
-struct AcceptIssueReworkProposalResponse: Codable, Equatable, Sendable {
-    let proposal: IssueProposedAction
-    let outcome: String
-    let attempt: Int
-    let revision: Int
-    let workflowStage: String
-}
-
-struct AcceptIssueActionProposalResponse: Codable, Equatable, Sendable {
+struct AcceptIssueActionProposalResponse: Equatable, Sendable {
     let proposal: IssueProposedAction
     let outcome: String
     let resultRunId: UUID?
     /// Present when an accepted create proposal requested a separate execution
-    /// approval. Optional keeps decoding compatible with older responses.
+    /// approval.
     let executionProposal: IssueExecutionProposal?
-}
-
-struct RunEvidenceResponse: Codable, Equatable, Sendable {
-    let evidence: [RunEvidence]
 }
 
 struct RunEvidence: Codable, Equatable, Identifiable, Sendable {
@@ -904,6 +905,7 @@ enum DashboardMerge {
         }
         return DashboardSnapshot(
             project: delta.project ?? snapshot.project,
+            settings: delta.settings ?? snapshot.settings,
             runs: Array(runs.prefix(200)),
             workers: delta.workers ?? snapshot.workers,
             organizationProviders: delta.organizationProviders ?? snapshot.organizationProviders,

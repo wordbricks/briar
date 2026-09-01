@@ -3,51 +3,24 @@ import type {
   PermissionRuleset,
   QuestionRequest,
 } from "@opencode-ai/sdk/v2";
-import * as Schema from "effect/Schema";
 import { pathToFileURL } from "node:url";
 import {
-  normalizedActivityText,
-  normalizedActivityTitle,
-  type AgentActivityKind,
-  type NormalizedAgentEvent,
-} from "./normalized-agent-event";
-import {
-  commonRunnerRequestFields,
-  runnerRequestDecoderOptions,
-} from "./runner-request";
-
-export type {
   AgentActivityKind,
   AgentActivityStatus,
-  NormalizedAgentEvent,
+  type NormalizedAgentEvent,
+} from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
+import {
+  normalizedActivityCompleted,
+  normalizedActivityDelta,
+  normalizedActivityStarted,
+  normalizedActivityText,
+  normalizedActivityTitle,
+  normalizedMessageCompleted,
+  normalizedMessageDelta,
+  normalizedMessageStarted,
+  normalizedTurnCompleted,
 } from "./normalized-agent-event";
-
-export const OpenCodeRunnerRequest = Schema.Struct({
-  ...commonRunnerRequestFields,
-  effort: Schema.optional(Schema.NullOr(Schema.String)),
-  opencodeBinary: Schema.String,
-});
-
-export type OpenCodeRunnerRequest = typeof OpenCodeRunnerRequest.Type;
-
-export const decodeOpenCodeRunnerRequest = Schema.decodeUnknownResult(
-  OpenCodeRunnerRequest,
-  runnerRequestDecoderOptions,
-);
-
-export type OpenCodeRunnerOutput =
-  | { type: "session"; sessionId: string }
-  | { type: "event"; raw: unknown; event?: NormalizedAgentEvent }
-  | {
-      type: "approval";
-      id: string;
-      toolName: string;
-      input: Record<string, unknown>;
-      title?: string;
-    }
-  | ({ type: "blocked" } & OpenCodeBlockedRetry)
-  | { type: "result"; sessionId: string; message: string }
-  | { type: "error"; message: string };
+import type { RunnerRequest } from "./runner-request";
 
 export type OpenCodeBlockedRetry =
   | {
@@ -123,13 +96,13 @@ export function parseOpenCodeModel(
 }
 
 export function mapEffortToOpenCode(
-  effort: OpenCodeRunnerRequest["effort"],
+  effort: RunnerRequest["effort"],
 ): string | undefined {
   if (!effort) return undefined;
   return effort;
 }
 
-export function buildOpenCodePrompt(request: OpenCodeRunnerRequest): string {
+export function buildOpenCodePrompt(request: RunnerRequest): string {
   const sections: string[] = [];
   if (request.outputSchema !== null && request.outputSchema !== undefined) {
     sections.push(
@@ -141,12 +114,12 @@ export function buildOpenCodePrompt(request: OpenCodeRunnerRequest): string {
 }
 
 export function openCodeSystemPrompt(
-  request: OpenCodeRunnerRequest,
+  request: RunnerRequest,
 ): string | undefined {
   return request.instructions?.trim() || undefined;
 }
 
-export function buildOpenCodeParts(request: OpenCodeRunnerRequest) {
+export function buildOpenCodeParts(request: RunnerRequest) {
   return [
     { type: "text" as const, text: buildOpenCodePrompt(request) },
     ...(request.attachments ?? []).map((attachment) => ({
@@ -171,7 +144,7 @@ const writePermissions = new Set([
 const readOnlyPermissions = new Set(["glob", "grep", "list", "read"]);
 
 function isOpenCodeReadOnlyPermission(
-  request: OpenCodeRunnerRequest,
+  request: RunnerRequest,
   permission: string,
 ) {
   const normalized = permission.trim().toLowerCase();
@@ -193,7 +166,7 @@ export function isOpenCodeWritePermission(permission: string): boolean {
 }
 
 export function shouldAutoApproveOpenCodePermission(
-  request: OpenCodeRunnerRequest,
+  request: RunnerRequest,
   permission: string,
 ): boolean {
   if (request.sandboxMode === "readOnly") {
@@ -212,7 +185,7 @@ export function shouldAutoApproveOpenCodePermission(
 }
 
 export function buildOpenCodePermissionRules(
-  request: OpenCodeRunnerRequest,
+  request: RunnerRequest,
 ): PermissionRuleset {
   const defaultAction = request.sandboxMode === "readOnly"
     ? "deny"
@@ -448,29 +421,28 @@ function emitForMessageText(
     state.startedMessages.add(messageId);
     if (complete) {
       state.completedMessages.add(messageId);
-      return { type: "messageCompleted", id: messageId, phase, text };
+      return normalizedMessageCompleted({ id: messageId, phase, text });
     }
-    return { type: "messageStarted", id: messageId, phase, text };
+    return normalizedMessageStarted({ id: messageId, phase, text });
   }
 
   if (complete) {
     state.completedMessages.add(messageId);
-    return { type: "messageCompleted", id: messageId, phase, text };
+    return normalizedMessageCompleted({ id: messageId, phase, text });
   }
 
   if (text.startsWith(previous) && text.length > previous.length) {
-    return {
-      type: "messageDelta",
+    return normalizedMessageDelta({
       id: messageId,
       delta: text.slice(previous.length),
-    };
+    });
   }
 
   // Non-prefix snapshot updates still need a durable full-text event. Re-emit
   // messageStarted so transcript consumers replace the visible body without
   // inventing a second message id.
   if (text !== previous) {
-    return { type: "messageStarted", id: messageId, phase, text };
+    return normalizedMessageStarted({ id: messageId, phase, text });
   }
   return undefined;
 }
@@ -584,7 +556,7 @@ export function normalizeOpenCodeEvent(
       const activity = state.activities.get(id);
       if (!activity || activity.completed) return [];
       activity.text = normalizedActivityText(`${activity.text}${delta}`);
-      return [{ type: "activityDelta", id, delta }];
+      return [normalizedActivityDelta({ id, delta })];
     }
     // OpenCode streams text on field "text"; ignore tool-input and other fields.
     if (typeof field === "string" && field !== "text") return [];
@@ -618,12 +590,12 @@ export function normalizeOpenCodeEvent(
     // Complete any open assistant messages when the session returns to idle so
     // durable transcripts never leave "writing…" placeholders behind.
     const events = completeOpenCodeMessages(state, { phase: "commentary" });
-    events.push({ type: "turnCompleted", status: "completed" });
+    events.push(normalizedTurnCompleted("completed"));
     return events;
   }
 
   if (event.type === "session.error") {
-    return [{ type: "turnCompleted", status: "failed" }];
+    return [normalizedTurnCompleted("failed")];
   }
   return [];
 }
@@ -656,21 +628,22 @@ function normalizeOpenCodeActivity(
   const events: NormalizedAgentEvent[] = [];
   if (!activity.started) {
     activity.started = true;
-    events.push({ type: "activityStarted", id, kind, title, text: "" });
+    events.push(normalizedActivityStarted({ id, kind, title, text: "" }));
   }
   if (
     !activity.completed &&
     (partState.status === "completed" || partState.status === "error")
   ) {
     activity.completed = true;
-    events.push({
-      type: "activityCompleted",
+    events.push(normalizedActivityCompleted({
       id,
       kind,
       title,
       text,
-      status: partState.status === "error" ? "failed" : "completed",
-    });
+      status: partState.status === "error"
+        ? AgentActivityStatus.FAILED
+        : AgentActivityStatus.COMPLETED,
+    }));
   }
   state.activities.set(id, activity);
   return events;
@@ -678,19 +651,21 @@ function normalizeOpenCodeActivity(
 
 function openCodeActivityKind(tool: string): AgentActivityKind {
   const normalized = tool.toLowerCase();
-  if (normalized === "bash" || normalized === "shell") return "command";
+  if (normalized === "bash" || normalized === "shell") {
+    return AgentActivityKind.COMMAND;
+  }
   if (
     normalized === "edit" ||
     normalized === "write" ||
     normalized === "patch" ||
     normalized === "apply_patch"
   ) {
-    return "fileChange";
+    return AgentActivityKind.FILE_CHANGE;
   }
   if (normalized === "webfetch" || normalized === "websearch") {
-    return "webSearch";
+    return AgentActivityKind.WEB_SEARCH;
   }
-  return "tool";
+  return AgentActivityKind.TOOL;
 }
 
 function openCodeActivityTitle(

@@ -1,12 +1,19 @@
-import { describe, expect, it } from "vitest";
+/** @vitest-environment jsdom */
+
 import {
-  SseRealtimeTransport,
+  OrganizationNotificationSchema,
+  ProjectChangedSchema,
+} from "@briar/contracts/gen/briar/realtime/v1/realtime_pb";
+import { create, toBinary } from "@bufbuild/protobuf";
+import { describe, expect, it, vi } from "vitest";
+import {
   WebSocketRealtimeTransport,
   type RealtimeNotification,
 } from "./realtime-transport";
 
 class FakeWebSocket {
   private readonly listeners = new Map<string, Set<(event: Event) => void>>();
+  binaryType = "blob";
   closeCode: number | undefined;
 
   addEventListener(type: string, listener: (event: Event) => void) {
@@ -24,167 +31,88 @@ class FakeWebSocket {
   }
 }
 
-describe("SseRealtimeTransport", () => {
-  it("authenticates the fetch stream and emits cursor notifications", async () => {
-    let request: RequestInit | undefined;
-    const stream = new ReadableStream<Uint8Array>({
-      start(controller) {
-        controller.enqueue(new TextEncoder().encode(
-          'event: ready\ndata: {"topic":"channels","cursor":21}\n\n',
-        ));
+describe("WebSocketRealtimeTransport", () => {
+  it("opens the issued URL and emits a protobuf oneof frame", async () => {
+    const socket = new FakeWebSocket();
+    const createTicket = vi.fn(async () =>
+      "wss://api.test/channel-events?ticket=signed"
+    );
+    const transport = new WebSocketRealtimeTransport({
+      createTicket,
+      createWebSocket: () => socket as unknown as WebSocket,
+    });
+    const notification = new Promise<RealtimeNotification>(
+      (resolve) => transport.subscribe(resolve),
+    );
+
+    transport.start();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    socket.emit("open", new Event("open"));
+    const frame = create(OrganizationNotificationSchema, {
+      notification: {
+        case: "projectChanged",
+        value: create(ProjectChangedSchema, {
+          projectId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+          cursor: 34n,
+        }),
       },
     });
-    const fetchMock = async (_input: RequestInfo | URL, init?: RequestInit) => {
-      request = init;
-      return new Response(stream, { status: 200 });
-    };
-    const transport = new SseRealtimeTransport({
-      url: "https://api.test/channel-events",
-      token: "secret-token",
-      fetch: fetchMock,
-    });
-    const notification = new Promise<RealtimeNotification>(
-      (resolve) => transport.subscribe(resolve),
-    );
-
-    transport.start();
-    await expect(notification).resolves.toEqual({ topic: "channels", cursor: 21 });
-    expect(new Headers(request?.headers).get("authorization"))
-      .toBe("Bearer secret-token");
-    transport.stop();
-  });
-});
-
-describe("WebSocketRealtimeTransport", () => {
-  it("exchanges the bearer token for a short-lived socket URL", async () => {
-    let request: RequestInit | undefined;
-    const socket = new FakeWebSocket();
-    const fetchMock = async (_input: RequestInfo | URL, init?: RequestInit) => {
-      request = init;
-      return Response.json({
-        url: "wss://api.test/channel-events?ticket=signed",
-        expiresAt: "2026-08-12T00:00:00.000Z",
-      });
-    };
-    const transport = new WebSocketRealtimeTransport({
-      url: "https://api.test/channel-events",
-      token: "secret-token",
-      fetch: fetchMock,
-      createWebSocket: () => socket as unknown as WebSocket,
-    });
-    const notification = new Promise<RealtimeNotification>(
-      (resolve) => transport.subscribe(resolve),
-    );
-
-    transport.start();
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    socket.emit("open", new Event("open"));
-    socket.emit(
-      "message",
-      { data: '{"topic":"channels","cursor":34}' } as MessageEvent,
-    );
-
-    await expect(notification).resolves.toEqual({ topic: "channels", cursor: 34 });
-    expect(request?.method).toBe("POST");
-    expect(new Headers(request?.headers).get("authorization"))
-      .toBe("Bearer secret-token");
-    transport.stop();
-    expect(socket.closeCode).toBe(1000);
-  });
-
-  it("emits project cursor notifications over the shared socket", async () => {
-    const socket = new FakeWebSocket();
-    const transport = new WebSocketRealtimeTransport({
-      url: "https://api.test/channel-events",
-      token: "secret-token",
-      fetch: async () => Response.json({
-        url: "wss://api.test/channel-events?ticket=signed",
-        expiresAt: "2026-08-12T00:00:00.000Z",
-      }),
-      createWebSocket: () => socket as unknown as WebSocket,
-    });
-    const notification = new Promise((resolve) => transport.subscribe(resolve));
-
-    transport.start();
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    socket.emit("open", new Event("open"));
+    const encoded = toBinary(OrganizationNotificationSchema, frame);
     socket.emit("message", {
-      data: JSON.stringify({
-        topic: "project",
-        projectId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-        cursor: 9,
-      }),
+      data: encoded.buffer.slice(
+        encoded.byteOffset,
+        encoded.byteOffset + encoded.byteLength,
+      ),
     } as MessageEvent);
 
     await expect(notification).resolves.toEqual({
       topic: "project",
       projectId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-      cursor: 9,
+      cursor: 34,
     });
+    expect(createTicket).toHaveBeenCalledWith(expect.any(AbortSignal));
+    expect(socket.binaryType).toBe("arraybuffer");
     transport.stop();
+    expect(socket.closeCode).toBe(1000);
   });
 
-  it("emits ready and project session revision notifications", async () => {
-    const socket = new FakeWebSocket();
+  it("rejects a non-WebSocket URL", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const createWebSocket = vi.fn(
+      () => new FakeWebSocket() as unknown as WebSocket,
+    );
     const transport = new WebSocketRealtimeTransport({
-      url: "https://api.test/channel-events",
-      token: "secret-token",
-      fetch: async () => Response.json({
-        url: "wss://api.test/channel-events?ticket=signed",
-        expiresAt: "2026-08-12T00:00:00.000Z",
-      }),
-      createWebSocket: () => socket as unknown as WebSocket,
+      createTicket: async () => "https://api.test/not-a-websocket",
+      createWebSocket,
     });
-    const notifications: RealtimeNotification[] = [];
-    transport.subscribe((notification) => notifications.push(notification));
 
     transport.start();
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    socket.emit("open", new Event("open"));
-    socket.emit("message", { data: '{"topic":"ready"}' } as MessageEvent);
-    socket.emit("message", {
-      data: JSON.stringify({
-        topic: "project-session",
-        projectId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-        version: 11,
-      }),
-    } as MessageEvent);
+    await vi.waitFor(() => expect(warn).toHaveBeenCalledOnce());
 
-    expect(notifications).toEqual([
-      { topic: "ready" },
-      {
-        topic: "project-session",
-        projectId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-        version: 11,
-      },
-    ]);
+    expect(createWebSocket).not.toHaveBeenCalled();
     transport.stop();
+    warn.mockRestore();
   });
 
-  it("emits Inbox version notifications over the shared socket", async () => {
-    const socket = new FakeWebSocket();
-    const transport = new WebSocketRealtimeTransport({
-      url: "https://api.test/channel-events",
-      token: "secret-token",
-      fetch: async () => Response.json({
-        url: "wss://api.test/channel-events?ticket=signed",
-        expiresAt: "2026-08-12T00:00:00.000Z",
-      }),
-      createWebSocket: () => socket as unknown as WebSocket,
+  it("aborts a pending ticket request when stopped", async () => {
+    let signal: AbortSignal | undefined;
+    const createTicket = vi.fn((value: AbortSignal) => {
+      signal = value;
+      return new Promise<string>(() => undefined);
     });
-    const notification = new Promise((resolve) => transport.subscribe(resolve));
+    const createWebSocket = vi.fn(
+      () => new FakeWebSocket() as unknown as WebSocket,
+    );
+    const transport = new WebSocketRealtimeTransport({
+      createTicket,
+      createWebSocket,
+    });
 
     transport.start();
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    socket.emit("open", new Event("open"));
-    socket.emit("message", {
-      data: JSON.stringify({ topic: "inbox", version: 17 }),
-    } as MessageEvent);
-
-    await expect(notification).resolves.toEqual({
-      topic: "inbox",
-      version: 17,
-    });
+    await vi.waitFor(() => expect(createTicket).toHaveBeenCalledOnce());
     transport.stop();
+
+    expect(signal?.aborted).toBe(true);
+    expect(createWebSocket).not.toHaveBeenCalled();
   });
 });

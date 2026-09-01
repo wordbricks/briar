@@ -23,12 +23,14 @@ use crate::host::CommandRunner;
 pub(crate) use codex::{
     AutoHuntCliEnvironment, AutoHuntCoordinatorResponse, ProjectAgentRunRequest,
     ProjectAgentRunResponse, ProjectAutoHuntIssue, ProjectAutoHuntIssueAttachment,
-    ProjectAutoHuntIssueMessage, ProjectAutoHuntIssueResult, ProjectAutoHuntRequest,
-    ProjectAutoHuntResponse, ProjectAutoHuntResult, ProjectAutoHuntWorkerResponse,
-    MAX_AUTO_HUNT_ISSUES,
+    ProjectAutoHuntIssueMessage, ProjectAutoHuntIssueMessageAuthor, ProjectAutoHuntIssueResult,
+    ProjectAutoHuntRequest, ProjectAutoHuntResponse, ProjectAutoHuntResult,
+    ProjectAutoHuntWorkerResponse, MAX_AUTO_HUNT_ISSUES,
 };
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, serde::Deserialize, serde::Serialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, serde::Deserialize, serde::Serialize, specta::Type,
+)]
 #[serde(rename_all = "camelCase")]
 pub(crate) enum AgentProviderKind {
     #[default]
@@ -105,14 +107,14 @@ impl AgentProviderKind {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Deserialize, serde::Serialize, specta::Type)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum AgentEventDirection {
     Client,
     Server,
 }
 
-#[derive(Clone, Copy, Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Copy, Debug, serde::Deserialize, serde::Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) enum AgentActivityKind {
     Command,
@@ -121,7 +123,7 @@ pub(crate) enum AgentActivityKind {
     Tool,
 }
 
-#[derive(Clone, Copy, Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Copy, Debug, serde::Deserialize, serde::Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) enum AgentActivityStatus {
     Completed,
@@ -129,8 +131,12 @@ pub(crate) enum AgentActivityStatus {
     Cancelled,
 }
 
-#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize, specta::Type)]
+#[serde(
+    tag = "type",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 pub(crate) enum AgentEvent {
     ConversationStarted {
         conversation_id: String,
@@ -200,7 +206,9 @@ impl SandboxMode {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, serde::Deserialize, serde::Serialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, serde::Deserialize, serde::Serialize, specta::Type,
+)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum ApprovalPolicy {
     Untrusted,
@@ -219,14 +227,22 @@ impl ApprovalPolicy {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize, specta::Type)]
 #[serde(transparent)]
 pub(crate) struct ModelEffort(String);
 
 impl ModelEffort {
+    pub(crate) fn from_id(value: impl Into<String>) -> Self {
+        Self(value.into())
+    }
+
+    pub(crate) fn id(&self) -> &str {
+        &self.0
+    }
+
     #[cfg(test)]
     pub(crate) fn new(value: impl Into<String>) -> Self {
-        Self(value.into())
+        Self::from_id(value)
     }
 
     fn as_str(&self) -> &str {
@@ -248,7 +264,7 @@ pub(crate) struct ChatExecution {
     pub(crate) workspace_write_roots: Vec<String>,
 }
 
-#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ProjectLlmSettings {
     #[serde(default)]
@@ -272,7 +288,7 @@ impl Default for ProjectLlmSettings {
     }
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ProjectLlmRequest {
     pub(crate) message: String,
@@ -283,6 +299,7 @@ pub(crate) struct ProjectLlmRequest {
     #[serde(default)]
     pub(crate) instructions: Option<String>,
     #[serde(default)]
+    #[specta(type = Option<crate::ipc::JsonValue>)]
     pub(crate) output_schema: Option<serde_json::Value>,
 }
 
@@ -301,7 +318,7 @@ impl ProjectLlmRequest {
     }
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ProjectLlmResponse {
     pub(crate) conversation_id: String,
@@ -322,13 +339,15 @@ pub(crate) struct AutoHuntExecution {
     pub(crate) full_access: bool,
 }
 
-#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
+#[tauri_specta(event_name = "auto-hunt-app-server-event")]
 pub(crate) struct AppServerEventRecord {
     pub(crate) session_id: String,
     pub(crate) sequence: u64,
     pub(crate) occurred_at_ms: u64,
-    pub(crate) direction: String,
+    pub(crate) direction: AgentEventDirection,
+    #[specta(type = crate::ipc::JsonValue)]
     pub(crate) message: serde_json::Value,
     #[serde(default)]
     pub(crate) provider: AgentProviderKind,
@@ -349,11 +368,7 @@ impl AppServerEventRecord {
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
                 .as_millis() as u64,
-            direction: match provider_event.direction {
-                AgentEventDirection::Client => "client",
-                AgentEventDirection::Server => "server",
-            }
-            .to_string(),
+            direction: provider_event.direction,
             message: provider_event.raw,
             provider: provider_event.provider,
             event: provider_event.event,

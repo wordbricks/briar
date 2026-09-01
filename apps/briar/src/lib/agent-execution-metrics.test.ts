@@ -3,7 +3,6 @@ import {
   agentExecutionCostObservationsFromPayload,
   agentExecutionCostRecordsFromObservations,
   agentExecutionMetrics,
-  agentExecutionTokenUsageFromPayload,
   agentExecutionTokenUsageFromObservations,
   agentExecutionUsageObservationsFromPayload,
   agentExecutionUsageRecordsFromObservations,
@@ -95,40 +94,22 @@ describe("agent execution metrics", () => {
     ]);
   });
 
-  it("normalizes Codex turn usage without double-counting cached input", () => {
-    expect(
-      agentExecutionTokenUsageFromPayload("codex", {
-        type: "turn.completed",
-        usage: {
-          input_tokens: 1_000,
-          cached_input_tokens: 800,
-          output_tokens: 250,
-        },
-      }),
-    ).toEqual({
-      inputTokens: 1_000,
-      outputTokens: 250,
-      cacheReadTokens: 800,
-      cacheWriteTokens: null,
-      reasoningOutputTokens: null,
-      totalTokens: 1_250,
-    });
-  });
-
   it("normalizes Claude result usage including cache activity", () => {
     expect(
-      agentExecutionTokenUsageFromPayload("claude", {
-        type: "event",
-        raw: {
-          type: "result",
-          usage: {
-            input_tokens: 100,
-            output_tokens: 50,
-            cache_read_input_tokens: 25,
-            cache_creation_input_tokens: 10,
+      agentExecutionTokenUsageFromObservations(
+        agentExecutionUsageObservationsFromPayload("claude", {
+          type: "event",
+          raw: {
+            type: "result",
+            usage: {
+              input_tokens: 100,
+              output_tokens: 50,
+              cache_read_input_tokens: 25,
+              cache_creation_input_tokens: 10,
+            },
           },
-        },
-      }),
+        }),
+      ),
     ).toMatchObject({
       inputTokens: 100,
       outputTokens: 50,
@@ -259,7 +240,11 @@ describe("agent execution metrics", () => {
         tokenUsage: expect.objectContaining({ totalTokens: 55 }),
       }),
     ]);
-    expect(agentExecutionTokenUsageFromPayload("claude", payload)).toEqual({
+    expect(
+      agentExecutionTokenUsageFromObservations(
+        agentExecutionUsageObservationsFromPayload("claude", payload),
+      ),
+    ).toEqual({
       inputTokens: 130,
       outputTokens: 70,
       cacheReadTokens: 30,
@@ -797,64 +782,6 @@ describe("agent execution metrics", () => {
       cacheWriteTokens: null,
       reasoningOutputTokens: 35,
       totalTokens: 1_010,
-    });
-  });
-
-  it("returns ledger-ready Codex records with disjoint input and a stable timestamp", () => {
-    const collector = createAgentExecutionUsageCollector("codex", {
-      configuredModel: "gpt-5.6-sol",
-    });
-    collector.observe(
-      {
-        type: "turn.completed",
-        usage: {
-          input_tokens: 1_000,
-          cached_input_tokens: 800,
-          cache_write_input_tokens: 50,
-          output_tokens: 250,
-          reasoning_output_tokens: 100,
-          total_tokens: 1_250,
-        },
-      },
-      "2026-08-10T01:02:03.000Z",
-    );
-
-    const observations = collector.finish();
-    expect(observations).toEqual([
-      expect.objectContaining({
-        dedupeKey: "codex:observation:0",
-        observedAt: "2026-08-10T01:02:03.000Z",
-      }),
-    ]);
-    expect(agentExecutionUsageRecordsFromObservations(observations)).toEqual([
-      {
-        usageKey: "codex:observation:0",
-        sessionId: null,
-        scopeId: null,
-        turnId: null,
-        agentProvider: "codex",
-        modelProvider: null,
-        model: "gpt-5.6-sol",
-        canonicalModel: null,
-        modelSource: "configuredFallback",
-        source: "codex.turnUsage",
-        uncachedInputTokens: 150,
-        cacheReadTokens: 800,
-        cacheWriteTokens: 50,
-        outputTokens: 250,
-        reasoningOutputTokens: 100,
-        totalTokens: 1_250,
-        observedAt: "2026-08-10T01:02:03.000Z",
-      },
-    ]);
-    // reasoningOutputTokens is a subset of outputTokens, not an extra bucket.
-    expect(
-      agentExecutionTokenUsageFromObservations(observations),
-    ).toMatchObject({
-      inputTokens: 1_000,
-      outputTokens: 250,
-      reasoningOutputTokens: 100,
-      totalTokens: 1_250,
     });
   });
 

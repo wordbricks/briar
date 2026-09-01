@@ -1,5 +1,6 @@
 import { betterAuth } from "better-auth";
 import { bearer, deviceAuthorization, emailOTP } from "better-auth/plugins";
+import * as Schema from "effect/Schema";
 import {
   consumeEmailOTPEmailLimit,
   logAuthEmailFailure,
@@ -8,7 +9,9 @@ import {
   sendAuthOTPEmail,
   type AuthEmailSender,
 } from "./auth-email";
-import { isMobileClientId } from "./mobile-contract";
+
+const mobileClientIdSchema = Schema.Literals(["briar-mobile", "briar-android"]);
+const isMobileClientId = Schema.is(mobileClientIdSchema);
 
 type AuthExecutionContext = Pick<ExecutionContext, "waitUntil">;
 

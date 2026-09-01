@@ -25,6 +25,7 @@ describe("remote D1 migration imports", () => {
     await writeFile(join(migrationsDirectory, "0002_second.sql"), "SELECT 2;\n");
 
     let importedSql = "";
+    const beforeMigration = vi.fn(async () => 0);
     const runner = vi.fn<WranglerRunner>(async (args, captureOutput) => {
       if (captureOutput) {
         return {
@@ -42,13 +43,19 @@ describe("remote D1 migration imports", () => {
     });
 
     await expect(
-      applyRemoteD1Migrations({ migrationsDirectory, runner }),
+      applyRemoteD1Migrations({
+        migrationsDirectory,
+        runner,
+        beforeMigration,
+      }),
     ).resolves.toBe(0);
     expect(importedSql).toContain("SELECT 2;");
     expect(importedSql).toContain(
       "INSERT INTO d1_migrations (name) VALUES ('0002_second.sql');",
     );
     expect(runner).toHaveBeenCalledTimes(3);
+    expect(beforeMigration).toHaveBeenCalledOnce();
+    expect(beforeMigration).toHaveBeenCalledWith("0002_second.sql");
   });
 
   it("recovers when the final import poll fails after D1 commits", async () => {

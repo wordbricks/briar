@@ -72,7 +72,6 @@ export type ProjectUsageSummaryRun = {
   createdByName?: string | null;
   agentId?: string | null;
   agentName?: string | null;
-  hasUsageLedger?: boolean;
   usageRecords?: ProjectUsageRecord[];
 };
 
@@ -294,48 +293,24 @@ export function summarizeProjectUsage(
       inWindow(Date.parse(record.observedAt)),
     );
     const hasExecutionEvidence =
-      run.executionMetrics != null || run.hasUsageLedger ||
+      run.executionMetrics != null ||
       run.claimedAt !== null || run.claimedBy !== null || run.workerId !== null ||
       run.claimAttempts > 0 || executedStatuses.has(run.status);
     if (!hasExecutionEvidence || (!runIsInWindow && records.length === 0)) continue;
 
     observedRuns += 1;
-    const hasLedger = run.hasUsageLedger ?? records.length > 0;
-    if (hasLedger) {
-      if (records.length > 0) reportedRuns += 1;
-      for (const record of records) {
-        const tokens = hasTokenCount(record.totalTokens)
-          ? finiteTokenCount(record.totalTokens)
-          : finiteTokenCount(record.uncachedInputTokens) +
-            finiteTokenCount(record.cacheReadTokens) +
-            finiteTokenCount(record.cacheWriteTokens) +
-            finiteTokenCount(record.outputTokens);
-        totalTokens += tokens;
-        const index = bucketIndex(starts, Date.parse(record.observedAt), endAt);
-        if (index >= 0) timeline[index].totalTokens += tokens;
-      }
-      continue;
+    if (records.length > 0) reportedRuns += 1;
+    for (const record of records) {
+      const tokens = hasTokenCount(record.totalTokens)
+        ? finiteTokenCount(record.totalTokens)
+        : finiteTokenCount(record.uncachedInputTokens) +
+          finiteTokenCount(record.cacheReadTokens) +
+          finiteTokenCount(record.cacheWriteTokens) +
+          finiteTokenCount(record.outputTokens);
+      totalTokens += tokens;
+      const index = bucketIndex(starts, Date.parse(record.observedAt), endAt);
+      if (index >= 0) timeline[index].totalTokens += tokens;
     }
-
-    if (!runIsInWindow || !run.executionMetrics) continue;
-    const metrics = run.executionMetrics;
-    const reported = [
-      metrics.totalTokens, metrics.inputTokens, metrics.outputTokens,
-      metrics.cacheReadTokens, metrics.cacheWriteTokens,
-      metrics.reasoningOutputTokens,
-    ].some(hasTokenCount);
-    if (!reported) continue;
-    reportedRuns += 1;
-    const provider = run.executionProvider ?? run.requestedProvider ?? run.preferredProvider;
-    const tokens = hasTokenCount(metrics.totalTokens)
-      ? finiteTokenCount(metrics.totalTokens)
-      : provider === "claude"
-        ? finiteTokenCount(metrics.inputTokens) + finiteTokenCount(metrics.outputTokens) +
-          finiteTokenCount(metrics.cacheReadTokens) + finiteTokenCount(metrics.cacheWriteTokens)
-        : finiteTokenCount(metrics.inputTokens) + finiteTokenCount(metrics.outputTokens);
-    totalTokens += tokens;
-    const index = bucketIndex(starts, timestamp, endAt);
-    if (index >= 0) timeline[index].totalTokens += tokens;
   }
 
   return {

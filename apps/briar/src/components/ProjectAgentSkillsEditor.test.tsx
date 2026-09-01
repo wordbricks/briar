@@ -28,40 +28,6 @@ afterEach(async () => {
 });
 
 describe("ProjectAgentSkillsEditor", () => {
-  it("serializes only fields accepted by the Skill input contract", () => {
-    const persistedSkill = {
-      id: "skill-1",
-      agentId: "agent-1",
-      name: "Issue processing",
-      description: "Use for queued project issues.",
-      body: "Process queued issues.",
-      provider: "codex" as const,
-      model: "gpt-5.6-sol",
-      effort: "high" as const,
-      kind: "issue_processing" as const,
-      position: 9,
-      createdAt: "2026-08-01T00:00:00.000Z",
-      updatedAt: "2026-08-02T00:00:00.000Z",
-    };
-
-    expect(projectAgentSkillInputs([persistedSkill])).toEqual([
-      {
-        id: "skill-1",
-        name: "Issue processing",
-        description: "Use for queued project issues.",
-        body: "Process queued issues.",
-        provider: "codex",
-        model: "gpt-5.6-sol",
-        effort: "high",
-        kind: "issue_processing",
-        executionMode: "task",
-        approvalPolicy: "explicit",
-        position: 0,
-      },
-    ]);
-  });
-
-
   it("allows the final Skill to be deleted", async () => {
     const { cleanup, container, root } = createReactTestRoot({
       attachToDocument: true,
@@ -86,6 +52,8 @@ describe("ProjectAgentSkillsEditor", () => {
             model: null,
             effort: null,
             kind: "custom",
+            executionMode: "task",
+            approvalPolicy: "explicit",
             position: 0,
           },
         ]}
@@ -145,6 +113,8 @@ describe("ProjectAgentSkillsEditor", () => {
       model: null,
       effort: null,
       kind: "custom" as const,
+      executionMode: "task" as const,
+      approvalPolicy: "explicit" as const,
       position: index,
     }));
     expect(projectAgentSkillsValid(skills)).toBe(true);
