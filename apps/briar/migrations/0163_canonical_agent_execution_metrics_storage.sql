@@ -1,11 +1,17 @@
 pragma foreign_keys = on;
 
--- Metrics are optional derived telemetry. Drop the pre-contract snapshots at
--- this pre-release cutover instead of preserving parallel historical shapes.
--- The Effect codec owns every future field, numeric bound, and refinement.
+-- Metrics remain useful historical telemetry. The previous writer used the
+-- same Effect model, so retain every bounded JSON object and remove only values
+-- that are not valid storage envelopes. Effect owns all field-level rules.
 update briar_hunt_runs
 set execution_metrics_json = null
-where execution_metrics_json is not null;
+where execution_metrics_json is not null
+  and case
+    when not json_valid(execution_metrics_json) then 1
+    when json_type(execution_metrics_json) <> 'object' then 1
+    when length(cast(execution_metrics_json as blob)) > 4096 then 1
+    else 0
+  end;
 
 -- D1 owns only the storage envelope. Full field validation belongs to the
 -- Effect encoder on write and strict decoder on read.

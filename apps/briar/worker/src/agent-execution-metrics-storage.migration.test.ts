@@ -18,7 +18,7 @@ const canonicalMetrics = {
 } as const;
 
 describe("agent execution metrics storage cutover", () => {
-  it("retires old telemetry and leaves field authority with Effect", async () => {
+  it("preserves canonical telemetry and rejects invalid future storage", async () => {
     const db = env.DB;
     const canonicalJson = encodeAgentExecutionMetricsJson(canonicalMetrics);
     await executeD1Sql(db, `
@@ -47,7 +47,7 @@ describe("agent execution metrics storage cutover", () => {
        from briar_hunt_runs
        order by id`,
     ).all()).results).toEqual([
-      { id: "old-canonical", execution_metrics_json: null },
+      { id: "old-canonical", execution_metrics_json: canonicalJson },
       { id: "old-corrupt", execution_metrics_json: null },
     ]);
 

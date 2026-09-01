@@ -19,7 +19,7 @@ const canonicalResult = {
 } as const;
 
 describe("structured agent result storage cutover", () => {
-  it("retires old metadata and leaves field authority with Effect", async () => {
+  it("preserves canonical history and rejects invalid future storage", async () => {
     const db = env.DB;
     const canonicalJson = encodeStructuredAgentResultJson(canonicalResult);
     await executeD1Sql(db, `
@@ -62,7 +62,7 @@ describe("structured agent result storage cutover", () => {
       {
         id: "old-hunt",
         result_summary: "Keep hunt summary",
-        structured_result_json: null,
+        structured_result_json: canonicalJson,
       },
       {
         id: "old-schedule",

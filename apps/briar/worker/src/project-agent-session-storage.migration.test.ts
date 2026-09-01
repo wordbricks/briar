@@ -16,11 +16,72 @@ import {
 } from "./test-helpers/d1";
 
 describe("project Agent session storage cutover", () => {
-  it("purges legacy state and accepts only canonical relational projections", async () => {
+  it("backfills visible history and rejects corrupt storage", async () => {
     const db = env.DB;
     const observedAt = "2026-08-31T00:00:00.000Z";
     const projectId = "11111111-1111-4111-8111-111111111111";
     const sessionId = "22222222-2222-4222-8222-222222222222";
+    const legacyPayload = JSON.stringify({
+      dispatchGroupId: "",
+      agentId: null,
+      sessionType: "task",
+      trigger: "manual",
+      scheduleId: null,
+      scheduleRunId: null,
+      parentSessionId: null,
+      request: "Historical request",
+      status: "running",
+      issues: [],
+      startedAt: observedAt,
+      completedAt: null,
+      conversationId: null,
+      summary: "Historical summary",
+      error: null,
+      events: [],
+      updatedAt: observedAt,
+    });
+    const legacySummary = JSON.stringify({
+      dispatchGroupId: "legacy-valid",
+      agentId: null,
+      agentName: null,
+      skillId: null,
+      sessionType: "task",
+      trigger: "manual",
+      scheduleId: null,
+      scheduleRunId: null,
+      parentSessionId: null,
+      requestedByUserId: "session-owner",
+      request: "Historical request",
+      status: "running",
+      issues: [],
+      startedAt: observedAt,
+      completedAt: null,
+      inboxVersion: "session:v1:running:2026-08-31T00:00:00.000Z",
+      requestedWorkerId: null,
+      workerId: null,
+      updatedAt: observedAt,
+    });
+    const archivedSummary = JSON.stringify({
+      dispatchGroupId: "archive-only",
+      agentId: null,
+      agentName: null,
+      skillId: null,
+      sessionType: "task",
+      trigger: null,
+      scheduleId: null,
+      scheduleRunId: null,
+      parentSessionId: null,
+      requestedByUserId: null,
+      request: "Archived request",
+      status: "completed",
+      issues: [],
+      startedAt: observedAt,
+      completedAt: observedAt,
+      inboxVersion: "session:v1:completed:2026-08-31T00:00:00.000Z",
+      requestedWorkerId: null,
+      workerId: null,
+      updatedAt: observedAt,
+    });
     await applyD1Migrations(db, {
       through: "0163_canonical_agent_execution_metrics_storage.sql",
     });
@@ -49,7 +110,7 @@ describe("project Agent session storage cutover", () => {
         started_at, completed_at, updated_at, requested_by_user_id
       ) values
         ('${projectId}', 'legacy-valid', null, 'running', 'task',
-         '{"status":"running"}', '${observedAt}', null, '${observedAt}',
+         '${legacyPayload}', '${observedAt}', null, '${observedAt}',
          'session-owner'),
         ('${projectId}', 'legacy-corrupt', null, 'running', 'task',
          '{not-json', '${observedAt}', null, '${observedAt}', 'session-owner');
@@ -62,9 +123,9 @@ describe("project Agent session storage cutover", () => {
       insert into briar_project_agent_session_summaries (
         project_id, session_id, summary_json, updated_at, archived
       ) values
-        ('${projectId}', 'legacy-valid', '{"status":"running"}',
+        ('${projectId}', 'legacy-valid', '${legacySummary}',
          '${observedAt}', 0),
-        ('${projectId}', 'archive-only', '{"status":"completed"}',
+        ('${projectId}', 'archive-only', '${archivedSummary}',
          '${observedAt}', 1);
       insert into briar_inbox_read_states (
         user_id, message_id, version, updated_at
@@ -84,24 +145,65 @@ describe("project Agent session storage cutover", () => {
 
     expect((await db.prepare(
       `select id from briar_project_agent_sessions`,
-    ).all()).results).toEqual([]);
+    ).all()).results).toEqual([{ id: "legacy-valid" }]);
     expect((await db.prepare(
-      `select session_id from briar_project_agent_session_summaries`,
-    ).all()).results).toEqual([]);
-    expect((await db.prepare(
-      `select session_id from briar_project_agent_session_context_membership`,
-    ).all()).results).toEqual([]);
-    await expect(listProjectAgentSessionChanges(db, projectId, 0)).resolves
-      .toEqual({
-        currentVersion: 0,
-        changes: [],
-        hasMore: false,
-        nextCursor: 0,
-        expired: false,
-      });
-    await expect(listInboxReadStates(db, "session-owner")).resolves.toEqual([
-      expect.objectContaining({ message_id: "issue:keep" }),
+      `select session_id from briar_project_agent_session_summaries
+       order by session_id`,
+    ).all()).results).toEqual([
+      { session_id: "archive-only" },
+      { session_id: "legacy-valid" },
     ]);
+    expect((await db.prepare(
+      `select session_id from briar_project_agent_session_context_membership
+       order by session_id`,
+    ).all()).results).toEqual([
+      { session_id: "archive-only" },
+      { session_id: "legacy-valid" },
+    ]);
+    const migratedPayload = decodeStoredProjectAgentSessionPayload(
+      (await db.prepare(
+        `select payload_json from briar_project_agent_sessions
+         where project_id = ? and id = 'legacy-valid'`,
+      ).bind(projectId).first<string>("payload_json"))!,
+    );
+    expect(migratedPayload).toMatchObject({
+      dispatchGroupId: "legacy-valid",
+      requestedByUserId: "session-owner",
+      summary: "Historical summary",
+    });
+    const migratedSummaries = await listProjectAgentSessionSummaries(
+      db,
+      projectId,
+      ["legacy-valid", "archive-only"],
+    );
+    expect(migratedSummaries.map((row) => ({
+      id: row.session_id,
+      value: decodeStoredProjectAgentSessionSummary(row.summary_json),
+    }))).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "legacy-valid",
+        value: expect.objectContaining({
+          summary: "Historical summary",
+          error: null,
+        }),
+      }),
+      expect.objectContaining({
+        id: "archive-only",
+        value: expect.objectContaining({ summary: null, error: null }),
+      }),
+    ]));
+    const changes = await listProjectAgentSessionChanges(db, projectId, 0);
+    expect(changes.expired).toBe(false);
+    expect(changes.changes).toEqual(expect.arrayContaining([
+      expect.objectContaining({ session_id: "legacy-valid" }),
+      expect.objectContaining({ session_id: "archive-only" }),
+    ]));
+    await expect(listInboxReadStates(db, "session-owner")).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ message_id: "issue:keep" }),
+        expect.objectContaining({ message_id: "session:legacy-valid" }),
+      ]),
+    );
     const inboxVersionAfter = await db.prepare(
       `select current_version from briar_organization_inbox_sync_state
        where organization_id = 'session-org'`,

@@ -1,17 +1,108 @@
 pragma foreign_keys = on;
 
--- Project Agent sessions are operational state, not durable user data. Drop
--- every legacy document rather than teaching SQL a second copy of the Effect
--- schema or guessing defaults for historic payloads.
-delete from briar_project_agent_session_summaries;
--- Summary deletion deliberately advances the organization Inbox revision so
--- connected clients refetch the now-empty session feed. Its per-project
--- tombstones and cursor are obsolete after this no-compatibility cutover.
-delete from briar_project_agent_session_changes;
-delete from briar_project_agent_session_sync_state;
-delete from briar_inbox_read_states where message_id like 'session:%';
-delete from briar_project_agent_session_context_membership;
-delete from briar_project_agent_sessions;
+-- Project Agent sessions and their lightweight summaries are user-visible
+-- history. Previous payloads already passed ProjectAgentSessionInput. Backfill
+-- only the two values that were formerly supplied outside the stored document:
+-- an empty dispatch group meant the session itself, and requester ownership
+-- lived in the relational column.
+update briar_project_agent_sessions
+set payload_json = json_set(
+  payload_json,
+  '$.dispatchGroupId', case
+    when coalesce(json_extract(payload_json, '$.dispatchGroupId'), '') = ''
+      then id
+    else json_extract(payload_json, '$.dispatchGroupId')
+  end,
+  '$.agentId', agent_id,
+  '$.status', status,
+  '$.sessionType', session_type,
+  '$.startedAt', started_at,
+  '$.completedAt', completed_at,
+  '$.updatedAt', updated_at,
+  '$.requestedByUserId', requested_by_user_id
+)
+where case
+  when not json_valid(payload_json) then 0
+  when json_type(payload_json) <> 'object' then 0
+  when length(cast(payload_json as blob)) > 1048576 then 0
+  else 1
+end;
+
+-- The old summary projection carried an internal Inbox version and omitted
+-- the newly explicit preview fields. Preserve its durable catalog entry while
+-- deriving previews from the hot payload when it is still available.
+update briar_project_agent_session_summaries as summary
+set summary_json = json_set(
+  json_remove(summary.summary_json, '$.inboxVersion'),
+  '$.dispatchGroupId', case
+    when coalesce(
+      json_extract(summary.summary_json, '$.dispatchGroupId'), ''
+    ) = '' then summary.session_id
+    else json_extract(summary.summary_json, '$.dispatchGroupId')
+  end,
+  '$.summary', (
+    select substr(json_extract(session.payload_json, '$.summary'), 1, 2000)
+    from briar_project_agent_sessions session
+    where session.project_id = summary.project_id
+      and session.id = summary.session_id
+  ),
+  '$.error', (
+    select substr(json_extract(session.payload_json, '$.error'), 1, 2000)
+    from briar_project_agent_sessions session
+    where session.project_id = summary.project_id
+      and session.id = summary.session_id
+  )
+)
+where case
+  when not json_valid(summary.summary_json) then 0
+  when json_type(summary.summary_json) <> 'object' then 0
+  when length(cast(summary.summary_json as blob)) > 262144 then 0
+  else 1
+end;
+
+-- A malformed document cannot be safely guessed into the Effect domain.
+-- Remove only those corrupt envelopes; valid session history, sync cursors,
+-- read state, and archive-only summaries remain intact.
+delete from briar_project_agent_sessions
+where case
+  when length(cast(payload_json as blob)) > 1048576 then 1
+  when not json_valid(payload_json) then 1
+  when json_type(payload_json) <> 'object' then 1
+  else 0
+end;
+
+delete from briar_project_agent_session_summaries
+where case
+  when length(cast(summary_json as blob)) > 262144 then 1
+  when not json_valid(summary_json) then 1
+  when json_type(summary_json) <> 'object' then 1
+  else 0
+end;
+
+delete from briar_project_agent_session_context_membership
+where not exists (
+  select 1 from briar_project_agent_sessions session
+  where session.project_id =
+      briar_project_agent_session_context_membership.project_id
+    and session.id =
+      briar_project_agent_session_context_membership.session_id
+)
+and not exists (
+  select 1 from briar_project_agent_session_summaries summary
+  where summary.project_id =
+      briar_project_agent_session_context_membership.project_id
+    and summary.session_id =
+      briar_project_agent_session_context_membership.session_id
+)
+and not exists (
+  select 1 from briar_log_archives archive
+  where archive.project_id =
+      briar_project_agent_session_context_membership.project_id
+    and archive.scope_id =
+      briar_project_agent_session_context_membership.session_id
+    and archive.archive_kind = 'project_agent_sessions'
+    and archive.status in ('verified', 'complete')
+);
 
 -- The application supplies one Effect-encoded payload while accepting a task
 -- proposal. The materializer consumes it in the same statement and clears the

@@ -1,16 +1,28 @@
 pragma foreign_keys = on;
 
--- Structured results are optional derived metadata. Earlier rows were written
--- through several hand-maintained JSON shapes, and this pre-release cutover
--- does not retain that compatibility surface. The Effect codec owns the full
--- document contract for every future writer and reader.
+-- Structured results are user-visible run history. The previous writer used
+-- the same Effect schema as the canonical codec, so retain every bounded JSON
+-- object and discard only values that cannot be decoded as stored documents.
+-- Effect remains the sole field-level contract for future reads and writes.
 update briar_hunt_runs
 set structured_result_json = null
-where structured_result_json is not null;
+where structured_result_json is not null
+  and case
+    when not json_valid(structured_result_json) then 1
+    when json_type(structured_result_json) <> 'object' then 1
+    when length(cast(structured_result_json as blob)) > 131072 then 1
+    else 0
+  end;
 
 update briar_project_agent_schedule_runs
 set structured_result_json = null
-where structured_result_json is not null;
+where structured_result_json is not null
+  and case
+    when not json_valid(structured_result_json) then 1
+    when json_type(structured_result_json) <> 'object' then 1
+    when length(cast(structured_result_json as blob)) > 131072 then 1
+    else 0
+  end;
 
 -- D1 owns only the storage envelope. Repeating fields, enums, and refinements
 -- here would create a second contract that can drift from the Effect schema.
