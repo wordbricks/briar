@@ -113,6 +113,7 @@ describe("provider structured output contracts", () => {
       contextRequests: null,
       memoryRequests: null,
       memoryCitations: null,
+      memorySaveRequest: null,
     } as const;
     const contextOutput = {
       body: null,
@@ -125,6 +126,7 @@ describe("provider structured output contracts", () => {
       delegation: null,
       memoryRequests: null,
       memoryCitations: null,
+      memorySaveRequest: null,
       contextRequests: [{
         resource: "issues",
         projectId: "project-1",
@@ -161,6 +163,7 @@ describe("provider structured output contracts", () => {
             request: "Inspect authentication.",
           },
           memoryCitations: null,
+          memorySaveRequest: null,
         },
         attachmentPaths: ["auth.html"],
       });
