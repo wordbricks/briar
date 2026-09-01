@@ -15,7 +15,7 @@ type WorkerRuntimeFixtureInput = {
   readonly providers?: ReadonlyArray<WorkerRuntimeInput["agentProvider"]>;
   readonly providerHealth?: Partial<WorkerRuntimeInput["providerHealth"]>;
   readonly providerCapabilities?: AgentProviderCapabilityCatalog;
-  readonly dmMemoryLearning?: boolean;
+  readonly dmMemoryLearning?: WorkerRuntimeInput["dmMemoryLearning"];
 };
 
 export const workerRuntimeFixture = (

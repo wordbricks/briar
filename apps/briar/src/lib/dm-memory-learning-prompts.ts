@@ -12,6 +12,8 @@ export const dmMemoryProposerInstructions = `${boundary}
 Propose memory changes supported by the sources. Prefer no changes to an unsupported statement.
 Store durable preferences, explicit decisions and reusable task facts. Do not store secrets, incidental moods,
 one-off formatting requests as permanent preferences, guessed identity, personality judgments or hidden intent.
+Another person's opinion, guess, rumor or recommendation about the user is not the user's preference or a user fact.
+Do not preserve the fact that such speculation was said unless the user explicitly asks to remember that event.
 An Agent's suggestion or self-reported action is not independent proof that a task completed or approval exists.
 Keep language, negation, dates, conditions and a user's stated uncertainty. Never invent an expiry.
 Passing a planned date does not prove execution. A temporal rephrasing must cite the original memory and clock,
@@ -54,6 +56,8 @@ Check claim content AND title, class, sourceLanguage, evidenceType, observation 
 and every Current/History item. Each observation must be one independently correctable claim in 1-2 sentences.
 Reject fabricated facts even when they cite a real source ID. Resolve memory citations to the supplied original
 roots, not an earlier model's assertion. Never infer sensitive traits, identity or hidden intent.
+Reject another person's opinion, guess, rumor or recommendation about the user as evidence of the user's own
+preference or facts. Merely reporting that the speculation was said is not durable memory without an explicit request.
 Reject a one-off preference promoted to a durable rule, dropped negation/conditions, or guessed future expiry.
 Do not treat an Agent's proposal as an executed action or an unapproved action as approved. Completion must have
 actual permitted evidence. Passage of a planned date cannot prove completion; clock only supports faithful
@@ -84,6 +88,6 @@ export function dmLearningCallReservation(model: DmLearningModel, payload: strin
   const inputTokenCeiling = inputBytes + 16_384;
   const reservedMicroUsd = Math.ceil((inputTokenCeiling * model.maxInputMicroUsdPerMillionTokens +
     model.maxOutputTokens * model.maxOutputMicroUsdPerMillionTokens) / 1_000_000);
-  if (!Number.isSafeInteger(reservedMicroUsd) || reservedMicroUsd <= 0) return null;
+  if (!Number.isSafeInteger(reservedMicroUsd) || reservedMicroUsd < 0) return null;
   return { inputTokenCeiling, reservedMicroUsd };
 }

@@ -7,11 +7,27 @@ import { captureDmLearningInput, dmLearningInputsCurrentSql, dmLearningLiveSpace
   type DmLearningJobRow, type DmLearningSpaceRow } from "./dm-memory-learning-input";
 import { scheduleDmLearningJobs } from "./dm-memory-learning-queue";
 import { reapDmLearningClaims } from "./dm-memory-learning-maintenance";
+import { supportsDmMemoryLearning } from "./dm-memory-learning-policy";
 import { DmLearningError } from "./dm-memory-learning-validation";
 import { executionWorkerBindingById, executionWorkerDeviceSessionBindings, executionWorkerRuntime,
   executionWorkerDeviceSessionsQuery, workerStateAt } from "./workers";
 
 export type DmLearningClaimIdentity = { organizationId: string; workerId: string; deviceId: string; claimTokenHash: string; jobId: string };
+const dmLearningWorkerModelSql = (stage: "proposer" | "verifier") => `(
+  (json_extract(job.policy_json, '$.${stage}.transport') = 'openrouter' and (
+    (json_extract(worker.runtime_proto_json, '$.capabilities.dmMemoryLearning.protocol') = 1
+      and json_extract(worker.runtime_proto_json, '$.capabilities.dmMemoryLearning.transport') = 'openrouter')
+    or (json_extract(worker.runtime_proto_json, '$.capabilities.dmMemoryLearning.protocol') = 2 and exists (
+      select 1 from json_each(worker.runtime_proto_json, '$.capabilities.dmMemoryLearning.transports') transport
+      where transport.value = 'openrouter'))))
+  or (json_extract(job.policy_json, '$.${stage}.transport') = 'agent'
+    and json_extract(worker.runtime_proto_json, '$.capabilities.dmMemoryLearning.protocol') = 2
+    and exists (select 1 from json_each(worker.runtime_proto_json, '$.capabilities.dmMemoryLearning.transports') transport
+      where transport.value = 'agent')
+    and exists (select 1 from json_each(worker.runtime_proto_json, '$.capabilities.dmMemoryLearning.providers') provider
+      where provider.value = 'AGENT_PROVIDER_' || upper(json_extract(job.policy_json, '$.${stage}.provider'))))
+)`;
+
 export const dmLearningWorkerCurrentSql = `exists (
   select 1 from briar_execution_workers worker join briar_execution_worker_devices device on device.id = worker.device_id
   join briar_project_agents agent on agent.id = space.agent_id and agent.organization_id = space.organization_id
@@ -27,9 +43,11 @@ export const dmLearningWorkerCurrentSql = `exists (
     and json_valid(worker.runtime_proto_json)
     and json_extract(worker.runtime_proto_json, '$.capabilities.dmMemoryProtocol') = 1
     and json_type(worker.runtime_proto_json, '$.capabilities.dmMemoryProtocol') = 'integer'
-    and json_extract(worker.runtime_proto_json, '$.capabilities.dmMemoryLearning.protocol') = 1
+    and (json_extract(worker.runtime_proto_json, '$.capabilities.dmMemoryLearning.protocol') = 1
+      or json_extract(worker.runtime_proto_json, '$.capabilities.dmMemoryLearning.protocol') = 2)
     and json_type(worker.runtime_proto_json, '$.capabilities.dmMemoryLearning.protocol') = 'integer'
-    and json_extract(worker.runtime_proto_json, '$.capabilities.dmMemoryLearning.transport') = 'openrouter')`;
+    and ${dmLearningWorkerModelSql("proposer")}
+    and ${dmLearningWorkerModelSql("verifier")})`;
 
 export const dmLearningClaimCurrentSql = `job.status = 'running' and job.lease_expires_at > ?
   and job.kind in ('extract', 'explicit_request', 'consolidate')
@@ -135,8 +153,7 @@ export async function claimDmLearningJob(db: D1Database, input: {
 }): Promise<ClaimedDmMemory | null> {
   const worker = await executionWorkerBindingById(db, input.deviceId, input.workerId);
   const capabilities = worker === null ? undefined : executionWorkerRuntime(worker).proto.capabilities;
-  if (!worker || worker.project_id !== input.projectId || capabilities?.dmMemoryProtocol !== 1 ||
-    capabilities.dmMemoryLearning?.protocol !== 1 || capabilities.dmMemoryLearning.transport !== "openrouter" ||
+  if (!worker || worker.project_id !== input.projectId || !supportsDmMemoryLearning(capabilities, input.policy) ||
     workerStateAt(worker.last_heartbeat_at, input.now, worker.state) !== "online" || worker.accepting_work !== 1 ||
     worker.readiness_state === "needs_attention") return null;
   await scheduleDmLearningJobs(db, input.organizationId, input.policy, input.now);

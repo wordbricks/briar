@@ -1,4 +1,6 @@
 import * as Schema from "effect/Schema";
+import { ModelEffort } from "./agent-provider-contract";
+import { agentProviders } from "./agent-provider";
 import { IsoDateTimeWithOffset } from "./date-time-schema";
 
 export const dmMemoryLearningPolicyVersion = "dm-learning-verified-v1";
@@ -47,13 +49,30 @@ export const DmLearningDocument = strict(Schema.Struct({
 }));
 export type DmLearningDocument = typeof DmLearningDocument.Type;
 
-export const DmLearningModel = strict(Schema.Struct({
+const DmLearningOpenRouterModel = strict(Schema.Struct({
   transport: Schema.Literal("openrouter"),
   model: text(200), upstreamProvider: text(100),
   maxOutputTokens: positive.check(Schema.isLessThanOrEqualTo(16_384)),
   maxInputMicroUsdPerMillionTokens: positive,
   maxOutputMicroUsdPerMillionTokens: positive,
 }));
+
+const DmLearningAgentModel = strict(Schema.Struct({
+  transport: Schema.Literal("agent"),
+  provider: Schema.Literals(agentProviders),
+  model: Schema.NullOr(text(200)),
+  effort: Schema.NullOr(ModelEffort),
+  maxOutputTokens: positive.check(Schema.isLessThanOrEqualTo(16_384)),
+  // Subscription-backed Agent CLIs do not expose a reliable per-call price.
+  // Zero keeps the existing reservation ledger explicit without inventing cost.
+  maxInputMicroUsdPerMillionTokens: nonnegative,
+  maxOutputMicroUsdPerMillionTokens: nonnegative,
+}));
+
+export const DmLearningModel = Schema.Union([
+  DmLearningOpenRouterModel,
+  DmLearningAgentModel,
+]);
 export type DmLearningModel = typeof DmLearningModel.Type;
 
 export const DmLearningPolicy = strict(Schema.Struct({
@@ -61,7 +80,7 @@ export const DmLearningPolicy = strict(Schema.Struct({
   proposer: DmLearningModel, verifier: DmLearningModel,
   maxInputBytes: positive.check(Schema.isLessThanOrEqualTo(131_072)),
   spaceDailyCalls: positive, organizationDailyCalls: positive,
-  spaceDailyMicroUsd: positive, organizationDailyMicroUsd: positive,
+  spaceDailyMicroUsd: nonnegative, organizationDailyMicroUsd: nonnegative,
 }));
 export type DmLearningPolicy = typeof DmLearningPolicy.Type;
 

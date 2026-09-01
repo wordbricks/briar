@@ -135,8 +135,9 @@ describe("DM memory management", () => {
   it("keeps learning opt-in separate, shows verification failure, and disables learning when memory use stops", async () => {
     const enabled = { ...page, capabilities: { recall: true, automaticLearning: true },
       spaces: page.spaces.map((space) => ({ ...space, useEnabled: true, autoEnabled: false })),
-      learning: { configuration: { proposer: { model: "synthetic/proposer", provider: "synthetic" },
-        verifier: { model: "synthetic/verifier", provider: "synthetic" }, spaceDailyCalls: 24, spaceDailyMicroUsd: 5_000_000 },
+      learning: { configuration: { proposer: { transport: "agent" as const, model: "default", provider: "codex" },
+        verifier: { transport: "agent" as const, model: "default", provider: "codex" }, costTracked: false,
+        spaceDailyCalls: 24, spaceDailyMicroUsd: 0 },
         callsToday: 2, reservedMicroUsdToday: 50_000, pendingJobs: 0, failedJobs: 1,
         lastJob: { id: crypto.randomUUID(), kind: "extract" as const, status: "failed" as const, stage: "verifying" as const,
           errorCode: "verification_rejected" as const, updatedAt: "2026-09-01T00:00:00.000Z" },
@@ -146,7 +147,9 @@ describe("DM memory management", () => {
     client.retryLearning.mockResolvedValue({ accepted: true, replayed: false });
     await render();
     expect(dialog().textContent).toContain("Independent verification rejected the proposal");
-    expect(dialog().textContent).toContain("synthetic/proposer / synthetic/verifier");
+    expect(dialog().textContent).toContain("default / default");
+    expect(dialog().textContent).toContain("Agent · codex / Agent · codex");
+    expect(dialog().textContent).not.toContain("Reserved cost today");
     await act(async () => button("Retry failed learning").click());
     expect(client.retryLearning).toHaveBeenCalledWith(scope, enabled.learning.retryableJob.id, 0);
     const automatic = [...dialog().querySelectorAll("label")].find((label) => label.textContent === "Learn memories from this conversation")!

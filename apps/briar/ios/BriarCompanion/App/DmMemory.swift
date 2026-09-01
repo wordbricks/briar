@@ -450,14 +450,16 @@ struct DmMemoryView: View {
             let configuration = learning.configuration
             Text("\(text("제안 / 검증 모델", "Proposer / verifier model")) · \(configuration.proposer.model) / \(configuration.verifier.model)")
                 .font(.caption)
-            Text("OpenRouter · \(configuration.proposer.provider) / \(configuration.verifier.provider)")
+            Text("\(configuration.proposer.transport == "agent" ? "Agent" : "OpenRouter") · \(configuration.proposer.provider) / \(configuration.verifier.transport == "agent" ? "Agent" : "OpenRouter") · \(configuration.verifier.provider)")
                 .font(.caption)
             Text("\(text("오늘 호출 / 하루 한도", "Calls today / daily limit")) · \(learning.callsToday) / \(configuration.spaceDailyCalls)")
                 .font(.caption)
-            Text(text("오늘 예약 비용 / 하루 한도", "Reserved cost today / daily limit") + " · " +
-                 String(format: "$%.4f / $%.2f USD", Double(learning.reservedMicroUsdToday) / 1_000_000,
-                        Double(configuration.spaceDailyMicroUsd) / 1_000_000))
-                .font(.caption)
+            if configuration.costTracked {
+                Text(text("오늘 예약 비용 / 하루 한도", "Reserved cost today / daily limit") + " · " +
+                     String(format: "$%.4f / $%.2f USD", Double(learning.reservedMicroUsdToday) / 1_000_000,
+                            Double(configuration.spaceDailyMicroUsd) / 1_000_000))
+                    .font(.caption)
+            }
         }
         Text("\(text("대기·진행 작업", "Pending or running jobs")) · \(learning.pendingJobs) / \(text("실패 기록", "Failed jobs")) · \(learning.failedJobs)")
             .font(.caption)

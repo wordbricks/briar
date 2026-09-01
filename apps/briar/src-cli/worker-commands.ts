@@ -61,6 +61,7 @@ import {
   worktreeSettings,
   worktreesEnabled,
   currentProject,
+  providerExecutionEnvironment,
 } from "./command-support";
 import {
   maintainRecordedCompletedWorktrees,
@@ -80,6 +81,8 @@ import {
 } from "./reply-execution";
 import { loadManagedComputerCredential } from "./managed-computer-credential";
 import { runClaimedDmMemory } from "./dm-memory-learning";
+import { runDetachedProviderTurn } from "./detached-provider-turn";
+import { prepareReadOnlyAgentEnvironment } from "./read-only-agent-environment";
 
 const WORKER_SERVER_MAINTENANCE_INTERVAL_MS = 5 * 60_000;
 
@@ -99,7 +102,7 @@ const workerRuntime = (input: {
   providerCapabilities: WorkerRuntimeInput["providerCapabilities"];
   worktrees: boolean;
   workflowRequirements?: WorkerRuntimeInput["workflowRequirements"];
-  dmMemoryLearning: boolean;
+  dmMemoryLearning: WorkerRuntimeInput["dmMemoryLearning"];
 }): WorkerRuntimeInput => ({
   ...input,
   versions: { briar: cliVersion },
@@ -107,6 +110,15 @@ const workerRuntime = (input: {
     supported: supportsRemoteWorkerUpdates(platform()),
     protocol: 1,
   },
+});
+
+const dmMemoryLearningCapability = (
+  providers: ReturnType<typeof healthyWorkerProviders>,
+  hasOpenRouterKey: boolean,
+): NonNullable<WorkerRuntimeInput["dmMemoryLearning"]> => ({
+  protocol: 2,
+  transports: ["agent", ...(hasOpenRouterKey ? ["openrouter" as const] : [])],
+  providers,
 });
 
 async function workerRegisterCommand() {
@@ -152,7 +164,10 @@ async function workerRegisterCommand() {
           providerHealth,
           providerCapabilities,
           worktrees: true,
-          dmMemoryLearning: Boolean(config.openrouterApiKey?.trim()),
+          dmMemoryLearning: dmMemoryLearningCapability(
+            providers,
+            Boolean(config.openrouterApiKey?.trim()),
+          ),
         }),
       });
       const existing = config.projects.find(
@@ -181,7 +196,10 @@ async function workerRegisterCommand() {
       providerHealth,
       providerCapabilities,
       worktrees: true,
-      dmMemoryLearning: Boolean(config.openrouterApiKey?.trim()),
+      dmMemoryLearning: dmMemoryLearningCapability(
+        providers,
+        Boolean(config.openrouterApiKey?.trim()),
+      ),
     }),
     ...(Number.isInteger(requestedMaxSessions) && requestedMaxSessions > 0
       ? { maxConcurrentSessions: requestedMaxSessions }
@@ -414,7 +432,10 @@ async function workerCommand() {
         providerHealth,
         providerCapabilities,
         worktrees: true,
-        dmMemoryLearning: Boolean(config.openrouterApiKey?.trim()),
+        dmMemoryLearning: dmMemoryLearningCapability(
+          providers,
+          Boolean(config.openrouterApiKey?.trim()),
+        ),
       }),
       acceptingWork: false,
       readinessState: "needs_attention",
@@ -586,7 +607,10 @@ async function workerCommand() {
               healthy: item.healthy,
               detail: item.detail,
             })),
-            dmMemoryLearning: Boolean(config.openrouterApiKey?.trim()),
+            dmMemoryLearning: dmMemoryLearningCapability(
+              providers,
+              Boolean(config.openrouterApiKey?.trim()),
+            ),
           }),
           refreshMaintenance,
           acceptingWork,
@@ -655,7 +679,10 @@ async function workerCommand() {
                     healthy: item.healthy,
                     detail: item.detail,
                   })),
-                  dmMemoryLearning: Boolean(config.openrouterApiKey?.trim()),
+                  dmMemoryLearning: dmMemoryLearningCapability(
+                    providers,
+                    Boolean(config.openrouterApiKey?.trim()),
+                  ),
                 }),
                 acceptingWork: false,
                 readinessState: "needs_attention",
@@ -691,6 +718,10 @@ async function workerCommand() {
             claim: issue,
             apiKey: config.openrouterApiKey ?? null,
             signal,
+            agentEnvironment: (provider) =>
+              providerExecutionEnvironment(config, provider, process.env),
+            runAgentTurn: runDetachedProviderTurn,
+            prepareAgentEnvironment: prepareReadOnlyAgentEnvironment,
           });
           return;
         }

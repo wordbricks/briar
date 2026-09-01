@@ -1,8 +1,8 @@
 # DM memory delivery
 
-The target is the complete [DM memory SPEC](dm-memory-spec.md). Delivery is split
-into at most four pull requests. A merged intermediate PR does not mean that
-automatic learning or end-to-end recall is complete.
+The target is the complete [DM memory SPEC](dm-memory-spec.md). The four
+foundation pull requests are merged. Recall and the connected-Agent learning
+runtime are enabled only after their separate measured gates pass.
 
 | PR | Scope | State |
 | --- | --- | --- |
@@ -11,9 +11,9 @@ automatic learning or end-to-end recall is complete.
 | 3 | Worker capability, DM lookup loop, provider session fencing, citations | [#1500](https://github.com/wordbricks/briar/pull/1500), merged |
 | 4 | Durable learning claims, proposals, independent verification, consolidation, release gates | [#1501](https://github.com/wordbricks/briar/pull/1501), merged |
 
-Keep automatic learning disabled until its runtime, budgets and evaluation pass.
-Do not advertise recall before PR 3 connects the DM execution path. Use synthetic
-fixtures; never commit the user archive, profiles or conversation text.
+Use synthetic fixtures; never commit the user archive, profiles or conversation
+text. Per-DM recall and automatic learning remain owner opt-ins even when the
+server flags and an organization policy are active.
 
 The final audit must bind M01–M28 to actual test evidence and record the four PR
 numbers, verified heads, required signoffs and merge commits. Retrieval and
@@ -131,10 +131,11 @@ and deleting its conversation source, on desktop/Android and native iOS.
   reply and durable outbox entry commit together. The learning snapshot contains
   that request plus only the current target documents discovered during the
   reply. Quotations, attachments and Agent messages cannot grant the exception.
-- Proposer and verifier use separate, stateless OpenRouter requests. The Worker
-  pins one configured model and upstream provider, disables paid fallback,
-  requires parameter support and requests data-collection denial and ZDR.
-  Credentials remain on the execution Worker. These options follow the current
+- The original proposer and verifier use separate, stateless OpenRouter requests.
+  The Worker pins one configured model and upstream provider, disables paid
+  fallback, requires parameter support and requests data-collection denial and
+  ZDR. This transport remains supported for compatible policies. These options
+  follow the current
   [provider routing](https://openrouter.ai/docs/guides/routing/provider-selection),
   [chat completion](https://openrouter.ai/docs/api/api-reference/chat/create-a-chat-completion),
   and [structured output](https://openrouter.ai/docs/guides/features/structured-outputs)
@@ -194,6 +195,30 @@ commit row counts were all zero, so no private DM was imported or backfilled.
   quality pass. Automatic learning still requires the full 20 store and 20
   do-not-store evaluation, precision at least 95%, recall at least 80%, no
   protected/scope violations, and a funded privacy-compatible runtime.
+
+## Connected-Agent learning activation
+
+- The Worker learning capability advances to protocol 2 and advertises the
+  exact healthy connected providers. An Agent policy is claimable only when the
+  Worker advertises both the Agent transport and the pinned proposer/verifier
+  providers. Protocol 1 OpenRouter policies remain compatible.
+- Each stage is a fresh, stateless text call. The Worker copies only provider
+  authentication into a mode-0700 temporary home, starts in an empty temporary
+  workspace, supplies no attachments, skills, tools, MCP, retained conversation
+  or network permission, and accepts only the strict proposal or verification
+  JSON schema. Cleanup runs after success and failure.
+- The initial organization policy pins connected Codex with its configured
+  default model for both stages. Subscription usage is not presented as tracked
+  per-call cost; daily call limits remain enforced. There is no automatic paid
+  fallback and another connected provider cannot silently replace the policy.
+- `apps/briar/evals/dm-memory-learning-v1` contains 20 human-labelled store and
+  20 reject cases in Korean and English. The live connected-Codex run measured
+  precision 100%, recall 95% and zero safety violations. One stored and approved
+  preference missed an evaluator-specific keyword and was counted as a false
+  negative. The report stores IDs and decisions, not source or generated bodies.
+- The checked-in rollout sets `DM_MEMORY_LEARNING_ENABLED=true` for the limited
+  organization policy. Every DM remains owner opt-in and starts learning only
+  from the point of opt-in; no existing conversation is imported or backfilled.
 
 Rollback sets retrieval and indexing flags to false while leaving owner edit,
 forget, exclusion, and vector cleanup paths available. A rollback does not

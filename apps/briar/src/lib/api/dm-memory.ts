@@ -177,6 +177,18 @@ const writeInput = (input: DmMemoryCreateInput | DmMemoryEditInput) => ({
   sourceMessage: input.sourceMessage,
 });
 
+const learningModelFromProto = (
+  value: { readonly transport: string; readonly model: string; readonly provider: string },
+) => ({
+  transport: value.transport === "agent"
+    ? "agent" as const
+    : value.transport === "openrouter" || value.transport === ""
+    ? "openrouter" as const
+    : (() => { throw new Error(`Unknown DM memory learning transport: ${value.transport}`); })(),
+  model: value.model,
+  provider: value.provider,
+});
+
 const learningStatusFromProto = (
   value: DmMemoryLearningStatusMessage,
 ): DmMemoryLearningStatus => {
@@ -186,14 +198,15 @@ const learningStatusFromProto = (
     configuration: configuration === undefined
       ? null
       : {
-          proposer: requiredMessage(
+          proposer: learningModelFromProto(requiredMessage(
             configuration.proposer,
             "dmMemoryLearning.configuration.proposer",
-          ),
-          verifier: requiredMessage(
+          )),
+          verifier: learningModelFromProto(requiredMessage(
             configuration.verifier,
             "dmMemoryLearning.configuration.verifier",
-          ),
+          )),
+          costTracked: configuration.costTracked,
           spaceDailyCalls: configuration.spaceDailyCalls,
           spaceDailyMicroUsd: safeNumber(
             configuration.spaceDailyMicroUsd,
