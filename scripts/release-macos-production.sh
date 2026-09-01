@@ -55,7 +55,7 @@ upload_release_artifact() {
   name="$(basename "$artifact")"
 
   gh release upload "$tag" "$artifact" --repo "$repository"
-  bunx wrangler r2 object put \
+  wrangler r2 object put \
     "briar-releases/releases/$tag/$name" \
     --file "$artifact" \
     --remote
@@ -250,7 +250,7 @@ if [[ "$publish" == true ]]; then
     "${BRIAR_RELEASE_BASE_URL}/${tag}/briar-managed-runtime-${version}-linux-x86_64.tar.gz" \
     >/dev/null
   gh release edit "$tag" --repo "$repository" --draft=false --latest
-  bunx wrangler r2 object put \
+  wrangler r2 object put \
     "briar-releases/releases/latest.json" \
     --file "$artifact_root/latest.json" \
     --remote

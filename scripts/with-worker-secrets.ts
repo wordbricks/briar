@@ -66,7 +66,7 @@ function serializeDotenv(secrets: Record<string, string>): string {
 }
 
 async function runWrangler(args: string[]): Promise<number> {
-  const processHandle = Bun.spawn(["bunx", "wrangler", ...args], {
+  const processHandle = Bun.spawn(["wrangler", ...args], {
     cwd: process.cwd(),
     env: process.env,
     stdin: "inherit",
