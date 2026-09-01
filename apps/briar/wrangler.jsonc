@@ -27,9 +27,9 @@
     "mode": "smart"
   },
   "vars": {
-    "DM_MEMORY_INDEX_ENABLED": "false",
-    "DM_MEMORY_RETRIEVAL_ENABLED": "false",
-    "DM_MEMORY_MINIMUM_SCORE": "",
+    "DM_MEMORY_INDEX_ENABLED": "true",
+    "DM_MEMORY_RETRIEVAL_ENABLED": "true",
+    "DM_MEMORY_MINIMUM_SCORE": "0.5",
     "DM_MEMORY_LEARNING_ENABLED": "false",
     "DM_MEMORY_LEARNING_POLICIES": "{}",
     "APNS_TEAM_ID": "QFJZ2V3829",

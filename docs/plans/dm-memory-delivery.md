@@ -9,7 +9,7 @@ automatic learning or end-to-end recall is complete.
 | 1 | Versioned storage, ownership, CRUD/export, desktop/Android/iOS management | [#1497](https://github.com/wordbricks/briar/pull/1497), merged |
 | 2 | Chunking, durable indexing, Vectorize search, briefs, purge lifecycle | [#1499](https://github.com/wordbricks/briar/pull/1499), merged |
 | 3 | Worker capability, DM lookup loop, provider session fencing, citations | [#1500](https://github.com/wordbricks/briar/pull/1500), merged |
-| 4 | Durable learning claims, proposals, independent verification, consolidation, release gates | [#1501](https://github.com/wordbricks/briar/pull/1501), under review |
+| 4 | Durable learning claims, proposals, independent verification, consolidation, release gates | [#1501](https://github.com/wordbricks/briar/pull/1501), merged |
 
 Keep automatic learning disabled until its runtime, budgets and evaluation pass.
 Do not advertise recall before PR 3 connects the DM execution path. Use synthetic
@@ -160,10 +160,41 @@ and deleting its conversation source, on desktop/Android and native iOS.
   These are local fixture checks, not authenticated production or Android-device
   evidence.
 
-Automatic learning and recall remain disabled in `wrangler.jsonc`. The required
-40 positive/20 negative bilingual retrieval labels and 20 store/20 do-not-store
-human learning labels have not been collected or scored. Synthetic integration
-does not establish model quality, Hit@5, false-positive rate, precision, recall,
-p95 latency, authenticated production behavior or Android device behavior. Those
-measurements remain release gates; merging PR 4 does not enable the feature or
-run migration 0155 remotely.
+PR #1501 merged as `dadc9fca2b82b2da259de8f0ee85b9e524ef8a2c`.
+Migration 0155 and the production Vectorize index were provisioned before the
+activation change. Existing memory, indexing, learning-outbox, model-call and
+commit row counts were all zero, so no private DM was imported or backfilled.
+
+## First recall activation
+
+- The checked-in rollout turns on `DM_MEMORY_INDEX_ENABLED` and
+  `DM_MEMORY_RETRIEVAL_ENABLED` with vector floor `0.5`. Per-DM memory use remains
+  an owner opt-in. Existing conversations are not backfilled.
+- The versioned synthetic evaluation is under
+  `apps/briar/evals/dm-memory-retrieval-v1`. It has 40 answerable and 20
+  no-answer queries, with separate development/final splits and ten examples in
+  each Korean/English direction.
+- Raw BGE-M3 vectors reached Hit@5 100%, but final false-positive rate 60%.
+  Recall therefore adds a bounded Llama 3.3 70B semantic relevance check after
+  vector retrieval. Development and final results each measured Hit@5 100% and
+  false-positive rate 10%; both language directions measured Hit@5 100%.
+  Verifier p95 was 1,235.55 ms and maximum was 1,628.96 ms.
+- Semantic verification receives at most ten candidate excerpts, has no tools,
+  uses strict JSON, and treats all supplied text as untrusted. Invalid output,
+  provider failure, snapshot change, or the five-second overall deadline returns
+  no memory.
+- The OpenRouter request now uses the endpoint-supported `max_tokens` field.
+  The previous `max_completion_tokens`, `modalities`, and `n` combination had no
+  matching pinned xAI ZDR endpoint when parameter support was required.
+- `DM_MEMORY_LEARNING_ENABLED` remains false and its policy map remains empty.
+  A real Grok proposer/verifier smoke passed, but the configured OpenRouter
+  account reported zero purchased credits during the 20/20 run. Paid calls then
+  returned 402, while available free alternatives either failed the ZDR policy
+  or returned provider capacity errors. The incomplete run is not reported as a
+  quality pass. Automatic learning still requires the full 20 store and 20
+  do-not-store evaluation, precision at least 95%, recall at least 80%, no
+  protected/scope violations, and a funded privacy-compatible runtime.
+
+Rollback sets retrieval and indexing flags to false while leaving owner edit,
+forget, exclusion, and vector cleanup paths available. A rollback does not
+delete owner-managed memory.

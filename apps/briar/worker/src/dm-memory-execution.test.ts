@@ -31,7 +31,7 @@ describe("DM memory in active channel claims", () => {
   const capabilities = { providers: ["claude"], providerHealth: { claude: { healthy: true } },
     organizationAgentContext: { protocol: 1 }, dmMemory: { protocol: 1 } };
   const env = () => ({ DB: db, BETTER_AUTH_SECRET: "synthetic-memory-activity-secret-with-enough-length",
-    DM_MEMORY_RETRIEVAL_ENABLED: String("true"), DM_MEMORY_MINIMUM_SCORE: "" }) as Env;
+    DM_MEMORY_RETRIEVAL_ENABLED: String("true"), DM_MEMORY_MINIMUM_SCORE: "" }) as unknown as Env;
   const workerRequest = (path: string, body?: unknown, token = workerToken) => new Request(`https://briar.example${path}`, {
     method: body === undefined ? "GET" : "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),

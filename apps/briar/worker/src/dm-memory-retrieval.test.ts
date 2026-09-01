@@ -22,6 +22,7 @@ function vectorStore() {
     .slice(0, options?.topK ?? 20).map((vector) => ({ ...vector, score: 0.9 }));
   const store: DmMemoryVectorStore = {
     embed: vi.fn<DmMemoryVectorStore["embed"]>(async (texts) => texts.map(() => [1, ...Array<number>(1023).fill(0)])),
+    verify: vi.fn<DmMemoryVectorStore["verify"]>(async (_queries, candidates) => candidates.map((candidate) => candidate.id)),
     info: vi.fn<DmMemoryVectorStore["info"]>(async () => ({ dimensions: 1024, processedUpToDatetime: lastTime, processedUpToMutation: lastMutation })),
     upsert: vi.fn<DmMemoryVectorStore["upsert"]>(async (vectors) => {
       const id = crypto.randomUUID();
@@ -135,6 +136,25 @@ describe("DM memory retrieval with durable D1 state", () => {
     expect(result.results.map((row) => row.documentId)).toEqual([own.documentId]);
     expect((await getDmMemoryReferences(db, scope, { documents: [{ documentId: other.documentId, version: 1 }] },
       [{ documentId: other.documentId!, version: 1 }])).documents[0]).toMatchObject({ status: "stale_reference" });
+  });
+
+  it("M05 verifies semantic scope after vector recall and fails closed when verification is unavailable", async () => {
+    const owner = await dm();
+    const android = await saveDmMemory(db, owner, input({ title: "Android minimum version", body: "Minimum Android version is 12." }));
+    const upload = await saveDmMemory(db, owner, input({ title: "Upload limit", body: "One attachment may be at most 20 MiB." }));
+    const backend = vectorStore(); await index(backend);
+    backend.store.verify = vi.fn<DmMemoryVectorStore["verify"]>(async (queries, candidates) => {
+      expect(queries).toEqual(["What is the minimum supported Android version?"]);
+      expect(candidates).toHaveLength(2);
+      return candidates.filter((candidate) => candidate.text.includes("Android version is 12")).map((candidate) => candidate.id);
+    });
+    const scope = await access(owner);
+    const verified = await search(scope, backend, ["What is the minimum supported Android version?"]);
+    expect(verified.results.map((row) => row.documentId)).toEqual([android.documentId]);
+    expect(verified.results.map((row) => row.documentId)).not.toContain(upload.documentId);
+    backend.store.verify = vi.fn(async () => { throw new Error("synthetic verifier outage with private text"); });
+    expect(await search(scope, backend, ["What is the minimum supported Android version?"]))
+      .toMatchObject({ status: "unavailable", results: [] });
   });
 
   it("M03/M04 invalidates old vectors and old references immediately when a document changes", async () => {

@@ -1,0 +1,587 @@
+{
+  "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+  "candidateCount": 10,
+  "dev": {
+    "hitAt5": 1.0,
+    "falsePositiveRate": 0.1
+  },
+  "final": {
+    "hitAt5": 1.0,
+    "falsePositiveRate": 0.1
+  },
+  "all": {
+    "hitAt5": 1.0,
+    "falsePositiveRate": 0.1
+  },
+  "latencyMs": {
+    "p50": 594.3990830564871,
+    "p95": 1235.5506250169128,
+    "max": 1628.9607080398127
+  },
+  "directions": {
+    "en_to_ko": {
+      "count": 10,
+      "hitAt5": 1.0
+    },
+    "ko_to_en": {
+      "count": 10,
+      "hitAt5": 1.0
+    },
+    "mixed": {
+      "count": 2,
+      "hitAt5": 1.0
+    },
+    "same": {
+      "count": 18,
+      "hitAt5": 1.0
+    }
+  },
+  "positive": [
+    {
+      "id": "r01",
+      "split": "dev",
+      "selected": [
+        "r01"
+      ],
+      "latencyMs": 1553.1249579507858,
+      "direction": "ko_to_en",
+      "hit": true
+    },
+    {
+      "id": "r02",
+      "split": "final",
+      "selected": [
+        "r02"
+      ],
+      "latencyMs": 1381.4897499978542,
+      "direction": "ko_to_en",
+      "hit": true
+    },
+    {
+      "id": "r03",
+      "split": "dev",
+      "selected": [
+        "r03"
+      ],
+      "latencyMs": 1628.9607080398127,
+      "direction": "ko_to_en",
+      "hit": true
+    },
+    {
+      "id": "r04",
+      "split": "final",
+      "selected": [
+        "r04"
+      ],
+      "latencyMs": 1235.5506250169128,
+      "direction": "ko_to_en",
+      "hit": true
+    },
+    {
+      "id": "r05",
+      "split": "dev",
+      "selected": [
+        "r05"
+      ],
+      "latencyMs": 1160.2630000561476,
+      "direction": "ko_to_en",
+      "hit": true
+    },
+    {
+      "id": "r06",
+      "split": "final",
+      "selected": [
+        "r06"
+      ],
+      "latencyMs": 880.0639170221984,
+      "direction": "ko_to_en",
+      "hit": true
+    },
+    {
+      "id": "r07",
+      "split": "dev",
+      "selected": [
+        "r07"
+      ],
+      "latencyMs": 526.0154999559745,
+      "direction": "ko_to_en",
+      "hit": true
+    },
+    {
+      "id": "r08",
+      "split": "final",
+      "selected": [
+        "r08"
+      ],
+      "latencyMs": 555.3169999038801,
+      "direction": "ko_to_en",
+      "hit": true
+    },
+    {
+      "id": "r09",
+      "split": "dev",
+      "selected": [
+        "r09"
+      ],
+      "latencyMs": 816.5579999331385,
+      "direction": "ko_to_en",
+      "hit": true
+    },
+    {
+      "id": "r10",
+      "split": "final",
+      "selected": [
+        "r10"
+      ],
+      "latencyMs": 705.4212910588831,
+      "direction": "ko_to_en",
+      "hit": true
+    },
+    {
+      "id": "r11",
+      "split": "dev",
+      "selected": [
+        "r11"
+      ],
+      "latencyMs": 605.1852080272511,
+      "direction": "en_to_ko",
+      "hit": true
+    },
+    {
+      "id": "r12",
+      "split": "final",
+      "selected": [
+        "r12"
+      ],
+      "latencyMs": 591.8069580802694,
+      "direction": "en_to_ko",
+      "hit": true
+    },
+    {
+      "id": "r13",
+      "split": "dev",
+      "selected": [
+        "r13"
+      ],
+      "latencyMs": 564.4467920064926,
+      "direction": "en_to_ko",
+      "hit": true
+    },
+    {
+      "id": "r14",
+      "split": "final",
+      "selected": [
+        "r14"
+      ],
+      "latencyMs": 396.9376250170171,
+      "direction": "en_to_ko",
+      "hit": true
+    },
+    {
+      "id": "r15",
+      "split": "dev",
+      "selected": [
+        "r15"
+      ],
+      "latencyMs": 815.1528749149293,
+      "direction": "en_to_ko",
+      "hit": true
+    },
+    {
+      "id": "r16",
+      "split": "final",
+      "selected": [
+        "r16"
+      ],
+      "latencyMs": 827.2847500629723,
+      "direction": "en_to_ko",
+      "hit": true
+    },
+    {
+      "id": "r17",
+      "split": "dev",
+      "selected": [
+        "r17"
+      ],
+      "latencyMs": 596.7860840028152,
+      "direction": "en_to_ko",
+      "hit": true
+    },
+    {
+      "id": "r18",
+      "split": "final",
+      "selected": [
+        "r18"
+      ],
+      "latencyMs": 777.0187080604956,
+      "direction": "en_to_ko",
+      "hit": true
+    },
+    {
+      "id": "r19",
+      "split": "dev",
+      "selected": [
+        "r19"
+      ],
+      "latencyMs": 593.1766669964418,
+      "direction": "en_to_ko",
+      "hit": true
+    },
+    {
+      "id": "r20",
+      "split": "final",
+      "selected": [
+        "r20"
+      ],
+      "latencyMs": 766.8138750595972,
+      "direction": "en_to_ko",
+      "hit": true
+    },
+    {
+      "id": "r21",
+      "split": "dev",
+      "selected": [
+        "r21"
+      ],
+      "latencyMs": 752.7707089902833,
+      "direction": "same",
+      "hit": true
+    },
+    {
+      "id": "r22",
+      "split": "final",
+      "selected": [
+        "r22"
+      ],
+      "latencyMs": 751.7621249426156,
+      "direction": "mixed",
+      "hit": true
+    },
+    {
+      "id": "r23",
+      "split": "dev",
+      "selected": [
+        "r23"
+      ],
+      "latencyMs": 662.3131249798462,
+      "direction": "same",
+      "hit": true
+    },
+    {
+      "id": "r24",
+      "split": "final",
+      "selected": [
+        "r24"
+      ],
+      "latencyMs": 625.2912089694291,
+      "direction": "same",
+      "hit": true
+    },
+    {
+      "id": "r25",
+      "split": "dev",
+      "selected": [
+        "r25"
+      ],
+      "latencyMs": 652.4798329919577,
+      "direction": "mixed",
+      "hit": true
+    },
+    {
+      "id": "r26",
+      "split": "final",
+      "selected": [
+        "r26"
+      ],
+      "latencyMs": 538.2193339755759,
+      "direction": "same",
+      "hit": true
+    },
+    {
+      "id": "r27",
+      "split": "dev",
+      "selected": [
+        "r27"
+      ],
+      "latencyMs": 397.40699995309114,
+      "direction": "same",
+      "hit": true
+    },
+    {
+      "id": "r28",
+      "split": "final",
+      "selected": [
+        "r28"
+      ],
+      "latencyMs": 619.8519159806892,
+      "direction": "same",
+      "hit": true
+    },
+    {
+      "id": "r29",
+      "split": "dev",
+      "selected": [
+        "r29"
+      ],
+      "latencyMs": 531.1188329942524,
+      "direction": "same",
+      "hit": true
+    },
+    {
+      "id": "r30",
+      "split": "final",
+      "selected": [
+        "r30"
+      ],
+      "latencyMs": 617.7989999996498,
+      "direction": "same",
+      "hit": true
+    },
+    {
+      "id": "r31",
+      "split": "dev",
+      "selected": [
+        "r31"
+      ],
+      "latencyMs": 678.590500028804,
+      "direction": "same",
+      "hit": true
+    },
+    {
+      "id": "r32",
+      "split": "final",
+      "selected": [
+        "r32"
+      ],
+      "latencyMs": 396.1835829541087,
+      "direction": "same",
+      "hit": true
+    },
+    {
+      "id": "r33",
+      "split": "dev",
+      "selected": [
+        "r33"
+      ],
+      "latencyMs": 990.4139160644263,
+      "direction": "same",
+      "hit": true
+    },
+    {
+      "id": "r34",
+      "split": "final",
+      "selected": [
+        "r34"
+      ],
+      "latencyMs": 1127.3444999242201,
+      "direction": "same",
+      "hit": true
+    },
+    {
+      "id": "r35",
+      "split": "dev",
+      "selected": [
+        "r35"
+      ],
+      "latencyMs": 525.1841249410063,
+      "direction": "same",
+      "hit": true
+    },
+    {
+      "id": "r36",
+      "split": "final",
+      "selected": [
+        "r36"
+      ],
+      "latencyMs": 1113.869957975112,
+      "direction": "same",
+      "hit": true
+    },
+    {
+      "id": "r37",
+      "split": "dev",
+      "selected": [
+        "r37"
+      ],
+      "latencyMs": 392.33733294531703,
+      "direction": "same",
+      "hit": true
+    },
+    {
+      "id": "r38",
+      "split": "final",
+      "selected": [
+        "r38"
+      ],
+      "latencyMs": 584.6612920286134,
+      "direction": "same",
+      "hit": true
+    },
+    {
+      "id": "r39",
+      "split": "dev",
+      "selected": [
+        "r39"
+      ],
+      "latencyMs": 354.3120000977069,
+      "direction": "same",
+      "hit": true
+    },
+    {
+      "id": "r40",
+      "split": "final",
+      "selected": [
+        "r40"
+      ],
+      "latencyMs": 502.5849579833448,
+      "direction": "same",
+      "hit": true
+    }
+  ],
+  "negative": [
+    {
+      "id": "n01",
+      "split": "dev",
+      "selected": [],
+      "latencyMs": 548.714124946855,
+      "falsePositive": false
+    },
+    {
+      "id": "n02",
+      "split": "final",
+      "selected": [],
+      "latencyMs": 560.4962090728804,
+      "falsePositive": false
+    },
+    {
+      "id": "n03",
+      "split": "dev",
+      "selected": [],
+      "latencyMs": 505.2375830709934,
+      "falsePositive": false
+    },
+    {
+      "id": "n04",
+      "split": "final",
+      "selected": [],
+      "latencyMs": 544.7085410123691,
+      "falsePositive": false
+    },
+    {
+      "id": "n05",
+      "split": "dev",
+      "selected": [],
+      "latencyMs": 599.5299579808488,
+      "falsePositive": false
+    },
+    {
+      "id": "n06",
+      "split": "final",
+      "selected": [
+        "r34"
+      ],
+      "latencyMs": 435.96387503203005,
+      "falsePositive": true
+    },
+    {
+      "id": "n07",
+      "split": "dev",
+      "selected": [],
+      "latencyMs": 601.2743340106681,
+      "falsePositive": false
+    },
+    {
+      "id": "n08",
+      "split": "final",
+      "selected": [],
+      "latencyMs": 436.188125051558,
+      "falsePositive": false
+    },
+    {
+      "id": "n09",
+      "split": "dev",
+      "selected": [],
+      "latencyMs": 556.1680829850957,
+      "falsePositive": false
+    },
+    {
+      "id": "n10",
+      "split": "final",
+      "selected": [],
+      "latencyMs": 594.3990830564871,
+      "falsePositive": false
+    },
+    {
+      "id": "n11",
+      "split": "dev",
+      "selected": [
+        "r30"
+      ],
+      "latencyMs": 593.3497910154983,
+      "falsePositive": true
+    },
+    {
+      "id": "n12",
+      "split": "final",
+      "selected": [],
+      "latencyMs": 605.4344159783795,
+      "falsePositive": false
+    },
+    {
+      "id": "n13",
+      "split": "dev",
+      "selected": [],
+      "latencyMs": 545.4399159643799,
+      "falsePositive": false
+    },
+    {
+      "id": "n14",
+      "split": "final",
+      "selected": [],
+      "latencyMs": 605.057500069961,
+      "falsePositive": false
+    },
+    {
+      "id": "n15",
+      "split": "dev",
+      "selected": [],
+      "latencyMs": 556.2684589531273,
+      "falsePositive": false
+    },
+    {
+      "id": "n16",
+      "split": "final",
+      "selected": [],
+      "latencyMs": 588.0334170069546,
+      "falsePositive": false
+    },
+    {
+      "id": "n17",
+      "split": "dev",
+      "selected": [],
+      "latencyMs": 586.9538750266656,
+      "falsePositive": false
+    },
+    {
+      "id": "n18",
+      "split": "final",
+      "selected": [],
+      "latencyMs": 581.5954159479588,
+      "falsePositive": false
+    },
+    {
+      "id": "n19",
+      "split": "dev",
+      "selected": [],
+      "latencyMs": 490.88029202539474,
+      "falsePositive": false
+    },
+    {
+      "id": "n20",
+      "split": "final",
+      "selected": [],
+      "latencyMs": 594.6953749516979,
+      "falsePositive": false
+    }
+  ]
+}
