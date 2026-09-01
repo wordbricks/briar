@@ -73,11 +73,10 @@ pub(super) fn configure_execution_worker(
         .resource_dir()
         .map_err(|error| error.to_string())?;
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
-    sync_auto_hunt_assets_and_restart_workers(
-        &resource_directory,
-        &home,
-        ExecutionWorkerRestartPolicy::WhenRuntimeIsStale,
-    )?;
+    // A stale Worker binding can make the global restart handoff fail. Keep
+    // the CLI current, then let the target project register before its service
+    // is installed below.
+    sync_auto_hunt_assets(&resource_directory, &home)?;
     let bun = bundled_bun_binary()
         .ok_or_else(|| "Briar에 포함된 Bun runtime을 찾지 못했습니다.".to_string())?;
     let cli = home.join(".local/share/briar/briar.js");
@@ -139,16 +138,7 @@ pub(super) fn current_execution_worker_device_id(
 #[tauri::command]
 #[specta::specta]
 pub(super) fn sync_execution_worker_labels(app: AppHandle) -> Result<(), String> {
-    let resource_directory = app
-        .path()
-        .resource_dir()
-        .map_err(|error| error.to_string())?;
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
-    sync_auto_hunt_assets_and_restart_workers(
-        &resource_directory,
-        &home,
-        ExecutionWorkerRestartPolicy::WhenRuntimeIsStale,
-    )?;
     let bun = bundled_bun_binary()
         .ok_or_else(|| "Briar에 포함된 Bun runtime을 찾지 못했습니다.".to_string())?;
     let cli = home.join(".local/share/briar/briar.js");
