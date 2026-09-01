@@ -225,6 +225,57 @@ describe("createKeyboardCommandBindings", () => {
     );
   });
 
+  it("keeps shortcuts inactive for an editable control inside Shadow DOM", async () => {
+    const onCapture = vi.fn();
+    await renderHarness({ onCapture });
+    const picker = document.createElement("em-emoji-picker");
+    const search = document.createElement("input");
+    picker.attachShadow({ mode: "open" }).append(search);
+    container.append(picker);
+
+    await act(async () => search.focus());
+    expect(container.querySelector('[data-testid="mode"]')?.textContent).toBe(
+      "insert",
+    );
+
+    const event = dispatchKey(search, {
+      code: "KeyX",
+      composed: true,
+      key: "x",
+    });
+
+    expect(onCapture).not.toHaveBeenCalled();
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  it("does not restore insert mode after Escape blurs a Shadow DOM input", async () => {
+    await renderHarness();
+    const picker = document.createElement("em-emoji-picker");
+    const search = document.createElement("input");
+    picker.attachShadow({ mode: "open" }).append(search);
+    container.append(picker);
+    search.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") search.blur();
+    });
+
+    await act(async () => search.focus());
+    expect(container.querySelector('[data-testid="mode"]')?.textContent).toBe(
+      "insert",
+    );
+
+    await act(async () => {
+      dispatchKey(search, {
+        code: "Escape",
+        composed: true,
+        key: "Escape",
+      });
+    });
+
+    expect(container.querySelector('[data-testid="mode"]')?.textContent).toBe(
+      "normal",
+    );
+  });
+
   it("cancels a pending sequence on pointerdown and on its injected deadline", async () => {
     vi.useFakeTimers();
     await renderHarness();
