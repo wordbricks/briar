@@ -53691,6 +53691,964 @@ pub const __RUN_EVIDENCE_IMAGE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = 
 };
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
+pub enum DmMemoryLearningJobKind {
+    DM_MEMORY_LEARNING_JOB_KIND_UNSPECIFIED = 0i32,
+    DM_MEMORY_LEARNING_JOB_KIND_EXTRACT = 1i32,
+    DM_MEMORY_LEARNING_JOB_KIND_EXPLICIT_REQUEST = 2i32,
+    DM_MEMORY_LEARNING_JOB_KIND_CONSOLIDATE = 3i32,
+}
+impl DmMemoryLearningJobKind {
+    ///Idiomatic alias for [`Self::DM_MEMORY_LEARNING_JOB_KIND_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Unspecified: Self = Self::DM_MEMORY_LEARNING_JOB_KIND_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::DM_MEMORY_LEARNING_JOB_KIND_EXTRACT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Extract: Self = Self::DM_MEMORY_LEARNING_JOB_KIND_EXTRACT;
+    ///Idiomatic alias for [`Self::DM_MEMORY_LEARNING_JOB_KIND_EXPLICIT_REQUEST`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ExplicitRequest: Self = Self::DM_MEMORY_LEARNING_JOB_KIND_EXPLICIT_REQUEST;
+    ///Idiomatic alias for [`Self::DM_MEMORY_LEARNING_JOB_KIND_CONSOLIDATE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Consolidate: Self = Self::DM_MEMORY_LEARNING_JOB_KIND_CONSOLIDATE;
+}
+impl ::core::default::Default for DmMemoryLearningJobKind {
+    fn default() -> Self {
+        Self::DM_MEMORY_LEARNING_JOB_KIND_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for DmMemoryLearningJobKind {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for DmMemoryLearningJobKind {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = DmMemoryLearningJobKind;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ",
+                        stringify!(DmMemoryLearningJobKind)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<DmMemoryLearningJobKind, E> {
+                <DmMemoryLearningJobKind as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<DmMemoryLearningJobKind, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <DmMemoryLearningJobKind as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<DmMemoryLearningJobKind, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <DmMemoryLearningJobKind as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<DmMemoryLearningJobKind, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for DmMemoryLearningJobKind {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for DmMemoryLearningJobKind {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_JOB_KIND_UNSPECIFIED,
+                )
+            }
+            1i32 => {
+                ::core::option::Option::Some(Self::DM_MEMORY_LEARNING_JOB_KIND_EXTRACT)
+            }
+            2i32 => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_JOB_KIND_EXPLICIT_REQUEST,
+                )
+            }
+            3i32 => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_JOB_KIND_CONSOLIDATE,
+                )
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::DM_MEMORY_LEARNING_JOB_KIND_UNSPECIFIED => {
+                "DM_MEMORY_LEARNING_JOB_KIND_UNSPECIFIED"
+            }
+            Self::DM_MEMORY_LEARNING_JOB_KIND_EXTRACT => {
+                "DM_MEMORY_LEARNING_JOB_KIND_EXTRACT"
+            }
+            Self::DM_MEMORY_LEARNING_JOB_KIND_EXPLICIT_REQUEST => {
+                "DM_MEMORY_LEARNING_JOB_KIND_EXPLICIT_REQUEST"
+            }
+            Self::DM_MEMORY_LEARNING_JOB_KIND_CONSOLIDATE => {
+                "DM_MEMORY_LEARNING_JOB_KIND_CONSOLIDATE"
+            }
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "DM_MEMORY_LEARNING_JOB_KIND_UNSPECIFIED" => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_JOB_KIND_UNSPECIFIED,
+                )
+            }
+            "DM_MEMORY_LEARNING_JOB_KIND_EXTRACT" => {
+                ::core::option::Option::Some(Self::DM_MEMORY_LEARNING_JOB_KIND_EXTRACT)
+            }
+            "DM_MEMORY_LEARNING_JOB_KIND_EXPLICIT_REQUEST" => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_JOB_KIND_EXPLICIT_REQUEST,
+                )
+            }
+            "DM_MEMORY_LEARNING_JOB_KIND_CONSOLIDATE" => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_JOB_KIND_CONSOLIDATE,
+                )
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::DM_MEMORY_LEARNING_JOB_KIND_UNSPECIFIED,
+            Self::DM_MEMORY_LEARNING_JOB_KIND_EXTRACT,
+            Self::DM_MEMORY_LEARNING_JOB_KIND_EXPLICIT_REQUEST,
+            Self::DM_MEMORY_LEARNING_JOB_KIND_CONSOLIDATE,
+        ]
+    }
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum DmMemoryLearningJobStatus {
+    DM_MEMORY_LEARNING_JOB_STATUS_UNSPECIFIED = 0i32,
+    DM_MEMORY_LEARNING_JOB_STATUS_PENDING = 1i32,
+    DM_MEMORY_LEARNING_JOB_STATUS_RUNNING = 2i32,
+    DM_MEMORY_LEARNING_JOB_STATUS_RETRY_WAIT = 3i32,
+    DM_MEMORY_LEARNING_JOB_STATUS_FAILED = 4i32,
+    DM_MEMORY_LEARNING_JOB_STATUS_CANCELLED = 5i32,
+    DM_MEMORY_LEARNING_JOB_STATUS_SUCCEEDED = 6i32,
+    DM_MEMORY_LEARNING_JOB_STATUS_NO_CHANGE = 7i32,
+}
+impl DmMemoryLearningJobStatus {
+    ///Idiomatic alias for [`Self::DM_MEMORY_LEARNING_JOB_STATUS_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Unspecified: Self = Self::DM_MEMORY_LEARNING_JOB_STATUS_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::DM_MEMORY_LEARNING_JOB_STATUS_PENDING`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Pending: Self = Self::DM_MEMORY_LEARNING_JOB_STATUS_PENDING;
+    ///Idiomatic alias for [`Self::DM_MEMORY_LEARNING_JOB_STATUS_RUNNING`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Running: Self = Self::DM_MEMORY_LEARNING_JOB_STATUS_RUNNING;
+    ///Idiomatic alias for [`Self::DM_MEMORY_LEARNING_JOB_STATUS_RETRY_WAIT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const RetryWait: Self = Self::DM_MEMORY_LEARNING_JOB_STATUS_RETRY_WAIT;
+    ///Idiomatic alias for [`Self::DM_MEMORY_LEARNING_JOB_STATUS_FAILED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Failed: Self = Self::DM_MEMORY_LEARNING_JOB_STATUS_FAILED;
+    ///Idiomatic alias for [`Self::DM_MEMORY_LEARNING_JOB_STATUS_CANCELLED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Cancelled: Self = Self::DM_MEMORY_LEARNING_JOB_STATUS_CANCELLED;
+    ///Idiomatic alias for [`Self::DM_MEMORY_LEARNING_JOB_STATUS_SUCCEEDED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Succeeded: Self = Self::DM_MEMORY_LEARNING_JOB_STATUS_SUCCEEDED;
+    ///Idiomatic alias for [`Self::DM_MEMORY_LEARNING_JOB_STATUS_NO_CHANGE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const NoChange: Self = Self::DM_MEMORY_LEARNING_JOB_STATUS_NO_CHANGE;
+}
+impl ::core::default::Default for DmMemoryLearningJobStatus {
+    fn default() -> Self {
+        Self::DM_MEMORY_LEARNING_JOB_STATUS_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for DmMemoryLearningJobStatus {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for DmMemoryLearningJobStatus {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = DmMemoryLearningJobStatus;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ",
+                        stringify!(DmMemoryLearningJobStatus)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<DmMemoryLearningJobStatus, E> {
+                <DmMemoryLearningJobStatus as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<DmMemoryLearningJobStatus, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <DmMemoryLearningJobStatus as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<DmMemoryLearningJobStatus, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <DmMemoryLearningJobStatus as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<DmMemoryLearningJobStatus, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for DmMemoryLearningJobStatus {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for DmMemoryLearningJobStatus {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_JOB_STATUS_UNSPECIFIED,
+                )
+            }
+            1i32 => {
+                ::core::option::Option::Some(Self::DM_MEMORY_LEARNING_JOB_STATUS_PENDING)
+            }
+            2i32 => {
+                ::core::option::Option::Some(Self::DM_MEMORY_LEARNING_JOB_STATUS_RUNNING)
+            }
+            3i32 => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_JOB_STATUS_RETRY_WAIT,
+                )
+            }
+            4i32 => {
+                ::core::option::Option::Some(Self::DM_MEMORY_LEARNING_JOB_STATUS_FAILED)
+            }
+            5i32 => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_JOB_STATUS_CANCELLED,
+                )
+            }
+            6i32 => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_JOB_STATUS_SUCCEEDED,
+                )
+            }
+            7i32 => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_JOB_STATUS_NO_CHANGE,
+                )
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::DM_MEMORY_LEARNING_JOB_STATUS_UNSPECIFIED => {
+                "DM_MEMORY_LEARNING_JOB_STATUS_UNSPECIFIED"
+            }
+            Self::DM_MEMORY_LEARNING_JOB_STATUS_PENDING => {
+                "DM_MEMORY_LEARNING_JOB_STATUS_PENDING"
+            }
+            Self::DM_MEMORY_LEARNING_JOB_STATUS_RUNNING => {
+                "DM_MEMORY_LEARNING_JOB_STATUS_RUNNING"
+            }
+            Self::DM_MEMORY_LEARNING_JOB_STATUS_RETRY_WAIT => {
+                "DM_MEMORY_LEARNING_JOB_STATUS_RETRY_WAIT"
+            }
+            Self::DM_MEMORY_LEARNING_JOB_STATUS_FAILED => {
+                "DM_MEMORY_LEARNING_JOB_STATUS_FAILED"
+            }
+            Self::DM_MEMORY_LEARNING_JOB_STATUS_CANCELLED => {
+                "DM_MEMORY_LEARNING_JOB_STATUS_CANCELLED"
+            }
+            Self::DM_MEMORY_LEARNING_JOB_STATUS_SUCCEEDED => {
+                "DM_MEMORY_LEARNING_JOB_STATUS_SUCCEEDED"
+            }
+            Self::DM_MEMORY_LEARNING_JOB_STATUS_NO_CHANGE => {
+                "DM_MEMORY_LEARNING_JOB_STATUS_NO_CHANGE"
+            }
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "DM_MEMORY_LEARNING_JOB_STATUS_UNSPECIFIED" => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_JOB_STATUS_UNSPECIFIED,
+                )
+            }
+            "DM_MEMORY_LEARNING_JOB_STATUS_PENDING" => {
+                ::core::option::Option::Some(Self::DM_MEMORY_LEARNING_JOB_STATUS_PENDING)
+            }
+            "DM_MEMORY_LEARNING_JOB_STATUS_RUNNING" => {
+                ::core::option::Option::Some(Self::DM_MEMORY_LEARNING_JOB_STATUS_RUNNING)
+            }
+            "DM_MEMORY_LEARNING_JOB_STATUS_RETRY_WAIT" => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_JOB_STATUS_RETRY_WAIT,
+                )
+            }
+            "DM_MEMORY_LEARNING_JOB_STATUS_FAILED" => {
+                ::core::option::Option::Some(Self::DM_MEMORY_LEARNING_JOB_STATUS_FAILED)
+            }
+            "DM_MEMORY_LEARNING_JOB_STATUS_CANCELLED" => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_JOB_STATUS_CANCELLED,
+                )
+            }
+            "DM_MEMORY_LEARNING_JOB_STATUS_SUCCEEDED" => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_JOB_STATUS_SUCCEEDED,
+                )
+            }
+            "DM_MEMORY_LEARNING_JOB_STATUS_NO_CHANGE" => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_JOB_STATUS_NO_CHANGE,
+                )
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::DM_MEMORY_LEARNING_JOB_STATUS_UNSPECIFIED,
+            Self::DM_MEMORY_LEARNING_JOB_STATUS_PENDING,
+            Self::DM_MEMORY_LEARNING_JOB_STATUS_RUNNING,
+            Self::DM_MEMORY_LEARNING_JOB_STATUS_RETRY_WAIT,
+            Self::DM_MEMORY_LEARNING_JOB_STATUS_FAILED,
+            Self::DM_MEMORY_LEARNING_JOB_STATUS_CANCELLED,
+            Self::DM_MEMORY_LEARNING_JOB_STATUS_SUCCEEDED,
+            Self::DM_MEMORY_LEARNING_JOB_STATUS_NO_CHANGE,
+        ]
+    }
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum DmMemoryLearningJobStage {
+    DM_MEMORY_LEARNING_JOB_STAGE_UNSPECIFIED = 0i32,
+    DM_MEMORY_LEARNING_JOB_STAGE_PROPOSING = 1i32,
+    DM_MEMORY_LEARNING_JOB_STAGE_VERIFYING = 2i32,
+    DM_MEMORY_LEARNING_JOB_STAGE_COMMITTING = 3i32,
+}
+impl DmMemoryLearningJobStage {
+    ///Idiomatic alias for [`Self::DM_MEMORY_LEARNING_JOB_STAGE_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Unspecified: Self = Self::DM_MEMORY_LEARNING_JOB_STAGE_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::DM_MEMORY_LEARNING_JOB_STAGE_PROPOSING`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Proposing: Self = Self::DM_MEMORY_LEARNING_JOB_STAGE_PROPOSING;
+    ///Idiomatic alias for [`Self::DM_MEMORY_LEARNING_JOB_STAGE_VERIFYING`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Verifying: Self = Self::DM_MEMORY_LEARNING_JOB_STAGE_VERIFYING;
+    ///Idiomatic alias for [`Self::DM_MEMORY_LEARNING_JOB_STAGE_COMMITTING`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Committing: Self = Self::DM_MEMORY_LEARNING_JOB_STAGE_COMMITTING;
+}
+impl ::core::default::Default for DmMemoryLearningJobStage {
+    fn default() -> Self {
+        Self::DM_MEMORY_LEARNING_JOB_STAGE_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for DmMemoryLearningJobStage {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for DmMemoryLearningJobStage {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = DmMemoryLearningJobStage;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ",
+                        stringify!(DmMemoryLearningJobStage)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<DmMemoryLearningJobStage, E> {
+                <DmMemoryLearningJobStage as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<DmMemoryLearningJobStage, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <DmMemoryLearningJobStage as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<DmMemoryLearningJobStage, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <DmMemoryLearningJobStage as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<DmMemoryLearningJobStage, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for DmMemoryLearningJobStage {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for DmMemoryLearningJobStage {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_JOB_STAGE_UNSPECIFIED,
+                )
+            }
+            1i32 => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_JOB_STAGE_PROPOSING,
+                )
+            }
+            2i32 => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_JOB_STAGE_VERIFYING,
+                )
+            }
+            3i32 => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_JOB_STAGE_COMMITTING,
+                )
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::DM_MEMORY_LEARNING_JOB_STAGE_UNSPECIFIED => {
+                "DM_MEMORY_LEARNING_JOB_STAGE_UNSPECIFIED"
+            }
+            Self::DM_MEMORY_LEARNING_JOB_STAGE_PROPOSING => {
+                "DM_MEMORY_LEARNING_JOB_STAGE_PROPOSING"
+            }
+            Self::DM_MEMORY_LEARNING_JOB_STAGE_VERIFYING => {
+                "DM_MEMORY_LEARNING_JOB_STAGE_VERIFYING"
+            }
+            Self::DM_MEMORY_LEARNING_JOB_STAGE_COMMITTING => {
+                "DM_MEMORY_LEARNING_JOB_STAGE_COMMITTING"
+            }
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "DM_MEMORY_LEARNING_JOB_STAGE_UNSPECIFIED" => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_JOB_STAGE_UNSPECIFIED,
+                )
+            }
+            "DM_MEMORY_LEARNING_JOB_STAGE_PROPOSING" => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_JOB_STAGE_PROPOSING,
+                )
+            }
+            "DM_MEMORY_LEARNING_JOB_STAGE_VERIFYING" => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_JOB_STAGE_VERIFYING,
+                )
+            }
+            "DM_MEMORY_LEARNING_JOB_STAGE_COMMITTING" => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_JOB_STAGE_COMMITTING,
+                )
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::DM_MEMORY_LEARNING_JOB_STAGE_UNSPECIFIED,
+            Self::DM_MEMORY_LEARNING_JOB_STAGE_PROPOSING,
+            Self::DM_MEMORY_LEARNING_JOB_STAGE_VERIFYING,
+            Self::DM_MEMORY_LEARNING_JOB_STAGE_COMMITTING,
+        ]
+    }
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum DmMemoryLearningFailureCode {
+    DM_MEMORY_LEARNING_FAILURE_CODE_UNSPECIFIED = 0i32,
+    DM_MEMORY_LEARNING_FAILURE_CODE_INVALID_PROPOSAL = 1i32,
+    DM_MEMORY_LEARNING_FAILURE_CODE_VERIFICATION_REJECTED = 2i32,
+    DM_MEMORY_LEARNING_FAILURE_CODE_STALE = 3i32,
+    DM_MEMORY_LEARNING_FAILURE_CODE_SCOPE_REVOKED = 4i32,
+    DM_MEMORY_LEARNING_FAILURE_CODE_BUDGET_EXHAUSTED = 5i32,
+    DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_UNAVAILABLE = 6i32,
+    DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_TIMEOUT = 7i32,
+    DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_CREDENTIALS = 8i32,
+    DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_CONFIGURATION = 9i32,
+    DM_MEMORY_LEARNING_FAILURE_CODE_INPUT_CAPACITY = 10i32,
+}
+impl DmMemoryLearningFailureCode {
+    ///Idiomatic alias for [`Self::DM_MEMORY_LEARNING_FAILURE_CODE_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Unspecified: Self = Self::DM_MEMORY_LEARNING_FAILURE_CODE_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::DM_MEMORY_LEARNING_FAILURE_CODE_INVALID_PROPOSAL`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const InvalidProposal: Self = Self::DM_MEMORY_LEARNING_FAILURE_CODE_INVALID_PROPOSAL;
+    ///Idiomatic alias for [`Self::DM_MEMORY_LEARNING_FAILURE_CODE_VERIFICATION_REJECTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const VerificationRejected: Self = Self::DM_MEMORY_LEARNING_FAILURE_CODE_VERIFICATION_REJECTED;
+    ///Idiomatic alias for [`Self::DM_MEMORY_LEARNING_FAILURE_CODE_STALE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Stale: Self = Self::DM_MEMORY_LEARNING_FAILURE_CODE_STALE;
+    ///Idiomatic alias for [`Self::DM_MEMORY_LEARNING_FAILURE_CODE_SCOPE_REVOKED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ScopeRevoked: Self = Self::DM_MEMORY_LEARNING_FAILURE_CODE_SCOPE_REVOKED;
+    ///Idiomatic alias for [`Self::DM_MEMORY_LEARNING_FAILURE_CODE_BUDGET_EXHAUSTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const BudgetExhausted: Self = Self::DM_MEMORY_LEARNING_FAILURE_CODE_BUDGET_EXHAUSTED;
+    ///Idiomatic alias for [`Self::DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_UNAVAILABLE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ModelUnavailable: Self = Self::DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_UNAVAILABLE;
+    ///Idiomatic alias for [`Self::DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_TIMEOUT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ModelTimeout: Self = Self::DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_TIMEOUT;
+    ///Idiomatic alias for [`Self::DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_CREDENTIALS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ModelCredentials: Self = Self::DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_CREDENTIALS;
+    ///Idiomatic alias for [`Self::DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_CONFIGURATION`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ModelConfiguration: Self = Self::DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_CONFIGURATION;
+    ///Idiomatic alias for [`Self::DM_MEMORY_LEARNING_FAILURE_CODE_INPUT_CAPACITY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const InputCapacity: Self = Self::DM_MEMORY_LEARNING_FAILURE_CODE_INPUT_CAPACITY;
+}
+impl ::core::default::Default for DmMemoryLearningFailureCode {
+    fn default() -> Self {
+        Self::DM_MEMORY_LEARNING_FAILURE_CODE_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for DmMemoryLearningFailureCode {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for DmMemoryLearningFailureCode {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = DmMemoryLearningFailureCode;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ",
+                        stringify!(DmMemoryLearningFailureCode)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<DmMemoryLearningFailureCode, E> {
+                <DmMemoryLearningFailureCode as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<DmMemoryLearningFailureCode, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <DmMemoryLearningFailureCode as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<DmMemoryLearningFailureCode, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <DmMemoryLearningFailureCode as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<DmMemoryLearningFailureCode, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for DmMemoryLearningFailureCode {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for DmMemoryLearningFailureCode {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_FAILURE_CODE_UNSPECIFIED,
+                )
+            }
+            1i32 => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_FAILURE_CODE_INVALID_PROPOSAL,
+                )
+            }
+            2i32 => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_FAILURE_CODE_VERIFICATION_REJECTED,
+                )
+            }
+            3i32 => {
+                ::core::option::Option::Some(Self::DM_MEMORY_LEARNING_FAILURE_CODE_STALE)
+            }
+            4i32 => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_FAILURE_CODE_SCOPE_REVOKED,
+                )
+            }
+            5i32 => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_FAILURE_CODE_BUDGET_EXHAUSTED,
+                )
+            }
+            6i32 => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_UNAVAILABLE,
+                )
+            }
+            7i32 => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_TIMEOUT,
+                )
+            }
+            8i32 => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_CREDENTIALS,
+                )
+            }
+            9i32 => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_CONFIGURATION,
+                )
+            }
+            10i32 => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_FAILURE_CODE_INPUT_CAPACITY,
+                )
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::DM_MEMORY_LEARNING_FAILURE_CODE_UNSPECIFIED => {
+                "DM_MEMORY_LEARNING_FAILURE_CODE_UNSPECIFIED"
+            }
+            Self::DM_MEMORY_LEARNING_FAILURE_CODE_INVALID_PROPOSAL => {
+                "DM_MEMORY_LEARNING_FAILURE_CODE_INVALID_PROPOSAL"
+            }
+            Self::DM_MEMORY_LEARNING_FAILURE_CODE_VERIFICATION_REJECTED => {
+                "DM_MEMORY_LEARNING_FAILURE_CODE_VERIFICATION_REJECTED"
+            }
+            Self::DM_MEMORY_LEARNING_FAILURE_CODE_STALE => {
+                "DM_MEMORY_LEARNING_FAILURE_CODE_STALE"
+            }
+            Self::DM_MEMORY_LEARNING_FAILURE_CODE_SCOPE_REVOKED => {
+                "DM_MEMORY_LEARNING_FAILURE_CODE_SCOPE_REVOKED"
+            }
+            Self::DM_MEMORY_LEARNING_FAILURE_CODE_BUDGET_EXHAUSTED => {
+                "DM_MEMORY_LEARNING_FAILURE_CODE_BUDGET_EXHAUSTED"
+            }
+            Self::DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_UNAVAILABLE => {
+                "DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_UNAVAILABLE"
+            }
+            Self::DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_TIMEOUT => {
+                "DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_TIMEOUT"
+            }
+            Self::DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_CREDENTIALS => {
+                "DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_CREDENTIALS"
+            }
+            Self::DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_CONFIGURATION => {
+                "DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_CONFIGURATION"
+            }
+            Self::DM_MEMORY_LEARNING_FAILURE_CODE_INPUT_CAPACITY => {
+                "DM_MEMORY_LEARNING_FAILURE_CODE_INPUT_CAPACITY"
+            }
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "DM_MEMORY_LEARNING_FAILURE_CODE_UNSPECIFIED" => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_FAILURE_CODE_UNSPECIFIED,
+                )
+            }
+            "DM_MEMORY_LEARNING_FAILURE_CODE_INVALID_PROPOSAL" => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_FAILURE_CODE_INVALID_PROPOSAL,
+                )
+            }
+            "DM_MEMORY_LEARNING_FAILURE_CODE_VERIFICATION_REJECTED" => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_FAILURE_CODE_VERIFICATION_REJECTED,
+                )
+            }
+            "DM_MEMORY_LEARNING_FAILURE_CODE_STALE" => {
+                ::core::option::Option::Some(Self::DM_MEMORY_LEARNING_FAILURE_CODE_STALE)
+            }
+            "DM_MEMORY_LEARNING_FAILURE_CODE_SCOPE_REVOKED" => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_FAILURE_CODE_SCOPE_REVOKED,
+                )
+            }
+            "DM_MEMORY_LEARNING_FAILURE_CODE_BUDGET_EXHAUSTED" => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_FAILURE_CODE_BUDGET_EXHAUSTED,
+                )
+            }
+            "DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_UNAVAILABLE" => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_UNAVAILABLE,
+                )
+            }
+            "DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_TIMEOUT" => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_TIMEOUT,
+                )
+            }
+            "DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_CREDENTIALS" => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_CREDENTIALS,
+                )
+            }
+            "DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_CONFIGURATION" => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_CONFIGURATION,
+                )
+            }
+            "DM_MEMORY_LEARNING_FAILURE_CODE_INPUT_CAPACITY" => {
+                ::core::option::Option::Some(
+                    Self::DM_MEMORY_LEARNING_FAILURE_CODE_INPUT_CAPACITY,
+                )
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::DM_MEMORY_LEARNING_FAILURE_CODE_UNSPECIFIED,
+            Self::DM_MEMORY_LEARNING_FAILURE_CODE_INVALID_PROPOSAL,
+            Self::DM_MEMORY_LEARNING_FAILURE_CODE_VERIFICATION_REJECTED,
+            Self::DM_MEMORY_LEARNING_FAILURE_CODE_STALE,
+            Self::DM_MEMORY_LEARNING_FAILURE_CODE_SCOPE_REVOKED,
+            Self::DM_MEMORY_LEARNING_FAILURE_CODE_BUDGET_EXHAUSTED,
+            Self::DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_UNAVAILABLE,
+            Self::DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_TIMEOUT,
+            Self::DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_CREDENTIALS,
+            Self::DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_CONFIGURATION,
+            Self::DM_MEMORY_LEARNING_FAILURE_CODE_INPUT_CAPACITY,
+        ]
+    }
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
 pub enum DmMemoryClass {
     DM_MEMORY_CLASS_UNSPECIFIED = 0i32,
     DM_MEMORY_CLASS_PROFILE = 1i32,
@@ -55444,6 +56402,15 @@ pub struct ListDmMemoriesResponse {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub next_cursor: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 7: `learning`
+    #[serde(
+        rename = "learning",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub learning: ::buffa::MessageField<
+        DmMemoryLearningStatus,
+        ::buffa::Inline<DmMemoryLearningStatus>,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -55457,6 +56424,7 @@ impl ::core::fmt::Debug for ListDmMemoriesResponse {
             .field("selected_space_id", &self.selected_space_id)
             .field("documents", &self.documents)
             .field("next_cursor", &self.next_cursor)
+            .field("learning", &self.learning)
             .finish()
     }
 }
@@ -55542,6 +56510,14 @@ impl ::buffa::Message for ListDmMemoriesResponse {
         if let Some(ref v) = self.next_cursor {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
+        if self.learning.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.learning.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -55584,6 +56560,14 @@ impl ::buffa::Message for ListDmMemoriesResponse {
         }
         if let Some(ref v) = self.next_cursor {
             ::buffa::types::put_string_field(6u32, v, buf);
+        }
+        if self.learning.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                7u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.learning.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -55664,6 +56648,17 @@ impl ::buffa::Message for ListDmMemoriesResponse {
                     buf,
                 )?;
             }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.learning.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -55678,6 +56673,7 @@ impl ::buffa::Message for ListDmMemoriesResponse {
         self.selected_space_id = ::core::option::Option::None;
         self.documents.clear();
         self.next_cursor = ::core::option::Option::None;
+        self.learning = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -55708,6 +56704,1516 @@ pub const __LIST_DM_MEMORIES_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyE
     type_url: "type.googleapis.com/briar.app.v1.ListDmMemoriesResponse",
     to_json: ::buffa::type_registry::any_to_json::<ListDmMemoriesResponse>,
     from_json: ::buffa::type_registry::any_from_json::<ListDmMemoriesResponse>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct DmMemoryLearningStatus {
+    /// Field 1: `configuration`
+    #[serde(
+        rename = "configuration",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub configuration: ::buffa::MessageField<
+        DmMemoryLearningConfiguration,
+        ::buffa::Inline<DmMemoryLearningConfiguration>,
+    >,
+    /// Field 2: `calls_today`
+    #[serde(
+        rename = "callsToday",
+        alias = "calls_today",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub calls_today: u32,
+    /// Field 3: `reserved_micro_usd_today`
+    #[serde(
+        rename = "reservedMicroUsdToday",
+        alias = "reserved_micro_usd_today",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub reserved_micro_usd_today: u64,
+    /// Field 4: `pending_jobs`
+    #[serde(
+        rename = "pendingJobs",
+        alias = "pending_jobs",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub pending_jobs: u32,
+    /// Field 5: `failed_jobs`
+    #[serde(
+        rename = "failedJobs",
+        alias = "failed_jobs",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub failed_jobs: u32,
+    /// Field 6: `last_job`
+    #[serde(
+        rename = "lastJob",
+        alias = "last_job",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub last_job: ::buffa::MessageField<
+        DmMemoryLearningJob,
+        ::buffa::Inline<DmMemoryLearningJob>,
+    >,
+    /// Field 7: `retryable_job`
+    #[serde(
+        rename = "retryableJob",
+        alias = "retryable_job",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub retryable_job: ::buffa::MessageField<
+        DmMemoryLearningRetryableJob,
+        ::buffa::Inline<DmMemoryLearningRetryableJob>,
+    >,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for DmMemoryLearningStatus {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("DmMemoryLearningStatus")
+            .field("configuration", &self.configuration)
+            .field("calls_today", &self.calls_today)
+            .field("reserved_micro_usd_today", &self.reserved_micro_usd_today)
+            .field("pending_jobs", &self.pending_jobs)
+            .field("failed_jobs", &self.failed_jobs)
+            .field("last_job", &self.last_job)
+            .field("retryable_job", &self.retryable_job)
+            .finish()
+    }
+}
+impl DmMemoryLearningStatus {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DmMemoryLearningStatus";
+}
+::buffa::impl_default_instance!(DmMemoryLearningStatus);
+impl ::buffa::MessageName for DmMemoryLearningStatus {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "DmMemoryLearningStatus";
+    const FULL_NAME: &'static str = "briar.app.v1.DmMemoryLearningStatus";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DmMemoryLearningStatus";
+}
+impl ::buffa::Message for DmMemoryLearningStatus {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.configuration.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.configuration.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if self.calls_today != 0u32 {
+            size += 1u64 + ::buffa::types::uint32_encoded_len(self.calls_today) as u64;
+        }
+        if self.reserved_micro_usd_today != 0u64 {
+            size
+                += 1u64
+                    + ::buffa::types::uint64_encoded_len(self.reserved_micro_usd_today)
+                        as u64;
+        }
+        if self.pending_jobs != 0u32 {
+            size += 1u64 + ::buffa::types::uint32_encoded_len(self.pending_jobs) as u64;
+        }
+        if self.failed_jobs != 0u32 {
+            size += 1u64 + ::buffa::types::uint32_encoded_len(self.failed_jobs) as u64;
+        }
+        if self.last_job.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.last_job.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if self.retryable_job.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.retryable_job.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.configuration.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.configuration.write_to(__cache, buf);
+        }
+        if self.calls_today != 0u32 {
+            ::buffa::types::put_uint32_field(2u32, self.calls_today, buf);
+        }
+        if self.reserved_micro_usd_today != 0u64 {
+            ::buffa::types::put_uint64_field(3u32, self.reserved_micro_usd_today, buf);
+        }
+        if self.pending_jobs != 0u32 {
+            ::buffa::types::put_uint32_field(4u32, self.pending_jobs, buf);
+        }
+        if self.failed_jobs != 0u32 {
+            ::buffa::types::put_uint32_field(5u32, self.failed_jobs, buf);
+        }
+        if self.last_job.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                6u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.last_job.write_to(__cache, buf);
+        }
+        if self.retryable_job.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                7u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.retryable_job.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.configuration.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.calls_today = ::buffa::types::decode_uint32(buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.reserved_micro_usd_today = ::buffa::types::decode_uint64(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.pending_jobs = ::buffa::types::decode_uint32(buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.failed_jobs = ::buffa::types::decode_uint32(buf)?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.last_job.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.retryable_job.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.configuration = ::buffa::MessageField::none();
+        self.calls_today = 0u32;
+        self.reserved_micro_usd_today = 0u64;
+        self.pending_jobs = 0u32;
+        self.failed_jobs = 0u32;
+        self.last_job = ::buffa::MessageField::none();
+        self.retryable_job = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for DmMemoryLearningStatus {
+    const PROTO_FQN: &'static str = "briar.app.v1.DmMemoryLearningStatus";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for DmMemoryLearningStatus {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __DM_MEMORY_LEARNING_STATUS_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.DmMemoryLearningStatus",
+    to_json: ::buffa::type_registry::any_to_json::<DmMemoryLearningStatus>,
+    from_json: ::buffa::type_registry::any_from_json::<DmMemoryLearningStatus>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct DmMemoryLearningConfiguration {
+    /// Field 1: `proposer`
+    #[serde(
+        rename = "proposer",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub proposer: ::buffa::MessageField<
+        DmMemoryLearningModel,
+        ::buffa::Inline<DmMemoryLearningModel>,
+    >,
+    /// Field 2: `verifier`
+    #[serde(
+        rename = "verifier",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub verifier: ::buffa::MessageField<
+        DmMemoryLearningModel,
+        ::buffa::Inline<DmMemoryLearningModel>,
+    >,
+    /// Field 3: `space_daily_calls`
+    #[serde(
+        rename = "spaceDailyCalls",
+        alias = "space_daily_calls",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub space_daily_calls: u32,
+    /// Field 4: `space_daily_micro_usd`
+    #[serde(
+        rename = "spaceDailyMicroUsd",
+        alias = "space_daily_micro_usd",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub space_daily_micro_usd: u64,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for DmMemoryLearningConfiguration {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("DmMemoryLearningConfiguration")
+            .field("proposer", &self.proposer)
+            .field("verifier", &self.verifier)
+            .field("space_daily_calls", &self.space_daily_calls)
+            .field("space_daily_micro_usd", &self.space_daily_micro_usd)
+            .finish()
+    }
+}
+impl DmMemoryLearningConfiguration {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DmMemoryLearningConfiguration";
+}
+::buffa::impl_default_instance!(DmMemoryLearningConfiguration);
+impl ::buffa::MessageName for DmMemoryLearningConfiguration {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "DmMemoryLearningConfiguration";
+    const FULL_NAME: &'static str = "briar.app.v1.DmMemoryLearningConfiguration";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DmMemoryLearningConfiguration";
+}
+impl ::buffa::Message for DmMemoryLearningConfiguration {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.proposer.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.proposer.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if self.verifier.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.verifier.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if self.space_daily_calls != 0u32 {
+            size
+                += 1u64
+                    + ::buffa::types::uint32_encoded_len(self.space_daily_calls) as u64;
+        }
+        if self.space_daily_micro_usd != 0u64 {
+            size
+                += 1u64
+                    + ::buffa::types::uint64_encoded_len(self.space_daily_micro_usd)
+                        as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.proposer.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.proposer.write_to(__cache, buf);
+        }
+        if self.verifier.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                2u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.verifier.write_to(__cache, buf);
+        }
+        if self.space_daily_calls != 0u32 {
+            ::buffa::types::put_uint32_field(3u32, self.space_daily_calls, buf);
+        }
+        if self.space_daily_micro_usd != 0u64 {
+            ::buffa::types::put_uint64_field(4u32, self.space_daily_micro_usd, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.proposer.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.verifier.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.space_daily_calls = ::buffa::types::decode_uint32(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.space_daily_micro_usd = ::buffa::types::decode_uint64(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.proposer = ::buffa::MessageField::none();
+        self.verifier = ::buffa::MessageField::none();
+        self.space_daily_calls = 0u32;
+        self.space_daily_micro_usd = 0u64;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for DmMemoryLearningConfiguration {
+    const PROTO_FQN: &'static str = "briar.app.v1.DmMemoryLearningConfiguration";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for DmMemoryLearningConfiguration {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __DM_MEMORY_LEARNING_CONFIGURATION_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.DmMemoryLearningConfiguration",
+    to_json: ::buffa::type_registry::any_to_json::<DmMemoryLearningConfiguration>,
+    from_json: ::buffa::type_registry::any_from_json::<DmMemoryLearningConfiguration>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct DmMemoryLearningModel {
+    /// Field 1: `model`
+    #[serde(
+        rename = "model",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub model: ::buffa::alloc::string::String,
+    /// Field 2: `provider`
+    #[serde(
+        rename = "provider",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub provider: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for DmMemoryLearningModel {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("DmMemoryLearningModel")
+            .field("model", &self.model)
+            .field("provider", &self.provider)
+            .finish()
+    }
+}
+impl DmMemoryLearningModel {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DmMemoryLearningModel";
+}
+::buffa::impl_default_instance!(DmMemoryLearningModel);
+impl ::buffa::MessageName for DmMemoryLearningModel {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "DmMemoryLearningModel";
+    const FULL_NAME: &'static str = "briar.app.v1.DmMemoryLearningModel";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DmMemoryLearningModel";
+}
+impl ::buffa::Message for DmMemoryLearningModel {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.model.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.model) as u64;
+        }
+        if !self.provider.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.provider) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.model.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.model, buf);
+        }
+        if !self.provider.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.provider, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.model, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.provider, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.model.clear();
+        self.provider.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for DmMemoryLearningModel {
+    const PROTO_FQN: &'static str = "briar.app.v1.DmMemoryLearningModel";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for DmMemoryLearningModel {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __DM_MEMORY_LEARNING_MODEL_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.DmMemoryLearningModel",
+    to_json: ::buffa::type_registry::any_to_json::<DmMemoryLearningModel>,
+    from_json: ::buffa::type_registry::any_from_json::<DmMemoryLearningModel>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct DmMemoryLearningJob {
+    /// Field 1: `id`
+    #[serde(
+        rename = "id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub id: ::buffa::alloc::string::String,
+    /// Field 2: `kind`
+    #[serde(
+        rename = "kind",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub kind: ::buffa::EnumValue<DmMemoryLearningJobKind>,
+    /// Field 3: `status`
+    #[serde(
+        rename = "status",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub status: ::buffa::EnumValue<DmMemoryLearningJobStatus>,
+    /// Field 4: `stage`
+    #[serde(
+        rename = "stage",
+        with = "::buffa::json_helpers::opt_enum",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub stage: ::core::option::Option<::buffa::EnumValue<DmMemoryLearningJobStage>>,
+    /// Field 5: `error_code`
+    #[serde(
+        rename = "errorCode",
+        alias = "error_code",
+        with = "::buffa::json_helpers::opt_enum",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub error_code: ::core::option::Option<
+        ::buffa::EnumValue<DmMemoryLearningFailureCode>,
+    >,
+    /// Field 6: `updated_at`
+    #[serde(
+        rename = "updatedAt",
+        alias = "updated_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub updated_at: ::buffa::MessageField<
+        ::buffa_types::google::protobuf::Timestamp,
+        ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+    >,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for DmMemoryLearningJob {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("DmMemoryLearningJob")
+            .field("id", &self.id)
+            .field("kind", &self.kind)
+            .field("status", &self.status)
+            .field("stage", &self.stage)
+            .field("error_code", &self.error_code)
+            .field("updated_at", &self.updated_at)
+            .finish()
+    }
+}
+impl DmMemoryLearningJob {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DmMemoryLearningJob";
+}
+impl DmMemoryLearningJob {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::stage`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_stage(
+        mut self,
+        value: impl Into<::buffa::EnumValue<DmMemoryLearningJobStage>>,
+    ) -> Self {
+        self.stage = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::error_code`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_error_code(
+        mut self,
+        value: impl Into<::buffa::EnumValue<DmMemoryLearningFailureCode>>,
+    ) -> Self {
+        self.error_code = Some(value.into());
+        self
+    }
+}
+::buffa::impl_default_instance!(DmMemoryLearningJob);
+impl ::buffa::MessageName for DmMemoryLearningJob {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "DmMemoryLearningJob";
+    const FULL_NAME: &'static str = "briar.app.v1.DmMemoryLearningJob";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DmMemoryLearningJob";
+}
+impl ::buffa::Message for DmMemoryLearningJob {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.id) as u64;
+        }
+        {
+            let val = self.kind.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        if let Some(ref v) = self.stage {
+            size += 1u64 + ::buffa::types::int32_encoded_len(v.to_i32()) as u64;
+        }
+        if let Some(ref v) = self.error_code {
+            size += 1u64 + ::buffa::types::int32_encoded_len(v.to_i32()) as u64;
+        }
+        if self.updated_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.updated_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.id, buf);
+        }
+        {
+            let val = self.kind.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(2u32, val, buf);
+            }
+        }
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(3u32, val, buf);
+            }
+        }
+        if let Some(ref v) = self.stage {
+            ::buffa::types::put_int32_field(4u32, v.to_i32(), buf);
+        }
+        if let Some(ref v) = self.error_code {
+            ::buffa::types::put_int32_field(5u32, v.to_i32(), buf);
+        }
+        if self.updated_at.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                6u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.updated_at.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.kind = ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?);
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.status = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.stage = ::core::option::Option::Some(
+                    ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?),
+                );
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.error_code = ::core::option::Option::Some(
+                    ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?),
+                );
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.updated_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.id.clear();
+        self.kind = ::buffa::EnumValue::from(0);
+        self.status = ::buffa::EnumValue::from(0);
+        self.stage = ::core::option::Option::None;
+        self.error_code = ::core::option::Option::None;
+        self.updated_at = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for DmMemoryLearningJob {
+    const PROTO_FQN: &'static str = "briar.app.v1.DmMemoryLearningJob";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for DmMemoryLearningJob {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __DM_MEMORY_LEARNING_JOB_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.DmMemoryLearningJob",
+    to_json: ::buffa::type_registry::any_to_json::<DmMemoryLearningJob>,
+    from_json: ::buffa::type_registry::any_from_json::<DmMemoryLearningJob>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct DmMemoryLearningRetryableJob {
+    /// Field 1: `id`
+    #[serde(
+        rename = "id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub id: ::buffa::alloc::string::String,
+    /// Field 2: `calls_used`
+    #[serde(
+        rename = "callsUsed",
+        alias = "calls_used",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub calls_used: u32,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for DmMemoryLearningRetryableJob {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("DmMemoryLearningRetryableJob")
+            .field("id", &self.id)
+            .field("calls_used", &self.calls_used)
+            .finish()
+    }
+}
+impl DmMemoryLearningRetryableJob {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DmMemoryLearningRetryableJob";
+}
+::buffa::impl_default_instance!(DmMemoryLearningRetryableJob);
+impl ::buffa::MessageName for DmMemoryLearningRetryableJob {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "DmMemoryLearningRetryableJob";
+    const FULL_NAME: &'static str = "briar.app.v1.DmMemoryLearningRetryableJob";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DmMemoryLearningRetryableJob";
+}
+impl ::buffa::Message for DmMemoryLearningRetryableJob {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.id) as u64;
+        }
+        if self.calls_used != 0u32 {
+            size += 1u64 + ::buffa::types::uint32_encoded_len(self.calls_used) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.id, buf);
+        }
+        if self.calls_used != 0u32 {
+            ::buffa::types::put_uint32_field(2u32, self.calls_used, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.calls_used = ::buffa::types::decode_uint32(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.id.clear();
+        self.calls_used = 0u32;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for DmMemoryLearningRetryableJob {
+    const PROTO_FQN: &'static str = "briar.app.v1.DmMemoryLearningRetryableJob";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for DmMemoryLearningRetryableJob {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __DM_MEMORY_LEARNING_RETRYABLE_JOB_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.DmMemoryLearningRetryableJob",
+    to_json: ::buffa::type_registry::any_to_json::<DmMemoryLearningRetryableJob>,
+    from_json: ::buffa::type_registry::any_from_json::<DmMemoryLearningRetryableJob>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct RetryDmMemoryLearningRequest {
+    /// Field 1: `organization_id`
+    #[serde(
+        rename = "organizationId",
+        alias = "organization_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub organization_id: ::buffa::alloc::string::String,
+    /// Field 2: `channel_id`
+    #[serde(
+        rename = "channelId",
+        alias = "channel_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub channel_id: ::buffa::alloc::string::String,
+    /// Field 3: `job_id`
+    #[serde(
+        rename = "jobId",
+        alias = "job_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub job_id: ::buffa::alloc::string::String,
+    /// Field 4: `request_id`
+    #[serde(
+        rename = "requestId",
+        alias = "request_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub request_id: ::buffa::alloc::string::String,
+    /// Field 5: `revocation_epoch`
+    #[serde(
+        rename = "revocationEpoch",
+        alias = "revocation_epoch",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub revocation_epoch: u64,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for RetryDmMemoryLearningRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("RetryDmMemoryLearningRequest")
+            .field("organization_id", &self.organization_id)
+            .field("channel_id", &self.channel_id)
+            .field("job_id", &self.job_id)
+            .field("request_id", &self.request_id)
+            .field("revocation_epoch", &self.revocation_epoch)
+            .finish()
+    }
+}
+impl RetryDmMemoryLearningRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.RetryDmMemoryLearningRequest";
+}
+::buffa::impl_default_instance!(RetryDmMemoryLearningRequest);
+impl ::buffa::MessageName for RetryDmMemoryLearningRequest {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "RetryDmMemoryLearningRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.RetryDmMemoryLearningRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.RetryDmMemoryLearningRequest";
+}
+impl ::buffa::Message for RetryDmMemoryLearningRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.organization_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        }
+        if !self.channel_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.channel_id) as u64;
+        }
+        if !self.job_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.job_id) as u64;
+        }
+        if !self.request_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.request_id) as u64;
+        }
+        if self.revocation_epoch != 0u64 {
+            size
+                += 1u64
+                    + ::buffa::types::uint64_encoded_len(self.revocation_epoch) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.organization_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        }
+        if !self.channel_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
+        }
+        if !self.job_id.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.job_id, buf);
+        }
+        if !self.request_id.is_empty() {
+            ::buffa::types::put_string_field(4u32, &self.request_id, buf);
+        }
+        if self.revocation_epoch != 0u64 {
+            ::buffa::types::put_uint64_field(5u32, self.revocation_epoch, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.channel_id, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.job_id, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.request_id, buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.revocation_epoch = ::buffa::types::decode_uint64(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.organization_id.clear();
+        self.channel_id.clear();
+        self.job_id.clear();
+        self.request_id.clear();
+        self.revocation_epoch = 0u64;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for RetryDmMemoryLearningRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.RetryDmMemoryLearningRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for RetryDmMemoryLearningRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __RETRY_DM_MEMORY_LEARNING_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.RetryDmMemoryLearningRequest",
+    to_json: ::buffa::type_registry::any_to_json::<RetryDmMemoryLearningRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<RetryDmMemoryLearningRequest>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct RetryDmMemoryLearningResponse {
+    /// Field 1: `accepted`
+    #[serde(
+        rename = "accepted",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub accepted: bool,
+    /// Field 2: `replayed`
+    #[serde(
+        rename = "replayed",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub replayed: bool,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for RetryDmMemoryLearningResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("RetryDmMemoryLearningResponse")
+            .field("accepted", &self.accepted)
+            .field("replayed", &self.replayed)
+            .finish()
+    }
+}
+impl RetryDmMemoryLearningResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.RetryDmMemoryLearningResponse";
+}
+::buffa::impl_default_instance!(RetryDmMemoryLearningResponse);
+impl ::buffa::MessageName for RetryDmMemoryLearningResponse {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "RetryDmMemoryLearningResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.RetryDmMemoryLearningResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.RetryDmMemoryLearningResponse";
+}
+impl ::buffa::Message for RetryDmMemoryLearningResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.accepted {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        if self.replayed {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.accepted {
+            ::buffa::types::put_bool_field(1u32, self.accepted, buf);
+        }
+        if self.replayed {
+            ::buffa::types::put_bool_field(2u32, self.replayed, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.accepted = ::buffa::types::decode_bool(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.replayed = ::buffa::types::decode_bool(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.accepted = false;
+        self.replayed = false;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for RetryDmMemoryLearningResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.RetryDmMemoryLearningResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for RetryDmMemoryLearningResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __RETRY_DM_MEMORY_LEARNING_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.RetryDmMemoryLearningResponse",
+    to_json: ::buffa::type_registry::any_to_json::<RetryDmMemoryLearningResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<RetryDmMemoryLearningResponse>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
@@ -214118,6 +216624,10 @@ pub mod __buffa {
             >,
             /// Field 6: `next_cursor`
             pub next_cursor: ::core::option::Option<&'a str>,
+            /// Field 7: `learning`
+            pub learning: ::buffa::MessageFieldView<
+                super::super::__buffa::view::DmMemoryLearningStatusView<'a>,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ListDmMemoriesResponseView<'a> {
@@ -214199,6 +216709,31 @@ pub mod __buffa {
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
                         view.next_cursor = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.learning.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.learning = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::DmMemoryLearningStatusView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
                     }
                     3u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -214291,6 +216826,15 @@ pub mod __buffa {
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
                     next_cursor: self.next_cursor.map(|s| s.to_string()),
+                    learning: match self.learning.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::DmMemoryLearningStatus,
+                                ::buffa::Inline<super::super::DmMemoryLearningStatus>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -214338,6 +216882,14 @@ pub mod __buffa {
                 if let Some(ref v) = self.next_cursor {
                     size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
                 }
+                if self.learning.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.learning.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -214382,6 +216934,14 @@ pub mod __buffa {
                 if let Some(ref v) = self.next_cursor {
                     ::buffa::types::put_string_field(6u32, v, buf);
                 }
+                if self.learning.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        7u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.learning.write_to(__cache, buf);
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -214425,6 +216985,12 @@ pub mod __buffa {
                 }
                 if let ::core::option::Option::Some(__v) = self.next_cursor {
                     __map.serialize_entry("nextCursor", __v)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.learning.as_option()
+                    {
+                        __map.serialize_entry("learning", __v)?;
+                    }
                 }
                 __map.end()
             }
@@ -214565,6 +217131,15 @@ pub mod __buffa {
             pub fn next_cursor(&self) -> ::core::option::Option<&'_ str> {
                 self.0.reborrow().next_cursor
             }
+            /// Field 7: `learning`
+            #[must_use]
+            pub fn learning(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::DmMemoryLearningStatusView<'_>,
+            > {
+                &self.0.reborrow().learning
+            }
         }
         impl ::core::convert::From<
             ::buffa::OwnedView<ListDmMemoriesResponseView<'static>>,
@@ -214595,6 +217170,2808 @@ pub mod __buffa {
             type ViewHandle = ListDmMemoriesResponseOwnedView;
         }
         impl ::serde::Serialize for ListDmMemoriesResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct DmMemoryLearningStatusView<'a> {
+            /// Field 1: `configuration`
+            pub configuration: ::buffa::MessageFieldView<
+                super::super::__buffa::view::DmMemoryLearningConfigurationView<'a>,
+            >,
+            /// Field 2: `calls_today`
+            pub calls_today: u32,
+            /// Field 3: `reserved_micro_usd_today`
+            pub reserved_micro_usd_today: u64,
+            /// Field 4: `pending_jobs`
+            pub pending_jobs: u32,
+            /// Field 5: `failed_jobs`
+            pub failed_jobs: u32,
+            /// Field 6: `last_job`
+            pub last_job: ::buffa::MessageFieldView<
+                super::super::__buffa::view::DmMemoryLearningJobView<'a>,
+            >,
+            /// Field 7: `retryable_job`
+            pub retryable_job: ::buffa::MessageFieldView<
+                super::super::__buffa::view::DmMemoryLearningRetryableJobView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for DmMemoryLearningStatusView<'a> {
+            type Owned = super::super::DmMemoryLearningStatus;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.configuration.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.configuration = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::DmMemoryLearningConfigurationView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.calls_today = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.reserved_micro_usd_today = ::buffa::types::decode_uint64(
+                            &mut cur,
+                        )?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.pending_jobs = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.failed_jobs = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.last_job.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.last_job = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::DmMemoryLearningJobView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.retryable_job.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.retryable_job = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::DmMemoryLearningRetryableJobView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DmMemoryLearningStatus,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::DmMemoryLearningStatus,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::DmMemoryLearningStatus {
+                    configuration: match self.configuration.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::DmMemoryLearningConfiguration,
+                                ::buffa::Inline<super::super::DmMemoryLearningConfiguration>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    calls_today: self.calls_today,
+                    reserved_micro_usd_today: self.reserved_micro_usd_today,
+                    pending_jobs: self.pending_jobs,
+                    failed_jobs: self.failed_jobs,
+                    last_job: match self.last_job.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::DmMemoryLearningJob,
+                                ::buffa::Inline<super::super::DmMemoryLearningJob>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    retryable_job: match self.retryable_job.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::DmMemoryLearningRetryableJob,
+                                ::buffa::Inline<super::super::DmMemoryLearningRetryableJob>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for DmMemoryLearningStatusView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if self.configuration.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.configuration.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                if self.calls_today != 0u32 {
+                    size
+                        += 1u64
+                            + ::buffa::types::uint32_encoded_len(self.calls_today)
+                                as u64;
+                }
+                if self.reserved_micro_usd_today != 0u64 {
+                    size
+                        += 1u64
+                            + ::buffa::types::uint64_encoded_len(
+                                self.reserved_micro_usd_today,
+                            ) as u64;
+                }
+                if self.pending_jobs != 0u32 {
+                    size
+                        += 1u64
+                            + ::buffa::types::uint32_encoded_len(self.pending_jobs)
+                                as u64;
+                }
+                if self.failed_jobs != 0u32 {
+                    size
+                        += 1u64
+                            + ::buffa::types::uint32_encoded_len(self.failed_jobs)
+                                as u64;
+                }
+                if self.last_job.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.last_job.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                if self.retryable_job.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.retryable_job.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.configuration.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.configuration.write_to(__cache, buf);
+                }
+                if self.calls_today != 0u32 {
+                    ::buffa::types::put_uint32_field(2u32, self.calls_today, buf);
+                }
+                if self.reserved_micro_usd_today != 0u64 {
+                    ::buffa::types::put_uint64_field(
+                        3u32,
+                        self.reserved_micro_usd_today,
+                        buf,
+                    );
+                }
+                if self.pending_jobs != 0u32 {
+                    ::buffa::types::put_uint32_field(4u32, self.pending_jobs, buf);
+                }
+                if self.failed_jobs != 0u32 {
+                    ::buffa::types::put_uint32_field(5u32, self.failed_jobs, buf);
+                }
+                if self.last_job.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        6u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.last_job.write_to(__cache, buf);
+                }
+                if self.retryable_job.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        7u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.retryable_job.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for DmMemoryLearningStatusView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .configuration
+                        .as_option()
+                    {
+                        __map.serialize_entry("configuration", __v)?;
+                    }
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.calls_today) {
+                    __map
+                        .serialize_entry(
+                            "callsToday",
+                            &::buffa::json_helpers::ProtoJson(&self.calls_today),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(
+                    &self.reserved_micro_usd_today,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "reservedMicroUsdToday",
+                            &::buffa::json_helpers::ProtoJson(
+                                &self.reserved_micro_usd_today,
+                            ),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.pending_jobs) {
+                    __map
+                        .serialize_entry(
+                            "pendingJobs",
+                            &::buffa::json_helpers::ProtoJson(&self.pending_jobs),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.failed_jobs) {
+                    __map
+                        .serialize_entry(
+                            "failedJobs",
+                            &::buffa::json_helpers::ProtoJson(&self.failed_jobs),
+                        )?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.last_job.as_option()
+                    {
+                        __map.serialize_entry("lastJob", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .retryable_job
+                        .as_option()
+                    {
+                        __map.serialize_entry("retryableJob", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for DmMemoryLearningStatusView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "DmMemoryLearningStatus";
+            const FULL_NAME: &'static str = "briar.app.v1.DmMemoryLearningStatus";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DmMemoryLearningStatus";
+        }
+        ::buffa::impl_default_view_instance!(DmMemoryLearningStatusView);
+        ::buffa::impl_view_reborrow!(DmMemoryLearningStatusView);
+        /** Self-contained, `'static` owned view of a `DmMemoryLearningStatus` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`DmMemoryLearningStatusView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`DmMemoryLearningStatusView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct DmMemoryLearningStatusOwnedView(
+            ::buffa::OwnedView<DmMemoryLearningStatusView<'static>>,
+        );
+        impl DmMemoryLearningStatusOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DmMemoryLearningStatusOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DmMemoryLearningStatusOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::DmMemoryLearningStatus,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DmMemoryLearningStatusOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`DmMemoryLearningStatusView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &DmMemoryLearningStatusView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::DmMemoryLearningStatus {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `configuration`
+            #[must_use]
+            pub fn configuration(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::DmMemoryLearningConfigurationView<'_>,
+            > {
+                &self.0.reborrow().configuration
+            }
+            /// Field 2: `calls_today`
+            #[must_use]
+            pub fn calls_today(&self) -> u32 {
+                self.0.reborrow().calls_today
+            }
+            /// Field 3: `reserved_micro_usd_today`
+            #[must_use]
+            pub fn reserved_micro_usd_today(&self) -> u64 {
+                self.0.reborrow().reserved_micro_usd_today
+            }
+            /// Field 4: `pending_jobs`
+            #[must_use]
+            pub fn pending_jobs(&self) -> u32 {
+                self.0.reborrow().pending_jobs
+            }
+            /// Field 5: `failed_jobs`
+            #[must_use]
+            pub fn failed_jobs(&self) -> u32 {
+                self.0.reborrow().failed_jobs
+            }
+            /// Field 6: `last_job`
+            #[must_use]
+            pub fn last_job(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::DmMemoryLearningJobView<'_>,
+            > {
+                &self.0.reborrow().last_job
+            }
+            /// Field 7: `retryable_job`
+            #[must_use]
+            pub fn retryable_job(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::DmMemoryLearningRetryableJobView<'_>,
+            > {
+                &self.0.reborrow().retryable_job
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<DmMemoryLearningStatusView<'static>>,
+        > for DmMemoryLearningStatusOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<DmMemoryLearningStatusView<'static>>,
+            ) -> Self {
+                DmMemoryLearningStatusOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<DmMemoryLearningStatusOwnedView>
+        for ::buffa::OwnedView<DmMemoryLearningStatusView<'static>> {
+            fn from(wrapper: DmMemoryLearningStatusOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<DmMemoryLearningStatusView<'static>>,
+        > for DmMemoryLearningStatusOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<DmMemoryLearningStatusView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::DmMemoryLearningStatus {
+            type View<'a> = DmMemoryLearningStatusView<'a>;
+            type ViewHandle = DmMemoryLearningStatusOwnedView;
+        }
+        impl ::serde::Serialize for DmMemoryLearningStatusOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct DmMemoryLearningConfigurationView<'a> {
+            /// Field 1: `proposer`
+            pub proposer: ::buffa::MessageFieldView<
+                super::super::__buffa::view::DmMemoryLearningModelView<'a>,
+            >,
+            /// Field 2: `verifier`
+            pub verifier: ::buffa::MessageFieldView<
+                super::super::__buffa::view::DmMemoryLearningModelView<'a>,
+            >,
+            /// Field 3: `space_daily_calls`
+            pub space_daily_calls: u32,
+            /// Field 4: `space_daily_micro_usd`
+            pub space_daily_micro_usd: u64,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for DmMemoryLearningConfigurationView<'a> {
+            type Owned = super::super::DmMemoryLearningConfiguration;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.proposer.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.proposer = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::DmMemoryLearningModelView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.verifier.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.verifier = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::DmMemoryLearningModelView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.space_daily_calls = ::buffa::types::decode_uint32(
+                            &mut cur,
+                        )?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.space_daily_micro_usd = ::buffa::types::decode_uint64(
+                            &mut cur,
+                        )?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DmMemoryLearningConfiguration,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::DmMemoryLearningConfiguration,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::DmMemoryLearningConfiguration {
+                    proposer: match self.proposer.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::DmMemoryLearningModel,
+                                ::buffa::Inline<super::super::DmMemoryLearningModel>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    verifier: match self.verifier.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::DmMemoryLearningModel,
+                                ::buffa::Inline<super::super::DmMemoryLearningModel>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    space_daily_calls: self.space_daily_calls,
+                    space_daily_micro_usd: self.space_daily_micro_usd,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for DmMemoryLearningConfigurationView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if self.proposer.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.proposer.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                if self.verifier.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.verifier.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                if self.space_daily_calls != 0u32 {
+                    size
+                        += 1u64
+                            + ::buffa::types::uint32_encoded_len(self.space_daily_calls)
+                                as u64;
+                }
+                if self.space_daily_micro_usd != 0u64 {
+                    size
+                        += 1u64
+                            + ::buffa::types::uint64_encoded_len(
+                                self.space_daily_micro_usd,
+                            ) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.proposer.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.proposer.write_to(__cache, buf);
+                }
+                if self.verifier.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.verifier.write_to(__cache, buf);
+                }
+                if self.space_daily_calls != 0u32 {
+                    ::buffa::types::put_uint32_field(3u32, self.space_daily_calls, buf);
+                }
+                if self.space_daily_micro_usd != 0u64 {
+                    ::buffa::types::put_uint64_field(
+                        4u32,
+                        self.space_daily_micro_usd,
+                        buf,
+                    );
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for DmMemoryLearningConfigurationView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self.proposer.as_option()
+                    {
+                        __map.serialize_entry("proposer", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.verifier.as_option()
+                    {
+                        __map.serialize_entry("verifier", __v)?;
+                    }
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(
+                    &self.space_daily_calls,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "spaceDailyCalls",
+                            &::buffa::json_helpers::ProtoJson(&self.space_daily_calls),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(
+                    &self.space_daily_micro_usd,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "spaceDailyMicroUsd",
+                            &::buffa::json_helpers::ProtoJson(
+                                &self.space_daily_micro_usd,
+                            ),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for DmMemoryLearningConfigurationView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "DmMemoryLearningConfiguration";
+            const FULL_NAME: &'static str = "briar.app.v1.DmMemoryLearningConfiguration";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DmMemoryLearningConfiguration";
+        }
+        ::buffa::impl_default_view_instance!(DmMemoryLearningConfigurationView);
+        ::buffa::impl_view_reborrow!(DmMemoryLearningConfigurationView);
+        /** Self-contained, `'static` owned view of a `DmMemoryLearningConfiguration` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`DmMemoryLearningConfigurationView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`DmMemoryLearningConfigurationView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct DmMemoryLearningConfigurationOwnedView(
+            ::buffa::OwnedView<DmMemoryLearningConfigurationView<'static>>,
+        );
+        impl DmMemoryLearningConfigurationOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DmMemoryLearningConfigurationOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DmMemoryLearningConfigurationOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::DmMemoryLearningConfiguration,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DmMemoryLearningConfigurationOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`DmMemoryLearningConfigurationView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &DmMemoryLearningConfigurationView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::DmMemoryLearningConfiguration {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `proposer`
+            #[must_use]
+            pub fn proposer(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::DmMemoryLearningModelView<'_>,
+            > {
+                &self.0.reborrow().proposer
+            }
+            /// Field 2: `verifier`
+            #[must_use]
+            pub fn verifier(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::DmMemoryLearningModelView<'_>,
+            > {
+                &self.0.reborrow().verifier
+            }
+            /// Field 3: `space_daily_calls`
+            #[must_use]
+            pub fn space_daily_calls(&self) -> u32 {
+                self.0.reborrow().space_daily_calls
+            }
+            /// Field 4: `space_daily_micro_usd`
+            #[must_use]
+            pub fn space_daily_micro_usd(&self) -> u64 {
+                self.0.reborrow().space_daily_micro_usd
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<DmMemoryLearningConfigurationView<'static>>,
+        > for DmMemoryLearningConfigurationOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<DmMemoryLearningConfigurationView<'static>>,
+            ) -> Self {
+                DmMemoryLearningConfigurationOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<DmMemoryLearningConfigurationOwnedView>
+        for ::buffa::OwnedView<DmMemoryLearningConfigurationView<'static>> {
+            fn from(wrapper: DmMemoryLearningConfigurationOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<DmMemoryLearningConfigurationView<'static>>,
+        > for DmMemoryLearningConfigurationOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<DmMemoryLearningConfigurationView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::DmMemoryLearningConfiguration {
+            type View<'a> = DmMemoryLearningConfigurationView<'a>;
+            type ViewHandle = DmMemoryLearningConfigurationOwnedView;
+        }
+        impl ::serde::Serialize for DmMemoryLearningConfigurationOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct DmMemoryLearningModelView<'a> {
+            /// Field 1: `model`
+            pub model: &'a str,
+            /// Field 2: `provider`
+            pub provider: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for DmMemoryLearningModelView<'a> {
+            type Owned = super::super::DmMemoryLearningModel;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.model = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.provider = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DmMemoryLearningModel,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::DmMemoryLearningModel,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::DmMemoryLearningModel {
+                    model: self.model.to_string(),
+                    provider: self.provider.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for DmMemoryLearningModelView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.model.is_empty() {
+                    size
+                        += 1u64 + ::buffa::types::string_encoded_len(&self.model) as u64;
+                }
+                if !self.provider.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.provider) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.model.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.model, buf);
+                }
+                if !self.provider.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.provider, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for DmMemoryLearningModelView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.model) {
+                    __map.serialize_entry("model", self.model)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.provider) {
+                    __map.serialize_entry("provider", self.provider)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for DmMemoryLearningModelView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "DmMemoryLearningModel";
+            const FULL_NAME: &'static str = "briar.app.v1.DmMemoryLearningModel";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DmMemoryLearningModel";
+        }
+        ::buffa::impl_default_view_instance!(DmMemoryLearningModelView);
+        ::buffa::impl_view_reborrow!(DmMemoryLearningModelView);
+        /** Self-contained, `'static` owned view of a `DmMemoryLearningModel` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`DmMemoryLearningModelView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`DmMemoryLearningModelView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct DmMemoryLearningModelOwnedView(
+            ::buffa::OwnedView<DmMemoryLearningModelView<'static>>,
+        );
+        impl DmMemoryLearningModelOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DmMemoryLearningModelOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DmMemoryLearningModelOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::DmMemoryLearningModel,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DmMemoryLearningModelOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`DmMemoryLearningModelView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &DmMemoryLearningModelView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::DmMemoryLearningModel {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `model`
+            #[must_use]
+            pub fn model(&self) -> &'_ str {
+                self.0.reborrow().model
+            }
+            /// Field 2: `provider`
+            #[must_use]
+            pub fn provider(&self) -> &'_ str {
+                self.0.reborrow().provider
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<DmMemoryLearningModelView<'static>>,
+        > for DmMemoryLearningModelOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<DmMemoryLearningModelView<'static>>,
+            ) -> Self {
+                DmMemoryLearningModelOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<DmMemoryLearningModelOwnedView>
+        for ::buffa::OwnedView<DmMemoryLearningModelView<'static>> {
+            fn from(wrapper: DmMemoryLearningModelOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<DmMemoryLearningModelView<'static>>,
+        > for DmMemoryLearningModelOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<DmMemoryLearningModelView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::DmMemoryLearningModel {
+            type View<'a> = DmMemoryLearningModelView<'a>;
+            type ViewHandle = DmMemoryLearningModelOwnedView;
+        }
+        impl ::serde::Serialize for DmMemoryLearningModelOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct DmMemoryLearningJobView<'a> {
+            /// Field 1: `id`
+            pub id: &'a str,
+            /// Field 2: `kind`
+            pub kind: ::buffa::EnumValue<super::super::DmMemoryLearningJobKind>,
+            /// Field 3: `status`
+            pub status: ::buffa::EnumValue<super::super::DmMemoryLearningJobStatus>,
+            /// Field 4: `stage`
+            pub stage: ::core::option::Option<
+                ::buffa::EnumValue<super::super::DmMemoryLearningJobStage>,
+            >,
+            /// Field 5: `error_code`
+            pub error_code: ::core::option::Option<
+                ::buffa::EnumValue<super::super::DmMemoryLearningFailureCode>,
+            >,
+            /// Field 6: `updated_at`
+            pub updated_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for DmMemoryLearningJobView<'a> {
+            type Owned = super::super::DmMemoryLearningJob;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.kind = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.status = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.stage = Some(
+                            ::buffa::EnumValue::from(
+                                ::buffa::types::decode_int32(&mut cur)?,
+                            ),
+                        );
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.error_code = Some(
+                            ::buffa::EnumValue::from(
+                                ::buffa::types::decode_int32(&mut cur)?,
+                            ),
+                        );
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.updated_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.updated_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DmMemoryLearningJob,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::DmMemoryLearningJob,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::DmMemoryLearningJob {
+                    id: self.id.to_string(),
+                    kind: self.kind,
+                    status: self.status,
+                    stage: self.stage,
+                    error_code: self.error_code,
+                    updated_at: match self.updated_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                                ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for DmMemoryLearningJobView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.id.is_empty() {
+                    size += 1u64 + ::buffa::types::string_encoded_len(&self.id) as u64;
+                }
+                {
+                    let val = self.kind.to_i32();
+                    if val != 0 {
+                        size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+                    }
+                }
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+                    }
+                }
+                if let Some(ref v) = self.stage {
+                    size += 1u64 + ::buffa::types::int32_encoded_len(v.to_i32()) as u64;
+                }
+                if let Some(ref v) = self.error_code {
+                    size += 1u64 + ::buffa::types::int32_encoded_len(v.to_i32()) as u64;
+                }
+                if self.updated_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.updated_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.id, buf);
+                }
+                {
+                    let val = self.kind.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(2u32, val, buf);
+                    }
+                }
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(3u32, val, buf);
+                    }
+                }
+                if let Some(ref v) = self.stage {
+                    ::buffa::types::put_int32_field(4u32, v.to_i32(), buf);
+                }
+                if let Some(ref v) = self.error_code {
+                    ::buffa::types::put_int32_field(5u32, v.to_i32(), buf);
+                }
+                if self.updated_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        6u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.updated_at.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for DmMemoryLearningJobView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.id) {
+                    __map.serialize_entry("id", self.id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.kind) {
+                    __map.serialize_entry("kind", &self.kind)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.status) {
+                    __map.serialize_entry("status", &self.status)?;
+                }
+                if let ::core::option::Option::Some(ref __v) = self.stage {
+                    __map.serialize_entry("stage", __v)?;
+                }
+                if let ::core::option::Option::Some(ref __v) = self.error_code {
+                    __map.serialize_entry("errorCode", __v)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .updated_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("updatedAt", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for DmMemoryLearningJobView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "DmMemoryLearningJob";
+            const FULL_NAME: &'static str = "briar.app.v1.DmMemoryLearningJob";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DmMemoryLearningJob";
+        }
+        ::buffa::impl_default_view_instance!(DmMemoryLearningJobView);
+        ::buffa::impl_view_reborrow!(DmMemoryLearningJobView);
+        /** Self-contained, `'static` owned view of a `DmMemoryLearningJob` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`DmMemoryLearningJobView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`DmMemoryLearningJobView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct DmMemoryLearningJobOwnedView(
+            ::buffa::OwnedView<DmMemoryLearningJobView<'static>>,
+        );
+        impl DmMemoryLearningJobOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DmMemoryLearningJobOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DmMemoryLearningJobOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::DmMemoryLearningJob,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DmMemoryLearningJobOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`DmMemoryLearningJobView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &DmMemoryLearningJobView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::DmMemoryLearningJob {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `id`
+            #[must_use]
+            pub fn id(&self) -> &'_ str {
+                self.0.reborrow().id
+            }
+            /// Field 2: `kind`
+            #[must_use]
+            pub fn kind(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::DmMemoryLearningJobKind> {
+                self.0.reborrow().kind
+            }
+            /// Field 3: `status`
+            #[must_use]
+            pub fn status(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::DmMemoryLearningJobStatus> {
+                self.0.reborrow().status
+            }
+            /// Field 4: `stage`
+            #[must_use]
+            pub fn stage(
+                &self,
+            ) -> ::core::option::Option<
+                ::buffa::EnumValue<super::super::DmMemoryLearningJobStage>,
+            > {
+                self.0.reborrow().stage
+            }
+            /// Field 5: `error_code`
+            #[must_use]
+            pub fn error_code(
+                &self,
+            ) -> ::core::option::Option<
+                ::buffa::EnumValue<super::super::DmMemoryLearningFailureCode>,
+            > {
+                self.0.reborrow().error_code
+            }
+            /// Field 6: `updated_at`
+            #[must_use]
+            pub fn updated_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().updated_at
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<DmMemoryLearningJobView<'static>>>
+        for DmMemoryLearningJobOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<DmMemoryLearningJobView<'static>>,
+            ) -> Self {
+                DmMemoryLearningJobOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<DmMemoryLearningJobOwnedView>
+        for ::buffa::OwnedView<DmMemoryLearningJobView<'static>> {
+            fn from(wrapper: DmMemoryLearningJobOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<DmMemoryLearningJobView<'static>>>
+        for DmMemoryLearningJobOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<DmMemoryLearningJobView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::DmMemoryLearningJob {
+            type View<'a> = DmMemoryLearningJobView<'a>;
+            type ViewHandle = DmMemoryLearningJobOwnedView;
+        }
+        impl ::serde::Serialize for DmMemoryLearningJobOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct DmMemoryLearningRetryableJobView<'a> {
+            /// Field 1: `id`
+            pub id: &'a str,
+            /// Field 2: `calls_used`
+            pub calls_used: u32,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for DmMemoryLearningRetryableJobView<'a> {
+            type Owned = super::super::DmMemoryLearningRetryableJob;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.calls_used = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DmMemoryLearningRetryableJob,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::DmMemoryLearningRetryableJob,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::DmMemoryLearningRetryableJob {
+                    id: self.id.to_string(),
+                    calls_used: self.calls_used,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for DmMemoryLearningRetryableJobView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.id.is_empty() {
+                    size += 1u64 + ::buffa::types::string_encoded_len(&self.id) as u64;
+                }
+                if self.calls_used != 0u32 {
+                    size
+                        += 1u64
+                            + ::buffa::types::uint32_encoded_len(self.calls_used) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.id, buf);
+                }
+                if self.calls_used != 0u32 {
+                    ::buffa::types::put_uint32_field(2u32, self.calls_used, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for DmMemoryLearningRetryableJobView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.id) {
+                    __map.serialize_entry("id", self.id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.calls_used) {
+                    __map
+                        .serialize_entry(
+                            "callsUsed",
+                            &::buffa::json_helpers::ProtoJson(&self.calls_used),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for DmMemoryLearningRetryableJobView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "DmMemoryLearningRetryableJob";
+            const FULL_NAME: &'static str = "briar.app.v1.DmMemoryLearningRetryableJob";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DmMemoryLearningRetryableJob";
+        }
+        ::buffa::impl_default_view_instance!(DmMemoryLearningRetryableJobView);
+        ::buffa::impl_view_reborrow!(DmMemoryLearningRetryableJobView);
+        /** Self-contained, `'static` owned view of a `DmMemoryLearningRetryableJob` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`DmMemoryLearningRetryableJobView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`DmMemoryLearningRetryableJobView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct DmMemoryLearningRetryableJobOwnedView(
+            ::buffa::OwnedView<DmMemoryLearningRetryableJobView<'static>>,
+        );
+        impl DmMemoryLearningRetryableJobOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DmMemoryLearningRetryableJobOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DmMemoryLearningRetryableJobOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::DmMemoryLearningRetryableJob,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DmMemoryLearningRetryableJobOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`DmMemoryLearningRetryableJobView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &DmMemoryLearningRetryableJobView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::DmMemoryLearningRetryableJob {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `id`
+            #[must_use]
+            pub fn id(&self) -> &'_ str {
+                self.0.reborrow().id
+            }
+            /// Field 2: `calls_used`
+            #[must_use]
+            pub fn calls_used(&self) -> u32 {
+                self.0.reborrow().calls_used
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<DmMemoryLearningRetryableJobView<'static>>,
+        > for DmMemoryLearningRetryableJobOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<DmMemoryLearningRetryableJobView<'static>>,
+            ) -> Self {
+                DmMemoryLearningRetryableJobOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<DmMemoryLearningRetryableJobOwnedView>
+        for ::buffa::OwnedView<DmMemoryLearningRetryableJobView<'static>> {
+            fn from(wrapper: DmMemoryLearningRetryableJobOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<DmMemoryLearningRetryableJobView<'static>>,
+        > for DmMemoryLearningRetryableJobOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<DmMemoryLearningRetryableJobView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::DmMemoryLearningRetryableJob {
+            type View<'a> = DmMemoryLearningRetryableJobView<'a>;
+            type ViewHandle = DmMemoryLearningRetryableJobOwnedView;
+        }
+        impl ::serde::Serialize for DmMemoryLearningRetryableJobOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct RetryDmMemoryLearningRequestView<'a> {
+            /// Field 1: `organization_id`
+            pub organization_id: &'a str,
+            /// Field 2: `channel_id`
+            pub channel_id: &'a str,
+            /// Field 3: `job_id`
+            pub job_id: &'a str,
+            /// Field 4: `request_id`
+            pub request_id: &'a str,
+            /// Field 5: `revocation_epoch`
+            pub revocation_epoch: u64,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for RetryDmMemoryLearningRequestView<'a> {
+            type Owned = super::super::RetryDmMemoryLearningRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.channel_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.job_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.request_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.revocation_epoch = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::RetryDmMemoryLearningRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::RetryDmMemoryLearningRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::RetryDmMemoryLearningRequest {
+                    organization_id: self.organization_id.to_string(),
+                    channel_id: self.channel_id.to_string(),
+                    job_id: self.job_id.to_string(),
+                    request_id: self.request_id.to_string(),
+                    revocation_epoch: self.revocation_epoch,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for RetryDmMemoryLearningRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.organization_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                                as u64;
+                }
+                if !self.channel_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.channel_id)
+                                as u64;
+                }
+                if !self.job_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.job_id) as u64;
+                }
+                if !self.request_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.request_id)
+                                as u64;
+                }
+                if self.revocation_epoch != 0u64 {
+                    size
+                        += 1u64
+                            + ::buffa::types::uint64_encoded_len(self.revocation_epoch)
+                                as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.organization_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                }
+                if !self.channel_id.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
+                }
+                if !self.job_id.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.job_id, buf);
+                }
+                if !self.request_id.is_empty() {
+                    ::buffa::types::put_string_field(4u32, &self.request_id, buf);
+                }
+                if self.revocation_epoch != 0u64 {
+                    ::buffa::types::put_uint64_field(5u32, self.revocation_epoch, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for RetryDmMemoryLearningRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
+                    __map.serialize_entry("organizationId", self.organization_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.channel_id) {
+                    __map.serialize_entry("channelId", self.channel_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.job_id) {
+                    __map.serialize_entry("jobId", self.job_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.request_id) {
+                    __map.serialize_entry("requestId", self.request_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.revocation_epoch) {
+                    __map
+                        .serialize_entry(
+                            "revocationEpoch",
+                            &::buffa::json_helpers::ProtoJson(&self.revocation_epoch),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for RetryDmMemoryLearningRequestView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "RetryDmMemoryLearningRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.RetryDmMemoryLearningRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.RetryDmMemoryLearningRequest";
+        }
+        ::buffa::impl_default_view_instance!(RetryDmMemoryLearningRequestView);
+        ::buffa::impl_view_reborrow!(RetryDmMemoryLearningRequestView);
+        /** Self-contained, `'static` owned view of a `RetryDmMemoryLearningRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`RetryDmMemoryLearningRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`RetryDmMemoryLearningRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct RetryDmMemoryLearningRequestOwnedView(
+            ::buffa::OwnedView<RetryDmMemoryLearningRequestView<'static>>,
+        );
+        impl RetryDmMemoryLearningRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RetryDmMemoryLearningRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RetryDmMemoryLearningRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::RetryDmMemoryLearningRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RetryDmMemoryLearningRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`RetryDmMemoryLearningRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &RetryDmMemoryLearningRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::RetryDmMemoryLearningRequest {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `organization_id`
+            #[must_use]
+            pub fn organization_id(&self) -> &'_ str {
+                self.0.reborrow().organization_id
+            }
+            /// Field 2: `channel_id`
+            #[must_use]
+            pub fn channel_id(&self) -> &'_ str {
+                self.0.reborrow().channel_id
+            }
+            /// Field 3: `job_id`
+            #[must_use]
+            pub fn job_id(&self) -> &'_ str {
+                self.0.reborrow().job_id
+            }
+            /// Field 4: `request_id`
+            #[must_use]
+            pub fn request_id(&self) -> &'_ str {
+                self.0.reborrow().request_id
+            }
+            /// Field 5: `revocation_epoch`
+            #[must_use]
+            pub fn revocation_epoch(&self) -> u64 {
+                self.0.reborrow().revocation_epoch
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<RetryDmMemoryLearningRequestView<'static>>,
+        > for RetryDmMemoryLearningRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<RetryDmMemoryLearningRequestView<'static>>,
+            ) -> Self {
+                RetryDmMemoryLearningRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<RetryDmMemoryLearningRequestOwnedView>
+        for ::buffa::OwnedView<RetryDmMemoryLearningRequestView<'static>> {
+            fn from(wrapper: RetryDmMemoryLearningRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<RetryDmMemoryLearningRequestView<'static>>,
+        > for RetryDmMemoryLearningRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<RetryDmMemoryLearningRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::RetryDmMemoryLearningRequest {
+            type View<'a> = RetryDmMemoryLearningRequestView<'a>;
+            type ViewHandle = RetryDmMemoryLearningRequestOwnedView;
+        }
+        impl ::serde::Serialize for RetryDmMemoryLearningRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct RetryDmMemoryLearningResponseView<'a> {
+            /// Field 1: `accepted`
+            pub accepted: bool,
+            /// Field 2: `replayed`
+            pub replayed: bool,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for RetryDmMemoryLearningResponseView<'a> {
+            type Owned = super::super::RetryDmMemoryLearningResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.accepted = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.replayed = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::RetryDmMemoryLearningResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::RetryDmMemoryLearningResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::RetryDmMemoryLearningResponse {
+                    accepted: self.accepted,
+                    replayed: self.replayed,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for RetryDmMemoryLearningResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if self.accepted {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
+                if self.replayed {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.accepted {
+                    ::buffa::types::put_bool_field(1u32, self.accepted, buf);
+                }
+                if self.replayed {
+                    ::buffa::types::put_bool_field(2u32, self.replayed, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for RetryDmMemoryLearningResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if self.accepted {
+                    __map.serialize_entry("accepted", &self.accepted)?;
+                }
+                if self.replayed {
+                    __map.serialize_entry("replayed", &self.replayed)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for RetryDmMemoryLearningResponseView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "RetryDmMemoryLearningResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.RetryDmMemoryLearningResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.RetryDmMemoryLearningResponse";
+        }
+        ::buffa::impl_default_view_instance!(RetryDmMemoryLearningResponseView);
+        ::buffa::impl_view_reborrow!(RetryDmMemoryLearningResponseView);
+        /** Self-contained, `'static` owned view of a `RetryDmMemoryLearningResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`RetryDmMemoryLearningResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`RetryDmMemoryLearningResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct RetryDmMemoryLearningResponseOwnedView(
+            ::buffa::OwnedView<RetryDmMemoryLearningResponseView<'static>>,
+        );
+        impl RetryDmMemoryLearningResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RetryDmMemoryLearningResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RetryDmMemoryLearningResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::RetryDmMemoryLearningResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RetryDmMemoryLearningResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`RetryDmMemoryLearningResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &RetryDmMemoryLearningResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::RetryDmMemoryLearningResponse {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `accepted`
+            #[must_use]
+            pub fn accepted(&self) -> bool {
+                self.0.reborrow().accepted
+            }
+            /// Field 2: `replayed`
+            #[must_use]
+            pub fn replayed(&self) -> bool {
+                self.0.reborrow().replayed
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<RetryDmMemoryLearningResponseView<'static>>,
+        > for RetryDmMemoryLearningResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<RetryDmMemoryLearningResponseView<'static>>,
+            ) -> Self {
+                RetryDmMemoryLearningResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<RetryDmMemoryLearningResponseOwnedView>
+        for ::buffa::OwnedView<RetryDmMemoryLearningResponseView<'static>> {
+            fn from(wrapper: RetryDmMemoryLearningResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<RetryDmMemoryLearningResponseView<'static>>,
+        > for RetryDmMemoryLearningResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<RetryDmMemoryLearningResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::RetryDmMemoryLearningResponse {
+            type View<'a> = RetryDmMemoryLearningResponseView<'a>;
+            type ViewHandle = RetryDmMemoryLearningResponseOwnedView;
+        }
+        impl ::serde::Serialize for RetryDmMemoryLearningResponseOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -348982,6 +354359,13 @@ pub mod __buffa {
         reg.register_json_any(super::__RUN_EVIDENCE_IMAGE_JSON_ANY);
         reg.register_json_any(super::__LIST_DM_MEMORIES_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_DM_MEMORIES_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__DM_MEMORY_LEARNING_STATUS_JSON_ANY);
+        reg.register_json_any(super::__DM_MEMORY_LEARNING_CONFIGURATION_JSON_ANY);
+        reg.register_json_any(super::__DM_MEMORY_LEARNING_MODEL_JSON_ANY);
+        reg.register_json_any(super::__DM_MEMORY_LEARNING_JOB_JSON_ANY);
+        reg.register_json_any(super::__DM_MEMORY_LEARNING_RETRYABLE_JOB_JSON_ANY);
+        reg.register_json_any(super::__RETRY_DM_MEMORY_LEARNING_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__RETRY_DM_MEMORY_LEARNING_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__GET_DM_MEMORY_DOCUMENT_REQUEST_JSON_ANY);
         reg.register_json_any(super::__GET_DM_MEMORY_DOCUMENT_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__LIST_DM_MEMORY_REVISIONS_REQUEST_JSON_ANY);
@@ -350066,6 +355450,34 @@ pub use self::__buffa::view::ListDmMemoriesRequestOwnedView;
 pub use self::__buffa::view::ListDmMemoriesResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::ListDmMemoriesResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DmMemoryLearningStatusView;
+#[doc(inline)]
+pub use self::__buffa::view::DmMemoryLearningStatusOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DmMemoryLearningConfigurationView;
+#[doc(inline)]
+pub use self::__buffa::view::DmMemoryLearningConfigurationOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DmMemoryLearningModelView;
+#[doc(inline)]
+pub use self::__buffa::view::DmMemoryLearningModelOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DmMemoryLearningJobView;
+#[doc(inline)]
+pub use self::__buffa::view::DmMemoryLearningJobOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DmMemoryLearningRetryableJobView;
+#[doc(inline)]
+pub use self::__buffa::view::DmMemoryLearningRetryableJobOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RetryDmMemoryLearningRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::RetryDmMemoryLearningRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RetryDmMemoryLearningResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::RetryDmMemoryLearningResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::GetDmMemoryDocumentRequestView;
 #[doc(inline)]

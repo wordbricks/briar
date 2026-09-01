@@ -1,4 +1,5 @@
 import { create, fromJson, toJson } from "@bufbuild/protobuf";
+import * as Schema from "effect/Schema";
 import { timestampFromDate, ValueSchema } from "@bufbuild/protobuf/wkt";
 import {
   DmMemoryBriefState,
@@ -32,13 +33,20 @@ import {
   type CompleteMergeBatchPublicationRequest,
   type CompleteProjectAgentTaskRequest,
   type DmMemoryClaimIdentity,
+  DmMemoryLearningFailure,
+  DmMemoryLearningStage,
+  type DmMemoryLearningRequestIdentity,
+  type FailDmMemoryLearningRequest,
   type GetDmMemoryBriefRequest,
   type LookupDmMemoryRequest,
   type PrepareReplyAttachmentUploadsRequest,
+  type ReserveDmMemoryLearningCallRequest,
   type RecordMergeBatchAuthorityRequest,
   type RecordMergeBatchCandidateEnqueuedRequest,
   type RecordMergeBatchValidationRequest,
   type WorkClaimIdentity,
+  type SubmitDmMemoryLearningProposalRequest,
+  type SubmitDmMemoryLearningVerificationRequest,
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import type {
   ConnectRouter,
@@ -81,6 +89,25 @@ import {
   decodeProjectAgentTaskSuccess,
 } from "./project-request-contract";
 import { claimNextQueueWork } from "./queue-claim-routes";
+import {
+  claimDmLearningJob,
+  failDmLearningClaim,
+  renewDmLearningClaim,
+  type DmLearningClaimIdentity,
+} from "./dm-memory-learning-claims";
+import {
+  reserveDmLearningModelCall,
+  submitDmLearningProposal,
+  submitDmLearningVerification,
+} from "./dm-memory-learning-model-calls";
+import { dmLearningPolicy } from "./dm-memory-learning-policy";
+import { DmLearningError } from "./dm-memory-learning-validation";
+import {
+  DmLearningProposal,
+  DmLearningUsage,
+  DmLearningVerification,
+} from "../../src/lib/dm-memory-learning-contract";
+import { dmMemoryCanonicalJson } from "../../src/lib/dm-memory-canonical-json";
 import {
   channelActivityCredential,
   issueActivityCredential,
@@ -134,6 +161,7 @@ export type WorkerQueueServices = {
   readonly completeProjectAgentTaskWork: typeof completeProjectAgentTaskWork;
   readonly claimNextChannelReplyWork: typeof claimNextChannelReplyWork;
   readonly claimNextQueueWork: typeof claimNextQueueWork;
+  readonly claimDmLearningJob: typeof claimDmLearningJob;
   readonly sha256: typeof sha256;
   readonly renewHuntRunLease: typeof renewHuntRunLease;
   readonly renewProjectAgentTaskLease: typeof renewProjectAgentTaskLease;
@@ -164,6 +192,11 @@ export type WorkerQueueServices = {
   readonly checkDmMemoryClaim: typeof checkDmMemoryClaim;
   readonly getDmMemoryClaimBrief: typeof getDmMemoryClaimBrief;
   readonly lookupDmMemoryClaim: typeof lookupDmMemoryClaim;
+  readonly reserveDmLearningModelCall: typeof reserveDmLearningModelCall;
+  readonly submitDmLearningProposal: typeof submitDmLearningProposal;
+  readonly submitDmLearningVerification: typeof submitDmLearningVerification;
+  readonly renewDmLearningClaim: typeof renewDmLearningClaim;
+  readonly failDmLearningClaim: typeof failDmLearningClaim;
 };
 
 const workerQueueServices: WorkerQueueServices = {
@@ -174,6 +207,7 @@ const workerQueueServices: WorkerQueueServices = {
   completeProjectAgentTaskWork,
   claimNextChannelReplyWork,
   claimNextQueueWork,
+  claimDmLearningJob,
   sha256,
   renewHuntRunLease,
   renewProjectAgentTaskLease,
@@ -201,6 +235,11 @@ const workerQueueServices: WorkerQueueServices = {
   checkDmMemoryClaim,
   getDmMemoryClaimBrief,
   lookupDmMemoryClaim,
+  reserveDmLearningModelCall,
+  submitDmLearningProposal,
+  submitDmLearningVerification,
+  renewDmLearningClaim,
+  failDmLearningClaim,
 };
 
 const requiredWork = (value: WorkClaimIdentity | undefined) => {
@@ -258,6 +297,29 @@ const authenticatedWorker = (
   projectId,
   workerId,
 );
+
+const rethrowDmLearningError = (error: unknown): never => {
+  if (!(error instanceof DmLearningError)) throw error;
+  const status = error.code === "stale" || error.code === "scope_revoked"
+    ? 409
+    : error.code === "invalid_proposal" ||
+        error.code === "verification_rejected"
+    ? 422
+    : error.code === "budget_exhausted"
+    ? 429
+    : 503;
+  throw new HttpError(
+    status,
+    "Memory learning could not complete",
+    `memory_${error.code}`,
+  );
+};
+
+const dmLearningPolicyFor = (input: WorkerConnectQueueInput, organizationId: string) => {
+  const policy = dmLearningPolicy(input.env, organizationId);
+  if (!policy) throw new DmLearningError("model_configuration");
+  return policy;
+};
 
 async function claimWork(
   input: WorkerConnectQueueInput,
@@ -332,6 +394,22 @@ async function claimWork(
       authenticatedWorker: worker,
     });
     if (issue) return { work: workerClaimMessage(issue) };
+
+    const policy = dmLearningPolicy(
+      input.env,
+      worker.principal.organizationId,
+    );
+    if (policy) {
+      const learning = await services.claimDmLearningJob(input.db, {
+        organizationId: worker.principal.organizationId,
+        deviceId: worker.principal.deviceId,
+        workerId: claimInput.workerId,
+        projectId: claimInput.projectId,
+        policy,
+        now: new Date().toISOString(),
+      });
+      if (learning) return { work: workerClaimMessage(learning) };
+    }
   }
 
   return { retryAfterMs: 15_000 };
@@ -489,6 +567,37 @@ async function renewWorkLease(
         },
       });
     }
+    case "dmMemory": {
+      if (
+        identity.work.value.organizationId !==
+          worker.principal.organizationId
+      ) {
+        throw new HttpError(403, "Worker is not enabled for this organization");
+      }
+      try {
+        const renewed = await services.renewDmLearningClaim(input.db, {
+          identity: {
+            organizationId: worker.principal.organizationId,
+            deviceId: worker.principal.deviceId,
+            workerId: worker.binding.id,
+            jobId: identity.workId,
+            claimTokenHash,
+          },
+          policy: dmLearningPolicyFor(
+            input,
+            worker.principal.organizationId,
+          ),
+          inputHash: identity.work.value.inputHash,
+          now: observedAt,
+        });
+        return create(RenewWorkLeaseResponseSchema, {
+          leaseExpiresAt: timestamp(renewed, "lease expiry"),
+          work: { case: "dmMemory", value: {} },
+        });
+      } catch (error) {
+        return rethrowDmLearningError(error);
+      }
+    }
     case "mergeBatch": {
       const renewed = await services.renewMergeBatchLease(input.db, {
         batchId: identity.workId,
@@ -534,6 +643,35 @@ async function handoffWork(
   );
   const observedAt = new Date().toISOString();
   const claimTokenHash = await services.sha256(identity.claimToken);
+
+  if (identity.work.case === "dmMemory") {
+    if (
+      identity.work.value.organizationId !== worker.principal.organizationId
+    ) {
+      throw new HttpError(403, "Worker is not enabled for this organization");
+    }
+    const released = await services.failDmLearningClaim(
+      input.db,
+      {
+        organizationId: worker.principal.organizationId,
+        deviceId: worker.principal.deviceId,
+        workerId: worker.binding.id,
+        jobId: identity.workId,
+        claimTokenHash,
+      },
+      "model_unavailable",
+      observedAt,
+    );
+    return {
+      outcome: released
+        ? HandoffWorkResponse_Outcome.RELEASED
+        : HandoffWorkResponse_Outcome.ALREADY_RELEASED,
+      requestId: request.requestId,
+      state: HandoffWorkResponse_State.DRAINING,
+      activeWorkCount: 0,
+      ready: false,
+    };
+  }
 
   if (identity.work.case === "mergeBatch") {
     const released = await services.releaseMergeBatchLease(input.db, {
@@ -1114,6 +1252,202 @@ async function lookupDmMemoryRpc(
   });
 }
 
+const learningJson = <S extends Schema.ConstraintDecoder<unknown>>(
+  schema: S,
+  bytes: Uint8Array,
+): S["Type"] => {
+  try {
+    return Schema.decodeUnknownSync(schema)(
+      JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)),
+    );
+  } catch {
+    throw new HttpError(400, "Invalid memory learning payload");
+  }
+};
+
+const learningJsonBytes = (value: unknown) =>
+  new TextEncoder().encode(dmMemoryCanonicalJson(value));
+
+const learningNumber = (value: bigint, field: string) => {
+  const number = Number(value);
+  if (!Number.isSafeInteger(number)) {
+    throw new HttpError(400, `${field} exceeds JavaScript's safe integer range`);
+  }
+  return number;
+};
+
+const learningUsage = (
+  value: { inputTokens: bigint; outputTokens: bigint; costMicroUsd?: bigint } |
+    undefined,
+) => {
+  if (!value) throw new HttpError(400, "Memory learning usage is required");
+  return Schema.decodeSync(DmLearningUsage)({
+    inputTokens: learningNumber(value.inputTokens, "input_tokens"),
+    outputTokens: learningNumber(value.outputTokens, "output_tokens"),
+    costMicroUsd: value.costMicroUsd === undefined
+      ? null
+      : learningNumber(value.costMicroUsd, "cost_micro_usd"),
+  });
+};
+
+const learningStage = (value: DmMemoryLearningStage) => {
+  switch (value) {
+    case DmMemoryLearningStage.PROPOSING: return "proposing" as const;
+    case DmMemoryLearningStage.VERIFYING: return "verifying" as const;
+    default: throw new HttpError(400, "Memory learning stage is required");
+  }
+};
+
+const learningFailure = (value: DmMemoryLearningFailure) => {
+  switch (value) {
+    case DmMemoryLearningFailure.INVALID_PROPOSAL: return "invalid_proposal" as const;
+    case DmMemoryLearningFailure.VERIFICATION_REJECTED: return "verification_rejected" as const;
+    case DmMemoryLearningFailure.STALE: return "stale" as const;
+    case DmMemoryLearningFailure.SCOPE_REVOKED: return "scope_revoked" as const;
+    case DmMemoryLearningFailure.BUDGET_EXHAUSTED: return "budget_exhausted" as const;
+    case DmMemoryLearningFailure.MODEL_UNAVAILABLE: return "model_unavailable" as const;
+    case DmMemoryLearningFailure.MODEL_TIMEOUT: return "model_timeout" as const;
+    case DmMemoryLearningFailure.MODEL_CREDENTIALS: return "model_credentials" as const;
+    case DmMemoryLearningFailure.MODEL_CONFIGURATION: return "model_configuration" as const;
+    case DmMemoryLearningFailure.INPUT_CAPACITY: return "input_capacity" as const;
+    default: throw new HttpError(400, "Memory learning failure code is required");
+  }
+};
+
+async function dmLearningScope(
+  input: WorkerConnectQueueInput,
+  claim: DmMemoryLearningRequestIdentity | undefined,
+  services: WorkerQueueServices,
+) {
+  if (!claim) throw new HttpError(400, "Memory learning claim is required");
+  const work = requiredWork(claim.work);
+  const worker = await authenticatedWorker(
+    input,
+    claim.projectId,
+    claim.workerId,
+    services,
+  );
+  if (
+    work.work.case !== "dmMemory" || work.workId !== work.runId ||
+    work.work.value.organizationId !== worker.principal.organizationId ||
+    !work.work.value.inputHash
+  ) {
+    throw new HttpError(400, "Memory learning claim identity is invalid");
+  }
+  return {
+    identity: {
+      organizationId: worker.principal.organizationId,
+      deviceId: worker.principal.deviceId,
+      workerId: worker.binding.id,
+      jobId: work.workId,
+      claimTokenHash: await services.sha256(work.claimToken),
+    } satisfies DmLearningClaimIdentity,
+    inputHash: work.work.value.inputHash,
+    organizationId: worker.principal.organizationId,
+  };
+}
+
+async function reserveDmMemoryLearningCallRpc(
+  input: WorkerConnectQueueInput,
+  request: ReserveDmMemoryLearningCallRequest,
+  services: WorkerQueueServices,
+) {
+  try {
+    const scope = await dmLearningScope(input, request.claim, services);
+    const result = await services.reserveDmLearningModelCall(input.db, {
+      ...scope,
+      policy: dmLearningPolicyFor(input, scope.organizationId),
+      callId: request.callId,
+      stage: learningStage(request.stage),
+      now: new Date().toISOString(),
+    });
+    return create(WorkerQueueService.method.reserveDmMemoryLearningCall.output, {
+      json: learningJsonBytes(result),
+    });
+  } catch (error) {
+    return rethrowDmLearningError(error);
+  }
+}
+
+async function submitDmMemoryLearningProposalRpc(
+  input: WorkerConnectQueueInput,
+  request: SubmitDmMemoryLearningProposalRequest,
+  services: WorkerQueueServices,
+) {
+  try {
+    const scope = await dmLearningScope(input, request.claim, services);
+    const result = await services.submitDmLearningProposal(input.db, {
+      ...scope,
+      policy: dmLearningPolicyFor(input, scope.organizationId),
+      callId: request.callId,
+      proposal: learningJson(DmLearningProposal, request.proposalJson),
+      usage: learningUsage(request.usage),
+      now: new Date().toISOString(),
+    });
+    return create(WorkerQueueService.method.submitDmMemoryLearningProposal.output, {
+      json: learningJsonBytes(result),
+    });
+  } catch (error) {
+    return rethrowDmLearningError(error);
+  }
+}
+
+async function submitDmMemoryLearningVerificationRpc(
+  input: WorkerConnectQueueInput,
+  request: SubmitDmMemoryLearningVerificationRequest,
+  services: WorkerQueueServices,
+) {
+  try {
+    const scope = await dmLearningScope(input, request.claim, services);
+    const result = await services.submitDmLearningVerification(input.db, {
+      ...scope,
+      policy: dmLearningPolicyFor(input, scope.organizationId),
+      callId: request.callId,
+      proposalId: request.proposalId,
+      proposalHash: request.proposalHash,
+      verification: learningJson(
+        DmLearningVerification,
+        request.verificationJson,
+      ),
+      usage: learningUsage(request.usage),
+      now: new Date().toISOString(),
+    });
+    return create(
+      WorkerQueueService.method.submitDmMemoryLearningVerification.output,
+      { json: learningJsonBytes(result) },
+    );
+  } catch (error) {
+    return rethrowDmLearningError(error);
+  }
+}
+
+async function failDmMemoryLearningRpc(
+  input: WorkerConnectQueueInput,
+  request: FailDmMemoryLearningRequest,
+  services: WorkerQueueServices,
+) {
+  try {
+    const scope = await dmLearningScope(input, request.claim, services);
+    if ((request.callId === undefined) !== (request.usage === undefined)) {
+      throw new HttpError(400, "Memory learning accounting is incomplete");
+    }
+    const released = await services.failDmLearningClaim(
+      input.db,
+      scope.identity,
+      learningFailure(request.code),
+      new Date().toISOString(),
+      request.callId && request.usage
+        ? { callId: request.callId, usage: learningUsage(request.usage) }
+        : undefined,
+    );
+    return create(WorkerQueueService.method.failDmMemoryLearning.output, {
+      released,
+    });
+  } catch (error) {
+    return rethrowDmLearningError(error);
+  }
+}
+
 export function createWorkerQueueService(
   input: WorkerConnectQueueInput,
   overrides: Partial<WorkerQueueServices> = {},
@@ -1136,6 +1470,14 @@ export function createWorkerQueueService(
     checkDmMemoryClaim: (request) => checkDmMemoryClaimRpc(input, request, services),
     getDmMemoryBrief: (request) => getDmMemoryBriefRpc(input, request, services),
     lookupDmMemory: (request) => lookupDmMemoryRpc(input, request, services),
+    reserveDmMemoryLearningCall: (request) =>
+      reserveDmMemoryLearningCallRpc(input, request, services),
+    submitDmMemoryLearningProposal: (request) =>
+      submitDmMemoryLearningProposalRpc(input, request, services),
+    submitDmMemoryLearningVerification: (request) =>
+      submitDmMemoryLearningVerificationRpc(input, request, services),
+    failDmMemoryLearning: (request) =>
+      failDmMemoryLearningRpc(input, request, services),
   };
 }
 

@@ -83,7 +83,7 @@ describe("project Agent session storage cutover", () => {
       updatedAt: observedAt,
     });
     await applyD1Migrations(db, {
-      through: "0167_canonical_agent_execution_metrics_storage.sql",
+      through: "0168_canonical_agent_execution_metrics_storage.sql",
     });
     await executeD1Sql(db, `
       insert into "user" (
@@ -140,7 +140,7 @@ describe("project Agent session storage cutover", () => {
     ).first<number>("current_version");
 
     await applyD1Migrations(db, {
-      files: ["0168_canonical_project_agent_session_json.sql"],
+      files: ["0169_canonical_project_agent_session_json.sql"],
     });
 
     expect((await db.prepare(

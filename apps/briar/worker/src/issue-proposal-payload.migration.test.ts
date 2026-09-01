@@ -10,7 +10,7 @@ describe("issue proposal payload migration", () => {
     const db = env.DB;
     const now = "2026-08-31T00:00:00.000Z";
     await applyD1Migrations(db, {
-      through: "0161_canonical_archive_storage.sql",
+      through: "0162_canonical_archive_storage.sql",
     });
     await executeD1Sql(db, `
       insert into "user" (
@@ -140,7 +140,7 @@ describe("issue proposal payload migration", () => {
     ).bind(now).run();
 
     await applyD1Migrations(db, {
-      files: ["0162_remove_issue_proposal_status.sql"],
+      files: ["0163_remove_issue_proposal_status.sql"],
     });
 
     expect(await db.prepare(

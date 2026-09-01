@@ -7,6 +7,15 @@ import {
   DmMemoryDocumentStatus as ProtoDmMemoryDocumentStatus,
   DmMemoryEvidenceType as ProtoDmMemoryEvidenceType,
   DmMemoryIndexState as ProtoDmMemoryIndexState,
+  DmMemoryLearningFailureCode as ProtoDmMemoryLearningFailureCode,
+  DmMemoryLearningConfigurationSchema,
+  DmMemoryLearningJobKind as ProtoDmMemoryLearningJobKind,
+  DmMemoryLearningJobSchema,
+  DmMemoryLearningJobStage as ProtoDmMemoryLearningJobStage,
+  DmMemoryLearningJobStatus as ProtoDmMemoryLearningJobStatus,
+  DmMemoryLearningStatusSchema,
+  DmMemoryLearningModelSchema,
+  DmMemoryLearningRetryableJobSchema,
   DmMemoryRevisionOrigin as ProtoDmMemoryRevisionOrigin,
   DmMemoryRevisionSchema,
   DmMemoryService,
@@ -24,10 +33,12 @@ import {
 import {
   dmMemoryCreateInput,
   dmMemoryEditInput,
+  dmMemoryLearningRetryInput,
   dmMemorySettingsInput,
   type DmMemoryClass,
   type DmMemoryDocument,
   type DmMemoryDocumentDetail,
+  type DmMemoryLearningStatus,
   type DmMemorySource,
   type DmMemorySpace,
 } from "../../src/lib/dm-memory-contract";
@@ -43,6 +54,9 @@ import {
   updateDmMemorySettings,
   type DmMemoryOwner,
 } from "./dm-memory-repository";
+import { dmLearningPolicy } from "./dm-memory-learning-policy";
+import { retryDmLearningJob } from "./dm-memory-learning-retry";
+import { readDmLearningStatus } from "./dm-memory-learning-status";
 import { HttpError } from "./http-response";
 import { getOrganizationRole } from "./organization-repository";
 import { decodeRequestSync } from "./request-schema";
@@ -61,6 +75,7 @@ const canonicalUuid = (value: string) => decodeUuid(value).toLowerCase();
 const decodeCreate = decodeRequestSync(dmMemoryCreateInput);
 const decodeEdit = decodeRequestSync(dmMemoryEditInput);
 const decodeSettings = decodeRequestSync(dmMemorySettingsInput);
+const decodeLearningRetry = decodeRequestSync(dmMemoryLearningRetryInput);
 
 const domainMemoryClass = (value: ProtoDmMemoryClass): DmMemoryClass => {
   switch (value) {
@@ -128,6 +143,79 @@ const protoRevisionOrigin = (
     case "consolidate": return ProtoDmMemoryRevisionOrigin.CONSOLIDATE;
   }
 };
+
+const protoLearningJobKind = (value: "extract" | "explicit_request" | "consolidate") => {
+  switch (value) {
+    case "extract": return ProtoDmMemoryLearningJobKind.EXTRACT;
+    case "explicit_request": return ProtoDmMemoryLearningJobKind.EXPLICIT_REQUEST;
+    case "consolidate": return ProtoDmMemoryLearningJobKind.CONSOLIDATE;
+  }
+};
+
+const protoLearningJobStatus = (value: DmMemoryLearningStatus["lastJob"] extends infer T
+  ? NonNullable<T> extends { status: infer S } ? S : never
+  : never) => {
+  switch (value) {
+    case "pending": return ProtoDmMemoryLearningJobStatus.PENDING;
+    case "running": return ProtoDmMemoryLearningJobStatus.RUNNING;
+    case "retry_wait": return ProtoDmMemoryLearningJobStatus.RETRY_WAIT;
+    case "failed": return ProtoDmMemoryLearningJobStatus.FAILED;
+    case "cancelled": return ProtoDmMemoryLearningJobStatus.CANCELLED;
+    case "succeeded": return ProtoDmMemoryLearningJobStatus.SUCCEEDED;
+    case "no_change": return ProtoDmMemoryLearningJobStatus.NO_CHANGE;
+  }
+};
+
+const protoLearningJobStage = (value: "proposing" | "verifying" | "committing") => {
+  switch (value) {
+    case "proposing": return ProtoDmMemoryLearningJobStage.PROPOSING;
+    case "verifying": return ProtoDmMemoryLearningJobStage.VERIFYING;
+    case "committing": return ProtoDmMemoryLearningJobStage.COMMITTING;
+  }
+};
+
+const protoLearningFailureCode = (value: NonNullable<NonNullable<DmMemoryLearningStatus["lastJob"]>["errorCode"]>) => {
+  switch (value) {
+    case "invalid_proposal": return ProtoDmMemoryLearningFailureCode.INVALID_PROPOSAL;
+    case "verification_rejected": return ProtoDmMemoryLearningFailureCode.VERIFICATION_REJECTED;
+    case "stale": return ProtoDmMemoryLearningFailureCode.STALE;
+    case "scope_revoked": return ProtoDmMemoryLearningFailureCode.SCOPE_REVOKED;
+    case "budget_exhausted": return ProtoDmMemoryLearningFailureCode.BUDGET_EXHAUSTED;
+    case "model_unavailable": return ProtoDmMemoryLearningFailureCode.MODEL_UNAVAILABLE;
+    case "model_timeout": return ProtoDmMemoryLearningFailureCode.MODEL_TIMEOUT;
+    case "model_credentials": return ProtoDmMemoryLearningFailureCode.MODEL_CREDENTIALS;
+    case "model_configuration": return ProtoDmMemoryLearningFailureCode.MODEL_CONFIGURATION;
+    case "input_capacity": return ProtoDmMemoryLearningFailureCode.INPUT_CAPACITY;
+  }
+};
+
+const protoLearningStatus = (status: DmMemoryLearningStatus | null) => status === null
+  ? undefined
+  : create(DmMemoryLearningStatusSchema, {
+    configuration: status.configuration === null
+      ? undefined
+      : create(DmMemoryLearningConfigurationSchema, {
+          proposer: create(DmMemoryLearningModelSchema, status.configuration.proposer),
+          verifier: create(DmMemoryLearningModelSchema, status.configuration.verifier),
+          spaceDailyCalls: status.configuration.spaceDailyCalls,
+          spaceDailyMicroUsd: BigInt(status.configuration.spaceDailyMicroUsd),
+        }),
+    callsToday: status.callsToday,
+    reservedMicroUsdToday: BigInt(status.reservedMicroUsdToday),
+    pendingJobs: status.pendingJobs,
+    failedJobs: status.failedJobs,
+    lastJob: status.lastJob === null ? undefined : create(DmMemoryLearningJobSchema, {
+      id: status.lastJob.id,
+      kind: protoLearningJobKind(status.lastJob.kind),
+      status: protoLearningJobStatus(status.lastJob.status),
+      stage: status.lastJob.stage === null ? undefined : protoLearningJobStage(status.lastJob.stage),
+      errorCode: status.lastJob.errorCode === null ? undefined : protoLearningFailureCode(status.lastJob.errorCode),
+      updatedAt: timestamp(status.lastJob.updatedAt),
+    }),
+    retryableJob: status.retryableJob == null
+      ? undefined
+      : create(DmMemoryLearningRetryableJobSchema, status.retryableJob),
+  });
 
 const timestamp = (value: string) => timestampFromDate(new Date(value));
 const optionalTimestamp = (value: string | null) => value === null
@@ -222,6 +310,7 @@ const createAppDmMemoryService = (
 ): ServiceImpl<typeof DmMemoryService> => ({
   listDmMemories: async (request) => {
     const owner = await ownerFor(input, request.organizationId, request.channelId);
+    const policy = dmLearningPolicy(input.env, owner.organizationId);
     const page = await listDmMemories(
       input.db,
       owner,
@@ -230,16 +319,24 @@ const createAppDmMemoryService = (
         : canonicalUuid(request.memorySpaceId),
       request.cursor === undefined ? undefined : canonicalUuid(request.cursor),
     );
+    const learning = await readDmLearningStatus(
+      input.db,
+      owner,
+      page.selectedSpaceId,
+      policy,
+    );
     return create(DmMemoryService.method.listDmMemories.output, {
       eligible: page.eligible,
       capabilities: {
         ...page.capabilities,
         recall: String(input.env.DM_MEMORY_RETRIEVAL_ENABLED) === "true",
+        automaticLearning: learning?.configuration !== null && learning?.configuration !== undefined,
       },
       spaces: page.spaces.map(protoSpace),
       selectedSpaceId: page.selectedSpaceId ?? undefined,
       documents: page.documents.map(protoDocument),
       nextCursor: page.nextCursor ?? undefined,
+      learning: protoLearningStatus(learning),
     });
   },
 
@@ -348,10 +445,27 @@ const createAppDmMemoryService = (
       ),
       useEnabled: request.useEnabled,
       autoEnabled: request.autoEnabled,
-    }));
+    }), {
+      learningAvailable: dmLearningPolicy(input.env, owner.organizationId) !== null,
+    });
     return create(DmMemoryService.method.updateDmMemorySettings.output, {
       space: protoSpace(space),
     });
+  },
+
+  retryDmMemoryLearning: async (request) => {
+    const owner = await ownerFor(input, request.organizationId, request.channelId);
+    const result = await retryDmLearningJob(
+      input.db,
+      owner,
+      canonicalUuid(request.jobId),
+      decodeLearningRetry({
+        requestId: canonicalUuid(request.requestId),
+        revocationEpoch: checkedNumber(request.revocationEpoch, "revocation_epoch"),
+      }),
+      dmLearningPolicy(input.env, owner.organizationId),
+    );
+    return create(DmMemoryService.method.retryDmMemoryLearning.output, result);
   },
 });
 

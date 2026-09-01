@@ -8,6 +8,7 @@ import {
   dmMemoryReplyFenceCurrent,
   requireDmMemoryReplyFence,
 } from "./dm-memory-reply-fence";
+import { dmLearningReplyOutboxStatements } from "./dm-memory-learning-queue";
 import {
   channelReplyAssignedWorkerUnavailableError,
   channelReplyNoAvailableWorkerError,
@@ -4055,6 +4056,9 @@ export async function failChannelReply(
 
 export type ChannelReplyCompletionInput = {
   memoryCitations?: readonly { documentId: string; version: number }[] | null;
+  memorySaveRequest?: {
+    readonly documents: readonly { documentId: string; version: number }[];
+  } | null;
   jobId: string;
   deviceId: string;
   workerId: string;
@@ -4410,7 +4414,10 @@ export async function completeChannelReply(
         input.workerId,
         input.claimTokenHash,
         input.completedAt,
-        JSON.stringify(input.memoryCitations ?? []),
+        JSON.stringify([
+          ...(input.memoryCitations ?? []),
+          ...(input.memorySaveRequest?.documents ?? []),
+        ]),
         ...delegationGuardBindings,
         ...executionGuardBindings,
         ...skillExecutionGuardBindings,
@@ -4469,6 +4476,13 @@ export async function completeChannelReply(
       references: input.memoryCitations,
     }));
   }
+  statements.push(...dmLearningReplyOutboxStatements(db, {
+    jobId: input.jobId,
+    claimTokenHash: input.claimTokenHash,
+    completedAt: input.completedAt,
+    explicitRequested: input.memorySaveRequest != null,
+    requestTargets: input.memorySaveRequest?.documents,
+  }));
   for (const attachment of input.attachments ?? []) {
     statements.push(
       db

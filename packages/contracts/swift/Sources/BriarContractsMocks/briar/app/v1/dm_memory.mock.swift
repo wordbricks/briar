@@ -35,6 +35,8 @@ open class BriarAPI_DmMemoryServiceClientMock: BriarAPI_DmMemoryServiceClientInt
     public var mockAsyncDeleteDmMemoryDocument = { (_: BriarAPI_DeleteDmMemoryDocumentRequest) -> ResponseMessage<BriarAPI_DeleteDmMemoryDocumentResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `updateDmMemorySettings()`.
     public var mockAsyncUpdateDmMemorySettings = { (_: BriarAPI_UpdateDmMemorySettingsRequest) -> ResponseMessage<BriarAPI_UpdateDmMemorySettingsResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `retryDmMemoryLearning()`.
+    public var mockAsyncRetryDmMemoryLearning = { (_: BriarAPI_RetryDmMemoryLearningRequest) -> ResponseMessage<BriarAPI_RetryDmMemoryLearningResponse> in .init(result: .success(.init())) }
 
     public init() {}
 
@@ -64,5 +66,9 @@ open class BriarAPI_DmMemoryServiceClientMock: BriarAPI_DmMemoryServiceClientInt
 
     open func `updateDmMemorySettings`(request: BriarAPI_UpdateDmMemorySettingsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UpdateDmMemorySettingsResponse> {
         return self.mockAsyncUpdateDmMemorySettings(request)
+    }
+
+    open func `retryDmMemoryLearning`(request: BriarAPI_RetryDmMemoryLearningRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_RetryDmMemoryLearningResponse> {
+        return self.mockAsyncRetryDmMemoryLearning(request)
     }
 }

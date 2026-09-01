@@ -219,7 +219,7 @@ final class DmMemoryStore: ObservableObject, Identifiable {
             return true
         } catch { errorMessage = error.localizedDescription; return false }
     }
-    func setUse(_ enabled: Bool, newSpace: Bool = false) async {
+    func setUse(_ enabled: Bool, automatic: Bool = false, newSpace: Bool = false) async {
         guard !busy else { return }
         busy = true; errorMessage = nil
         defer { busy = false }
@@ -232,7 +232,7 @@ final class DmMemoryStore: ObservableObject, Identifiable {
             if !newSpace, let space { request.memorySpaceID = space.id }
             request.expectedMemoryRevision = newSpace ? 0 : space?.memoryRevision ?? 0
             request.useEnabled = enabled
-            request.autoEnabled = false
+            request.autoEnabled = automatic
             let result = try await service.updateDmMemorySettings(request: request, headers: [:]).briarValue()
             guard result.hasSpace else { throw MobileAPIError.invalidResponse }
             page = try await fetchPage(spaceID: result.space.id)
@@ -250,6 +250,22 @@ final class DmMemoryStore: ObservableObject, Identifiable {
             request.documentID = id
             _ = try await service.deleteDmMemoryDocument(request: request, headers: [:]).briarValue()
             page = try await fetchPage(spaceID: page?.selectedSpaceID)
+        } catch { errorMessage = error.localizedDescription }
+    }
+    func retryLearning(_ jobID: String) async {
+        guard !busy, let space else { return }
+        busy = true; errorMessage = nil
+        defer { busy = false }
+        do {
+            try requireScope()
+            var request = BriarAPI_RetryDmMemoryLearningRequest()
+            request.organizationID = organizationID
+            request.channelID = channelID
+            request.jobID = jobID
+            request.requestID = UUID().uuidString.lowercased()
+            request.revocationEpoch = space.revocationEpoch
+            _ = try await service.retryDmMemoryLearning(request: request, headers: [:]).briarValue()
+            page = try await fetchPage(spaceID: space.id)
         } catch { errorMessage = error.localizedDescription }
     }
     func export() async {
@@ -330,8 +346,20 @@ struct DmMemoryView: View {
                                 set: { enabled in Task { await store.setUse(enabled) } }
                             ))
                         }
-                        Toggle(text("자동 학습 · 아직 사용할 수 없음", "Automatic learning · not available yet"),
-                               isOn: .constant(store.space?.autoEnabled ?? false)).disabled(true)
+                        Toggle(page.capabilities.automaticLearning
+                               ? text("대화에서 자동으로 기억", "Learn memories from this conversation")
+                               : text("자동 학습 · 아직 사용할 수 없음", "Automatic learning · not available yet"),
+                               isOn: Binding(
+                                get: { store.space?.autoEnabled ?? false },
+                                set: { enabled in Task { await store.setUse(true, automatic: enabled) } }
+                               ))
+                            .disabled(!store.writable || store.space?.useEnabled != true ||
+                                      (!page.capabilities.automaticLearning && store.space?.autoEnabled != true))
+                            .accessibilityIdentifier("dm-memory-automatic")
+                        Text(text("기억 사용을 먼저 켜세요. 자동 학습은 켠 시점 이후의 대화만 처리하며 직접 편집한 기억은 덮어쓰지 않습니다.",
+                                  "Enable memory first. Automatic learning only processes later conversations and never overwrites user-edited memories."))
+                            .font(.caption).foregroundStyle(.secondary)
+                        if page.hasLearning { learningStatus(page.learning) }
                     }
                     Section(text("저장된 기억", "Saved memories")) {
                         if page.documents.isEmpty { Text(text("저장된 기억이 없습니다.", "No saved memories.")) }
@@ -413,6 +441,77 @@ struct DmMemoryView: View {
         case .failed: text("색인 실패", "Index failed")
         case .pending: text("색인 대기", "Awaiting index")
         case .unspecified, .UNRECOGNIZED: text("알 수 없음", "Unknown")
+        }
+    }
+
+    @ViewBuilder
+    private func learningStatus(_ learning: BriarAPI_DmMemoryLearningStatus) -> some View {
+        if learning.hasConfiguration {
+            let configuration = learning.configuration
+            Text("\(text("제안 / 검증 모델", "Proposer / verifier model")) · \(configuration.proposer.model) / \(configuration.verifier.model)")
+                .font(.caption)
+            Text("OpenRouter · \(configuration.proposer.provider) / \(configuration.verifier.provider)")
+                .font(.caption)
+            Text("\(text("오늘 호출 / 하루 한도", "Calls today / daily limit")) · \(learning.callsToday) / \(configuration.spaceDailyCalls)")
+                .font(.caption)
+            Text(text("오늘 예약 비용 / 하루 한도", "Reserved cost today / daily limit") + " · " +
+                 String(format: "$%.4f / $%.2f USD", Double(learning.reservedMicroUsdToday) / 1_000_000,
+                        Double(configuration.spaceDailyMicroUsd) / 1_000_000))
+                .font(.caption)
+        }
+        Text("\(text("대기·진행 작업", "Pending or running jobs")) · \(learning.pendingJobs) / \(text("실패 기록", "Failed jobs")) · \(learning.failedJobs)")
+            .font(.caption)
+        if learning.hasLastJob {
+            Text(text("학습 상태", "Learning status") + " · " + learningState(learning.lastJob))
+                .font(.caption)
+            if learning.lastJob.hasErrorCode {
+                Text(learningError(learning.lastJob.errorCode))
+                    .font(.caption).foregroundStyle(.red)
+            }
+            if learning.hasRetryableJob {
+                Button(text("실패한 학습 다시 시도", "Retry failed learning")) {
+                    Task { await store.retryLearning(learning.retryableJob.id) }
+                }.disabled(store.busy)
+            }
+        } else {
+            Text(text("아직 학습 작업 없음", "No learning jobs yet")).font(.caption)
+        }
+    }
+
+    private func learningState(_ job: BriarAPI_DmMemoryLearningJob) -> String {
+        if job.status == .running, job.hasStage {
+            switch job.stage {
+            case .proposing: return text("기억 변경안 생성 중", "Proposing memory changes")
+            case .verifying: return text("원본 근거 검증 중", "Verifying original evidence")
+            case .committing: return text("검증된 기억 저장 중", "Saving verified memories")
+            case .unspecified, .UNRECOGNIZED: break
+            }
+        }
+        switch job.status {
+        case .pending: return text("실행 대기", "Waiting to run")
+        case .running: return text("처리 중", "Processing")
+        case .retryWait: return text("재시도 대기", "Waiting to retry")
+        case .failed: return text("학습 실패 · 기억은 변경하지 않음", "Learning failed; memories unchanged")
+        case .cancelled: return text("취소됨", "Cancelled")
+        case .succeeded: return text("기억 저장 완료", "Memories saved")
+        case .noChange: return text("검토 완료 · 새 기억 없음", "Reviewed; no new memories")
+        case .unspecified, .UNRECOGNIZED: return text("확인 필요", "Needs review")
+        }
+    }
+
+    private func learningError(_ code: BriarAPI_DmMemoryLearningFailureCode) -> String {
+        switch code {
+        case .invalidProposal: return text("변경안 형식이나 근거가 유효하지 않아 저장하지 않았습니다.", "The proposal or evidence was invalid. No changes were saved.")
+        case .verificationRejected: return text("별도 검증이 변경안을 거절했습니다. 저장된 기억은 바뀌지 않았습니다.", "Independent verification rejected the proposal. Saved memories were unchanged.")
+        case .stale: return text("근거나 기억이 바뀌어 최신 입력으로 다시 처리합니다.", "Evidence or memories changed. Processing will use current input.")
+        case .scopeRevoked: return text("기억 설정이나 접근 권한이 바뀌어 작업을 중단했습니다.", "Memory settings or access changed. The job stopped.")
+        case .budgetExhausted: return text("설정된 호출·비용 한도를 소진했습니다.", "The call or cost limit was reached.")
+        case .modelUnavailable: return text("학습 모델에 연결하지 못했습니다.", "The learning model could not be reached.")
+        case .modelTimeout: return text("학습 모델 응답 시간이 초과됐습니다.", "The learning model timed out.")
+        case .modelCredentials: return text("학습 모델 인증이나 잔액 설정을 확인해야 합니다.", "Check learning model credentials or account balance.")
+        case .modelConfiguration: return text("설정된 학습 모델·제공자·출력 계약을 사용할 수 없습니다.", "The configured model, provider or output contract is unavailable.")
+        case .inputCapacity: return text("입력 한도를 초과해 학습을 중단했습니다.", "The input exceeded its limit.")
+        case .unspecified, .UNRECOGNIZED: return text("학습 실패 기록을 확인하세요.", "Check the learning failure record.")
         }
     }
 

@@ -48,7 +48,7 @@ describe("structured agent result storage cutover", () => {
     ]);
 
     await applyD1Migrations(db, {
-      files: ["0166_canonical_structured_agent_result_storage.sql"],
+      files: ["0167_canonical_structured_agent_result_storage.sql"],
     });
 
     expect((await db.prepare(

@@ -31,6 +31,9 @@ public protocol BriarAPI_DmMemoryServiceClientInterface: Sendable {
 
     @available(iOS 13, *)
     func `updateDmMemorySettings`(request: BriarAPI_UpdateDmMemorySettingsRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_UpdateDmMemorySettingsResponse>
+
+    @available(iOS 13, *)
+    func `retryDmMemoryLearning`(request: BriarAPI_RetryDmMemoryLearningRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_RetryDmMemoryLearningResponse>
 }
 
 /// Concrete implementation of `BriarAPI_DmMemoryServiceClientInterface`.
@@ -76,6 +79,11 @@ public final class BriarAPI_DmMemoryServiceClient: BriarAPI_DmMemoryServiceClien
         return await self.client.unary(path: "/briar.app.v1.DmMemoryService/UpdateDmMemorySettings", idempotencyLevel: .unknown, request: request, headers: headers)
     }
 
+    @available(iOS 13, *)
+    public func `retryDmMemoryLearning`(request: BriarAPI_RetryDmMemoryLearningRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_RetryDmMemoryLearningResponse> {
+        return await self.client.unary(path: "/briar.app.v1.DmMemoryService/RetryDmMemoryLearning", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
     public enum Metadata {
         public enum Methods {
             public static let listDmMemories = Connect.MethodSpec(name: "ListDmMemories", service: "briar.app.v1.DmMemoryService", type: .unary)
@@ -85,6 +93,7 @@ public final class BriarAPI_DmMemoryServiceClient: BriarAPI_DmMemoryServiceClien
             public static let updateDmMemoryDocument = Connect.MethodSpec(name: "UpdateDmMemoryDocument", service: "briar.app.v1.DmMemoryService", type: .unary)
             public static let deleteDmMemoryDocument = Connect.MethodSpec(name: "DeleteDmMemoryDocument", service: "briar.app.v1.DmMemoryService", type: .unary)
             public static let updateDmMemorySettings = Connect.MethodSpec(name: "UpdateDmMemorySettings", service: "briar.app.v1.DmMemoryService", type: .unary)
+            public static let retryDmMemoryLearning = Connect.MethodSpec(name: "RetryDmMemoryLearning", service: "briar.app.v1.DmMemoryService", type: .unary)
         }
     }
 }

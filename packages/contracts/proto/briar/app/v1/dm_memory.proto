@@ -14,6 +14,7 @@ service DmMemoryService {
   rpc UpdateDmMemoryDocument(UpdateDmMemoryDocumentRequest) returns (UpdateDmMemoryDocumentResponse);
   rpc DeleteDmMemoryDocument(DeleteDmMemoryDocumentRequest) returns (DeleteDmMemoryDocumentResponse);
   rpc UpdateDmMemorySettings(UpdateDmMemorySettingsRequest) returns (UpdateDmMemorySettingsResponse);
+  rpc RetryDmMemoryLearning(RetryDmMemoryLearningRequest) returns (RetryDmMemoryLearningResponse);
 }
 
 message ListDmMemoriesRequest {
@@ -30,6 +31,95 @@ message ListDmMemoriesResponse {
   optional string selected_space_id = 4;
   repeated DmMemoryDocument documents = 5;
   optional string next_cursor = 6;
+  optional DmMemoryLearningStatus learning = 7;
+}
+
+message DmMemoryLearningStatus {
+  optional DmMemoryLearningConfiguration configuration = 1;
+  uint32 calls_today = 2;
+  uint64 reserved_micro_usd_today = 3;
+  uint32 pending_jobs = 4;
+  uint32 failed_jobs = 5;
+  optional DmMemoryLearningJob last_job = 6;
+  optional DmMemoryLearningRetryableJob retryable_job = 7;
+}
+
+message DmMemoryLearningConfiguration {
+  DmMemoryLearningModel proposer = 1;
+  DmMemoryLearningModel verifier = 2;
+  uint32 space_daily_calls = 3;
+  uint64 space_daily_micro_usd = 4;
+}
+
+message DmMemoryLearningModel {
+  string model = 1;
+  string provider = 2;
+}
+
+message DmMemoryLearningJob {
+  string id = 1;
+  DmMemoryLearningJobKind kind = 2;
+  DmMemoryLearningJobStatus status = 3;
+  optional DmMemoryLearningJobStage stage = 4;
+  optional DmMemoryLearningFailureCode error_code = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+message DmMemoryLearningRetryableJob {
+  string id = 1;
+  uint32 calls_used = 2;
+}
+
+message RetryDmMemoryLearningRequest {
+  string organization_id = 1;
+  string channel_id = 2;
+  string job_id = 3;
+  string request_id = 4;
+  uint64 revocation_epoch = 5;
+}
+
+message RetryDmMemoryLearningResponse {
+  bool accepted = 1;
+  bool replayed = 2;
+}
+
+enum DmMemoryLearningJobKind {
+  DM_MEMORY_LEARNING_JOB_KIND_UNSPECIFIED = 0;
+  DM_MEMORY_LEARNING_JOB_KIND_EXTRACT = 1;
+  DM_MEMORY_LEARNING_JOB_KIND_EXPLICIT_REQUEST = 2;
+  DM_MEMORY_LEARNING_JOB_KIND_CONSOLIDATE = 3;
+}
+
+enum DmMemoryLearningJobStatus {
+  DM_MEMORY_LEARNING_JOB_STATUS_UNSPECIFIED = 0;
+  DM_MEMORY_LEARNING_JOB_STATUS_PENDING = 1;
+  DM_MEMORY_LEARNING_JOB_STATUS_RUNNING = 2;
+  DM_MEMORY_LEARNING_JOB_STATUS_RETRY_WAIT = 3;
+  DM_MEMORY_LEARNING_JOB_STATUS_FAILED = 4;
+  DM_MEMORY_LEARNING_JOB_STATUS_CANCELLED = 5;
+  DM_MEMORY_LEARNING_JOB_STATUS_SUCCEEDED = 6;
+  DM_MEMORY_LEARNING_JOB_STATUS_NO_CHANGE = 7;
+}
+
+enum DmMemoryLearningJobStage {
+  DM_MEMORY_LEARNING_JOB_STAGE_UNSPECIFIED = 0;
+  DM_MEMORY_LEARNING_JOB_STAGE_PROPOSING = 1;
+  DM_MEMORY_LEARNING_JOB_STAGE_VERIFYING = 2;
+  DM_MEMORY_LEARNING_JOB_STAGE_COMMITTING = 3;
+}
+
+enum DmMemoryLearningFailureCode {
+  DM_MEMORY_LEARNING_FAILURE_CODE_UNSPECIFIED = 0;
+  DM_MEMORY_LEARNING_FAILURE_CODE_INVALID_PROPOSAL = 1;
+  DM_MEMORY_LEARNING_FAILURE_CODE_VERIFICATION_REJECTED = 2;
+  DM_MEMORY_LEARNING_FAILURE_CODE_STALE = 3;
+  DM_MEMORY_LEARNING_FAILURE_CODE_SCOPE_REVOKED = 4;
+  DM_MEMORY_LEARNING_FAILURE_CODE_BUDGET_EXHAUSTED = 5;
+  DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_UNAVAILABLE = 6;
+  DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_TIMEOUT = 7;
+  DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_CREDENTIALS = 8;
+  DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_CONFIGURATION = 9;
+  DM_MEMORY_LEARNING_FAILURE_CODE_INPUT_CAPACITY = 10;
 }
 
 message GetDmMemoryDocumentRequest {

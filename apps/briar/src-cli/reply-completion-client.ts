@@ -5,6 +5,7 @@ import {
   ChannelReplySuccessSchema,
   CompleteChannelReplyRequestSchema,
   CompleteIssueReplyRequestSchema,
+  DmMemorySaveRequestSchema,
   IssueReplySuccessSchema,
   PrepareReplyAttachmentUploadsRequestSchema,
   ReplyCompletionDisposition,
@@ -204,6 +205,14 @@ const channelSuccess = (
       documentId: reference.documentId,
       version: reference.version,
     })),
+    memorySaveRequest: result.memorySaveRequest
+      ? create(DmMemorySaveRequestSchema, {
+          documents: result.memorySaveRequest.documents.map((reference) => ({
+            documentId: reference.documentId,
+            version: reference.version,
+          })),
+        })
+      : undefined,
   };
   const artifactProposalCount = [
     result.issueProposal,

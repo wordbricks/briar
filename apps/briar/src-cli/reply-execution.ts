@@ -785,6 +785,7 @@ async function runClaimedChannelReply(
       },
       workspaceAvailable: Boolean(analysisWorktree),
       organizationContextAvailable: organizationContext !== null,
+      memoryLearningAvailable: reply.memoryLearningEnabled,
       delegationTargets: reply.delegationTargets,
       delegation: reply.delegation,
       skillExecutionTarget: reply.skillExecutionTarget,
@@ -894,6 +895,9 @@ async function runClaimedChannelReply(
       const decodedTurn = outputContract.decodeJson(turn.resultText);
       if (decodedTurn.case === "reply") {
         result = decodedTurn.result;
+        if (result.memorySaveRequest && !reply.memoryLearningEnabled) {
+          throw new Error("memory_learning_unavailable");
+        }
         attachmentPaths = decodedTurn.attachmentPaths;
         break;
       }

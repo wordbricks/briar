@@ -478,6 +478,9 @@ export function completeChannelReplyInputFromProto(
   }
   const completion = mapping(() => decodeChannelReplyCompletion({
     memoryCitations: success.memoryCitations,
+    memorySaveRequest: success.memorySaveRequest
+      ? { documents: success.memorySaveRequest.documents }
+      : null,
     body: success.body,
     document,
     issueProposal,

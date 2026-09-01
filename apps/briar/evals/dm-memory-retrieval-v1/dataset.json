@@ -1,0 +1,428 @@
+{
+  "version": 1,
+  "embeddingProfile": "cf-bge-m3-1024-cosine-v1",
+  "positive": [
+    {
+      "id": "r01",
+      "title": "Executive summary order",
+      "body": "For technical explanations, start with the conclusion and then provide the supporting evidence.",
+      "query": "기술 설명을 할 때 어떤 순서로 말해야 하나요?",
+      "split": "dev",
+      "direction": "ko_to_en"
+    },
+    {
+      "id": "r02",
+      "title": "Package manager",
+      "body": "The Cedar web workspace uses pnpm. Do not run npm install in that repository.",
+      "query": "Cedar 웹 저장소에서는 어떤 패키지 매니저를 써야 해?",
+      "split": "final",
+      "direction": "ko_to_en"
+    },
+    {
+      "id": "r03",
+      "title": "Weekly design review",
+      "body": "The recurring design review is every Wednesday at 15:00 UTC.",
+      "query": "정기 디자인 리뷰는 언제 열려?",
+      "split": "dev",
+      "direction": "ko_to_en"
+    },
+    {
+      "id": "r04",
+      "title": "Flight preference",
+      "body": "Avoid red-eye flights when arranging work travel, even when they are cheaper.",
+      "query": "출장 항공편을 고를 때 피해야 할 시간대가 있나요?",
+      "split": "final",
+      "direction": "ko_to_en"
+    },
+    {
+      "id": "r05",
+      "title": "API date format",
+      "body": "Public API timestamps must use ISO 8601 with an explicit UTC offset.",
+      "query": "공개 API의 날짜와 시간은 어떤 형식이어야 해?",
+      "split": "dev",
+      "direction": "ko_to_en"
+    },
+    {
+      "id": "r06",
+      "title": "Meal constraint",
+      "body": "For team meals, choose vegetarian food and exclude shellfish.",
+      "query": "팀 식사 메뉴를 정할 때 지켜야 할 음식 조건은?",
+      "split": "final",
+      "direction": "ko_to_en"
+    },
+    {
+      "id": "r07",
+      "title": "Production promotion",
+      "body": "Promote a build to production only after its staging approval is recorded.",
+      "query": "프로덕션으로 올리기 전에 필요한 조건이 뭐야?",
+      "split": "dev",
+      "direction": "ko_to_en"
+    },
+    {
+      "id": "r08",
+      "title": "Measurement units",
+      "body": "Use metric units in product specifications and customer-facing documentation.",
+      "query": "제품 사양 문서에서는 어떤 단위를 사용해야 해?",
+      "split": "final",
+      "direction": "ko_to_en"
+    },
+    {
+      "id": "r09",
+      "title": "Error reports",
+      "body": "Every support error report must include the safe request ID when one is available.",
+      "query": "지원 오류 보고서에 반드시 넣어야 하는 식별자는?",
+      "split": "dev",
+      "direction": "ko_to_en"
+    },
+    {
+      "id": "r10",
+      "title": "Purchase approval",
+      "body": "Purchases above USD 50 require explicit approval before ordering.",
+      "query": "얼마를 넘는 구매부터 사전 승인이 필요한가요?",
+      "split": "final",
+      "direction": "ko_to_en"
+    },
+    {
+      "id": "r11",
+      "title": "이메일 문체",
+      "body": "고객 이메일은 한국어 존댓말로 작성하고 과도한 친근한 표현은 피한다.",
+      "query": "What tone should customer emails use?",
+      "split": "dev",
+      "direction": "en_to_ko"
+    },
+    {
+      "id": "r12",
+      "title": "안드로이드 최소 버전",
+      "body": "안드로이드 앱의 최소 지원 버전은 Android 12이다.",
+      "query": "What is the minimum supported Android version?",
+      "split": "final",
+      "direction": "en_to_ko"
+    },
+    {
+      "id": "r13",
+      "title": "데이터 내보내기 형식",
+      "body": "사용자 데이터 내보내기는 원문과 메타데이터를 포함한 ZIP 파일로 제공한다.",
+      "query": "Which format should a user data export use?",
+      "split": "dev",
+      "direction": "en_to_ko"
+    },
+    {
+      "id": "r14",
+      "title": "회의 불가 시간",
+      "body": "금요일 오전에는 외부 회의를 잡지 않는다.",
+      "query": "When should external meetings not be scheduled?",
+      "split": "final",
+      "direction": "en_to_ko"
+    },
+    {
+      "id": "r15",
+      "title": "QA 로케일",
+      "body": "출시 전 기본 QA는 한국어 로케일에서도 반드시 수행한다.",
+      "query": "Which additional locale is mandatory for release QA?",
+      "split": "dev",
+      "direction": "en_to_ko"
+    },
+    {
+      "id": "r16",
+      "title": "백업 보존 기간",
+      "body": "서비스 백업은 생성일로부터 30일 동안 보존한다.",
+      "query": "How long are service backups retained?",
+      "split": "final",
+      "direction": "en_to_ko"
+    },
+    {
+      "id": "r17",
+      "title": "스크린샷 테마",
+      "body": "제품 문서의 화면 예시는 가능하면 다크 모드 스크린샷을 사용한다.",
+      "query": "Which theme is preferred for product documentation screenshots?",
+      "split": "dev",
+      "direction": "en_to_ko"
+    },
+    {
+      "id": "r18",
+      "title": "청구서 수신처",
+      "body": "공급업체 청구서는 finance@wordbricks.ai 별칭으로 전달한다.",
+      "query": "Where should vendor invoices be sent?",
+      "split": "final",
+      "direction": "en_to_ko"
+    },
+    {
+      "id": "r19",
+      "title": "PR 제목 언어",
+      "body": "Pull request 제목은 영어로 작성한다. 본문 설명은 한국어여도 된다.",
+      "query": "What language should pull request titles use?",
+      "split": "dev",
+      "direction": "en_to_ko"
+    },
+    {
+      "id": "r20",
+      "title": "이름 로마자 표기",
+      "body": "사용자의 성은 로마자로 Nam이라고 표기한다. Nahm은 이전의 잘못된 표기다.",
+      "query": "What is the corrected romanization of the user’s surname?",
+      "split": "final",
+      "direction": "en_to_ko"
+    },
+    {
+      "id": "r21",
+      "title": "Current deployment region",
+      "body": "History: the service previously ran in NRT. Current: production is deployed in the ICN region.",
+      "query": "Which region currently hosts production?",
+      "split": "dev",
+      "direction": "same"
+    },
+    {
+      "id": "r22",
+      "title": "Quiet hours",
+      "body": "Do not send non-urgent notifications after 22:00 local time.",
+      "query": "비긴급 알림의 야간 제한 시간은 언제부터인가요?",
+      "split": "final",
+      "direction": "mixed"
+    },
+    {
+      "id": "r23",
+      "title": "Offline cache storage",
+      "body": "Use SQLite for the mobile offline cache; do not use localStorage for that data.",
+      "query": "모바일 오프라인 캐시는 어디에 저장해야 해?",
+      "split": "dev",
+      "direction": "same"
+    },
+    {
+      "id": "r24",
+      "title": "Reduced motion",
+      "body": "Interactive transitions must respect the operating system reduced-motion setting.",
+      "query": "애니메이션 접근성에서 따라야 할 시스템 설정은?",
+      "split": "final",
+      "direction": "same"
+    },
+    {
+      "id": "r25",
+      "title": "Displayed prices",
+      "body": "Customer-facing prices include VAT unless a market-specific rule says otherwise.",
+      "query": "고객에게 표시하는 가격에 세금이 포함되나요?",
+      "split": "dev",
+      "direction": "mixed"
+    },
+    {
+      "id": "r26",
+      "title": "Code example language",
+      "body": "Use TypeScript for SDK examples unless the customer requests another language.",
+      "query": "기본 SDK 예제는 어느 프로그래밍 언어로 작성해?",
+      "split": "final",
+      "direction": "same"
+    },
+    {
+      "id": "r27",
+      "title": "Beta exclusion",
+      "body": "Customer Alpha is excluded from the private beta until its security review is complete.",
+      "query": "보안 검토 전 비공개 베타에서 제외되는 고객은?",
+      "split": "dev",
+      "direction": "same"
+    },
+    {
+      "id": "r28",
+      "title": "Delivery deadline correction",
+      "body": "The delivery deadline is September 15, not the previously stated September 12.",
+      "query": "수정된 납품 마감일은 언제야?",
+      "split": "final",
+      "direction": "same"
+    },
+    {
+      "id": "r29",
+      "title": "Report limitations",
+      "body": "Every analytical report must state material limitations and unverified assumptions.",
+      "query": "분석 보고서에 반드시 밝혀야 하는 것은?",
+      "split": "dev",
+      "direction": "same"
+    },
+    {
+      "id": "r30",
+      "title": "Legal clause handling",
+      "body": "Do not automatically summarize legal clauses; preserve the original text for human review.",
+      "query": "법률 조항을 자동으로 요약해도 되나요?",
+      "split": "final",
+      "direction": "same"
+    },
+    {
+      "id": "r31",
+      "title": "Model routing",
+      "body": "Model-provider fallback is disabled for verified memory proposal and verification calls.",
+      "query": "검증된 기억 모델 호출에서 provider fallback을 허용하나요?",
+      "split": "dev",
+      "direction": "same"
+    },
+    {
+      "id": "r32",
+      "title": "Upload limit",
+      "body": "A single attachment may be at most 20 MiB.",
+      "query": "첨부 파일 하나의 최대 크기는?",
+      "split": "final",
+      "direction": "same"
+    },
+    {
+      "id": "r33",
+      "title": "Browser validation",
+      "body": "Customer-facing browser validation includes Safari in addition to the default Chromium run.",
+      "query": "기본 Chromium 외에 어떤 브라우저 검증이 필요한가요?",
+      "split": "dev",
+      "direction": "same"
+    },
+    {
+      "id": "r34",
+      "title": "Quarterly report currency",
+      "body": "Quarterly finance reports present totals in KRW.",
+      "query": "분기 재무 보고서의 기본 통화는?",
+      "split": "final",
+      "direction": "same"
+    },
+    {
+      "id": "r35",
+      "title": "Support document privacy",
+      "body": "Never include a person’s private phone number in support documentation.",
+      "query": "지원 문서에 개인 전화번호를 넣어도 되나요?",
+      "split": "dev",
+      "direction": "same"
+    },
+    {
+      "id": "r36",
+      "title": "Project codename",
+      "body": "The internal codename for the memory project is Cedar.",
+      "query": "기억 프로젝트의 내부 코드명은 무엇인가요?",
+      "split": "final",
+      "direction": "same"
+    },
+    {
+      "id": "r37",
+      "title": "Timezone preservation",
+      "body": "When displaying an imported event, preserve its original timezone instead of silently converting it.",
+      "query": "가져온 일정의 시간대를 표시할 때 어떤 원칙을 따라야 해?",
+      "split": "dev",
+      "direction": "same"
+    },
+    {
+      "id": "r38",
+      "title": "Current notification channel",
+      "body": "Deployment alerts now go to the release-ops channel; the old deploy-log channel is retired.",
+      "query": "배포 알림의 현재 채널은 어디야?",
+      "split": "final",
+      "direction": "same"
+    },
+    {
+      "id": "r39",
+      "title": "Public examples",
+      "body": "When an example is published publicly, replace real customer names with synthetic names.",
+      "query": "예제를 공개할 때 실제 고객 이름은 어떻게 처리해야 하나요?",
+      "split": "dev",
+      "direction": "same"
+    },
+    {
+      "id": "r40",
+      "title": "Runbook structure",
+      "body": "Operational runbooks use numbered steps for procedures and plain paragraphs for context.",
+      "query": "운영 런북의 절차는 어떤 형식으로 작성해?",
+      "split": "final",
+      "direction": "same"
+    }
+  ],
+  "negative": [
+    {
+      "id": "n01",
+      "query": "What is the user’s favorite color?",
+      "split": "dev"
+    },
+    {
+      "id": "n02",
+      "query": "사용자는 커피와 차 중 무엇을 더 좋아하나요?",
+      "split": "final"
+    },
+    {
+      "id": "n03",
+      "query": "Which Python formatter is required?",
+      "split": "dev"
+    },
+    {
+      "id": "n04",
+      "query": "iOS의 최소 지원 버전은 무엇인가요?",
+      "split": "final"
+    },
+    {
+      "id": "n05",
+      "query": "How long are application logs retained?",
+      "split": "dev"
+    },
+    {
+      "id": "n06",
+      "query": "월간 영업 보고서의 기본 통화는 무엇인가요?",
+      "split": "final"
+    },
+    {
+      "id": "n07",
+      "query": "Can Customer Beta join the public beta?",
+      "split": "dev"
+    },
+    {
+      "id": "n08",
+      "query": "이미지의 최대 가로 픽셀 수는 얼마인가요?",
+      "split": "final"
+    },
+    {
+      "id": "n09",
+      "query": "What language should SMS messages use?",
+      "split": "dev"
+    },
+    {
+      "id": "n10",
+      "query": "영수증은 어느 이메일 주소로 보내야 하나요?",
+      "split": "final"
+    },
+    {
+      "id": "n11",
+      "query": "Should legal clauses be translated automatically?",
+      "split": "dev"
+    },
+    {
+      "id": "n12",
+      "query": "서버 분석 데이터베이스로 무엇을 사용해야 하나요?",
+      "split": "final"
+    },
+    {
+      "id": "n13",
+      "query": "May a personal email address appear in support documentation?",
+      "split": "dev"
+    },
+    {
+      "id": "n14",
+      "query": "인쇄된 PDF에도 reduced motion 설정을 적용해야 하나요?",
+      "split": "final"
+    },
+    {
+      "id": "n15",
+      "query": "What is the project’s public marketing name?",
+      "split": "dev"
+    },
+    {
+      "id": "n16",
+      "query": "주말에 알림을 보내도 되나요?",
+      "split": "final"
+    },
+    {
+      "id": "n17",
+      "query": "Which screen reader does the user use?",
+      "split": "dev"
+    },
+    {
+      "id": "n18",
+      "query": "사용자의 집 주소는 어디인가요?",
+      "split": "final"
+    },
+    {
+      "id": "n19",
+      "query": "What seat does the user prefer on daytime flights?",
+      "split": "dev"
+    },
+    {
+      "id": "n20",
+      "query": "법률 계약서의 날짜 형식은 무엇인가요?",
+      "split": "final"
+    }
+  ]
+}

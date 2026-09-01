@@ -168,6 +168,54 @@ pub type OwnedLookupDmMemoryRequestView = ::buffa::view::OwnedView<
 pub type OwnedLookupDmMemoryResponseView = ::buffa::view::OwnedView<
     crate::proto::briar::worker::v1::__buffa::view::LookupDmMemoryResponseView<'static>,
 >;
+///Shorthand for `OwnedView<ReserveDmMemoryLearningCallRequestView<'static>>`.
+pub type OwnedReserveDmMemoryLearningCallRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::ReserveDmMemoryLearningCallRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ReserveDmMemoryLearningCallResponseView<'static>>`.
+pub type OwnedReserveDmMemoryLearningCallResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::ReserveDmMemoryLearningCallResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<SubmitDmMemoryLearningProposalRequestView<'static>>`.
+pub type OwnedSubmitDmMemoryLearningProposalRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::SubmitDmMemoryLearningProposalRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<SubmitDmMemoryLearningProposalResponseView<'static>>`.
+pub type OwnedSubmitDmMemoryLearningProposalResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::SubmitDmMemoryLearningProposalResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<SubmitDmMemoryLearningVerificationRequestView<'static>>`.
+pub type OwnedSubmitDmMemoryLearningVerificationRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::SubmitDmMemoryLearningVerificationRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<SubmitDmMemoryLearningVerificationResponseView<'static>>`.
+pub type OwnedSubmitDmMemoryLearningVerificationResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::SubmitDmMemoryLearningVerificationResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<FailDmMemoryLearningRequestView<'static>>`.
+pub type OwnedFailDmMemoryLearningRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::FailDmMemoryLearningRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<FailDmMemoryLearningResponseView<'static>>`.
+pub type OwnedFailDmMemoryLearningResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::FailDmMemoryLearningResponseView<
+        'static,
+    >,
+>;
 ///Shorthand for `OwnedView<PublishReplyActivityRequestView<'static>>`.
 pub type OwnedPublishReplyActivityRequestView = ::buffa::view::OwnedView<
     crate::proto::briar::worker::v1::__buffa::view::PublishReplyActivityRequestView<
@@ -973,6 +1021,174 @@ for ::buffa::view::OwnedView<
     }
 }
 impl ::connectrpc::Encodable<
+    crate::proto::briar::worker::v1::ReserveDmMemoryLearningCallResponse,
+>
+for crate::proto::briar::worker::v1::__buffa::view::ReserveDmMemoryLearningCallResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::worker::v1::ReserveDmMemoryLearningCallResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::ReserveDmMemoryLearningCallResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::worker::v1::SubmitDmMemoryLearningProposalResponse,
+>
+for crate::proto::briar::worker::v1::__buffa::view::SubmitDmMemoryLearningProposalResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::worker::v1::SubmitDmMemoryLearningProposalResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::SubmitDmMemoryLearningProposalResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::worker::v1::SubmitDmMemoryLearningVerificationResponse,
+>
+for crate::proto::briar::worker::v1::__buffa::view::SubmitDmMemoryLearningVerificationResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::worker::v1::SubmitDmMemoryLearningVerificationResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::SubmitDmMemoryLearningVerificationResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::worker::v1::FailDmMemoryLearningResponse,
+>
+for crate::proto::briar::worker::v1::__buffa::view::FailDmMemoryLearningResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::worker::v1::FailDmMemoryLearningResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::FailDmMemoryLearningResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
     crate::proto::briar::worker::v1::PublishReplyActivityResponse,
 >
 for crate::proto::briar::worker::v1::__buffa::view::PublishReplyActivityResponseView<
@@ -1622,6 +1838,30 @@ pub const WORKER_QUEUE_SERVICE_LOOKUP_DM_MEMORY_SPEC: ::connectrpc::Spec = ::con
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `ReserveDmMemoryLearningCall` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_QUEUE_SERVICE_RESERVE_DM_MEMORY_LEARNING_CALL_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerQueueService/ReserveDmMemoryLearningCall",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `SubmitDmMemoryLearningProposal` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_QUEUE_SERVICE_SUBMIT_DM_MEMORY_LEARNING_PROPOSAL_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerQueueService/SubmitDmMemoryLearningProposal",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `SubmitDmMemoryLearningVerification` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_QUEUE_SERVICE_SUBMIT_DM_MEMORY_LEARNING_VERIFICATION_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerQueueService/SubmitDmMemoryLearningVerification",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `FailDmMemoryLearning` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_QUEUE_SERVICE_FAIL_DM_MEMORY_LEARNING_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerQueueService/FailDmMemoryLearning",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// The machine Worker queue control plane. Attachment metadata and upload
 /// capabilities are negotiated here, while attachment bytes, large evidence,
 /// and provider-specific streams intentionally use their dedicated transports.
@@ -2040,6 +2280,98 @@ pub trait WorkerQueueService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::briar::worker::v1::LookupDmMemoryResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the ReserveDmMemoryLearningCall RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn reserve_dm_memory_learning_call<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::worker::v1::ReserveDmMemoryLearningCallRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::worker::v1::ReserveDmMemoryLearningCallResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the SubmitDmMemoryLearningProposal RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn submit_dm_memory_learning_proposal<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::worker::v1::SubmitDmMemoryLearningProposalRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::worker::v1::SubmitDmMemoryLearningProposalResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the SubmitDmMemoryLearningVerification RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn submit_dm_memory_learning_verification<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::worker::v1::SubmitDmMemoryLearningVerificationRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::worker::v1::SubmitDmMemoryLearningVerificationResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the FailDmMemoryLearning RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn fail_dm_memory_learning<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::worker::v1::FailDmMemoryLearningRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::worker::v1::FailDmMemoryLearningResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -2539,6 +2871,122 @@ impl<S: WorkerQueueService> WorkerQueueServiceExt for S {
                 },
             )
             .with_spec(WORKER_QUEUE_SERVICE_LOOKUP_DM_MEMORY_SPEC)
+            .route_view(
+                WORKER_QUEUE_SERVICE_SERVICE_NAME,
+                "ReserveDmMemoryLearningCall",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::worker::v1::__buffa::view::ReserveDmMemoryLearningCallRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::worker::v1::ReserveDmMemoryLearningCallRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.reserve_dm_memory_learning_call(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::worker::v1::ReserveDmMemoryLearningCallResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(WORKER_QUEUE_SERVICE_RESERVE_DM_MEMORY_LEARNING_CALL_SPEC)
+            .route_view(
+                WORKER_QUEUE_SERVICE_SERVICE_NAME,
+                "SubmitDmMemoryLearningProposal",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::worker::v1::__buffa::view::SubmitDmMemoryLearningProposalRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::worker::v1::SubmitDmMemoryLearningProposalRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.submit_dm_memory_learning_proposal(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::worker::v1::SubmitDmMemoryLearningProposalResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(WORKER_QUEUE_SERVICE_SUBMIT_DM_MEMORY_LEARNING_PROPOSAL_SPEC)
+            .route_view(
+                WORKER_QUEUE_SERVICE_SERVICE_NAME,
+                "SubmitDmMemoryLearningVerification",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::worker::v1::__buffa::view::SubmitDmMemoryLearningVerificationRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::worker::v1::SubmitDmMemoryLearningVerificationRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.submit_dm_memory_learning_verification(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::worker::v1::SubmitDmMemoryLearningVerificationResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(WORKER_QUEUE_SERVICE_SUBMIT_DM_MEMORY_LEARNING_VERIFICATION_SPEC)
+            .route_view(
+                WORKER_QUEUE_SERVICE_SERVICE_NAME,
+                "FailDmMemoryLearning",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::worker::v1::__buffa::view::FailDmMemoryLearningRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::worker::v1::FailDmMemoryLearningRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.fail_dm_memory_learning(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::worker::v1::FailDmMemoryLearningResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(WORKER_QUEUE_SERVICE_FAIL_DM_MEMORY_LEARNING_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -2701,6 +3149,36 @@ impl<T: WorkerQueueService> ::connectrpc::Dispatcher for WorkerQueueServiceServe
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
                         .with_spec(WORKER_QUEUE_SERVICE_LOOKUP_DM_MEMORY_SPEC),
+                )
+            }
+            "ReserveDmMemoryLearningCall" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(
+                            WORKER_QUEUE_SERVICE_RESERVE_DM_MEMORY_LEARNING_CALL_SPEC,
+                        ),
+                )
+            }
+            "SubmitDmMemoryLearningProposal" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(
+                            WORKER_QUEUE_SERVICE_SUBMIT_DM_MEMORY_LEARNING_PROPOSAL_SPEC,
+                        ),
+                )
+            }
+            "SubmitDmMemoryLearningVerification" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(
+                            WORKER_QUEUE_SERVICE_SUBMIT_DM_MEMORY_LEARNING_VERIFICATION_SPEC,
+                        ),
+                )
+            }
+            "FailDmMemoryLearning" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(WORKER_QUEUE_SERVICE_FAIL_DM_MEMORY_LEARNING_SPEC),
                 )
             }
             _ => None,
@@ -3067,6 +3545,94 @@ impl<T: WorkerQueueService> ::connectrpc::Dispatcher for WorkerQueueServiceServe
                         .await?
                         .encode::<
                             crate::proto::briar::worker::v1::LookupDmMemoryResponse,
+                        >(format)
+                })
+            }
+            "ReserveDmMemoryLearningCall" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::worker::v1::ReserveDmMemoryLearningCallRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::worker::v1::__buffa::view::ReserveDmMemoryLearningCallRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::worker::v1::ReserveDmMemoryLearningCallRequest,
+                    >::from_parts(&req, &body);
+                    svc.reserve_dm_memory_learning_call(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::worker::v1::ReserveDmMemoryLearningCallResponse,
+                        >(format)
+                })
+            }
+            "SubmitDmMemoryLearningProposal" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::worker::v1::SubmitDmMemoryLearningProposalRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::worker::v1::__buffa::view::SubmitDmMemoryLearningProposalRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::worker::v1::SubmitDmMemoryLearningProposalRequest,
+                    >::from_parts(&req, &body);
+                    svc.submit_dm_memory_learning_proposal(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::worker::v1::SubmitDmMemoryLearningProposalResponse,
+                        >(format)
+                })
+            }
+            "SubmitDmMemoryLearningVerification" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::worker::v1::SubmitDmMemoryLearningVerificationRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::worker::v1::__buffa::view::SubmitDmMemoryLearningVerificationRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::worker::v1::SubmitDmMemoryLearningVerificationRequest,
+                    >::from_parts(&req, &body);
+                    svc.submit_dm_memory_learning_verification(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::worker::v1::SubmitDmMemoryLearningVerificationResponse,
+                        >(format)
+                })
+            }
+            "FailDmMemoryLearning" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::worker::v1::FailDmMemoryLearningRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::worker::v1::__buffa::view::FailDmMemoryLearningRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::worker::v1::FailDmMemoryLearningRequest,
+                    >::from_parts(&req, &body);
+                    svc.fail_dm_memory_learning(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::worker::v1::FailDmMemoryLearningResponse,
                         >(format)
                 })
             }
@@ -3914,6 +4480,186 @@ where
                 &self.transport,
                 &self.config,
                 WORKER_QUEUE_SERVICE_LOOKUP_DM_MEMORY_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ReserveDmMemoryLearningCall RPC. Sends a request to /briar.worker.v1.WorkerQueueService/ReserveDmMemoryLearningCall.
+    pub async fn reserve_dm_memory_learning_call(
+        &self,
+        request: crate::proto::briar::worker::v1::ReserveDmMemoryLearningCallRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::ReserveDmMemoryLearningCallResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.reserve_dm_memory_learning_call_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ReserveDmMemoryLearningCall RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn reserve_dm_memory_learning_call_with_options(
+        &self,
+        request: crate::proto::briar::worker::v1::ReserveDmMemoryLearningCallRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::ReserveDmMemoryLearningCallResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                WORKER_QUEUE_SERVICE_RESERVE_DM_MEMORY_LEARNING_CALL_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the SubmitDmMemoryLearningProposal RPC. Sends a request to /briar.worker.v1.WorkerQueueService/SubmitDmMemoryLearningProposal.
+    pub async fn submit_dm_memory_learning_proposal(
+        &self,
+        request: crate::proto::briar::worker::v1::SubmitDmMemoryLearningProposalRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::SubmitDmMemoryLearningProposalResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.submit_dm_memory_learning_proposal_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the SubmitDmMemoryLearningProposal RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn submit_dm_memory_learning_proposal_with_options(
+        &self,
+        request: crate::proto::briar::worker::v1::SubmitDmMemoryLearningProposalRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::SubmitDmMemoryLearningProposalResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                WORKER_QUEUE_SERVICE_SUBMIT_DM_MEMORY_LEARNING_PROPOSAL_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the SubmitDmMemoryLearningVerification RPC. Sends a request to /briar.worker.v1.WorkerQueueService/SubmitDmMemoryLearningVerification.
+    pub async fn submit_dm_memory_learning_verification(
+        &self,
+        request: crate::proto::briar::worker::v1::SubmitDmMemoryLearningVerificationRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::SubmitDmMemoryLearningVerificationResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.submit_dm_memory_learning_verification_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the SubmitDmMemoryLearningVerification RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn submit_dm_memory_learning_verification_with_options(
+        &self,
+        request: crate::proto::briar::worker::v1::SubmitDmMemoryLearningVerificationRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::SubmitDmMemoryLearningVerificationResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                WORKER_QUEUE_SERVICE_SUBMIT_DM_MEMORY_LEARNING_VERIFICATION_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the FailDmMemoryLearning RPC. Sends a request to /briar.worker.v1.WorkerQueueService/FailDmMemoryLearning.
+    pub async fn fail_dm_memory_learning(
+        &self,
+        request: crate::proto::briar::worker::v1::FailDmMemoryLearningRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::FailDmMemoryLearningResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.fail_dm_memory_learning_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the FailDmMemoryLearning RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn fail_dm_memory_learning_with_options(
+        &self,
+        request: crate::proto::briar::worker::v1::FailDmMemoryLearningRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::FailDmMemoryLearningResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                WORKER_QUEUE_SERVICE_FAIL_DM_MEMORY_LEARNING_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,

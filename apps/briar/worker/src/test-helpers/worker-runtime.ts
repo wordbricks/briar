@@ -15,6 +15,7 @@ type WorkerRuntimeFixtureInput = {
   readonly providers?: ReadonlyArray<WorkerRuntimeInput["agentProvider"]>;
   readonly providerHealth?: Partial<WorkerRuntimeInput["providerHealth"]>;
   readonly providerCapabilities?: AgentProviderCapabilityCatalog;
+  readonly dmMemoryLearning?: boolean;
 };
 
 export const workerRuntimeFixture = (
@@ -45,6 +46,7 @@ export const workerRuntimeFixture = (
     worktrees: true,
     remoteUpdates: { supported: true, protocol: 1 },
     workflowRequirements: [],
+    dmMemoryLearning: input.dmMemoryLearning,
   });
 };
 

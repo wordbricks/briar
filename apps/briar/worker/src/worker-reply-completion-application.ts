@@ -44,6 +44,12 @@ import type {
   IssueReplyCompletionInput,
   PreparedReplyAttachmentUploadsInput,
 } from "./worker-reply-completion-mappers";
+import { dmLearningPolicy } from "./dm-memory-learning-policy";
+import { requireDmMemoryReplyFence } from "./dm-memory-reply-fence";
+import {
+  executionWorkerBindingById,
+  executionWorkerRuntime,
+} from "./workers";
 
 export class ReplyCompletionApplicationError extends Error {
   constructor(
@@ -89,6 +95,8 @@ export type ReplyCompletionApplicationServices = {
   readonly scheduleIssueActivityClear: typeof scheduleIssueActivityClear;
   readonly scheduleChannelRealtimePublish: typeof scheduleChannelRealtimePublish;
   readonly scheduleChannelActivityClear: typeof scheduleChannelActivityClear;
+  readonly executionWorkerBindingById: typeof executionWorkerBindingById;
+  readonly requireDmMemoryReplyFence: typeof requireDmMemoryReplyFence;
 };
 
 const applicationServices: ReplyCompletionApplicationServices = {
@@ -113,6 +121,8 @@ const applicationServices: ReplyCompletionApplicationServices = {
   scheduleIssueActivityClear,
   scheduleChannelRealtimePublish,
   scheduleChannelActivityClear,
+  executionWorkerBindingById,
+  requireDmMemoryReplyFence,
 };
 
 const servicesWith = (overrides: Partial<ReplyCompletionApplicationServices>) =>
@@ -630,6 +640,29 @@ export async function completeChannelReplyApplication(
         );
       }
       const result = input.request.outcome.completion;
+      if (result.memorySaveRequest) {
+        const binding = await services.executionWorkerBindingById(
+          input.db,
+          scope.deviceId,
+          scope.workerId,
+        );
+        const capabilities = binding
+          ? executionWorkerRuntime(binding).proto.capabilities
+          : undefined;
+        if (
+          capabilities?.dmMemoryLearningRequests !== 1 ||
+          dmLearningPolicy(input.env, scope.organizationId) === null
+        ) {
+          throw new ReplyCompletionApplicationError(
+            "claim_conflict",
+            "Memory learning is unavailable",
+          );
+        }
+        await services.requireDmMemoryReplyFence(
+          input.db,
+          scope.workId,
+        );
+      }
       if (
         result.delegation &&
         (agent.project_id !== null || claimed.delegated_by_reply_job_id !== null)
@@ -742,6 +775,7 @@ export async function completeChannelReplyApplication(
         claimTokenHash: scope.claimTokenHash,
         body: result.body,
         memoryCitations: result.memoryCitations,
+        memorySaveRequest: result.memorySaveRequest,
         document,
         issueProposal,
         issueBatchProposal,

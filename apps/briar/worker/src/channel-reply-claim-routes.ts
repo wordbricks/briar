@@ -6,6 +6,7 @@ import {
   excludeForgottenDmSources,
 } from "./dm-memory-claim";
 import { requireDmMemoryReplyFence } from "./dm-memory-reply-fence";
+import { dmLearningPolicy } from "./dm-memory-learning-policy";
 import {
   agentSkillJson,
   hydrateAgentSkills,
@@ -388,6 +389,10 @@ export async function claimNextChannelReplyWork(
         activity,
         handoffContext: memoryBinding ? null : handoffContext,
         memory: memoryBinding?.memory ?? null,
+        memoryLearningEnabled:
+          runtime.proto.capabilities?.dmMemoryLearningRequests === 1 &&
+          memoryBinding !== null &&
+          dmLearningPolicy(env, job.organization_id) !== null,
         session: {
           id: job.channel_reply_session.id,
           threadId: job.channel_reply_session.thread_root_message_id,

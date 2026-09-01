@@ -14,6 +14,7 @@ describe("DM memory management", () => {
     load: vi.fn<DmMemoryClient["load"]>(), get: vi.fn<DmMemoryClient["get"]>(),
     save: vi.fn<DmMemoryClient["save"]>(), remove: vi.fn<DmMemoryClient["remove"]>(),
     settings: vi.fn<DmMemoryClient["settings"]>(), export: vi.fn<DmMemoryClient["export"]>(),
+    retryLearning: vi.fn<DmMemoryClient["retryLearning"]>(),
   } satisfies DmMemoryClient;
   const spaceId = "99999999-9999-4999-8999-999999999999";
   const channelId = "12121212-1212-4212-8212-121212121212";
@@ -130,5 +131,33 @@ describe("DM memory management", () => {
     expect(button("Save")).toBeUndefined();
     expect(button("Export Markdown").disabled).toBe(false);
     expect(dialog().querySelector('[aria-label="Forget memory"]')).not.toBeNull();
+  });
+  it("keeps learning opt-in separate, shows verification failure, and disables learning when memory use stops", async () => {
+    const enabled = { ...page, capabilities: { recall: true, automaticLearning: true },
+      spaces: page.spaces.map((space) => ({ ...space, useEnabled: true, autoEnabled: false })),
+      learning: { configuration: { proposer: { model: "synthetic/proposer", provider: "synthetic" },
+        verifier: { model: "synthetic/verifier", provider: "synthetic" }, spaceDailyCalls: 24, spaceDailyMicroUsd: 5_000_000 },
+        callsToday: 2, reservedMicroUsdToday: 50_000, pendingJobs: 0, failedJobs: 1,
+        lastJob: { id: crypto.randomUUID(), kind: "extract" as const, status: "failed" as const, stage: "verifying" as const,
+          errorCode: "verification_rejected" as const, updatedAt: "2026-09-01T00:00:00.000Z" },
+        retryableJob: { id: crypto.randomUUID(), callsUsed: 2 } } };
+    client.load.mockResolvedValue(enabled);
+    client.settings.mockResolvedValue({ ...enabled.spaces[0]!, autoEnabled: true });
+    client.retryLearning.mockResolvedValue({ accepted: true, replayed: false });
+    await render();
+    expect(dialog().textContent).toContain("Independent verification rejected the proposal");
+    expect(dialog().textContent).toContain("synthetic/proposer / synthetic/verifier");
+    await act(async () => button("Retry failed learning").click());
+    expect(client.retryLearning).toHaveBeenCalledWith(scope, enabled.learning.retryableJob.id, 0);
+    const automatic = [...dialog().querySelectorAll("label")].find((label) => label.textContent === "Learn memories from this conversation")!
+      .querySelector("input")!;
+    expect(automatic.checked).toBe(false);
+    client.load.mockResolvedValue({ ...enabled, spaces: enabled.spaces.map((space) => ({ ...space, autoEnabled: true })) });
+    await act(async () => automatic.click());
+    expect(client.settings.mock.calls[0]![1]).toMatchObject({ useEnabled: true, autoEnabled: true,
+      expectedMemoryRevision: enabled.spaces[0]!.memoryRevision });
+    const use = [...dialog().querySelectorAll("label")].find((label) => label.textContent === "Use memory in this DM")!.querySelector("input")!;
+    await act(async () => use.click());
+    expect(client.settings.mock.calls[1]![1]).toMatchObject({ useEnabled: false, autoEnabled: false });
   });
 });

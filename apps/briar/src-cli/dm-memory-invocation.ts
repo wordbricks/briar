@@ -28,6 +28,7 @@ const decodeTurn = Schema.decodeUnknownSync(Schema.Struct({
   skillExecutionProposal: Schema.optional(Schema.Null), delegation: Schema.optional(Schema.Null),
   contextRequests: Schema.optional(Schema.Null),
   memoryCitations: Schema.optional(Schema.Null),
+  memorySaveRequest: Schema.optional(Schema.Null),
   memoryRequests: Schema.Array(dmMemoryRequestSchema).check(Schema.isLengthBetween(1, 1)),
 }).annotate({ parseOptions: { onExcessProperty: "error" } }));
 export function decodeDmMemoryTurn(value: unknown): DmMemoryRequest {

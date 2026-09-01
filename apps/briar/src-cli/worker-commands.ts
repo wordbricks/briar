@@ -79,6 +79,7 @@ import {
   failClaimedChannelReply,
 } from "./reply-execution";
 import { loadManagedComputerCredential } from "./managed-computer-credential";
+import { runClaimedDmMemory } from "./dm-memory-learning";
 
 const WORKER_SERVER_MAINTENANCE_INTERVAL_MS = 5 * 60_000;
 
@@ -98,6 +99,7 @@ const workerRuntime = (input: {
   providerCapabilities: WorkerRuntimeInput["providerCapabilities"];
   worktrees: boolean;
   workflowRequirements?: WorkerRuntimeInput["workflowRequirements"];
+  dmMemoryLearning: boolean;
 }): WorkerRuntimeInput => ({
   ...input,
   versions: { briar: cliVersion },
@@ -150,6 +152,7 @@ async function workerRegisterCommand() {
           providerHealth,
           providerCapabilities,
           worktrees: true,
+          dmMemoryLearning: Boolean(config.openrouterApiKey?.trim()),
         }),
       });
       const existing = config.projects.find(
@@ -178,6 +181,7 @@ async function workerRegisterCommand() {
       providerHealth,
       providerCapabilities,
       worktrees: true,
+      dmMemoryLearning: Boolean(config.openrouterApiKey?.trim()),
     }),
     ...(Number.isInteger(requestedMaxSessions) && requestedMaxSessions > 0
       ? { maxConcurrentSessions: requestedMaxSessions }
@@ -410,6 +414,7 @@ async function workerCommand() {
         providerHealth,
         providerCapabilities,
         worktrees: true,
+        dmMemoryLearning: Boolean(config.openrouterApiKey?.trim()),
       }),
       acceptingWork: false,
       readinessState: "needs_attention",
@@ -581,6 +586,7 @@ async function workerCommand() {
               healthy: item.healthy,
               detail: item.detail,
             })),
+            dmMemoryLearning: Boolean(config.openrouterApiKey?.trim()),
           }),
           refreshMaintenance,
           acceptingWork,
@@ -649,6 +655,7 @@ async function workerCommand() {
                     healthy: item.healthy,
                     detail: item.detail,
                   })),
+                  dmMemoryLearning: Boolean(config.openrouterApiKey?.trim()),
                 }),
                 acceptingWork: false,
                 readinessState: "needs_attention",
@@ -677,6 +684,16 @@ async function workerCommand() {
         });
       },
       runIssue: async (issue, signal, reportCheckpoint) => {
+        if (issue.workType === "dmMemory") {
+          await runClaimedDmMemory({
+            rpc: workerQueueClient,
+            projectId: project.id,
+            claim: issue,
+            apiKey: config.openrouterApiKey ?? null,
+            signal,
+          });
+          return;
+        }
         if (issue.workType === "mergeBatch") {
           const claim = issue;
           await executeClaimedMergeBatch({

@@ -21,6 +21,7 @@ export type ClaimedIssue = {
     | "issueReply"
     | "channelReply"
     | "projectAgentTask"
+    | "dmMemory"
     | "mergeBatch";
   workId?: string;
   /** Immutable identity of one run claim/execution attempt. */

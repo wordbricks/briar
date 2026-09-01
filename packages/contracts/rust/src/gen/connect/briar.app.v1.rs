@@ -11557,6 +11557,18 @@ pub type OwnedUpdateDmMemorySettingsResponseView = ::buffa::view::OwnedView<
         'static,
     >,
 >;
+///Shorthand for `OwnedView<RetryDmMemoryLearningRequestView<'static>>`.
+pub type OwnedRetryDmMemoryLearningRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::RetryDmMemoryLearningRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<RetryDmMemoryLearningResponseView<'static>>`.
+pub type OwnedRetryDmMemoryLearningResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::RetryDmMemoryLearningResponseView<
+        'static,
+    >,
+>;
 impl ::connectrpc::Encodable<crate::proto::briar::app::v1::ListDmMemoriesResponse>
 for crate::proto::briar::app::v1::__buffa::view::ListDmMemoriesResponseView<'_> {
     fn encode(
@@ -11821,6 +11833,42 @@ for ::buffa::view::OwnedView<
         )
     }
 }
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::RetryDmMemoryLearningResponse>
+for crate::proto::briar::app::v1::__buffa::view::RetryDmMemoryLearningResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::RetryDmMemoryLearningResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::RetryDmMemoryLearningResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
 /// Full service name for this service.
 pub const DM_MEMORY_SERVICE_SERVICE_NAME: &str = "briar.app.v1.DmMemoryService";
 /// Static [`Spec`](::connectrpc::Spec) for the `ListDmMemories` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
@@ -11862,6 +11910,12 @@ pub const DM_MEMORY_SERVICE_DELETE_DM_MEMORY_DOCUMENT_SPEC: ::connectrpc::Spec =
 /// Static [`Spec`](::connectrpc::Spec) for the `UpdateDmMemorySettings` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const DM_MEMORY_SERVICE_UPDATE_DM_MEMORY_SETTINGS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/briar.app.v1.DmMemoryService/UpdateDmMemorySettings",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `RetryDmMemoryLearning` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const DM_MEMORY_SERVICE_RETRY_DM_MEMORY_LEARNING_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.DmMemoryService/RetryDmMemoryLearning",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -12074,6 +12128,29 @@ pub trait DmMemoryService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::briar::app::v1::UpdateDmMemorySettingsResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the RetryDmMemoryLearning RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn retry_dm_memory_learning<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::RetryDmMemoryLearningRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::RetryDmMemoryLearningResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -12312,6 +12389,35 @@ impl<S: DmMemoryService> DmMemoryServiceExt for S {
                 },
             )
             .with_spec(DM_MEMORY_SERVICE_UPDATE_DM_MEMORY_SETTINGS_SPEC)
+            .route_view(
+                DM_MEMORY_SERVICE_SERVICE_NAME,
+                "RetryDmMemoryLearning",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::RetryDmMemoryLearningRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::RetryDmMemoryLearningRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.retry_dm_memory_learning(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::RetryDmMemoryLearningResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(DM_MEMORY_SERVICE_RETRY_DM_MEMORY_LEARNING_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -12406,6 +12512,12 @@ impl<T: DmMemoryService> ::connectrpc::Dispatcher for DmMemoryServiceServer<T> {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
                         .with_spec(DM_MEMORY_SERVICE_UPDATE_DM_MEMORY_SETTINGS_SPEC),
+                )
+            }
+            "RetryDmMemoryLearning" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(DM_MEMORY_SERVICE_RETRY_DM_MEMORY_LEARNING_SPEC),
                 )
             }
             _ => None,
@@ -12574,6 +12686,28 @@ impl<T: DmMemoryService> ::connectrpc::Dispatcher for DmMemoryServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::briar::app::v1::UpdateDmMemorySettingsResponse,
+                        >(format)
+                })
+            }
+            "RetryDmMemoryLearning" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::RetryDmMemoryLearningRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::RetryDmMemoryLearningRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::RetryDmMemoryLearningRequest,
+                    >::from_parts(&req, &body);
+                    svc.retry_dm_memory_learning(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::RetryDmMemoryLearningResponse,
                         >(format)
                 })
             }
@@ -13016,6 +13150,51 @@ where
                 &self.transport,
                 &self.config,
                 DM_MEMORY_SERVICE_UPDATE_DM_MEMORY_SETTINGS_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the RetryDmMemoryLearning RPC. Sends a request to /briar.app.v1.DmMemoryService/RetryDmMemoryLearning.
+    pub async fn retry_dm_memory_learning(
+        &self,
+        request: crate::proto::briar::app::v1::RetryDmMemoryLearningRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::RetryDmMemoryLearningResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.retry_dm_memory_learning_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the RetryDmMemoryLearning RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn retry_dm_memory_learning_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::RetryDmMemoryLearningRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::RetryDmMemoryLearningResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                DM_MEMORY_SERVICE_RETRY_DM_MEMORY_LEARNING_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,

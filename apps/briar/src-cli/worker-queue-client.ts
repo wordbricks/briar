@@ -69,7 +69,16 @@ export const workClaimIdentityToProto = (
                 $typeName: "briar.worker.v1.ProjectAgentTaskClaimIdentity",
               },
             }
-          : {
+          : work.workType === "dmMemory"
+            ? {
+                case: "dmMemory",
+                value: {
+                  $typeName: "briar.worker.v1.DmMemoryLearningClaimIdentity",
+                  organizationId: work.organizationId,
+                  inputHash: work.inputHash,
+                },
+              }
+            : {
               case: "mergeBatch",
               value: { $typeName: "briar.worker.v1.MergeBatchClaimIdentity" },
             },

@@ -20,6 +20,218 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
   typealias Version = _2
 }
 
+public nonisolated enum BriarAPI_DmMemoryLearningJobKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case extract // = 1
+  case explicitRequest // = 2
+  case consolidate // = 3
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .extract
+    case 2: self = .explicitRequest
+    case 3: self = .consolidate
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .extract: return 1
+    case .explicitRequest: return 2
+    case .consolidate: return 3
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [BriarAPI_DmMemoryLearningJobKind] = [
+    .unspecified,
+    .extract,
+    .explicitRequest,
+    .consolidate,
+  ]
+
+}
+
+public nonisolated enum BriarAPI_DmMemoryLearningJobStatus: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case pending // = 1
+  case running // = 2
+  case retryWait // = 3
+  case failed // = 4
+  case cancelled // = 5
+  case succeeded // = 6
+  case noChange // = 7
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .pending
+    case 2: self = .running
+    case 3: self = .retryWait
+    case 4: self = .failed
+    case 5: self = .cancelled
+    case 6: self = .succeeded
+    case 7: self = .noChange
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .pending: return 1
+    case .running: return 2
+    case .retryWait: return 3
+    case .failed: return 4
+    case .cancelled: return 5
+    case .succeeded: return 6
+    case .noChange: return 7
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [BriarAPI_DmMemoryLearningJobStatus] = [
+    .unspecified,
+    .pending,
+    .running,
+    .retryWait,
+    .failed,
+    .cancelled,
+    .succeeded,
+    .noChange,
+  ]
+
+}
+
+public nonisolated enum BriarAPI_DmMemoryLearningJobStage: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case proposing // = 1
+  case verifying // = 2
+  case committing // = 3
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .proposing
+    case 2: self = .verifying
+    case 3: self = .committing
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .proposing: return 1
+    case .verifying: return 2
+    case .committing: return 3
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [BriarAPI_DmMemoryLearningJobStage] = [
+    .unspecified,
+    .proposing,
+    .verifying,
+    .committing,
+  ]
+
+}
+
+public nonisolated enum BriarAPI_DmMemoryLearningFailureCode: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case invalidProposal // = 1
+  case verificationRejected // = 2
+  case stale // = 3
+  case scopeRevoked // = 4
+  case budgetExhausted // = 5
+  case modelUnavailable // = 6
+  case modelTimeout // = 7
+  case modelCredentials // = 8
+  case modelConfiguration // = 9
+  case inputCapacity // = 10
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .invalidProposal
+    case 2: self = .verificationRejected
+    case 3: self = .stale
+    case 4: self = .scopeRevoked
+    case 5: self = .budgetExhausted
+    case 6: self = .modelUnavailable
+    case 7: self = .modelTimeout
+    case 8: self = .modelCredentials
+    case 9: self = .modelConfiguration
+    case 10: self = .inputCapacity
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .invalidProposal: return 1
+    case .verificationRejected: return 2
+    case .stale: return 3
+    case .scopeRevoked: return 4
+    case .budgetExhausted: return 5
+    case .modelUnavailable: return 6
+    case .modelTimeout: return 7
+    case .modelCredentials: return 8
+    case .modelConfiguration: return 9
+    case .inputCapacity: return 10
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [BriarAPI_DmMemoryLearningFailureCode] = [
+    .unspecified,
+    .invalidProposal,
+    .verificationRejected,
+    .stale,
+    .scopeRevoked,
+    .budgetExhausted,
+    .modelUnavailable,
+    .modelTimeout,
+    .modelCredentials,
+    .modelConfiguration,
+    .inputCapacity,
+  ]
+
+}
+
 public nonisolated enum BriarAPI_DmMemoryClass: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
@@ -455,6 +667,15 @@ public nonisolated struct BriarAPI_ListDmMemoriesResponse: Sendable {
   /// Clears the value of `nextCursor`. Subsequent reads from it will return its default value.
   public mutating func clearNextCursor() {self._nextCursor = nil}
 
+  public var learning: BriarAPI_DmMemoryLearningStatus {
+    get {_learning ?? BriarAPI_DmMemoryLearningStatus()}
+    set {_learning = newValue}
+  }
+  /// Returns true if `learning` has been explicitly set.
+  public var hasLearning: Bool {self._learning != nil}
+  /// Clears the value of `learning`. Subsequent reads from it will return its default value.
+  public mutating func clearLearning() {self._learning = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -462,6 +683,210 @@ public nonisolated struct BriarAPI_ListDmMemoriesResponse: Sendable {
   fileprivate var _capabilities: BriarAPI_DmMemoryCapabilities? = nil
   fileprivate var _selectedSpaceID: String? = nil
   fileprivate var _nextCursor: String? = nil
+  fileprivate var _learning: BriarAPI_DmMemoryLearningStatus? = nil
+}
+
+public nonisolated struct BriarAPI_DmMemoryLearningStatus: @unchecked Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var configuration: BriarAPI_DmMemoryLearningConfiguration {
+    get {_storage._configuration ?? BriarAPI_DmMemoryLearningConfiguration()}
+    set {_uniqueStorage()._configuration = newValue}
+  }
+  /// Returns true if `configuration` has been explicitly set.
+  public var hasConfiguration: Bool {_storage._configuration != nil}
+  /// Clears the value of `configuration`. Subsequent reads from it will return its default value.
+  public mutating func clearConfiguration() {_uniqueStorage()._configuration = nil}
+
+  public var callsToday: UInt32 {
+    get {_storage._callsToday}
+    set {_uniqueStorage()._callsToday = newValue}
+  }
+
+  public var reservedMicroUsdToday: UInt64 {
+    get {_storage._reservedMicroUsdToday}
+    set {_uniqueStorage()._reservedMicroUsdToday = newValue}
+  }
+
+  public var pendingJobs: UInt32 {
+    get {_storage._pendingJobs}
+    set {_uniqueStorage()._pendingJobs = newValue}
+  }
+
+  public var failedJobs: UInt32 {
+    get {_storage._failedJobs}
+    set {_uniqueStorage()._failedJobs = newValue}
+  }
+
+  public var lastJob: BriarAPI_DmMemoryLearningJob {
+    get {_storage._lastJob ?? BriarAPI_DmMemoryLearningJob()}
+    set {_uniqueStorage()._lastJob = newValue}
+  }
+  /// Returns true if `lastJob` has been explicitly set.
+  public var hasLastJob: Bool {_storage._lastJob != nil}
+  /// Clears the value of `lastJob`. Subsequent reads from it will return its default value.
+  public mutating func clearLastJob() {_uniqueStorage()._lastJob = nil}
+
+  public var retryableJob: BriarAPI_DmMemoryLearningRetryableJob {
+    get {_storage._retryableJob ?? BriarAPI_DmMemoryLearningRetryableJob()}
+    set {_uniqueStorage()._retryableJob = newValue}
+  }
+  /// Returns true if `retryableJob` has been explicitly set.
+  public var hasRetryableJob: Bool {_storage._retryableJob != nil}
+  /// Clears the value of `retryableJob`. Subsequent reads from it will return its default value.
+  public mutating func clearRetryableJob() {_uniqueStorage()._retryableJob = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _storage = _StorageClass.defaultInstance
+}
+
+public nonisolated struct BriarAPI_DmMemoryLearningConfiguration: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var proposer: BriarAPI_DmMemoryLearningModel {
+    get {_proposer ?? BriarAPI_DmMemoryLearningModel()}
+    set {_proposer = newValue}
+  }
+  /// Returns true if `proposer` has been explicitly set.
+  public var hasProposer: Bool {self._proposer != nil}
+  /// Clears the value of `proposer`. Subsequent reads from it will return its default value.
+  public mutating func clearProposer() {self._proposer = nil}
+
+  public var verifier: BriarAPI_DmMemoryLearningModel {
+    get {_verifier ?? BriarAPI_DmMemoryLearningModel()}
+    set {_verifier = newValue}
+  }
+  /// Returns true if `verifier` has been explicitly set.
+  public var hasVerifier: Bool {self._verifier != nil}
+  /// Clears the value of `verifier`. Subsequent reads from it will return its default value.
+  public mutating func clearVerifier() {self._verifier = nil}
+
+  public var spaceDailyCalls: UInt32 = 0
+
+  public var spaceDailyMicroUsd: UInt64 = 0
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _proposer: BriarAPI_DmMemoryLearningModel? = nil
+  fileprivate var _verifier: BriarAPI_DmMemoryLearningModel? = nil
+}
+
+public nonisolated struct BriarAPI_DmMemoryLearningModel: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var model: String = String()
+
+  public var provider: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_DmMemoryLearningJob: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var id: String = String()
+
+  public var kind: BriarAPI_DmMemoryLearningJobKind = .unspecified
+
+  public var status: BriarAPI_DmMemoryLearningJobStatus = .unspecified
+
+  public var stage: BriarAPI_DmMemoryLearningJobStage {
+    get {_stage ?? .unspecified}
+    set {_stage = newValue}
+  }
+  /// Returns true if `stage` has been explicitly set.
+  public var hasStage: Bool {self._stage != nil}
+  /// Clears the value of `stage`. Subsequent reads from it will return its default value.
+  public mutating func clearStage() {self._stage = nil}
+
+  public var errorCode: BriarAPI_DmMemoryLearningFailureCode {
+    get {_errorCode ?? .unspecified}
+    set {_errorCode = newValue}
+  }
+  /// Returns true if `errorCode` has been explicitly set.
+  public var hasErrorCode: Bool {self._errorCode != nil}
+  /// Clears the value of `errorCode`. Subsequent reads from it will return its default value.
+  public mutating func clearErrorCode() {self._errorCode = nil}
+
+  public var updatedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_updatedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_updatedAt = newValue}
+  }
+  /// Returns true if `updatedAt` has been explicitly set.
+  public var hasUpdatedAt: Bool {self._updatedAt != nil}
+  /// Clears the value of `updatedAt`. Subsequent reads from it will return its default value.
+  public mutating func clearUpdatedAt() {self._updatedAt = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _stage: BriarAPI_DmMemoryLearningJobStage? = nil
+  fileprivate var _errorCode: BriarAPI_DmMemoryLearningFailureCode? = nil
+  fileprivate var _updatedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+}
+
+public nonisolated struct BriarAPI_DmMemoryLearningRetryableJob: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var id: String = String()
+
+  public var callsUsed: UInt32 = 0
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_RetryDmMemoryLearningRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var organizationID: String = String()
+
+  public var channelID: String = String()
+
+  public var jobID: String = String()
+
+  public var requestID: String = String()
+
+  public var revocationEpoch: UInt64 = 0
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_RetryDmMemoryLearningResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var accepted: Bool = false
+
+  public var replayed: Bool = false
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
 }
 
 public nonisolated struct BriarAPI_GetDmMemoryDocumentRequest: Sendable {
@@ -1110,6 +1535,22 @@ public nonisolated struct BriarAPI_DmMemoryDescriptor: Sendable {
 
 fileprivate nonisolated let _protobuf_package = "briar.app.v1"
 
+nonisolated extension BriarAPI_DmMemoryLearningJobKind: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DM_MEMORY_LEARNING_JOB_KIND_UNSPECIFIED\0\u{1}DM_MEMORY_LEARNING_JOB_KIND_EXTRACT\0\u{1}DM_MEMORY_LEARNING_JOB_KIND_EXPLICIT_REQUEST\0\u{1}DM_MEMORY_LEARNING_JOB_KIND_CONSOLIDATE\0")
+}
+
+nonisolated extension BriarAPI_DmMemoryLearningJobStatus: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DM_MEMORY_LEARNING_JOB_STATUS_UNSPECIFIED\0\u{1}DM_MEMORY_LEARNING_JOB_STATUS_PENDING\0\u{1}DM_MEMORY_LEARNING_JOB_STATUS_RUNNING\0\u{1}DM_MEMORY_LEARNING_JOB_STATUS_RETRY_WAIT\0\u{1}DM_MEMORY_LEARNING_JOB_STATUS_FAILED\0\u{1}DM_MEMORY_LEARNING_JOB_STATUS_CANCELLED\0\u{1}DM_MEMORY_LEARNING_JOB_STATUS_SUCCEEDED\0\u{1}DM_MEMORY_LEARNING_JOB_STATUS_NO_CHANGE\0")
+}
+
+nonisolated extension BriarAPI_DmMemoryLearningJobStage: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DM_MEMORY_LEARNING_JOB_STAGE_UNSPECIFIED\0\u{1}DM_MEMORY_LEARNING_JOB_STAGE_PROPOSING\0\u{1}DM_MEMORY_LEARNING_JOB_STAGE_VERIFYING\0\u{1}DM_MEMORY_LEARNING_JOB_STAGE_COMMITTING\0")
+}
+
+nonisolated extension BriarAPI_DmMemoryLearningFailureCode: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DM_MEMORY_LEARNING_FAILURE_CODE_UNSPECIFIED\0\u{1}DM_MEMORY_LEARNING_FAILURE_CODE_INVALID_PROPOSAL\0\u{1}DM_MEMORY_LEARNING_FAILURE_CODE_VERIFICATION_REJECTED\0\u{1}DM_MEMORY_LEARNING_FAILURE_CODE_STALE\0\u{1}DM_MEMORY_LEARNING_FAILURE_CODE_SCOPE_REVOKED\0\u{1}DM_MEMORY_LEARNING_FAILURE_CODE_BUDGET_EXHAUSTED\0\u{1}DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_UNAVAILABLE\0\u{1}DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_TIMEOUT\0\u{1}DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_CREDENTIALS\0\u{1}DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_CONFIGURATION\0\u{1}DM_MEMORY_LEARNING_FAILURE_CODE_INPUT_CAPACITY\0")
+}
+
 nonisolated extension BriarAPI_DmMemoryClass: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DM_MEMORY_CLASS_UNSPECIFIED\0\u{1}DM_MEMORY_CLASS_PROFILE\0\u{1}DM_MEMORY_CLASS_LOG\0\u{1}DM_MEMORY_CLASS_NOTE\0")
 }
@@ -1197,7 +1638,7 @@ nonisolated extension BriarAPI_ListDmMemoriesRequest: SwiftProtobuf.Message, Swi
 
 nonisolated extension BriarAPI_ListDmMemoriesResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ListDmMemoriesResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}eligible\0\u{1}capabilities\0\u{1}spaces\0\u{3}selected_space_id\0\u{1}documents\0\u{3}next_cursor\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}eligible\0\u{1}capabilities\0\u{1}spaces\0\u{3}selected_space_id\0\u{1}documents\0\u{3}next_cursor\0\u{1}learning\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1211,6 +1652,7 @@ nonisolated extension BriarAPI_ListDmMemoriesResponse: SwiftProtobuf.Message, Sw
       case 4: try { try decoder.decodeSingularStringField(value: &self._selectedSpaceID) }()
       case 5: try { try decoder.decodeRepeatedMessageField(value: &self.documents) }()
       case 6: try { try decoder.decodeSingularStringField(value: &self._nextCursor) }()
+      case 7: try { try decoder.decodeSingularMessageField(value: &self._learning) }()
       default: break
       }
     }
@@ -1239,6 +1681,9 @@ nonisolated extension BriarAPI_ListDmMemoriesResponse: SwiftProtobuf.Message, Sw
     try { if let v = self._nextCursor {
       try visitor.visitSingularStringField(value: v, fieldNumber: 6)
     } }()
+    try { if let v = self._learning {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1249,6 +1694,382 @@ nonisolated extension BriarAPI_ListDmMemoriesResponse: SwiftProtobuf.Message, Sw
     if lhs._selectedSpaceID != rhs._selectedSpaceID {return false}
     if lhs.documents != rhs.documents {return false}
     if lhs._nextCursor != rhs._nextCursor {return false}
+    if lhs._learning != rhs._learning {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_DmMemoryLearningStatus: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".DmMemoryLearningStatus"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}configuration\0\u{3}calls_today\0\u{3}reserved_micro_usd_today\0\u{3}pending_jobs\0\u{3}failed_jobs\0\u{3}last_job\0\u{3}retryable_job\0")
+
+  fileprivate class _StorageClass {
+    var _configuration: BriarAPI_DmMemoryLearningConfiguration? = nil
+    var _callsToday: UInt32 = 0
+    var _reservedMicroUsdToday: UInt64 = 0
+    var _pendingJobs: UInt32 = 0
+    var _failedJobs: UInt32 = 0
+    var _lastJob: BriarAPI_DmMemoryLearningJob? = nil
+    var _retryableJob: BriarAPI_DmMemoryLearningRetryableJob? = nil
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _configuration = source._configuration
+      _callsToday = source._callsToday
+      _reservedMicroUsdToday = source._reservedMicroUsdToday
+      _pendingJobs = source._pendingJobs
+      _failedJobs = source._failedJobs
+      _lastJob = source._lastJob
+      _retryableJob = source._retryableJob
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularMessageField(value: &_storage._configuration) }()
+        case 2: try { try decoder.decodeSingularUInt32Field(value: &_storage._callsToday) }()
+        case 3: try { try decoder.decodeSingularUInt64Field(value: &_storage._reservedMicroUsdToday) }()
+        case 4: try { try decoder.decodeSingularUInt32Field(value: &_storage._pendingJobs) }()
+        case 5: try { try decoder.decodeSingularUInt32Field(value: &_storage._failedJobs) }()
+        case 6: try { try decoder.decodeSingularMessageField(value: &_storage._lastJob) }()
+        case 7: try { try decoder.decodeSingularMessageField(value: &_storage._retryableJob) }()
+        default: break
+        }
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      try { if let v = _storage._configuration {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+      } }()
+      if _storage._callsToday != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._callsToday, fieldNumber: 2)
+      }
+      if _storage._reservedMicroUsdToday != 0 {
+        try visitor.visitSingularUInt64Field(value: _storage._reservedMicroUsdToday, fieldNumber: 3)
+      }
+      if _storage._pendingJobs != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._pendingJobs, fieldNumber: 4)
+      }
+      if _storage._failedJobs != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._failedJobs, fieldNumber: 5)
+      }
+      try { if let v = _storage._lastJob {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
+      } }()
+      try { if let v = _storage._retryableJob {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
+      } }()
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_DmMemoryLearningStatus, rhs: BriarAPI_DmMemoryLearningStatus) -> Bool {
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._configuration != rhs_storage._configuration {return false}
+        if _storage._callsToday != rhs_storage._callsToday {return false}
+        if _storage._reservedMicroUsdToday != rhs_storage._reservedMicroUsdToday {return false}
+        if _storage._pendingJobs != rhs_storage._pendingJobs {return false}
+        if _storage._failedJobs != rhs_storage._failedJobs {return false}
+        if _storage._lastJob != rhs_storage._lastJob {return false}
+        if _storage._retryableJob != rhs_storage._retryableJob {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_DmMemoryLearningConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".DmMemoryLearningConfiguration"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}proposer\0\u{1}verifier\0\u{3}space_daily_calls\0\u{3}space_daily_micro_usd\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._proposer) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._verifier) }()
+      case 3: try { try decoder.decodeSingularUInt32Field(value: &self.spaceDailyCalls) }()
+      case 4: try { try decoder.decodeSingularUInt64Field(value: &self.spaceDailyMicroUsd) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._proposer {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    try { if let v = self._verifier {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
+    if self.spaceDailyCalls != 0 {
+      try visitor.visitSingularUInt32Field(value: self.spaceDailyCalls, fieldNumber: 3)
+    }
+    if self.spaceDailyMicroUsd != 0 {
+      try visitor.visitSingularUInt64Field(value: self.spaceDailyMicroUsd, fieldNumber: 4)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_DmMemoryLearningConfiguration, rhs: BriarAPI_DmMemoryLearningConfiguration) -> Bool {
+    if lhs._proposer != rhs._proposer {return false}
+    if lhs._verifier != rhs._verifier {return false}
+    if lhs.spaceDailyCalls != rhs.spaceDailyCalls {return false}
+    if lhs.spaceDailyMicroUsd != rhs.spaceDailyMicroUsd {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_DmMemoryLearningModel: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".DmMemoryLearningModel"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}model\0\u{1}provider\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.model) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.provider) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.model.isEmpty {
+      try visitor.visitSingularStringField(value: self.model, fieldNumber: 1)
+    }
+    if !self.provider.isEmpty {
+      try visitor.visitSingularStringField(value: self.provider, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_DmMemoryLearningModel, rhs: BriarAPI_DmMemoryLearningModel) -> Bool {
+    if lhs.model != rhs.model {return false}
+    if lhs.provider != rhs.provider {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_DmMemoryLearningJob: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".DmMemoryLearningJob"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}kind\0\u{1}status\0\u{1}stage\0\u{3}error_code\0\u{3}updated_at\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.id) }()
+      case 2: try { try decoder.decodeSingularEnumField(value: &self.kind) }()
+      case 3: try { try decoder.decodeSingularEnumField(value: &self.status) }()
+      case 4: try { try decoder.decodeSingularEnumField(value: &self._stage) }()
+      case 5: try { try decoder.decodeSingularEnumField(value: &self._errorCode) }()
+      case 6: try { try decoder.decodeSingularMessageField(value: &self._updatedAt) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.id.isEmpty {
+      try visitor.visitSingularStringField(value: self.id, fieldNumber: 1)
+    }
+    if self.kind != .unspecified {
+      try visitor.visitSingularEnumField(value: self.kind, fieldNumber: 2)
+    }
+    if self.status != .unspecified {
+      try visitor.visitSingularEnumField(value: self.status, fieldNumber: 3)
+    }
+    try { if let v = self._stage {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 4)
+    } }()
+    try { if let v = self._errorCode {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 5)
+    } }()
+    try { if let v = self._updatedAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_DmMemoryLearningJob, rhs: BriarAPI_DmMemoryLearningJob) -> Bool {
+    if lhs.id != rhs.id {return false}
+    if lhs.kind != rhs.kind {return false}
+    if lhs.status != rhs.status {return false}
+    if lhs._stage != rhs._stage {return false}
+    if lhs._errorCode != rhs._errorCode {return false}
+    if lhs._updatedAt != rhs._updatedAt {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_DmMemoryLearningRetryableJob: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".DmMemoryLearningRetryableJob"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}calls_used\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.id) }()
+      case 2: try { try decoder.decodeSingularUInt32Field(value: &self.callsUsed) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.id.isEmpty {
+      try visitor.visitSingularStringField(value: self.id, fieldNumber: 1)
+    }
+    if self.callsUsed != 0 {
+      try visitor.visitSingularUInt32Field(value: self.callsUsed, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_DmMemoryLearningRetryableJob, rhs: BriarAPI_DmMemoryLearningRetryableJob) -> Bool {
+    if lhs.id != rhs.id {return false}
+    if lhs.callsUsed != rhs.callsUsed {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_RetryDmMemoryLearningRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RetryDmMemoryLearningRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0\u{3}job_id\0\u{3}request_id\0\u{3}revocation_epoch\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.jobID) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
+      case 5: try { try decoder.decodeSingularUInt64Field(value: &self.revocationEpoch) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.organizationID.isEmpty {
+      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    }
+    if !self.channelID.isEmpty {
+      try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 2)
+    }
+    if !self.jobID.isEmpty {
+      try visitor.visitSingularStringField(value: self.jobID, fieldNumber: 3)
+    }
+    if !self.requestID.isEmpty {
+      try visitor.visitSingularStringField(value: self.requestID, fieldNumber: 4)
+    }
+    if self.revocationEpoch != 0 {
+      try visitor.visitSingularUInt64Field(value: self.revocationEpoch, fieldNumber: 5)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_RetryDmMemoryLearningRequest, rhs: BriarAPI_RetryDmMemoryLearningRequest) -> Bool {
+    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.channelID != rhs.channelID {return false}
+    if lhs.jobID != rhs.jobID {return false}
+    if lhs.requestID != rhs.requestID {return false}
+    if lhs.revocationEpoch != rhs.revocationEpoch {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_RetryDmMemoryLearningResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RetryDmMemoryLearningResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}accepted\0\u{1}replayed\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularBoolField(value: &self.accepted) }()
+      case 2: try { try decoder.decodeSingularBoolField(value: &self.replayed) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.accepted != false {
+      try visitor.visitSingularBoolField(value: self.accepted, fieldNumber: 1)
+    }
+    if self.replayed != false {
+      try visitor.visitSingularBoolField(value: self.replayed, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_RetryDmMemoryLearningResponse, rhs: BriarAPI_RetryDmMemoryLearningResponse) -> Bool {
+    if lhs.accepted != rhs.accepted {return false}
+    if lhs.replayed != rhs.replayed {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

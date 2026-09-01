@@ -4,6 +4,7 @@ import { agentReplyAttachmentPathsProviderSchema } from "./agent-reply-contract"
 import {
   channelMessageBodySchema,
   channelMemoryCitationSchema,
+  channelMemorySaveRequestSchema,
   channelReplyCompletionFields,
   channelReplyCompletionSchema,
 } from "./channels-contract";
@@ -55,6 +56,7 @@ const ChannelAgentReplyProviderSourceSchema = strict(Schema.Struct({
   memoryCitations: Schema.NullOr(
     mutableArray(channelMemoryCitationSchema).check(Schema.isMaxLength(10)),
   ),
+  memorySaveRequest: Schema.NullOr(channelMemorySaveRequestSchema),
 }).check(
   Schema.makeFilter((output) => {
     const issues: Array<Schema.FilterIssue> = [];
@@ -81,7 +83,10 @@ const ChannelAgentReplyProviderSourceSchema = strict(Schema.Struct({
           });
         }
       }
-      if (output.memoryRequests !== null || output.memoryCitations !== null) {
+      if (
+        output.memoryRequests !== null || output.memoryCitations !== null ||
+        output.memorySaveRequest !== null
+      ) {
         issues.push({
           path: ["memoryRequests"],
           issue: "A context lookup cannot include memory data",
@@ -104,7 +109,7 @@ const ChannelAgentReplyProviderSourceSchema = strict(Schema.Struct({
           });
         }
       }
-      if (output.memoryCitations !== null) {
+      if (output.memoryCitations !== null || output.memorySaveRequest !== null) {
         issues.push({
           path: ["memoryCitations"],
           issue: "A memory lookup cannot cite a result before it is returned",
@@ -175,6 +180,7 @@ export const ChannelAgentReplyProviderOutputSchema =
                 contextRequests: turn.requests.contextRequests,
                 memoryRequests: null,
                 memoryCitations: null,
+                memorySaveRequest: null,
               };
             case "memory":
               return {
@@ -189,6 +195,7 @@ export const ChannelAgentReplyProviderOutputSchema =
                 contextRequests: null,
                 memoryRequests: [turn.request],
                 memoryCitations: null,
+                memorySaveRequest: null,
               };
             case "reply":
               return {
@@ -205,6 +212,7 @@ export const ChannelAgentReplyProviderOutputSchema =
                 memoryCitations: turn.result.memoryCitations
                   ? [...turn.result.memoryCitations]
                   : null,
+                memorySaveRequest: turn.result.memorySaveRequest ?? null,
               };
           }
         },

@@ -36,6 +36,7 @@ export type WorkerRuntimeInput = {
     readonly healthy: boolean;
     readonly detail: string | null;
   }>;
+  readonly dmMemoryLearning?: boolean;
 };
 
 export const workerRuntimeToProto = (input: WorkerRuntimeInput) =>
@@ -85,6 +86,10 @@ export const workerRuntimeToProto = (input: WorkerRuntimeInput) =>
         detail: requirement.detail ?? undefined,
       })) ?? [],
       dmMemoryProtocol: 1,
+      dmMemoryLearningRequests: input.dmMemoryLearning ? 1 : undefined,
+      dmMemoryLearning: input.dmMemoryLearning
+        ? { protocol: 1, transport: "openrouter" }
+        : undefined,
     },
     versions: { ...input.versions },
   });

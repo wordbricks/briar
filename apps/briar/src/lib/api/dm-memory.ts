@@ -7,6 +7,11 @@ import {
   DmMemoryDocumentStatus as ProtoDmMemoryDocumentStatus,
   DmMemoryEvidenceType as ProtoDmMemoryEvidenceType,
   DmMemoryIndexState as ProtoDmMemoryIndexState,
+  DmMemoryLearningFailureCode as ProtoDmMemoryLearningFailureCode,
+  DmMemoryLearningJobKind as ProtoDmMemoryLearningJobKind,
+  DmMemoryLearningJobStage as ProtoDmMemoryLearningJobStage,
+  DmMemoryLearningJobStatus as ProtoDmMemoryLearningJobStatus,
+  type DmMemoryLearningStatus as DmMemoryLearningStatusMessage,
   DmMemoryService,
   DmMemoryRevisionOrigin as ProtoDmMemoryRevisionOrigin,
   DmMemorySourceType as ProtoDmMemorySourceType,
@@ -20,6 +25,7 @@ import type {
   DmMemoryDocument,
   DmMemoryDocumentDetail,
   DmMemoryEditInput,
+  DmMemoryLearningStatus,
   DmMemoryPage,
   DmMemoryRevisionPage,
   DmMemorySettingsInput,
@@ -171,6 +177,91 @@ const writeInput = (input: DmMemoryCreateInput | DmMemoryEditInput) => ({
   sourceMessage: input.sourceMessage,
 });
 
+const learningStatusFromProto = (
+  value: DmMemoryLearningStatusMessage,
+): DmMemoryLearningStatus => {
+  const configuration = value.configuration;
+  const last = value.lastJob;
+  return {
+    configuration: configuration === undefined
+      ? null
+      : {
+          proposer: requiredMessage(
+            configuration.proposer,
+            "dmMemoryLearning.configuration.proposer",
+          ),
+          verifier: requiredMessage(
+            configuration.verifier,
+            "dmMemoryLearning.configuration.verifier",
+          ),
+          spaceDailyCalls: configuration.spaceDailyCalls,
+          spaceDailyMicroUsd: safeNumber(
+            configuration.spaceDailyMicroUsd,
+            "dmMemoryLearning.configuration.spaceDailyMicroUsd",
+          ),
+        },
+    callsToday: value.callsToday,
+    reservedMicroUsdToday: safeNumber(
+      value.reservedMicroUsdToday,
+      "dmMemoryLearning.reservedMicroUsdToday",
+    ),
+    pendingJobs: value.pendingJobs,
+    failedJobs: value.failedJobs,
+    retryableJob: value.retryableJob ?? null,
+    lastJob: last === undefined
+      ? null
+      : {
+          id: last.id,
+          kind: (() => {
+            switch (last.kind) {
+              case ProtoDmMemoryLearningJobKind.EXTRACT: return "extract" as const;
+              case ProtoDmMemoryLearningJobKind.EXPLICIT_REQUEST: return "explicit_request" as const;
+              case ProtoDmMemoryLearningJobKind.CONSOLIDATE: return "consolidate" as const;
+              default: throw new Error(`Unknown memory learning job kind: ${last.kind}`);
+            }
+          })(),
+          status: (() => {
+            switch (last.status) {
+              case ProtoDmMemoryLearningJobStatus.PENDING: return "pending" as const;
+              case ProtoDmMemoryLearningJobStatus.RUNNING: return "running" as const;
+              case ProtoDmMemoryLearningJobStatus.RETRY_WAIT: return "retry_wait" as const;
+              case ProtoDmMemoryLearningJobStatus.FAILED: return "failed" as const;
+              case ProtoDmMemoryLearningJobStatus.CANCELLED: return "cancelled" as const;
+              case ProtoDmMemoryLearningJobStatus.SUCCEEDED: return "succeeded" as const;
+              case ProtoDmMemoryLearningJobStatus.NO_CHANGE: return "no_change" as const;
+              default: throw new Error(`Unknown memory learning job status: ${last.status}`);
+            }
+          })(),
+          stage: (() => {
+            switch (last.stage) {
+              case undefined: return null;
+              case ProtoDmMemoryLearningJobStage.PROPOSING: return "proposing" as const;
+              case ProtoDmMemoryLearningJobStage.VERIFYING: return "verifying" as const;
+              case ProtoDmMemoryLearningJobStage.COMMITTING: return "committing" as const;
+              default: throw new Error(`Unknown memory learning job stage: ${last.stage}`);
+            }
+          })(),
+          errorCode: (() => {
+            switch (last.errorCode) {
+              case undefined: return null;
+              case ProtoDmMemoryLearningFailureCode.INVALID_PROPOSAL: return "invalid_proposal" as const;
+              case ProtoDmMemoryLearningFailureCode.VERIFICATION_REJECTED: return "verification_rejected" as const;
+              case ProtoDmMemoryLearningFailureCode.STALE: return "stale" as const;
+              case ProtoDmMemoryLearningFailureCode.SCOPE_REVOKED: return "scope_revoked" as const;
+              case ProtoDmMemoryLearningFailureCode.BUDGET_EXHAUSTED: return "budget_exhausted" as const;
+              case ProtoDmMemoryLearningFailureCode.MODEL_UNAVAILABLE: return "model_unavailable" as const;
+              case ProtoDmMemoryLearningFailureCode.MODEL_TIMEOUT: return "model_timeout" as const;
+              case ProtoDmMemoryLearningFailureCode.MODEL_CREDENTIALS: return "model_credentials" as const;
+              case ProtoDmMemoryLearningFailureCode.MODEL_CONFIGURATION: return "model_configuration" as const;
+              case ProtoDmMemoryLearningFailureCode.INPUT_CAPACITY: return "input_capacity" as const;
+              default: throw new Error(`Unknown memory learning failure: ${last.errorCode}`);
+            }
+          })(),
+          updatedAt: requiredTimestamp(last.updatedAt, "dmMemoryLearning.lastJob.updatedAt"),
+        },
+  };
+};
+
 export async function loadDmMemory(
   scope: DmMemoryApiScope,
   spaceId?: string,
@@ -193,6 +284,9 @@ export async function loadDmMemory(
     selectedSpaceId: response.selectedSpaceId ?? null,
     documents: response.documents.map(documentBaseFromProto),
     nextCursor: response.nextCursor ?? null,
+    learning: response.learning
+      ? learningStatusFromProto(response.learning)
+      : null,
   };
 }
 
@@ -306,6 +400,21 @@ export async function removeDmMemoryDocument(
   }, appCallOptions(scope.token));
 }
 
+export async function retryDmMemoryLearning(
+  scope: DmMemoryApiScope,
+  jobId: string,
+  revocationEpoch: number,
+) {
+  const response = await requireClient().retryDmMemoryLearning({
+    organizationId: scope.organizationId,
+    channelId: scope.channelId,
+    jobId,
+    requestId: crypto.randomUUID(),
+    revocationEpoch: BigInt(revocationEpoch),
+  }, appCallOptions(scope.token));
+  return { accepted: response.accepted, replayed: response.replayed };
+}
+
 export async function exportDmMemory(scope: DmMemoryApiScope, spaceId: string) {
   const response = await fetch(`${briarApiUrl}${base(scope.organizationId, scope.channelId)}/export?memorySpaceId=${encodeURIComponent(spaceId)}`, {
     headers: { Authorization: `Bearer ${scope.token}` },
@@ -322,6 +431,7 @@ export const dmMemoryApi = {
   save: saveDmMemoryDocument,
   settings: setDmMemorySettings,
   remove: removeDmMemoryDocument,
+  retryLearning: retryDmMemoryLearning,
   export: exportDmMemory,
 };
 export type DmMemoryClient = typeof dmMemoryApi;

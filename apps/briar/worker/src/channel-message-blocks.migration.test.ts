@@ -7,7 +7,7 @@ describe("channel message block cutover", () => {
   it("preserves readable imported blocks under the strict decoder", async () => {
     const db = env.DB;
     await applyD1Migrations(db, {
-      through: "0162_remove_issue_proposal_status.sql",
+      through: "0163_remove_issue_proposal_status.sql",
     });
 
     const historical = await db.prepare(
@@ -17,7 +17,7 @@ describe("channel message block cutover", () => {
     expect(historical).not.toBeNull();
 
     await applyD1Migrations(db, {
-      files: ["0163_canonical_channel_message_blocks.sql"],
+      files: ["0164_canonical_channel_message_blocks.sql"],
     });
 
     expect(await getChannelMessage(

@@ -71,7 +71,7 @@ describe("typed pull request evidence identity migration", () => {
     ]);
 
     await applyD1Migrations(db, {
-      files: ["0170_typed_run_evidence_pull_requests.sql"],
+      files: ["0171_typed_run_evidence_pull_requests.sql"],
     });
 
     expect((await db.prepare(

@@ -2,8 +2,8 @@
 
 The [SPEC](../plans/dm-memory-spec.md) defines ownership and behavior. The
 [delivery log](../plans/dm-memory-delivery.md) distinguishes merged foundations
-from enabled recall and learning. Neither indexing nor retrieval is enabled by
-default. Do not import a private conversation archive for a smoke test.
+from enabled recall and learning. Recall is an owner opt-in even when its Worker
+flags are active. Do not import a private conversation archive for a smoke test.
 
 ## Index provisioning
 
@@ -77,8 +77,11 @@ embedding provider's tokenizer or billable usage. Index and query preprocessing
 use the same embedding model without translating the source language.
 
 Search accepts one to three unique queries, merges at most twenty candidates per
-query and returns at most ten final results. The similarity threshold must come
-from the SPEC evaluation; an absent threshold disables semantic retrieval.
+query and returns at most ten final results. The first rollout uses BGE-M3 cosine
+floor `0.5`, followed by a strict JSON semantic check of at most ten candidates
+with `@cf/meta/llama-3.3-70b-instruct-fp8-fast`. The measured report and fixtures
+are in `apps/briar/evals/dm-memory-retrieval-v1`. An absent threshold disables
+semantic retrieval.
 Source-body reads are bounded, deadline-limited and checked against the active
 claim's space. A timeout returns no documents and `memoryRevision: null` if the
 snapshot could not be established in time. It does not fall back to keyword
@@ -116,10 +119,16 @@ Lookup request IDs survive transport retries; a new ID consumes a new lookup tur
 from the three-turn limit shared with organization context. Memory changes
 invalidate cached payloads without resetting that budget.
 
-`DM_MEMORY_MINIMUM_SCORE` is empty until a reviewed evaluation determines it.
-Missing or invalid Vectorize bindings return unavailable retrieval. They do not
-activate a fallback. Brief availability does not prove that semantic search is
-ready, and the feature remains disabled by default.
+Missing or invalid Vectorize or Workers AI bindings return unavailable
+retrieval. They do not activate a fallback. The semantic verifier also fails
+closed on invalid output or provider failure. Brief availability does not prove
+that semantic search is ready.
+
+The first rollout sets `DM_MEMORY_INDEX_ENABLED=true`,
+`DM_MEMORY_RETRIEVAL_ENABLED=true`, and `DM_MEMORY_MINIMUM_SCORE=0.5` while
+leaving automatic learning disabled. To roll back recall, set retrieval and
+indexing false and redeploy. Keep cleanup and owner management available; do not
+delete D1 originals or purge registries as a flag rollback.
 
 Temporary memory files live outside the checkout with directory mode 0700 and
 file mode 0600. Completion/failure removes them. On a subsequent invocation,

@@ -40,6 +40,10 @@ service WorkerQueueService {
   rpc CheckDmMemoryClaim(CheckDmMemoryClaimRequest) returns (CheckDmMemoryClaimResponse);
   rpc GetDmMemoryBrief(GetDmMemoryBriefRequest) returns (GetDmMemoryBriefResponse);
   rpc LookupDmMemory(LookupDmMemoryRequest) returns (LookupDmMemoryResponse);
+  rpc ReserveDmMemoryLearningCall(ReserveDmMemoryLearningCallRequest) returns (ReserveDmMemoryLearningCallResponse);
+  rpc SubmitDmMemoryLearningProposal(SubmitDmMemoryLearningProposalRequest) returns (SubmitDmMemoryLearningProposalResponse);
+  rpc SubmitDmMemoryLearningVerification(SubmitDmMemoryLearningVerificationRequest) returns (SubmitDmMemoryLearningVerificationResponse);
+  rpc FailDmMemoryLearning(FailDmMemoryLearningRequest) returns (FailDmMemoryLearningResponse);
 }
 
 // Ephemeral reply activity uses the short-lived capability returned with a
@@ -301,6 +305,7 @@ message ClaimedWork {
     ClaimedChannelReply channel_reply = 3;
     ClaimedProjectAgentTask project_agent_task = 4;
     ClaimedMergeBatch merge_batch = 5;
+    ClaimedDmMemoryLearning dm_memory = 6;
   }
 }
 
@@ -321,6 +326,7 @@ message WorkClaimIdentity {
     ChannelReplyClaimIdentity channel_reply = 12;
     ProjectAgentTaskClaimIdentity project_agent_task = 13;
     MergeBatchClaimIdentity merge_batch = 14;
+    DmMemoryLearningClaimIdentity dm_memory = 15;
   }
 }
 
@@ -328,6 +334,10 @@ message IssueClaimIdentity {}
 message IssueReplyClaimIdentity {}
 message ProjectAgentTaskClaimIdentity {}
 message MergeBatchClaimIdentity {}
+message DmMemoryLearningClaimIdentity {
+  string organization_id = 1;
+  string input_hash = 2;
+}
 
 message ChannelReplyClaimIdentity {
   string organization_id = 1;
@@ -341,6 +351,7 @@ message RenewWorkLeaseResponse {
     ChannelReplyLeaseRenewal channel_reply = 12;
     ProjectAgentTaskLeaseRenewal project_agent_task = 13;
     MergeBatchLeaseRenewal merge_batch = 14;
+    DmMemoryLearningLeaseRenewal dm_memory = 15;
   }
 }
 
@@ -511,6 +522,7 @@ message ChannelReplySuccess {
   optional string conversation_id = 2;
   repeated briar.types.v1.UploadReference attachments = 3;
   repeated briar.app.v1.DmMemoryReference memory_citations = 4;
+  optional DmMemorySaveRequest memory_save_request = 5;
 
   // A document may accompany at most one proposal. Skill execution and
   // delegation remain exclusive from every artifact at the wire boundary.
@@ -520,6 +532,10 @@ message ChannelReplySuccess {
     ChannelReplySkillExecutionAction skill_execution = 11;
     ChannelReplyDelegationAction delegation = 12;
   }
+}
+
+message DmMemorySaveRequest {
+  repeated briar.app.v1.DmMemoryReference documents = 1;
 }
 
 message CompleteChannelReplyRequest {
@@ -601,6 +617,99 @@ message ChannelReplyLeaseRenewal {
 
 message MergeBatchLeaseRenewal {
   string batch_id = 1;
+}
+
+message DmMemoryLearningLeaseRenewal {}
+
+message ClaimedDmMemoryLearning {
+  string work_id = 1;
+  string run_id = 2;
+  string organization_id = 3;
+  string worker_id = 4;
+  string source_key = 5;
+  string title = 6;
+  string claim_token = 7;
+  google.protobuf.Timestamp claimed_at = 8;
+  google.protobuf.Timestamp lease_expires_at = 9;
+  string input_hash = 10;
+  bytes snapshot_json = 11;
+}
+
+enum DmMemoryLearningStage {
+  DM_MEMORY_LEARNING_STAGE_UNSPECIFIED = 0;
+  DM_MEMORY_LEARNING_STAGE_PROPOSING = 1;
+  DM_MEMORY_LEARNING_STAGE_VERIFYING = 2;
+}
+
+enum DmMemoryLearningFailure {
+  DM_MEMORY_LEARNING_FAILURE_UNSPECIFIED = 0;
+  DM_MEMORY_LEARNING_FAILURE_INVALID_PROPOSAL = 1;
+  DM_MEMORY_LEARNING_FAILURE_VERIFICATION_REJECTED = 2;
+  DM_MEMORY_LEARNING_FAILURE_STALE = 3;
+  DM_MEMORY_LEARNING_FAILURE_SCOPE_REVOKED = 4;
+  DM_MEMORY_LEARNING_FAILURE_BUDGET_EXHAUSTED = 5;
+  DM_MEMORY_LEARNING_FAILURE_MODEL_UNAVAILABLE = 6;
+  DM_MEMORY_LEARNING_FAILURE_MODEL_TIMEOUT = 7;
+  DM_MEMORY_LEARNING_FAILURE_MODEL_CREDENTIALS = 8;
+  DM_MEMORY_LEARNING_FAILURE_MODEL_CONFIGURATION = 9;
+  DM_MEMORY_LEARNING_FAILURE_INPUT_CAPACITY = 10;
+}
+
+message DmMemoryLearningUsage {
+  uint64 input_tokens = 1;
+  uint64 output_tokens = 2;
+  optional uint64 cost_micro_usd = 3;
+}
+
+message DmMemoryLearningRequestIdentity {
+  string project_id = 1;
+  string worker_id = 2;
+  WorkClaimIdentity work = 3;
+}
+
+message ReserveDmMemoryLearningCallRequest {
+  DmMemoryLearningRequestIdentity claim = 1;
+  string call_id = 2;
+  DmMemoryLearningStage stage = 3;
+}
+
+message SubmitDmMemoryLearningProposalRequest {
+  DmMemoryLearningRequestIdentity claim = 1;
+  string call_id = 2;
+  bytes proposal_json = 3;
+  DmMemoryLearningUsage usage = 4;
+}
+
+message SubmitDmMemoryLearningVerificationRequest {
+  DmMemoryLearningRequestIdentity claim = 1;
+  string call_id = 2;
+  string proposal_id = 3;
+  string proposal_hash = 4;
+  bytes verification_json = 5;
+  DmMemoryLearningUsage usage = 6;
+}
+
+message FailDmMemoryLearningRequest {
+  DmMemoryLearningRequestIdentity claim = 1;
+  DmMemoryLearningFailure code = 2;
+  optional string call_id = 3;
+  optional DmMemoryLearningUsage usage = 4;
+}
+
+message ReserveDmMemoryLearningCallResponse {
+  bytes json = 1;
+}
+
+message SubmitDmMemoryLearningProposalResponse {
+  bytes json = 1;
+}
+
+message SubmitDmMemoryLearningVerificationResponse {
+  bytes json = 1;
+}
+
+message FailDmMemoryLearningResponse {
+  bool released = 1;
 }
 
 message HandoffWorkRequest {
@@ -1088,6 +1197,7 @@ message ClaimedChannelReply {
   // Trigger-message files with claim-scoped raw download URLs.
   repeated QueuedAttachment trigger_attachments = 25;
   optional briar.app.v1.DmMemoryDescriptor memory = 26;
+  bool memory_learning_enabled = 27;
 }
 
 enum MergeBatchPhase {

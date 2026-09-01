@@ -1,4 +1,5 @@
 import type { JsonObject } from "@bufbuild/protobuf";
+import * as Schema from "effect/Schema";
 import { timestampDate, type Timestamp } from "@bufbuild/protobuf/wkt";
 import { AgentProvider as ProtoAgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
 import {
@@ -22,6 +23,7 @@ import {
   MergeBatchValidationFailureCode,
   type ChannelActivityCredential as ProtoChannelActivityCredential,
   type ClaimedChannelReply as ProtoClaimedChannelReply,
+  type ClaimedDmMemoryLearning as ProtoClaimedDmMemoryLearning,
   type ClaimedHandoffContext as ProtoClaimedHandoffContext,
   type ClaimedIssue as ProtoClaimedIssue,
   type ClaimedIssueReply as ProtoClaimedIssueReply,
@@ -42,6 +44,10 @@ import {
 } from "../src/lib/auto-hunt-contract";
 import type { AgentProvider } from "../src/lib/agent-provider";
 import { MERGE_QUEUE_VALIDATION_CONTEXT } from "../src/lib/merge-queue-validation-contract";
+import {
+  ClaimedDmMemory as ClaimedDmMemorySchema,
+  DmLearningSnapshot,
+} from "../src/lib/dm-memory-learning-contract";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -566,6 +572,7 @@ const channelReplyFromProto = (
     snapshot: required(value.snapshot, "channelReply.snapshot"),
     triggerAttachments: value.triggerAttachments,
     memory: value.memory ? dmMemoryDescriptorFromProto(value.memory) : null,
+    memoryLearningEnabled: value.memoryLearningEnabled,
   };
   if (scope.kind === "organization") {
     if (!mapped.organizationContext || mapped.delegation || mapped.skillExecutionTarget) {
@@ -729,6 +736,27 @@ const mergeBatchDomain = (
   };
 };
 
+const claimedDmMemoryFromProto = (value: ProtoClaimedDmMemoryLearning) =>
+  Schema.decodeUnknownSync(ClaimedDmMemorySchema)({
+    workType: "dmMemory",
+    workId: value.workId,
+    runId: value.runId,
+    organizationId: value.organizationId,
+    workerId: value.workerId,
+    sourceKey: value.sourceKey,
+    title: value.title,
+    claimToken: value.claimToken,
+    claimedAt: isoTimestamp(value.claimedAt, "dmMemory.claimedAt"),
+    leaseExpiresAt: isoTimestamp(
+      value.leaseExpiresAt,
+      "dmMemory.leaseExpiresAt",
+    ),
+    inputHash: value.inputHash,
+    snapshot: Schema.decodeUnknownSync(DmLearningSnapshot)(
+      JSON.parse(new TextDecoder().decode(value.snapshotJson)),
+    ),
+  });
+
 export type QueuedAttachment = ReturnType<typeof attachment>;
 export type QueuedIssueMessage = ReturnType<typeof issueMessage>;
 export type DetachedAgentSkill = ReturnType<typeof agentSkill>;
@@ -744,12 +772,14 @@ export type ClaimedProjectAgentTask = ReturnType<
 export type ClaimedIssueReply = ReturnType<typeof issueReplyFromProto>;
 export type ClaimedChannelReply = ReturnType<typeof channelReplyFromProto>;
 export type ClaimedMergeBatch = ReturnType<typeof mergeBatchDomain>;
+export type ClaimedDmMemory = ReturnType<typeof claimedDmMemoryFromProto>;
 export type ClaimedWork =
   | ClaimedRun
   | ClaimedIssueReply
   | ClaimedChannelReply
   | ClaimedProjectAgentTask
-  | ClaimedMergeBatch;
+  | ClaimedMergeBatch
+  | ClaimedDmMemory;
 
 const assertMergeBatch = (claim: ClaimedMergeBatch): ClaimedMergeBatch => {
   const expectedState = {
@@ -816,6 +846,8 @@ export function claimedWorkFromProto(value: ProtoClaimedWork): ClaimedWork {
       return projectAgentTaskFromProto(value.work.value);
     case "mergeBatch":
       return mergeBatchFromProto(value.work.value);
+    case "dmMemory":
+      return claimedDmMemoryFromProto(value.work.value);
     default:
       throw new Error("Worker claim omitted work variant");
   }

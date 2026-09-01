@@ -12,6 +12,7 @@ import type {
 import { dmMemoryPageSize } from "../../src/lib/dm-memory-contract";
 import { sha256 } from "./crypto-digest";
 import { HttpError } from "./http-response";
+import { dmLearningCapacityTable } from "./dm-memory-capacity";
 
 export type DmMemoryOwner = { organizationId: string; channelId: string; userId: string };
 type SpaceRow = {
@@ -284,10 +285,12 @@ export async function saveDmMemory(
 
 export async function updateDmMemorySettings(
   db: D1Database, owner: DmMemoryOwner, input: DmMemorySettingsInput,
+  options: { learningAvailable?: boolean } = {},
 ) {
-  if (input.autoEnabled) {
+  if (input.autoEnabled && !options.learningAvailable) {
     throw new HttpError(409, "Automatic memory learning is not available yet", "memory_learning_unavailable");
   }
+  if (input.autoEnabled && !input.useEnabled) throw new HttpError(400, "Enable memory use before automatic learning", "memory_invalid_settings");
   const space = await ensureWriteSpace(db, owner, input.memorySpaceId);
   const payloadHash = await sha256(JSON.stringify(input));
   const previous = await findCommit(db, space.id, input.requestId);
@@ -304,11 +307,13 @@ export async function updateDmMemorySettings(
       where ${ownerWhere} and space.id = ? and space.memory_revision = ? and ${liveSpaceWhere}
       on conflict (space_id, request_id) do nothing`)
       .bind(commitId, input.requestId, payloadHash, now, ...ownerBindings(owner), space.id, input.expectedMemoryRevision),
-    db.prepare(`update briar_dm_memory_spaces set use_enabled = ?, auto_enabled = 0,
+    db.prepare(`update briar_dm_memory_spaces set use_enabled = ?, auto_enabled = ?,
+      auto_enabled_at = case when ? = 1 and auto_enabled = 0 then ? else auto_enabled_at end,
       memory_revision = memory_revision + 1,
-      revocation_epoch = revocation_epoch + case when use_enabled = 1 and ? = 0 then 1 else 0 end,
+      revocation_epoch = revocation_epoch + case when ? = 0 or (auto_enabled = 1 and ? = 0) then 1 else 0 end,
       updated_at = ? where id = ? and ${commitGate}`)
-      .bind(Number(input.useEnabled), Number(input.useEnabled), now, space.id, commitId),
+      .bind(Number(input.useEnabled), Number(input.autoEnabled), Number(input.autoEnabled), now,
+        Number(input.useEnabled), Number(input.autoEnabled), now, space.id, commitId),
     finishCommit(db, commitId),
   ]);
   const committed = await findCommit(db, space.id, input.requestId);
@@ -363,9 +368,12 @@ export async function deleteDmMemory(db: D1Database, owner: DmMemoryOwner, docum
 }
 
 async function dmMemoryPurgeState(db: D1Database, documentId: string): Promise<"pending" | "complete"> {
-  const pending = await db.prepare(`select 1 from briar_dm_memory_vectors where document_id = ? and state <> 'purged'
+  const derived = await dmLearningCapacityTable(db) === "briar_dm_memory_jobs"
+    ? "document_id in (select document_id from briar_dm_memory_purge_documents where root_document_id = ?)"
+    : "document_id = ?";
+  const pending = await db.prepare(`select 1 from briar_dm_memory_vectors where (document_id = ? or ${derived}) and state <> 'purged'
     union all select 1 from briar_dm_memory_jobs where document_id = ? and kind = 'delete'
-      and status <> 'succeeded' limit 1`).bind(documentId, documentId).first();
+      and status <> 'succeeded' limit 1`).bind(documentId, documentId, documentId).first();
   return pending ? "pending" : "complete";
 }
 

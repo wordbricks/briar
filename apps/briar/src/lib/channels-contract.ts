@@ -1095,7 +1095,16 @@ export const channelReplyCompletionFields = {
   delegation: Schema.NullOr(channelReplyDelegationSchema),
 } as const;
 
+export const channelMemorySaveRequestSchema = strict(Schema.Struct({
+    documents: Schema.Array(channelMemoryCitationSchema).check(
+      Schema.isMaxLength(10),
+    ),
+  }));
+
 export const channelReplyCompletionSchema = strict(Schema.Struct({
+  memorySaveRequest: Schema.optional(
+    Schema.NullOr(channelMemorySaveRequestSchema),
+  ),
   memoryCitations: Schema.optional(
     Schema.NullOr(
       Schema.Array(channelMemoryCitationSchema).check(Schema.isMaxLength(10)),
