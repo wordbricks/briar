@@ -49,7 +49,154 @@ pub(super) fn read_cli_config(config_path: &Path) -> Result<LocalConfig, String>
     }
     let contents = fs::read_to_string(config_path)
         .map_err(|error| format!("Briar 로컬 설정을 읽지 못했습니다: {error}"))?;
-    decode_local_config_json(&contents)
+    match decode_local_config_json(&contents) {
+        Ok(config) => Ok(config),
+        Err(original_error) => {
+            let Some(config) = migrate_pre_protojson_local_config(&contents)? else {
+                return Err(original_error);
+            };
+            write_cli_config(config_path, &config)?;
+            Ok(config)
+        }
+    }
+}
+
+fn replace_legacy_enum(
+    object: &mut serde_json::Map<String, serde_json::Value>,
+    field: &str,
+    mappings: &[(&str, &str)],
+) -> bool {
+    let Some(serde_json::Value::String(value)) = object.get_mut(field) else {
+        return false;
+    };
+    let Some((_, replacement)) = mappings.iter().find(|(legacy, _)| value == legacy) else {
+        return false;
+    };
+    *value = (*replacement).to_string();
+    true
+}
+
+// TODO(remove after every pre-ProtoJSON Briar installation has launched at least once):
+// Delete this one-time local config migration. The strict generated ProtoJSON decoder below
+// remains the only supported storage contract after the installed user base has been rewritten.
+fn migrate_pre_protojson_local_config(contents: &str) -> Result<Option<LocalConfig>, String> {
+    let Ok(mut root) = serde_json::from_str::<serde_json::Value>(contents) else {
+        return Ok(None);
+    };
+    let Some(root) = root.as_object_mut() else {
+        return Ok(None);
+    };
+
+    let mut changed = root
+        .get_mut("appSettings")
+        .and_then(serde_json::Value::as_object_mut)
+        .is_some_and(|settings| {
+            replace_legacy_enum(
+                settings,
+                "browserAutomationProvider",
+                &[
+                    (
+                        "ego-browser",
+                        "LOCAL_BROWSER_AUTOMATION_PROVIDER_EGO_BROWSER",
+                    ),
+                    (
+                        "agent-browser",
+                        "LOCAL_BROWSER_AUTOMATION_PROVIDER_AGENT_BROWSER",
+                    ),
+                    ("aside", "LOCAL_BROWSER_AUTOMATION_PROVIDER_ASIDE"),
+                ],
+            )
+        });
+
+    if let Some(projects) = root
+        .get_mut("projects")
+        .and_then(serde_json::Value::as_array_mut)
+    {
+        for project in projects {
+            let Some(project) = project.as_object_mut() else {
+                continue;
+            };
+            if let Some(llm) = project
+                .get_mut("llm")
+                .and_then(serde_json::Value::as_object_mut)
+            {
+                changed |= replace_legacy_enum(
+                    llm,
+                    "provider",
+                    &[
+                        ("codex", "AGENT_PROVIDER_CODEX"),
+                        ("claude", "AGENT_PROVIDER_CLAUDE"),
+                        ("cursor", "AGENT_PROVIDER_CURSOR"),
+                        ("grok", "AGENT_PROVIDER_GROK"),
+                        ("agy", "AGENT_PROVIDER_AGY"),
+                        ("opencode", "AGENT_PROVIDER_OPENCODE"),
+                        ("openrouter", "AGENT_PROVIDER_OPENROUTER"),
+                    ],
+                );
+                changed |= replace_legacy_enum(
+                    llm,
+                    "approvalPolicy",
+                    &[
+                        ("untrusted", "LOCAL_APPROVAL_POLICY_UNTRUSTED"),
+                        ("on-request", "LOCAL_APPROVAL_POLICY_ON_REQUEST"),
+                        ("never", "LOCAL_APPROVAL_POLICY_NEVER"),
+                    ],
+                );
+            }
+            if let Some(claim) = project
+                .get_mut("activeClaim")
+                .and_then(serde_json::Value::as_object_mut)
+            {
+                changed |= replace_legacy_enum(
+                    claim,
+                    "terminalStatus",
+                    &[
+                        ("completed", "LOCAL_CLAIM_TERMINAL_STATUS_COMPLETED"),
+                        ("cancelled", "LOCAL_CLAIM_TERMINAL_STATUS_CANCELLED"),
+                        ("blocked", "LOCAL_CLAIM_TERMINAL_STATUS_BLOCKED"),
+                        ("failed", "LOCAL_CLAIM_TERMINAL_STATUS_FAILED"),
+                    ],
+                );
+            }
+            if let Some(auto_hunt) = project
+                .get_mut("autoHunt")
+                .and_then(serde_json::Value::as_object_mut)
+            {
+                if let Some(repository_id) = auto_hunt.get_mut("githubRepositoryId") {
+                    if let Some(repository_id_number) = repository_id.as_u64() {
+                        *repository_id =
+                            serde_json::Value::String(repository_id_number.to_string());
+                        changed = true;
+                    }
+                }
+                if let Some(checkpoints) = auto_hunt
+                    .get_mut("workflow")
+                    .and_then(serde_json::Value::as_object_mut)
+                    .and_then(|workflow| workflow.get_mut("execution"))
+                    .and_then(serde_json::Value::as_object_mut)
+                    .and_then(|execution| execution.get_mut("checkpoints"))
+                    .and_then(serde_json::Value::as_array_mut)
+                {
+                    for checkpoint in checkpoints {
+                        if let Some(checkpoint) = checkpoint.as_object_mut() {
+                            changed |= replace_legacy_enum(
+                                checkpoint,
+                                "position",
+                                &[("before", "POSITION_BEFORE"), ("after", "POSITION_AFTER")],
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if !changed {
+        return Ok(None);
+    }
+    let migrated = serde_json::to_string(root)
+        .map_err(|error| format!("Briar 로컬 설정을 변환하지 못했습니다: {error}"))?;
+    decode_local_config_json(&migrated).map(Some)
 }
 
 fn decode_local_config_json(contents: &str) -> Result<LocalConfig, String> {
@@ -764,5 +911,126 @@ mod tests {
         assert!(decode_local_config_json(&invalid)
             .expect_err("zero concurrency must fail")
             .contains("maxConcurrentSessions"));
+    }
+
+    #[test]
+    fn startup_ports_legacy_domain_json_once_without_masking_corruption() {
+        let legacy = serde_json::json!({
+            "apiUrl": "https://briar.example.com",
+            "userToken": "preserved-user-token",
+            "agentProviders": {
+                "codex": true,
+                "claude": true,
+                "cursor": true,
+                "grok": true,
+                "agy": true,
+                "opencode": true,
+                "openrouter": true
+            },
+            "appSettings": {
+                "preventSleepWhileRunning": false,
+                "browserAutomationProvider": "ego-browser"
+            },
+            "projects": [{
+                "id": "11111111-1111-4111-8111-111111111111",
+                "repositoryPath": "/projects/briar",
+                "agentToken": "briar_agent_preserved",
+                "apiUrl": "https://briar.example.com",
+                "llm": {
+                    "provider": "codex",
+                    "model": "gpt-5",
+                    "approvalPolicy": "on-request"
+                },
+                "autoHunt": {
+                    "githubRepositoryId": 9007199254740991_u64,
+                    "workflow": {
+                        "version": 2,
+                        "requirements": [],
+                        "stages": [{
+                            "id": "build",
+                            "label": "Build",
+                            "required": true
+                        }],
+                        "execution": {
+                            "checkpoints": [{
+                                "key": "before-build",
+                                "stage": "build",
+                                "position": "before"
+                            }]
+                        },
+                        "completion": { "requiredStages": ["build"] }
+                    }
+                },
+                "activeClaim": {
+                    "runId": "22222222-2222-4222-8222-222222222222",
+                    "sourceKey": "BRIAR-1",
+                    "token": "briar_claim_preserved",
+                    "leaseExpiresAt": "2026-09-01T00:00:00Z",
+                    "finished": true,
+                    "terminalStatus": "completed",
+                    "finishedAt": "2026-09-01T00:00:00Z"
+                }
+            }]
+        });
+        let directory = tempfile::tempdir().expect("temporary directory should be created");
+        let config_path = directory.path().join("config.json");
+        let legacy_contents = serde_json::to_string_pretty(&legacy).expect("legacy config encodes");
+        fs::write(&config_path, &legacy_contents).expect("legacy config should be written");
+
+        let migrated = read_cli_config(&config_path).expect("legacy config should migrate");
+        assert_eq!(migrated.user_token.as_deref(), Some("preserved-user-token"));
+        assert_eq!(
+            migrated.projects[0].agent_token.as_deref(),
+            Some("briar_agent_preserved")
+        );
+
+        let canonical_contents =
+            fs::read_to_string(&config_path).expect("config should be rewritten");
+        decode_local_config_json(&canonical_contents).expect("rewritten config must be strict");
+        let canonical: serde_json::Value =
+            serde_json::from_str(&canonical_contents).expect("canonical config should be JSON");
+        assert_eq!(
+            canonical.pointer("/appSettings/browserAutomationProvider"),
+            Some(&serde_json::json!(
+                "LOCAL_BROWSER_AUTOMATION_PROVIDER_EGO_BROWSER"
+            ))
+        );
+        assert_eq!(
+            canonical.pointer("/projects/0/llm/provider"),
+            Some(&serde_json::json!("AGENT_PROVIDER_CODEX"))
+        );
+        assert_eq!(
+            canonical.pointer("/projects/0/llm/approvalPolicy"),
+            Some(&serde_json::json!("LOCAL_APPROVAL_POLICY_ON_REQUEST"))
+        );
+        assert_eq!(
+            canonical.pointer("/projects/0/autoHunt/githubRepositoryId"),
+            Some(&serde_json::json!("9007199254740991"))
+        );
+        assert_eq!(
+            canonical.pointer("/projects/0/autoHunt/workflow/execution/checkpoints/0/position"),
+            Some(&serde_json::json!("POSITION_BEFORE"))
+        );
+        assert_eq!(
+            canonical.pointer("/projects/0/activeClaim/terminalStatus"),
+            Some(&serde_json::json!("LOCAL_CLAIM_TERMINAL_STATUS_COMPLETED"))
+        );
+
+        let corrupt_path = directory.path().join("corrupt.json");
+        let mut corrupt = legacy;
+        corrupt
+            .as_object_mut()
+            .expect("config should be an object")
+            .insert("futureRoot".to_string(), serde_json::Value::Bool(true));
+        let corrupt_contents =
+            serde_json::to_string_pretty(&corrupt).expect("config should encode");
+        fs::write(&corrupt_path, &corrupt_contents).expect("corrupt config should be written");
+        assert!(read_cli_config(&corrupt_path)
+            .expect_err("unknown fields must remain an error")
+            .contains("futureRoot"));
+        assert_eq!(
+            fs::read_to_string(corrupt_path).expect("corrupt config should remain readable"),
+            corrupt_contents
+        );
     }
 }
