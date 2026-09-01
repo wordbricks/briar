@@ -51,6 +51,7 @@
       "/api/*",
       "/briar.app.v1.*",
       "/briar.worker.v1.*",
+      "/me",
       "/inbox/*",
       "/invitations*",
       "/organizations*",
