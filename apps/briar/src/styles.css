@@ -439,6 +439,10 @@ body { overflow: hidden; font-synthesis: none; }
 .sidebar-planning-project-row > button:first-child:hover { color:var(--sidebar-accent-foreground); background:var(--sidebar-hover); }
 .sidebar-planning-project-row > button:first-child span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--text-xs); }
 .sidebar-planning-project-row[data-project-status="completed"] > button:first-child span,.sidebar-planning-project-row[data-project-status="cancelled"] > button:first-child span { opacity:.58; text-decoration:line-through; }
+.sidebar-planning-project-list .sidebar-planning-project-row.top-level { grid-template-columns:minmax(0,1fr) 30px; gap:0; }
+.sidebar-planning-project-list .sidebar-planning-project-row.top-level > button:first-child { height:32px; padding:0 8px 0 36px; border-radius:8px; }
+.sidebar-planning-project-list .sidebar-planning-project-row.top-level > button:first-child.active { color:var(--sidebar-accent-foreground); background:var(--sidebar-active); font-weight:600; }
+.sidebar-planning-project-list .sidebar-planning-project-row.top-level > button:not(:first-child) { width:28px; height:28px; }
 .sidebar-bottom { flex: 0 0 auto; position: relative; padding: 7px 10px 9px; border-top: 1px solid var(--sidebar-border); background:transparent; }
 .sidebar-footer-row { display: flex; align-items: center; gap: 6px; }
 .account-menu { min-width: 0; position: relative; flex: 1 1 auto; }

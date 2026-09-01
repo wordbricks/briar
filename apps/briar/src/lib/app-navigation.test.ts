@@ -136,6 +136,19 @@ describe("app navigation locations", () => {
     );
   });
 
+  it("stores Projects with its organization context", () => {
+    const location = organizationNavigationLocation(
+      "organization/one",
+      "projects",
+    );
+
+    expect(location).toBe("organizations/organization%2Fone/projects");
+    expect(pageFromNavigationLocation(location)).toBe("projects");
+    expect(organizationIdFromNavigationLocation(location)).toBe(
+      "organization/one",
+    );
+  });
+
   it.each([
     { scope: "application", section: "keybindings" },
     {

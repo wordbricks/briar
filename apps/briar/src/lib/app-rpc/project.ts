@@ -167,6 +167,18 @@ export async function updatePlanningProject(
   return planningProjectFromMessage(requiredMessage(response.project, "updatePlanningProject.project"));
 }
 
+export async function deletePlanningProject(
+  token: string,
+  projectId: string,
+) {
+  const response = await requireProjectClient().deletePlanningProject(
+    { projectId },
+    appCallOptions(token),
+  );
+  if (!response.deleted) throw new Error("Project was not deleted");
+  return { movedIssueCount: response.movedIssueCount };
+}
+
 export async function moveIssueToPlanningProject(
   token: string,
   sourceProjectId: string,

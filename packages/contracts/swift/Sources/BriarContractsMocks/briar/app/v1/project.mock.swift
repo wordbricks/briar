@@ -49,6 +49,8 @@ open class BriarAPI_ProjectServiceClientMock: BriarAPI_ProjectServiceClientInter
     public var mockAsyncCreatePlanningProject = { (_: BriarAPI_CreatePlanningProjectRequest) -> ResponseMessage<BriarAPI_CreatePlanningProjectResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `updatePlanningProject()`.
     public var mockAsyncUpdatePlanningProject = { (_: BriarAPI_UpdatePlanningProjectRequest) -> ResponseMessage<BriarAPI_UpdatePlanningProjectResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `deletePlanningProject()`.
+    public var mockAsyncDeletePlanningProject = { (_: BriarAPI_DeletePlanningProjectRequest) -> ResponseMessage<BriarAPI_DeletePlanningProjectResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `moveIssueToPlanningProject()`.
     public var mockAsyncMoveIssueToPlanningProject = { (_: BriarAPI_MoveIssueToPlanningProjectRequest) -> ResponseMessage<BriarAPI_MoveIssueToPlanningProjectResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `resolveIssueHierarchyLocation()`.
@@ -110,6 +112,10 @@ open class BriarAPI_ProjectServiceClientMock: BriarAPI_ProjectServiceClientInter
 
     open func `updatePlanningProject`(request: BriarAPI_UpdatePlanningProjectRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UpdatePlanningProjectResponse> {
         return self.mockAsyncUpdatePlanningProject(request)
+    }
+
+    open func `deletePlanningProject`(request: BriarAPI_DeletePlanningProjectRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_DeletePlanningProjectResponse> {
+        return self.mockAsyncDeletePlanningProject(request)
     }
 
     open func `moveIssueToPlanningProject`(request: BriarAPI_MoveIssueToPlanningProjectRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_MoveIssueToPlanningProjectResponse> {

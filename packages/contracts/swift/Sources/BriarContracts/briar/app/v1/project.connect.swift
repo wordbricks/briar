@@ -54,6 +54,9 @@ public protocol BriarAPI_ProjectServiceClientInterface: Sendable {
     func `updatePlanningProject`(request: BriarAPI_UpdatePlanningProjectRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_UpdatePlanningProjectResponse>
 
     @available(iOS 13, *)
+    func `deletePlanningProject`(request: BriarAPI_DeletePlanningProjectRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_DeletePlanningProjectResponse>
+
+    @available(iOS 13, *)
     func `moveIssueToPlanningProject`(request: BriarAPI_MoveIssueToPlanningProjectRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_MoveIssueToPlanningProjectResponse>
 
     @available(iOS 13, *)
@@ -139,6 +142,11 @@ public final class BriarAPI_ProjectServiceClient: BriarAPI_ProjectServiceClientI
     }
 
     @available(iOS 13, *)
+    public func `deletePlanningProject`(request: BriarAPI_DeletePlanningProjectRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_DeletePlanningProjectResponse> {
+        return await self.client.unary(path: "/briar.app.v1.ProjectService/DeletePlanningProject", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
     public func `moveIssueToPlanningProject`(request: BriarAPI_MoveIssueToPlanningProjectRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_MoveIssueToPlanningProjectResponse> {
         return await self.client.unary(path: "/briar.app.v1.ProjectService/MoveIssueToPlanningProject", idempotencyLevel: .unknown, request: request, headers: headers)
     }
@@ -164,6 +172,7 @@ public final class BriarAPI_ProjectServiceClient: BriarAPI_ProjectServiceClientI
             public static let listTeamPlanningProjects = Connect.MethodSpec(name: "ListTeamPlanningProjects", service: "briar.app.v1.ProjectService", type: .unary)
             public static let createPlanningProject = Connect.MethodSpec(name: "CreatePlanningProject", service: "briar.app.v1.ProjectService", type: .unary)
             public static let updatePlanningProject = Connect.MethodSpec(name: "UpdatePlanningProject", service: "briar.app.v1.ProjectService", type: .unary)
+            public static let deletePlanningProject = Connect.MethodSpec(name: "DeletePlanningProject", service: "briar.app.v1.ProjectService", type: .unary)
             public static let moveIssueToPlanningProject = Connect.MethodSpec(name: "MoveIssueToPlanningProject", service: "briar.app.v1.ProjectService", type: .unary)
             public static let resolveIssueHierarchyLocation = Connect.MethodSpec(name: "ResolveIssueHierarchyLocation", service: "briar.app.v1.ProjectService", type: .unary)
         }

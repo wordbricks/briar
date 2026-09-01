@@ -40,6 +40,8 @@ import { HttpError } from "./http-response";
 import { hasOrganizationCapability } from "./organization-access";
 import {
   createPlanningProject,
+  deletePlanningProject,
+  getDefaultProjectForTeam,
   getPlanningProjectForUser,
   getTeamForUser,
   listTeamProjects,
@@ -105,6 +107,8 @@ export type AppConnectProjectServices = {
   readonly getPlanningProject: typeof getPlanningProjectForUser;
   readonly getTeam: typeof getTeamForUser;
   readonly createPlanningProject: typeof createPlanningProject;
+  readonly deletePlanningProject: typeof deletePlanningProject;
+  readonly getDefaultPlanningProject: typeof getDefaultProjectForTeam;
   readonly updatePlanningProject: typeof updatePlanningProject;
   readonly moveIssueWithinTeam: typeof moveIssueWithinTeam;
   readonly resolveIssueHierarchyLocation: typeof resolveIssueHierarchyLocation;
@@ -128,6 +132,8 @@ export const appConnectProjectServices: AppConnectProjectServices = {
   getPlanningProject: getPlanningProjectForUser,
   getTeam: getTeamForUser,
   createPlanningProject,
+  deletePlanningProject,
+  getDefaultPlanningProject: getDefaultProjectForTeam,
   updatePlanningProject,
   moveIssueWithinTeam,
   resolveIssueHierarchyLocation,
@@ -373,6 +379,35 @@ export const createAppProjectService = (
     const updated = await services.getPlanningProject(db, project.id, session.user.id);
     if (!updated) throw new HttpError(404, "Project not found");
     return { project: planningProjectMessage(updated) };
+  },
+
+  deletePlanningProject: async (input) => {
+    const session = await services.requireSession(auth, request);
+    const project = await services.getPlanningProject(
+      db,
+      decodeUuid(input.projectId),
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    requirePlanningWrite(project.role);
+    if (project.is_default !== 0) {
+      throw new HttpError(409, "The Team default project must remain available");
+    }
+    const defaultProject = await services.getDefaultPlanningProject(
+      db,
+      project.team_id,
+    );
+    if (!defaultProject) {
+      throw new HttpError(409, "The Team default project is unavailable");
+    }
+    const result = await services.deletePlanningProject(db, {
+      projectId: project.id,
+      teamId: project.team_id,
+      defaultProjectId: defaultProject.id,
+    });
+    if (!result.deleted) throw new HttpError(404, "Project not found");
+    scheduleProjectRealtimePublish(env, db, project.team_id, context);
+    return result;
   },
 
   moveIssueToPlanningProject: async (input) => {

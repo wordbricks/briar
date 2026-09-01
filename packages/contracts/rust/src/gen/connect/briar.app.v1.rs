@@ -18617,6 +18617,18 @@ pub type OwnedUpdatePlanningProjectResponseView = ::buffa::view::OwnedView<
         'static,
     >,
 >;
+///Shorthand for `OwnedView<DeletePlanningProjectRequestView<'static>>`.
+pub type OwnedDeletePlanningProjectRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::DeletePlanningProjectRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<DeletePlanningProjectResponseView<'static>>`.
+pub type OwnedDeletePlanningProjectResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::DeletePlanningProjectResponseView<
+        'static,
+    >,
+>;
 ///Shorthand for `OwnedView<MoveIssueToPlanningProjectRequestView<'static>>`.
 pub type OwnedMoveIssueToPlanningProjectRequestView = ::buffa::view::OwnedView<
     crate::proto::briar::app::v1::__buffa::view::MoveIssueToPlanningProjectRequestView<
@@ -19169,6 +19181,42 @@ for ::buffa::view::OwnedView<
         )
     }
 }
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::DeletePlanningProjectResponse>
+for crate::proto::briar::app::v1::__buffa::view::DeletePlanningProjectResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::DeletePlanningProjectResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::DeletePlanningProjectResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
 impl ::connectrpc::Encodable<
     crate::proto::briar::app::v1::MoveIssueToPlanningProjectResponse,
 >
@@ -19336,6 +19384,12 @@ pub const PROJECT_SERVICE_CREATE_PLANNING_PROJECT_SPEC: ::connectrpc::Spec = ::c
 /// Static [`Spec`](::connectrpc::Spec) for the `UpdatePlanningProject` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const PROJECT_SERVICE_UPDATE_PLANNING_PROJECT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/briar.app.v1.ProjectService/UpdatePlanningProject",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `DeletePlanningProject` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const PROJECT_SERVICE_DELETE_PLANNING_PROJECT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.ProjectService/DeletePlanningProject",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -19721,6 +19775,29 @@ pub trait ProjectService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::briar::app::v1::UpdatePlanningProjectResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the DeletePlanningProject RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn delete_planning_project<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::DeletePlanningProjectRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::DeletePlanningProjectResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -20210,6 +20287,35 @@ impl<S: ProjectService> ProjectServiceExt for S {
             .with_spec(PROJECT_SERVICE_UPDATE_PLANNING_PROJECT_SPEC)
             .route_view(
                 PROJECT_SERVICE_SERVICE_NAME,
+                "DeletePlanningProject",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::DeletePlanningProjectRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::DeletePlanningProjectRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.delete_planning_project(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::DeletePlanningProjectResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(PROJECT_SERVICE_DELETE_PLANNING_PROJECT_SPEC)
+            .route_view(
+                PROJECT_SERVICE_SERVICE_NAME,
                 "MoveIssueToPlanningProject",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
@@ -20406,6 +20512,12 @@ impl<T: ProjectService> ::connectrpc::Dispatcher for ProjectServiceServer<T> {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
                         .with_spec(PROJECT_SERVICE_UPDATE_PLANNING_PROJECT_SPEC),
+                )
+            }
+            "DeletePlanningProject" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(PROJECT_SERVICE_DELETE_PLANNING_PROJECT_SPEC),
                 )
             }
             "MoveIssueToPlanningProject" => {
@@ -20740,6 +20852,28 @@ impl<T: ProjectService> ::connectrpc::Dispatcher for ProjectServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::briar::app::v1::UpdatePlanningProjectResponse,
+                        >(format)
+                })
+            }
+            "DeletePlanningProject" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::DeletePlanningProjectRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::DeletePlanningProjectRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::DeletePlanningProjectRequest,
+                    >::from_parts(&req, &body);
+                    svc.delete_planning_project(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::DeletePlanningProjectResponse,
                         >(format)
                 })
             }
@@ -21541,6 +21675,51 @@ where
                 &self.transport,
                 &self.config,
                 PROJECT_SERVICE_UPDATE_PLANNING_PROJECT_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the DeletePlanningProject RPC. Sends a request to /briar.app.v1.ProjectService/DeletePlanningProject.
+    pub async fn delete_planning_project(
+        &self,
+        request: crate::proto::briar::app::v1::DeletePlanningProjectRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::DeletePlanningProjectResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.delete_planning_project_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the DeletePlanningProject RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn delete_planning_project_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::DeletePlanningProjectRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::DeletePlanningProjectResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                PROJECT_SERVICE_DELETE_PLANNING_PROJECT_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
