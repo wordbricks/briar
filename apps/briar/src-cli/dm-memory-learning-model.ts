@@ -62,8 +62,7 @@ export async function invokeDmLearningModel(input: {
   const reservation = dmLearningCallReservation(invocation.model, prompt, invocation.stage);
   if (!reservation) throw new DmLearningClientError("model_configuration");
   const body = JSON.stringify({
-    model: invocation.model.model, stream: false, n: 1, modalities: ["text"],
-    max_completion_tokens: invocation.model.maxOutputTokens,
+    model: invocation.model.model, stream: false, max_tokens: invocation.model.maxOutputTokens,
     provider: { only: [invocation.model.upstreamProvider], allow_fallbacks: false,
       require_parameters: true, data_collection: "deny", zdr: true,
       max_price: { prompt: invocation.model.maxInputMicroUsdPerMillionTokens / 1_000_000,

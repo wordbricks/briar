@@ -129,7 +129,16 @@ async function searchWithinDeadline(
     for (const row of ranked) {
       if (selected.filter((other) => other.id === row.id).length < 2) selected.push(row);
     }
-    for (const row of selected.slice(0, input.max_results ?? 5)) {
+    const verificationCandidates = selected.slice(0, 10).map((row) => ({ id: row.chunk_id,
+      text: `${row.title}\n\n${memoryUtf8Slice(row.body, row.start_bytes, row.end_bytes - row.start_bytes).body}` }));
+    let verified: Set<string>;
+    try { verified = new Set(await store.verify(queries, verificationCandidates)); }
+    catch {
+      await sameSnapshot(db, access, snapshot.memory_revision);
+      return { ...response, status: "unavailable" };
+    }
+    const relevant = selected.filter((row) => verified.has(row.chunk_id));
+    for (const row of relevant.slice(0, input.max_results ?? 5)) {
       const sourceMetadata = await metadata(db, row);
       const headings = Schema.decodeUnknownSync(Schema.Array(Schema.String))(JSON.parse(row.headings_json))
         .map((heading) => {

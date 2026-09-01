@@ -34,8 +34,10 @@ describe("isolated memory model transport", () => {
     expect(request.messages.map((message: { role: string }) => message.role)).toEqual(["system", "user"]);
     expect(request.messages[1].content).toBe(JSON.stringify({ snapshot: invocation.snapshot }));
     expect(request.response_format.json_schema.strict).toBe(true);
-    expect(request.max_completion_tokens).toBe(invocation.model.maxOutputTokens);
-    for (const field of ["tools", "plugins", "conversation_id", "models", "session_id"]) expect(request).not.toHaveProperty(field);
+    expect(request.max_tokens).toBe(invocation.model.maxOutputTokens);
+    for (const field of ["tools", "plugins", "conversation_id", "models", "session_id", "modalities", "n", "max_completion_tokens"]) {
+      expect(request).not.toHaveProperty(field);
+    }
     expect(String(init?.body)).not.toContain("synthetic-secret");
   });
   it("verifies in a fresh request without inheriting the proposing conversation", async () => {
