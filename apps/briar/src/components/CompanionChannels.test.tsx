@@ -143,6 +143,11 @@ describe("CompanionChannels", () => {
         "aria-busy",
       ),
     ).toBe("false");
+    expect(
+      container.querySelector<HTMLTextAreaElement>(
+        ".companion-channel-composer textarea",
+      ),
+    ).not.toBeNull();
 
     await act(async () => back?.click());
     expect(container.textContent).toContain("General");

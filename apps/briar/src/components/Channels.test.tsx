@@ -226,6 +226,9 @@ describe("Channels", () => {
     expect(
       container.querySelector(".channel-main")?.getAttribute("aria-busy"),
     ).toBe("false");
+    expect(
+      container.querySelector<HTMLTextAreaElement>(".channel-composer textarea"),
+    ).not.toBeNull();
 
     await cleanup();
   });
