@@ -28,7 +28,7 @@ pub(super) fn default_app_settings() -> LocalAppSettings {
     LocalAppSettings {
         prevent_sleep_while_running: false,
         browser_automation_provider: Some(
-            local_proto::LocalBrowserAutomationProvider::EgoBrowser.into(),
+            local_proto::LocalBrowserAutomationProvider::AgentBrowser.into(),
         ),
         ..Default::default()
     }
@@ -862,6 +862,17 @@ pub(super) fn providers_any_enabled(settings: &LocalAgentProviderSettings) -> bo
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn defaults_browser_automation_to_agent_browser() {
+        assert_eq!(
+            default_app_settings()
+                .browser_automation_provider
+                .as_ref()
+                .and_then(buffa::EnumValue::as_known),
+            Some(local_proto::LocalBrowserAutomationProvider::AgentBrowser)
+        );
+    }
 
     fn managed_config(max_concurrent_sessions: u32) -> LocalConfig {
         let managed_computer_id = "44444444-4444-4444-8444-444444444444";

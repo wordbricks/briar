@@ -131,7 +131,7 @@ async function loadConfig(): Promise<Config> {
         },
         appSettings: {
           preventSleepWhileRunning: false,
-          browserAutomationProvider: "ego-browser",
+          browserAutomationProvider: "agent-browser",
         },
         projects: [],
       };

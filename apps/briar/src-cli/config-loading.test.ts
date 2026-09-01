@@ -148,6 +148,29 @@ describe("CLI config loading", () => {
     ).toBe("ego-browser");
   });
 
+  it("defaults browser automation to agent-browser when config is missing", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "briar-cli-config-"));
+    temporaryDirectories.push(directory);
+    const environment = { ...process.env };
+    delete environment.BRIAR_API_URL;
+    delete environment.BRIAR_MANAGED_CREDENTIAL_FILE;
+    const result = spawnSync(
+      bunExecutable,
+      [
+        "-e",
+        'const { loadConfig } = await import("./src-cli/command-support.ts"); console.log((await loadConfig()).appSettings.browserAutomationProvider);',
+      ],
+      {
+        cwd: process.cwd(),
+        env: { ...environment, BRIAR_CONFIG_HOME: directory },
+        encoding: "utf8",
+      },
+    );
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout.trim()).toBe("agent-browser");
+  });
+
   it("loads a canonical workflow execution boundary", async () => {
     const directory = await configDirectory({
       apiUrl: "https://briar.example.com",
