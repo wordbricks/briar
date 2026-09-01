@@ -22,6 +22,7 @@ import {
   createPlanningProject as createRemotePlanningProject,
   createProject,
   deleteAccount as deleteRemoteAccount,
+  deletePlanningProject as deleteRemotePlanningProject,
   deleteIssue as deleteRemoteIssue,
   deleteIssueMessage,
   transferIssue as transferRemoteIssue,
@@ -2649,6 +2650,57 @@ export function useBriar(options: UseBriarOptions = {}) {
     [planningProjects, token],
   );
 
+  const removePlanningProject = useCallback(
+    async (projectId: string) => {
+      const project = planningProjects.find(
+        (candidate) => candidate.id === projectId,
+      );
+      if (!project) throw new Error("삭제할 프로젝트가 없습니다.");
+      if (project.isDefault) {
+        throw new Error("팀의 기본 General 프로젝트는 삭제할 수 없습니다.");
+      }
+      const defaultProject = planningProjects.find(
+        (candidate) => candidate.teamId === project.teamId && candidate.isDefault,
+      );
+      if (!defaultProject) {
+        throw new Error("이슈를 옮길 기본 General 프로젝트를 찾을 수 없습니다.");
+      }
+      const result = demoMode
+        ? {
+            movedIssueCount: dashboard?.runs.filter(
+              (run) => run.projectId === projectId,
+            ).length ?? 0,
+          }
+        : await (async () => {
+            if (!token) throw new Error("로그인이 필요합니다.");
+            return deleteRemotePlanningProject(token, projectId);
+          })();
+      setPlanningProjects((current) =>
+        current.filter((candidate) => candidate.id !== projectId),
+      );
+      if (result.movedIssueCount > 0) {
+        setDashboard((current) =>
+          current?.project.id === project.teamId
+            ? {
+                ...current,
+                runs: current.runs.map((run) =>
+                  run.projectId === projectId
+                    ? {
+                        ...run,
+                        projectId: defaultProject.id,
+                        projectName: defaultProject.name,
+                      }
+                    : run,
+                ),
+              }
+            : current,
+        );
+      }
+      return result;
+    },
+    [dashboard?.runs, planningProjects, setDashboard, token],
+  );
+
   const addIssue = useCallback(
     async (projectId: string, input: CreateIssueInput) => {
       const planningProject = planningProjects.find((candidate) => candidate.id === projectId);
@@ -4382,6 +4434,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     deleteAccount,
     deleteIssue: removeIssue,
     transferIssue: transferIssueToProject,
+    deletePlanningProject: removePlanningProject,
     deleteProject: removeProject,
     deletingIssueId,
     deletingProjectId,

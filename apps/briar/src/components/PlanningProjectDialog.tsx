@@ -1,5 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { AlertTriangle, Trash2 } from "lucide-react";
 import { useI18n } from "../i18n";
+import { hasOrganizationCapability } from "../lib/organization-role";
 import type { PlanningProject, PlanningProjectStatus } from "../types";
 import { Button } from "./ui/button";
 import {
@@ -13,9 +15,11 @@ import {
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
+import { Spinner } from "./ui/spinner";
 
 export function PlanningProjectDialog({
   onCreate,
+  onDelete,
   onUpdate,
   onOpenChange,
   open,
@@ -27,6 +31,7 @@ export function PlanningProjectDialog({
     description?: string;
     status?: PlanningProjectStatus;
   }) => Promise<unknown>;
+  onDelete?: (projectId: string) => Promise<unknown>;
   onUpdate: (projectId: string, input: {
     name: string;
     description: string;
@@ -42,6 +47,8 @@ export function PlanningProjectDialog({
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<PlanningProjectStatus>("planned");
   const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -49,8 +56,16 @@ export function PlanningProjectDialog({
     setName(project?.name ?? "");
     setDescription(project?.description ?? "");
     setStatus(project?.status ?? "planned");
+    setConfirmingDelete(false);
     setError(null);
   }, [open, project]);
+
+  const canDelete = Boolean(
+    project &&
+      !project.isDefault &&
+      onDelete &&
+      hasOrganizationCapability(project.role, "issues:write"),
+  );
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -80,14 +95,74 @@ export function PlanningProjectDialog({
     }
   };
 
+  const confirmDelete = async () => {
+    if (!project || !onDelete || deleting) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      await onDelete(project.id);
+      onOpenChange(false);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <Dialog
       onOpenChange={(nextOpen) => {
-        if (!submitting) onOpenChange(nextOpen);
+        if (!submitting && !deleting) onOpenChange(nextOpen);
       }}
       open={open}
     >
-      <DialogContent closeLabel={t("common.close")} className="sm:max-w-lg">
+      <DialogContent
+        closeLabel={t("common.close")}
+        className="sm:max-w-lg"
+        showClose={!deleting}
+      >
+        {confirmingDelete && project ? (
+          <div className="grid gap-5">
+            <DialogHeader>
+              <div className="mb-2 grid size-10 place-items-center rounded-xl bg-destructive/10 text-destructive">
+                <Trash2 aria-hidden="true" size={20} strokeWidth={1.8} />
+              </div>
+              <DialogTitle>
+                {t("planningProject.deleteTitle", { name: project.name })}
+              </DialogTitle>
+              <DialogDescription>
+                {t("planningProject.deleteDescription")}
+              </DialogDescription>
+            </DialogHeader>
+            {error ? (
+              <p className="text-sm text-destructive" role="alert">{error}</p>
+            ) : null}
+            <DialogFooter>
+              <Button
+                disabled={deleting}
+                onClick={() => {
+                  setConfirmingDelete(false);
+                  setError(null);
+                }}
+                type="button"
+                variant="outline"
+              >
+                {t("common.cancel")}
+              </Button>
+              <Button
+                disabled={deleting}
+                onClick={() => void confirmDelete()}
+                type="button"
+                variant="destructive"
+              >
+                {deleting ? <Spinner size={15} /> : <Trash2 aria-hidden="true" />}
+                {deleting
+                  ? t("planningProject.deleting")
+                  : t("planningProject.delete")}
+              </Button>
+            </DialogFooter>
+          </div>
+        ) : (
         <form className="grid gap-5" onSubmit={submit}>
           <DialogHeader>
             <DialogTitle>
@@ -162,6 +237,39 @@ export function PlanningProjectDialog({
           {error ? (
             <p className="text-sm text-destructive" role="alert">{error}</p>
           ) : null}
+          {project ? (
+            <section className="flex items-center gap-3 rounded-xl border border-destructive/25 bg-destructive/5 p-3.5">
+              <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-destructive/10 text-destructive">
+                <AlertTriangle aria-hidden="true" size={17} />
+              </span>
+              <span className="grid min-w-0 flex-1 gap-0.5">
+                <strong className="text-sm text-foreground">
+                  {t("planningProject.dangerTitle")}
+                </strong>
+                <small className="text-xs leading-relaxed text-muted-foreground">
+                  {t(
+                    project.isDefault
+                      ? "planningProject.defaultDeleteDescription"
+                      : "planningProject.dangerDescription",
+                  )}
+                </small>
+              </span>
+              {canDelete ? (
+                <Button
+                  onClick={() => {
+                    setError(null);
+                    setConfirmingDelete(true);
+                  }}
+                  size="sm"
+                  type="button"
+                  variant="destructive"
+                >
+                  <Trash2 aria-hidden="true" />
+                  {t("planningProject.delete")}
+                </Button>
+              ) : null}
+            </section>
+          ) : null}
           <DialogFooter>
             <Button
               disabled={submitting}
@@ -182,6 +290,7 @@ export function PlanningProjectDialog({
             </Button>
           </DialogFooter>
         </form>
+        )}
       </DialogContent>
     </Dialog>
   );

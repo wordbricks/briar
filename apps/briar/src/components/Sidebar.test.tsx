@@ -109,6 +109,75 @@ describe("Sidebar", () => {
     await cleanup();
   });
 
+  it("shows projects as an organization accordion and opens its list and rows", async () => {
+    const onProjectsOpen = vi.fn();
+    const onPlanningProjectOpen = vi.fn();
+    const onPlanningProjectEdit = vi.fn();
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <Sidebar
+        {...sidebarProps}
+        activePlanningProjectId="planning-1"
+        onPlanningProjectEdit={onPlanningProjectEdit}
+        onPlanningProjectOpen={onPlanningProjectOpen}
+        onProjectsOpen={onProjectsOpen}
+        planningProjects={[{
+          id: "planning-1",
+          workspaceId: "organization-1",
+          workspaceName: "Briar",
+          teamId: "project-1",
+          teamName: "Briar",
+          name: "Desktop navigation",
+          description: "Expose organization projects",
+          status: "active",
+          leadUserId: null,
+          leadName: null,
+          startDate: null,
+          targetDate: null,
+          icon: null,
+          color: "#7c3aed",
+          sortOrder: 1,
+          isDefault: false,
+          role: "owner",
+          createdAt: "2026-09-01T00:00:00Z",
+          updatedAt: "2026-09-01T00:00:00Z",
+        }]}
+      />,
+    );
+
+    const toggle = container.querySelector<HTMLButtonElement>(
+      '.sidebar-planning-projects-nav > button',
+    )!;
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(container.querySelector("#sidebar-planning-project-list")?.textContent)
+      .toContain("Desktop navigation");
+
+    await act(async () => toggle.click());
+    expect(onProjectsOpen).toHaveBeenCalledOnce();
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+
+    await act(async () => toggle.click());
+    const row = container.querySelector<HTMLButtonElement>(
+      ".sidebar-planning-project-row > button:first-child",
+    )!;
+    await act(async () => row.click());
+    expect(onPlanningProjectOpen).toHaveBeenCalledWith(
+      "planning-1",
+      "project-1",
+    );
+
+    const settings = container.querySelector<HTMLButtonElement>(
+      ".sidebar-planning-project-row > button:last-child",
+    )!;
+    await act(async () => settings.click());
+    expect(onPlanningProjectEdit).toHaveBeenCalledWith("planning-1");
+
+    await cleanup();
+  });
+
   it("shows channels as an accordion and creates one from its context menu", async () => {
     const onChannelOpen = vi.fn();
     const onChannelCreate = vi.fn().mockResolvedValue(undefined);

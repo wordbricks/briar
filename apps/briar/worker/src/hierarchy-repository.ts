@@ -336,6 +336,39 @@ export async function archivePlanningProject(
   return (result.meta.changes ?? 0) > 0;
 }
 
+export async function deletePlanningProject(
+  db: D1Database,
+  input: {
+    projectId: string;
+    teamId: string;
+    defaultProjectId: string;
+  },
+) {
+  const observedAt = new Date().toISOString();
+  const [movedIssues, deletedProject] = await db.batch([
+    db.prepare(
+      `update briar_hunt_runs
+       set planning_project_id = ?, updated_at = ?
+       where planning_project_id = ? and project_id = ?
+       returning id`,
+    ).bind(
+      input.defaultProjectId,
+      observedAt,
+      input.projectId,
+      input.teamId,
+    ),
+    db.prepare(
+      `delete from briar_planning_projects
+       where id = ? and team_id = ? and is_default = 0
+       returning id`,
+    ).bind(input.projectId, input.teamId),
+  ]);
+  return {
+    deleted: deletedProject.results.length > 0,
+    movedIssueCount: movedIssues.results.length,
+  };
+}
+
 export async function listProjectIssues(
   db: D1Database,
   projectId: string,

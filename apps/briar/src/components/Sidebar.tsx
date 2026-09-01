@@ -9,6 +9,7 @@ import {
   Check,
   Ellipsis,
   ExternalLink,
+  FolderKanban,
   Inbox,
   ListTodo,
   LogOut,
@@ -52,6 +53,7 @@ import { useToast } from "./ui/toast";
 type SidebarPage =
   | "issues"
   | "lobby"
+  | "projects"
   | "agents"
   | "channels"
   | "dms"
@@ -69,6 +71,7 @@ export function Sidebar({
   activePage,
   activeOrganizationId,
   activeProjectId,
+  activePlanningProjectId,
   activeChannelId,
   agents,
   channels,
@@ -76,9 +79,9 @@ export function Sidebar({
   connectedProjectIds,
   isOpen,
   onAddProject,
-  onAddPlanningProject,
   onPlanningProjectEdit,
   onPlanningProjectOpen,
+  onProjectsOpen,
   onAgentSessionOpen,
   onAgentsOpen,
   onLobbyOpen,
@@ -115,6 +118,7 @@ export function Sidebar({
   activePage: SidebarPage;
   activeOrganizationId: string | null;
   activeProjectId: string | null;
+  activePlanningProjectId?: string | null;
   activeChannelId?: string | null;
   agents: ProjectAgent[];
   channels?: ChannelSummary[];
@@ -122,9 +126,9 @@ export function Sidebar({
   connectedProjectIds: string[] | null;
   isOpen: boolean;
   onAddProject: () => void;
-  onAddPlanningProject?: (teamId: string) => void;
   onPlanningProjectEdit?: (projectId: string) => void;
   onPlanningProjectOpen?: (projectId: string, teamId: string) => void;
+  onProjectsOpen?: () => void;
   onAgentSessionOpen: (sessionId: string) => void;
   onAgentsOpen: () => void;
   onLobbyOpen: () => void;
@@ -170,6 +174,8 @@ export function Sidebar({
   const [collapsedProjectIds, setCollapsedProjectIds] = useState<Set<string>>(
     () => new Set(),
   );
+  const [arePlanningProjectsExpanded, setArePlanningProjectsExpanded] =
+    useState(true);
   const [openProjectMenuId, setOpenProjectMenuId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const menuItemRef = useRef<HTMLButtonElement | null>(null);
@@ -318,6 +324,14 @@ export function Sidebar({
         (project) => project.organizationId === activeOrganization.id,
       )
     : projects;
+  const visibleTeamIds = new Set(visibleProjects.map((project) => project.id));
+  const visiblePlanningProjects = planningProjects.filter((project) =>
+    visibleTeamIds.has(project.teamId),
+  );
+
+  useEffect(() => {
+    if (activePage === "projects") setArePlanningProjectsExpanded(true);
+  }, [activePage]);
   const runningAgentSessionsByProjectId = useMemo(() => {
     const agentById = new Map(agents.map((agent) => [agent.id, agent]));
     const grouped = new Map<
@@ -560,6 +574,95 @@ export function Sidebar({
             <ListTodo aria-hidden="true" size={15} strokeWidth={1.7} />
             <span>{t("sidebar.myIssues")}</span>
           </a>
+        ) : null}
+        {!isProjectWindow && onProjectsOpen ? (
+          <div className="sidebar-channels sidebar-planning-projects-nav">
+            <button
+              aria-controls="sidebar-planning-project-list"
+              aria-expanded={arePlanningProjectsExpanded}
+              aria-label={
+                arePlanningProjectsExpanded
+                  ? t("sidebar.collapseProjects")
+                  : t("sidebar.expandProjects")
+              }
+              className={`sidebar-channels-toggle${
+                activePage === "projects" ? " active" : ""
+              }`}
+              onClick={() => {
+                setArePlanningProjectsExpanded((current) => !current);
+                onProjectsOpen();
+              }}
+              type="button"
+            >
+              <FolderKanban aria-hidden="true" size={16} strokeWidth={1.7} />
+              <span>{t("sidebar.projects")}</span>
+              <ChevronRight
+                aria-hidden="true"
+                className={`sidebar-channels-chevron${
+                  arePlanningProjectsExpanded ? " open" : ""
+                }`}
+                size={14}
+                strokeWidth={1.8}
+              />
+            </button>
+            {arePlanningProjectsExpanded ? (
+              <div
+                className="sidebar-channel-list sidebar-planning-project-list"
+                id="sidebar-planning-project-list"
+              >
+                {visiblePlanningProjects.map((planningProject) => (
+                  <div
+                    className="sidebar-planning-project-row top-level"
+                    data-project-status={planningProject.status}
+                    key={planningProject.id}
+                  >
+                    <button
+                      aria-current={
+                        activePage === "issues" &&
+                        activePlanningProjectId === planningProject.id
+                          ? "page"
+                          : undefined
+                      }
+                      className={
+                        activePage === "issues" &&
+                        activePlanningProjectId === planningProject.id
+                          ? "active"
+                          : undefined
+                      }
+                      onClick={() =>
+                        onPlanningProjectOpen?.(
+                          planningProject.id,
+                          planningProject.teamId,
+                        )
+                      }
+                      title={planningProject.description || planningProject.name}
+                      type="button"
+                    >
+                      <FolderKanban aria-hidden="true" size={13} strokeWidth={1.7} />
+                      <span>{planningProject.name}</span>
+                    </button>
+                    {onPlanningProjectEdit ? (
+                      <button
+                        aria-label={t("sidebar.editPlanningProject", {
+                          name: planningProject.name,
+                        })}
+                        onClick={() => onPlanningProjectEdit(planningProject.id)}
+                        title={t("sidebar.editPlanningProject", {
+                          name: planningProject.name,
+                        })}
+                        type="button"
+                      >
+                        <Settings size={12} strokeWidth={1.7} />
+                      </button>
+                    ) : null}
+                  </div>
+                ))}
+                {visiblePlanningProjects.length === 0 ? (
+                  <p>{t("sidebar.noProjects")}</p>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
         ) : null}
         {isProjectWindow && projectWindowProject && onChannelOpen ? (
           <SidebarProjectChannels
@@ -890,82 +993,6 @@ export function Sidebar({
                     className="sidebar-project-views"
                     id={`project-views-${project.id}`}
                   >
-                    <div className="sidebar-planning-projects">
-                      <div className="sidebar-planning-projects-heading">
-                        <span>{t("sidebar.projects")}</span>
-                        {onAddPlanningProject ? (
-                          <button
-                            aria-label={t("sidebar.addPlanningProject", {
-                              name: project.name,
-                            })}
-                            onClick={() => onAddPlanningProject(project.id)}
-                            title={t("sidebar.addPlanningProject", {
-                              name: project.name,
-                            })}
-                            type="button"
-                          >
-                            <Plus size={13} strokeWidth={1.8} />
-                          </button>
-                        ) : null}
-                      </div>
-                      {planningProjects
-                        .filter(candidate => candidate.teamId === project.id)
-                        .map(planningProject => (
-                          <div
-                            className="sidebar-planning-project-row"
-                            data-project-status={planningProject.status}
-                            key={planningProject.id}
-                          >
-                            <button
-                              onClick={() => openProjectPage(() => {
-                                if (onPlanningProjectOpen) {
-                                  onPlanningProjectOpen(
-                                    planningProject.id,
-                                    planningProject.teamId,
-                                  );
-                                } else {
-                                  onIssuesOpen();
-                                }
-                              })}
-                              title={planningProject.description || planningProject.name}
-                              type="button"
-                            >
-                              <ListTodo size={13} strokeWidth={1.7} />
-                              <span>{planningProject.name}</span>
-                            </button>
-                            {onPlanningProjectEdit ? (
-                              <button
-                                aria-label={t("sidebar.editPlanningProject", {
-                                  name: planningProject.name,
-                                })}
-                                onClick={() => onPlanningProjectEdit(
-                                  planningProject.id,
-                                )}
-                                title={t("sidebar.editPlanningProject", {
-                                  name: planningProject.name,
-                                })}
-                                type="button"
-                              >
-                                <Settings size={12} strokeWidth={1.7} />
-                              </button>
-                            ) : null}
-                            <button
-                              aria-label={t("sidebar.createIssueInProject", {
-                                name: planningProject.name,
-                              })}
-                              onClick={() => openProjectPage(
-                                () => onCreateIssue(planningProject.id),
-                              )}
-                              title={t("sidebar.createIssueInProject", {
-                                name: planningProject.name,
-                              })}
-                              type="button"
-                            >
-                              <Plus size={13} strokeWidth={1.8} />
-                            </button>
-                          </div>
-                        ))}
-                    </div>
                     <div className="sidebar-project-view-row">
                       <a
                         aria-current={

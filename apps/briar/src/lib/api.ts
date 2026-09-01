@@ -23,6 +23,7 @@ export {
   createAgentToken,
   createPlanningProject,
   createProject,
+  deletePlanningProject,
   deleteProject,
   loadProjectExecutionWorkerPolicy,
   loadTeamProjects,

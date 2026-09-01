@@ -24,6 +24,7 @@ service ProjectService {
   rpc ListTeamPlanningProjects(ListTeamPlanningProjectsRequest) returns (ListTeamPlanningProjectsResponse);
   rpc CreatePlanningProject(CreatePlanningProjectRequest) returns (CreatePlanningProjectResponse);
   rpc UpdatePlanningProject(UpdatePlanningProjectRequest) returns (UpdatePlanningProjectResponse);
+  rpc DeletePlanningProject(DeletePlanningProjectRequest) returns (DeletePlanningProjectResponse);
   rpc MoveIssueToPlanningProject(MoveIssueToPlanningProjectRequest) returns (MoveIssueToPlanningProjectResponse);
   rpc ResolveIssueHierarchyLocation(ResolveIssueHierarchyLocationRequest) returns (ResolveIssueHierarchyLocationResponse);
 }
@@ -258,6 +259,15 @@ message CreatePlanningProjectResponse {
 
 message UpdatePlanningProjectResponse {
   PlanningProject project = 1;
+}
+
+message DeletePlanningProjectRequest {
+  string project_id = 1;
+}
+
+message DeletePlanningProjectResponse {
+  bool deleted = 1;
+  int32 moved_issue_count = 2;
 }
 
 message MoveIssueToPlanningProjectRequest {

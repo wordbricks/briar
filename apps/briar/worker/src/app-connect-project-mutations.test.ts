@@ -306,4 +306,88 @@ describe("ProjectService mutations", () => {
       Code.FailedPrecondition,
     );
   });
+
+  it("deletes a planning project without orphaning its issues", async () => {
+    const owner = client(tokens.owner);
+    const createdTeam = await owner.createProject(
+      { name: "Planning lifecycle", organizationId },
+      options(tokens.owner),
+    );
+    const teamId = createdTeam.project?.id;
+    expect(teamId).toBeTruthy();
+    await db.batch(
+      [developerId, viewerId].map((userId) =>
+        db.prepare(
+          `insert into briar_project_members (
+             project_id, organization_id, user_id, created_at, updated_at
+           ) values (?, ?, ?, ?, ?)`,
+        ).bind(teamId, organizationId, userId, now, now),
+      ),
+    );
+
+    const defaultProject = (await owner.listTeamPlanningProjects(
+      { teamId: teamId! },
+      options(tokens.owner),
+    )).projects.find((project) => project.isDefault);
+    expect(defaultProject).toBeDefined();
+    const project = (await owner.createPlanningProject(
+      { teamId: teamId!, name: "Mobile launch" },
+      options(tokens.owner),
+    )).project;
+    expect(project).toBeDefined();
+
+    const runId = "55555555-5555-4555-8555-555555555555";
+    await db.prepare(
+      `insert into briar_hunt_runs (
+         id, project_id, team_id, planning_project_id, source, source_key,
+         title, stage, status, workflow_stage, workflow_snapshot_json,
+         issue_checkpoints_json, repository, started_at, last_event_at,
+         created_at, updated_at
+       ) values (
+         ?, ?, ?, ?, 'issue', 'planning-delete:issue', 'Keep this issue',
+         'queued', 'backlog', null,
+         '{"version":2,"stages":[{"id":"implementing","label":"Implement","required":true}],"execution":{"checkpoints":[]},"completion":{"requiredStages":["implementing"]}}',
+         '[]', 'example/planning-delete', ?, ?, ?, ?
+       )`,
+    ).bind(
+      runId,
+      teamId,
+      teamId,
+      project!.id,
+      now,
+      now,
+      now,
+      now,
+    ).run();
+
+    const denied = await client(tokens.viewer).deletePlanningProject(
+      { projectId: project!.id },
+      options(tokens.viewer),
+    ).catch((error: unknown) => error);
+    expect(denied).toBeInstanceOf(ConnectError);
+    expect((denied as ConnectError).code).toBe(Code.PermissionDenied);
+
+    const protectedDefault = await owner.deletePlanningProject(
+      { projectId: defaultProject!.id },
+      options(tokens.owner),
+    ).catch((error: unknown) => error);
+    expect(protectedDefault).toBeInstanceOf(ConnectError);
+    expect((protectedDefault as ConnectError).code).toBe(Code.FailedPrecondition);
+
+    await expect(owner.deletePlanningProject(
+      { projectId: project!.id },
+      options(tokens.owner),
+    )).resolves.toMatchObject({ deleted: true, movedIssueCount: 1 });
+    await expect(db.prepare(
+      `select planning_project_id from briar_hunt_runs where id = ?`,
+    ).bind(runId).first()).resolves.toEqual({
+      planning_project_id: defaultProject!.id,
+    });
+    await expect(owner.listTeamPlanningProjects(
+      { teamId: teamId! },
+      options(tokens.owner),
+    )).resolves.toMatchObject({
+      projects: [expect.objectContaining({ id: defaultProject!.id })],
+    });
+  });
 });

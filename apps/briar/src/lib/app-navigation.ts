@@ -3,6 +3,7 @@ import * as Schema from "effect/Schema";
 
 const ActivePage = Schema.Literals([
   "lobby",
+  "projects",
   "issues",
   "agents",
   "channels",
@@ -61,7 +62,11 @@ export const ProjectSettingsSection = Schema.Literals([
 ]);
 export type ProjectSettingsSection = typeof ProjectSettingsSection.Type;
 
-export const organizationNavigationPages = ["inbox", "my-issues"] as const;
+export const organizationNavigationPages = [
+  "projects",
+  "inbox",
+  "my-issues",
+] as const;
 const OrganizationNavigationPage = Schema.Literals(organizationNavigationPages);
 export type OrganizationNavigationPage = typeof OrganizationNavigationPage.Type;
 
