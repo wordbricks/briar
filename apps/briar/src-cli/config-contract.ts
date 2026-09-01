@@ -644,6 +644,8 @@ export const decodeConfig = (input: unknown): Config =>
   configFromProto(fromJson(LocalConfigSchema, input as JsonValue));
 export const decodeConfigJson = (input: string): Config =>
   configFromProto(fromJsonString(LocalConfigSchema, input));
+export const decodePreProtoConfigJson = (input: string): Config =>
+  decodeDomainConfig(JSON.parse(input));
 export const encodeConfigJson = (config: Config): string =>
   `${
     toJsonString(LocalConfigSchema, configToProto(config), { prettySpaces: 2 })
