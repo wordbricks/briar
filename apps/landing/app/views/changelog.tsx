@@ -30,6 +30,20 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.181",
+        date: "2026년 9월 1일",
+        title: "연결된 에이전트로 DM 메모리를 안전하게 학습합니다",
+        summary:
+          "현재 연결된 에이전트를 격리된 텍스트 호출로 재사용해 DM 메모리를 제안하고 독립적으로 검증합니다.",
+        items: [
+          "선택한 Codex·Claude·Grok·Cursor·Agy·OpenCode 연결을 별도 API 키나 모델 설정 없이 DM 메모리의 제안과 독립 검증에 재사용합니다.",
+          "각 학습 호출은 새로운 빈 임시 작업공간에서 첨부파일, Skill, 이전 대화 없이 읽기 전용 환경으로 실행하고 구조화된 결과만 받습니다.",
+          "Worker가 지원하는 전송 방식과 연결된 provider 상태를 광고해 건강한 에이전트만 선택하고 조직·대화별 호출 한도를 적용합니다.",
+          "자동 학습 기능을 운영 환경에서 사용할 수 있게 하되, 각 DM의 자동 학습 선택은 사용자가 직접 켜거나 끌 수 있도록 유지합니다.",
+          "브라우저 자동화의 기본 실행기를 agent-browser로 통일해 CLI와 데스크톱의 동작을 맞춥니다.",
+        ],
+      },
+      {
         version: "1.2.180",
         date: "2026년 9월 1일",
         title: "기존 설치의 업데이트 진입점과 CLI 설정을 복구합니다",
@@ -1408,6 +1422,20 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.181",
+        date: "September 1, 2026",
+        title: "Learn DM memory safely through connected agents",
+        summary:
+          "Reuse connected agents through isolated text calls to propose and independently verify DM memory.",
+        items: [
+          "Reuse selected Codex, Claude, Grok, Cursor, Agy, and OpenCode connections for DM memory proposal and independent verification without separate API keys or model configuration.",
+          "Run every learning call in a fresh empty temporary workspace with read-only provider state, no attachments, Skills, or retained conversation, and accept only structured results.",
+          "Advertise supported transports and connected provider health so only healthy agents are selected, with per-organization and per-conversation call limits.",
+          "Enable automatic learning in production while keeping each DM's automatic-learning choice under direct user control.",
+          "Use agent-browser as the default browser automation runtime across the CLI and desktop app.",
+        ],
+      },
       {
         version: "1.2.180",
         date: "September 1, 2026",
@@ -2878,7 +2906,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-180">
+          <a href="#v1-2-181">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -2900,9 +2928,10 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.180"
+                      entry.version === "1.2.181"
                         ? "2026-09-01"
-                        : entry.version === "1.2.178" ||
+                        : entry.version === "1.2.180" ||
+                            entry.version === "1.2.178" ||
                             entry.version === "1.2.177"
                           ? "2026-09-01"
                         : entry.version === "1.2.176"
