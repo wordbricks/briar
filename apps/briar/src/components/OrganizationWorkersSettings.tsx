@@ -37,6 +37,7 @@ import {
 } from "../lib/api";
 import { isDesktopTauri } from "../lib/platform";
 import { configureLocalExecutionWorker } from "../lib/project-connection";
+import { loadExecutionWorkerSettings } from "../lib/organization-worker-settings";
 import {
   compareSemanticVersions,
   isSemanticVersion,
@@ -123,17 +124,19 @@ export function OrganizationWorkersSettings({
     setLoading(true);
     setError(null);
     try {
-      if (desktop) {
-        await commands.syncExecutionWorkerLabels();
-      }
-      const [remote, local] = await Promise.all([
-        loadOrganizationExecutionWorkers(token, organization.id),
-        desktop
-          ? commands.inspectExecutionWorkers(
-              connectedOrganizationProjects.map((project) => project.id),
-            )
-          : Promise.resolve([]),
-      ]);
+      const [remote, local] = await loadExecutionWorkerSettings({
+        syncLabels: desktop
+          ? () => commands.syncExecutionWorkerLabels()
+          : undefined,
+        loadRemote: () =>
+          loadOrganizationExecutionWorkers(token, organization.id),
+        loadLocal: () =>
+          desktop
+            ? commands.inspectExecutionWorkers(
+                connectedOrganizationProjects.map((project) => project.id),
+              )
+            : Promise.resolve([]),
+      });
       setWorkers(remote.workers);
       setLatestVersion(remote.latestVersion ?? null);
       setCanManage(remote.canManage);
