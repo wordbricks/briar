@@ -30,6 +30,19 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.179",
+        date: "2026년 9월 1일",
+        title: "기존 설치의 업데이트 진입점과 CLI 설정을 복구합니다",
+        summary:
+          "1.2.174 설치도 앱 화면에 진입해 최신 버전을 받을 수 있게 하고, 기존 로컬 설정과 삭제된 프로젝트 경로를 안전하게 처리합니다.",
+        items: [
+          "Connect 전환 전 앱이 시작할 때 사용하는 인증·조직·프로젝트 조회를 일시적으로 복구해 기존 설치에서도 업데이트 UI가 표시됩니다.",
+          "기존 kebab-case 로컬 설정을 canonical ProtoJSON으로 한 번만 이전하고, 프로젝트와 credential을 보존한 백업을 남깁니다.",
+          "이미 삭제된 저장소 경로는 현재 프로젝트 검색에서 건너뛰어 다른 정상 프로젝트의 CLI 명령을 막지 않습니다.",
+          "새 설치와 최신 클라이언트는 생성된 Protobuf/Connect 계약을 그대로 사용하며, 호환 경로에는 전체 사용자 이전 후 제거할 TODO를 명시했습니다.",
+        ],
+      },
+      {
         version: "1.2.178",
         date: "2026년 9월 1일",
         title: "앱과 Worker의 계약을 하나로 통합하고 로컬 설정을 안전하게 복구합니다",
@@ -1394,6 +1407,19 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.179",
+        date: "September 1, 2026",
+        title: "Restore updates and CLI settings for existing installations",
+        summary:
+          "Let 1.2.174 installations reach the in-app updater while safely carrying forward local settings and ignoring removed project paths.",
+        items: [
+          "Temporarily restore the authenticated user, organization, and project reads used during startup before the Connect migration so existing installations can render the updater UI.",
+          "Migrate exact legacy kebab-case settings to canonical ProtoJSON once, preserving projects and credentials in a dated backup.",
+          "Skip repository paths that no longer exist while identifying the current project so one stale entry cannot block unrelated CLI commands.",
+          "Keep new installations and current clients on generated Protobuf/Connect contracts, with an explicit removal TODO once all existing users have upgraded.",
+        ],
+      },
       {
         version: "1.2.178",
         date: "September 1, 2026",
@@ -2850,7 +2876,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-178">
+          <a href="#v1-2-179">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -2872,9 +2898,10 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.178"
+                      entry.version === "1.2.179"
                         ? "2026-09-01"
-                        : entry.version === "1.2.177"
+                        : entry.version === "1.2.178" ||
+                            entry.version === "1.2.177"
                           ? "2026-09-01"
                         : entry.version === "1.2.176"
                           ? "2026-08-31"
