@@ -9,6 +9,14 @@
     {
       "pattern": "briar.wordbricks.ai/app*",
       "zone_name": "wordbricks.ai"
+    },
+    {
+      "pattern": "briar.wordbricks.ai/api/auth/*",
+      "zone_name": "wordbricks.ai"
+    },
+    {
+      "pattern": "briar.wordbricks.ai/device",
+      "zone_name": "wordbricks.ai"
     }
   ],
   "rules": [

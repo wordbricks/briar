@@ -1,4 +1,4 @@
-import { briarApiUrl } from "./api-config";
+import { briarApiUrl, briarAuthUrl } from "./api-config";
 export { briarApiUrl } from "./api-config";
 import { ApiError } from "./api/errors";
 export {
@@ -217,8 +217,8 @@ import type {
 } from "../types";
 
 const apiUrl = briarApiUrl;
-const deviceAuthorizationClient = apiUrl
-  ? createDeviceAuthorizationClient(apiUrl)
+const deviceAuthorizationClient = briarAuthUrl
+  ? createDeviceAuthorizationClient(briarAuthUrl)
   : undefined;
 
 const requireDeviceAuthorizationClient = () => {
