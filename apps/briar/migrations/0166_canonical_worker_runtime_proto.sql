@@ -148,6 +148,15 @@ where designated_worker_id in (
   select id from briar_invalid_execution_worker_runtime_ids
 );
 
+-- A reply-session lease pairs its device and worker identities. Letting the
+-- worker FK clear only owner_worker_id would violate that invariant, so release
+-- the whole lease before removing an unusable runtime advertisement.
+update briar_channel_reply_sessions
+set owner_device_id = null, owner_worker_id = null
+where owner_worker_id in (
+  select id from briar_invalid_execution_worker_runtime_ids
+);
+
 delete from briar_execution_workers
 where id in (select id from briar_invalid_execution_worker_runtime_ids);
 
@@ -260,6 +269,12 @@ where length(cast(runtime_proto_json as blob)) > 1048576;
 update briar_project_agents
 set designated_worker_id = null
 where designated_worker_id in (
+  select id from briar_invalid_execution_worker_runtime_ids
+);
+
+update briar_channel_reply_sessions
+set owner_device_id = null, owner_worker_id = null
+where owner_worker_id in (
   select id from briar_invalid_execution_worker_runtime_ids
 );
 

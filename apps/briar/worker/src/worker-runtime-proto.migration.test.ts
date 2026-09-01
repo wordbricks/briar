@@ -121,6 +121,31 @@ describe("Worker runtime ProtoJSON migration", () => {
          'invalid-runtime-worker', 'Invalid Runtime Worker', ?, ?
        )`,
     ).bind(now, now).run();
+    await executeD1Sql(db, `
+      insert into briar_channels (
+        id, organization_id, slug, name, default_project_id,
+        created_by_user_id, created_at, updated_at
+      ) values (
+        'runtime-channel', 'runtime-org', 'runtime', 'Runtime',
+        'runtime-project', 'runtime-owner', '${now}', '${now}'
+      );
+      insert into briar_channel_messages (
+        id, channel_id, author_user_id, body, created_at, updated_at
+      ) values (
+        'runtime-message', 'runtime-channel', 'runtime-owner',
+        'Runtime thread', '${now}', '${now}'
+      );
+      insert into briar_channel_reply_sessions (
+        id, organization_id, channel_id, thread_root_message_id, project_id,
+        agent_id, provider, owner_device_id, owner_worker_id,
+        last_activity_at, retained_until, created_at, updated_at
+      ) values (
+        'runtime-session', 'runtime-org', 'runtime-channel',
+        'runtime-message', 'runtime-project', 'runtime-agent', 'codex',
+        'invalid-runtime-device', 'invalid-runtime-worker',
+        '${now}', '${now}', '${now}', '${now}'
+      );
+    `);
 
     await applyD1Migrations(db, {
       files: ["0166_canonical_worker_runtime_proto.sql"],
@@ -136,6 +161,13 @@ describe("Worker runtime ProtoJSON migration", () => {
     ).first()).toEqual({
       designated_worker_id: null,
       designated_worker_label: "Invalid Runtime Worker",
+    });
+    expect(await db.prepare(
+      `select owner_device_id, owner_worker_id
+       from briar_channel_reply_sessions where id = 'runtime-session'`,
+    ).first()).toEqual({
+      owner_device_id: null,
+      owner_worker_id: null,
     });
 
     const stored = await db.prepare(
