@@ -30,6 +30,20 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.178",
+        date: "2026년 9월 1일",
+        title: "앱과 Worker의 계약을 하나로 통합하고 로컬 설정을 안전하게 복구합니다",
+        summary:
+          "클라이언트와 Worker가 같은 생성 계약을 사용하도록 통합하고, 기존 로컬 설정을 앱 시작 시 새 형식으로 자동 이전합니다.",
+        items: [
+          "데스크톱·모바일·Web과 Worker의 API를 하나의 Protobuf/Connect 계약에서 생성해 요청, 응답, 경로의 불일치를 방지합니다.",
+          "Bun sidecar와 실시간 이벤트도 공통 Protobuf 메시지를 사용해 실행 상태와 이벤트 형식을 일관되게 해석합니다.",
+          "기존 Briar 로컬 설정은 앱 시작 시 프로젝트와 credential을 보존한 채 canonical ProtoJSON으로 한 번만 원자적으로 이전됩니다.",
+          "알 수 없거나 실제로 손상된 설정은 임의 fallback으로 숨기지 않고 명확히 실패해 잘못된 상태가 계속 저장되지 않도록 합니다.",
+          "서버 저장 데이터는 표시 가능한 기록을 backfill하면서 일시적·불완전한 runtime 상태만 정리하도록 migration 경계를 다듬었습니다.",
+        ],
+      },
+      {
         version: "1.2.177",
         date: "2026년 9월 1일",
         title: "DM 메모리를 안전하게 연결하고 에이전트 작업을 더 안정화합니다",
@@ -1380,6 +1394,20 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.178",
+        date: "September 1, 2026",
+        title: "Unify app–Worker contracts and safely repair local settings",
+        summary:
+          "Generate client and Worker boundaries from one contract and automatically move existing local settings to the canonical format at startup.",
+        items: [
+          "Generate desktop, mobile, Web, and Worker APIs from one Protobuf/Connect contract to prevent request, response, and route drift.",
+          "Use shared Protobuf messages for the Bun sidecar and realtime events so execution state is interpreted consistently across runtimes.",
+          "On startup, atomically migrate existing Briar local settings to canonical ProtoJSON while preserving projects and credentials.",
+          "Keep unknown or genuinely damaged settings fail-closed instead of hiding them behind a permissive fallback.",
+          "Refine server storage migrations to backfill visible history while removing only incomplete transient runtime state.",
+        ],
+      },
       {
         version: "1.2.177",
         date: "September 1, 2026",
@@ -2822,7 +2850,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-177">
+          <a href="#v1-2-178">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -2844,8 +2872,10 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.177"
+                      entry.version === "1.2.178"
                         ? "2026-09-01"
+                        : entry.version === "1.2.177"
+                          ? "2026-09-01"
                         : entry.version === "1.2.176"
                           ? "2026-08-31"
                         : entry.version === "1.2.175"
