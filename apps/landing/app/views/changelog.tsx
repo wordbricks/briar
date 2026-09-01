@@ -30,6 +30,22 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.182",
+        date: "2026년 9월 2일",
+        title: "프로젝트를 안전하게 관리하고 데스크톱 작업 흐름을 다듬습니다",
+        summary:
+          "프로젝트 탐색과 삭제를 안전하게 만들고, 인증·입력·작업자 복구 흐름을 더 안정적으로 정리합니다.",
+        items: [
+          "조직별 Projects 목록과 아코디언 탐색을 추가하고 프로젝트 설정으로 바로 이동할 수 있습니다.",
+          "프로젝트 삭제는 보호된 General을 지키는 2단계 확인을 거치며, 삭제된 프로젝트의 이슈는 원자적으로 General로 이동합니다.",
+          "긴 DM·채널 초안이 제한된 textarea 안에서 스크롤되고 첨부·전송 컨트롤은 계속 사용할 수 있습니다.",
+          "설정 화면에서 원격·로컬 Worker 상태를 먼저 복구하고 오래된 Worker의 CLI 자산 동기화를 재시작 없이 시도합니다.",
+          "이모지 검색 입력이 Shadow DOM 안에 있어도 전역 단축키를 실행하지 않고 Escape 동작을 보존합니다.",
+          "이슈·채널 답장 완료 ID 생성에서 Crypto receiver를 보존해 기본 UUID 경로가 실패하지 않도록 합니다.",
+          "웹 기기 인증을 briar.wordbricks.ai의 same-origin 경로로 연결하고, Better Auth CORS를 요청 origin별로 안전하게 반환합니다.",
+        ],
+      },
+      {
         version: "1.2.181",
         date: "2026년 9월 1일",
         title: "연결된 에이전트로 DM 메모리를 안전하게 학습합니다",
@@ -1422,6 +1438,22 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.182",
+        date: "September 2, 2026",
+        title: "Safely manage projects and smooth out desktop workflows",
+        summary:
+          "Make project navigation and deletion safer while tightening web auth, composer scrolling, and Worker recovery.",
+        items: [
+          "Add an organization-scoped Projects list and accordion, with direct access to project settings.",
+          "Protect General with a guarded two-step project deletion flow and move deleted-project issues back atomically.",
+          "Keep long DM and channel drafts scrollable inside a bounded textarea while attachment and send controls stay available.",
+          "Recover remote and local Worker status from Settings and synchronize stale Worker CLI assets without restarting every Worker.",
+          "Keep emoji search inside Shadow DOM from triggering global shortcuts and preserve its Escape behavior.",
+          "Preserve the Crypto receiver when generating issue and channel reply completion UUIDs.",
+          "Route web device authentication through briar.wordbricks.ai and return origin-specific credentialed CORS for Better Auth.",
+        ],
+      },
       {
         version: "1.2.181",
         date: "September 1, 2026",
@@ -2906,7 +2938,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-181">
+          <a href="#v1-2-182">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -2928,9 +2960,10 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.181"
-                        ? "2026-09-01"
-                        : entry.version === "1.2.180" ||
+                      entry.version === "1.2.182"
+                        ? "2026-09-02"
+                        : entry.version === "1.2.181" ||
+                            entry.version === "1.2.180" ||
                             entry.version === "1.2.178" ||
                             entry.version === "1.2.177"
                           ? "2026-09-01"
