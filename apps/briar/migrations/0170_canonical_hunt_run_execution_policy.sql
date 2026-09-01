@@ -20,6 +20,11 @@ set full_auto = case
       else 0
     end;
 
+-- The old guard correctly freezes user-visible channel context, but this
+-- migration owns the one-time removal of the legacy policy field. Recreate the
+-- guard below against the canonical relational policy after the backfill.
+drop trigger if exists briar_channel_approved_backlog_context_guard;
+
 update briar_hunt_runs
 set context_json = json_remove(context_json, '$.fullAuto')
 where json_type(context_json, '$.fullAuto') is not null;

@@ -73,7 +73,31 @@ describe("hunt run execution policy storage cutover", () => {
         now,
         now,
       ),
+      insertRun.bind(
+        "channel-manual",
+        "channel-manual",
+        "Channel manual",
+        JSON.stringify(repositoryWorkflowBootstrap),
+        JSON.stringify({ origin: "briar-channel", fullAuto: false }),
+        now,
+        now,
+        now,
+        now,
+      ),
     ]);
+    await executeD1Sql(db, `
+      update briar_hunt_runs set status = 'backlog'
+      where id = 'channel-manual';
+      insert into briar_channel_issue_approval_audit (
+        id, proposal_id, organization_id, channel_id, project_id, run_id,
+        approved_by_user_id, approved_at, issue_source_key,
+        result_verification, payload_json, created_at
+      ) values (
+        'channel-manual-audit', 'channel-manual-proposal', 'policy-org',
+        'policy-channel', 'policy-project', 'channel-manual', 'policy-owner',
+        '${now}', 'channel-manual', 'atomic', '{}', '${now}'
+      );
+    `);
 
     await applyD1Migrations(db, {
       files: ["0170_canonical_hunt_run_execution_policy.sql"],
@@ -100,6 +124,12 @@ describe("hunt run execution policy storage cutover", () => {
         },
         full_auto: 1,
         requires_claim_token: 1,
+      },
+      {
+        id: "channel-manual",
+        context_json: { origin: "briar-channel" },
+        full_auto: 0,
+        requires_claim_token: 0,
       },
       {
         id: "external-manual",
