@@ -23,7 +23,7 @@ async function runWrangler(
   args: string[],
   captureOutput = false,
 ): Promise<WranglerResult> {
-  const processHandle = Bun.spawn(["bunx", "wrangler", ...args], {
+  const processHandle = Bun.spawn(["wrangler", ...args], {
     cwd: process.cwd(),
     env: process.env,
     stdin: "inherit",
