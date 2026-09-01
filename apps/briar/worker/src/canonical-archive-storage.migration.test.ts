@@ -16,7 +16,7 @@ describe("canonical archive storage migration", () => {
       `logs/v1/archive-cutover.canonical-v1-${"9".repeat(64)}.jsonl.gz`;
     const relatedObjectKey = "run-evidence/archive-cutover.png";
     await applyD1Migrations(db, {
-      through: "0156_canonical_project_agent_schedule_recurrence.sql",
+      through: "0160_canonical_project_agent_schedule_recurrence.sql",
     });
     await executeD1Sql(db, `
       insert into "user" (
@@ -58,13 +58,13 @@ describe("canonical archive storage migration", () => {
     `);
 
     await expect(applyD1Migrations(db, {
-      files: ["0157_canonical_archive_storage.sql"],
+      files: ["0161_canonical_archive_storage.sql"],
     })).rejects.toThrow();
 
     await db.prepare(
       `update briar_log_archives set object_key = ? where id = ?`,
     ).bind(archiveObjectKey, archiveId).run();
-    await applyD1Migrations(db, { files: ["0157_canonical_archive_storage.sql"] });
+    await applyD1Migrations(db, { files: ["0161_canonical_archive_storage.sql"] });
 
     expect(await db.prepare(
       `select count(*) as count from briar_log_archives`,
