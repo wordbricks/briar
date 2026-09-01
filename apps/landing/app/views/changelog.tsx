@@ -30,7 +30,7 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
-        version: "1.2.179",
+        version: "1.2.180",
         date: "2026년 9월 1일",
         title: "기존 설치의 업데이트 진입점과 CLI 설정을 복구합니다",
         summary:
@@ -1409,7 +1409,7 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
-        version: "1.2.179",
+        version: "1.2.180",
         date: "September 1, 2026",
         title: "Restore updates and CLI settings for existing installations",
         summary:
@@ -2878,7 +2878,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-179">
+          <a href="#v1-2-180">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -2900,7 +2900,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.179"
+                      entry.version === "1.2.180"
                         ? "2026-09-01"
                         : entry.version === "1.2.178" ||
                             entry.version === "1.2.177"
