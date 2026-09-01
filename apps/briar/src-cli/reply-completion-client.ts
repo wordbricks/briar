@@ -321,7 +321,7 @@ export function createReplyCompletionClient(
 ) {
   const queue = dependencies.queue ?? createWorkerQueueClient(apiUrl, token);
   const fetch = dependencies.fetch ?? globalThis.fetch;
-  const randomUUID = dependencies.randomUUID ?? crypto.randomUUID;
+  const randomUUID = dependencies.randomUUID ?? (() => crypto.randomUUID());
 
   const prepareAttachments = async (input: {
     projectId: string;

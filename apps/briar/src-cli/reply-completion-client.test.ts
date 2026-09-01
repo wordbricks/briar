@@ -183,4 +183,53 @@ describe("generated reply completion client", () => {
       },
     });
   });
+
+  it("uses the default crypto UUID function with its receiver intact", async () => {
+    const completeIssue = vi.fn().mockResolvedValue({
+      replayed: false,
+      disposition: ReplyCompletionDisposition.REQUEUED,
+    });
+    const completeChannel = vi.fn().mockResolvedValue({
+      replayed: false,
+      disposition: ReplyCompletionDisposition.REQUEUED,
+      retainedUntil: timestampFromDate(new Date("2026-08-31T16:00:00.000Z")),
+    });
+    const queue = {
+      prepareReplyAttachmentUploads: vi.fn(),
+      completeIssueReply: completeIssue,
+      completeChannelReply: completeChannel,
+    } as unknown as ReplyCompletionQueueClient;
+    const client = createReplyCompletionClient(
+      "http://127.0.0.1:8787",
+      "worker-token",
+      { queue },
+    );
+
+    await expect(client.completeIssueReply({
+      projectId,
+      workerId,
+      work: issueWork,
+      outcome: { case: "failure", error: "agent failed" },
+    })).resolves.toEqual({
+      replayed: false,
+      disposition: "requeued",
+    });
+    await expect(client.completeChannelReply({
+      projectId,
+      workerId,
+      work: channelWork,
+      outcome: { case: "failure", error: "agent failed" },
+    })).resolves.toEqual({
+      replayed: false,
+      disposition: "requeued",
+      retainedUntil: "2026-08-31T16:00:00.000Z",
+    });
+
+    expect(completeIssue.mock.calls[0]![0].requestId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    );
+    expect(completeChannel.mock.calls[0]![0].requestId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    );
+  });
 });
