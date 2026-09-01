@@ -124,11 +124,42 @@ retrieval. They do not activate a fallback. The semantic verifier also fails
 closed on invalid output or provider failure. Brief availability does not prove
 that semantic search is ready.
 
-The first rollout sets `DM_MEMORY_INDEX_ENABLED=true`,
-`DM_MEMORY_RETRIEVAL_ENABLED=true`, and `DM_MEMORY_MINIMUM_SCORE=0.5` while
-leaving automatic learning disabled. To roll back recall, set retrieval and
-indexing false and redeploy. Keep cleanup and owner management available; do not
-delete D1 originals or purge registries as a flag rollback.
+The current rollout sets `DM_MEMORY_INDEX_ENABLED=true`,
+`DM_MEMORY_RETRIEVAL_ENABLED=true`, `DM_MEMORY_MINIMUM_SCORE=0.5`, and
+`DM_MEMORY_LEARNING_ENABLED=true`. Learning still requires a matching
+organization policy, a protocol-2 learning Worker with the pinned providers,
+and owner opt-in for that DM. To roll back learning, set only the learning flag
+false and redeploy. To roll back recall, set retrieval and indexing false and
+redeploy. Keep cleanup and owner management available; do not delete D1 originals
+or purge registries as a flag rollback.
+
+## Connected-Agent learning runtime
+
+Learning Workers advertise `dmMemoryLearning: { protocol: 2, transports,
+providers }`. The server checks both proposer and verifier against that exact
+capability before claim and commit. A protocol-1 Worker can claim only a legacy
+OpenRouter policy; it cannot receive an Agent policy.
+
+An Agent stage reuses the user's existing local provider connection without
+sending its credential to Cloudflare. It copies the provider's minimal auth files
+to a mode-0700 temporary home and runs in a separate empty workspace with a new
+conversation, read-only execution, no attachments or skills, and a strict output
+schema. Codex also has MCP, apps, plugins, external tools and network permission
+disabled. The provider receives only the bounded snapshot JSON and fixed system
+instructions. Proposer and verifier never share a provider conversation.
+
+The Worker deletes both temporary homes and workspaces in `finally`. A crash may
+leave a directory until the existing stale-temp cleanup runs; do not claim
+provider-side deletion. Provider errors, invalid JSON and timeouts fail the job
+without advancing the watermark or writing a partial proposal. Subscription Agent
+calls have zero tracked micro-USD cost in the status UI, but retain per-space and
+per-organization call limits.
+
+Before enabling a new organization policy, run
+`bun evals/dm-memory-learning-v1/run.ts` from `apps/briar` with synthetic cases,
+confirm precision at least 95%, recall at least 80% and zero safety violations,
+then verify the target Worker heartbeat advertises protocol 2 and every pinned
+provider. Never use a private conversation archive for this check.
 
 Temporary memory files live outside the checkout with directory mode 0700 and
 file mode 0600. Completion/failure removes them. On a subsequent invocation,

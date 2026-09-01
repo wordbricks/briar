@@ -224,7 +224,7 @@ build_for_testing() {
     -scheme "$swift_dev_scheme" \
     -configuration 'Dev Debug' \
     -destination "$generic_simulator_destination" \
-    "${derived_data_args[@]}" \
+    ${derived_data_args[@]+"${derived_data_args[@]}"} \
     CODE_SIGNING_ALLOWED=NO \
     build-for-testing
 }
@@ -240,7 +240,7 @@ run_tests() {
     -project "$swift_project" \
     -scheme "$swift_dev_scheme" \
     -destination "$iphone_destination" \
-    "${derived_data_args[@]}" \
+    ${derived_data_args[@]+"${derived_data_args[@]}"} \
     CODE_SIGNING_ALLOWED=NO \
     test
 }
@@ -256,7 +256,7 @@ run_ipad_accessibility_test() {
     -project "$swift_project" \
     -scheme "$swift_dev_scheme" \
     -destination "$ipad_destination" \
-    "${derived_data_args[@]}" \
+    ${derived_data_args[@]+"${derived_data_args[@]}"} \
     -only-testing:BriarCompanionUITests/BriarCompanionUITests/testAccessibilityAndLargestDynamicTypeLayout \
     CODE_SIGNING_ALLOWED=NO \
     test
@@ -273,7 +273,7 @@ build_production() {
     -scheme "$swift_production_scheme" \
     -configuration Production \
     -destination "$generic_simulator_destination" \
-    "${derived_data_args[@]}" \
+    ${derived_data_args[@]+"${derived_data_args[@]}"} \
     CODE_SIGNING_ALLOWED=NO \
     analyze build
 }

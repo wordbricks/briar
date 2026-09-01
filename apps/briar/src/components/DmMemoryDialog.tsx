@@ -143,11 +143,16 @@ export function DmMemoryDialog({ scope, onClose, client = dmMemoryApi, initialRe
           {page.learning.configuration && <>
             <p className="break-words">{t("memory.learningModels")} · {page.learning.configuration.proposer.model}
               {" / "}{page.learning.configuration.verifier.model}</p>
-            <p className="break-words">OpenRouter · {page.learning.configuration.proposer.provider}
-              {" / "}{page.learning.configuration.verifier.provider}</p>
+            <p className="break-words">
+              {page.learning.configuration.proposer.transport === "agent" ? "Agent" : "OpenRouter"}
+              {" · "}{page.learning.configuration.proposer.provider}{" / "}
+              {page.learning.configuration.verifier.transport === "agent" ? "Agent" : "OpenRouter"}
+              {" · "}{page.learning.configuration.verifier.provider}
+            </p>
             <p>{t("memory.learningCalls")} · {page.learning.callsToday} / {page.learning.configuration.spaceDailyCalls}</p>
-            <p>{t("memory.learningCost")} · ${(page.learning.reservedMicroUsdToday / 1_000_000).toFixed(4)}
+            {page.learning.configuration.costTracked && <p>{t("memory.learningCost")} · ${(page.learning.reservedMicroUsdToday / 1_000_000).toFixed(4)}
               {" / $"}{(page.learning.configuration.spaceDailyMicroUsd / 1_000_000).toFixed(2)} USD</p>
+            }
           </>}
           <p>{t("memory.learningPending")} · {page.learning.pendingJobs} / {t("memory.learningFailures")} · {page.learning.failedJobs}</p>
           <p role="status">{t("memory.learningStatus")} · {page.learning.lastJob

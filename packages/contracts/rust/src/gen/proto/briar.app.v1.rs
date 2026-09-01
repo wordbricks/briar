@@ -57059,6 +57059,14 @@ pub struct DmMemoryLearningConfiguration {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub space_daily_micro_usd: u64,
+    /// Field 5: `cost_tracked`
+    #[serde(
+        rename = "costTracked",
+        alias = "cost_tracked",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub cost_tracked: bool,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -57070,6 +57078,7 @@ impl ::core::fmt::Debug for DmMemoryLearningConfiguration {
             .field("verifier", &self.verifier)
             .field("space_daily_calls", &self.space_daily_calls)
             .field("space_daily_micro_usd", &self.space_daily_micro_usd)
+            .field("cost_tracked", &self.cost_tracked)
             .finish()
     }
 }
@@ -57127,6 +57136,9 @@ impl ::buffa::Message for DmMemoryLearningConfiguration {
                     + ::buffa::types::uint64_encoded_len(self.space_daily_micro_usd)
                         as u64;
         }
+        if self.cost_tracked {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -57158,6 +57170,9 @@ impl ::buffa::Message for DmMemoryLearningConfiguration {
         }
         if self.space_daily_micro_usd != 0u64 {
             ::buffa::types::put_uint64_field(4u32, self.space_daily_micro_usd, buf);
+        }
+        if self.cost_tracked {
+            ::buffa::types::put_bool_field(5u32, self.cost_tracked, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -57208,6 +57223,13 @@ impl ::buffa::Message for DmMemoryLearningConfiguration {
                 )?;
                 self.space_daily_micro_usd = ::buffa::types::decode_uint64(buf)?;
             }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.cost_tracked = ::buffa::types::decode_bool(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -57220,6 +57242,7 @@ impl ::buffa::Message for DmMemoryLearningConfiguration {
         self.verifier = ::buffa::MessageField::none();
         self.space_daily_calls = 0u32;
         self.space_daily_micro_usd = 0u64;
+        self.cost_tracked = false;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -57270,6 +57293,13 @@ pub struct DmMemoryLearningModel {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub provider: ::buffa::alloc::string::String,
+    /// Field 3: `transport`
+    #[serde(
+        rename = "transport",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub transport: ::buffa::alloc::string::String,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -57279,6 +57309,7 @@ impl ::core::fmt::Debug for DmMemoryLearningModel {
         f.debug_struct("DmMemoryLearningModel")
             .field("model", &self.model)
             .field("provider", &self.provider)
+            .field("transport", &self.transport)
             .finish()
     }
 }
@@ -57315,6 +57346,9 @@ impl ::buffa::Message for DmMemoryLearningModel {
         if !self.provider.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.provider) as u64;
         }
+        if !self.transport.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.transport) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -57330,6 +57364,9 @@ impl ::buffa::Message for DmMemoryLearningModel {
         }
         if !self.provider.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.provider, buf);
+        }
+        if !self.transport.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.transport, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -57358,6 +57395,13 @@ impl ::buffa::Message for DmMemoryLearningModel {
                 )?;
                 ::buffa::types::merge_string(&mut self.provider, buf)?;
             }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.transport, buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -57368,6 +57412,7 @@ impl ::buffa::Message for DmMemoryLearningModel {
     fn clear(&mut self) {
         self.model.clear();
         self.provider.clear();
+        self.transport.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -217780,6 +217825,8 @@ pub mod __buffa {
             pub space_daily_calls: u32,
             /// Field 4: `space_daily_micro_usd`
             pub space_daily_micro_usd: u64,
+            /// Field 5: `cost_tracked`
+            pub cost_tracked: bool,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for DmMemoryLearningConfigurationView<'a> {
@@ -217882,6 +217929,13 @@ pub mod __buffa {
                             &mut cur,
                         )?;
                     }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.cost_tracked = ::buffa::types::decode_bool(&mut cur)?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -217931,6 +217985,7 @@ pub mod __buffa {
                     },
                     space_daily_calls: self.space_daily_calls,
                     space_daily_micro_usd: self.space_daily_micro_usd,
+                    cost_tracked: self.cost_tracked,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -217974,6 +218029,9 @@ pub mod __buffa {
                                 self.space_daily_micro_usd,
                             ) as u64;
                 }
+                if self.cost_tracked {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -218010,6 +218068,9 @@ pub mod __buffa {
                         self.space_daily_micro_usd,
                         buf,
                     );
+                }
+                if self.cost_tracked {
+                    ::buffa::types::put_bool_field(5u32, self.cost_tracked, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -218063,6 +218124,9 @@ pub mod __buffa {
                                 &self.space_daily_micro_usd,
                             ),
                         )?;
+                }
+                if self.cost_tracked {
+                    __map.serialize_entry("costTracked", &self.cost_tracked)?;
                 }
                 __map.end()
             }
@@ -218193,6 +218257,11 @@ pub mod __buffa {
             pub fn space_daily_micro_usd(&self) -> u64 {
                 self.0.reborrow().space_daily_micro_usd
             }
+            /// Field 5: `cost_tracked`
+            #[must_use]
+            pub fn cost_tracked(&self) -> bool {
+                self.0.reborrow().cost_tracked
+            }
         }
         impl ::core::convert::From<
             ::buffa::OwnedView<DmMemoryLearningConfigurationView<'static>>,
@@ -218236,6 +218305,8 @@ pub mod __buffa {
             pub model: &'a str,
             /// Field 2: `provider`
             pub provider: &'a str,
+            /// Field 3: `transport`
+            pub transport: &'a str,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for DmMemoryLearningModelView<'a> {
@@ -218284,6 +218355,13 @@ pub mod __buffa {
                         )?;
                         view.provider = ::buffa::types::borrow_str(&mut cur)?;
                     }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.transport = ::buffa::types::borrow_str(&mut cur)?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -218315,6 +218393,7 @@ pub mod __buffa {
                 ::core::result::Result::Ok(super::super::DmMemoryLearningModel {
                     model: self.model.to_string(),
                     provider: self.provider.to_string(),
+                    transport: self.transport.to_string(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -218338,6 +218417,11 @@ pub mod __buffa {
                         += 1u64
                             + ::buffa::types::string_encoded_len(&self.provider) as u64;
                 }
+                if !self.transport.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.transport) as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -218354,6 +218438,9 @@ pub mod __buffa {
                 }
                 if !self.provider.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.provider, buf);
+                }
+                if !self.transport.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.transport, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -218381,6 +218468,9 @@ pub mod __buffa {
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.provider) {
                     __map.serialize_entry("provider", self.provider)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.transport) {
+                    __map.serialize_entry("transport", self.transport)?;
                 }
                 __map.end()
             }
@@ -218486,6 +218576,11 @@ pub mod __buffa {
             #[must_use]
             pub fn provider(&self) -> &'_ str {
                 self.0.reborrow().provider
+            }
+            /// Field 3: `transport`
+            #[must_use]
+            pub fn transport(&self) -> &'_ str {
+                self.0.reborrow().transport
             }
         }
         impl ::core::convert::From<

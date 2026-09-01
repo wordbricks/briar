@@ -36,7 +36,11 @@ export type WorkerRuntimeInput = {
     readonly healthy: boolean;
     readonly detail: string | null;
   }>;
-  readonly dmMemoryLearning?: boolean;
+  readonly dmMemoryLearning?: boolean | {
+    readonly protocol: 2;
+    readonly transports: ReadonlyArray<"agent" | "openrouter">;
+    readonly providers: ReadonlyArray<AgentProvider>;
+  };
 };
 
 export const workerRuntimeToProto = (input: WorkerRuntimeInput) =>
@@ -88,7 +92,15 @@ export const workerRuntimeToProto = (input: WorkerRuntimeInput) =>
       dmMemoryProtocol: 1,
       dmMemoryLearningRequests: input.dmMemoryLearning ? 1 : undefined,
       dmMemoryLearning: input.dmMemoryLearning
-        ? { protocol: 1, transport: "openrouter" }
+        ? typeof input.dmMemoryLearning === "boolean"
+          ? { protocol: 1, transport: "openrouter" }
+          : {
+              protocol: input.dmMemoryLearning.protocol,
+              transports: [...input.dmMemoryLearning.transports],
+              providers: input.dmMemoryLearning.providers.map(
+                (provider) => protoAgentProvider[provider],
+              ),
+            }
         : undefined,
     },
     versions: { ...input.versions },

@@ -49,11 +49,13 @@ message DmMemoryLearningConfiguration {
   DmMemoryLearningModel verifier = 2;
   uint32 space_daily_calls = 3;
   uint64 space_daily_micro_usd = 4;
+  bool cost_tracked = 5;
 }
 
 message DmMemoryLearningModel {
   string model = 1;
   string provider = 2;
+  string transport = 3;
 }
 
 message DmMemoryLearningJob {

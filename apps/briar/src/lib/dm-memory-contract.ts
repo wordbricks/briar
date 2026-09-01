@@ -84,8 +84,9 @@ export const DmMemoryRevisionPage = Schema.Struct({
 export type DmMemoryRevisionPage = typeof DmMemoryRevisionPage.Type;
 export const DmMemoryLearningStatus = Schema.Struct({
   configuration: Schema.NullOr(Schema.Struct({
-    proposer: Schema.Struct({ model: Schema.String, provider: Schema.String }),
-    verifier: Schema.Struct({ model: Schema.String, provider: Schema.String }),
+    proposer: Schema.Struct({ transport: Schema.Literals(["agent", "openrouter"]), model: Schema.String, provider: Schema.String }),
+    verifier: Schema.Struct({ transport: Schema.Literals(["agent", "openrouter"]), model: Schema.String, provider: Schema.String }),
+    costTracked: Schema.Boolean,
     spaceDailyCalls: Schema.Int, spaceDailyMicroUsd: Schema.Int,
   })),
   callsToday: Schema.Int, reservedMicroUsdToday: Schema.Int, pendingJobs: Schema.Int, failedJobs: Schema.Int,
