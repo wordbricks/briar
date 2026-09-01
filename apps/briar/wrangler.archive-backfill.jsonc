@@ -1,0 +1,20 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "briar-archive-storage-backfill",
+  "main": "worker/src/archive-storage-backfill-entry.ts",
+  "compatibility_date": "2026-07-21",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "briar-db",
+      "database_id": "b83c9a2a-2a41-48ec-8bc4-ef038f5c9685"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "ARCHIVES",
+      "bucket_name": "briar-attachments"
+    }
+  ]
+}

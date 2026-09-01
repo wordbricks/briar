@@ -87,6 +87,11 @@ export function buildMigrationImport(
   return `${migrationSql.trimEnd()}\n\nINSERT INTO d1_migrations (name) VALUES ('${escapedName}');\n`;
 }
 
+const runRequiredMigrationPreflight = (migrationName: string) =>
+  migrationName.endsWith("_canonical_archive_storage.sql")
+    ? backfillRemoteArchiveStorage()
+    : Promise.resolve(0);
+
 async function readAppliedMigrations(
   runner: WranglerRunner,
   database: string,
@@ -116,7 +121,7 @@ export async function applyRemoteD1Migrations({
   database = "briar-db",
   migrationsDirectory = join(process.cwd(), "migrations"),
   runner = runWrangler,
-  beforeMigration,
+  beforeMigration = runRequiredMigrationPreflight,
 }: {
   database?: string;
   migrationsDirectory?: string;
@@ -199,12 +204,7 @@ export async function applyRemoteD1Migrations({
 }
 
 async function main(): Promise<void> {
-  const exitCode = await applyRemoteD1Migrations({
-    beforeMigration: (migrationName) =>
-      migrationName.endsWith("_canonical_archive_storage.sql")
-        ? backfillRemoteArchiveStorage()
-        : Promise.resolve(0),
-  });
+  const exitCode = await applyRemoteD1Migrations();
   if (exitCode !== 0) process.exitCode = exitCode;
 }
 

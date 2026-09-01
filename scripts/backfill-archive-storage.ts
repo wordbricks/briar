@@ -38,7 +38,7 @@ export async function backfillRemoteArchiveStorage(): Promise<number> {
     "worker/src/archive-storage-backfill-entry.ts",
     "--remote",
     "--config",
-    "wrangler.jsonc",
+    "wrangler.archive-backfill.jsonc",
     "--ip",
     "127.0.0.1",
     "--port",
