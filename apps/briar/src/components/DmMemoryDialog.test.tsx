@@ -68,7 +68,12 @@ describe("DM memory management", () => {
     client.get.mockResolvedValue(detail);
     root = createReactTestRoot({ attachToDocument: true });
   });
-  afterEach(async () => { await root.cleanup(); });
+  afterEach(async () => {
+    await root.cleanup();
+    // Radix FocusScope restores focus on the next task after unmount. Let that
+    // task finish while this file's jsdom Event constructors are still active.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
   const render = () => root.render(<I18nProvider><DmMemoryDialog client={client} scope={scope} onClose={() => {}} /></I18nProvider>);
   async function edit() {
     const entry = [...dialog().querySelectorAll("button")].find((node) => node.textContent?.includes(detail.title))!;
