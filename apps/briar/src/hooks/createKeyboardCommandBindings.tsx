@@ -22,6 +22,7 @@ import {
   type KeyboardCommandState,
 } from "../lib/keyboard-command-controller";
 import {
+  isKeyboardShortcutEditableEvent,
   isKeyboardShortcutEditableTarget,
   keyboardShortcutEventIsComposing,
 } from "../lib/keyboard-shortcuts";
@@ -78,10 +79,18 @@ export function installKeyboardCommandDomAdapters<CommandId extends string>({
   remoteCapturesKeyboard = remoteDesktopCapturesKeyboard,
   windowTarget,
 }: KeyboardCommandDomAdapterOptions<CommandId>): () => void {
+  const projectMode = (editable: boolean) => {
+    const mode = editable ? "insert" : "normal";
+    if (controller.snapshot.value.mode !== mode) controller.setMode(mode);
+  };
+  const projectEventFocus = (event: Event) => {
+    projectMode(isKeyboardShortcutEditableEvent(event));
+  };
   const dispatch = (
     event: KeyboardEvent,
     phase: KeyboardCommandPhase,
   ) => {
+    if (phase === "capture") projectEventFocus(event);
     if (isKeybindingRecording() || remoteCapturesKeyboard()) return;
     if (!pendingBelongsToPhase(controller, phase)) return;
     const decision = controller.dispatch(inputFromKeyboardEvent(event), phase);
@@ -92,11 +101,9 @@ export function installKeyboardCommandDomAdapters<CommandId extends string>({
   const captureKeydown = (event: KeyboardEvent) => dispatch(event, "capture");
   const bubbleKeydown = (event: KeyboardEvent) => dispatch(event, "bubble");
   const projectFocus = (target: EventTarget | null) => {
-    controller.setMode(
-      isKeyboardShortcutEditableTarget(target) ? "insert" : "normal",
-    );
+    projectMode(isKeyboardShortcutEditableTarget(target));
   };
-  const focusin = (event: FocusEvent) => projectFocus(event.target);
+  const focusin = (event: FocusEvent) => projectEventFocus(event);
   const focusout = (event: FocusEvent) => projectFocus(event.relatedTarget);
   const cancelPending = () => controller.cancelPending();
 

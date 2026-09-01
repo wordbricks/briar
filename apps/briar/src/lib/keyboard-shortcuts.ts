@@ -56,14 +56,16 @@ const closedOverlayAncestorSelector = [
   '[data-state="closed"]',
 ].join(",");
 
-function eventTargetElement(target: EventTarget | null): Element | null {
+function eventTargetElement(
+  target: EventTarget | null | undefined,
+): Element | null {
   if (target instanceof Element) return target;
   if (target instanceof Node) return target.parentElement;
   return null;
 }
 
 export function isKeyboardShortcutEditableTarget(
-  target: EventTarget | null,
+  target: EventTarget | null | undefined,
 ): boolean {
   const element = eventTargetElement(target);
   if (!element) return false;
@@ -84,6 +86,13 @@ export function isKeyboardShortcutEditableTarget(
   const contentEditable = element.closest("[contenteditable]");
   if (!contentEditable) return false;
   return contentEditable.getAttribute("contenteditable") !== "false";
+}
+
+export function isKeyboardShortcutEditableEvent(event: Event): boolean {
+  const path = event.composedPath();
+  return path.length > 0
+    ? path.some(isKeyboardShortcutEditableTarget)
+    : isKeyboardShortcutEditableTarget(event.target);
 }
 
 export function isOpenKeyboardShortcutOverlay(element: Element): boolean {
