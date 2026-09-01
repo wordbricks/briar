@@ -1775,7 +1775,7 @@ export function CompanionChannelComposer({
     setActiveSuggestionIndex,
     showsSuggestions,
     suggestions,
-  } = useChannelComposer<HTMLInputElement>({
+  } = useChannelComposer<HTMLTextAreaElement>({
     agents,
     busy,
     currentUserId,
@@ -1850,7 +1850,7 @@ export function CompanionChannelComposer({
           if (nextProfile) setProfile(nextProfile);
         }}
       >
-        <input
+        <textarea
           aria-activedescendant={
             showsSuggestions
               ? `${mentionListId}-option-${activeSuggestionIndex}`
@@ -1868,6 +1868,7 @@ export function CompanionChannelComposer({
           onPaste={handlePaste}
           placeholder={t("companion.channelMessagePlaceholder")}
           ref={inputRef}
+          rows={1}
           role="combobox"
           value={body}
         />
