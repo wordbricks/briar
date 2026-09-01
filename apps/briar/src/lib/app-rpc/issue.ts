@@ -216,7 +216,7 @@ const assertAccessibleIssueAttachmentReferences = (
 };
 
 export const createIssueRequestFromInput = (
-  projectId: string,
+  target: { teamId: string; planningProjectId: string },
   input: CreateIssueInput,
   mutation: {
     clientIssueId: string;
@@ -224,7 +224,8 @@ export const createIssueRequestFromInput = (
     attachmentIds: readonly string[];
   },
 ) => ({
-  projectId,
+  projectId: target.teamId,
+  planningProjectId: target.planningProjectId,
   title: input.title,
   description: mutation.description ?? undefined,
   priority: input.priority ?? undefined,
@@ -280,7 +281,7 @@ const createIssueResultFromMessage = (
 
 export async function createIssue(
   token: string,
-  projectId: string,
+  target: { teamId: string; planningProjectId: string },
   input: CreateIssueInput,
   injectedRuntime?: IssueMutationRuntime,
 ): Promise<CreateIssueResult> {
@@ -294,7 +295,7 @@ export async function createIssue(
     prepare: (attachments) => runtime.client.prepareCreateIssueAttachments(
       {
         preparationRequestId: runtime.randomUUID(),
-        projectId,
+        projectId: target.teamId,
         clientIssueId,
         attachments,
       },
@@ -309,7 +310,7 @@ export async function createIssue(
   assertAccessibleIssueAttachmentReferences(description, attachmentIds);
   return createIssueResultFromMessage(
     await runtime.client.createIssue(
-      createIssueRequestFromInput(projectId, input, {
+      createIssueRequestFromInput(target, input, {
         clientIssueId,
         description,
         attachmentIds,

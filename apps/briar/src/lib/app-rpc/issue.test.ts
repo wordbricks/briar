@@ -200,7 +200,10 @@ describe("Issue Connect boundary", () => {
       attachmentReferences: ["attachment-ref"],
       checkpoints: [{ key: "review", stage: "review", position: "after" }],
     };
-    const request = createIssueRequestFromInput("project-1", input, {
+    const request = createIssueRequestFromInput({
+      teamId: "team-1",
+      planningProjectId: "project-1",
+    }, input, {
       clientIssueId: "issue-1",
       description: "Canonical description",
       attachmentIds: [],
@@ -222,6 +225,8 @@ describe("Issue Connect boundary", () => {
     );
 
     expect(request).toMatchObject({
+      projectId: "team-1",
+      planningProjectId: "project-1",
       clientIssueId: "issue-1",
       description: "Canonical description",
       attachments: [],
