@@ -878,7 +878,7 @@ describe("conversational Agent Skill execution approval", () => {
     const archive = await archiveCompletedLogs(
       db,
       archives,
-      "2026-10-01T00:00:00.000Z",
+      new Date(Date.now() + 31 * 86_400_000).toISOString(),
       { maxObjects: 24 },
     );
     expect(archive.failures).toEqual([]);
