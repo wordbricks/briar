@@ -7,3 +7,7 @@ export const briarWebAppOrigin =
     : "";
 
 export const briarApiUrl = (configuredApiUrl || briarWebAppOrigin).replace(/\/$/u, "");
+
+// Browser authentication uses cookies, so keep it on the web app origin.
+// Bearer-authenticated Connect clients continue to use the configured API origin.
+export const briarAuthUrl = briarWebAppOrigin || briarApiUrl;
