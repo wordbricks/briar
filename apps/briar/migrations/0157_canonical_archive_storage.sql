@@ -1,5 +1,21 @@
 pragma foreign_keys = on;
 
+-- Production archives must be ported through archive-storage-backfill before
+-- the strict runtime decoder deploys. A failed assertion aborts the migration
+-- without changing either metadata or the original R2 objects.
+create table briar_archive_storage_backfill_guard (
+  remaining integer not null check (remaining = 0)
+);
+
+insert into briar_archive_storage_backfill_guard (remaining)
+select count(*)
+from briar_log_archives
+where archive_kind = 'project_agent_sessions'
+  and status in ('verified', 'complete')
+  and instr(object_key, '.canonical-v1-') = 0;
+
+drop table briar_archive_storage_backfill_guard;
+
 -- Archive format 1 remains canonical: the stricter Effect decoder did not
 -- change the manifest or record wire shape. Preserve every R2 object and its
 -- searchable D1 metadata. Normalize only invalid related-object identities,

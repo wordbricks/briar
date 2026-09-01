@@ -14,7 +14,6 @@ import type {
 } from "./agent-worklog";
 import {
   decodeStoredProjectAgentSessionPayload,
-  encodeStoredProjectAgentSessionPayload,
 } from "./project-request-contract";
 import {
   PositiveSafeInteger,
@@ -277,38 +276,15 @@ export const decodeArchivedRunEvidenceImage:
     decodeArchiveSync(ArchivedRunEvidenceImage);
 export const decodeArchivedIssueMessage: (input: unknown) => IssueMessageRow =
   decodeArchiveSync(ArchivedIssueMessage);
-const decodeArchivedProjectAgentSessionRow = decodeArchiveSync(
+export const decodeArchivedProjectAgentSessionRow = decodeArchiveSync(
   ArchivedProjectAgentSession,
-);
-const ArchivedProjectAgentSessionPayloadJson = Schema.fromJsonString(
-  Schema.Record(Schema.String, Schema.Unknown),
-);
-const decodeArchivedProjectAgentSessionPayload = Schema.decodeUnknownSync(
-  ArchivedProjectAgentSessionPayloadJson,
-  strictSchemaOptions,
-);
-const encodeArchivedProjectAgentSessionPayload = Schema.encodeSync(
-  ArchivedProjectAgentSessionPayloadJson,
-  strictSchemaOptions,
 );
 export const decodeArchivedProjectAgentSession = (
   input: unknown,
 ): ProjectAgentSessionRow => {
   const row = decodeArchivedProjectAgentSessionRow(input);
-  const archived = decodeArchivedProjectAgentSessionPayload(row.payload_json);
-  const canonicalJson = encodeArchivedProjectAgentSessionPayload({
-    ...archived,
-    dispatchGroupId: typeof archived.dispatchGroupId === "string" &&
-        archived.dispatchGroupId.length > 0
-      ? archived.dispatchGroupId
-      : row.id,
-    requestedByUserId: row.requested_by_user_id,
-  });
-  const payload = decodeStoredProjectAgentSessionPayload(canonicalJson);
-  return {
-    ...row,
-    payload_json: encodeStoredProjectAgentSessionPayload(payload),
-  };
+  decodeStoredProjectAgentSessionPayload(row.payload_json);
+  return row;
 };
 export const decodeArchivedTranscriptSession:
   (input: unknown) => TranscriptSessionRow =

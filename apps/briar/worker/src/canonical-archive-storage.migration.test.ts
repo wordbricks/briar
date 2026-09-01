@@ -7,11 +7,13 @@ import {
 } from "./test-helpers/d1";
 
 describe("canonical archive storage migration", () => {
-  it("preserves readable archives and guards cleanup identities", async () => {
+  it("requires a completed R2 backfill and preserves its D1 pointer", async () => {
     const db = env.DB;
     const now = "2026-08-31T00:00:00.000Z";
     const archiveId = "a".repeat(64);
-    const archiveObjectKey = "logs/v1/archive-cutover.jsonl.gz";
+    const legacyObjectKey = "logs/v1/archive-cutover.jsonl.gz";
+    const archiveObjectKey =
+      `logs/v1/archive-cutover.canonical-v1-${"9".repeat(64)}.jsonl.gz`;
     const relatedObjectKey = "run-evidence/archive-cutover.png";
     await applyD1Migrations(db, {
       through: "0156_canonical_project_agent_schedule_recurrence.sql",
@@ -48,16 +50,21 @@ describe("canonical archive storage migration", () => {
         related_object_keys_json
       ) values (
         '${archiveId}', 'archive-project', null, 'archive-project',
-        'execution_audit', '${archiveObjectKey}', 1, 'complete', 1, 10,
+        'project_agent_sessions', '${legacyObjectKey}', 1, 'complete', 1, 10,
         '${"c".repeat(64)}', '${"d".repeat(64)}', '${now}', '${now}',
         '${now}', '${now}', '${now}', '2027-08-31T00:00:00.000Z',
         0, null, '["${relatedObjectKey}"]'
       );
     `);
 
-    await applyD1Migrations(db, {
-      files: ["0157_archive_format_v2.sql"],
-    });
+    await expect(applyD1Migrations(db, {
+      files: ["0157_canonical_archive_storage.sql"],
+    })).rejects.toThrow();
+
+    await db.prepare(
+      `update briar_log_archives set object_key = ? where id = ?`,
+    ).bind(archiveObjectKey, archiveId).run();
+    await applyD1Migrations(db, { files: ["0157_canonical_archive_storage.sql"] });
 
     expect(await db.prepare(
       `select count(*) as count from briar_log_archives`,

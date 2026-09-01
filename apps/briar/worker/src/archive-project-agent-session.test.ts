@@ -169,26 +169,6 @@ describe("readArchivedProjectAgentSession", () => {
     },
   );
 
-  it("canonicalizes the stored identity of existing v1 sessions", async () => {
-    const legacyPayload = JSON.stringify({
-      ...JSON.parse(sessionPayloadJson),
-      dispatchGroupId: "",
-      requestedByUserId: undefined,
-    });
-    const { bucket, metadata } = await fixture([
-      sessionRecord({
-        requested_by_user_id: "archive-owner",
-        payload_json: legacyPayload,
-      }),
-    ]);
-
-    const session = await readArchivedProjectAgentSession(bucket, metadata);
-    expect(JSON.parse(session.payload_json)).toMatchObject({
-      dispatchGroupId: sessionId,
-      requestedByUserId: "archive-owner",
-    });
-  });
-
   it("rejects the wrong archive kind and unreadable status before reading R2", async () => {
     const { bucket, metadata } = await fixture();
     const unreadableBucket: ArchiveBucket = {
