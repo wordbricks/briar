@@ -451,9 +451,9 @@ BEGIN
     and accepted_by_user_id is not null and accepted_at is not null;
 END;
 
--- Retire the predictable proposal identities and unverifiable approval
--- authority. This branch has not shipped, so there is no rolling-worker
--- compatibility window to preserve.
+-- Retire unverifiable approval authority without deleting the issue and
+-- proposal history users still see. Once its audit row is gone, a legacy run
+-- is an ordinary issue and cannot inherit the atomic approval privileges below.
 drop trigger if exists briar_channel_reconciled_run_event_guard;
 drop trigger if exists briar_channel_reconciled_run_status_guard;
 drop trigger if exists briar_hunt_runs_legacy_channel_proposal_guard;
@@ -482,19 +482,6 @@ where result_verification <> 'atomic'
          or source_key like 'briar-conversation-proposal:%'
        )
    );
-
-delete from briar_channel_action_proposals
-where issue_source_key like 'briar-channel-proposal:%';
-
-delete from briar_issue_action_proposals
-where issue_source_key like 'briar-conversation-proposal:%';
-
-delete from briar_hunt_runs
-where source = 'issue'
-  and (
-    source_key like 'briar-channel-proposal:%'
-    or source_key like 'briar-conversation-proposal:%'
-  );
 
 drop table if exists briar_channel_issue_approval_reconciliation;
 drop table if exists briar_channel_issue_transfer_reconciliation;

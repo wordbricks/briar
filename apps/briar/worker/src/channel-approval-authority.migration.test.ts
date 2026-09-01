@@ -9,7 +9,7 @@ import {
 } from "./test-helpers/d1";
 
 describe("channel approval authority cutover", () => {
-  it("purges unverifiable authority and preserves atomic dispatch security", async () => {
+  it("removes unverifiable authority without deleting visible issues", async () => {
     const db = env.DB;
     const now = "2026-09-01T00:00:00.000Z";
     await applyD1Migrations(db, {
@@ -202,7 +202,11 @@ describe("channel approval authority cutover", () => {
     await expect(db.prepare(
       `select id from briar_hunt_runs order by id`,
     ).all()).resolves.toMatchObject({
-      results: [{ id: "atomic-run" }],
+      results: [
+        { id: "atomic-run" },
+        { id: "legacy-channel-run" },
+        { id: "legacy-conversation-run" },
+      ],
     });
     await expect(db.prepare(
       `select id from briar_channel_action_proposals
@@ -210,11 +214,24 @@ describe("channel approval authority cutover", () => {
        union all
        select id from briar_issue_action_proposals
        where issue_source_key like 'briar-conversation-proposal:%'`,
-    ).all()).resolves.toMatchObject({ results: [] });
+    ).all()).resolves.toMatchObject({
+      results: [
+        { id: "legacy-channel-proposal" },
+        { id: "legacy-conversation-proposal" },
+      ],
+    });
     await expect(isChannelApprovedIssue(db, {
       id: "atomic-run",
       source_key: "atomic-approved",
     })).resolves.toBe(true);
+    await expect(isChannelApprovedIssue(db, {
+      id: "legacy-channel-run",
+      source_key: "briar-channel-proposal:legacy",
+    })).resolves.toBe(false);
+    await expect(isChannelApprovedIssue(db, {
+      id: "legacy-conversation-run",
+      source_key: "briar-conversation-proposal:legacy",
+    })).resolves.toBe(false);
 
     await expect(insertAudit.bind(
       "future-legacy-audit",
