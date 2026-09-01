@@ -2796,7 +2796,13 @@ export function useBriar(options: UseBriarOptions = {}) {
           };
         }
         if (!token) throw new Error("로그인이 필요합니다.");
-        const result = await createIssue(token, planningProject!.id, input);
+        if (!planningProject) {
+          throw new Error("이슈를 추가할 프로젝트가 없습니다.");
+        }
+        const result = await createIssue(token, {
+          teamId,
+          planningProjectId: planningProject.id,
+        }, input);
         if (teamId === activeProjectId) {
           await refresh("snapshot");
         } else {

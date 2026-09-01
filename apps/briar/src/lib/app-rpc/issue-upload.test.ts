@@ -8,7 +8,10 @@ import { createIssue } from "./issue";
 const observed = {
   preparationRequestId: "",
   preparedClientIssueId: "",
+  preparedProjectId: "",
   finalClientIssueId: "",
+  finalProjectId: "",
+  finalPlanningProjectId: "",
   finalDescription: "",
   finalUploadIds: [] as string[],
   digest: [] as number[],
@@ -19,6 +22,7 @@ const client = createClient(IssueService, createRouterTransport((router) => {
     prepareCreateIssueAttachments(request) {
       observed.preparationRequestId = request.preparationRequestId;
       observed.preparedClientIssueId = request.clientIssueId;
+      observed.preparedProjectId = request.projectId;
       observed.digest = [...(request.attachments[0]?.sha256 ?? [])];
       return {
         uploads: [{
@@ -31,6 +35,8 @@ const client = createClient(IssueService, createRouterTransport((router) => {
     },
     createIssue(request) {
       observed.finalClientIssueId = request.clientIssueId;
+      observed.finalProjectId = request.projectId;
+      observed.finalPlanningProjectId = request.planningProjectId ?? "";
       observed.finalDescription = request.description ?? "";
       observed.finalUploadIds = request.attachments.map(({ uploadId }) =>
         uploadId
@@ -49,7 +55,7 @@ const client = createClient(IssueService, createRouterTransport((router) => {
 describe("Issue prepared upload boundary", () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it("binds one stable ID across prepare, raw PUT, and final Connect mutation", async () => {
+  it("binds the mutation and Team/Project identities across the upload boundary", async () => {
     const file = new File(["screen"], "screen.png", { type: "image/png" });
     const upload = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(null, { status: 204 }),
@@ -57,7 +63,7 @@ describe("Issue prepared upload boundary", () => {
 
     const result = await createIssue(
       "session-token",
-      "project-1",
+      { teamId: "team-1", planningProjectId: "project-1" },
       {
         title: "Upload screenshot",
         description: "![screen](briar-attachment://local-screen)",
@@ -83,6 +89,9 @@ describe("Issue prepared upload boundary", () => {
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u,
     );
     expect(observed.finalClientIssueId).toBe(observed.preparedClientIssueId);
+    expect(observed.preparedProjectId).toBe("team-1");
+    expect(observed.finalProjectId).toBe("team-1");
+    expect(observed.finalPlanningProjectId).toBe("project-1");
     expect(result.runId).toBe(observed.preparedClientIssueId);
     expect(observed.digest).toHaveLength(32);
     expect(observed.finalDescription).toBe(
