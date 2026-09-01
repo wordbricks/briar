@@ -73,7 +73,7 @@ export async function loadBrowserAutomationSettings(): Promise<BrowserAutomation
     } catch {
       // Use the default when browser storage is unavailable or invalid.
     }
-    return { provider: "ego-browser" };
+    return { provider: "agent-browser" };
   }
   return commands.loadBrowserAutomationSettings();
 }
