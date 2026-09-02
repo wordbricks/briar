@@ -25,10 +25,13 @@ import type {
   ChannelMember,
 } from "../lib/channels-contract";
 import {
+  isChannelAttachmentTypeSupported,
+  normalizeChannelAttachmentFile,
+  validateChannelAttachments,
+} from "../lib/channel-attachments";
+import {
   dataTransferHasFiles,
   filesFromDataTransfer,
-  normalizeIssueAttachmentFile,
-  validateIssueAttachments,
 } from "../lib/issue-attachments";
 
 type ComposerInput = HTMLInputElement | HTMLTextAreaElement;
@@ -223,16 +226,16 @@ export function useChannelComposer<T extends ComposerInput>({
   };
 
   const addImages = (files: readonly File[]) => {
-    const normalized = files.map(normalizeIssueAttachmentFile);
+    const normalized = files.map(normalizeChannelAttachmentFile);
     if (
       normalized.length === 0 ||
-      normalized.some((file) => !file.type.startsWith("image/"))
+      normalized.some((file) => !isChannelAttachmentTypeSupported(file.type))
     ) {
-      setAttachmentError(t("channel.imageOnly"));
+      setAttachmentError(t("channel.attachmentTypeUnsupported"));
       return;
     }
     const next = [...images, ...normalized.map(draftChannelImage)];
-    const validationError = validateIssueAttachments(
+    const validationError = validateChannelAttachments(
       next.map((image) => image.file),
     );
     if (validationError) {
@@ -349,7 +352,7 @@ export function useChannelComposer<T extends ComposerInput>({
   };
   const handlePaste = (event: ClipboardEvent<T>) => {
     const pasted = filesFromDataTransfer(event.clipboardData).filter((file) =>
-      file.type.startsWith("image/"),
+      file.type.startsWith("image/") || file.type === "application/pdf",
     );
     if (pasted.length === 0) return;
     event.preventDefault();

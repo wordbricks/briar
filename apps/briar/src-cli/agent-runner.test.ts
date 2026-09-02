@@ -395,11 +395,13 @@ describe("detached Agent runner", () => {
           createdAt: "2026-08-16T00:00:00.000Z",
         }],
         downloadedImagePaths: [".briar-channel-images/evidence.png"],
+        downloadedFilePaths: [".briar-channel-attachments/brief.pdf"],
       },
     });
 
     expect(prompt).toContain("Repository findings");
     expect(prompt).toContain("evidence.png");
+    expect(prompt).toContain(".briar-channel-attachments/brief.pdf");
     expect(prompt).toContain("Briar development");
     expect(prompt).not.toContain(avatar);
     expect(prompt).not.toContain("agent@example.com");

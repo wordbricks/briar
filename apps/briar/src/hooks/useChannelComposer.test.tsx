@@ -350,6 +350,35 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     await cleanup();
   });
 
+  it("adds a dropped PDF and submits its prepared upload reference", async () => {
+    const onSend = vi.fn<OnSend>();
+    const { cleanup, container } = await renderHarness({ onSend });
+    const form = container.querySelector("form")!;
+    const pdf = new File(["%PDF-1.7"], "brief.pdf", {
+      type: "application/pdf",
+    });
+    const dataTransfer = {
+      files: [pdf],
+      items: [{ kind: "file", getAsFile: () => pdf }],
+      types: ["Files"],
+      dropEffect: "none",
+    };
+    const drop = new Event("drop", { bubbles: true, cancelable: true });
+    Object.defineProperty(drop, "dataTransfer", { value: dataTransfer });
+    await act(async () => form.dispatchEvent(drop));
+
+    expect(container.querySelector('[data-testid="images"]')?.textContent).toBe("1");
+    expect(container.querySelector('[data-testid="error"]')?.textContent).toBe("");
+    await act(async () => form.requestSubmit());
+    expect(onSend).toHaveBeenCalledWith(
+      expect.stringContaining("briar-attachment://"),
+      [],
+      [pdf],
+      [expect.any(String)],
+    );
+    await cleanup();
+  });
+
   it("shows a localized error and leaves drag mode after a non-image drop", async () => {
     const { cleanup, container } = await renderHarness({
       onSend: vi.fn<OnSend>(),
@@ -374,7 +403,7 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     expect(drop.defaultPrevented).toBe(true);
     expect(form.className).toBe("");
     expect(container.querySelector('[data-testid="error"]')?.textContent).toBe(
-      "Only image files can be attached.",
+      "Only images and PDF files can be attached.",
     );
     await cleanup();
   });

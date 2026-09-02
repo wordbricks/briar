@@ -78,6 +78,7 @@ import {
   channelBodyWithoutImages,
   useChannelMessageImageCache,
 } from "./ChannelImages";
+import { channelAttachmentAccept } from "../lib/channel-attachments";
 import { ChannelMentionMenu } from "./ChannelMentionMenu";
 import { ChannelThreadSubscribeControls } from "./ChannelThreadSubscribeControls";
 import { ChannelTypingState } from "./ChannelTypingState";
@@ -1874,7 +1875,7 @@ export function CompanionChannelComposer({
         />
       </MentionComposerField>
       <input
-        accept="image/*"
+        accept={channelAttachmentAccept}
         className="channel-composer-file-input"
         disabled={busy || images.length >= maxIssueAttachmentCount}
         multiple
