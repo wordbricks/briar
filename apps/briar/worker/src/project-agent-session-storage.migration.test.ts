@@ -31,7 +31,14 @@ describe("project Agent session storage cutover", () => {
       parentSessionId: null,
       request: "Historical request",
       status: "running",
-      issues: [],
+      issues: [{
+        runId: "legacy-run",
+        runNumber: 1,
+        sourceKey: "BR-1",
+        title: "Legacy issue",
+        outcome: "completed",
+        summary: "Legacy full issue summary",
+      }],
       startedAt: observedAt,
       completedAt: null,
       conversationId: null,
@@ -52,7 +59,14 @@ describe("project Agent session storage cutover", () => {
       parentSessionId: null,
       request: "Historical request",
       status: "running",
-      issues: [],
+      issues: [{
+        runId: "legacy-run",
+        runNumber: 1,
+        sourceKey: "BR-1",
+        title: "Legacy issue",
+        outcome: "completed",
+        summary: "Legacy full issue summary",
+      }],
       startedAt: observedAt,
       completedAt: null,
       inboxVersion: "session:v1:running:2026-08-31T00:00:00.000Z",
@@ -72,7 +86,14 @@ describe("project Agent session storage cutover", () => {
       parentSessionId: null,
       request: "Archived request",
       status: "completed",
-      issues: [],
+      issues: [{
+        runId: "archived-run",
+        runNumber: 2,
+        sourceKey: "BR-2",
+        title: "Archived issue",
+        outcome: "completed",
+        summary: "Archived full issue summary",
+      }],
       startedAt: observedAt,
       completedAt: observedAt,
       inboxVersion: "session:v1:completed:2026-08-31T00:00:00.000Z",
@@ -152,6 +173,21 @@ describe("project Agent session storage cutover", () => {
       files: ["0174_backfill_agent_session_summary_requester.sql"],
     });
 
+    const legacyIssueSummaries = (await db.prepare(
+      `select json_extract(issue.value, '$.summary') as summary
+       from briar_project_agent_session_summaries stored,
+         json_each(stored.summary_json, '$.issues') issue
+       order by stored.session_id`,
+    ).all()).results;
+    expect(legacyIssueSummaries).toEqual([
+      { summary: "Archived full issue summary" },
+      { summary: "Legacy full issue summary" },
+    ]);
+
+    await applyD1Migrations(db, {
+      files: ["0175_canonical_agent_session_summary_issues.sql"],
+    });
+
     expect((await db.prepare(
       `select id from briar_project_agent_sessions`,
     ).all()).results).toEqual([{ id: "legacy-valid" }]);
@@ -179,6 +215,9 @@ describe("project Agent session storage cutover", () => {
       dispatchGroupId: "legacy-valid",
       requestedByUserId: "session-owner",
       summary: "Historical summary",
+      issues: [expect.objectContaining({
+        summary: "Legacy full issue summary",
+      })],
     });
     const migratedSummaries = await listProjectAgentSessionSummaries(
       db,
@@ -195,6 +234,7 @@ describe("project Agent session storage cutover", () => {
           requestedByUserId: "session-owner",
           summary: "Historical summary",
           error: null,
+          issues: [expect.objectContaining({ summary: null })],
         }),
       }),
       expect.objectContaining({
@@ -203,6 +243,7 @@ describe("project Agent session storage cutover", () => {
           requestedByUserId: null,
           summary: null,
           error: null,
+          issues: [expect.objectContaining({ summary: null })],
         }),
       }),
     ]));
