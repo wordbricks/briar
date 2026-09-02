@@ -9,6 +9,7 @@ Type=simple
 User=briar
 Group=briar
 Environment=HOME=/home/briar
+Environment=GH_BROWSER=/opt/briar/bin/briar-open-browser
 Environment=PATH=/opt/briar/bin:/usr/local/bin:/usr/bin:/bin
 WorkingDirectory=/home/briar
 StateDirectory=briar-computer-use
