@@ -30,6 +30,18 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.184",
+        date: "2026년 9월 2일",
+        title: "DM에서 관리형 컴퓨터 화면을 확인하고 조작합니다",
+        summary:
+          "Agent DM에서 연결된 관리형 컴퓨터 화면을 미리 보고, 전체 화면에서 직접 조작할 수 있습니다.",
+        items: [
+          "Agent가 사용하는 관리형 컴퓨터를 찾아 DM의 Sites 탭에 읽기 전용 화면 미리보기를 표시합니다.",
+          "같은 원격 화면을 전체 화면으로 열어 키보드와 마우스로 조작하고, Ctrl Alt Del과 클립보드 붙여넣기를 사용할 수 있습니다.",
+          "화면 연결 상태, 재연결, 권한·오프라인·중계 오류를 DM 안에서 확인할 수 있습니다.",
+        ],
+      },
+      {
         version: "1.2.183",
         date: "2026년 9월 2일",
         title: "관리형 컴퓨터에서 에이전트가 화면을 안전하게 조작합니다",
@@ -1452,6 +1464,18 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.184",
+        date: "September 2, 2026",
+        title: "View and control a managed computer from DMs",
+        summary:
+          "Preview the managed computer connected to an Agent DM and open the same screen in a full-screen control session.",
+        items: [
+          "Resolve the managed computer used by an agent and show its screen as a read-only preview in the DM Sites tab.",
+          "Open the same remote screen in a full-screen session with keyboard and mouse control, Ctrl Alt Del, and clipboard paste.",
+          "Show connection state, reconnect actions, and permission, offline, and relay errors inside the DM.",
+        ],
+      },
       {
         version: "1.2.183",
         date: "September 2, 2026",
@@ -2966,7 +2990,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-183">
+          <a href="#v1-2-184">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -2988,7 +3012,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.183"
+                      entry.version === "1.2.184"
+                        ? "2026-09-02"
+                        : entry.version === "1.2.183"
                         ? "2026-09-02"
                         : entry.version === "1.2.182"
                         ? "2026-09-02"
