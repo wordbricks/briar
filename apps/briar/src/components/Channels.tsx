@@ -25,6 +25,7 @@ import {
 import { Spinner } from "./ui/spinner";
 import { DmMemoryCitations } from "./DmMemoryCitations";
 import { DmMemoryDialog } from "./DmMemoryDialog";
+import { DmComputerPanel } from "./DmComputerPanel";
 import {
   useCallback,
   useEffect,
@@ -1228,7 +1229,15 @@ export function Channels({
       }
     >
       {!showRequestedThreadOnly ? (
-        <section aria-busy={channelLoading} className="channel-main">
+        <div
+          className={surface === "dm"
+            ? "flex min-h-0 min-w-0 overflow-hidden"
+            : "contents"}
+        >
+        <section
+          aria-busy={channelLoading}
+          className={`channel-main${surface === "dm" ? " flex-1" : ""}`}
+        >
         {activeChannel ? (
           <>
             <header className="channel-header" data-tauri-drag-region="deep">
@@ -1453,6 +1462,14 @@ export function Channels({
           <p className="muted channel-empty">{t("channel.selectPrompt")}</p>
         )}
         </section>
+        {surface === "dm" ? (
+          <DmComputerPanel
+            agents={agents}
+            organizationId={organizationId}
+            token={token}
+          />
+        ) : null}
+        </div>
       ) : null}
 
       {threadParentId && activeChannel ? (
