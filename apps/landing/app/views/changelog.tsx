@@ -30,6 +30,18 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.185",
+        date: "2026년 9월 2일",
+        title: "로그인 세션 복구와 관리형 컴퓨터 실행 환경을 고칩니다",
+        summary:
+          "만료된 웹 세션이 로그인 화면에 멈추지 않게 하고, 새 관리형 컴퓨터가 최신 실행 설정을 사용하도록 갱신했습니다.",
+        items: [
+          "Connect 오류 안에 감싸진 401 응답도 찾아 저장된 세션 토큰을 지우고 로그인 화면으로 돌아갑니다.",
+          "관리형 컴퓨터가 새 AMI를 가리키는 Launch Template 13을 사용하도록 Worker 설정을 갱신했습니다.",
+          "관리형 컴퓨터의 실행 서비스에 GH_BROWSER 경로를 지정해 에이전트가 브라우저를 올바르게 열도록 했습니다.",
+        ],
+      },
+      {
         version: "1.2.184",
         date: "2026년 9월 2일",
         title: "DM에서 관리형 컴퓨터 화면을 확인하고 조작합니다",
@@ -1464,6 +1476,18 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.185",
+        date: "September 2, 2026",
+        title: "Recover expired sessions and refresh managed computer launch settings",
+        summary:
+          "Recover from expired web sessions when Connect wraps an unauthorized response, and point new managed computers at the refreshed launch configuration.",
+        items: [
+          "Find a 401 response even when Connect wraps it in another error, clear the stored session token, and return to sign-in.",
+          "Point managed computers at Launch Template 13, which contains the refreshed machine image and runtime setup.",
+          "Set GH_BROWSER for the managed computer executor so agents open the browser through the expected launcher.",
+        ],
+      },
       {
         version: "1.2.184",
         date: "September 2, 2026",
@@ -2990,7 +3014,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-184">
+          <a href="#v1-2-185">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -3012,7 +3036,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.184"
+                      entry.version === "1.2.185"
+                        ? "2026-09-02"
+                        : entry.version === "1.2.184"
                         ? "2026-09-02"
                         : entry.version === "1.2.183"
                         ? "2026-09-02"
