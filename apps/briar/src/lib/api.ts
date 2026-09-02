@@ -9,8 +9,10 @@ export {
   isApiErrorStatus,
 } from "./api/errors";
 import {
+  createDeviceVerificationUrl,
   createDeviceAuthorizationClient,
   type DeviceAuthorizationClientId,
+  type DeviceAuthorizationLaunchOptions,
 } from "./device-authorization-client";
 export {
   deleteAccount,
@@ -246,39 +248,26 @@ export type DeviceClientId = Exclude<
   "briar-cli"
 >;
 
-export type DeviceLoginMethod = "email" | "google";
+export type DeviceLoginMethod = NonNullable<
+  DeviceAuthorizationLaunchOptions["method"]
+>;
 
 export async function beginDeviceAuthorization(
   clientId: DeviceClientId = "briar-desktop",
-  options: {
-    method?: DeviceLoginMethod;
-    locale?: "ko" | "en" | "zh";
-    switchAccount?: boolean;
-  } = {},
+  options: DeviceAuthorizationLaunchOptions = {},
 ): Promise<DeviceAuthorization> {
   const response = await requireDeviceAuthorizationClient().requestCode({
     clientId,
     scope: "openid profile email",
   });
-  const clientVerificationUrl = new URL(response.verificationUriComplete);
-  if (clientId === "briar-mobile" || clientId === "briar-android") {
-    clientVerificationUrl.searchParams.set("client", "mobile");
-  } else if (clientId === "briar-web") {
-    clientVerificationUrl.searchParams.set("client", "web");
-  }
-  if (options.method) {
-    clientVerificationUrl.searchParams.set("method", options.method);
-  }
-  if (options.locale) {
-    clientVerificationUrl.searchParams.set("locale", options.locale);
-  }
-  if (options.switchAccount) {
-    clientVerificationUrl.searchParams.set("switch_account", "1");
-  }
   return {
     deviceCode: response.deviceCode,
     userCode: response.userCode,
-    verificationUrl: clientVerificationUrl.toString(),
+    verificationUrl: createDeviceVerificationUrl(
+      response.verificationUriComplete,
+      clientId,
+      options,
+    ),
     interval: response.interval,
   };
 }

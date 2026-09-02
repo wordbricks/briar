@@ -15,7 +15,7 @@
       "zone_name": "wordbricks.ai"
     },
     {
-      "pattern": "briar.wordbricks.ai/device",
+      "pattern": "briar.wordbricks.ai/device*",
       "zone_name": "wordbricks.ai"
     }
   ],

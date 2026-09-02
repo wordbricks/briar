@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   createDeviceAuthorizationClient,
+  createDeviceVerificationUrl,
   type DeviceAuthorizationFetch,
 } from "./device-authorization-client";
 
@@ -13,6 +14,16 @@ const jsonResponse = (body: unknown, status = 200) => new Response(
 );
 
 describe("Better Auth device authorization boundary", () => {
+  it("preserves the user code when adding the selected method and locale", () => {
+    expect(createDeviceVerificationUrl(
+      "https://briar.wordbricks.ai/device?user_code=ABCD-1234",
+      "briar-desktop",
+      { method: "email", locale: "ko" },
+    )).toBe(
+      "https://briar.wordbricks.ai/device?user_code=ABCD-1234&method=email&locale=ko",
+    );
+  });
+
   it("uses the generated device code route and rejects a malformed success", async () => {
     let requestedUrl = "";
     let requestedBody: unknown;
