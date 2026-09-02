@@ -50,7 +50,6 @@ describe("project Agent session storage cutover", () => {
       scheduleId: null,
       scheduleRunId: null,
       parentSessionId: null,
-      requestedByUserId: "session-owner",
       request: "Historical request",
       status: "running",
       issues: [],
@@ -71,7 +70,6 @@ describe("project Agent session storage cutover", () => {
       scheduleId: null,
       scheduleRunId: null,
       parentSessionId: null,
-      requestedByUserId: null,
       request: "Archived request",
       status: "completed",
       issues: [],
@@ -142,6 +140,17 @@ describe("project Agent session storage cutover", () => {
     await applyD1Migrations(db, {
       files: ["0169_canonical_project_agent_session_json.sql"],
     });
+    expect((await db.prepare(
+      `select session_id from briar_invalid_project_agent_session_summary
+       order by session_id`,
+    ).all()).results).toEqual([
+      { session_id: "archive-only" },
+      { session_id: "legacy-valid" },
+    ]);
+
+    await applyD1Migrations(db, {
+      files: ["0174_backfill_agent_session_summary_requester.sql"],
+    });
 
     expect((await db.prepare(
       `select id from briar_project_agent_sessions`,
@@ -183,15 +192,23 @@ describe("project Agent session storage cutover", () => {
       expect.objectContaining({
         id: "legacy-valid",
         value: expect.objectContaining({
+          requestedByUserId: "session-owner",
           summary: "Historical summary",
           error: null,
         }),
       }),
       expect.objectContaining({
         id: "archive-only",
-        value: expect.objectContaining({ summary: null, error: null }),
+        value: expect.objectContaining({
+          requestedByUserId: null,
+          summary: null,
+          error: null,
+        }),
       }),
     ]));
+    expect((await db.prepare(
+      `select session_id from briar_invalid_project_agent_session_summary`,
+    ).all()).results).toEqual([]);
     const changes = await listProjectAgentSessionChanges(db, projectId, 0);
     expect(changes.expired).toBe(false);
     expect(changes.changes).toEqual(expect.arrayContaining([
