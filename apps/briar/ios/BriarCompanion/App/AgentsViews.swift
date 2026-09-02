@@ -204,9 +204,14 @@ private struct AgentRow: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
-                Text(agent.provider.rawValue.uppercased() + (agent.model.map { " · \($0)" } ?? ""))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 6) {
+                    Text(agent.provider.rawValue.uppercased() + (agent.model.map { " · \($0)" } ?? ""))
+                    if agent.computerUsePolicy == .unattended {
+                        Label("Computer Use", systemImage: "display")
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
             Spacer()
             if sessionCount > 0 {

@@ -8,6 +8,7 @@ import {
   type AgentSkillProvider,
   type AgentSkillRow,
 } from "./agent-skills";
+import type { ComputerUsePolicy } from "../../src/lib/computer-use-contract";
 
 export type ProjectAgentProvider = AgentSkillProvider;
 export type ModelEffort = AgentSkillEffort;
@@ -23,6 +24,7 @@ export type ProjectAgentRow = {
   provider: ProjectAgentProvider;
   model: string | null;
   effort: AgentSkillEffort | null;
+  computer_use_policy: ComputerUsePolicy;
   designated_worker_id: string | null;
   designated_worker_label: string | null;
   description: string;
@@ -120,6 +122,7 @@ export type ClaimedProjectAgentTaskRow = ProjectAgentTaskJobRow & {
   agent_provider: ProjectAgentProvider;
   agent_model: string | null;
   agent_effort: AgentSkillEffort | null;
+  agent_computer_use_policy: ComputerUsePolicy;
   agent_responsibility: string;
   selected_skill_id: string;
   selected_skill_name: string;
@@ -160,6 +163,7 @@ export type ProjectAgentScheduleRunRow = {
   agent_provider: ProjectAgentProvider;
   agent_model: string | null;
   agent_effort: string | null;
+  agent_computer_use_policy: ComputerUsePolicy;
   agent_description: string;
   agent_responsibility: string;
   agent_skill_markdown: string;

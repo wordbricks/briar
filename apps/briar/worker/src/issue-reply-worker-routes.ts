@@ -73,6 +73,9 @@ export async function claimNextIssueReplyWork(input: {
       staleBefore: new Date(
         Date.parse(observedAt) - WORKER_STALE_AFTER_MS,
       ).toISOString(),
+      computerUseProvidersJson: JSON.stringify(
+        runtime.computerUse?.providers ?? [],
+      ),
     });
     if (!job) return null;
     scheduleProjectRealtimePublish(env, db, input.projectId, context);
@@ -208,6 +211,7 @@ export async function claimNextIssueReplyWork(input: {
               provider: job.agent_provider,
               model: replyExecution.model,
               effort: replyExecution.effort,
+              computerUsePolicy: agent.computer_use_policy,
               responsibility: agent.responsibility,
               skills: agent.skills.map(agentSkillJson),
             }

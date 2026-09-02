@@ -30,6 +30,7 @@ type RemoteSocketAttachment = {
   maxExpiresAt: string | null;
   controllerBytes: number;
   screenBytes: number;
+  agentId: string | null;
 };
 
 type ActiveRemoteSession = {
@@ -38,6 +39,7 @@ type ActiveRemoteSession = {
   managedComputerId: string;
   controllerUserId: string;
   maxExpiresAt: string;
+  agentId: string | null;
 };
 
 const activeSessionStorageKey = "active-session";
@@ -187,6 +189,7 @@ export class ManagedComputerRemoteSessionHub extends DurableObject<Env> {
       maxExpiresAt: null,
       controllerBytes: 0,
       screenBytes: 0,
+      agentId: null,
     } satisfies RemoteSocketAttachment);
     const controller = this.ctx.getWebSockets("setup-controller").find(
       (socket) => socket.readyState === socketOpen,
@@ -231,6 +234,7 @@ export class ManagedComputerRemoteSessionHub extends DurableObject<Env> {
       maxExpiresAt: expiresAt,
       controllerBytes: 0,
       screenBytes: 0,
+      agentId: null,
     } satisfies RemoteSocketAttachment);
     agent.send(setupControllerControlFrame("ready", sessionId));
     return new Response(null, {
@@ -256,6 +260,7 @@ export class ManagedComputerRemoteSessionHub extends DurableObject<Env> {
       maxExpiresAt: null,
       controllerBytes: 0,
       screenBytes: 0,
+      agentId: null,
     } satisfies RemoteSocketAttachment);
     const controller = latestLiveController(
       this.ctx.getWebSockets("controller"),
@@ -265,6 +270,7 @@ export class ManagedComputerRemoteSessionHub extends DurableObject<Env> {
       server.send(encodeManagedComputerRemoteRelayControlFrame({
         type: "controller_ready",
         sessionId: current.sessionId,
+        agentId: current.agentId ?? undefined,
       }));
     }
     return new Response(null, {
@@ -314,6 +320,7 @@ export class ManagedComputerRemoteSessionHub extends DurableObject<Env> {
       maxExpiresAt,
       controllerBytes: connected.controller_bytes,
       screenBytes: connected.screen_bytes,
+      agentId: connected.agent_id,
     } satisfies RemoteSocketAttachment);
     const active = {
       sessionId,
@@ -321,6 +328,7 @@ export class ManagedComputerRemoteSessionHub extends DurableObject<Env> {
       managedComputerId: connected.managed_computer_id,
       controllerUserId: connected.controller_user_id,
       maxExpiresAt,
+      agentId: connected.agent_id,
     } satisfies ActiveRemoteSession;
     await this.ctx.storage.put(activeSessionStorageKey, active);
     await this.ctx.storage.setAlarm(Date.parse(maxExpiresAt));
@@ -339,6 +347,7 @@ export class ManagedComputerRemoteSessionHub extends DurableObject<Env> {
       liveAgent.send(encodeManagedComputerRemoteRelayControlFrame({
         type: "controller_ready",
         sessionId,
+        agentId: connected.agent_id ?? undefined,
       }));
     } else {
       server.close(4004, "Remote display agent offline");

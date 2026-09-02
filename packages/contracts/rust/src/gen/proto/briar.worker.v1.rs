@@ -30741,6 +30741,16 @@ pub struct DetachedAgentClaim {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub skills: ::buffa::alloc::vec::Vec<DetachedAgentSkill>,
+    /// Field 9: `computer_use_policy`
+    #[serde(
+        rename = "computerUsePolicy",
+        alias = "computer_use_policy",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub computer_use_policy: ::buffa::EnumValue<
+        super::super::types::v1::ComputerUsePolicy,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -30755,6 +30765,7 @@ impl ::core::fmt::Debug for DetachedAgentClaim {
             .field("effort", &self.effort)
             .field("responsibility", &self.responsibility)
             .field("skills", &self.skills)
+            .field("computer_use_policy", &self.computer_use_policy)
             .finish()
     }
 }
@@ -30838,6 +30849,12 @@ impl ::buffa::Message for DetachedAgentClaim {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        {
+            let val = self.computer_use_policy.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -30876,6 +30893,12 @@ impl ::buffa::Message for DetachedAgentClaim {
                 buf,
             );
             v.write_to(__cache, buf);
+        }
+        {
+            let val = self.computer_use_policy.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(9u32, val, buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -30952,6 +30975,15 @@ impl ::buffa::Message for DetachedAgentClaim {
                 ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
                 self.skills.push(elem);
             }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.computer_use_policy = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -30967,6 +30999,7 @@ impl ::buffa::Message for DetachedAgentClaim {
         self.effort = ::core::option::Option::None;
         self.responsibility.clear();
         self.skills.clear();
+        self.computer_use_policy = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -94360,6 +94393,10 @@ pub mod __buffa {
                 'a,
                 super::super::__buffa::view::DetachedAgentSkillView<'a>,
             >,
+            /// Field 9: `computer_use_policy`
+            pub computer_use_policy: ::buffa::EnumValue<
+                super::super::super::super::types::v1::ComputerUsePolicy,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for DetachedAgentClaimView<'a> {
@@ -94438,6 +94475,15 @@ pub mod __buffa {
                         )?;
                         view.responsibility = ::buffa::types::borrow_str(&mut cur)?;
                     }
+                    9u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.computer_use_policy = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
                     8u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -94498,6 +94544,7 @@ pub mod __buffa {
                         .iter()
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    computer_use_policy: self.computer_use_policy,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -94544,6 +94591,12 @@ pub mod __buffa {
                         += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                             + inner_size as u64;
                 }
+                {
+                    let val = self.computer_use_policy.to_i32();
+                    if val != 0 {
+                        size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+                    }
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -94583,6 +94636,12 @@ pub mod __buffa {
                         buf,
                     );
                     v.write_to(__cache, buf);
+                }
+                {
+                    let val = self.computer_use_policy.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(9u32, val, buf);
+                    }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -94627,6 +94686,15 @@ pub mod __buffa {
                 }
                 if !self.skills.is_empty() {
                     __map.serialize_entry("skills", &*self.skills)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.computer_use_policy,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "computerUsePolicy",
+                            &self.computer_use_policy,
+                        )?;
                 }
                 __map.end()
             }
@@ -94766,6 +94834,15 @@ pub mod __buffa {
                 super::super::__buffa::view::DetachedAgentSkillView<'_>,
             > {
                 &self.0.reborrow().skills
+            }
+            /// Field 9: `computer_use_policy`
+            #[must_use]
+            pub fn computer_use_policy(
+                &self,
+            ) -> ::buffa::EnumValue<
+                super::super::super::super::types::v1::ComputerUsePolicy,
+            > {
+                self.0.reborrow().computer_use_policy
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<DetachedAgentClaimView<'static>>>

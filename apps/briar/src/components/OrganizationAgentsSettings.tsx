@@ -51,6 +51,7 @@ import {
   projectAgentSkillsValid,
 } from "./ProjectAgentSkillsEditor";
 import type { ProjectAgentSkillInput } from "../types";
+import { ComputerUsePolicySwitch } from "./ComputerUsePolicySwitch";
 
 const providers: readonly ChannelAgentProvider[] = agentProviders;
 
@@ -74,6 +75,9 @@ export function OrganizationAgentsSettings({
     useState<ChannelAgentSummary | null>(null);
   const [editingSkills, setEditingSkills] =
     useState<ProjectAgentSkillInput[]>([]);
+  const [editingComputerUsePolicy, setEditingComputerUsePolicy] = useState<
+    "disabled" | "unattended"
+  >("disabled");
   const [isSavingSkills, setIsSavingSkills] = useState(false);
   const [skillSaveError, setSkillSaveError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -109,6 +113,7 @@ export function OrganizationAgentsSettings({
     effort: ModelEffort | null;
     description: string;
     responsibility: string;
+    computerUsePolicy: "disabled" | "unattended";
   }) => {
     const result = await createOrganizationAgent(token, organizationId, input);
     setAgents((current) => [...current, result.agent]);
@@ -139,6 +144,7 @@ export function OrganizationAgentsSettings({
   const editSkills = (agent: ChannelAgentSummary) => {
     setSkillSaveError(null);
     setEditingAgent(agent);
+    setEditingComputerUsePolicy(agent.computerUsePolicy ?? "disabled");
     setEditingSkills(
       projectAgentSkillInputs(
         agent.skills.map((skill) => ({
@@ -179,6 +185,7 @@ export function OrganizationAgentsSettings({
           effort: editingAgent.effort,
           description: editingAgent.description ?? "",
           responsibility: editingAgent.responsibility,
+          computerUsePolicy: editingComputerUsePolicy,
           skills: projectAgentSkillInputs(editingSkills),
         },
       );
@@ -346,6 +353,7 @@ export function OrganizationAgentsSettings({
           if (!open && !isSavingSkills) {
             setEditingAgent(null);
             setEditingSkills([]);
+            setEditingComputerUsePolicy("disabled");
             setSkillSaveError(null);
           }
         }}
@@ -362,14 +370,22 @@ export function OrganizationAgentsSettings({
             <SettingsAlert className="mt-0">{skillSaveError}</SettingsAlert>
           ) : null}
           {editingAgent ? (
-            <ProjectAgentSkillsEditor
-              defaultEffort={editingAgent.effort}
-              defaultModel={editingAgent.model}
-              defaultProvider={editingAgent.provider}
-              disabled={isSavingSkills}
-              onChange={setEditingSkills}
-              skills={editingSkills}
-            />
+            <div className="grid gap-5">
+              <ComputerUsePolicySwitch
+                disabled={isSavingSkills}
+                onChange={setEditingComputerUsePolicy}
+                policy={editingComputerUsePolicy}
+                provider={editingAgent.provider}
+              />
+              <ProjectAgentSkillsEditor
+                defaultEffort={editingAgent.effort}
+                defaultModel={editingAgent.model}
+                defaultProvider={editingAgent.provider}
+                disabled={isSavingSkills}
+                onChange={setEditingSkills}
+                skills={editingSkills}
+              />
+            </div>
           ) : null}
           <DialogFooter>
             <Button
@@ -377,6 +393,7 @@ export function OrganizationAgentsSettings({
               onClick={() => {
                 setEditingAgent(null);
                 setEditingSkills([]);
+                setEditingComputerUsePolicy("disabled");
                 setSkillSaveError(null);
               }}
               type="button"
@@ -460,6 +477,7 @@ function OrganizationAgentCreateDialog({
     effort: ModelEffort | null;
     description: string;
     responsibility: string;
+    computerUsePolicy: "disabled" | "unattended";
   }) => Promise<void>;
 }) {
   const { t } = useI18n();
@@ -471,6 +489,9 @@ function OrganizationAgentCreateDialog({
   const [effort, setEffort] = useState<ModelEffort | null>(null);
   const [description, setDescription] = useState("");
   const [responsibility, setResponsibility] = useState("");
+  const [computerUsePolicy, setComputerUsePolicy] = useState<
+    "disabled" | "unattended"
+  >("disabled");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
@@ -481,6 +502,7 @@ function OrganizationAgentCreateDialog({
       setEffort(null);
       setDescription("");
       setResponsibility("");
+      setComputerUsePolicy("disabled");
       setError(null);
     }
   }, [isOpen]);
@@ -522,6 +544,7 @@ function OrganizationAgentCreateDialog({
               effort,
               description: description.trim(),
               responsibility: responsibility.trim(),
+              computerUsePolicy,
             })
               .catch((caught) =>
                 setError(caught instanceof Error ? caught.message : String(caught)),
@@ -568,6 +591,7 @@ function OrganizationAgentCreateDialog({
                 label={t("agents.provider")}
                 onValueChange={(value) => {
                   setProvider(value as ChannelAgentProvider);
+                  if (value !== "grok") setComputerUsePolicy("disabled");
                   setModel("");
                   setEffort(null);
                 }}
@@ -609,6 +633,13 @@ function OrganizationAgentCreateDialog({
               />
             </div>
           </div>
+
+          <ComputerUsePolicySwitch
+            disabled={isSubmitting}
+            onChange={setComputerUsePolicy}
+            policy={computerUsePolicy}
+            provider={provider}
+          />
 
           <div className="grid gap-2">
             <Label htmlFor="organization-agent-responsibility">

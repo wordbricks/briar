@@ -60,6 +60,7 @@ command -v node >/dev/null
 command -v cc >/dev/null
 command -v make >/dev/null
 command -v minisign >/dev/null
+/usr/bin/python3 -c 'from PIL import Image; from Xlib.ext import xtest; assert Image and xtest'
 /usr/sbin/visudo --check
 test "$(stat --format='%U:%G:%a' /etc/sudoers.d/briar-local-admin)" = \
   "root:root:440"
@@ -74,10 +75,13 @@ test "$(sudo -u briar -H bash -lc 'printf %s "$GH_BROWSER"')" = \
   "/opt/briar/bin/briar-open-browser"
 grep -Fq -- '--no-first-run' /opt/briar/bin/briar-open-browser
 grep -Fq -- '--no-default-browser-check' /opt/briar/bin/briar-open-browser
+grep -Fq -- '--user-data-dir=' /opt/briar/bin/briar-open-browser
 test -r /usr/share/applications/google-chrome.desktop
 grep -Fq 'Icon=google-chrome' /usr/share/applications/google-chrome.desktop
 test -x "/home/briar/Desktop/Google Chrome.desktop"
-grep -Fq 'google-chrome.desktop' /home/briar/.config/mimeapps.list
+grep -Fq 'Exec=/opt/briar/bin/briar-open-browser' \
+  "/home/briar/Desktop/Google Chrome.desktop"
+grep -Fq 'briar-google-chrome.desktop' /home/briar/.config/mimeapps.list
 grep -Fq 'FontName=Noto Sans Mono CJK KR 12' \
   /home/briar/.config/xfce4/terminal/terminalrc
 fc-match -f '%{family}\n' ':lang=ko' | grep -Fq 'Noto Sans CJK KR'
@@ -107,12 +111,20 @@ sudo -u briar -H bash -lc 'rustup run 1.96.0 rustc --version' \
 runner_count="$(find /opt/briar/lib/agent -maxdepth 1 -type f \
   -name '*-runner.js' | wc -l)"
 test "$runner_count" = "6"
+test -s /opt/briar/lib/agent/computer-use-mcp-server.js
 test "$(readlink -f /opt/briar/current)" = \
   "/opt/briar/releases/$briar_version"
 test "$(readlink -f /opt/briar/bin/briar)" = \
   "/opt/briar/releases/$briar_version/bin/briar"
 test -x /opt/briar/bin/briar-managed-runtime-update-request
 test -x /opt/briar/bin/briar-managed-runtime-updater
+test -s /opt/briar/bin/briar-box-exec.js
+test -x /opt/briar/libexec/briar-computer-executor.py
+test -s /opt/briar/current/lib/agent/computer-use-mcp-server.js
+test "$(readlink -f /opt/briar/bin/briar-box-exec.js)" = \
+  "/opt/briar/releases/$briar_version/bin/briar-box-exec.js"
+test "$(readlink -f /opt/briar/libexec/briar-computer-executor.py)" = \
+  "/opt/briar/releases/$briar_version/libexec/briar-computer-executor.py"
 test -s /opt/briar/etc/runtime-updater.pub
 jq -e \
   --arg version "$briar_version" \
@@ -204,6 +216,12 @@ test "$(systemctl show briar-managed-worker.service --property=Group --value)" =
   "briar"
 test "$(systemctl show briar-managed-runtime-updater.service --property=User --value)" = \
   "root"
+test "$(systemctl show briar-box-exec.service --property=User --value)" = \
+  "briar"
+test "$(systemctl show briar-box-exec.service --property=Group --value)" = \
+  "briar"
+test "$(systemctl show briar-box-exec.service --property=StateDirectoryMode --value)" = \
+  "0700"
 systemctl show briar-managed-worker.service --property=Environment --value \
   | grep -Fq 'CARGO_HOME=/home/briar/.cargo'
 systemctl show briar-managed-worker.service --property=Environment --value \
@@ -213,6 +231,7 @@ systemctl show briar-managed-worker.service --property=Environment --value \
 systemctl show briar-remote-session-agent.service --property=Environment --value \
   | grep -Fq 'PATH=/opt/briar/bin:'
 for unit in \
+  briar-box-exec.service \
   briar-managed-worker.service \
   briar-remote-desktop.service \
   briar-remote-session-agent.service; do
@@ -235,6 +254,8 @@ systemd-analyze verify \
   /etc/systemd/system/briar-managed-enroll.service \
   /etc/systemd/system/briar-managed-runtime-updater.service \
   /etc/systemd/system/briar-managed-worker.service \
+  /etc/systemd/system/briar-box-exec.service \
+  /etc/systemd/system/briar-computer-use-window@.service \
   /etc/systemd/system/briar-remote-desktop.service \
   /etc/systemd/system/briar-remote-session-agent.service
 

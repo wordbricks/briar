@@ -9,10 +9,12 @@ fi
 source_dir="${1:-/opt/briar/source}"
 package_lock="${2:-$source_dir/remote-desktop-packages.lock}"
 agent_bundle="${3:-$source_dir/briar-remote-session-agent.js}"
+box_exec_bundle="${4:-$source_dir/briar-box-exec.js}"
 test -x "$source_dir/assert-debian-13-x86_64"
 "$source_dir/assert-debian-13-x86_64"
 test -s "$package_lock"
 test -s "$agent_bundle"
+test -s "$box_exec_bundle"
 
 packages=()
 while IFS= read -r package; do
@@ -40,10 +42,12 @@ install -o root -g root -m 0440 "$source_dir/briar-local-admin.sudoers" \
   /etc/sudoers.d/briar-local-admin
 /usr/sbin/visudo --check
 install -d -o root -g root -m 0755 /opt/briar/bin
+install -d -o root -g root -m 0755 /opt/briar/libexec
 install -d -o root -g briar -m 0750 /var/lib/briar
 install -o root -g root -m 0755 \
   "$source_dir/briar-managed-enroll" \
   "$source_dir/briar-managed-computer-health" \
+  "$source_dir/briar-computer-use-window" \
   "$source_dir/briar-remote-desktop" \
   "$source_dir/resolve-remote-desktop-packages" \
   "$source_dir/install-remote-desktop" \
@@ -54,9 +58,11 @@ install -o root -g root -m 0644 \
   "$source_dir/briar-managed-computer.target" \
   "$source_dir/briar-managed-computer-health.service" \
   "$source_dir/briar-managed-computer-health.timer" \
+  "$source_dir/briar-box-exec.service" \
   "$source_dir/briar-managed-enroll.service" \
   "$source_dir/briar-managed-runtime-updater.service" \
   "$source_dir/briar-managed-worker.service" \
+  "$source_dir/briar-computer-use-window@.service" \
   "$source_dir/briar-remote-desktop.service" \
   "$source_dir/briar-remote-session-agent.service" \
   /etc/systemd/system/
@@ -67,12 +73,17 @@ install -o root -g root -m 0644 "$package_lock" \
   /opt/briar/remote-desktop-packages.lock
 install -o root -g root -m 0644 "$agent_bundle" \
   /opt/briar/bin/briar-remote-session-agent.js
+install -o root -g root -m 0644 "$box_exec_bundle" \
+  /opt/briar/bin/briar-box-exec.js
+install -o root -g root -m 0755 "$source_dir/briar-computer-executor.py" \
+  /opt/briar/libexec/briar-computer-executor.py
 
 systemctl daemon-reload
 systemctl disable \
   briar-managed-enroll.service \
   briar-managed-runtime-updater.service \
   briar-managed-worker.service \
+  briar-box-exec.service \
   briar-remote-desktop.service \
   briar-remote-session-agent.service \
   2>/dev/null || true

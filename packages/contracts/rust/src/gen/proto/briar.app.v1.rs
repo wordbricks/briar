@@ -15161,6 +15161,16 @@ pub struct CreateOrganizationAgentRequest {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub skills: ::buffa::alloc::vec::Vec<ProjectAgentSkillInput>,
+    /// Field 9: `computer_use_policy`
+    #[serde(
+        rename = "computerUsePolicy",
+        alias = "computer_use_policy",
+        with = "::buffa::json_helpers::opt_enum",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub computer_use_policy: ::core::option::Option<
+        ::buffa::EnumValue<super::super::types::v1::ComputerUsePolicy>,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -15176,6 +15186,7 @@ impl ::core::fmt::Debug for CreateOrganizationAgentRequest {
             .field("responsibility", &self.responsibility)
             .field("effort", &self.effort)
             .field("skills", &self.skills)
+            .field("computer_use_policy", &self.computer_use_policy)
             .finish()
     }
 }
@@ -15215,6 +15226,16 @@ impl CreateOrganizationAgentRequest {
         value: impl Into<::buffa::alloc::string::String>,
     ) -> Self {
         self.effort = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::computer_use_policy`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_computer_use_policy(
+        mut self,
+        value: impl Into<::buffa::EnumValue<super::super::types::v1::ComputerUsePolicy>>,
+    ) -> Self {
+        self.computer_use_policy = Some(value.into());
         self
     }
 }
@@ -15274,6 +15295,9 @@ impl ::buffa::Message for CreateOrganizationAgentRequest {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if let Some(ref v) = self.computer_use_policy {
+            size += 1u64 + ::buffa::types::int32_encoded_len(v.to_i32()) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -15315,6 +15339,9 @@ impl ::buffa::Message for CreateOrganizationAgentRequest {
                 buf,
             );
             v.write_to(__cache, buf);
+        }
+        if let Some(ref v) = self.computer_use_policy {
+            ::buffa::types::put_int32_field(9u32, v.to_i32(), buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -15403,6 +15430,15 @@ impl ::buffa::Message for CreateOrganizationAgentRequest {
                 ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
                 self.skills.push(elem);
             }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.computer_use_policy = ::core::option::Option::Some(
+                    ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?),
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -15419,6 +15455,7 @@ impl ::buffa::Message for CreateOrganizationAgentRequest {
         self.responsibility.clear();
         self.effort = ::core::option::Option::None;
         self.skills.clear();
+        self.computer_use_policy = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -15653,6 +15690,16 @@ pub struct UpdateOrganizationAgentRequest {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub skills: ::buffa::alloc::vec::Vec<ProjectAgentSkillInput>,
+    /// Field 10: `computer_use_policy`
+    #[serde(
+        rename = "computerUsePolicy",
+        alias = "computer_use_policy",
+        with = "::buffa::json_helpers::opt_enum",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub computer_use_policy: ::core::option::Option<
+        ::buffa::EnumValue<super::super::types::v1::ComputerUsePolicy>,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -15669,6 +15716,7 @@ impl ::core::fmt::Debug for UpdateOrganizationAgentRequest {
             .field("responsibility", &self.responsibility)
             .field("effort", &self.effort)
             .field("skills", &self.skills)
+            .field("computer_use_policy", &self.computer_use_policy)
             .finish()
     }
 }
@@ -15708,6 +15756,16 @@ impl UpdateOrganizationAgentRequest {
         value: impl Into<::buffa::alloc::string::String>,
     ) -> Self {
         self.effort = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::computer_use_policy`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_computer_use_policy(
+        mut self,
+        value: impl Into<::buffa::EnumValue<super::super::types::v1::ComputerUsePolicy>>,
+    ) -> Self {
+        self.computer_use_policy = Some(value.into());
         self
     }
 }
@@ -15770,6 +15828,9 @@ impl ::buffa::Message for UpdateOrganizationAgentRequest {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if let Some(ref v) = self.computer_use_policy {
+            size += 1u64 + ::buffa::types::int32_encoded_len(v.to_i32()) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -15814,6 +15875,9 @@ impl ::buffa::Message for UpdateOrganizationAgentRequest {
                 buf,
             );
             v.write_to(__cache, buf);
+        }
+        if let Some(ref v) = self.computer_use_policy {
+            ::buffa::types::put_int32_field(10u32, v.to_i32(), buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -15909,6 +15973,15 @@ impl ::buffa::Message for UpdateOrganizationAgentRequest {
                 ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
                 self.skills.push(elem);
             }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.computer_use_policy = ::core::option::Option::Some(
+                    ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?),
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -15926,6 +15999,7 @@ impl ::buffa::Message for UpdateOrganizationAgentRequest {
         self.responsibility.clear();
         self.effort = ::core::option::Option::None;
         self.skills.clear();
+        self.computer_use_policy = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -16712,6 +16786,16 @@ pub struct CreateProjectAgentRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub calendar_color: ::buffa::alloc::string::String,
+    /// Field 12: `computer_use_policy`
+    #[serde(
+        rename = "computerUsePolicy",
+        alias = "computer_use_policy",
+        with = "::buffa::json_helpers::opt_enum",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub computer_use_policy: ::core::option::Option<
+        ::buffa::EnumValue<super::super::types::v1::ComputerUsePolicy>,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -16730,6 +16814,7 @@ impl ::core::fmt::Debug for CreateProjectAgentRequest {
             .field("responsibility", &self.responsibility)
             .field("skills", &self.skills)
             .field("calendar_color", &self.calendar_color)
+            .field("computer_use_policy", &self.computer_use_policy)
             .finish()
     }
 }
@@ -16801,6 +16886,16 @@ impl CreateProjectAgentRequest {
         self.description = Some(value.into());
         self
     }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::computer_use_policy`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_computer_use_policy(
+        mut self,
+        value: impl Into<::buffa::EnumValue<super::super::types::v1::ComputerUsePolicy>>,
+    ) -> Self {
+        self.computer_use_policy = Some(value.into());
+        self
+    }
 }
 ::buffa::impl_default_instance!(CreateProjectAgentRequest);
 impl ::buffa::MessageName for CreateProjectAgentRequest {
@@ -16867,6 +16962,9 @@ impl ::buffa::Message for CreateProjectAgentRequest {
                 += 1u64
                     + ::buffa::types::string_encoded_len(&self.calendar_color) as u64;
         }
+        if let Some(ref v) = self.computer_use_policy {
+            size += 1u64 + ::buffa::types::int32_encoded_len(v.to_i32()) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -16917,6 +17015,9 @@ impl ::buffa::Message for CreateProjectAgentRequest {
         }
         if !self.calendar_color.is_empty() {
             ::buffa::types::put_string_field(11u32, &self.calendar_color, buf);
+        }
+        if let Some(ref v) = self.computer_use_policy {
+            ::buffa::types::put_int32_field(12u32, v.to_i32(), buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -17037,6 +17138,15 @@ impl ::buffa::Message for CreateProjectAgentRequest {
                 )?;
                 ::buffa::types::merge_string(&mut self.calendar_color, buf)?;
             }
+            12u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.computer_use_policy = ::core::option::Option::Some(
+                    ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?),
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -17056,6 +17166,7 @@ impl ::buffa::Message for CreateProjectAgentRequest {
         self.responsibility.clear();
         self.skills.clear();
         self.calendar_color.clear();
+        self.computer_use_policy = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -17286,6 +17397,16 @@ pub struct UpdateProjectAgentRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub calendar_color: ::buffa::alloc::string::String,
+    /// Field 18: `computer_use_policy`
+    #[serde(
+        rename = "computerUsePolicy",
+        alias = "computer_use_policy",
+        with = "::buffa::json_helpers::opt_enum",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub computer_use_policy: ::core::option::Option<
+        ::buffa::EnumValue<super::super::types::v1::ComputerUsePolicy>,
+    >,
     #[serde(flatten)]
     pub avatar_update: ::core::option::Option<
         __buffa::oneof::update_project_agent_request::AvatarUpdate,
@@ -17318,6 +17439,7 @@ impl ::core::fmt::Debug for UpdateProjectAgentRequest {
             .field("responsibility", &self.responsibility)
             .field("skills", &self.skills)
             .field("calendar_color", &self.calendar_color)
+            .field("computer_use_policy", &self.computer_use_policy)
             .field("avatar_update", &self.avatar_update)
             .field("codex_pet_update", &self.codex_pet_update)
             .field("effort_update", &self.effort_update)
@@ -17361,6 +17483,16 @@ impl UpdateProjectAgentRequest {
         value: impl Into<::buffa::alloc::string::String>,
     ) -> Self {
         self.description = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::computer_use_policy`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_computer_use_policy(
+        mut self,
+        value: impl Into<::buffa::EnumValue<super::super::types::v1::ComputerUsePolicy>>,
+    ) -> Self {
+        self.computer_use_policy = Some(value.into());
         self
     }
 }
@@ -17504,6 +17636,9 @@ impl ::buffa::Message for UpdateProjectAgentRequest {
                 += 2u64
                     + ::buffa::types::string_encoded_len(&self.calendar_color) as u64;
         }
+        if let Some(ref v) = self.computer_use_policy {
+            size += 2u64 + ::buffa::types::int32_encoded_len(v.to_i32()) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -17629,6 +17764,9 @@ impl ::buffa::Message for UpdateProjectAgentRequest {
         }
         if !self.calendar_color.is_empty() {
             ::buffa::types::put_string_field(17u32, &self.calendar_color, buf);
+        }
+        if let Some(ref v) = self.computer_use_policy {
+            ::buffa::types::put_int32_field(18u32, v.to_i32(), buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -17867,6 +18005,15 @@ impl ::buffa::Message for UpdateProjectAgentRequest {
                 )?;
                 ::buffa::types::merge_string(&mut self.calendar_color, buf)?;
             }
+            18u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.computer_use_policy = ::core::option::Option::Some(
+                    ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?),
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -17888,6 +18035,7 @@ impl ::buffa::Message for UpdateProjectAgentRequest {
         self.responsibility.clear();
         self.skills.clear();
         self.calendar_color.clear();
+        self.computer_use_policy = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -17941,6 +18089,11 @@ impl<'de> serde::Deserialize<'de> for UpdateProjectAgentRequest {
                 > = None;
                 let mut __f_calendar_color: ::core::option::Option<
                     ::buffa::alloc::string::String,
+                > = None;
+                let mut __f_computer_use_policy: ::core::option::Option<
+                    ::core::option::Option<
+                        ::buffa::EnumValue<super::super::types::v1::ComputerUsePolicy>,
+                    >,
                 > = None;
                 let mut __oneof_avatar_update: ::core::option::Option<
                     __buffa::oneof::update_project_agent_request::AvatarUpdate,
@@ -18087,6 +18240,32 @@ impl<'de> serde::Deserialize<'de> for UpdateProjectAgentRequest {
                                         D::Error,
                                     > {
                                         ::buffa::json_helpers::proto_string::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "computerUsePolicy" | "computer_use_policy" => {
+                            __f_computer_use_policy = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::core::option::Option<
+                                        ::buffa::EnumValue<
+                                            super::super::types::v1::ComputerUsePolicy,
+                                        >,
+                                    >;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::core::option::Option<
+                                            ::buffa::EnumValue<
+                                                super::super::types::v1::ComputerUsePolicy,
+                                            >,
+                                        >,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::opt_enum::deserialize(d)
                                     }
                                 }
                                 map.next_value_seed(_S)?
@@ -18330,6 +18509,9 @@ impl<'de> serde::Deserialize<'de> for UpdateProjectAgentRequest {
                 }
                 if let ::core::option::Option::Some(v) = __f_calendar_color {
                     __r.calendar_color = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_computer_use_policy {
+                    __r.computer_use_policy = v;
                 }
                 __r.avatar_update = __oneof_avatar_update;
                 __r.codex_pet_update = __oneof_codex_pet_update;
@@ -26485,6 +26667,16 @@ pub struct ProjectAgent {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub skill: ::buffa::alloc::string::String,
+    /// Field 18: `computer_use_policy`
+    #[serde(
+        rename = "computerUsePolicy",
+        alias = "computer_use_policy",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub computer_use_policy: ::buffa::EnumValue<
+        super::super::types::v1::ComputerUsePolicy,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -26509,6 +26701,7 @@ impl ::core::fmt::Debug for ProjectAgent {
             .field("created_at", &self.created_at)
             .field("updated_at", &self.updated_at)
             .field("skill", &self.skill)
+            .field("computer_use_policy", &self.computer_use_policy)
             .finish()
     }
 }
@@ -26679,6 +26872,12 @@ impl ::buffa::Message for ProjectAgent {
         if !self.skill.is_empty() {
             size += 2u64 + ::buffa::types::string_encoded_len(&self.skill) as u64;
         }
+        {
+            let val = self.computer_use_policy.to_i32();
+            if val != 0 {
+                size += 2u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -26762,6 +26961,12 @@ impl ::buffa::Message for ProjectAgent {
         }
         if !self.skill.is_empty() {
             ::buffa::types::put_string_field(17u32, &self.skill, buf);
+        }
+        {
+            let val = self.computer_use_policy.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(18u32, val, buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -26938,6 +27143,15 @@ impl ::buffa::Message for ProjectAgent {
                 )?;
                 ::buffa::types::merge_string(&mut self.skill, buf)?;
             }
+            18u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.computer_use_policy = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -26963,6 +27177,7 @@ impl ::buffa::Message for ProjectAgent {
         self.created_at = ::buffa::MessageField::none();
         self.updated_at = ::buffa::MessageField::none();
         self.skill.clear();
+        self.computer_use_policy = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -27074,6 +27289,16 @@ pub struct OrganizationAgent {
         ::buffa_types::google::protobuf::Timestamp,
         ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
     >,
+    /// Field 13: `computer_use_policy`
+    #[serde(
+        rename = "computerUsePolicy",
+        alias = "computer_use_policy",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub computer_use_policy: ::buffa::EnumValue<
+        super::super::types::v1::ComputerUsePolicy,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -27093,6 +27318,7 @@ impl ::core::fmt::Debug for OrganizationAgent {
             .field("responsibility", &self.responsibility)
             .field("skills", &self.skills)
             .field("created_at", &self.created_at)
+            .field("computer_use_policy", &self.computer_use_policy)
             .finish()
     }
 }
@@ -27236,6 +27462,12 @@ impl ::buffa::Message for OrganizationAgent {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        {
+            let val = self.computer_use_policy.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -27294,6 +27526,12 @@ impl ::buffa::Message for OrganizationAgent {
                 buf,
             );
             self.created_at.write_to(__cache, buf);
+        }
+        {
+            let val = self.computer_use_policy.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(13u32, val, buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -27427,6 +27665,15 @@ impl ::buffa::Message for OrganizationAgent {
                     ctx,
                 )?;
             }
+            13u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.computer_use_policy = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -27447,6 +27694,7 @@ impl ::buffa::Message for OrganizationAgent {
         self.responsibility.clear();
         self.skills.clear();
         self.created_at = ::buffa::MessageField::none();
+        self.computer_use_policy = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -28150,6 +28398,16 @@ pub struct ProjectAgentScheduleRunAgent {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub skills: ::buffa::alloc::vec::Vec<ProjectAgentSkill>,
+    /// Field 10: `computer_use_policy`
+    #[serde(
+        rename = "computerUsePolicy",
+        alias = "computer_use_policy",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub computer_use_policy: ::buffa::EnumValue<
+        super::super::types::v1::ComputerUsePolicy,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -28166,6 +28424,7 @@ impl ::core::fmt::Debug for ProjectAgentScheduleRunAgent {
             .field("responsibility", &self.responsibility)
             .field("skill", &self.skill)
             .field("skills", &self.skills)
+            .field("computer_use_policy", &self.computer_use_policy)
             .finish()
     }
 }
@@ -28265,6 +28524,12 @@ impl ::buffa::Message for ProjectAgentScheduleRunAgent {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        {
+            let val = self.computer_use_policy.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -28309,6 +28574,12 @@ impl ::buffa::Message for ProjectAgentScheduleRunAgent {
                 buf,
             );
             v.write_to(__cache, buf);
+        }
+        {
+            let val = self.computer_use_policy.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(10u32, val, buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -28404,6 +28675,15 @@ impl ::buffa::Message for ProjectAgentScheduleRunAgent {
                 ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
                 self.skills.push(elem);
             }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.computer_use_policy = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -28421,6 +28701,7 @@ impl ::buffa::Message for ProjectAgentScheduleRunAgent {
         self.responsibility.clear();
         self.skill.clear();
         self.skills.clear();
+        self.computer_use_policy = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -109553,6 +109834,13 @@ pub struct ManagedComputerRemoteSession {
         ::buffa_types::google::protobuf::Timestamp,
         ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
     >,
+    /// Field 10: `agent_id`
+    #[serde(
+        rename = "agentId",
+        alias = "agent_id",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub agent_id: ::core::option::Option<::buffa::alloc::string::String>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -109569,6 +109857,7 @@ impl ::core::fmt::Debug for ManagedComputerRemoteSession {
             .field("connected_at", &self.connected_at)
             .field("disconnected_at", &self.disconnected_at)
             .field("ended_at", &self.ended_at)
+            .field("agent_id", &self.agent_id)
             .finish()
     }
 }
@@ -109578,6 +109867,18 @@ impl ManagedComputerRemoteSession {
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
     pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ManagedComputerRemoteSession";
+}
+impl ManagedComputerRemoteSession {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::agent_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_agent_id(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.agent_id = Some(value.into());
+        self
+    }
 }
 ::buffa::impl_default_instance!(ManagedComputerRemoteSession);
 impl ::buffa::MessageName for ManagedComputerRemoteSession {
@@ -109660,6 +109961,9 @@ impl ::buffa::Message for ManagedComputerRemoteSession {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if let Some(ref v) = self.agent_id {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -109724,6 +110028,9 @@ impl ::buffa::Message for ManagedComputerRemoteSession {
                 buf,
             );
             self.ended_at.write_to(__cache, buf);
+        }
+        if let Some(ref v) = self.agent_id {
+            ::buffa::types::put_string_field(10u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -109823,6 +110130,18 @@ impl ::buffa::Message for ManagedComputerRemoteSession {
                     ctx,
                 )?;
             }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .agent_id
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -109840,6 +110159,7 @@ impl ::buffa::Message for ManagedComputerRemoteSession {
         self.connected_at = ::buffa::MessageField::none();
         self.disconnected_at = ::buffa::MessageField::none();
         self.ended_at = ::buffa::MessageField::none();
+        self.agent_id = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -110055,6 +110375,13 @@ pub struct CreateManagedComputerRemoteSessionRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub reconnect_session_id: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 5: `agent_id`
+    #[serde(
+        rename = "agentId",
+        alias = "agent_id",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub agent_id: ::core::option::Option<::buffa::alloc::string::String>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -110066,6 +110393,7 @@ impl ::core::fmt::Debug for CreateManagedComputerRemoteSessionRequest {
             .field("managed_computer_id", &self.managed_computer_id)
             .field("request_id", &self.request_id)
             .field("reconnect_session_id", &self.reconnect_session_id)
+            .field("agent_id", &self.agent_id)
             .finish()
     }
 }
@@ -110085,6 +110413,16 @@ impl CreateManagedComputerRemoteSessionRequest {
         value: impl Into<::buffa::alloc::string::String>,
     ) -> Self {
         self.reconnect_session_id = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::agent_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_agent_id(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.agent_id = Some(value.into());
         self
     }
 }
@@ -110125,6 +110463,9 @@ impl ::buffa::Message for CreateManagedComputerRemoteSessionRequest {
         if let Some(ref v) = self.reconnect_session_id {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
+        if let Some(ref v) = self.agent_id {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -110146,6 +110487,9 @@ impl ::buffa::Message for CreateManagedComputerRemoteSessionRequest {
         }
         if let Some(ref v) = self.reconnect_session_id {
             ::buffa::types::put_string_field(4u32, v, buf);
+        }
+        if let Some(ref v) = self.agent_id {
+            ::buffa::types::put_string_field(5u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -110193,6 +110537,18 @@ impl ::buffa::Message for CreateManagedComputerRemoteSessionRequest {
                     buf,
                 )?;
             }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .agent_id
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -110205,6 +110561,7 @@ impl ::buffa::Message for CreateManagedComputerRemoteSessionRequest {
         self.managed_computer_id.clear();
         self.request_id.clear();
         self.reconnect_session_id = ::core::option::Option::None;
+        self.agent_id = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -157500,6 +157857,12 @@ pub mod __buffa {
                 'a,
                 super::super::__buffa::view::ProjectAgentSkillInputView<'a>,
             >,
+            /// Field 9: `computer_use_policy`
+            pub computer_use_policy: ::core::option::Option<
+                ::buffa::EnumValue<
+                    super::super::super::super::types::v1::ComputerUsePolicy,
+                >,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for CreateOrganizationAgentRequestView<'a> {
@@ -157585,6 +157948,17 @@ pub mod __buffa {
                         )?;
                         view.effort = Some(::buffa::types::borrow_str(&mut cur)?);
                     }
+                    9u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.computer_use_policy = Some(
+                            ::buffa::EnumValue::from(
+                                ::buffa::types::decode_int32(&mut cur)?,
+                            ),
+                        );
+                    }
                     8u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -157646,6 +158020,7 @@ pub mod __buffa {
                         .iter()
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    computer_use_policy: self.computer_use_policy,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -157698,6 +158073,9 @@ pub mod __buffa {
                         += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                             + inner_size as u64;
                 }
+                if let Some(ref v) = self.computer_use_policy {
+                    size += 1u64 + ::buffa::types::int32_encoded_len(v.to_i32()) as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -157740,6 +158118,9 @@ pub mod __buffa {
                         buf,
                     );
                     v.write_to(__cache, buf);
+                }
+                if let Some(ref v) = self.computer_use_policy {
+                    ::buffa::types::put_int32_field(9u32, v.to_i32(), buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -157787,6 +158168,9 @@ pub mod __buffa {
                 }
                 if !self.skills.is_empty() {
                     __map.serialize_entry("skills", &*self.skills)?;
+                }
+                if let ::core::option::Option::Some(ref __v) = self.computer_use_policy {
+                    __map.serialize_entry("computerUsePolicy", __v)?;
                 }
                 __map.end()
             }
@@ -157937,6 +158321,17 @@ pub mod __buffa {
                 super::super::__buffa::view::ProjectAgentSkillInputView<'_>,
             > {
                 &self.0.reborrow().skills
+            }
+            /// Field 9: `computer_use_policy`
+            #[must_use]
+            pub fn computer_use_policy(
+                &self,
+            ) -> ::core::option::Option<
+                ::buffa::EnumValue<
+                    super::super::super::super::types::v1::ComputerUsePolicy,
+                >,
+            > {
+                self.0.reborrow().computer_use_policy
             }
         }
         impl ::core::convert::From<
@@ -158317,6 +158712,12 @@ pub mod __buffa {
                 'a,
                 super::super::__buffa::view::ProjectAgentSkillInputView<'a>,
             >,
+            /// Field 10: `computer_use_policy`
+            pub computer_use_policy: ::core::option::Option<
+                ::buffa::EnumValue<
+                    super::super::super::super::types::v1::ComputerUsePolicy,
+                >,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for UpdateOrganizationAgentRequestView<'a> {
@@ -158409,6 +158810,17 @@ pub mod __buffa {
                         )?;
                         view.effort = Some(::buffa::types::borrow_str(&mut cur)?);
                     }
+                    10u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.computer_use_policy = Some(
+                            ::buffa::EnumValue::from(
+                                ::buffa::types::decode_int32(&mut cur)?,
+                            ),
+                        );
+                    }
                     9u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -158471,6 +158883,7 @@ pub mod __buffa {
                         .iter()
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    computer_use_policy: self.computer_use_policy,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -158528,6 +158941,9 @@ pub mod __buffa {
                         += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                             + inner_size as u64;
                 }
+                if let Some(ref v) = self.computer_use_policy {
+                    size += 1u64 + ::buffa::types::int32_encoded_len(v.to_i32()) as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -158573,6 +158989,9 @@ pub mod __buffa {
                         buf,
                     );
                     v.write_to(__cache, buf);
+                }
+                if let Some(ref v) = self.computer_use_policy {
+                    ::buffa::types::put_int32_field(10u32, v.to_i32(), buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -158623,6 +159042,9 @@ pub mod __buffa {
                 }
                 if !self.skills.is_empty() {
                     __map.serialize_entry("skills", &*self.skills)?;
+                }
+                if let ::core::option::Option::Some(ref __v) = self.computer_use_policy {
+                    __map.serialize_entry("computerUsePolicy", __v)?;
                 }
                 __map.end()
             }
@@ -158778,6 +159200,17 @@ pub mod __buffa {
                 super::super::__buffa::view::ProjectAgentSkillInputView<'_>,
             > {
                 &self.0.reborrow().skills
+            }
+            /// Field 10: `computer_use_policy`
+            #[must_use]
+            pub fn computer_use_policy(
+                &self,
+            ) -> ::core::option::Option<
+                ::buffa::EnumValue<
+                    super::super::super::super::types::v1::ComputerUsePolicy,
+                >,
+            > {
+                self.0.reborrow().computer_use_policy
             }
         }
         impl ::core::convert::From<
@@ -160315,6 +160748,12 @@ pub mod __buffa {
             >,
             /// Field 11: `calendar_color`
             pub calendar_color: &'a str,
+            /// Field 12: `computer_use_policy`
+            pub computer_use_policy: ::core::option::Option<
+                ::buffa::EnumValue<
+                    super::super::super::super::types::v1::ComputerUsePolicy,
+                >,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for CreateProjectAgentRequestView<'a> {
@@ -160423,6 +160862,17 @@ pub mod __buffa {
                         )?;
                         view.calendar_color = ::buffa::types::borrow_str(&mut cur)?;
                     }
+                    12u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.computer_use_policy = Some(
+                            ::buffa::EnumValue::from(
+                                ::buffa::types::decode_int32(&mut cur)?,
+                            ),
+                        );
+                    }
                     10u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -160489,6 +160939,7 @@ pub mod __buffa {
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
                     calendar_color: self.calendar_color.to_string(),
+                    computer_use_policy: self.computer_use_policy,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -160553,6 +161004,9 @@ pub mod __buffa {
                             + ::buffa::types::string_encoded_len(&self.calendar_color)
                                 as u64;
                 }
+                if let Some(ref v) = self.computer_use_policy {
+                    size += 1u64 + ::buffa::types::int32_encoded_len(v.to_i32()) as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -160604,6 +161058,9 @@ pub mod __buffa {
                 }
                 if !self.calendar_color.is_empty() {
                     ::buffa::types::put_string_field(11u32, &self.calendar_color, buf);
+                }
+                if let Some(ref v) = self.computer_use_policy {
+                    ::buffa::types::put_int32_field(12u32, v.to_i32(), buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -160660,6 +161117,9 @@ pub mod __buffa {
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.calendar_color) {
                     __map.serialize_entry("calendarColor", self.calendar_color)?;
+                }
+                if let ::core::option::Option::Some(ref __v) = self.computer_use_policy {
+                    __map.serialize_entry("computerUsePolicy", __v)?;
                 }
                 __map.end()
             }
@@ -160823,6 +161283,17 @@ pub mod __buffa {
             #[must_use]
             pub fn calendar_color(&self) -> &'_ str {
                 self.0.reborrow().calendar_color
+            }
+            /// Field 12: `computer_use_policy`
+            #[must_use]
+            pub fn computer_use_policy(
+                &self,
+            ) -> ::core::option::Option<
+                ::buffa::EnumValue<
+                    super::super::super::super::types::v1::ComputerUsePolicy,
+                >,
+            > {
+                self.0.reborrow().computer_use_policy
             }
         }
         impl ::core::convert::From<
@@ -161201,6 +161672,12 @@ pub mod __buffa {
             >,
             /// Field 17: `calendar_color`
             pub calendar_color: &'a str,
+            /// Field 18: `computer_use_policy`
+            pub computer_use_policy: ::core::option::Option<
+                ::buffa::EnumValue<
+                    super::super::super::super::types::v1::ComputerUsePolicy,
+                >,
+            >,
             pub avatar_update: ::core::option::Option<
                 super::super::__buffa::view::oneof::update_project_agent_request::AvatarUpdate<
                     'a,
@@ -161312,6 +161789,17 @@ pub mod __buffa {
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
                         view.calendar_color = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    18u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.computer_use_policy = Some(
+                            ::buffa::EnumValue::from(
+                                ::buffa::types::decode_int32(&mut cur)?,
+                            ),
+                        );
                     }
                     16u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -161563,6 +162051,7 @@ pub mod __buffa {
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
                     calendar_color: self.calendar_color.to_string(),
+                    computer_use_policy: self.computer_use_policy,
                     avatar_update: match self.avatar_update.as_ref() {
                         ::core::option::Option::Some(v) => {
                             ::core::option::Option::Some(
@@ -161811,6 +162300,9 @@ pub mod __buffa {
                             + ::buffa::types::string_encoded_len(&self.calendar_color)
                                 as u64;
                 }
+                if let Some(ref v) = self.computer_use_policy {
+                    size += 2u64 + ::buffa::types::int32_encoded_len(v.to_i32()) as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -161940,6 +162432,9 @@ pub mod __buffa {
                 if !self.calendar_color.is_empty() {
                     ::buffa::types::put_string_field(17u32, &self.calendar_color, buf);
                 }
+                if let Some(ref v) = self.computer_use_policy {
+                    ::buffa::types::put_int32_field(18u32, v.to_i32(), buf);
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -161989,6 +162484,9 @@ pub mod __buffa {
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.calendar_color) {
                     __map.serialize_entry("calendarColor", self.calendar_color)?;
+                }
+                if let ::core::option::Option::Some(ref __v) = self.computer_use_policy {
+                    __map.serialize_entry("computerUsePolicy", __v)?;
                 }
                 if let ::core::option::Option::Some(ref __ov) = self.avatar_update {
                     match __ov {
@@ -162200,6 +162698,17 @@ pub mod __buffa {
             #[must_use]
             pub fn calendar_color(&self) -> &'_ str {
                 self.0.reborrow().calendar_color
+            }
+            /// Field 18: `computer_use_policy`
+            #[must_use]
+            pub fn computer_use_policy(
+                &self,
+            ) -> ::core::option::Option<
+                ::buffa::EnumValue<
+                    super::super::super::super::types::v1::ComputerUsePolicy,
+                >,
+            > {
+                self.0.reborrow().computer_use_policy
             }
             /// Oneof `avatar_update`.
             #[must_use]
@@ -176730,6 +177239,10 @@ pub mod __buffa {
             >,
             /// Field 17: `skill`
             pub skill: &'a str,
+            /// Field 18: `computer_use_policy`
+            pub computer_use_policy: ::buffa::EnumValue<
+                super::super::super::super::types::v1::ComputerUsePolicy,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ProjectAgentView<'a> {
@@ -176936,6 +177449,15 @@ pub mod __buffa {
                         )?;
                         view.skill = ::buffa::types::borrow_str(&mut cur)?;
                     }
+                    18u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.computer_use_policy = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
                     13u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -177034,6 +177556,7 @@ pub mod __buffa {
                         None => ::buffa::MessageField::none(),
                     },
                     skill: self.skill.to_string(),
+                    computer_use_policy: self.computer_use_policy,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -177132,6 +177655,12 @@ pub mod __buffa {
                     size
                         += 2u64 + ::buffa::types::string_encoded_len(&self.skill) as u64;
                 }
+                {
+                    let val = self.computer_use_policy.to_i32();
+                    if val != 0 {
+                        size += 2u64 + ::buffa::types::int32_encoded_len(val) as u64;
+                    }
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -177216,6 +177745,12 @@ pub mod __buffa {
                 }
                 if !self.skill.is_empty() {
                     ::buffa::types::put_string_field(17u32, &self.skill, buf);
+                }
+                {
+                    let val = self.computer_use_policy.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(18u32, val, buf);
+                    }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -177303,6 +177838,15 @@ pub mod __buffa {
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.skill) {
                     __map.serialize_entry("skill", self.skill)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.computer_use_policy,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "computerUsePolicy",
+                            &self.computer_use_policy,
+                        )?;
                 }
                 __map.end()
             }
@@ -177503,6 +178047,15 @@ pub mod __buffa {
             pub fn skill(&self) -> &'_ str {
                 self.0.reborrow().skill
             }
+            /// Field 18: `computer_use_policy`
+            #[must_use]
+            pub fn computer_use_policy(
+                &self,
+            ) -> ::buffa::EnumValue<
+                super::super::super::super::types::v1::ComputerUsePolicy,
+            > {
+                self.0.reborrow().computer_use_policy
+            }
         }
         impl ::core::convert::From<::buffa::OwnedView<ProjectAgentView<'static>>>
         for ProjectAgentOwnedView {
@@ -177566,6 +178119,10 @@ pub mod __buffa {
             /// Field 12: `created_at`
             pub created_at: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            /// Field 13: `computer_use_policy`
+            pub computer_use_policy: ::buffa::EnumValue<
+                super::super::super::super::types::v1::ComputerUsePolicy,
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
@@ -177698,6 +178255,15 @@ pub mod __buffa {
                             }
                         }
                     }
+                    13u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.computer_use_policy = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
                     11u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -177771,6 +178337,7 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    computer_use_policy: self.computer_use_policy,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -177839,6 +178406,12 @@ pub mod __buffa {
                         += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                             + inner_size as u64;
                 }
+                {
+                    let val = self.computer_use_policy.to_i32();
+                    if val != 0 {
+                        size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+                    }
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -177898,6 +178471,12 @@ pub mod __buffa {
                         buf,
                     );
                     self.created_at.write_to(__cache, buf);
+                }
+                {
+                    let val = self.computer_use_policy.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(13u32, val, buf);
+                    }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -177962,6 +178541,15 @@ pub mod __buffa {
                     {
                         __map.serialize_entry("createdAt", __v)?;
                     }
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.computer_use_policy,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "computerUsePolicy",
+                            &self.computer_use_policy,
+                        )?;
                 }
                 __map.end()
             }
@@ -178130,6 +178718,15 @@ pub mod __buffa {
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
             > {
                 &self.0.reborrow().created_at
+            }
+            /// Field 13: `computer_use_policy`
+            #[must_use]
+            pub fn computer_use_policy(
+                &self,
+            ) -> ::buffa::EnumValue<
+                super::super::super::super::types::v1::ComputerUsePolicy,
+            > {
+                self.0.reborrow().computer_use_policy
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<OrganizationAgentView<'static>>>
@@ -179051,6 +179648,10 @@ pub mod __buffa {
                 'a,
                 super::super::__buffa::view::ProjectAgentSkillView<'a>,
             >,
+            /// Field 10: `computer_use_policy`
+            pub computer_use_policy: ::buffa::EnumValue<
+                super::super::super::super::types::v1::ComputerUsePolicy,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ProjectAgentScheduleRunAgentView<'a> {
@@ -179143,6 +179744,15 @@ pub mod __buffa {
                         )?;
                         view.skill = ::buffa::types::borrow_str(&mut cur)?;
                     }
+                    10u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.computer_use_policy = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
                     9u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -179205,6 +179815,7 @@ pub mod __buffa {
                         .iter()
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    computer_use_policy: self.computer_use_policy,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -179258,6 +179869,12 @@ pub mod __buffa {
                         += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                             + inner_size as u64;
                 }
+                {
+                    let val = self.computer_use_policy.to_i32();
+                    if val != 0 {
+                        size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+                    }
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -179303,6 +179920,12 @@ pub mod __buffa {
                         buf,
                     );
                     v.write_to(__cache, buf);
+                }
+                {
+                    let val = self.computer_use_policy.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(10u32, val, buf);
+                    }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -179353,6 +179976,15 @@ pub mod __buffa {
                 }
                 if !self.skills.is_empty() {
                     __map.serialize_entry("skills", &*self.skills)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.computer_use_policy,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "computerUsePolicy",
+                            &self.computer_use_policy,
+                        )?;
                 }
                 __map.end()
             }
@@ -179508,6 +180140,15 @@ pub mod __buffa {
                 super::super::__buffa::view::ProjectAgentSkillView<'_>,
             > {
                 &self.0.reborrow().skills
+            }
+            /// Field 10: `computer_use_policy`
+            #[must_use]
+            pub fn computer_use_policy(
+                &self,
+            ) -> ::buffa::EnumValue<
+                super::super::super::super::types::v1::ComputerUsePolicy,
+            > {
+                self.0.reborrow().computer_use_policy
             }
         }
         impl ::core::convert::From<
@@ -301423,6 +302064,8 @@ pub mod __buffa {
             pub ended_at: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
+            /// Field 10: `agent_id`
+            pub agent_id: ::core::option::Option<&'a str>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ManagedComputerRemoteSessionView<'a> {
@@ -301614,6 +302257,13 @@ pub mod __buffa {
                             }
                         }
                     }
+                    10u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.agent_id = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -301692,6 +302342,7 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    agent_id: self.agent_id.map(|s| s.to_string()),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -301769,6 +302420,9 @@ pub mod __buffa {
                         += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                             + inner_size as u64;
                 }
+                if let Some(ref v) = self.agent_id {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -301842,6 +302496,9 @@ pub mod __buffa {
                         buf,
                     );
                     self.ended_at.write_to(__cache, buf);
+                }
+                if let Some(ref v) = self.agent_id {
+                    ::buffa::types::put_string_field(10u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -301924,6 +302581,9 @@ pub mod __buffa {
                     {
                         __map.serialize_entry("endedAt", __v)?;
                     }
+                }
+                if let ::core::option::Option::Some(__v) = self.agent_id {
+                    __map.serialize_entry("agentId", __v)?;
                 }
                 __map.end()
             }
@@ -302092,6 +302752,11 @@ pub mod __buffa {
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
             > {
                 &self.0.reborrow().ended_at
+            }
+            /// Field 10: `agent_id`
+            #[must_use]
+            pub fn agent_id(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().agent_id
             }
         }
         impl ::core::convert::From<
@@ -302437,6 +303102,8 @@ pub mod __buffa {
             pub request_id: &'a str,
             /// Field 4: `reconnect_session_id`
             pub reconnect_session_id: ::core::option::Option<&'a str>,
+            /// Field 5: `agent_id`
+            pub agent_id: ::core::option::Option<&'a str>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a>
@@ -302502,6 +303169,13 @@ pub mod __buffa {
                             ::buffa::types::borrow_str(&mut cur)?,
                         );
                     }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.agent_id = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -302537,6 +303211,7 @@ pub mod __buffa {
                     reconnect_session_id: self
                         .reconnect_session_id
                         .map(|s| s.to_string()),
+                    agent_id: self.agent_id.map(|s| s.to_string()),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -302574,6 +303249,9 @@ pub mod __buffa {
                 if let Some(ref v) = self.reconnect_session_id {
                     size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
                 }
+                if let Some(ref v) = self.agent_id {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -302600,6 +303278,9 @@ pub mod __buffa {
                 }
                 if let Some(ref v) = self.reconnect_session_id {
                     ::buffa::types::put_string_field(4u32, v, buf);
+                }
+                if let Some(ref v) = self.agent_id {
+                    ::buffa::types::put_string_field(5u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -302637,6 +303318,9 @@ pub mod __buffa {
                 }
                 if let ::core::option::Option::Some(__v) = self.reconnect_session_id {
                     __map.serialize_entry("reconnectSessionId", __v)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.agent_id {
+                    __map.serialize_entry("agentId", __v)?;
                 }
                 __map.end()
             }
@@ -302761,6 +303445,11 @@ pub mod __buffa {
             #[must_use]
             pub fn reconnect_session_id(&self) -> ::core::option::Option<&'_ str> {
                 self.0.reborrow().reconnect_session_id
+            }
+            /// Field 5: `agent_id`
+            #[must_use]
+            pub fn agent_id(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().agent_id
             }
         }
         impl ::core::convert::From<

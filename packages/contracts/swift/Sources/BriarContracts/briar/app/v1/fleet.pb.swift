@@ -350,49 +350,41 @@ public nonisolated enum BriarAPI_ManagedComputerSetupSessionStatus: SwiftProtobu
 
 }
 
-public nonisolated struct BriarAPI_RegisterProjectExecutionWorkerRequest: @unchecked Sendable {
+public nonisolated struct BriarAPI_RegisterProjectExecutionWorkerRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var projectID: String {
-    get {_storage._projectID}
-    set {_uniqueStorage()._projectID = newValue}
-  }
+  public var projectID: String = String()
 
-  public var label: String {
-    get {_storage._label}
-    set {_uniqueStorage()._label = newValue}
-  }
+  public var label: String = String()
 
-  public var deviceIdentity: String {
-    get {_storage._deviceIdentity}
-    set {_uniqueStorage()._deviceIdentity = newValue}
-  }
+  public var deviceIdentity: String = String()
 
   public var runtime: BriarTypes_WorkerRuntimeAdvertisement {
-    get {_storage._runtime ?? BriarTypes_WorkerRuntimeAdvertisement()}
-    set {_uniqueStorage()._runtime = newValue}
+    get {_runtime ?? BriarTypes_WorkerRuntimeAdvertisement()}
+    set {_runtime = newValue}
   }
   /// Returns true if `runtime` has been explicitly set.
-  public var hasRuntime: Bool {_storage._runtime != nil}
+  public var hasRuntime: Bool {self._runtime != nil}
   /// Clears the value of `runtime`. Subsequent reads from it will return its default value.
-  public mutating func clearRuntime() {_uniqueStorage()._runtime = nil}
+  public mutating func clearRuntime() {self._runtime = nil}
 
   public var maxConcurrentSessions: UInt32 {
-    get {_storage._maxConcurrentSessions ?? 0}
-    set {_uniqueStorage()._maxConcurrentSessions = newValue}
+    get {_maxConcurrentSessions ?? 0}
+    set {_maxConcurrentSessions = newValue}
   }
   /// Returns true if `maxConcurrentSessions` has been explicitly set.
-  public var hasMaxConcurrentSessions: Bool {_storage._maxConcurrentSessions != nil}
+  public var hasMaxConcurrentSessions: Bool {self._maxConcurrentSessions != nil}
   /// Clears the value of `maxConcurrentSessions`. Subsequent reads from it will return its default value.
-  public mutating func clearMaxConcurrentSessions() {_uniqueStorage()._maxConcurrentSessions = nil}
+  public mutating func clearMaxConcurrentSessions() {self._maxConcurrentSessions = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _storage = _StorageClass.defaultInstance
+  fileprivate var _runtime: BriarTypes_WorkerRuntimeAdvertisement? = nil
+  fileprivate var _maxConcurrentSessions: UInt32? = nil
 }
 
 public nonisolated struct BriarAPI_RegisterProjectExecutionWorkerResponse: Sendable {
@@ -1527,6 +1519,15 @@ public nonisolated struct BriarAPI_ManagedComputerRemoteSession: Sendable {
   /// Clears the value of `endedAt`. Subsequent reads from it will return its default value.
   public mutating func clearEndedAt() {self._endedAt = nil}
 
+  public var agentID: String {
+    get {_agentID ?? String()}
+    set {_agentID = newValue}
+  }
+  /// Returns true if `agentID` has been explicitly set.
+  public var hasAgentID: Bool {self._agentID != nil}
+  /// Clears the value of `agentID`. Subsequent reads from it will return its default value.
+  public mutating func clearAgentID() {self._agentID = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -1536,6 +1537,7 @@ public nonisolated struct BriarAPI_ManagedComputerRemoteSession: Sendable {
   fileprivate var _connectedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
   fileprivate var _disconnectedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
   fileprivate var _endedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+  fileprivate var _agentID: String? = nil
 }
 
 public nonisolated struct BriarAPI_ManagedComputerSocketTicket: Sendable {
@@ -1572,11 +1574,21 @@ public nonisolated struct BriarAPI_CreateManagedComputerRemoteSessionRequest: Se
   /// Clears the value of `reconnectSessionID`. Subsequent reads from it will return its default value.
   public mutating func clearReconnectSessionID() {self._reconnectSessionID = nil}
 
+  public var agentID: String {
+    get {_agentID ?? String()}
+    set {_agentID = newValue}
+  }
+  /// Returns true if `agentID` has been explicitly set.
+  public var hasAgentID: Bool {self._agentID != nil}
+  /// Clears the value of `agentID`. Subsequent reads from it will return its default value.
+  public mutating func clearAgentID() {self._agentID = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _reconnectSessionID: String? = nil
+  fileprivate var _agentID: String? = nil
 }
 
 public nonisolated struct BriarAPI_CreateManagedComputerRemoteSessionResponse: @unchecked Sendable {
@@ -1846,95 +1858,51 @@ nonisolated extension BriarAPI_RegisterProjectExecutionWorkerRequest: SwiftProto
   public static let protoMessageName: String = _protobuf_package + ".RegisterProjectExecutionWorkerRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{1}label\0\u{3}device_identity\0\u{1}runtime\0\u{3}max_concurrent_sessions\0")
 
-  fileprivate class _StorageClass {
-    var _projectID: String = String()
-    var _label: String = String()
-    var _deviceIdentity: String = String()
-    var _runtime: BriarTypes_WorkerRuntimeAdvertisement? = nil
-    var _maxConcurrentSessions: UInt32? = nil
-
-      // This property is used as the initial default value for new instances of the type.
-      // The type itself is protecting the reference to its storage via CoW semantics.
-      // This will force a copy to be made of this reference when the first mutation occurs;
-      // hence, it is safe to mark this as `nonisolated(unsafe)`.
-      static nonisolated(unsafe) let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _projectID = source._projectID
-      _label = source._label
-      _deviceIdentity = source._deviceIdentity
-      _runtime = source._runtime
-      _maxConcurrentSessions = source._maxConcurrentSessions
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
-
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 1: try { try decoder.decodeSingularStringField(value: &_storage._projectID) }()
-        case 2: try { try decoder.decodeSingularStringField(value: &_storage._label) }()
-        case 3: try { try decoder.decodeSingularStringField(value: &_storage._deviceIdentity) }()
-        case 4: try { try decoder.decodeSingularMessageField(value: &_storage._runtime) }()
-        case 5: try { try decoder.decodeSingularUInt32Field(value: &_storage._maxConcurrentSessions) }()
-        default: break
-        }
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.projectID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.label) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.deviceIdentity) }()
+      case 4: try { try decoder.decodeSingularMessageField(value: &self._runtime) }()
+      case 5: try { try decoder.decodeSingularUInt32Field(value: &self._maxConcurrentSessions) }()
+      default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      if !_storage._projectID.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._projectID, fieldNumber: 1)
-      }
-      if !_storage._label.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._label, fieldNumber: 2)
-      }
-      if !_storage._deviceIdentity.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._deviceIdentity, fieldNumber: 3)
-      }
-      try { if let v = _storage._runtime {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
-      } }()
-      try { if let v = _storage._maxConcurrentSessions {
-        try visitor.visitSingularUInt32Field(value: v, fieldNumber: 5)
-      } }()
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.projectID.isEmpty {
+      try visitor.visitSingularStringField(value: self.projectID, fieldNumber: 1)
     }
+    if !self.label.isEmpty {
+      try visitor.visitSingularStringField(value: self.label, fieldNumber: 2)
+    }
+    if !self.deviceIdentity.isEmpty {
+      try visitor.visitSingularStringField(value: self.deviceIdentity, fieldNumber: 3)
+    }
+    try { if let v = self._runtime {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
+    } }()
+    try { if let v = self._maxConcurrentSessions {
+      try visitor.visitSingularUInt32Field(value: v, fieldNumber: 5)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: BriarAPI_RegisterProjectExecutionWorkerRequest, rhs: BriarAPI_RegisterProjectExecutionWorkerRequest) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._projectID != rhs_storage._projectID {return false}
-        if _storage._label != rhs_storage._label {return false}
-        if _storage._deviceIdentity != rhs_storage._deviceIdentity {return false}
-        if _storage._runtime != rhs_storage._runtime {return false}
-        if _storage._maxConcurrentSessions != rhs_storage._maxConcurrentSessions {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
+    if lhs.projectID != rhs.projectID {return false}
+    if lhs.label != rhs.label {return false}
+    if lhs.deviceIdentity != rhs.deviceIdentity {return false}
+    if lhs._runtime != rhs._runtime {return false}
+    if lhs._maxConcurrentSessions != rhs._maxConcurrentSessions {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -3745,7 +3713,7 @@ nonisolated extension BriarAPI_RetireManagedComputerResponse: SwiftProtobuf.Mess
 
 nonisolated extension BriarAPI_ManagedComputerRemoteSession: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ManagedComputerRemoteSession"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}managed_computer_id\0\u{1}state\0\u{3}connection_generation\0\u{3}token_expires_at\0\u{3}max_expires_at\0\u{3}connected_at\0\u{3}disconnected_at\0\u{3}ended_at\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}managed_computer_id\0\u{1}state\0\u{3}connection_generation\0\u{3}token_expires_at\0\u{3}max_expires_at\0\u{3}connected_at\0\u{3}disconnected_at\0\u{3}ended_at\0\u{3}agent_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -3762,6 +3730,7 @@ nonisolated extension BriarAPI_ManagedComputerRemoteSession: SwiftProtobuf.Messa
       case 7: try { try decoder.decodeSingularMessageField(value: &self._connectedAt) }()
       case 8: try { try decoder.decodeSingularMessageField(value: &self._disconnectedAt) }()
       case 9: try { try decoder.decodeSingularMessageField(value: &self._endedAt) }()
+      case 10: try { try decoder.decodeSingularStringField(value: &self._agentID) }()
       default: break
       }
     }
@@ -3799,6 +3768,9 @@ nonisolated extension BriarAPI_ManagedComputerRemoteSession: SwiftProtobuf.Messa
     try { if let v = self._endedAt {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
     } }()
+    try { if let v = self._agentID {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 10)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -3812,6 +3784,7 @@ nonisolated extension BriarAPI_ManagedComputerRemoteSession: SwiftProtobuf.Messa
     if lhs._connectedAt != rhs._connectedAt {return false}
     if lhs._disconnectedAt != rhs._disconnectedAt {return false}
     if lhs._endedAt != rhs._endedAt {return false}
+    if lhs._agentID != rhs._agentID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -3854,7 +3827,7 @@ nonisolated extension BriarAPI_ManagedComputerSocketTicket: SwiftProtobuf.Messag
 
 nonisolated extension BriarAPI_CreateManagedComputerRemoteSessionRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".CreateManagedComputerRemoteSessionRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}managed_computer_id\0\u{3}request_id\0\u{3}reconnect_session_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}managed_computer_id\0\u{3}request_id\0\u{3}reconnect_session_id\0\u{3}agent_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -3866,6 +3839,7 @@ nonisolated extension BriarAPI_CreateManagedComputerRemoteSessionRequest: SwiftP
       case 2: try { try decoder.decodeSingularStringField(value: &self.managedComputerID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self._reconnectSessionID) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self._agentID) }()
       default: break
       }
     }
@@ -3888,6 +3862,9 @@ nonisolated extension BriarAPI_CreateManagedComputerRemoteSessionRequest: SwiftP
     try { if let v = self._reconnectSessionID {
       try visitor.visitSingularStringField(value: v, fieldNumber: 4)
     } }()
+    try { if let v = self._agentID {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 5)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -3896,6 +3873,7 @@ nonisolated extension BriarAPI_CreateManagedComputerRemoteSessionRequest: SwiftP
     if lhs.managedComputerID != rhs.managedComputerID {return false}
     if lhs.requestID != rhs.requestID {return false}
     if lhs._reconnectSessionID != rhs._reconnectSessionID {return false}
+    if lhs._agentID != rhs._agentID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

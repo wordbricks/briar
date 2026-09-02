@@ -691,6 +691,432 @@ impl ::buffa::Enumeration for RunErrorCode {
         ]
     }
 }
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum AgentRunKind {
+    AGENT_RUN_KIND_UNSPECIFIED = 0i32,
+    AGENT_RUN_KIND_PARENT = 1i32,
+    AGENT_RUN_KIND_COMPUTER_USE = 2i32,
+}
+impl AgentRunKind {
+    ///Idiomatic alias for [`Self::AGENT_RUN_KIND_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Unspecified: Self = Self::AGENT_RUN_KIND_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::AGENT_RUN_KIND_PARENT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Parent: Self = Self::AGENT_RUN_KIND_PARENT;
+    ///Idiomatic alias for [`Self::AGENT_RUN_KIND_COMPUTER_USE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ComputerUse: Self = Self::AGENT_RUN_KIND_COMPUTER_USE;
+}
+impl ::core::default::Default for AgentRunKind {
+    fn default() -> Self {
+        Self::AGENT_RUN_KIND_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for AgentRunKind {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for AgentRunKind {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = AgentRunKind;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!("a string, integer, or null for ", stringify!(AgentRunKind)),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<AgentRunKind, E> {
+                <AgentRunKind as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<AgentRunKind, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <AgentRunKind as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<AgentRunKind, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <AgentRunKind as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<AgentRunKind, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for AgentRunKind {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for AgentRunKind {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::AGENT_RUN_KIND_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::AGENT_RUN_KIND_PARENT),
+            2i32 => ::core::option::Option::Some(Self::AGENT_RUN_KIND_COMPUTER_USE),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::AGENT_RUN_KIND_UNSPECIFIED => "AGENT_RUN_KIND_UNSPECIFIED",
+            Self::AGENT_RUN_KIND_PARENT => "AGENT_RUN_KIND_PARENT",
+            Self::AGENT_RUN_KIND_COMPUTER_USE => "AGENT_RUN_KIND_COMPUTER_USE",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "AGENT_RUN_KIND_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::AGENT_RUN_KIND_UNSPECIFIED)
+            }
+            "AGENT_RUN_KIND_PARENT" => {
+                ::core::option::Option::Some(Self::AGENT_RUN_KIND_PARENT)
+            }
+            "AGENT_RUN_KIND_COMPUTER_USE" => {
+                ::core::option::Option::Some(Self::AGENT_RUN_KIND_COMPUTER_USE)
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::AGENT_RUN_KIND_UNSPECIFIED,
+            Self::AGENT_RUN_KIND_PARENT,
+            Self::AGENT_RUN_KIND_COMPUTER_USE,
+        ]
+    }
+}
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ComputerUseChildBinding {
+    /// Field 1: `parent_run_id`
+    #[serde(
+        rename = "parentRunId",
+        alias = "parent_run_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub parent_run_id: ::buffa::alloc::string::String,
+    /// Field 2: `child_run_id`
+    #[serde(
+        rename = "childRunId",
+        alias = "child_run_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub child_run_id: ::buffa::alloc::string::String,
+    /// Field 3: `agent_id`
+    #[serde(
+        rename = "agentId",
+        alias = "agent_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub agent_id: ::buffa::alloc::string::String,
+    /// Field 4: `managed_computer_id`
+    #[serde(
+        rename = "managedComputerId",
+        alias = "managed_computer_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub managed_computer_id: ::buffa::alloc::string::String,
+    /// Field 5: `display_index`
+    #[serde(
+        rename = "displayIndex",
+        alias = "display_index",
+        with = "::buffa::json_helpers::int32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i32"
+    )]
+    pub display_index: i32,
+    /// Field 6: `owner_token`
+    #[serde(
+        rename = "ownerToken",
+        alias = "owner_token",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub owner_token: ::buffa::alloc::string::String,
+    /// Field 7: `provider`
+    #[serde(
+        rename = "provider",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub provider: ::buffa::EnumValue<super::super::types::v1::AgentProvider>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ComputerUseChildBinding {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ComputerUseChildBinding")
+            .field("parent_run_id", &self.parent_run_id)
+            .field("child_run_id", &self.child_run_id)
+            .field("agent_id", &self.agent_id)
+            .field("managed_computer_id", &self.managed_computer_id)
+            .field("display_index", &self.display_index)
+            .field("owner_token", &self.owner_token)
+            .field("provider", &self.provider)
+            .finish()
+    }
+}
+impl ComputerUseChildBinding {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.sidecar.v1.ComputerUseChildBinding";
+}
+::buffa::impl_default_instance!(ComputerUseChildBinding);
+impl ::buffa::MessageName for ComputerUseChildBinding {
+    const PACKAGE: &'static str = "briar.sidecar.v1";
+    const NAME: &'static str = "ComputerUseChildBinding";
+    const FULL_NAME: &'static str = "briar.sidecar.v1.ComputerUseChildBinding";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.sidecar.v1.ComputerUseChildBinding";
+}
+impl ::buffa::Message for ComputerUseChildBinding {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.parent_run_id.is_empty() {
+            size
+                += 1u64 + ::buffa::types::string_encoded_len(&self.parent_run_id) as u64;
+        }
+        if !self.child_run_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.child_run_id) as u64;
+        }
+        if !self.agent_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.agent_id) as u64;
+        }
+        if !self.managed_computer_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.managed_computer_id)
+                        as u64;
+        }
+        if self.display_index != 0i32 {
+            size += 1u64 + ::buffa::types::int32_encoded_len(self.display_index) as u64;
+        }
+        if !self.owner_token.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.owner_token) as u64;
+        }
+        {
+            let val = self.provider.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.parent_run_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.parent_run_id, buf);
+        }
+        if !self.child_run_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.child_run_id, buf);
+        }
+        if !self.agent_id.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.agent_id, buf);
+        }
+        if !self.managed_computer_id.is_empty() {
+            ::buffa::types::put_string_field(4u32, &self.managed_computer_id, buf);
+        }
+        if self.display_index != 0i32 {
+            ::buffa::types::put_int32_field(5u32, self.display_index, buf);
+        }
+        if !self.owner_token.is_empty() {
+            ::buffa::types::put_string_field(6u32, &self.owner_token, buf);
+        }
+        {
+            let val = self.provider.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(7u32, val, buf);
+            }
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.parent_run_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.child_run_id, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.agent_id, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.managed_computer_id, buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.display_index = ::buffa::types::decode_int32(buf)?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.owner_token, buf)?;
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.provider = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.parent_run_id.clear();
+        self.child_run_id.clear();
+        self.agent_id.clear();
+        self.managed_computer_id.clear();
+        self.display_index = 0i32;
+        self.owner_token.clear();
+        self.provider = ::buffa::EnumValue::from(0);
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ComputerUseChildBinding {
+    const PROTO_FQN: &'static str = "briar.sidecar.v1.ComputerUseChildBinding";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ComputerUseChildBinding {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __COMPUTER_USE_CHILD_BINDING_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.sidecar.v1.ComputerUseChildBinding",
+    to_json: ::buffa::type_registry::any_to_json::<ComputerUseChildBinding>,
+    from_json: ::buffa::type_registry::any_from_json::<ComputerUseChildBinding>,
+    is_wkt: false,
+};
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize)]
 #[serde(default)]
@@ -1601,6 +2027,33 @@ pub struct RunRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_bytes"
     )]
     pub protocol_fingerprint: ::buffa::alloc::vec::Vec<u8>,
+    /// Field 16: `run_kind`
+    #[serde(
+        rename = "runKind",
+        alias = "run_kind",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub run_kind: ::buffa::EnumValue<AgentRunKind>,
+    /// Field 17: `computer_use_binding`
+    #[serde(
+        rename = "computerUseBinding",
+        alias = "computer_use_binding",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub computer_use_binding: ::buffa::MessageField<
+        ComputerUseChildBinding,
+        ::buffa::Inline<ComputerUseChildBinding>,
+    >,
+    /// Field 18: `computer_use_mcp_server_path`
+    #[serde(
+        rename = "computerUseMcpServerPath",
+        alias = "computer_use_mcp_server_path",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub computer_use_mcp_server_path: ::core::option::Option<
+        ::buffa::alloc::string::String,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -1623,6 +2076,9 @@ impl ::core::fmt::Debug for RunRequest {
             .field("external_tools", &self.external_tools)
             .field("provider_binary_path", &self.provider_binary_path)
             .field("protocol_fingerprint", &self.protocol_fingerprint)
+            .field("run_kind", &self.run_kind)
+            .field("computer_use_binding", &self.computer_use_binding)
+            .field("computer_use_mcp_server_path", &self.computer_use_mcp_server_path)
             .finish()
     }
 }
@@ -1679,6 +2135,16 @@ impl RunRequest {
     ///Sets [`Self::external_tools`] to `Some(value)`, consuming and returning `self`.
     pub fn with_external_tools(mut self, value: bool) -> Self {
         self.external_tools = Some(value);
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::computer_use_mcp_server_path`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_computer_use_mcp_server_path(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.computer_use_mcp_server_path = Some(value.into());
         self
     }
 }
@@ -1771,6 +2237,23 @@ impl ::buffa::Message for RunRequest {
                     + ::buffa::types::bytes_encoded_len(&self.protocol_fingerprint)
                         as u64;
         }
+        {
+            let val = self.run_kind.to_i32();
+            if val != 0 {
+                size += 2u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        if self.computer_use_binding.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.computer_use_binding.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if let Some(ref v) = self.computer_use_mcp_server_path {
+            size += 2u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -1845,6 +2328,23 @@ impl ::buffa::Message for RunRequest {
                 &self.protocol_fingerprint,
                 buf,
             );
+        }
+        {
+            let val = self.run_kind.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(16u32, val, buf);
+            }
+        }
+        if self.computer_use_binding.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                17u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.computer_use_binding.write_to(__cache, buf);
+        }
+        if let Some(ref v) = self.computer_use_mcp_server_path {
+            ::buffa::types::put_string_field(18u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1999,6 +2499,38 @@ impl ::buffa::Message for RunRequest {
                 )?;
                 ::buffa::types::merge_bytes(&mut self.protocol_fingerprint, buf)?;
             }
+            16u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.run_kind = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            17u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.computer_use_binding.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            18u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .computer_use_mcp_server_path
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -2022,6 +2554,9 @@ impl ::buffa::Message for RunRequest {
         self.external_tools = ::core::option::Option::None;
         self.provider_binary_path.clear();
         self.protocol_fingerprint.clear();
+        self.run_kind = ::buffa::EnumValue::from(0);
+        self.computer_use_binding = ::buffa::MessageField::none();
+        self.computer_use_mcp_server_path = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -3802,6 +4337,464 @@ pub mod __buffa {
         #[allow(unused_imports)]
         use super::*;
         #[derive(Clone, Debug, Default)]
+        pub struct ComputerUseChildBindingView<'a> {
+            /// Field 1: `parent_run_id`
+            pub parent_run_id: &'a str,
+            /// Field 2: `child_run_id`
+            pub child_run_id: &'a str,
+            /// Field 3: `agent_id`
+            pub agent_id: &'a str,
+            /// Field 4: `managed_computer_id`
+            pub managed_computer_id: &'a str,
+            /// Field 5: `display_index`
+            pub display_index: i32,
+            /// Field 6: `owner_token`
+            pub owner_token: &'a str,
+            /// Field 7: `provider`
+            pub provider: ::buffa::EnumValue<
+                super::super::super::super::types::v1::AgentProvider,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ComputerUseChildBindingView<'a> {
+            type Owned = super::super::ComputerUseChildBinding;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.parent_run_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.child_run_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.agent_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.managed_computer_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.display_index = ::buffa::types::decode_int32(&mut cur)?;
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.owner_token = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.provider = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ComputerUseChildBinding,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ComputerUseChildBinding,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ComputerUseChildBinding {
+                    parent_run_id: self.parent_run_id.to_string(),
+                    child_run_id: self.child_run_id.to_string(),
+                    agent_id: self.agent_id.to_string(),
+                    managed_computer_id: self.managed_computer_id.to_string(),
+                    display_index: self.display_index,
+                    owner_token: self.owner_token.to_string(),
+                    provider: self.provider,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ComputerUseChildBindingView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.parent_run_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.parent_run_id)
+                                as u64;
+                }
+                if !self.child_run_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.child_run_id)
+                                as u64;
+                }
+                if !self.agent_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.agent_id) as u64;
+                }
+                if !self.managed_computer_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(
+                                &self.managed_computer_id,
+                            ) as u64;
+                }
+                if self.display_index != 0i32 {
+                    size
+                        += 1u64
+                            + ::buffa::types::int32_encoded_len(self.display_index)
+                                as u64;
+                }
+                if !self.owner_token.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.owner_token)
+                                as u64;
+                }
+                {
+                    let val = self.provider.to_i32();
+                    if val != 0 {
+                        size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+                    }
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.parent_run_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.parent_run_id, buf);
+                }
+                if !self.child_run_id.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.child_run_id, buf);
+                }
+                if !self.agent_id.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.agent_id, buf);
+                }
+                if !self.managed_computer_id.is_empty() {
+                    ::buffa::types::put_string_field(
+                        4u32,
+                        &self.managed_computer_id,
+                        buf,
+                    );
+                }
+                if self.display_index != 0i32 {
+                    ::buffa::types::put_int32_field(5u32, self.display_index, buf);
+                }
+                if !self.owner_token.is_empty() {
+                    ::buffa::types::put_string_field(6u32, &self.owner_token, buf);
+                }
+                {
+                    let val = self.provider.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(7u32, val, buf);
+                    }
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ComputerUseChildBindingView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.parent_run_id) {
+                    __map.serialize_entry("parentRunId", self.parent_run_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.child_run_id) {
+                    __map.serialize_entry("childRunId", self.child_run_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.agent_id) {
+                    __map.serialize_entry("agentId", self.agent_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(
+                    self.managed_computer_id,
+                ) {
+                    __map
+                        .serialize_entry("managedComputerId", self.managed_computer_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_i32(&self.display_index) {
+                    __map
+                        .serialize_entry(
+                            "displayIndex",
+                            &::buffa::json_helpers::ProtoJson(&self.display_index),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.owner_token) {
+                    __map.serialize_entry("ownerToken", self.owner_token)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.provider,
+                ) {
+                    __map.serialize_entry("provider", &self.provider)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ComputerUseChildBindingView<'a> {
+            const PACKAGE: &'static str = "briar.sidecar.v1";
+            const NAME: &'static str = "ComputerUseChildBinding";
+            const FULL_NAME: &'static str = "briar.sidecar.v1.ComputerUseChildBinding";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.sidecar.v1.ComputerUseChildBinding";
+        }
+        ::buffa::impl_default_view_instance!(ComputerUseChildBindingView);
+        ::buffa::impl_view_reborrow!(ComputerUseChildBindingView);
+        /** Self-contained, `'static` owned view of a `ComputerUseChildBinding` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ComputerUseChildBindingView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ComputerUseChildBindingView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ComputerUseChildBindingOwnedView(
+            ::buffa::OwnedView<ComputerUseChildBindingView<'static>>,
+        );
+        impl ComputerUseChildBindingOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ComputerUseChildBindingOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ComputerUseChildBindingOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ComputerUseChildBinding,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ComputerUseChildBindingOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ComputerUseChildBindingView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ComputerUseChildBindingView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::ComputerUseChildBinding {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `parent_run_id`
+            #[must_use]
+            pub fn parent_run_id(&self) -> &'_ str {
+                self.0.reborrow().parent_run_id
+            }
+            /// Field 2: `child_run_id`
+            #[must_use]
+            pub fn child_run_id(&self) -> &'_ str {
+                self.0.reborrow().child_run_id
+            }
+            /// Field 3: `agent_id`
+            #[must_use]
+            pub fn agent_id(&self) -> &'_ str {
+                self.0.reborrow().agent_id
+            }
+            /// Field 4: `managed_computer_id`
+            #[must_use]
+            pub fn managed_computer_id(&self) -> &'_ str {
+                self.0.reborrow().managed_computer_id
+            }
+            /// Field 5: `display_index`
+            #[must_use]
+            pub fn display_index(&self) -> i32 {
+                self.0.reborrow().display_index
+            }
+            /// Field 6: `owner_token`
+            #[must_use]
+            pub fn owner_token(&self) -> &'_ str {
+                self.0.reborrow().owner_token
+            }
+            /// Field 7: `provider`
+            #[must_use]
+            pub fn provider(
+                &self,
+            ) -> ::buffa::EnumValue<
+                super::super::super::super::types::v1::AgentProvider,
+            > {
+                self.0.reborrow().provider
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ComputerUseChildBindingView<'static>>,
+        > for ComputerUseChildBindingOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ComputerUseChildBindingView<'static>>,
+            ) -> Self {
+                ComputerUseChildBindingOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ComputerUseChildBindingOwnedView>
+        for ::buffa::OwnedView<ComputerUseChildBindingView<'static>> {
+            fn from(wrapper: ComputerUseChildBindingOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ComputerUseChildBindingView<'static>>,
+        > for ComputerUseChildBindingOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ComputerUseChildBindingView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ComputerUseChildBinding {
+            type View<'a> = ComputerUseChildBindingView<'a>;
+            type ViewHandle = ComputerUseChildBindingOwnedView;
+        }
+        impl ::serde::Serialize for ComputerUseChildBindingOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
         pub struct ParentToRunnerView<'a> {
             pub payload: ::core::option::Option<
                 super::super::__buffa::view::oneof::parent_to_runner::Payload<'a>,
@@ -4907,6 +5900,14 @@ pub mod __buffa {
             ///
             /// Field 15: `protocol_fingerprint`
             pub protocol_fingerprint: &'a [u8],
+            /// Field 16: `run_kind`
+            pub run_kind: ::buffa::EnumValue<super::super::AgentRunKind>,
+            /// Field 17: `computer_use_binding`
+            pub computer_use_binding: ::buffa::MessageFieldView<
+                super::super::__buffa::view::ComputerUseChildBindingView<'a>,
+            >,
+            /// Field 18: `computer_use_mcp_server_path`
+            pub computer_use_mcp_server_path: ::core::option::Option<&'a str>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for RunRequestView<'a> {
@@ -5062,6 +6063,49 @@ pub mod __buffa {
                             &mut cur,
                         )?;
                     }
+                    16u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.run_kind = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    17u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.computer_use_binding.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.computer_use_binding = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::ComputerUseChildBindingView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    18u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.computer_use_mcp_server_path = Some(
+                            ::buffa::types::borrow_str(&mut cur)?,
+                        );
+                    }
                     11u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -5147,6 +6191,19 @@ pub mod __buffa {
                     external_tools: self.external_tools,
                     provider_binary_path: self.provider_binary_path.to_string(),
                     protocol_fingerprint: (self.protocol_fingerprint).to_vec(),
+                    run_kind: self.run_kind,
+                    computer_use_binding: match self.computer_use_binding.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::ComputerUseChildBinding,
+                                ::buffa::Inline<super::super::ComputerUseChildBinding>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    computer_use_mcp_server_path: self
+                        .computer_use_mcp_server_path
+                        .map(|s| s.to_string()),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -5235,6 +6292,23 @@ pub mod __buffa {
                                 &self.protocol_fingerprint,
                             ) as u64;
                 }
+                {
+                    let val = self.run_kind.to_i32();
+                    if val != 0 {
+                        size += 2u64 + ::buffa::types::int32_encoded_len(val) as u64;
+                    }
+                }
+                if self.computer_use_binding.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.computer_use_binding.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                if let Some(ref v) = self.computer_use_mcp_server_path {
+                    size += 2u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -5314,6 +6388,23 @@ pub mod __buffa {
                         &self.protocol_fingerprint,
                         buf,
                     );
+                }
+                {
+                    let val = self.run_kind.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(16u32, val, buf);
+                    }
+                }
+                if self.computer_use_binding.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        17u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.computer_use_binding.write_to(__cache, buf);
+                }
+                if let Some(ref v) = self.computer_use_mcp_server_path {
+                    ::buffa::types::put_string_field(18u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -5405,6 +6496,24 @@ pub mod __buffa {
                             "protocolFingerprint",
                             &::buffa::json_helpers::BytesJson(self.protocol_fingerprint),
                         )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.run_kind,
+                ) {
+                    __map.serialize_entry("runKind", &self.run_kind)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .computer_use_binding
+                        .as_option()
+                    {
+                        __map.serialize_entry("computerUseBinding", __v)?;
+                    }
+                }
+                if let ::core::option::Option::Some(__v) = self
+                    .computer_use_mcp_server_path
+                {
+                    __map.serialize_entry("computerUseMcpServerPath", __v)?;
                 }
                 __map.end()
             }
@@ -5593,6 +6702,27 @@ pub mod __buffa {
             #[must_use]
             pub fn protocol_fingerprint(&self) -> &'_ [u8] {
                 self.0.reborrow().protocol_fingerprint
+            }
+            /// Field 16: `run_kind`
+            #[must_use]
+            pub fn run_kind(&self) -> ::buffa::EnumValue<super::super::AgentRunKind> {
+                self.0.reborrow().run_kind
+            }
+            /// Field 17: `computer_use_binding`
+            #[must_use]
+            pub fn computer_use_binding(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::ComputerUseChildBindingView<'_>,
+            > {
+                &self.0.reborrow().computer_use_binding
+            }
+            /// Field 18: `computer_use_mcp_server_path`
+            #[must_use]
+            pub fn computer_use_mcp_server_path(
+                &self,
+            ) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().computer_use_mcp_server_path
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<RunRequestView<'static>>>
@@ -8960,6 +10090,7 @@ pub mod __buffa {
     }
     /// Register this package's `Any` type entries and extension entries.
     pub fn register_types(reg: &mut ::buffa::type_registry::TypeRegistry) {
+        reg.register_json_any(super::__COMPUTER_USE_CHILD_BINDING_JSON_ANY);
         reg.register_json_any(super::__PARENT_TO_RUNNER_JSON_ANY);
         reg.register_json_any(super::__RUNNER_TO_PARENT_JSON_ANY);
         reg.register_json_any(super::__RUN_REQUEST_JSON_ANY);
@@ -8974,6 +10105,10 @@ pub mod __buffa {
         reg.register_json_any(super::__RUN_ERROR_JSON_ANY);
     }
 }
+#[doc(inline)]
+pub use self::__buffa::view::ComputerUseChildBindingView;
+#[doc(inline)]
+pub use self::__buffa::view::ComputerUseChildBindingOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ParentToRunnerView;
 #[doc(inline)]

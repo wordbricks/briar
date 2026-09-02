@@ -752,6 +752,7 @@ async function organizationAgentContextAgentDetails(
             null as avatar, agent.provider, agent.model,
             agent.description, agent.responsibility,
             null as skill_markdown, agent.effort,
+            agent.computer_use_policy,
             agent.created_at, agent.updated_at
      from briar_project_agents agent
      join briar_projects project on project.id = agent.project_id

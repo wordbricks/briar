@@ -722,6 +722,7 @@ export async function createManagedComputerRemoteSessionApplication(input: {
   userId: string;
   requestId: string;
   reconnectSessionId?: string;
+  agentId?: string;
   requestUrl: string;
   origin: string | null;
   secFetchSite: string | null;
@@ -751,6 +752,7 @@ export async function createManagedComputerRemoteSessionApplication(input: {
     controllerUserId: input.userId,
     requestId: input.requestId,
     reconnectSessionId: input.reconnectSessionId,
+    agentId: input.agentId,
     observedAt: input.observedAt,
   });
 }

@@ -11,6 +11,7 @@ struct ProjectAgent: Codable, Equatable, Identifiable, Sendable {
     let provider: AgentProvider
     let model: String?
     let effort: ModelEffort?
+    let computerUsePolicy: ComputerUsePolicy
     let designatedWorkerId: String?
     let designatedWorkerLabel: String?
     let description: String?
@@ -30,6 +31,7 @@ struct ProjectAgent: Codable, Equatable, Identifiable, Sendable {
         provider: AgentProvider,
         model: String?,
         effort: ModelEffort?,
+        computerUsePolicy: ComputerUsePolicy = .disabled,
         designatedWorkerId: String? = nil,
         designatedWorkerLabel: String? = nil,
         description: String?,
@@ -48,6 +50,7 @@ struct ProjectAgent: Codable, Equatable, Identifiable, Sendable {
         self.provider = provider
         self.model = model
         self.effort = effort
+        self.computerUsePolicy = computerUsePolicy
         self.designatedWorkerId = designatedWorkerId
         self.designatedWorkerLabel = designatedWorkerLabel
         self.description = description
@@ -68,6 +71,11 @@ struct ProjectAgent: Codable, Equatable, Identifiable, Sendable {
     }
 
     var summary: String { displayDescription ?? responsibility }
+
+    enum ComputerUsePolicy: String, Codable, Equatable, Sendable {
+        case disabled
+        case unattended
+    }
 
     struct CodexPet: Codable, Equatable, Sendable {
         let slug: String
@@ -482,6 +490,9 @@ extension ProjectAgent {
             provider: try AgentProvider(connectMessage: message.provider),
             model: message.hasModel ? message.model : nil,
             effort: message.hasEffort ? ModelEffort(rawValue: message.effort) : nil,
+            computerUsePolicy: message.computerUsePolicy == .unattended
+                ? .unattended
+                : .disabled,
             designatedWorkerId: message.hasDesignatedWorkerID
                 ? message.designatedWorkerID
                 : nil,

@@ -1,0 +1,37 @@
+{
+  "name": "@briar/agent-exec",
+  "version": "0.0.0",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./computer-tool": "./src/computer-tool.ts",
+    "./computer-use-governance": "./src/computer-use-governance.ts",
+    "./computer-use-resource": "./src/computer-use-resource.ts",
+    "./connect-exec-manager": "./src/connect-exec-manager.ts",
+    "./controlled-exec": "./src/controlled-exec.ts",
+    "./exec-resource": "./src/exec-resource.ts",
+    "./resource-provider": "./src/resource-provider.ts"
+  },
+  "scripts": {
+    "lint": "oxlint src --config ../../.oxlintrc.jsonc",
+    "lint:type-aware": "oxlint --type-aware src --config ../../.oxlintrc.jsonc",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@bufbuild/protobuf": "catalog:",
+    "@briar/contracts": "workspace:*",
+    "@connectrpc/connect": "catalog:",
+    "@connectrpc/connect-web": "catalog:",
+    "effect": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "oxlint": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

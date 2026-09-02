@@ -1,18 +1,8 @@
 import { create } from "@bufbuild/protobuf";
-import { AgentProvider as ProtoAgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
 import { WorkerRuntimeAdvertisementSchema } from "@briar/contracts/gen/briar/types/v1/worker_pb";
 import { agentProviders, type AgentProvider } from "./agent-provider";
 import type { AgentProviderCapabilityCatalog } from "./agent-provider-contract";
-
-const protoAgentProvider = {
-  codex: ProtoAgentProvider.CODEX,
-  claude: ProtoAgentProvider.CLAUDE,
-  cursor: ProtoAgentProvider.CURSOR,
-  grok: ProtoAgentProvider.GROK,
-  agy: ProtoAgentProvider.AGY,
-  opencode: ProtoAgentProvider.OPENCODE,
-  openrouter: ProtoAgentProvider.OPENROUTER,
-} as const satisfies Record<AgentProvider, ProtoAgentProvider>;
+import { protoAgentProvider } from "./agent-provider-proto";
 
 export type WorkerRuntimeInput = {
   readonly agentProvider: AgentProvider;
@@ -40,6 +30,15 @@ export type WorkerRuntimeInput = {
     readonly protocol: 2;
     readonly transports: ReadonlyArray<"agent" | "openrouter">;
     readonly providers: ReadonlyArray<AgentProvider>;
+  };
+  readonly computerUse?: {
+    readonly protocol: 1;
+    readonly transport: "connectrpc-resource-exec";
+    readonly providers: ReadonlyArray<AgentProvider>;
+    readonly maxWindows: number;
+    readonly sharedDesktop: true;
+    readonly humanTakeover: true;
+    readonly schemaDigest: string;
   };
 };
 
@@ -101,6 +100,19 @@ export const workerRuntimeToProto = (input: WorkerRuntimeInput) =>
                 (provider) => protoAgentProvider[provider],
               ),
             }
+        : undefined,
+      computerUse: input.computerUse
+        ? {
+            protocol: input.computerUse.protocol,
+            transport: input.computerUse.transport,
+            providers: input.computerUse.providers.map(
+              (provider) => protoAgentProvider[provider],
+            ),
+            maxWindows: input.computerUse.maxWindows,
+            sharedDesktop: input.computerUse.sharedDesktop,
+            humanTakeover: input.computerUse.humanTakeover,
+            schemaDigest: input.computerUse.schemaDigest,
+          }
         : undefined,
     },
     versions: { ...input.versions },

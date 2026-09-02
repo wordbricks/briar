@@ -20,6 +20,7 @@ export async function claimNextQueuedHuntRun(
     workerId?: string;
     workerDeviceId?: string;
     detachedOnly?: boolean;
+    computerUseProvidersJson?: string | null;
   },
 ) {
   const executionId = crypto.randomUUID();
@@ -129,6 +130,37 @@ export async function claimNextQueuedHuntRun(
              )
            )
            and (
+             ? is null
+             or not exists (
+               select 1
+               from briar_project_agents computer_agent
+               where computer_agent.id = briar_hunt_runs.agent_id
+                 and computer_agent.project_id = briar_hunt_runs.project_id
+                 and computer_agent.computer_use_policy = 'unattended'
+             )
+             or exists (
+               select 1 from json_each(?) computer_provider
+               where computer_provider.value = coalesce(
+                 requested_agent_provider,
+                 preferred_agent_provider,
+                 (
+                   select skill.provider
+                   from briar_agent_skills skill
+                   where skill.agent_id = briar_hunt_runs.agent_id
+                     and skill.kind = 'issue_processing'
+                   order by skill.position, skill.created_at, skill.id
+                   limit 1
+                 ),
+                 (
+                   select agent.provider
+                   from briar_project_agents agent
+                   where agent.id = briar_hunt_runs.agent_id
+                     and agent.project_id = briar_hunt_runs.project_id
+                 )
+               )
+             )
+           )
+           and (
              ? is null or (
              (select count(*)
               from briar_hunt_runs active
@@ -202,6 +234,8 @@ export async function claimNextQueuedHuntRun(
       input.workerId ?? null,
       input.workerId ?? null,
       input.workerId ?? null,
+      input.computerUseProvidersJson ?? null,
+      input.computerUseProvidersJson ?? null,
       input.workerDeviceId ?? null,
       input.workerDeviceId ?? null,
       input.claimedAt,

@@ -11,6 +11,8 @@ import {
   normalizeClaudeMessage,
 } from "./claude-runner-lib";
 import { createRunnerIo } from "./runner-io";
+import { prepareComputerUseMcp } from "./computer-use-mcp-config";
+import { claudeComputerUseServers } from "./computer-use-provider-adapters";
 
 const runnerIo = createRunnerIo({
   closeError: "Briar closed the Claude runner input.",
@@ -19,6 +21,7 @@ const { emit, request: requestPromise, waitForApproval } = runnerIo;
 
 async function main() {
   const request = await requestPromise;
+  const computerUseMcp = await prepareComputerUseMcp(request);
   let approvalSequence = 0;
   const canUseTool: CanUseTool = async (toolName, input, options) => {
     const id = String(++approvalSequence);
@@ -36,13 +39,18 @@ async function main() {
     | Extract<SDKMessage, { type: "result"; subtype: "success" }>
     | undefined;
 
-  for await (const message of query({
-    prompt:
-      request.attachments?.length
-        ? claudePrompt(request)
-        : request.message,
-    options: claudeOptions(request, canUseTool),
-  })) {
+  try {
+    for await (const message of query({
+      prompt:
+        request.attachments?.length
+          ? claudePrompt(request)
+          : request.message,
+      options: claudeOptions(
+        request,
+        canUseTool,
+        claudeComputerUseServers(computerUseMcp.servers),
+      ),
+    })) {
     if (message.type === "system" && message.subtype === "init") {
       const sessionId = (message as unknown as { session_id?: unknown }).session_id;
       if (typeof sessionId === "string" && sessionId.trim()) {
@@ -65,18 +73,21 @@ async function main() {
       }
       result = message;
     }
-  }
+    }
 
-  if (!result) {
-    throw new Error("Claude completed without a result message.");
+    if (!result) {
+      throw new Error("Claude completed without a result message.");
+    }
+    emit.result({
+      sessionId: result.session_id,
+      message:
+        result.structured_output === undefined
+          ? result.result
+          : JSON.stringify(result.structured_output),
+    });
+  } finally {
+    await computerUseMcp.cleanup();
   }
-  emit.result({
-    sessionId: result.session_id,
-    message:
-      result.structured_output === undefined
-        ? result.result
-        : JSON.stringify(result.structured_output),
-  });
 }
 
 void main()

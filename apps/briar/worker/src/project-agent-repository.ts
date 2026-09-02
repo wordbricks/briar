@@ -13,12 +13,14 @@ import {
   type ProjectAgentProvider,
   type ProjectAgentRow,
 } from "./project-agent-model";
+import type { ComputerUsePolicy } from "../../src/lib/computer-use-contract";
 
 export async function listProjectAgents(db: D1Database, projectId: string) {
   const result = await db
     .prepare(
       `select id, organization_id, project_id, name, avatar, avatar_pet_json,
               avatar_spritesheet_object_key, provider, model, effort,
+              computer_use_policy,
               designated_worker_id, designated_worker_label,
               description, responsibility, skill_markdown, calendar_color,
               created_at, updated_at
@@ -40,6 +42,7 @@ export async function getProjectAgent(
     .prepare(
       `select id, organization_id, project_id, name, avatar, avatar_pet_json,
               avatar_spritesheet_object_key, provider, model, effort,
+              computer_use_policy,
               designated_worker_id, designated_worker_label,
               description, responsibility,
               skill_markdown, calendar_color, created_at, updated_at
@@ -63,6 +66,7 @@ export async function createProjectAgent(
     provider: ProjectAgentProvider;
     model: string | null;
     effort: AgentSkillEffort | null;
+    computerUsePolicy?: ComputerUsePolicy;
     designatedWorkerId?: string | null;
     designatedWorkerLabel?: string | null;
     description?: string;
@@ -83,6 +87,7 @@ export async function createProjectAgent(
     provider: input.provider,
     model: input.model,
     effort: input.effort,
+    computer_use_policy: input.computerUsePolicy ?? "disabled",
     designated_worker_id: input.designatedWorkerId ?? null,
     designated_worker_label: input.designatedWorkerLabel ?? null,
     description: input.description ?? "",
@@ -113,10 +118,10 @@ export async function createProjectAgent(
           `insert into briar_project_agents (
              id, organization_id, project_id, name, avatar,
              avatar_pet_json, avatar_spritesheet_object_key, provider, model,
-             effort, designated_worker_id, designated_worker_label,
+             effort, computer_use_policy, designated_worker_id, designated_worker_label,
              description, responsibility, skill_markdown, calendar_color,
              created_at, updated_at
-           ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           agent.id,
@@ -129,6 +134,7 @@ export async function createProjectAgent(
           agent.provider,
           agent.model,
           agent.effort,
+          agent.computer_use_policy,
           agent.designated_worker_id,
           agent.designated_worker_label,
           agent.description,
@@ -158,6 +164,7 @@ export async function deleteProjectAgent(
          )
        returning id, organization_id, project_id, name, avatar, avatar_pet_json,
                  avatar_spritesheet_object_key, provider, model, effort,
+                 computer_use_policy,
                  designated_worker_id, designated_worker_label,
                  description, responsibility, skill_markdown, calendar_color,
                  created_at, updated_at`,
@@ -182,6 +189,7 @@ export async function updateProjectAgent(
     provider: ProjectAgentProvider;
     model: string | null;
     effort: AgentSkillEffort | null;
+    computerUsePolicy?: ComputerUsePolicy;
     designatedWorkerId?: string | null;
     designatedWorkerLabel?: string | null;
     description?: string;
@@ -217,6 +225,7 @@ export async function updateProjectAgent(
              avatar_spritesheet_object_key =
                case when ? = 1 then ? else avatar_spritesheet_object_key end,
              provider = ?, model = ?, effort = ?,
+             computer_use_policy = coalesce(?, computer_use_policy),
              designated_worker_id = ?, designated_worker_label = ?,
              description = ?, responsibility = ?,
              skill_markdown = ?, calendar_color = ?, updated_at = ?
@@ -232,6 +241,7 @@ export async function updateProjectAgent(
         input.provider,
         input.model,
         input.effort,
+        input.computerUsePolicy ?? null,
         input.designatedWorkerId ?? null,
         input.designatedWorkerLabel ?? null,
         input.description ?? existing.description,

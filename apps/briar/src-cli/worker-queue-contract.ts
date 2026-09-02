@@ -2,6 +2,7 @@ import type { JsonObject } from "@bufbuild/protobuf";
 import * as Schema from "effect/Schema";
 import { timestampDate, type Timestamp } from "@bufbuild/protobuf/wkt";
 import { AgentProvider as ProtoAgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
+import { ComputerUsePolicy as ProtoComputerUsePolicy } from "@briar/contracts/gen/briar/types/v1/computer_use_pb";
 import {
   DmMemoryBriefState,
   type DmMemoryDescriptor as ProtoDmMemoryDescriptor,
@@ -293,6 +294,9 @@ const agent = (value: ProtoDetachedAgentClaim) => ({
   provider: agentProvider(value.provider),
   model: value.model ?? null,
   effort: value.effort ?? null,
+  computerUsePolicy: value.computerUsePolicy === ProtoComputerUsePolicy.UNATTENDED
+    ? "unattended" as const
+    : "disabled" as const,
   responsibility: value.responsibility,
   skills: value.skills.map(agentSkill),
 });

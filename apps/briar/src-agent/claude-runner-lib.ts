@@ -1,5 +1,6 @@
 import type {
   CanUseTool,
+  McpServerConfig,
   Options,
   PermissionResult,
   SDKMessage,
@@ -91,6 +92,7 @@ export async function* claudePrompt(
 export function claudeOptions(
   request: RunnerRequest,
   canUseTool: CanUseTool,
+  mcpServers: Record<string, McpServerConfig> = {},
 ): Options {
   const readOnly = request.sandboxMode === "readOnly";
   const workspaceRoot = resolve(request.workspaceRoot);
@@ -112,6 +114,7 @@ export function claudeOptions(
       ? { effort: request.effort as Options["effort"] }
       : {}),
     pathToClaudeCodeExecutable: request.providerBinaryPath,
+    ...(Object.keys(mcpServers).length > 0 ? { mcpServers } : {}),
     systemPrompt: {
       type: "preset",
       preset: "claude_code",

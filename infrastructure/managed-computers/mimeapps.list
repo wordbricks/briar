@@ -1,9 +1,9 @@
 [Default Applications]
-text/html=google-chrome.desktop
-x-scheme-handler/http=google-chrome.desktop
-x-scheme-handler/https=google-chrome.desktop
+text/html=briar-google-chrome.desktop
+x-scheme-handler/http=briar-google-chrome.desktop
+x-scheme-handler/https=briar-google-chrome.desktop
 
 [Added Associations]
-text/html=google-chrome.desktop;
-x-scheme-handler/http=google-chrome.desktop;
-x-scheme-handler/https=google-chrome.desktop;
+text/html=briar-google-chrome.desktop;
+x-scheme-handler/http=briar-google-chrome.desktop;
+x-scheme-handler/https=briar-google-chrome.desktop;

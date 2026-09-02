@@ -361,6 +361,7 @@ message ManagedComputerRemoteSession {
   optional google.protobuf.Timestamp connected_at = 7;
   optional google.protobuf.Timestamp disconnected_at = 8;
   optional google.protobuf.Timestamp ended_at = 9;
+  optional string agent_id = 10;
 }
 
 message ManagedComputerSocketTicket {
@@ -373,6 +374,7 @@ message CreateManagedComputerRemoteSessionRequest {
   string managed_computer_id = 2;
   string request_id = 3;
   optional string reconnect_session_id = 4;
+  optional string agent_id = 5;
 }
 
 message CreateManagedComputerRemoteSessionResponse {

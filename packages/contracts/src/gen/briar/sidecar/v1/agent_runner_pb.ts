@@ -6,6 +6,8 @@ import type { GenEnum, GenFile, GenMessage } from "@bufbuild/protobuf/codegenv2"
 import { enumDesc, fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
 import type { AgentEventDirection, NormalizedAgentEvent } from "../../types/v1/agent_event_pb";
 import { file_briar_types_v1_agent_event } from "../../types/v1/agent_event_pb";
+import type { AgentProvider } from "../../types/v1/provider_pb";
+import { file_briar_types_v1_provider } from "../../types/v1/provider_pb";
 import type { Timestamp, Value } from "@bufbuild/protobuf/wkt";
 import { file_google_protobuf_struct, file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
 import type { JsonObject, Message } from "@bufbuild/protobuf";
@@ -14,7 +16,54 @@ import type { JsonObject, Message } from "@bufbuild/protobuf";
  * Describes the file briar/sidecar/v1/agent_runner.proto.
  */
 export const file_briar_sidecar_v1_agent_runner: GenFile = /*@__PURE__*/
-  fileDesc("CiNicmlhci9zaWRlY2FyL3YxL2FnZW50X3J1bm5lci5wcm90bxIQYnJpYXIuc2lkZWNhci52MSKJAQoOUGFyZW50VG9SdW5uZXISKwoDcnVuGAEgASgLMhwuYnJpYXIuc2lkZWNhci52MS5SdW5SZXF1ZXN0SAASPwoRYXBwcm92YWxfcmVzcG9uc2UYAiABKAsyIi5icmlhci5zaWRlY2FyLnYxLkFwcHJvdmFsUmVzcG9uc2VIAEIJCgdwYXlsb2FkIs4CCg5SdW5uZXJUb1BhcmVudBI7Cg9zZXNzaW9uX3N0YXJ0ZWQYASABKAsyIC5icmlhci5zaWRlY2FyLnYxLlNlc3Npb25TdGFydGVkSAASMAoFZXZlbnQYAiABKAsyHy5icmlhci5zaWRlY2FyLnYxLlByb3ZpZGVyRXZlbnRIABI1CghhcHByb3ZhbBgDIAEoCzIhLmJyaWFyLnNpZGVjYXIudjEuQXBwcm92YWxSZXF1ZXN0SAASLQoGcmVzdWx0GAQgASgLMhsuYnJpYXIuc2lkZWNhci52MS5SdW5SZXN1bHRIABIvCgdibG9ja2VkGAUgASgLMhwuYnJpYXIuc2lkZWNhci52MS5SdW5CbG9ja2VkSAASKwoFZXJyb3IYBiABKAsyGi5icmlhci5zaWRlY2FyLnYxLlJ1bkVycm9ySABCCQoHcGF5bG9hZCLpBAoKUnVuUmVxdWVzdBIPCgdtZXNzYWdlGAEgASgJEhYKDndvcmtzcGFjZV9yb290GAIgASgJEhwKD2NvbnZlcnNhdGlvbl9pZBgDIAEoCUgAiAEBEhkKDGluc3RydWN0aW9ucxgEIAEoCUgBiAEBEjgKDW91dHB1dF9zY2hlbWEYBSABKAsyHC5icmlhci5zaWRlY2FyLnYxLkpzb25TY2hlbWFIAogBARISCgVtb2RlbBgGIAEoCUgDiAEBEhMKBmVmZm9ydBgHIAEoCUgEiAEBEjkKD2FwcHJvdmFsX3BvbGljeRgIIAEoDjIgLmJyaWFyLnNpZGVjYXIudjEuQXBwcm92YWxQb2xpY3kSMwoMc2FuZGJveF9tb2RlGAkgASgOMh0uYnJpYXIuc2lkZWNhci52MS5TYW5kYm94TW9kZRIWCg5uZXR3b3JrX2FjY2VzcxgKIAEoCBI2CgthdHRhY2htZW50cxgLIAMoCzIhLmJyaWFyLnNpZGVjYXIudjEuSW1hZ2VBdHRhY2htZW50Eh4KFmFkZGl0aW9uYWxfZGlyZWN0b3JpZXMYDCADKAkSGwoOZXh0ZXJuYWxfdG9vbHMYDSABKAhIBYgBARIcChRwcm92aWRlcl9iaW5hcnlfcGF0aBgOIAEoCRIcChRwcm90b2NvbF9maW5nZXJwcmludBgPIAEoDEISChBfY29udmVyc2F0aW9uX2lkQg8KDV9pbnN0cnVjdGlvbnNCEAoOX291dHB1dF9zY2hlbWFCCAoGX21vZGVsQgkKB19lZmZvcnRCEQoPX2V4dGVybmFsX3Rvb2xzIlMKCkpzb25TY2hlbWESKQoGb2JqZWN0GAEgASgLMhcuZ29vZ2xlLnByb3RvYnVmLlN0cnVjdEgAEhEKB2Jvb2xlYW4YAiABKAhIAEIHCgV2YWx1ZSJACg9JbWFnZUF0dGFjaG1lbnQSDAoEcGF0aBgBIAEoCRIMCgRuYW1lGAIgASgJEhEKCW1pbWVfdHlwZRgDIAEoCSIwChBBcHByb3ZhbFJlc3BvbnNlEgoKAmlkGAEgASgJEhAKCGFwcHJvdmVkGAIgASgIIiQKDlNlc3Npb25TdGFydGVkEhIKCnNlc3Npb25faWQYASABKAkiugEKDVByb3ZpZGVyRXZlbnQSIwoDcmF3GAEgASgLMhYuZ29vZ2xlLnByb3RvYnVmLlZhbHVlEj0KCm5vcm1hbGl6ZWQYAiABKAsyJC5icmlhci50eXBlcy52MS5Ob3JtYWxpemVkQWdlbnRFdmVudEgAiAEBEjYKCWRpcmVjdGlvbhgDIAEoDjIjLmJyaWFyLnR5cGVzLnYxLkFnZW50RXZlbnREaXJlY3Rpb25CDQoLX25vcm1hbGl6ZWQidgoPQXBwcm92YWxSZXF1ZXN0EgoKAmlkGAEgASgJEhEKCXRvb2xfbmFtZRgCIAEoCRImCgVpbnB1dBgDIAEoCzIXLmdvb2dsZS5wcm90b2J1Zi5TdHJ1Y3QSEgoFdGl0bGUYBCABKAlIAIgBAUIICgZfdGl0bGUiMAoJUnVuUmVzdWx0EhIKCnNlc3Npb25faWQYASABKAkSDwoHbWVzc2FnZRgCIAEoCSL6AQoKUnVuQmxvY2tlZBItCgZyZWFzb24YASABKA4yHS5icmlhci5zaWRlY2FyLnYxLkJsb2NrUmVhc29uEg8KB21lc3NhZ2UYAiABKAkSFQoIcHJvdmlkZXIYAyABKAlIAIgBARIUCgxzZXJ2ZXJfbmFtZXMYBCADKAkSNgoNbmV4dF9yZXRyeV9hdBgFIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBIAYgBARIYCgtzdGF0dXNfY29kZRgGIAEoDUgCiAEBQgsKCV9wcm92aWRlckIQCg5fbmV4dF9yZXRyeV9hdEIOCgxfc3RhdHVzX2NvZGUiSQoIUnVuRXJyb3ISLAoEY29kZRgBIAEoDjIeLmJyaWFyLnNpZGVjYXIudjEuUnVuRXJyb3JDb2RlEg8KB21lc3NhZ2UYAiABKAkqiwEKDkFwcHJvdmFsUG9saWN5Eh8KG0FQUFJPVkFMX1BPTElDWV9VTlNQRUNJRklFRBAAEh0KGUFQUFJPVkFMX1BPTElDWV9VTlRSVVNURUQQARIeChpBUFBST1ZBTF9QT0xJQ1lfT05fUkVRVUVTVBACEhkKFUFQUFJPVkFMX1BPTElDWV9ORVZFUhADKo4BCgtTYW5kYm94TW9kZRIcChhTQU5EQk9YX01PREVfVU5TUEVDSUZJRUQQABIaChZTQU5EQk9YX01PREVfUkVBRF9PTkxZEAESIAocU0FOREJPWF9NT0RFX1dPUktTUEFDRV9XUklURRACEiMKH1NBTkRCT1hfTU9ERV9EQU5HRVJfRlVMTF9BQ0NFU1MQAyq5AQoLQmxvY2tSZWFzb24SHAoYQkxPQ0tfUkVBU09OX1VOU1BFQ0lGSUVEEAASIgoeQkxPQ0tfUkVBU09OX01DUF9BVVRIX1JFUVVJUkVEEAESIAocQkxPQ0tfUkVBU09OX1VTQUdFX0VYSEFVU1RFRBACEiQKIEJMT0NLX1JFQVNPTl9VUFNUUkVBTV9PVkVSTE9BREVEEAMSIAocQkxPQ0tfUkVBU09OX0ZSRUVfVElFUl9MSU1JVBAEKukBCgxSdW5FcnJvckNvZGUSHgoaUlVOX0VSUk9SX0NPREVfVU5TUEVDSUZJRUQQABIiCh5SVU5fRVJST1JfQ09ERV9JTlZBTElEX1JFUVVFU1QQARIoCiRSVU5fRVJST1JfQ09ERV9QUk9WSURFUl9TVEFSVF9GQUlMRUQQAhIqCiZSVU5fRVJST1JfQ09ERV9QUk9WSURFUl9QUk9UT0NPTF9FUlJPUhADEiIKHlJVTl9FUlJPUl9DT0RFX1BST1ZJREVSX0ZBSUxFRBAEEhsKF1JVTl9FUlJPUl9DT0RFX0lOVEVSTkFMEAViBnByb3RvMw", [file_briar_types_v1_agent_event, file_google_protobuf_struct, file_google_protobuf_timestamp]);
+  fileDesc("CiNicmlhci9zaWRlY2FyL3YxL2FnZW50X3J1bm5lci5wcm90bxIQYnJpYXIuc2lkZWNhci52MSLSAQoXQ29tcHV0ZXJVc2VDaGlsZEJpbmRpbmcSFQoNcGFyZW50X3J1bl9pZBgBIAEoCRIUCgxjaGlsZF9ydW5faWQYAiABKAkSEAoIYWdlbnRfaWQYAyABKAkSGwoTbWFuYWdlZF9jb21wdXRlcl9pZBgEIAEoCRIVCg1kaXNwbGF5X2luZGV4GAUgASgFEhMKC293bmVyX3Rva2VuGAYgASgJEi8KCHByb3ZpZGVyGAcgASgOMh0uYnJpYXIudHlwZXMudjEuQWdlbnRQcm92aWRlciKJAQoOUGFyZW50VG9SdW5uZXISKwoDcnVuGAEgASgLMhwuYnJpYXIuc2lkZWNhci52MS5SdW5SZXF1ZXN0SAASPwoRYXBwcm92YWxfcmVzcG9uc2UYAiABKAsyIi5icmlhci5zaWRlY2FyLnYxLkFwcHJvdmFsUmVzcG9uc2VIAEIJCgdwYXlsb2FkIs4CCg5SdW5uZXJUb1BhcmVudBI7Cg9zZXNzaW9uX3N0YXJ0ZWQYASABKAsyIC5icmlhci5zaWRlY2FyLnYxLlNlc3Npb25TdGFydGVkSAASMAoFZXZlbnQYAiABKAsyHy5icmlhci5zaWRlY2FyLnYxLlByb3ZpZGVyRXZlbnRIABI1CghhcHByb3ZhbBgDIAEoCzIhLmJyaWFyLnNpZGVjYXIudjEuQXBwcm92YWxSZXF1ZXN0SAASLQoGcmVzdWx0GAQgASgLMhsuYnJpYXIuc2lkZWNhci52MS5SdW5SZXN1bHRIABIvCgdibG9ja2VkGAUgASgLMhwuYnJpYXIuc2lkZWNhci52MS5SdW5CbG9ja2VkSAASKwoFZXJyb3IYBiABKAsyGi5icmlhci5zaWRlY2FyLnYxLlJ1bkVycm9ySABCCQoHcGF5bG9hZCLOBgoKUnVuUmVxdWVzdBIPCgdtZXNzYWdlGAEgASgJEhYKDndvcmtzcGFjZV9yb290GAIgASgJEhwKD2NvbnZlcnNhdGlvbl9pZBgDIAEoCUgAiAEBEhkKDGluc3RydWN0aW9ucxgEIAEoCUgBiAEBEjgKDW91dHB1dF9zY2hlbWEYBSABKAsyHC5icmlhci5zaWRlY2FyLnYxLkpzb25TY2hlbWFIAogBARISCgVtb2RlbBgGIAEoCUgDiAEBEhMKBmVmZm9ydBgHIAEoCUgEiAEBEjkKD2FwcHJvdmFsX3BvbGljeRgIIAEoDjIgLmJyaWFyLnNpZGVjYXIudjEuQXBwcm92YWxQb2xpY3kSMwoMc2FuZGJveF9tb2RlGAkgASgOMh0uYnJpYXIuc2lkZWNhci52MS5TYW5kYm94TW9kZRIWCg5uZXR3b3JrX2FjY2VzcxgKIAEoCBI2CgthdHRhY2htZW50cxgLIAMoCzIhLmJyaWFyLnNpZGVjYXIudjEuSW1hZ2VBdHRhY2htZW50Eh4KFmFkZGl0aW9uYWxfZGlyZWN0b3JpZXMYDCADKAkSGwoOZXh0ZXJuYWxfdG9vbHMYDSABKAhIBYgBARIcChRwcm92aWRlcl9iaW5hcnlfcGF0aBgOIAEoCRIcChRwcm90b2NvbF9maW5nZXJwcmludBgPIAEoDBIwCghydW5fa2luZBgQIAEoDjIeLmJyaWFyLnNpZGVjYXIudjEuQWdlbnRSdW5LaW5kEkwKFGNvbXB1dGVyX3VzZV9iaW5kaW5nGBEgASgLMikuYnJpYXIuc2lkZWNhci52MS5Db21wdXRlclVzZUNoaWxkQmluZGluZ0gGiAEBEikKHGNvbXB1dGVyX3VzZV9tY3Bfc2VydmVyX3BhdGgYEiABKAlIB4gBAUISChBfY29udmVyc2F0aW9uX2lkQg8KDV9pbnN0cnVjdGlvbnNCEAoOX291dHB1dF9zY2hlbWFCCAoGX21vZGVsQgkKB19lZmZvcnRCEQoPX2V4dGVybmFsX3Rvb2xzQhcKFV9jb21wdXRlcl91c2VfYmluZGluZ0IfCh1fY29tcHV0ZXJfdXNlX21jcF9zZXJ2ZXJfcGF0aCJTCgpKc29uU2NoZW1hEikKBm9iamVjdBgBIAEoCzIXLmdvb2dsZS5wcm90b2J1Zi5TdHJ1Y3RIABIRCgdib29sZWFuGAIgASgISABCBwoFdmFsdWUiQAoPSW1hZ2VBdHRhY2htZW50EgwKBHBhdGgYASABKAkSDAoEbmFtZRgCIAEoCRIRCgltaW1lX3R5cGUYAyABKAkiMAoQQXBwcm92YWxSZXNwb25zZRIKCgJpZBgBIAEoCRIQCghhcHByb3ZlZBgCIAEoCCIkCg5TZXNzaW9uU3RhcnRlZBISCgpzZXNzaW9uX2lkGAEgASgJIroBCg1Qcm92aWRlckV2ZW50EiMKA3JhdxgBIAEoCzIWLmdvb2dsZS5wcm90b2J1Zi5WYWx1ZRI9Cgpub3JtYWxpemVkGAIgASgLMiQuYnJpYXIudHlwZXMudjEuTm9ybWFsaXplZEFnZW50RXZlbnRIAIgBARI2CglkaXJlY3Rpb24YAyABKA4yIy5icmlhci50eXBlcy52MS5BZ2VudEV2ZW50RGlyZWN0aW9uQg0KC19ub3JtYWxpemVkInYKD0FwcHJvdmFsUmVxdWVzdBIKCgJpZBgBIAEoCRIRCgl0b29sX25hbWUYAiABKAkSJgoFaW5wdXQYAyABKAsyFy5nb29nbGUucHJvdG9idWYuU3RydWN0EhIKBXRpdGxlGAQgASgJSACIAQFCCAoGX3RpdGxlIjAKCVJ1blJlc3VsdBISCgpzZXNzaW9uX2lkGAEgASgJEg8KB21lc3NhZ2UYAiABKAki+gEKClJ1bkJsb2NrZWQSLQoGcmVhc29uGAEgASgOMh0uYnJpYXIuc2lkZWNhci52MS5CbG9ja1JlYXNvbhIPCgdtZXNzYWdlGAIgASgJEhUKCHByb3ZpZGVyGAMgASgJSACIAQESFAoMc2VydmVyX25hbWVzGAQgAygJEjYKDW5leHRfcmV0cnlfYXQYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wSAGIAQESGAoLc3RhdHVzX2NvZGUYBiABKA1IAogBAUILCglfcHJvdmlkZXJCEAoOX25leHRfcmV0cnlfYXRCDgoMX3N0YXR1c19jb2RlIkkKCFJ1bkVycm9yEiwKBGNvZGUYASABKA4yHi5icmlhci5zaWRlY2FyLnYxLlJ1bkVycm9yQ29kZRIPCgdtZXNzYWdlGAIgASgJKosBCg5BcHByb3ZhbFBvbGljeRIfChtBUFBST1ZBTF9QT0xJQ1lfVU5TUEVDSUZJRUQQABIdChlBUFBST1ZBTF9QT0xJQ1lfVU5UUlVTVEVEEAESHgoaQVBQUk9WQUxfUE9MSUNZX09OX1JFUVVFU1QQAhIZChVBUFBST1ZBTF9QT0xJQ1lfTkVWRVIQAyqOAQoLU2FuZGJveE1vZGUSHAoYU0FOREJPWF9NT0RFX1VOU1BFQ0lGSUVEEAASGgoWU0FOREJPWF9NT0RFX1JFQURfT05MWRABEiAKHFNBTkRCT1hfTU9ERV9XT1JLU1BBQ0VfV1JJVEUQAhIjCh9TQU5EQk9YX01PREVfREFOR0VSX0ZVTExfQUNDRVNTEAMquQEKC0Jsb2NrUmVhc29uEhwKGEJMT0NLX1JFQVNPTl9VTlNQRUNJRklFRBAAEiIKHkJMT0NLX1JFQVNPTl9NQ1BfQVVUSF9SRVFVSVJFRBABEiAKHEJMT0NLX1JFQVNPTl9VU0FHRV9FWEhBVVNURUQQAhIkCiBCTE9DS19SRUFTT05fVVBTVFJFQU1fT1ZFUkxPQURFRBADEiAKHEJMT0NLX1JFQVNPTl9GUkVFX1RJRVJfTElNSVQQBCrpAQoMUnVuRXJyb3JDb2RlEh4KGlJVTl9FUlJPUl9DT0RFX1VOU1BFQ0lGSUVEEAASIgoeUlVOX0VSUk9SX0NPREVfSU5WQUxJRF9SRVFVRVNUEAESKAokUlVOX0VSUk9SX0NPREVfUFJPVklERVJfU1RBUlRfRkFJTEVEEAISKgomUlVOX0VSUk9SX0NPREVfUFJPVklERVJfUFJPVE9DT0xfRVJST1IQAxIiCh5SVU5fRVJST1JfQ09ERV9QUk9WSURFUl9GQUlMRUQQBBIbChdSVU5fRVJST1JfQ09ERV9JTlRFUk5BTBAFKmoKDEFnZW50UnVuS2luZBIeChpBR0VOVF9SVU5fS0lORF9VTlNQRUNJRklFRBAAEhkKFUFHRU5UX1JVTl9LSU5EX1BBUkVOVBABEh8KG0FHRU5UX1JVTl9LSU5EX0NPTVBVVEVSX1VTRRACYgZwcm90bzM", [file_briar_types_v1_agent_event, file_briar_types_v1_provider, file_google_protobuf_struct, file_google_protobuf_timestamp]);
+
+/**
+ * @generated from message briar.sidecar.v1.ComputerUseChildBinding
+ */
+export type ComputerUseChildBinding = Message<"briar.sidecar.v1.ComputerUseChildBinding"> & {
+  /**
+   * @generated from field: string parent_run_id = 1;
+   */
+  parentRunId: string;
+
+  /**
+   * @generated from field: string child_run_id = 2;
+   */
+  childRunId: string;
+
+  /**
+   * @generated from field: string agent_id = 3;
+   */
+  agentId: string;
+
+  /**
+   * @generated from field: string managed_computer_id = 4;
+   */
+  managedComputerId: string;
+
+  /**
+   * @generated from field: int32 display_index = 5;
+   */
+  displayIndex: number;
+
+  /**
+   * @generated from field: string owner_token = 6;
+   */
+  ownerToken: string;
+
+  /**
+   * @generated from field: briar.types.v1.AgentProvider provider = 7;
+   */
+  provider: AgentProvider;
+};
+
+/**
+ * Describes the message briar.sidecar.v1.ComputerUseChildBinding.
+ * Use `create(ComputerUseChildBindingSchema)` to create a new message.
+ */
+export const ComputerUseChildBindingSchema: GenMessage<ComputerUseChildBinding> = /*@__PURE__*/
+  messageDesc(file_briar_sidecar_v1_agent_runner, 0);
 
 /**
  * @generated from message briar.sidecar.v1.ParentToRunner
@@ -43,7 +92,7 @@ export type ParentToRunner = Message<"briar.sidecar.v1.ParentToRunner"> & {
  * Use `create(ParentToRunnerSchema)` to create a new message.
  */
 export const ParentToRunnerSchema: GenMessage<ParentToRunner> = /*@__PURE__*/
-  messageDesc(file_briar_sidecar_v1_agent_runner, 0);
+  messageDesc(file_briar_sidecar_v1_agent_runner, 1);
 
 /**
  * @generated from message briar.sidecar.v1.RunnerToParent
@@ -96,7 +145,7 @@ export type RunnerToParent = Message<"briar.sidecar.v1.RunnerToParent"> & {
  * Use `create(RunnerToParentSchema)` to create a new message.
  */
 export const RunnerToParentSchema: GenMessage<RunnerToParent> = /*@__PURE__*/
-  messageDesc(file_briar_sidecar_v1_agent_runner, 1);
+  messageDesc(file_briar_sidecar_v1_agent_runner, 2);
 
 /**
  * @generated from message briar.sidecar.v1.RunRequest
@@ -185,6 +234,21 @@ export type RunRequest = Message<"briar.sidecar.v1.RunRequest"> & {
    * @generated from field: bytes protocol_fingerprint = 15;
    */
   protocolFingerprint: Uint8Array;
+
+  /**
+   * @generated from field: briar.sidecar.v1.AgentRunKind run_kind = 16;
+   */
+  runKind: AgentRunKind;
+
+  /**
+   * @generated from field: optional briar.sidecar.v1.ComputerUseChildBinding computer_use_binding = 17;
+   */
+  computerUseBinding?: ComputerUseChildBinding | undefined;
+
+  /**
+   * @generated from field: optional string computer_use_mcp_server_path = 18;
+   */
+  computerUseMcpServerPath?: string | undefined;
 };
 
 /**
@@ -192,7 +256,7 @@ export type RunRequest = Message<"briar.sidecar.v1.RunRequest"> & {
  * Use `create(RunRequestSchema)` to create a new message.
  */
 export const RunRequestSchema: GenMessage<RunRequest> = /*@__PURE__*/
-  messageDesc(file_briar_sidecar_v1_agent_runner, 2);
+  messageDesc(file_briar_sidecar_v1_agent_runner, 3);
 
 /**
  * @generated from message briar.sidecar.v1.JsonSchema
@@ -221,7 +285,7 @@ export type JsonSchema = Message<"briar.sidecar.v1.JsonSchema"> & {
  * Use `create(JsonSchemaSchema)` to create a new message.
  */
 export const JsonSchemaSchema: GenMessage<JsonSchema> = /*@__PURE__*/
-  messageDesc(file_briar_sidecar_v1_agent_runner, 3);
+  messageDesc(file_briar_sidecar_v1_agent_runner, 4);
 
 /**
  * @generated from message briar.sidecar.v1.ImageAttachment
@@ -248,7 +312,7 @@ export type ImageAttachment = Message<"briar.sidecar.v1.ImageAttachment"> & {
  * Use `create(ImageAttachmentSchema)` to create a new message.
  */
 export const ImageAttachmentSchema: GenMessage<ImageAttachment> = /*@__PURE__*/
-  messageDesc(file_briar_sidecar_v1_agent_runner, 4);
+  messageDesc(file_briar_sidecar_v1_agent_runner, 5);
 
 /**
  * @generated from message briar.sidecar.v1.ApprovalResponse
@@ -270,7 +334,7 @@ export type ApprovalResponse = Message<"briar.sidecar.v1.ApprovalResponse"> & {
  * Use `create(ApprovalResponseSchema)` to create a new message.
  */
 export const ApprovalResponseSchema: GenMessage<ApprovalResponse> = /*@__PURE__*/
-  messageDesc(file_briar_sidecar_v1_agent_runner, 5);
+  messageDesc(file_briar_sidecar_v1_agent_runner, 6);
 
 /**
  * @generated from message briar.sidecar.v1.SessionStarted
@@ -287,7 +351,7 @@ export type SessionStarted = Message<"briar.sidecar.v1.SessionStarted"> & {
  * Use `create(SessionStartedSchema)` to create a new message.
  */
 export const SessionStartedSchema: GenMessage<SessionStarted> = /*@__PURE__*/
-  messageDesc(file_briar_sidecar_v1_agent_runner, 6);
+  messageDesc(file_briar_sidecar_v1_agent_runner, 7);
 
 /**
  * @generated from message briar.sidecar.v1.ProviderEvent
@@ -317,7 +381,7 @@ export type ProviderEvent = Message<"briar.sidecar.v1.ProviderEvent"> & {
  * Use `create(ProviderEventSchema)` to create a new message.
  */
 export const ProviderEventSchema: GenMessage<ProviderEvent> = /*@__PURE__*/
-  messageDesc(file_briar_sidecar_v1_agent_runner, 7);
+  messageDesc(file_briar_sidecar_v1_agent_runner, 8);
 
 /**
  * @generated from message briar.sidecar.v1.ApprovalRequest
@@ -349,7 +413,7 @@ export type ApprovalRequest = Message<"briar.sidecar.v1.ApprovalRequest"> & {
  * Use `create(ApprovalRequestSchema)` to create a new message.
  */
 export const ApprovalRequestSchema: GenMessage<ApprovalRequest> = /*@__PURE__*/
-  messageDesc(file_briar_sidecar_v1_agent_runner, 8);
+  messageDesc(file_briar_sidecar_v1_agent_runner, 9);
 
 /**
  * @generated from message briar.sidecar.v1.RunResult
@@ -371,7 +435,7 @@ export type RunResult = Message<"briar.sidecar.v1.RunResult"> & {
  * Use `create(RunResultSchema)` to create a new message.
  */
 export const RunResultSchema: GenMessage<RunResult> = /*@__PURE__*/
-  messageDesc(file_briar_sidecar_v1_agent_runner, 9);
+  messageDesc(file_briar_sidecar_v1_agent_runner, 10);
 
 /**
  * @generated from message briar.sidecar.v1.RunBlocked
@@ -416,7 +480,7 @@ export type RunBlocked = Message<"briar.sidecar.v1.RunBlocked"> & {
  * Use `create(RunBlockedSchema)` to create a new message.
  */
 export const RunBlockedSchema: GenMessage<RunBlocked> = /*@__PURE__*/
-  messageDesc(file_briar_sidecar_v1_agent_runner, 10);
+  messageDesc(file_briar_sidecar_v1_agent_runner, 11);
 
 /**
  * @generated from message briar.sidecar.v1.RunError
@@ -438,7 +502,7 @@ export type RunError = Message<"briar.sidecar.v1.RunError"> & {
  * Use `create(RunErrorSchema)` to create a new message.
  */
 export const RunErrorSchema: GenMessage<RunError> = /*@__PURE__*/
-  messageDesc(file_briar_sidecar_v1_agent_runner, 11);
+  messageDesc(file_briar_sidecar_v1_agent_runner, 12);
 
 /**
  * @generated from enum briar.sidecar.v1.ApprovalPolicy
@@ -578,4 +642,30 @@ export enum RunErrorCode {
  */
 export const RunErrorCodeSchema: GenEnum<RunErrorCode> = /*@__PURE__*/
   enumDesc(file_briar_sidecar_v1_agent_runner, 3);
+
+/**
+ * @generated from enum briar.sidecar.v1.AgentRunKind
+ */
+export enum AgentRunKind {
+  /**
+   * @generated from enum value: AGENT_RUN_KIND_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: AGENT_RUN_KIND_PARENT = 1;
+   */
+  PARENT = 1,
+
+  /**
+   * @generated from enum value: AGENT_RUN_KIND_COMPUTER_USE = 2;
+   */
+  COMPUTER_USE = 2,
+}
+
+/**
+ * Describes the enum briar.sidecar.v1.AgentRunKind.
+ */
+export const AgentRunKindSchema: GenEnum<AgentRunKind> = /*@__PURE__*/
+  enumDesc(file_briar_sidecar_v1_agent_runner, 4);
 

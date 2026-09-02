@@ -26,6 +26,8 @@ import {
   readOnlySeatbeltSpawnSpec,
 } from "./read-only-seatbelt";
 import { AcpJsonRpcConnection } from "./acp-json-rpc";
+import { prepareComputerUseMcp } from "./computer-use-mcp-config";
+import { acpComputerUseServers } from "./computer-use-provider-adapters";
 
 class GrokAcpConnection extends AcpJsonRpcConnection {
   constructor(
@@ -194,6 +196,7 @@ async function main(runnerIo: GrokRunnerIo) {
     throw new Error("LLM에 보낼 메시지를 입력하세요.");
   }
 
+  const computerUseMcp = await prepareComputerUseMcp(request);
   const connection = new GrokAcpConnection(
     request.providerBinaryPath,
     request.workspaceRoot,
@@ -288,7 +291,7 @@ async function main(runnerIo: GrokRunnerIo) {
       const loadParams = {
         sessionId: resumeId,
         cwd: request.workspaceRoot,
-        mcpServers: [],
+        mcpServers: acpComputerUseServers(computerUseMcp.servers),
         ...(sessionMeta ? { _meta: sessionMeta } : {}),
       };
       let loaded: {
@@ -311,7 +314,7 @@ async function main(runnerIo: GrokRunnerIo) {
     } else {
       const newParams = {
         cwd: request.workspaceRoot,
-        mcpServers: [],
+        mcpServers: acpComputerUseServers(computerUseMcp.servers),
         ...(sessionMeta ? { _meta: sessionMeta } : {}),
       };
       const created = (await connection.request(
@@ -405,6 +408,7 @@ async function main(runnerIo: GrokRunnerIo) {
     });
   } finally {
     connection.close();
+    await computerUseMcp.cleanup();
   }
 }
 

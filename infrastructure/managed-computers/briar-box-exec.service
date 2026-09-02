@@ -1,0 +1,23 @@
+[Unit]
+Description=Briar Computer Use box executor
+After=network-online.target briar-managed-enroll.service
+Wants=network-online.target
+Requires=briar-managed-enroll.service
+
+[Service]
+Type=simple
+User=briar
+Group=briar
+Environment=HOME=/home/briar
+Environment=PATH=/opt/briar/bin:/usr/local/bin:/usr/bin:/bin
+WorkingDirectory=/home/briar
+StateDirectory=briar-computer-use
+StateDirectoryMode=0700
+ExecStartPre=/opt/briar/bin/verify-managed-admin
+ExecStart=/opt/briar/bin/bun /opt/briar/bin/briar-box-exec.js
+Restart=always
+RestartSec=2
+TimeoutStopSec=20
+UMask=0077
+# The desktop manager starts and stops only its validated systemd template.
+NoNewPrivileges=false

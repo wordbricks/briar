@@ -228,6 +228,7 @@ export function ProjectSchedule({
                 provider: agent.provider,
                 model: agent.model,
                 effort: agent.effort,
+                computerUsePolicy: agent.computerUsePolicy ?? "disabled",
                 description: agent.description,
                 responsibility: agent.responsibility,
                 skill: agent.skill,

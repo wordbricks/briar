@@ -15,6 +15,7 @@ export type ManagedComputerRemoteSessionRow = {
   id: string;
   organization_id: string;
   managed_computer_id: string;
+  agent_id: string | null;
   controller_user_id: string;
   request_id: string;
   state: ManagedComputerRemoteSessionState;
@@ -39,6 +40,7 @@ export function managedComputerRemoteSessionJson(
   return {
     id: row.id,
     managedComputerId: row.managed_computer_id,
+    agentId: row.agent_id,
     state: row.state,
     connectionGeneration: row.connection_generation,
     tokenExpiresAt: row.token_expires_at,

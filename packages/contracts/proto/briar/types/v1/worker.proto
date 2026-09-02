@@ -3,6 +3,7 @@ syntax = "proto3";
 package briar.types.v1;
 
 import "briar/types/v1/provider.proto";
+import "briar/types/v1/computer_use.proto";
 
 option swift_prefix = "BriarTypes_";
 
@@ -60,6 +61,7 @@ message WorkerCapabilities {
   optional uint32 dm_memory_protocol = 6;
   optional uint32 dm_memory_learning_requests = 7;
   optional DmMemoryLearningCapability dm_memory_learning = 8;
+  optional ComputerUseCapability computer_use = 9;
 }
 
 message DmMemoryLearningCapability {

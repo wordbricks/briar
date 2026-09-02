@@ -126,7 +126,7 @@ export async function createManagedComputerRemoteSession(
   token: string,
   organizationId: string,
   managedComputerId: string,
-  input: { requestId: string; reconnectSessionId?: string },
+  input: { requestId: string; reconnectSessionId?: string; agentId?: string },
 ): Promise<ManagedComputerRemoteSessionTicket> {
   return managedComputerRemoteSessionTicketFromProto(
     await requireFleetClient().createManagedComputerRemoteSession(
@@ -135,6 +135,7 @@ export async function createManagedComputerRemoteSession(
         managedComputerId,
         requestId: input.requestId,
         reconnectSessionId: input.reconnectSessionId,
+        agentId: input.agentId,
       },
       appCallOptions(token),
     ),

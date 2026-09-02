@@ -28,6 +28,7 @@ const agent = {
   provider: "codex" as const,
   model: null,
   effort: null,
+  computerUsePolicy: "disabled" as const,
   responsibility: "Handle the work",
   skills: [],
 };

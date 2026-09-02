@@ -42,6 +42,7 @@ export const projectAgentScheduleRunJson = (
       provider: row.agent_provider,
       model: row.agent_model,
       effort: row.agent_effort,
+      computerUsePolicy: row.agent_computer_use_policy,
       description: row.agent_description,
       responsibility: row.agent_responsibility,
       skill: row.agent_skill_markdown,

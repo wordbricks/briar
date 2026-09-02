@@ -654,6 +654,15 @@ public nonisolated struct BriarAPI_CreateOrganizationAgentRequest: Sendable {
 
   public var skills: [BriarAPI_ProjectAgentSkillInput] = []
 
+  public var computerUsePolicy: BriarTypes_ComputerUsePolicy {
+    get {_computerUsePolicy ?? .unspecified}
+    set {_computerUsePolicy = newValue}
+  }
+  /// Returns true if `computerUsePolicy` has been explicitly set.
+  public var hasComputerUsePolicy: Bool {self._computerUsePolicy != nil}
+  /// Clears the value of `computerUsePolicy`. Subsequent reads from it will return its default value.
+  public mutating func clearComputerUsePolicy() {self._computerUsePolicy = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -661,6 +670,7 @@ public nonisolated struct BriarAPI_CreateOrganizationAgentRequest: Sendable {
   fileprivate var _model: String? = nil
   fileprivate var _description_p: String? = nil
   fileprivate var _effort: String? = nil
+  fileprivate var _computerUsePolicy: BriarTypes_ComputerUsePolicy? = nil
 }
 
 public nonisolated struct BriarAPI_CreateOrganizationAgentResponse: Sendable {
@@ -728,6 +738,15 @@ public nonisolated struct BriarAPI_UpdateOrganizationAgentRequest: Sendable {
 
   public var skills: [BriarAPI_ProjectAgentSkillInput] = []
 
+  public var computerUsePolicy: BriarTypes_ComputerUsePolicy {
+    get {_computerUsePolicy ?? .unspecified}
+    set {_computerUsePolicy = newValue}
+  }
+  /// Returns true if `computerUsePolicy` has been explicitly set.
+  public var hasComputerUsePolicy: Bool {self._computerUsePolicy != nil}
+  /// Clears the value of `computerUsePolicy`. Subsequent reads from it will return its default value.
+  public mutating func clearComputerUsePolicy() {self._computerUsePolicy = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -735,6 +754,7 @@ public nonisolated struct BriarAPI_UpdateOrganizationAgentRequest: Sendable {
   fileprivate var _model: String? = nil
   fileprivate var _description_p: String? = nil
   fileprivate var _effort: String? = nil
+  fileprivate var _computerUsePolicy: BriarTypes_ComputerUsePolicy? = nil
 }
 
 public nonisolated struct BriarAPI_UpdateOrganizationAgentResponse: Sendable {
@@ -877,6 +897,15 @@ public nonisolated struct BriarAPI_CreateProjectAgentRequest: Sendable {
 
   public var calendarColor: String = String()
 
+  public var computerUsePolicy: BriarTypes_ComputerUsePolicy {
+    get {_computerUsePolicy ?? .unspecified}
+    set {_computerUsePolicy = newValue}
+  }
+  /// Returns true if `computerUsePolicy` has been explicitly set.
+  public var hasComputerUsePolicy: Bool {self._computerUsePolicy != nil}
+  /// Clears the value of `computerUsePolicy`. Subsequent reads from it will return its default value.
+  public mutating func clearComputerUsePolicy() {self._computerUsePolicy = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -887,6 +916,7 @@ public nonisolated struct BriarAPI_CreateProjectAgentRequest: Sendable {
   fileprivate var _effort: String? = nil
   fileprivate var _designatedWorkerID: String? = nil
   fileprivate var _description_p: String? = nil
+  fileprivate var _computerUsePolicy: BriarTypes_ComputerUsePolicy? = nil
 }
 
 public nonisolated struct BriarAPI_CreateProjectAgentResponse: Sendable {
@@ -1026,6 +1056,15 @@ public nonisolated struct BriarAPI_UpdateProjectAgentRequest: Sendable {
 
   public var calendarColor: String = String()
 
+  public var computerUsePolicy: BriarTypes_ComputerUsePolicy {
+    get {_computerUsePolicy ?? .unspecified}
+    set {_computerUsePolicy = newValue}
+  }
+  /// Returns true if `computerUsePolicy` has been explicitly set.
+  public var hasComputerUsePolicy: Bool {self._computerUsePolicy != nil}
+  /// Clears the value of `computerUsePolicy`. Subsequent reads from it will return its default value.
+  public mutating func clearComputerUsePolicy() {self._computerUsePolicy = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public nonisolated enum OneOf_AvatarUpdate: Equatable, Sendable {
@@ -1097,6 +1136,7 @@ public nonisolated struct BriarAPI_UpdateProjectAgentRequest: Sendable {
   fileprivate var _name: String? = nil
   fileprivate var _model: String? = nil
   fileprivate var _description_p: String? = nil
+  fileprivate var _computerUsePolicy: BriarTypes_ComputerUsePolicy? = nil
 }
 
 public nonisolated struct BriarAPI_UpdateProjectAgentResponse: Sendable {
@@ -2233,6 +2273,11 @@ public nonisolated struct BriarAPI_ProjectAgent: @unchecked Sendable {
     set {_uniqueStorage()._skill = newValue}
   }
 
+  public var computerUsePolicy: BriarTypes_ComputerUsePolicy {
+    get {_storage._computerUsePolicy}
+    set {_uniqueStorage()._computerUsePolicy = newValue}
+  }
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -2317,6 +2362,8 @@ public nonisolated struct BriarAPI_OrganizationAgent: Sendable {
   public var hasCreatedAt: Bool {self._createdAt != nil}
   /// Clears the value of `createdAt`. Subsequent reads from it will return its default value.
   public mutating func clearCreatedAt() {self._createdAt = nil}
+
+  public var computerUsePolicy: BriarTypes_ComputerUsePolicy = .unspecified
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -2483,6 +2530,8 @@ public nonisolated struct BriarAPI_ProjectAgentScheduleRunAgent: Sendable {
   public var skill: String = String()
 
   public var skills: [BriarAPI_ProjectAgentSkill] = []
+
+  public var computerUsePolicy: BriarTypes_ComputerUsePolicy = .unspecified
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -3219,7 +3268,7 @@ nonisolated extension BriarAPI_ListOrganizationAgentsResponse: SwiftProtobuf.Mes
 
 nonisolated extension BriarAPI_CreateOrganizationAgentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".CreateOrganizationAgentRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{1}name\0\u{1}provider\0\u{1}model\0\u{1}description\0\u{1}responsibility\0\u{1}effort\0\u{1}skills\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{1}name\0\u{1}provider\0\u{1}model\0\u{1}description\0\u{1}responsibility\0\u{1}effort\0\u{1}skills\0\u{3}computer_use_policy\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -3235,6 +3284,7 @@ nonisolated extension BriarAPI_CreateOrganizationAgentRequest: SwiftProtobuf.Mes
       case 6: try { try decoder.decodeSingularStringField(value: &self.responsibility) }()
       case 7: try { try decoder.decodeSingularStringField(value: &self._effort) }()
       case 8: try { try decoder.decodeRepeatedMessageField(value: &self.skills) }()
+      case 9: try { try decoder.decodeSingularEnumField(value: &self._computerUsePolicy) }()
       default: break
       }
     }
@@ -3269,6 +3319,9 @@ nonisolated extension BriarAPI_CreateOrganizationAgentRequest: SwiftProtobuf.Mes
     if !self.skills.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.skills, fieldNumber: 8)
     }
+    try { if let v = self._computerUsePolicy {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 9)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -3281,6 +3334,7 @@ nonisolated extension BriarAPI_CreateOrganizationAgentRequest: SwiftProtobuf.Mes
     if lhs.responsibility != rhs.responsibility {return false}
     if lhs._effort != rhs._effort {return false}
     if lhs.skills != rhs.skills {return false}
+    if lhs._computerUsePolicy != rhs._computerUsePolicy {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -3322,7 +3376,7 @@ nonisolated extension BriarAPI_CreateOrganizationAgentResponse: SwiftProtobuf.Me
 
 nonisolated extension BriarAPI_UpdateOrganizationAgentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".UpdateOrganizationAgentRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}agent_id\0\u{1}name\0\u{1}provider\0\u{1}model\0\u{1}description\0\u{1}responsibility\0\u{1}effort\0\u{1}skills\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}agent_id\0\u{1}name\0\u{1}provider\0\u{1}model\0\u{1}description\0\u{1}responsibility\0\u{1}effort\0\u{1}skills\0\u{3}computer_use_policy\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -3339,6 +3393,7 @@ nonisolated extension BriarAPI_UpdateOrganizationAgentRequest: SwiftProtobuf.Mes
       case 7: try { try decoder.decodeSingularStringField(value: &self.responsibility) }()
       case 8: try { try decoder.decodeSingularStringField(value: &self._effort) }()
       case 9: try { try decoder.decodeRepeatedMessageField(value: &self.skills) }()
+      case 10: try { try decoder.decodeSingularEnumField(value: &self._computerUsePolicy) }()
       default: break
       }
     }
@@ -3376,6 +3431,9 @@ nonisolated extension BriarAPI_UpdateOrganizationAgentRequest: SwiftProtobuf.Mes
     if !self.skills.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.skills, fieldNumber: 9)
     }
+    try { if let v = self._computerUsePolicy {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 10)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -3389,6 +3447,7 @@ nonisolated extension BriarAPI_UpdateOrganizationAgentRequest: SwiftProtobuf.Mes
     if lhs.responsibility != rhs.responsibility {return false}
     if lhs._effort != rhs._effort {return false}
     if lhs.skills != rhs.skills {return false}
+    if lhs._computerUsePolicy != rhs._computerUsePolicy {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -3555,7 +3614,7 @@ nonisolated extension BriarAPI_ListProjectAgentsResponse: SwiftProtobuf.Message,
 
 nonisolated extension BriarAPI_CreateProjectAgentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".CreateProjectAgentRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{1}name\0\u{1}avatar\0\u{1}provider\0\u{1}model\0\u{1}effort\0\u{3}designated_worker_id\0\u{1}description\0\u{1}responsibility\0\u{1}skills\0\u{3}calendar_color\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{1}name\0\u{1}avatar\0\u{1}provider\0\u{1}model\0\u{1}effort\0\u{3}designated_worker_id\0\u{1}description\0\u{1}responsibility\0\u{1}skills\0\u{3}calendar_color\0\u{3}computer_use_policy\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -3574,6 +3633,7 @@ nonisolated extension BriarAPI_CreateProjectAgentRequest: SwiftProtobuf.Message,
       case 9: try { try decoder.decodeSingularStringField(value: &self.responsibility) }()
       case 10: try { try decoder.decodeRepeatedMessageField(value: &self.skills) }()
       case 11: try { try decoder.decodeSingularStringField(value: &self.calendarColor) }()
+      case 12: try { try decoder.decodeSingularEnumField(value: &self._computerUsePolicy) }()
       default: break
       }
     }
@@ -3617,6 +3677,9 @@ nonisolated extension BriarAPI_CreateProjectAgentRequest: SwiftProtobuf.Message,
     if !self.calendarColor.isEmpty {
       try visitor.visitSingularStringField(value: self.calendarColor, fieldNumber: 11)
     }
+    try { if let v = self._computerUsePolicy {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 12)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -3632,6 +3695,7 @@ nonisolated extension BriarAPI_CreateProjectAgentRequest: SwiftProtobuf.Message,
     if lhs.responsibility != rhs.responsibility {return false}
     if lhs.skills != rhs.skills {return false}
     if lhs.calendarColor != rhs.calendarColor {return false}
+    if lhs._computerUsePolicy != rhs._computerUsePolicy {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -3673,7 +3737,7 @@ nonisolated extension BriarAPI_CreateProjectAgentResponse: SwiftProtobuf.Message
 
 nonisolated extension BriarAPI_UpdateProjectAgentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".UpdateProjectAgentRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}agent_id\0\u{1}name\0\u{1}avatar\0\u{3}clear_avatar\0\u{3}codex_pet\0\u{3}clear_codex_pet\0\u{1}provider\0\u{1}model\0\u{1}effort\0\u{3}clear_effort\0\u{3}designated_worker_id\0\u{3}clear_designated_worker\0\u{1}description\0\u{1}responsibility\0\u{1}skills\0\u{3}calendar_color\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}agent_id\0\u{1}name\0\u{1}avatar\0\u{3}clear_avatar\0\u{3}codex_pet\0\u{3}clear_codex_pet\0\u{1}provider\0\u{1}model\0\u{1}effort\0\u{3}clear_effort\0\u{3}designated_worker_id\0\u{3}clear_designated_worker\0\u{1}description\0\u{1}responsibility\0\u{1}skills\0\u{3}calendar_color\0\u{3}computer_use_policy\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -3779,6 +3843,7 @@ nonisolated extension BriarAPI_UpdateProjectAgentRequest: SwiftProtobuf.Message,
       case 15: try { try decoder.decodeSingularStringField(value: &self.responsibility) }()
       case 16: try { try decoder.decodeRepeatedMessageField(value: &self.skills) }()
       case 17: try { try decoder.decodeSingularStringField(value: &self.calendarColor) }()
+      case 18: try { try decoder.decodeSingularEnumField(value: &self._computerUsePolicy) }()
       default: break
       }
     }
@@ -3860,6 +3925,9 @@ nonisolated extension BriarAPI_UpdateProjectAgentRequest: SwiftProtobuf.Message,
     if !self.calendarColor.isEmpty {
       try visitor.visitSingularStringField(value: self.calendarColor, fieldNumber: 17)
     }
+    try { if let v = self._computerUsePolicy {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 18)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -3877,6 +3945,7 @@ nonisolated extension BriarAPI_UpdateProjectAgentRequest: SwiftProtobuf.Message,
     if lhs.responsibility != rhs.responsibility {return false}
     if lhs.skills != rhs.skills {return false}
     if lhs.calendarColor != rhs.calendarColor {return false}
+    if lhs._computerUsePolicy != rhs._computerUsePolicy {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -5650,7 +5719,7 @@ nonisolated extension BriarAPI_CodexPet: SwiftProtobuf.Message, SwiftProtobuf._M
 
 nonisolated extension BriarAPI_ProjectAgent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ProjectAgent"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}project_id\0\u{1}name\0\u{1}avatar\0\u{3}codex_pet\0\u{1}provider\0\u{1}model\0\u{1}effort\0\u{3}designated_worker_id\0\u{3}designated_worker_label\0\u{1}description\0\u{1}responsibility\0\u{1}skills\0\u{3}calendar_color\0\u{3}created_at\0\u{3}updated_at\0\u{1}skill\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}project_id\0\u{1}name\0\u{1}avatar\0\u{3}codex_pet\0\u{1}provider\0\u{1}model\0\u{1}effort\0\u{3}designated_worker_id\0\u{3}designated_worker_label\0\u{1}description\0\u{1}responsibility\0\u{1}skills\0\u{3}calendar_color\0\u{3}created_at\0\u{3}updated_at\0\u{1}skill\0\u{3}computer_use_policy\0")
 
   fileprivate class _StorageClass {
     var _id: String = String()
@@ -5670,6 +5739,7 @@ nonisolated extension BriarAPI_ProjectAgent: SwiftProtobuf.Message, SwiftProtobu
     var _createdAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
     var _updatedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
     var _skill: String = String()
+    var _computerUsePolicy: BriarTypes_ComputerUsePolicy = .unspecified
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -5697,6 +5767,7 @@ nonisolated extension BriarAPI_ProjectAgent: SwiftProtobuf.Message, SwiftProtobu
       _createdAt = source._createdAt
       _updatedAt = source._updatedAt
       _skill = source._skill
+      _computerUsePolicy = source._computerUsePolicy
     }
   }
 
@@ -5732,6 +5803,7 @@ nonisolated extension BriarAPI_ProjectAgent: SwiftProtobuf.Message, SwiftProtobu
         case 15: try { try decoder.decodeSingularMessageField(value: &_storage._createdAt) }()
         case 16: try { try decoder.decodeSingularMessageField(value: &_storage._updatedAt) }()
         case 17: try { try decoder.decodeSingularStringField(value: &_storage._skill) }()
+        case 18: try { try decoder.decodeSingularEnumField(value: &_storage._computerUsePolicy) }()
         default: break
         }
       }
@@ -5795,6 +5867,9 @@ nonisolated extension BriarAPI_ProjectAgent: SwiftProtobuf.Message, SwiftProtobu
       if !_storage._skill.isEmpty {
         try visitor.visitSingularStringField(value: _storage._skill, fieldNumber: 17)
       }
+      if _storage._computerUsePolicy != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._computerUsePolicy, fieldNumber: 18)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -5821,6 +5896,7 @@ nonisolated extension BriarAPI_ProjectAgent: SwiftProtobuf.Message, SwiftProtobu
         if _storage._createdAt != rhs_storage._createdAt {return false}
         if _storage._updatedAt != rhs_storage._updatedAt {return false}
         if _storage._skill != rhs_storage._skill {return false}
+        if _storage._computerUsePolicy != rhs_storage._computerUsePolicy {return false}
         return true
       }
       if !storagesAreEqual {return false}
@@ -5832,7 +5908,7 @@ nonisolated extension BriarAPI_ProjectAgent: SwiftProtobuf.Message, SwiftProtobu
 
 nonisolated extension BriarAPI_OrganizationAgent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".OrganizationAgent"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}agent_id\0\u{1}name\0\u{1}avatar\0\u{1}provider\0\u{1}model\0\u{1}effort\0\u{3}project_id\0\u{3}project_name\0\u{1}description\0\u{1}responsibility\0\u{1}skills\0\u{3}created_at\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}agent_id\0\u{1}name\0\u{1}avatar\0\u{1}provider\0\u{1}model\0\u{1}effort\0\u{3}project_id\0\u{3}project_name\0\u{1}description\0\u{1}responsibility\0\u{1}skills\0\u{3}created_at\0\u{3}computer_use_policy\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -5852,6 +5928,7 @@ nonisolated extension BriarAPI_OrganizationAgent: SwiftProtobuf.Message, SwiftPr
       case 10: try { try decoder.decodeSingularStringField(value: &self.responsibility) }()
       case 11: try { try decoder.decodeRepeatedMessageField(value: &self.skills) }()
       case 12: try { try decoder.decodeSingularMessageField(value: &self._createdAt) }()
+      case 13: try { try decoder.decodeSingularEnumField(value: &self.computerUsePolicy) }()
       default: break
       }
     }
@@ -5898,6 +5975,9 @@ nonisolated extension BriarAPI_OrganizationAgent: SwiftProtobuf.Message, SwiftPr
     try { if let v = self._createdAt {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 12)
     } }()
+    if self.computerUsePolicy != .unspecified {
+      try visitor.visitSingularEnumField(value: self.computerUsePolicy, fieldNumber: 13)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -5914,6 +5994,7 @@ nonisolated extension BriarAPI_OrganizationAgent: SwiftProtobuf.Message, SwiftPr
     if lhs.responsibility != rhs.responsibility {return false}
     if lhs.skills != rhs.skills {return false}
     if lhs._createdAt != rhs._createdAt {return false}
+    if lhs.computerUsePolicy != rhs.computerUsePolicy {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -6103,7 +6184,7 @@ nonisolated extension BriarAPI_ProjectAgentSchedule: SwiftProtobuf.Message, Swif
 
 nonisolated extension BriarAPI_ProjectAgentScheduleRunAgent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ProjectAgentScheduleRunAgent"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{1}provider\0\u{1}model\0\u{1}effort\0\u{1}description\0\u{1}responsibility\0\u{1}skill\0\u{1}skills\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{1}provider\0\u{1}model\0\u{1}effort\0\u{1}description\0\u{1}responsibility\0\u{1}skill\0\u{1}skills\0\u{3}computer_use_policy\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -6120,6 +6201,7 @@ nonisolated extension BriarAPI_ProjectAgentScheduleRunAgent: SwiftProtobuf.Messa
       case 7: try { try decoder.decodeSingularStringField(value: &self.responsibility) }()
       case 8: try { try decoder.decodeSingularStringField(value: &self.skill) }()
       case 9: try { try decoder.decodeRepeatedMessageField(value: &self.skills) }()
+      case 10: try { try decoder.decodeSingularEnumField(value: &self.computerUsePolicy) }()
       default: break
       }
     }
@@ -6157,6 +6239,9 @@ nonisolated extension BriarAPI_ProjectAgentScheduleRunAgent: SwiftProtobuf.Messa
     if !self.skills.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.skills, fieldNumber: 9)
     }
+    if self.computerUsePolicy != .unspecified {
+      try visitor.visitSingularEnumField(value: self.computerUsePolicy, fieldNumber: 10)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -6170,6 +6255,7 @@ nonisolated extension BriarAPI_ProjectAgentScheduleRunAgent: SwiftProtobuf.Messa
     if lhs.responsibility != rhs.responsibility {return false}
     if lhs.skill != rhs.skill {return false}
     if lhs.skills != rhs.skills {return false}
+    if lhs.computerUsePolicy != rhs.computerUsePolicy {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

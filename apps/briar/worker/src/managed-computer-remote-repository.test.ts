@@ -14,6 +14,7 @@ import { executeD1Sql } from "./test-helpers/d1";
 const organizationId = "11111111-1111-4111-8111-111111111111";
 const userId = "remote-owner";
 const computerId = "33333333-3333-4333-8333-333333333333";
+const agentId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const observedAt = "2026-08-22T00:00:00.000Z";
 
 describe("managed computer remote session repository", () => {
@@ -59,6 +60,7 @@ describe("managed computer remote session repository", () => {
       id: sessionId,
       organizationId,
       managedComputerId: computerId,
+      agentId,
       controllerUserId: userId,
       requestId: "77777777-7777-4777-8777-777777777777",
       clientTokenHash: await sha256Hex(firstToken),
@@ -70,12 +72,17 @@ describe("managed computer remote session repository", () => {
       rateCutoff: "2026-08-21T23:55:00.000Z",
       observedAt,
     });
-    expect(created).toMatchObject({ state: "created", connection_generation: 1 });
+    expect(created).toMatchObject({
+      state: "created",
+      connection_generation: 1,
+      agent_id: agentId,
+    });
 
     const duplicateController = await createManagedComputerRemoteSession(db, {
       id: "88888888-8888-4888-8888-888888888888",
       organizationId,
       managedComputerId: computerId,
+      agentId,
       controllerUserId: userId,
       requestId: "99999999-9999-4999-8999-999999999999",
       clientTokenHash: await sha256Hex("other-token"),
@@ -108,6 +115,7 @@ describe("managed computer remote session repository", () => {
       sessionId,
       organizationId,
       managedComputerId: computerId,
+      agentId,
       controllerUserId: userId,
       requestId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
       clientTokenHash: await sha256Hex(secondToken),

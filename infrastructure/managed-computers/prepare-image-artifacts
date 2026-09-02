@@ -31,6 +31,11 @@ install -d -m 0755 \
 for file in \
   assert-debian-13-x86_64 \
   briar \
+  briar-box-exec.service \
+  briar-google-chrome.desktop \
+  briar-computer-executor.py \
+  briar-computer-use-window \
+  briar-computer-use-window@.service \
   briar-local-admin.sudoers \
   briar-managed-computer-health \
   briar-managed-computer-health.service \
@@ -65,6 +70,8 @@ for file in \
 done
 for executable in \
   assert-debian-13-x86_64 briar briar-managed-computer-health \
+  briar-computer-use-window \
+  briar-computer-executor.py \
   briar-managed-enroll \
   briar-open-browser \
   briar-managed-runtime-update-request briar-managed-runtime-updater \
@@ -79,9 +86,15 @@ install -m 0644 "$repo_root/apps/briar/dist-cli/briar.js" "$output/briar.js"
 install -m 0644 \
   "$repo_root/apps/briar/dist-cli/briar-remote-session-agent.js" \
   "$output/briar-remote-session-agent.js"
+install -m 0644 \
+  "$repo_root/apps/briar/dist-cli/briar-box-exec.js" \
+  "$output/briar-box-exec.js"
 for runner in "$repo_root"/apps/briar/dist-agent/*-runner.js; do
   install -m 0644 "$runner" "$output/agent/$(basename -- "$runner")"
 done
+install -m 0644 \
+  "$repo_root/apps/briar/dist-agent/computer-use-mcp-server.js" \
+  "$output/agent/computer-use-mcp-server.js"
 install -m 0644 \
   "$script_dir/provider-runtime/package.json" \
   "$script_dir/provider-runtime/bun.lock" \

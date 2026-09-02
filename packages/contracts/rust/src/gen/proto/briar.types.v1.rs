@@ -2700,6 +2700,465 @@ pub const __TURN_COMPLETED_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::bu
     from_json: ::buffa::type_registry::any_from_json::<TurnCompleted>,
     is_wkt: false,
 };
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum ComputerUsePolicy {
+    COMPUTER_USE_POLICY_UNSPECIFIED = 0i32,
+    COMPUTER_USE_POLICY_DISABLED = 1i32,
+    COMPUTER_USE_POLICY_UNATTENDED = 2i32,
+}
+impl ComputerUsePolicy {
+    ///Idiomatic alias for [`Self::COMPUTER_USE_POLICY_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Unspecified: Self = Self::COMPUTER_USE_POLICY_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::COMPUTER_USE_POLICY_DISABLED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Disabled: Self = Self::COMPUTER_USE_POLICY_DISABLED;
+    ///Idiomatic alias for [`Self::COMPUTER_USE_POLICY_UNATTENDED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Unattended: Self = Self::COMPUTER_USE_POLICY_UNATTENDED;
+}
+impl ::core::default::Default for ComputerUsePolicy {
+    fn default() -> Self {
+        Self::COMPUTER_USE_POLICY_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for ComputerUsePolicy {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for ComputerUsePolicy {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = ComputerUsePolicy;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ", stringify!(ComputerUsePolicy)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<ComputerUsePolicy, E> {
+                <ComputerUsePolicy as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<ComputerUsePolicy, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <ComputerUsePolicy as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<ComputerUsePolicy, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <ComputerUsePolicy as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<ComputerUsePolicy, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ComputerUsePolicy {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for ComputerUsePolicy {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::COMPUTER_USE_POLICY_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::COMPUTER_USE_POLICY_DISABLED),
+            2i32 => ::core::option::Option::Some(Self::COMPUTER_USE_POLICY_UNATTENDED),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::COMPUTER_USE_POLICY_UNSPECIFIED => "COMPUTER_USE_POLICY_UNSPECIFIED",
+            Self::COMPUTER_USE_POLICY_DISABLED => "COMPUTER_USE_POLICY_DISABLED",
+            Self::COMPUTER_USE_POLICY_UNATTENDED => "COMPUTER_USE_POLICY_UNATTENDED",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "COMPUTER_USE_POLICY_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::COMPUTER_USE_POLICY_UNSPECIFIED)
+            }
+            "COMPUTER_USE_POLICY_DISABLED" => {
+                ::core::option::Option::Some(Self::COMPUTER_USE_POLICY_DISABLED)
+            }
+            "COMPUTER_USE_POLICY_UNATTENDED" => {
+                ::core::option::Option::Some(Self::COMPUTER_USE_POLICY_UNATTENDED)
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::COMPUTER_USE_POLICY_UNSPECIFIED,
+            Self::COMPUTER_USE_POLICY_DISABLED,
+            Self::COMPUTER_USE_POLICY_UNATTENDED,
+        ]
+    }
+}
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ComputerUseCapability {
+    /// Field 1: `protocol`
+    #[serde(
+        rename = "protocol",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub protocol: u32,
+    /// Field 2: `transport`
+    #[serde(
+        rename = "transport",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub transport: ::buffa::alloc::string::String,
+    /// Field 3: `providers`
+    #[serde(
+        rename = "providers",
+        with = "::buffa::json_helpers::repeated_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
+    )]
+    pub providers: ::buffa::alloc::vec::Vec<::buffa::EnumValue<AgentProvider>>,
+    /// Field 4: `max_windows`
+    #[serde(
+        rename = "maxWindows",
+        alias = "max_windows",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub max_windows: u32,
+    /// Field 5: `shared_desktop`
+    #[serde(
+        rename = "sharedDesktop",
+        alias = "shared_desktop",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub shared_desktop: bool,
+    /// Field 6: `human_takeover`
+    #[serde(
+        rename = "humanTakeover",
+        alias = "human_takeover",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub human_takeover: bool,
+    /// Field 7: `schema_digest`
+    #[serde(
+        rename = "schemaDigest",
+        alias = "schema_digest",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub schema_digest: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ComputerUseCapability {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ComputerUseCapability")
+            .field("protocol", &self.protocol)
+            .field("transport", &self.transport)
+            .field("providers", &self.providers)
+            .field("max_windows", &self.max_windows)
+            .field("shared_desktop", &self.shared_desktop)
+            .field("human_takeover", &self.human_takeover)
+            .field("schema_digest", &self.schema_digest)
+            .finish()
+    }
+}
+impl ComputerUseCapability {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.ComputerUseCapability";
+}
+::buffa::impl_default_instance!(ComputerUseCapability);
+impl ::buffa::MessageName for ComputerUseCapability {
+    const PACKAGE: &'static str = "briar.types.v1";
+    const NAME: &'static str = "ComputerUseCapability";
+    const FULL_NAME: &'static str = "briar.types.v1.ComputerUseCapability";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.ComputerUseCapability";
+}
+impl ::buffa::Message for ComputerUseCapability {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.protocol != 0u32 {
+            size += 1u64 + ::buffa::types::uint32_encoded_len(self.protocol) as u64;
+        }
+        if !self.transport.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.transport) as u64;
+        }
+        if !self.providers.is_empty() {
+            let payload: u64 = self
+                .providers
+                .iter()
+                .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u64)
+                .sum::<u64>();
+            size += 1u64 + ::buffa::encoding::varint_len(payload) as u64 + payload;
+        }
+        if self.max_windows != 0u32 {
+            size += 1u64 + ::buffa::types::uint32_encoded_len(self.max_windows) as u64;
+        }
+        if self.shared_desktop {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        if self.human_takeover {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        if !self.schema_digest.is_empty() {
+            size
+                += 1u64 + ::buffa::types::string_encoded_len(&self.schema_digest) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.protocol != 0u32 {
+            ::buffa::types::put_uint32_field(1u32, self.protocol, buf);
+        }
+        if !self.transport.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.transport, buf);
+        }
+        if !self.providers.is_empty() {
+            let payload: u64 = self
+                .providers
+                .iter()
+                .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u64)
+                .sum::<u64>();
+            ::buffa::types::put_len_delimited_header(3u32, payload, buf);
+            for v in &self.providers {
+                ::buffa::types::encode_int32(v.to_i32(), buf);
+            }
+        }
+        if self.max_windows != 0u32 {
+            ::buffa::types::put_uint32_field(4u32, self.max_windows, buf);
+        }
+        if self.shared_desktop {
+            ::buffa::types::put_bool_field(5u32, self.shared_desktop, buf);
+        }
+        if self.human_takeover {
+            ::buffa::types::put_bool_field(6u32, self.human_takeover, buf);
+        }
+        if !self.schema_digest.is_empty() {
+            ::buffa::types::put_string_field(7u32, &self.schema_digest, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.protocol = ::buffa::types::decode_uint32(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.transport, buf)?;
+            }
+            3u32 => {
+                if tag.wire_type() == ::buffa::encoding::WireType::LengthDelimited {
+                    let len = ::buffa::encoding::decode_varint(buf)?;
+                    let len = usize::try_from(len)
+                        .map_err(|_| ::buffa::DecodeError::MessageTooLarge)?;
+                    if buf.remaining() < len {
+                        return ::core::result::Result::Err(
+                            ::buffa::DecodeError::UnexpectedEof,
+                        );
+                    }
+                    self.providers.reserve(len);
+                    let mut limited = buf.take(len);
+                    while limited.has_remaining() {
+                        self.providers
+                            .push(
+                                ::buffa::EnumValue::from(
+                                    ::buffa::types::decode_int32_packed(&mut limited)?,
+                                ),
+                            );
+                    }
+                    let leftover = limited.remaining();
+                    if leftover > 0 {
+                        limited.advance(leftover);
+                    }
+                } else if tag.wire_type() == ::buffa::encoding::WireType::Varint {
+                    self.providers
+                        .push(
+                            ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?),
+                        );
+                } else {
+                    return ::core::result::Result::Err(
+                        ::buffa::encoding::wire_type_mismatch(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        ),
+                    );
+                }
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.max_windows = ::buffa::types::decode_uint32(buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.shared_desktop = ::buffa::types::decode_bool(buf)?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.human_takeover = ::buffa::types::decode_bool(buf)?;
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.schema_digest, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.protocol = 0u32;
+        self.transport.clear();
+        self.providers.clear();
+        self.max_windows = 0u32;
+        self.shared_desktop = false;
+        self.human_takeover = false;
+        self.schema_digest.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ComputerUseCapability {
+    const PROTO_FQN: &'static str = "briar.types.v1.ComputerUseCapability";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ComputerUseCapability {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __COMPUTER_USE_CAPABILITY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.types.v1.ComputerUseCapability",
+    to_json: ::buffa::type_registry::any_to_json::<ComputerUseCapability>,
+    from_json: ::buffa::type_registry::any_from_json::<ComputerUseCapability>,
+    is_wkt: false,
+};
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -8629,6 +9088,16 @@ pub struct WorkerCapabilities {
         DmMemoryLearningCapability,
         ::buffa::Inline<DmMemoryLearningCapability>,
     >,
+    /// Field 9: `computer_use`
+    #[serde(
+        rename = "computerUse",
+        alias = "computer_use",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub computer_use: ::buffa::MessageField<
+        ComputerUseCapability,
+        ::buffa::Inline<ComputerUseCapability>,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -8643,6 +9112,7 @@ impl ::core::fmt::Debug for WorkerCapabilities {
             .field("dm_memory_protocol", &self.dm_memory_protocol)
             .field("dm_memory_learning_requests", &self.dm_memory_learning_requests)
             .field("dm_memory_learning", &self.dm_memory_learning)
+            .field("computer_use", &self.computer_use)
             .finish()
     }
 }
@@ -8730,6 +9200,14 @@ impl ::buffa::Message for WorkerCapabilities {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if self.computer_use.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.computer_use.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -8780,6 +9258,14 @@ impl ::buffa::Message for WorkerCapabilities {
                 buf,
             );
             self.dm_memory_learning.write_to(__cache, buf);
+        }
+        if self.computer_use.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                9u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.computer_use.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -8865,6 +9351,17 @@ impl ::buffa::Message for WorkerCapabilities {
                     ctx,
                 )?;
             }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.computer_use.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -8880,6 +9377,7 @@ impl ::buffa::Message for WorkerCapabilities {
         self.dm_memory_protocol = ::core::option::Option::None;
         self.dm_memory_learning_requests = ::core::option::Option::None;
         self.dm_memory_learning = ::buffa::MessageField::none();
+        self.computer_use = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -15078,6 +15576,486 @@ pub mod __buffa {
             type ViewHandle = TurnCompletedOwnedView;
         }
         impl ::serde::Serialize for TurnCompletedOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct ComputerUseCapabilityView<'a> {
+            /// Field 1: `protocol`
+            pub protocol: u32,
+            /// Field 2: `transport`
+            pub transport: &'a str,
+            /// Field 3: `providers`
+            pub providers: ::buffa::RepeatedView<
+                'a,
+                ::buffa::EnumValue<super::super::AgentProvider>,
+            >,
+            /// Field 4: `max_windows`
+            pub max_windows: u32,
+            /// Field 5: `shared_desktop`
+            pub shared_desktop: bool,
+            /// Field 6: `human_takeover`
+            pub human_takeover: bool,
+            /// Field 7: `schema_digest`
+            pub schema_digest: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ComputerUseCapabilityView<'a> {
+            type Owned = super::super::ComputerUseCapability;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.protocol = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.transport = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.max_windows = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.shared_desktop = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.human_takeover = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.schema_digest = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        if tag.wire_type()
+                            == ::buffa::encoding::WireType::LengthDelimited
+                        {
+                            let payload = ::buffa::types::borrow_bytes(&mut cur)?;
+                            view.providers
+                                .reserve(::buffa::encoding::count_varints(payload));
+                            let mut pcur: &[u8] = payload;
+                            while !pcur.is_empty() {
+                                view.providers
+                                    .push(
+                                        ::buffa::EnumValue::from(
+                                            ::buffa::types::decode_int32_packed(&mut pcur)?,
+                                        ),
+                                    );
+                            }
+                        } else if tag.wire_type() == ::buffa::encoding::WireType::Varint
+                        {
+                            view.providers
+                                .push(
+                                    ::buffa::EnumValue::from(
+                                        ::buffa::types::decode_int32(&mut cur)?,
+                                    ),
+                                );
+                        } else {
+                            return Err(
+                                ::buffa::encoding::wire_type_mismatch(
+                                    tag,
+                                    ::buffa::encoding::WireType::LengthDelimited,
+                                ),
+                            );
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ComputerUseCapability,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ComputerUseCapability,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ComputerUseCapability {
+                    protocol: self.protocol,
+                    transport: self.transport.to_string(),
+                    providers: self.providers.to_vec(),
+                    max_windows: self.max_windows,
+                    shared_desktop: self.shared_desktop,
+                    human_takeover: self.human_takeover,
+                    schema_digest: self.schema_digest.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ComputerUseCapabilityView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if self.protocol != 0u32 {
+                    size
+                        += 1u64
+                            + ::buffa::types::uint32_encoded_len(self.protocol) as u64;
+                }
+                if !self.transport.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.transport) as u64;
+                }
+                if !self.providers.is_empty() {
+                    let payload: u64 = self
+                        .providers
+                        .iter()
+                        .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u64)
+                        .sum::<u64>();
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(payload) as u64
+                            + payload;
+                }
+                if self.max_windows != 0u32 {
+                    size
+                        += 1u64
+                            + ::buffa::types::uint32_encoded_len(self.max_windows)
+                                as u64;
+                }
+                if self.shared_desktop {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
+                if self.human_takeover {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
+                if !self.schema_digest.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.schema_digest)
+                                as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.protocol != 0u32 {
+                    ::buffa::types::put_uint32_field(1u32, self.protocol, buf);
+                }
+                if !self.transport.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.transport, buf);
+                }
+                if !self.providers.is_empty() {
+                    let payload: u64 = self
+                        .providers
+                        .iter()
+                        .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u64)
+                        .sum::<u64>();
+                    ::buffa::types::put_len_delimited_header(3u32, payload, buf);
+                    for v in &self.providers {
+                        ::buffa::types::encode_int32(v.to_i32(), buf);
+                    }
+                }
+                if self.max_windows != 0u32 {
+                    ::buffa::types::put_uint32_field(4u32, self.max_windows, buf);
+                }
+                if self.shared_desktop {
+                    ::buffa::types::put_bool_field(5u32, self.shared_desktop, buf);
+                }
+                if self.human_takeover {
+                    ::buffa::types::put_bool_field(6u32, self.human_takeover, buf);
+                }
+                if !self.schema_digest.is_empty() {
+                    ::buffa::types::put_string_field(7u32, &self.schema_digest, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ComputerUseCapabilityView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.protocol) {
+                    __map
+                        .serialize_entry(
+                            "protocol",
+                            &::buffa::json_helpers::ProtoJson(&self.protocol),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.transport) {
+                    __map.serialize_entry("transport", self.transport)?;
+                }
+                if !self.providers.is_empty() {
+                    __map
+                        .serialize_entry(
+                            "providers",
+                            &::buffa::json_helpers::EnumSeqJson(&self.providers),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.max_windows) {
+                    __map
+                        .serialize_entry(
+                            "maxWindows",
+                            &::buffa::json_helpers::ProtoJson(&self.max_windows),
+                        )?;
+                }
+                if self.shared_desktop {
+                    __map.serialize_entry("sharedDesktop", &self.shared_desktop)?;
+                }
+                if self.human_takeover {
+                    __map.serialize_entry("humanTakeover", &self.human_takeover)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.schema_digest) {
+                    __map.serialize_entry("schemaDigest", self.schema_digest)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ComputerUseCapabilityView<'a> {
+            const PACKAGE: &'static str = "briar.types.v1";
+            const NAME: &'static str = "ComputerUseCapability";
+            const FULL_NAME: &'static str = "briar.types.v1.ComputerUseCapability";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.ComputerUseCapability";
+        }
+        ::buffa::impl_default_view_instance!(ComputerUseCapabilityView);
+        ::buffa::impl_view_reborrow!(ComputerUseCapabilityView);
+        /** Self-contained, `'static` owned view of a `ComputerUseCapability` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ComputerUseCapabilityView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ComputerUseCapabilityView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ComputerUseCapabilityOwnedView(
+            ::buffa::OwnedView<ComputerUseCapabilityView<'static>>,
+        );
+        impl ComputerUseCapabilityOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ComputerUseCapabilityOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ComputerUseCapabilityOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ComputerUseCapability,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ComputerUseCapabilityOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`ComputerUseCapabilityView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ComputerUseCapabilityView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::ComputerUseCapability {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `protocol`
+            #[must_use]
+            pub fn protocol(&self) -> u32 {
+                self.0.reborrow().protocol
+            }
+            /// Field 2: `transport`
+            #[must_use]
+            pub fn transport(&self) -> &'_ str {
+                self.0.reborrow().transport
+            }
+            /// Field 3: `providers`
+            #[must_use]
+            pub fn providers(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                ::buffa::EnumValue<super::super::AgentProvider>,
+            > {
+                &self.0.reborrow().providers
+            }
+            /// Field 4: `max_windows`
+            #[must_use]
+            pub fn max_windows(&self) -> u32 {
+                self.0.reborrow().max_windows
+            }
+            /// Field 5: `shared_desktop`
+            #[must_use]
+            pub fn shared_desktop(&self) -> bool {
+                self.0.reborrow().shared_desktop
+            }
+            /// Field 6: `human_takeover`
+            #[must_use]
+            pub fn human_takeover(&self) -> bool {
+                self.0.reborrow().human_takeover
+            }
+            /// Field 7: `schema_digest`
+            #[must_use]
+            pub fn schema_digest(&self) -> &'_ str {
+                self.0.reborrow().schema_digest
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ComputerUseCapabilityView<'static>>,
+        > for ComputerUseCapabilityOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ComputerUseCapabilityView<'static>>,
+            ) -> Self {
+                ComputerUseCapabilityOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ComputerUseCapabilityOwnedView>
+        for ::buffa::OwnedView<ComputerUseCapabilityView<'static>> {
+            fn from(wrapper: ComputerUseCapabilityOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ComputerUseCapabilityView<'static>>,
+        > for ComputerUseCapabilityOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<ComputerUseCapabilityView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ComputerUseCapability {
+            type View<'a> = ComputerUseCapabilityView<'a>;
+            type ViewHandle = ComputerUseCapabilityOwnedView;
+        }
+        impl ::serde::Serialize for ComputerUseCapabilityOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -23897,6 +24875,10 @@ pub mod __buffa {
             pub dm_memory_learning: ::buffa::MessageFieldView<
                 super::super::__buffa::view::DmMemoryLearningCapabilityView<'a>,
             >,
+            /// Field 9: `computer_use`
+            pub computer_use: ::buffa::MessageFieldView<
+                super::super::__buffa::view::ComputerUseCapabilityView<'a>,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for WorkerCapabilitiesView<'a> {
@@ -24006,6 +24988,31 @@ pub mod __buffa {
                             }
                         }
                     }
+                    9u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.computer_use.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.computer_use = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::ComputerUseCapabilityView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     1u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -24106,6 +25113,15 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    computer_use: match self.computer_use.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::ComputerUseCapability,
+                                ::buffa::Inline<super::super::ComputerUseCapability>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -24156,6 +25172,14 @@ pub mod __buffa {
                 if self.dm_memory_learning.is_set() {
                     let __slot = __cache.reserve();
                     let inner_size = self.dm_memory_learning.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                if self.computer_use.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.computer_use.compute_size(__cache);
                     __cache.set(__slot, inner_size);
                     size
                         += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
@@ -24212,6 +25236,14 @@ pub mod __buffa {
                         buf,
                     );
                     self.dm_memory_learning.write_to(__cache, buf);
+                }
+                if self.computer_use.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        9u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.computer_use.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -24281,6 +25313,14 @@ pub mod __buffa {
                         .as_option()
                     {
                         __map.serialize_entry("dmMemoryLearning", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .computer_use
+                        .as_option()
+                    {
+                        __map.serialize_entry("computerUse", __v)?;
                     }
                 }
                 __map.end()
@@ -24430,6 +25470,15 @@ pub mod __buffa {
                 super::super::__buffa::view::DmMemoryLearningCapabilityView<'_>,
             > {
                 &self.0.reborrow().dm_memory_learning
+            }
+            /// Field 9: `computer_use`
+            #[must_use]
+            pub fn computer_use(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::ComputerUseCapabilityView<'_>,
+            > {
+                &self.0.reborrow().computer_use
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<WorkerCapabilitiesView<'static>>>
@@ -28733,6 +29782,7 @@ pub mod __buffa {
         reg.register_json_any(super::__ACTIVITY_DELTA_JSON_ANY);
         reg.register_json_any(super::__ACTIVITY_COMPLETED_JSON_ANY);
         reg.register_json_any(super::__TURN_COMPLETED_JSON_ANY);
+        reg.register_json_any(super::__COMPUTER_USE_CAPABILITY_JSON_ANY);
         reg.register_json_any(super::__WORKFLOW_CHECKPOINT_JSON_ANY);
         reg.register_json_any(super::__WORKFLOW_STAGE_JSON_ANY);
         reg.register_json_any(super::__AUTO_HUNT_WORKFLOW_JSON_ANY);
@@ -28804,6 +29854,10 @@ pub use self::__buffa::view::ActivityCompletedOwnedView;
 pub use self::__buffa::view::TurnCompletedView;
 #[doc(inline)]
 pub use self::__buffa::view::TurnCompletedOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ComputerUseCapabilityView;
+#[doc(inline)]
+pub use self::__buffa::view::ComputerUseCapabilityOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::WorkflowCheckpointView;
 #[doc(inline)]

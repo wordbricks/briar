@@ -532,6 +532,7 @@ export const managedComputerRemoteSessionFromProto = (
 ): ManagedComputerRemoteSession => ({
   id: session.id,
   managedComputerId: session.managedComputerId,
+  agentId: session.agentId ?? null,
   state: managedComputerRemoteSessionStateFromProto(session.state),
   connectionGeneration: session.connectionGeneration,
   tokenExpiresAt: requiredTimestamp(

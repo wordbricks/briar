@@ -33,6 +33,8 @@ trap cleanup EXIT
 for required in \
   "$workspace_root/apps/briar/dist-cli/briar.js" \
   "$workspace_root/apps/briar/dist-cli/briar-remote-session-agent.js" \
+  "$workspace_root/apps/briar/dist-cli/briar-box-exec.js" \
+  "$workspace_root/infrastructure/managed-computers/briar-computer-executor.py" \
   "$workspace_root/infrastructure/managed-computers/briar" \
   "$workspace_root/skills/briar-workflow/SKILL.md" \
   "$workspace_root/skills/browser/SKILL.md"; do
@@ -55,10 +57,15 @@ if (( ${#runner_sources[@]} != 6 )); then
   echo "Managed runtime requires exactly six provider runners." >&2
   exit 1
 fi
+computer_use_mcp_source="$workspace_root/apps/briar/dist-agent/computer-use-mcp-server.js"
+[[ -s "$computer_use_mcp_source" ]] || {
+  echo "Managed runtime requires the Computer Use MCP adapter." >&2
+  exit 1
+}
 
 stage="$temporary_root/stage"
 install -d -m 0755 \
-  "$artifact_root" "$stage/bin" "$stage/lib/agent" "$stage/skills"
+  "$artifact_root" "$stage/bin" "$stage/lib/agent" "$stage/libexec" "$stage/skills"
 install -m 0755 \
   "$workspace_root/infrastructure/managed-computers/briar" \
   "$stage/bin/briar"
@@ -66,12 +73,20 @@ install -m 0644 \
   "$workspace_root/apps/briar/dist-cli/briar-remote-session-agent.js" \
   "$stage/bin/briar-remote-session-agent.js"
 install -m 0644 \
+  "$workspace_root/apps/briar/dist-cli/briar-box-exec.js" \
+  "$stage/bin/briar-box-exec.js"
+install -m 0755 \
+  "$workspace_root/infrastructure/managed-computers/briar-computer-executor.py" \
+  "$stage/libexec/briar-computer-executor.py"
+install -m 0644 \
   "$workspace_root/apps/briar/dist-cli/briar.js" \
   "$stage/lib/briar.js"
 for runner in "${runner_sources[@]}"; do
   [[ -s "$runner" ]]
   install -m 0644 "$runner" "$stage/lib/agent/$(basename -- "$runner")"
 done
+install -m 0644 "$computer_use_mcp_source" \
+  "$stage/lib/agent/computer-use-mcp-server.js"
 cp -R "$workspace_root/skills/briar-workflow" "$stage/skills/"
 cp -R "$workspace_root/skills/browser" "$stage/skills/"
 chmod 0755 "$stage/skills/briar-workflow/scripts/briar"

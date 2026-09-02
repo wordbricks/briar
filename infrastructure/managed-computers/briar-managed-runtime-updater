@@ -186,6 +186,8 @@ install_release() {
   fi
   for required in \
     bin/briar lib/briar.js bin/briar-remote-session-agent.js \
+    bin/briar-box-exec.js libexec/briar-computer-executor.py \
+    lib/agent/computer-use-mcp-server.js \
     briar-version source-commit \
     skills/briar-workflow/SKILL.md skills/briar-workflow/VERSION \
     skills/browser/SKILL.md skills/browser/VERSION; do
@@ -196,6 +198,7 @@ install_release() {
     fi
   done
   chmod 0755 "$staging/bin/briar" \
+    "$staging/libexec/briar-computer-executor.py" \
     "$staging/skills/briar-workflow/scripts/briar"
   chmod -R go-w "$staging"
   chown -R root:root "$staging"
@@ -232,6 +235,7 @@ activate_release() {
   mv -Tf -- "$temporary_link" "$current_link" || return 1
   activated=true
   "$systemctl_binary" restart briar-remote-session-agent.service || return 1
+  "$systemctl_binary" restart briar-box-exec.service || return 1
   "$systemctl_binary" restart briar-managed-worker.service || return 1
 }
 
@@ -265,6 +269,7 @@ rollback_release() {
   ln -s -- "$previous_release" "$temporary_link" || return 1
   mv -Tf -- "$temporary_link" "$current_link" || return 1
   "$systemctl_binary" restart briar-remote-session-agent.service || true
+  "$systemctl_binary" restart briar-box-exec.service || true
   "$systemctl_binary" restart briar-managed-worker.service || true
 }
 

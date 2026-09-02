@@ -61,6 +61,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Typography } from "@/components/ui/typography";
+import { ComputerUsePolicySwitch } from "./ComputerUsePolicySwitch";
 
 export function ProjectAgentSettings({
   agent,
@@ -95,6 +96,9 @@ export function ProjectAgentSettings({
   const [designatedWorkerId, setDesignatedWorkerId] = useState<string | null>(
     agent.designatedWorkerId ?? null,
   );
+  const [computerUsePolicy, setComputerUsePolicy] = useState<
+    "disabled" | "unattended"
+  >(agent.computerUsePolicy ?? "disabled");
   const [description, setDescription] = useState(agent.description ?? "");
   const [responsibility, setResponsibility] = useState(agent.responsibility);
   const [calendarColor, setCalendarColor] = useState(agent.calendarColor);
@@ -108,6 +112,7 @@ export function ProjectAgentSettings({
     provider: agent.provider,
     model: agent.model ?? "",
     effort: agent.effort,
+    computerUsePolicy: agent.computerUsePolicy ?? "disabled",
     designatedWorkerId: agent.designatedWorkerId ?? null,
     designatedWorkerLabel: agent.designatedWorkerLabel ?? null,
     description: agent.description ?? "",
@@ -128,6 +133,7 @@ export function ProjectAgentSettings({
     provider !== savedProfile.provider ||
     model !== savedProfile.model ||
     effort !== savedProfile.effort ||
+    computerUsePolicy !== savedProfile.computerUsePolicy ||
     designatedWorkerId !== savedProfile.designatedWorkerId ||
     description !== savedProfile.description ||
     responsibility !== savedProfile.responsibility ||
@@ -154,6 +160,7 @@ export function ProjectAgentSettings({
         provider,
         model: model || null,
         effort,
+        computerUsePolicy,
         designatedWorkerId,
         description: description.trim(),
         responsibility: responsibility.trim(),
@@ -167,6 +174,7 @@ export function ProjectAgentSettings({
         provider: saved.provider,
         model: saved.model ?? "",
         effort: saved.effort,
+        computerUsePolicy: saved.computerUsePolicy ?? "disabled",
         designatedWorkerId: saved.designatedWorkerId ?? null,
         designatedWorkerLabel: saved.designatedWorkerLabel ?? null,
         description: saved.description ?? "",
@@ -180,6 +188,7 @@ export function ProjectAgentSettings({
       setProvider(nextProfile.provider);
       setModel(nextProfile.model);
       setEffort(nextProfile.effort);
+      setComputerUsePolicy(nextProfile.computerUsePolicy);
       setDesignatedWorkerId(nextProfile.designatedWorkerId);
       setDescription(nextProfile.description);
       setResponsibility(nextProfile.responsibility);
@@ -448,6 +457,7 @@ export function ProjectAgentSettings({
                       label={t("agents.provider")}
                       onValueChange={(value) => {
                         setProvider(value as AgentProvider);
+                        if (value !== "grok") setComputerUsePolicy("disabled");
                         setModel("");
                         setEffort(null);
                       }}
@@ -496,6 +506,12 @@ export function ProjectAgentSettings({
                     />
                   </div>
                 </div>
+                <ComputerUsePolicySwitch
+                  disabled={profileSaving}
+                  onChange={setComputerUsePolicy}
+                  policy={computerUsePolicy}
+                  provider={provider}
+                />
                 <div className="grid min-w-0 gap-2">
                   <Label htmlFor="project-agent-settings-responsibility">
                     {t("agents.responsibility")}

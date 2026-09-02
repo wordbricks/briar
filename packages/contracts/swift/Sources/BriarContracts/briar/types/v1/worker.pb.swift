@@ -210,61 +210,76 @@ public nonisolated struct BriarTypes_WorkflowRequirementHealth: Sendable {
   fileprivate var _detail: String? = nil
 }
 
-public nonisolated struct BriarTypes_WorkerCapabilities: Sendable {
+public nonisolated struct BriarTypes_WorkerCapabilities: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var providerCapabilities: [BriarTypes_AgentProviderCapability] = []
+  public var providerCapabilities: [BriarTypes_AgentProviderCapability] {
+    get {_storage._providerCapabilities}
+    set {_uniqueStorage()._providerCapabilities = newValue}
+  }
 
   public var remoteUpdates: BriarTypes_RemoteUpdateCapability {
-    get {_remoteUpdates ?? BriarTypes_RemoteUpdateCapability()}
-    set {_remoteUpdates = newValue}
+    get {_storage._remoteUpdates ?? BriarTypes_RemoteUpdateCapability()}
+    set {_uniqueStorage()._remoteUpdates = newValue}
   }
   /// Returns true if `remoteUpdates` has been explicitly set.
-  public var hasRemoteUpdates: Bool {self._remoteUpdates != nil}
+  public var hasRemoteUpdates: Bool {_storage._remoteUpdates != nil}
   /// Clears the value of `remoteUpdates`. Subsequent reads from it will return its default value.
-  public mutating func clearRemoteUpdates() {self._remoteUpdates = nil}
+  public mutating func clearRemoteUpdates() {_uniqueStorage()._remoteUpdates = nil}
 
-  public var worktrees: Bool = false
+  public var worktrees: Bool {
+    get {_storage._worktrees}
+    set {_uniqueStorage()._worktrees = newValue}
+  }
 
-  public var workflowRequirements: [BriarTypes_WorkflowRequirementHealth] = []
+  public var workflowRequirements: [BriarTypes_WorkflowRequirementHealth] {
+    get {_storage._workflowRequirements}
+    set {_uniqueStorage()._workflowRequirements = newValue}
+  }
 
   public var dmMemoryProtocol: UInt32 {
-    get {_dmMemoryProtocol ?? 0}
-    set {_dmMemoryProtocol = newValue}
+    get {_storage._dmMemoryProtocol ?? 0}
+    set {_uniqueStorage()._dmMemoryProtocol = newValue}
   }
   /// Returns true if `dmMemoryProtocol` has been explicitly set.
-  public var hasDmMemoryProtocol: Bool {self._dmMemoryProtocol != nil}
+  public var hasDmMemoryProtocol: Bool {_storage._dmMemoryProtocol != nil}
   /// Clears the value of `dmMemoryProtocol`. Subsequent reads from it will return its default value.
-  public mutating func clearDmMemoryProtocol() {self._dmMemoryProtocol = nil}
+  public mutating func clearDmMemoryProtocol() {_uniqueStorage()._dmMemoryProtocol = nil}
 
   public var dmMemoryLearningRequests: UInt32 {
-    get {_dmMemoryLearningRequests ?? 0}
-    set {_dmMemoryLearningRequests = newValue}
+    get {_storage._dmMemoryLearningRequests ?? 0}
+    set {_uniqueStorage()._dmMemoryLearningRequests = newValue}
   }
   /// Returns true if `dmMemoryLearningRequests` has been explicitly set.
-  public var hasDmMemoryLearningRequests: Bool {self._dmMemoryLearningRequests != nil}
+  public var hasDmMemoryLearningRequests: Bool {_storage._dmMemoryLearningRequests != nil}
   /// Clears the value of `dmMemoryLearningRequests`. Subsequent reads from it will return its default value.
-  public mutating func clearDmMemoryLearningRequests() {self._dmMemoryLearningRequests = nil}
+  public mutating func clearDmMemoryLearningRequests() {_uniqueStorage()._dmMemoryLearningRequests = nil}
 
   public var dmMemoryLearning: BriarTypes_DmMemoryLearningCapability {
-    get {_dmMemoryLearning ?? BriarTypes_DmMemoryLearningCapability()}
-    set {_dmMemoryLearning = newValue}
+    get {_storage._dmMemoryLearning ?? BriarTypes_DmMemoryLearningCapability()}
+    set {_uniqueStorage()._dmMemoryLearning = newValue}
   }
   /// Returns true if `dmMemoryLearning` has been explicitly set.
-  public var hasDmMemoryLearning: Bool {self._dmMemoryLearning != nil}
+  public var hasDmMemoryLearning: Bool {_storage._dmMemoryLearning != nil}
   /// Clears the value of `dmMemoryLearning`. Subsequent reads from it will return its default value.
-  public mutating func clearDmMemoryLearning() {self._dmMemoryLearning = nil}
+  public mutating func clearDmMemoryLearning() {_uniqueStorage()._dmMemoryLearning = nil}
+
+  public var computerUse: BriarTypes_ComputerUseCapability {
+    get {_storage._computerUse ?? BriarTypes_ComputerUseCapability()}
+    set {_uniqueStorage()._computerUse = newValue}
+  }
+  /// Returns true if `computerUse` has been explicitly set.
+  public var hasComputerUse: Bool {_storage._computerUse != nil}
+  /// Clears the value of `computerUse`. Subsequent reads from it will return its default value.
+  public mutating func clearComputerUse() {_uniqueStorage()._computerUse = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _remoteUpdates: BriarTypes_RemoteUpdateCapability? = nil
-  fileprivate var _dmMemoryProtocol: UInt32? = nil
-  fileprivate var _dmMemoryLearningRequests: UInt32? = nil
-  fileprivate var _dmMemoryLearning: BriarTypes_DmMemoryLearningCapability? = nil
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
 public nonisolated struct BriarTypes_DmMemoryLearningCapability: Sendable {
@@ -622,63 +637,118 @@ nonisolated extension BriarTypes_WorkflowRequirementHealth: SwiftProtobuf.Messag
 
 nonisolated extension BriarTypes_WorkerCapabilities: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".WorkerCapabilities"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}provider_capabilities\0\u{3}remote_updates\0\u{1}worktrees\0\u{4}\u{2}workflow_requirements\0\u{3}dm_memory_protocol\0\u{3}dm_memory_learning_requests\0\u{3}dm_memory_learning\0\u{b}organization_agent_context_protocol\0\u{c}\u{4}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}provider_capabilities\0\u{3}remote_updates\0\u{1}worktrees\0\u{4}\u{2}workflow_requirements\0\u{3}dm_memory_protocol\0\u{3}dm_memory_learning_requests\0\u{3}dm_memory_learning\0\u{3}computer_use\0\u{b}organization_agent_context_protocol\0\u{c}\u{4}\u{1}")
+
+  fileprivate class _StorageClass {
+    var _providerCapabilities: [BriarTypes_AgentProviderCapability] = []
+    var _remoteUpdates: BriarTypes_RemoteUpdateCapability? = nil
+    var _worktrees: Bool = false
+    var _workflowRequirements: [BriarTypes_WorkflowRequirementHealth] = []
+    var _dmMemoryProtocol: UInt32? = nil
+    var _dmMemoryLearningRequests: UInt32? = nil
+    var _dmMemoryLearning: BriarTypes_DmMemoryLearningCapability? = nil
+    var _computerUse: BriarTypes_ComputerUseCapability? = nil
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _providerCapabilities = source._providerCapabilities
+      _remoteUpdates = source._remoteUpdates
+      _worktrees = source._worktrees
+      _workflowRequirements = source._workflowRequirements
+      _dmMemoryProtocol = source._dmMemoryProtocol
+      _dmMemoryLearningRequests = source._dmMemoryLearningRequests
+      _dmMemoryLearning = source._dmMemoryLearning
+      _computerUse = source._computerUse
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.providerCapabilities) }()
-      case 2: try { try decoder.decodeSingularMessageField(value: &self._remoteUpdates) }()
-      case 3: try { try decoder.decodeSingularBoolField(value: &self.worktrees) }()
-      case 5: try { try decoder.decodeRepeatedMessageField(value: &self.workflowRequirements) }()
-      case 6: try { try decoder.decodeSingularUInt32Field(value: &self._dmMemoryProtocol) }()
-      case 7: try { try decoder.decodeSingularUInt32Field(value: &self._dmMemoryLearningRequests) }()
-      case 8: try { try decoder.decodeSingularMessageField(value: &self._dmMemoryLearning) }()
-      default: break
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeRepeatedMessageField(value: &_storage._providerCapabilities) }()
+        case 2: try { try decoder.decodeSingularMessageField(value: &_storage._remoteUpdates) }()
+        case 3: try { try decoder.decodeSingularBoolField(value: &_storage._worktrees) }()
+        case 5: try { try decoder.decodeRepeatedMessageField(value: &_storage._workflowRequirements) }()
+        case 6: try { try decoder.decodeSingularUInt32Field(value: &_storage._dmMemoryProtocol) }()
+        case 7: try { try decoder.decodeSingularUInt32Field(value: &_storage._dmMemoryLearningRequests) }()
+        case 8: try { try decoder.decodeSingularMessageField(value: &_storage._dmMemoryLearning) }()
+        case 9: try { try decoder.decodeSingularMessageField(value: &_storage._computerUse) }()
+        default: break
+        }
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.providerCapabilities.isEmpty {
-      try visitor.visitRepeatedMessageField(value: self.providerCapabilities, fieldNumber: 1)
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if !_storage._providerCapabilities.isEmpty {
+        try visitor.visitRepeatedMessageField(value: _storage._providerCapabilities, fieldNumber: 1)
+      }
+      try { if let v = _storage._remoteUpdates {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+      } }()
+      if _storage._worktrees != false {
+        try visitor.visitSingularBoolField(value: _storage._worktrees, fieldNumber: 3)
+      }
+      if !_storage._workflowRequirements.isEmpty {
+        try visitor.visitRepeatedMessageField(value: _storage._workflowRequirements, fieldNumber: 5)
+      }
+      try { if let v = _storage._dmMemoryProtocol {
+        try visitor.visitSingularUInt32Field(value: v, fieldNumber: 6)
+      } }()
+      try { if let v = _storage._dmMemoryLearningRequests {
+        try visitor.visitSingularUInt32Field(value: v, fieldNumber: 7)
+      } }()
+      try { if let v = _storage._dmMemoryLearning {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
+      } }()
+      try { if let v = _storage._computerUse {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
+      } }()
     }
-    try { if let v = self._remoteUpdates {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-    } }()
-    if self.worktrees != false {
-      try visitor.visitSingularBoolField(value: self.worktrees, fieldNumber: 3)
-    }
-    if !self.workflowRequirements.isEmpty {
-      try visitor.visitRepeatedMessageField(value: self.workflowRequirements, fieldNumber: 5)
-    }
-    try { if let v = self._dmMemoryProtocol {
-      try visitor.visitSingularUInt32Field(value: v, fieldNumber: 6)
-    } }()
-    try { if let v = self._dmMemoryLearningRequests {
-      try visitor.visitSingularUInt32Field(value: v, fieldNumber: 7)
-    } }()
-    try { if let v = self._dmMemoryLearning {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
-    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: BriarTypes_WorkerCapabilities, rhs: BriarTypes_WorkerCapabilities) -> Bool {
-    if lhs.providerCapabilities != rhs.providerCapabilities {return false}
-    if lhs._remoteUpdates != rhs._remoteUpdates {return false}
-    if lhs.worktrees != rhs.worktrees {return false}
-    if lhs.workflowRequirements != rhs.workflowRequirements {return false}
-    if lhs._dmMemoryProtocol != rhs._dmMemoryProtocol {return false}
-    if lhs._dmMemoryLearningRequests != rhs._dmMemoryLearningRequests {return false}
-    if lhs._dmMemoryLearning != rhs._dmMemoryLearning {return false}
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._providerCapabilities != rhs_storage._providerCapabilities {return false}
+        if _storage._remoteUpdates != rhs_storage._remoteUpdates {return false}
+        if _storage._worktrees != rhs_storage._worktrees {return false}
+        if _storage._workflowRequirements != rhs_storage._workflowRequirements {return false}
+        if _storage._dmMemoryProtocol != rhs_storage._dmMemoryProtocol {return false}
+        if _storage._dmMemoryLearningRequests != rhs_storage._dmMemoryLearningRequests {return false}
+        if _storage._dmMemoryLearning != rhs_storage._dmMemoryLearning {return false}
+        if _storage._computerUse != rhs_storage._computerUse {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

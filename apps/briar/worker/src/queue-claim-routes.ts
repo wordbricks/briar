@@ -19,6 +19,7 @@ import {
   auditExecutionEvent,
   leaseExpiryFrom,
   reapStalledHuntRuns,
+  executionWorkerRuntime,
   workerStateAt,
 } from "./workers";
 
@@ -65,6 +66,12 @@ export async function claimNextQueueWork(input: {
       workerId: authenticatedWorkerId,
       workerDeviceId: authenticatedWorker?.principal.deviceId,
       detachedOnly: Boolean(authenticatedWorkerId),
+      computerUseProvidersJson: authenticatedWorker
+        ? JSON.stringify(
+            executionWorkerRuntime(authenticatedWorker.binding).computerUse
+              ?.providers ?? [],
+          )
+        : null,
     });
     if (!run && input.runId) {
       const waiting = await db
@@ -191,6 +198,7 @@ export async function claimNextQueueWork(input: {
                   provider: execution?.provider ?? agent.provider,
                   model: execution?.model ?? null,
                   effort: execution?.effort ?? null,
+                  computerUsePolicy: agent.computer_use_policy,
                   responsibility: agent.responsibility,
                   skills: agent.skills.map(agentSkillJson),
                 }

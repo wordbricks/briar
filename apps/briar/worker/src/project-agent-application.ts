@@ -63,6 +63,7 @@ async function resolveDesignatedWorker(
     readonly provider: ProjectAgentRow["provider"];
     readonly model: string | null;
     readonly effort: ProjectAgentRow["effort"];
+    readonly computerUsePolicy: ProjectAgentRow["computer_use_policy"];
   },
   services: ProjectAgentApplicationServices,
 ) {
@@ -74,6 +75,7 @@ async function resolveDesignatedWorker(
     provider: input.provider,
     model: input.model,
     effort: input.effort,
+    computerUsePolicy: input.computerUsePolicy,
     observedAt: new Date().toISOString(),
   });
   if (!worker) {
@@ -109,6 +111,7 @@ export async function createProjectAgentApplication(
       provider: write.provider,
       model: write.model ?? null,
       effort: write.effort ?? null,
+      computerUsePolicy: write.computerUsePolicy ?? "disabled",
     },
     services,
   );
@@ -118,6 +121,7 @@ export async function createProjectAgentApplication(
     provider: write.provider,
     model: write.model ?? null,
     effort: write.effort ?? null,
+    computerUsePolicy: write.computerUsePolicy ?? "disabled",
     designatedWorkerId: designatedWorker?.id ?? null,
     designatedWorkerLabel: designatedWorker?.label ?? null,
     description: write.description ?? "",
@@ -143,6 +147,8 @@ export async function updateProjectAgentApplication(
     throw new ProjectAgentApplicationError("agent_not_found", "Agent not found");
   }
   const nextEffort = write.effort === undefined ? existing.effort : write.effort;
+  const nextComputerUsePolicy = write.computerUsePolicy ??
+    existing.computer_use_policy;
   const designatedWorker = await resolveDesignatedWorker(
     db,
     {
@@ -155,6 +161,7 @@ export async function updateProjectAgentApplication(
       provider: write.provider,
       model: write.model ?? null,
       effort: nextEffort,
+      computerUsePolicy: nextComputerUsePolicy,
     },
     services,
   );
@@ -197,6 +204,7 @@ export async function updateProjectAgentApplication(
       provider: write.provider,
       model: write.model ?? null,
       effort: nextEffort,
+      computerUsePolicy: write.computerUsePolicy,
       designatedWorkerId: designatedWorker?.id ?? null,
       designatedWorkerLabel: designatedWorker?.label ?? null,
       description: write.description ?? existing.description,

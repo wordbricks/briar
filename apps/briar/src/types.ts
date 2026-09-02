@@ -660,6 +660,7 @@ export type ManagedComputerProduct = {
 export type ManagedComputerRemoteSession = {
   id: string;
   managedComputerId: string;
+  agentId: string | null;
   state:
     | "created"
     | "connecting"
@@ -765,6 +766,7 @@ export type ProjectAgent = {
   provider: AgentProvider;
   model: string | null;
   effort: ModelEffort | null;
+  computerUsePolicy?: "disabled" | "unattended";
   designatedWorkerId?: string | null;
   designatedWorkerLabel?: string | null;
   description?: string;
@@ -822,6 +824,7 @@ export type CreateProjectAgentInput = {
   provider: AgentProvider;
   model: string | null;
   effort?: ModelEffort | null;
+  computerUsePolicy?: "disabled" | "unattended";
   designatedWorkerId?: string | null;
   description?: string;
   responsibility: string;
@@ -876,6 +879,7 @@ export type ProjectAgentScheduleRun = {
     | "provider"
     | "model"
     | "effort"
+    | "computerUsePolicy"
     | "description"
     | "responsibility"
     | "skill"

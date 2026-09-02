@@ -39,6 +39,9 @@ import {
 import {
   AgentActivityKind,
 } from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
+import {
+  ComputerUsePolicy as ProtoComputerUsePolicy,
+} from "@briar/contracts/gen/briar/types/v1/computer_use_pb";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
 import {
   Code,
@@ -48,6 +51,7 @@ import {
 } from "@connectrpc/connect";
 import * as Schema from "effect/Schema";
 import type { AgentProvider as DomainAgentProvider } from "../../src/lib/agent-provider";
+import type { ComputerUsePolicy as DomainComputerUsePolicy } from "../../src/lib/computer-use-contract";
 import { getAgentSkill } from "./agent-skills";
 import type { AgentWorkLogEntryRow } from "./agent-worklog";
 import { getProjectAgentTranscriptApplication } from "./agent-transcript-application";
@@ -192,6 +196,11 @@ const agentProvider = {
   openrouter: AgentProvider.OPENROUTER,
 } as const satisfies Record<DomainAgentProvider, AgentProvider>;
 
+const protoComputerUsePolicy = {
+  disabled: ProtoComputerUsePolicy.DISABLED,
+  unattended: ProtoComputerUsePolicy.UNATTENDED,
+} as const satisfies Record<DomainComputerUsePolicy, ProtoComputerUsePolicy>;
+
 const workLogEntryStatus = {
   writing: ProjectAgentWorkLogEntryStatus.WRITING,
   completed: ProjectAgentWorkLogEntryStatus.COMPLETED,
@@ -259,6 +268,25 @@ const domainAgentProvider = (value: AgentProvider): DomainAgentProvider => {
       return "openrouter";
     default:
       throw new ConnectError("provider is required", Code.InvalidArgument);
+  }
+};
+
+const domainComputerUsePolicy = (
+  value: ProtoComputerUsePolicy | undefined,
+): DomainComputerUsePolicy | undefined => {
+  switch (value) {
+    case undefined:
+      return undefined;
+    case ProtoComputerUsePolicy.UNSPECIFIED:
+    case ProtoComputerUsePolicy.DISABLED:
+      return "disabled";
+    case ProtoComputerUsePolicy.UNATTENDED:
+      return "unattended";
+    default:
+      throw new ConnectError(
+        "computer_use_policy is invalid",
+        Code.InvalidArgument,
+      );
   }
 };
 
@@ -656,6 +684,7 @@ const toProjectAgent = (row: Parameters<typeof projectAgentJson>[0]) => {
     provider: agentProvider[agent.provider],
     model: agent.model ?? undefined,
     effort: agent.effort ?? undefined,
+    computerUsePolicy: protoComputerUsePolicy[agent.computerUsePolicy],
     designatedWorkerId: agent.designatedWorkerId ?? undefined,
     designatedWorkerLabel: agent.designatedWorkerLabel ?? undefined,
     description: agent.description || undefined,
@@ -737,6 +766,8 @@ const toProjectAgentScheduleRun = (
       provider: agentProvider[scheduleRun.agent.provider],
       model: scheduleRun.agent.model ?? undefined,
       effort: scheduleRun.agent.effort ?? undefined,
+      computerUsePolicy:
+        protoComputerUsePolicy[scheduleRun.agent.computerUsePolicy],
       description: scheduleRun.agent.description || undefined,
       responsibility: scheduleRun.agent.responsibility,
       skill: scheduleRun.agent.skill,
@@ -779,6 +810,7 @@ const projectWrite = (input: CreateProjectAgentRequest) =>
     provider: domainAgentProvider(input.provider),
     model: input.model ?? null,
     effort: input.effort ?? null,
+    computerUsePolicy: domainComputerUsePolicy(input.computerUsePolicy),
     designatedWorkerId: input.designatedWorkerId ?? null,
     description: input.description,
     responsibility: input.responsibility,
@@ -806,6 +838,7 @@ const updateProjectWrite = (input: UpdateProjectAgentRequest) =>
       : input.effortUpdate.case === "clearEffort"
       ? null
       : undefined,
+    computerUsePolicy: domainComputerUsePolicy(input.computerUsePolicy),
     designatedWorkerId:
       input.designatedWorkerUpdate.case === "designatedWorkerId"
         ? input.designatedWorkerUpdate.value
@@ -828,6 +861,7 @@ const organizationWrite = (
     description: input.description,
     responsibility: input.responsibility,
     effort: input.effort ?? null,
+    computerUsePolicy: domainComputerUsePolicy(input.computerUsePolicy),
     skills: input.skills.map(domainSkillInput),
   });
 
@@ -1032,6 +1066,7 @@ export const createAppAgentService = (
       description: write.description ?? "",
       responsibility: write.responsibility,
       effort: write.effort,
+      computerUsePolicy: write.computerUsePolicy ?? "disabled",
       skills: write.skills ?? [],
       createdAt: new Date().toISOString(),
     });
@@ -1060,6 +1095,7 @@ export const createAppAgentService = (
       description: write.description,
       responsibility: write.responsibility,
       effort: write.effort,
+      computerUsePolicy: write.computerUsePolicy,
       skills: write.skills ?? [],
       updatedAt: new Date().toISOString(),
     });

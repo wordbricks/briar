@@ -220,6 +220,7 @@ export async function createManagedComputerRemoteSessionTicket(
     controllerUserId: string;
     requestId: string;
     reconnectSessionId?: string;
+    agentId?: string;
     observedAt: string;
   },
 ) {
@@ -271,7 +272,8 @@ export async function createManagedComputerRemoteSessionTicket(
   );
   const recoverableSessionId =
     activeSession?.state === "disconnected" &&
-      activeSession.controller_user_id === input.controllerUserId
+      activeSession.controller_user_id === input.controllerUserId &&
+      activeSession.agent_id === (input.agentId ?? null)
       ? activeSession.id
       : undefined;
   const reconnectSessionId = recoverableSessionId ??
@@ -304,6 +306,7 @@ export async function createManagedComputerRemoteSessionTicket(
         organizationId: input.organizationId,
         managedComputerId: input.managedComputerId,
         controllerUserId: input.controllerUserId,
+        agentId: input.agentId,
         requestId: input.requestId,
         clientTokenHash,
         tokenExpiresAt,
@@ -318,6 +321,7 @@ export async function createManagedComputerRemoteSessionTicket(
       organizationId: input.organizationId,
       managedComputerId: input.managedComputerId,
       controllerUserId: input.controllerUserId,
+      agentId: input.agentId,
       requestId: input.requestId,
       clientTokenHash,
       tokenExpiresAt,

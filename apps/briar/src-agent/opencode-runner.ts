@@ -36,6 +36,9 @@ import {
   readOnlySeatbeltProfile,
   readOnlySeatbeltSpawnSpec,
 } from "./read-only-seatbelt";
+import { prepareComputerUseMcp } from "./computer-use-mcp-config";
+import { openCodeComputerUseEnvironment } from
+  "./computer-use-provider-adapters";
 
 class OpenCodeBlockedError extends Error {
   constructor(readonly blocker: OpenCodeBlockedRetry) {
@@ -306,14 +309,16 @@ async function main(runnerIo: OpenCodeRunnerIo) {
     sandboxMode: request.sandboxMode,
     attachmentCount: request.attachments?.length ?? 0,
   });
-  const server = await OpenCodeServer.start(
-    request.providerBinaryPath,
-    request.workspaceRoot,
-    process.env,
-    request.sandboxMode === "readOnly",
-    emitRunnerDiagnostic,
-  );
+  const computerUseMcp = await prepareComputerUseMcp(request);
+  let server: OpenCodeServer | undefined;
   try {
+    server = await OpenCodeServer.start(
+      request.providerBinaryPath,
+      request.workspaceRoot,
+      openCodeComputerUseEnvironment(process.env, computerUseMcp.servers),
+      request.sandboxMode === "readOnly",
+      emitRunnerDiagnostic,
+    );
     const client = createOpencodeClient({
       baseUrl: server.url,
       directory: request.workspaceRoot,
@@ -436,7 +441,8 @@ async function main(runnerIo: OpenCodeRunnerIo) {
     }
     emit.result({ sessionId, message });
   } finally {
-    server.close();
+    server?.close();
+    await computerUseMcp.cleanup();
   }
 }
 

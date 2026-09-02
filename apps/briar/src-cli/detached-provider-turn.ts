@@ -1,9 +1,12 @@
 import { Buffer } from "node:buffer";
+import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { resolve } from "node:path";
-import { toBinary } from "@bufbuild/protobuf";
+import { create, toBinary } from "@bufbuild/protobuf";
 import { sizeDelimitedDecodeStream } from "@bufbuild/protobuf/wire";
 import {
+  type ComputerUseChildBinding,
+  ComputerUseChildBindingSchema,
   RunnerToParentSchema,
   SandboxMode,
   type RunnerToParent,
@@ -15,6 +18,9 @@ import {
 } from "../src-agent/sidecar-protocol";
 import type { JsonSchema } from "../src/lib/project-llm";
 import { agentProviderBinaryName } from "../src/lib/agent-provider";
+import { agentProviderToProto } from "../src/lib/agent-provider-proto";
+import { supportsComputerUseProvider } from
+  "../src/lib/computer-use-contract";
 import {
   detachedProviderRequest,
   type DetachedAgent,
@@ -25,6 +31,7 @@ import {
   materializeDetachedAgentSkillCatalog,
   type DetachedAgentSkillCatalog,
 } from "./agent-skill-discovery";
+import { ComputerUseBoxClient } from "./computer-use-box-client";
 
 export type DetachedProviderTurnResult = {
   exitCode: number | null;
@@ -64,6 +71,9 @@ export type DetachedProviderTurnInput = {
   /** A caller-managed catalog is shared across provider turns and is not cleaned here. */
   skillCatalog?: DetachedAgentSkillCatalog | null;
   outputSchema?: JsonSchema | null;
+  runKind?: "parent" | "computerUse";
+  computerUseBinding?: ComputerUseChildBinding;
+  computerUseMcpServerPath?: string | null;
   environment: NodeJS.ProcessEnv;
   signal: AbortSignal;
   diagnosticContext?: DetachedProviderTurnDiagnosticContext;
@@ -152,7 +162,83 @@ export function logDetachedProviderTurnDiagnostic(
   console.error(`[briar-agent-runner] ${JSON.stringify(diagnostic)}`);
 }
 
+const existingBundle = async (paths: readonly string[]): Promise<string | null> =>
+  (await Promise.all(
+    paths.map(async (path) => ((await Bun.file(path).exists()) ? path : null)),
+  )).find((path): path is string => Boolean(path)) ?? null;
+
+const prepareComputerUseTurn = async (
+  input: DetachedProviderTurnInput,
+): Promise<{
+  readonly input: DetachedProviderTurnInput;
+  release(): Promise<void>;
+}> => {
+  if (input.agent.computerUsePolicy !== "unattended") {
+    return { input, release: async () => undefined };
+  }
+  if (!supportsComputerUseProvider(input.agent.provider)) {
+    throw new Error(
+      `Computer Use is not available for the ${input.agent.provider} provider`,
+    );
+  }
+  if (input.runKind === "computerUse") {
+    if (!input.computerUseBinding || !input.computerUseMcpServerPath) {
+      throw new Error("Computer Use child is missing its display binding");
+    }
+    return { input, release: async () => undefined };
+  }
+  const mcpServerPath = await existingBundle([
+    resolve(import.meta.dir, "agent/computer-use-mcp-server.js"),
+    resolve(import.meta.dir, "../dist-agent/computer-use-mcp-server.js"),
+  ]);
+  if (!mcpServerPath) {
+    throw new Error(
+      "Computer Use MCP bundle is missing; run `bun run agent:build`",
+    );
+  }
+  const client = await ComputerUseBoxClient.connect();
+  const assigned = await client.assign(input.agent.id);
+  try {
+    const parentRunId = input.diagnosticContext?.runId
+      ?? input.diagnosticContext?.workId
+      ?? randomUUID();
+    const binding = create(ComputerUseChildBindingSchema, {
+      parentRunId,
+      agentId: input.agent.id,
+      managedComputerId:
+        input.environment.BRIAR_MANAGED_COMPUTER_ID?.trim()
+        || "local-managed-computer",
+      displayIndex: assigned.assignment.displayIndex,
+      ownerToken: assigned.assignment.ownerToken,
+      provider: agentProviderToProto(input.agent.provider),
+    });
+    return {
+      input: {
+        ...input,
+        runKind: "parent",
+        computerUseBinding: binding,
+        computerUseMcpServerPath: mcpServerPath,
+      },
+      release: assigned.release,
+    };
+  } catch (error) {
+    await assigned.release().catch(() => undefined);
+    throw error;
+  }
+};
+
 export async function runDetachedProviderTurn(
+  input: DetachedProviderTurnInput,
+): Promise<DetachedProviderTurnResult> {
+  const prepared = await prepareComputerUseTurn(input);
+  try {
+    return await runPreparedDetachedProviderTurn(prepared.input);
+  } finally {
+    await prepared.release();
+  }
+}
+
+async function runPreparedDetachedProviderTurn(
   input: DetachedProviderTurnInput,
 ): Promise<DetachedProviderTurnResult> {
   const diagnose = createDiagnosticEmitter(input);
@@ -178,14 +264,10 @@ export async function runDetachedProviderTurn(
     diagnose("turn.binary_missing", { binaryName });
     throw new Error(`${binaryName} coding agent is not installed on this Worker`);
   }
-  const runnerPath = (
-    await Promise.all(
-      [
-        resolve(import.meta.dir, `agent/${runnerProvider}-runner.js`),
-        resolve(import.meta.dir, `../dist-agent/${runnerProvider}-runner.js`),
-      ].map(async (path) => ((await Bun.file(path).exists()) ? path : null)),
-    )
-  ).find((path): path is string => Boolean(path));
+  const runnerPath = await existingBundle([
+    resolve(import.meta.dir, `agent/${runnerProvider}-runner.js`),
+    resolve(import.meta.dir, `../dist-agent/${runnerProvider}-runner.js`),
+  ]);
   if (!runnerPath) {
     diagnose("turn.runner_missing", { provider, runnerProvider });
     throw new Error(
@@ -244,6 +326,9 @@ async function executeDetachedProviderTurn(
     delegationTargets: input.delegationTargets,
     skillCatalog,
     outputSchema: input.outputSchema ?? null,
+    runKind: input.runKind,
+    computerUseBinding: input.computerUseBinding,
+    computerUseMcpServerPath: input.computerUseMcpServerPath,
     agentBinary,
   }).request;
   const requestFrame = encodeSidecarRunRequest(runnerRequest);
