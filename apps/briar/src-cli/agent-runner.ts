@@ -705,6 +705,12 @@ export function channelReplyPromptSnapshot(
   ) {
     context.downloadedImagePaths = snapshot.downloadedImagePaths;
   }
+  if (
+    Array.isArray(snapshot.downloadedFilePaths) &&
+    snapshot.downloadedFilePaths.every((path) => typeof path === "string")
+  ) {
+    context.downloadedFilePaths = snapshot.downloadedFilePaths;
+  }
   return context;
 }
 

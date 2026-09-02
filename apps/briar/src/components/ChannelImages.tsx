@@ -1,4 +1,4 @@
-import { CircleAlert, X } from "lucide-react";
+import { CircleAlert, ExternalLink, FileText, X } from "lucide-react";
 import { Spinner } from "./ui/spinner";
 import {
   createContext,
@@ -13,8 +13,13 @@ import { useObjectUrl } from "../hooks/useObjectUrl";
 import type { ChannelMessageAttachment } from "../lib/channels-contract";
 import { loadChannelMessageAttachment } from "../lib/api";
 import { formatAttachmentBytes } from "../lib/issue-attachments";
+import {
+  channelPdfContentType,
+  isChannelPdfAttachment,
+} from "../lib/channel-attachments";
 import { isHtmlArtifactAttachment } from "../lib/agent-reply-attachments";
 import { issueAttachmentMarkdown } from "../lib/issue-markdown";
+import { useI18n } from "../i18n";
 import { HtmlArtifactPreview } from "./HtmlArtifactPreview";
 import { ImageLightbox } from "./ImageLightbox";
 
@@ -222,11 +227,22 @@ function ChannelDraftImage({
   image: DraftChannelImage;
   onRemove: () => void;
 }) {
+  const isPdf = isChannelPdfAttachment(image.file.type, image.file.name);
   const loadImage = useCallback(() => image.file, [image.file]);
-  const { source } = useObjectUrl(loadImage);
+  const { source } = useObjectUrl(isPdf ? null : loadImage);
   return (
-    <figure className="channel-image-draft">
-      {source ? <img alt={image.file.name} src={source} /> : null}
+    <figure className={`channel-image-draft${isPdf ? " is-pdf" : ""}`}>
+      <span className="channel-image-draft-preview">
+        {isPdf
+          ? <FileText aria-hidden="true" size={22} />
+          : source
+          ? <img alt="" src={source} />
+          : null}
+      </span>
+      <figcaption>
+        <strong title={image.file.name}>{image.file.name}</strong>
+        <small>{formatAttachmentBytes(image.file.size)}</small>
+      </figcaption>
       <button aria-label={`Remove ${image.file.name}`} onClick={onRemove} type="button">
         <X aria-hidden="true" size={13} />
       </button>
@@ -276,12 +292,70 @@ function ChannelMessageImage({
       />
     );
   }
+  if (isChannelPdfAttachment(attachment.contentType, attachment.filename)) {
+    return (
+      <ChannelMessagePdfAttachment
+        attachment={attachment}
+        interactive={interactive}
+        token={token}
+      />
+    );
+  }
   return (
     <ChannelMessageMediaAttachment
       attachment={attachment}
       interactive={interactive}
       token={token}
     />
+  );
+}
+
+function ChannelMessagePdfAttachment({
+  attachment,
+  interactive,
+  token,
+}: {
+  attachment: ChannelMessageAttachment;
+  interactive: boolean;
+  token: string;
+}) {
+  const { t } = useI18n();
+  const loadAttachment = useCallback(async () => {
+    const blob = await loadChannelMessageAttachment(token, attachment);
+    if (blob.type !== channelPdfContentType) {
+      throw new Error("PDF attachment content type changed during download");
+    }
+    return blob;
+  }, [attachment.url, token]);
+  const { failed, source } = useObjectUrl(interactive ? loadAttachment : null);
+
+  return (
+    <article className="channel-message-file-card">
+      <span className="channel-message-file-icon">
+        <FileText aria-hidden="true" size={24} />
+      </span>
+      <span className="channel-message-file-copy">
+        <strong title={attachment.filename}>{attachment.filename}</strong>
+        <small>{formatAttachmentBytes(attachment.byteSize)} · PDF</small>
+      </span>
+      {interactive
+        ? failed
+          ? <CircleAlert aria-label={t("run.loadFailed")} size={18} />
+          : source
+          ? (
+              <a
+                aria-label={`${t("common.open")} ${attachment.filename}`}
+                href={source}
+                rel="noreferrer"
+                target="_blank"
+              >
+                <ExternalLink aria-hidden="true" size={16} />
+                <span>{t("common.open")}</span>
+              </a>
+            )
+          : <Spinner aria-label={t("loading.churning")} size={18} />
+        : <span className="channel-message-file-kind">PDF</span>}
+    </article>
   );
 }
 

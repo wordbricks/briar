@@ -1,9 +1,10 @@
 import type { UploadFileMetadata } from "@briar/contracts/gen/briar/types/v1/upload_pb";
 import { isIssueAttachmentReference } from "../../src/lib/issue-markdown";
 import {
-  issueAttachmentMimeTypeFromName,
-  validateIssueAttachments,
-} from "../../src/lib/issue-attachments";
+  channelAttachmentMimeTypeFromName,
+  isChannelAttachmentTypeSupported,
+  validateChannelAttachments,
+} from "../../src/lib/channel-attachments";
 import { prepareChannelMessageUploadRows } from "./channel-message-upload-repository";
 import { HttpError } from "./http-response";
 import { requireChannelWriteAccess } from "./channel-route-access";
@@ -24,9 +25,11 @@ const applicationServices: ChannelMessageUploadApplicationServices = {
 
 const normalizedContentType = (value: string, filename: string) => {
   const declared = value.split(";", 1)[0]?.trim().toLowerCase() ?? "";
-  const contentType = declared || issueAttachmentMimeTypeFromName(filename);
-  if (!contentType?.startsWith("image/")) {
-    throw new HttpError(400, "Channel attachments must be images");
+  const contentType = declared === "" || declared === "application/octet-stream"
+    ? channelAttachmentMimeTypeFromName(filename)
+    : declared;
+  if (!contentType || !isChannelAttachmentTypeSupported(contentType)) {
+    throw new HttpError(400, "Channel attachments must be images or PDFs");
   }
   return contentType;
 };
@@ -59,7 +62,7 @@ export function channelMessageUploadMetadata(
   if (new Set(files.map((file) => file.clientId)).size !== files.length) {
     throw new HttpError(400, "Channel attachment client IDs must be unique");
   }
-  const validationError = validateIssueAttachments(
+  const validationError = validateChannelAttachments(
     files.map((file) => ({
       name: file.filename,
       type: file.contentType,

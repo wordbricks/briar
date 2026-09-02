@@ -39,6 +39,12 @@ export type IssueAttachmentCandidate = {
   type: string;
 };
 
+export type AttachmentValidationPolicy = {
+  allowedMimeTypes: ReadonlySet<string>;
+  mimeTypeFromName: (name: string) => string | null;
+  unsupportedTypeMessage: (name: string) => string;
+};
+
 /** Infer a supported media type from a filename when the browser omits or generalizes File.type. */
 export function issueAttachmentMimeTypeFromName(name: string): string | null {
   const extension = name.normalize("NFC").trim().split(".").pop()?.toLowerCase();
@@ -105,8 +111,9 @@ export function dataTransferHasFiles(
   return Array.from(dataTransfer.items ?? []).some((item) => item.kind === "file");
 }
 
-export function validateIssueAttachments(
+export function validateAttachments(
   attachments: readonly IssueAttachmentCandidate[],
+  policy: AttachmentValidationPolicy,
 ): string | null {
   if (attachments.length > maxIssueAttachmentCount) {
     return `첨부 파일은 최대 ${maxIssueAttachmentCount}개까지 추가할 수 있습니다.`;
@@ -118,11 +125,11 @@ export function validateIssueAttachments(
       return "첨부 파일 이름이 유효하지 않습니다.";
     }
     const type =
-      attachment.type && allowedMimeTypes.has(attachment.type)
+      attachment.type && policy.allowedMimeTypes.has(attachment.type)
         ? attachment.type
-        : issueAttachmentMimeTypeFromName(name) ?? attachment.type;
-    if (!allowedMimeTypes.has(type)) {
-      return `${name}은(는) 지원하지 않는 이미지·영상 형식입니다.`;
+        : policy.mimeTypeFromName(name) ?? attachment.type;
+    if (!policy.allowedMimeTypes.has(type)) {
+      return policy.unsupportedTypeMessage(name);
     }
     if (!Number.isSafeInteger(attachment.size) || attachment.size <= 0) {
       return `${name}은(는) 빈 파일이거나 크기를 확인할 수 없습니다.`;
@@ -136,6 +143,17 @@ export function validateIssueAttachments(
     return "첨부 파일의 전체 크기는 25MB를 넘을 수 없습니다.";
   }
   return null;
+}
+
+export function validateIssueAttachments(
+  attachments: readonly IssueAttachmentCandidate[],
+): string | null {
+  return validateAttachments(attachments, {
+    allowedMimeTypes,
+    mimeTypeFromName: issueAttachmentMimeTypeFromName,
+    unsupportedTypeMessage: (name) =>
+      `${name}은(는) 지원하지 않는 이미지·영상 형식입니다.`,
+  });
 }
 
 export function formatAttachmentBytes(bytes: number) {

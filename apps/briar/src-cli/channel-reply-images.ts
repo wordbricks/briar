@@ -4,40 +4,45 @@ import type { QueuedAttachment } from "@briar/contracts/gen/briar/worker/v1/work
 import { matchChannelReplyAttachmentPath } from "../src/lib/channel-reply-attachment-path";
 import { channelReplyClaimTokenHeader } from "../src/lib/channels-contract";
 import {
-  issueAttachmentMimeTypes,
-  validateIssueAttachments,
-} from "../src/lib/issue-attachments";
+  channelAttachmentMimeTypes,
+  channelPdfContentType,
+  validateChannelAttachments,
+} from "../src/lib/channel-attachments";
 import type { AgentImageAttachment } from "../src-agent/runner-attachments";
 
-export const channelReplyImageDirectoryName = ".briar-channel-images";
+export const channelReplyAttachmentDirectoryName = ".briar-channel-attachments";
 
 type ChannelReplyImageFetcher = (
   input: string | URL | Request,
   init?: RequestInit,
 ) => Promise<Response>;
 
-const supportedChannelReplyImageTypes = new Set<string>(
-  issueAttachmentMimeTypes.filter(
-    (contentType) => contentType.startsWith("image/") &&
-      contentType !== "image/svg+xml",
+const supportedChannelReplyAttachmentTypes = new Set<string>(
+  channelAttachmentMimeTypes.filter((contentType) =>
+    contentType === channelPdfContentType ||
+    contentType.startsWith("image/") && contentType !== "image/svg+xml"
   ),
 );
 
-const imageExtension = (contentType: string) =>
-  contentType === "image/jpeg" ? "jpg" : contentType.slice("image/".length);
+const attachmentExtension = (contentType: string) =>
+  contentType === "image/jpeg"
+    ? "jpg"
+    : contentType === channelPdfContentType
+    ? "pdf"
+    : contentType.slice("image/".length);
 
-export function channelReplyImages(
+export function channelReplyAttachments(
   triggerAttachments: readonly QueuedAttachment[],
 ): QueuedAttachment[] {
   const unsupported = triggerAttachments.find(
-    (attachment) => !supportedChannelReplyImageTypes.has(attachment.contentType),
+    (attachment) => !supportedChannelReplyAttachmentTypes.has(attachment.contentType),
   );
   if (unsupported) {
     throw new Error(
-      `Channel reply image type is unsupported: ${unsupported.contentType}`,
+      `Channel reply attachment type is unsupported: ${unsupported.contentType}`,
     );
   }
-  const validationError = validateIssueAttachments(
+  const validationError = validateChannelAttachments(
     triggerAttachments.map((attachment) => ({
       name: attachment.filename,
       size: attachment.byteSize,
@@ -48,39 +53,39 @@ export function channelReplyImages(
   return [...triggerAttachments];
 }
 
-function channelReplyImageUrl(input: {
+function channelReplyAttachmentUrl(input: {
   apiUrl: string;
   organizationId: string;
   workId: string;
-  image: QueuedAttachment;
+  attachment: QueuedAttachment;
 }) {
-  const match = matchChannelReplyAttachmentPath(input.image.url);
+  const match = matchChannelReplyAttachmentPath(input.attachment.url);
   if (
     !match ||
     match.organizationId !== input.organizationId ||
     match.workId !== input.workId ||
-    match.attachmentId !== input.image.id
+    match.attachmentId !== input.attachment.id
   ) {
-    throw new Error("Channel reply image URL is outside the active claim scope");
+    throw new Error("Channel reply attachment URL is outside the active claim scope");
   }
   const apiUrl = new URL(input.apiUrl);
-  const imageUrl = new URL(input.image.url, apiUrl);
+  const attachmentUrl = new URL(input.attachment.url, apiUrl);
   if (
-    imageUrl.origin !== apiUrl.origin ||
-    imageUrl.pathname !== input.image.url ||
-    imageUrl.search !== "" ||
-    imageUrl.hash !== ""
+    attachmentUrl.origin !== apiUrl.origin ||
+    attachmentUrl.pathname !== input.attachment.url ||
+    attachmentUrl.search !== "" ||
+    attachmentUrl.hash !== ""
   ) {
-    throw new Error("Channel reply image URL is outside the active claim scope");
+    throw new Error("Channel reply attachment URL is outside the active claim scope");
   }
-  return imageUrl;
+  return attachmentUrl;
 }
 
-export function channelReplyImageDirectory(workspacePath: string) {
-  return join(workspacePath, channelReplyImageDirectoryName);
+export function channelReplyAttachmentDirectory(workspacePath: string) {
+  return join(workspacePath, channelReplyAttachmentDirectoryName);
 }
 
-export async function downloadChannelReplyImages(input: {
+export async function downloadChannelReplyAttachments(input: {
   apiUrl: string;
   workerToken: string;
   organizationId: string;
@@ -90,12 +95,14 @@ export async function downloadChannelReplyImages(input: {
   workspacePath: string;
   fetcher?: ChannelReplyImageFetcher;
 }) {
-  const images = channelReplyImages(input.triggerAttachments);
-  const directory = channelReplyImageDirectory(input.workspacePath);
-  if (images.length === 0) {
+  const attachments = channelReplyAttachments(input.triggerAttachments);
+  const directory = channelReplyAttachmentDirectory(input.workspacePath);
+  if (attachments.length === 0) {
     return {
       directory,
       paths: [] as string[],
+      imagePaths: [] as string[],
+      filePaths: [] as string[],
       attachments: [] as AgentImageAttachment[],
     };
   }
@@ -104,41 +111,41 @@ export async function downloadChannelReplyImages(input: {
   const paths: string[] = [];
   await mkdir(directory, { recursive: true, mode: 0o700 });
   try {
-    for (const image of images) {
+    for (const attachment of attachments) {
       const response = await fetcher(
-        channelReplyImageUrl({
+        channelReplyAttachmentUrl({
           apiUrl: input.apiUrl,
           organizationId: input.organizationId,
           workId: input.workId,
-          image,
+          attachment,
         }),
         {
           redirect: "error",
           headers: {
-            Accept: image.contentType,
+            Accept: attachment.contentType,
             Authorization: `Bearer ${input.workerToken}`,
             [channelReplyClaimTokenHeader]: input.claimToken,
           },
         },
       );
       if (!response.ok) {
-        throw new Error(`Channel reply image download failed (${response.status})`);
+        throw new Error(`Channel reply attachment download failed (${response.status})`);
       }
       const responseType = response.headers.get("Content-Type")?.split(";", 1)[0];
-      if (responseType !== image.contentType) {
-        throw new Error("Channel reply image content type changed during download");
+      if (responseType !== attachment.contentType) {
+        throw new Error("Channel reply attachment content type changed during download");
       }
       const contentLength = response.headers.get("Content-Length");
-      if (contentLength !== null && Number(contentLength) !== image.byteSize) {
-        throw new Error("Channel reply image size changed during download");
+      if (contentLength !== null && Number(contentLength) !== attachment.byteSize) {
+        throw new Error("Channel reply attachment size changed during download");
       }
       const bytes = new Uint8Array(await response.arrayBuffer());
-      if (bytes.byteLength !== image.byteSize) {
-        throw new Error("Channel reply image size changed during download");
+      if (bytes.byteLength !== attachment.byteSize) {
+        throw new Error("Channel reply attachment size changed during download");
       }
       const path = join(
         directory,
-        `${image.id}.${imageExtension(image.contentType)}`,
+        `${attachment.id}.${attachmentExtension(attachment.contentType)}`,
       );
       await writeFile(path, bytes, { mode: 0o600 });
       paths.push(path);
@@ -146,12 +153,22 @@ export async function downloadChannelReplyImages(input: {
     return {
       directory,
       paths,
-      attachments: images.map((image, index) => ({
-        type: "image" as const,
-        path: paths[index]!,
-        name: image.filename,
-        mimeType: image.contentType,
-      })),
+      imagePaths: attachments.flatMap((attachment, index) =>
+        attachment.contentType.startsWith("image/") ? [paths[index]!] : []
+      ),
+      filePaths: attachments.flatMap((attachment, index) =>
+        attachment.contentType === channelPdfContentType ? [paths[index]!] : []
+      ),
+      attachments: attachments.flatMap((attachment, index) =>
+        attachment.contentType.startsWith("image/")
+          ? [{
+              type: "image" as const,
+              path: paths[index]!,
+              name: attachment.filename,
+              mimeType: attachment.contentType,
+            }]
+          : []
+      ),
     };
   } catch (error) {
     await rm(directory, { recursive: true, force: true });
@@ -160,11 +177,11 @@ export async function downloadChannelReplyImages(input: {
 }
 
 /**
- * Private channel images must disappear before a detached analysis worktree is
+ * Private channel attachments must disappear before a detached analysis worktree is
  * removed. Keeping the operations in one helper makes that lifecycle ordering
  * explicit and testable for every success and failure path.
  */
-export async function cleanupChannelReplyImages(
+export async function cleanupChannelReplyAttachments(
   directory: string,
   removeWorkspace?: () => Promise<void>,
 ) {
