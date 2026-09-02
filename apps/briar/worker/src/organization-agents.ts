@@ -2,6 +2,7 @@ import {
   type ChannelAgentProvider as AgentProvider,
   type ChannelAgentSummary,
 } from "../../src/lib/channels-contract";
+import type { ComputerUsePolicy } from "../../src/lib/computer-use-contract";
 import {
   assertAgentSkillReplacementAllowed,
   agentSkillJson,
@@ -27,6 +28,7 @@ export type OrganizationAgentRow = {
   responsibility: string;
   skill_markdown?: string;
   effort: AgentSkillEffort | null;
+  computer_use_policy: ComputerUsePolicy;
   designated_worker_id?: string | null;
   designated_worker_label?: string | null;
   created_at: string;
@@ -43,6 +45,7 @@ export const organizationAgentJson = (
   provider: row.provider,
   model: row.model,
   effort: row.effort,
+  computerUsePolicy: row.computer_use_policy,
   projectId: row.project_id,
   projectName: row.project_name,
   description: row.description,
@@ -55,7 +58,8 @@ const agentSelect = `
   select agent.id, agent.organization_id, agent.project_id,
          project.name as project_name, agent.name, agent.avatar,
          agent.provider, agent.model, agent.description, agent.responsibility,
-         agent.skill_markdown, agent.effort, agent.designated_worker_id,
+         agent.skill_markdown, agent.effort, agent.computer_use_policy,
+         agent.designated_worker_id,
          agent.designated_worker_label, agent.created_at, agent.updated_at
   from briar_project_agents agent
   left join briar_teams project on project.id = agent.project_id`;
@@ -116,6 +120,7 @@ export async function createOrganizationAgent(
     description?: string;
     responsibility: string;
     effort: AgentSkillEffort | null;
+    computerUsePolicy?: ComputerUsePolicy;
     skills?: AgentSkillInput[];
     createdAt: string;
   },
@@ -129,8 +134,9 @@ export async function createOrganizationAgent(
     db.prepare(
       `insert into briar_project_agents (
          id, organization_id, project_id, name, provider, model,
-         description, responsibility, effort, created_at, updated_at
-       ) values (?, ?, null, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         description, responsibility, effort, computer_use_policy,
+         created_at, updated_at
+       ) values (?, ?, null, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(
       input.id,
       input.organizationId,
@@ -140,6 +146,7 @@ export async function createOrganizationAgent(
       input.description ?? "",
       input.responsibility,
       input.effort,
+      input.computerUsePolicy ?? "disabled",
       input.createdAt,
       input.createdAt,
     ),
@@ -159,6 +166,7 @@ export async function updateOrganizationAgent(
     description?: string;
     responsibility: string;
     effort: AgentSkillEffort | null;
+    computerUsePolicy?: ComputerUsePolicy;
     skills: AgentSkillInput[];
     updatedAt: string;
   },
@@ -184,7 +192,8 @@ export async function updateOrganizationAgent(
     db.prepare(
       `update briar_project_agents
        set name = ?, provider = ?, model = ?, description = ?, responsibility = ?,
-           effort = ?, updated_at = ?
+           effort = ?, computer_use_policy = coalesce(?, computer_use_policy),
+           updated_at = ?
        where id = ? and organization_id = ? and project_id is null`,
     ).bind(
       input.name,
@@ -193,6 +202,7 @@ export async function updateOrganizationAgent(
       input.description ?? existing.description,
       input.responsibility,
       input.effort,
+      input.computerUsePolicy ?? null,
       input.updatedAt,
       input.agentId,
       input.organizationId,

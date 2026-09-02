@@ -1,12 +1,12 @@
 #!/bin/sh
 set -eu
 
-if [ "$#" -ne 1 ]; then
-  echo "Usage: briar-open-browser <url>" >&2
+if [ "$#" -gt 1 ]; then
+  echo "Usage: briar-open-browser [url]" >&2
   exit 2
 fi
 
-url="$1"
+url="${1:-https://www.google.com/}"
 case "$url" in
   http://*|https://*) ;;
   *)
@@ -15,9 +15,27 @@ case "$url" in
     ;;
 esac
 
+profile_directory="${BRIAR_BROWSER_PROFILE_DIRECTORY:-}"
+if [ -n "$profile_directory" ]; then
+  case "$profile_directory" in
+    /var/lib/briar-computer-use/profiles/display-[2-9]|\
+    /var/lib/briar-computer-use/profiles/display-[1-9][0-9]|\
+    /var/lib/briar-computer-use/profiles/display-100) ;;
+    *)
+      echo "BRIAR_BROWSER_PROFILE_DIRECTORY is not an assigned Computer Use profile" >&2
+      exit 2
+      ;;
+  esac
+  /usr/bin/install -d -m 0700 "$profile_directory"
+  set -- --user-data-dir="$profile_directory"
+else
+  set --
+fi
+
 /usr/bin/nohup /usr/bin/setsid --fork \
   /usr/bin/google-chrome-stable \
   --no-first-run \
   --no-default-browser-check \
+  "$@" \
   --new-window "$url" \
   </dev/null >/dev/null 2>&1 &

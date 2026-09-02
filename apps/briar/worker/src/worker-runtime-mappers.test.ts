@@ -67,4 +67,52 @@ describe("Worker runtime protobuf mapping", () => {
     );
     expect(MAX_STORED_WORKER_RUNTIME_BYTES).toBe(1_048_576);
   });
+
+  it("accepts and round-trips a valid Computer Use capability", () => {
+    const metadata = workerRuntimeMetadataFromProto(workerRuntimeFixture({
+      providers: ["grok"],
+      computerUse: {
+        protocol: 1,
+        transport: "connectrpc-resource-exec",
+        providers: ["grok"],
+        maxWindows: 99,
+        sharedDesktop: true,
+        humanTakeover: true,
+        schemaDigest: "a".repeat(64),
+      },
+    }));
+
+    expect(metadata.computerUse).toEqual({
+      protocol: 1,
+      transport: "connectrpc-resource-exec",
+      providers: ["grok"],
+      maxWindows: 99,
+      sharedDesktop: true,
+      humanTakeover: true,
+      schemaDigest: "a".repeat(64),
+    });
+    expect(
+      workerRuntimeMetadataFromStoredProtoJson(metadata.runtimeProtoJson)
+        .computerUse,
+    ).toEqual(metadata.computerUse);
+  });
+
+  it("rejects Computer Use claims that are not backed by a healthy provider", () => {
+    expect(() => workerRuntimeMetadataFromProto(workerRuntimeFixture({
+      providers: ["codex"],
+      computerUse: {
+        protocol: 1,
+        transport: "connectrpc-resource-exec",
+        providers: ["grok"],
+        maxWindows: 99,
+        sharedDesktop: true,
+        humanTakeover: true,
+        schemaDigest: "a".repeat(64),
+      },
+    }))).toThrow(
+      new WorkerRuntimeValidationError(
+        "Computer Use providers must also be healthy",
+      ),
+    );
+  });
 });

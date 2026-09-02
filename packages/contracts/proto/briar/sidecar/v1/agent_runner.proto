@@ -3,6 +3,7 @@ syntax = "proto3";
 package briar.sidecar.v1;
 
 import "briar/types/v1/agent_event.proto";
+import "briar/types/v1/provider.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 
@@ -43,6 +44,22 @@ enum RunErrorCode {
   RUN_ERROR_CODE_PROVIDER_PROTOCOL_ERROR = 3;
   RUN_ERROR_CODE_PROVIDER_FAILED = 4;
   RUN_ERROR_CODE_INTERNAL = 5;
+}
+
+enum AgentRunKind {
+  AGENT_RUN_KIND_UNSPECIFIED = 0;
+  AGENT_RUN_KIND_PARENT = 1;
+  AGENT_RUN_KIND_COMPUTER_USE = 2;
+}
+
+message ComputerUseChildBinding {
+  string parent_run_id = 1;
+  string child_run_id = 2;
+  string agent_id = 3;
+  string managed_computer_id = 4;
+  int32 display_index = 5;
+  string owner_token = 6;
+  briar.types.v1.AgentProvider provider = 7;
 }
 
 message ParentToRunner {
@@ -88,6 +105,9 @@ message RunRequest {
   // A runner must reject an empty or mismatched fingerprint; there is no
   // protocol negotiation or legacy fallback between co-shipped binaries.
   bytes protocol_fingerprint = 15;
+  AgentRunKind run_kind = 16;
+  optional ComputerUseChildBinding computer_use_binding = 17;
+  optional string computer_use_mcp_server_path = 18;
 }
 
 message JsonSchema {

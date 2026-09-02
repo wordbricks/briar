@@ -21,6 +21,7 @@ import {
   type ProjectAgentSession as ProjectAgentSessionMessage,
   type ProjectAgentSkill as ProjectAgentSkillMessage,
 } from "@briar/contracts/gen/briar/app/v1/agent_pb";
+import { ComputerUsePolicy as ProtoComputerUsePolicy } from "@briar/contracts/gen/briar/types/v1/computer_use_pb";
 import type { GetProjectAgentTranscriptRequest } from "@briar/contracts/gen/briar/app/v1/agent_transcript_pb";
 import type {
   AutoHuntSession,
@@ -67,6 +68,18 @@ const requireAgentClient = () => {
   }
   return agentClient;
 };
+
+const computerUsePolicyFromProto = (
+  value: ProtoComputerUsePolicy,
+): "disabled" | "unattended" =>
+  value === ProtoComputerUsePolicy.UNATTENDED ? "unattended" : "disabled";
+
+const computerUsePolicyToProto = (
+  value: "disabled" | "unattended",
+): ProtoComputerUsePolicy =>
+  value === "unattended"
+    ? ProtoComputerUsePolicy.UNATTENDED
+    : ProtoComputerUsePolicy.DISABLED;
 
 export const skillKindFromProto = (value: ProtoAgentSkillKind): ProjectAgentSkillKind => {
   switch (value) {
@@ -154,6 +167,7 @@ export const projectAgentFromMessage = (agent: ProjectAgentMessage): ProjectAgen
   provider: agentProviderFromProto(agent.provider),
   model: agent.model ?? null,
   effort: agent.effort ?? null,
+  computerUsePolicy: computerUsePolicyFromProto(agent.computerUsePolicy),
   designatedWorkerId: agent.designatedWorkerId ?? null,
   designatedWorkerLabel: agent.designatedWorkerLabel ?? null,
   description: agent.description ?? "",
@@ -175,6 +189,7 @@ export const organizationAgentFromMessage = (
   provider: agentProviderFromProto(agent.provider),
   model: agent.model ?? null,
   effort: agent.effort ?? null,
+  computerUsePolicy: computerUsePolicyFromProto(agent.computerUsePolicy),
   projectId: agent.projectId ?? null,
   projectName: agent.projectName ?? null,
   responsibility: agent.responsibility,
@@ -539,6 +554,7 @@ const projectAgentScheduleRunFromMessage = (
       provider: agentProviderFromProto(agent.provider),
       model: agent.model ?? null,
       effort: agent.effort ?? null,
+      computerUsePolicy: computerUsePolicyFromProto(agent.computerUsePolicy),
       description: agent.description ?? "",
       responsibility: agent.responsibility,
       skill: agent.skill,
@@ -598,6 +614,7 @@ export async function createOrganizationAgent(
     description?: string;
     responsibility: string;
     effort?: ModelEffort | null;
+    computerUsePolicy?: "disabled" | "unattended";
     skills?: ChannelAgentSkillInput[];
   },
 ): Promise<{ agent: ChannelAgentSummary }> {
@@ -611,6 +628,9 @@ export async function createOrganizationAgent(
       description: input.description,
       responsibility: input.responsibility,
       effort: input.effort ?? undefined,
+      computerUsePolicy: computerUsePolicyToProto(
+        input.computerUsePolicy ?? "disabled",
+      ),
       skills: (input.skills ?? []).map(projectAgentSkillToMessage),
     },
     appCallOptions(token),
@@ -633,6 +653,7 @@ export async function updateOrganizationAgent(
     description?: string;
     responsibility: string;
     effort?: ModelEffort | null;
+    computerUsePolicy?: "disabled" | "unattended";
     skills: ChannelAgentSkillInput[];
   },
 ): Promise<{ agent: ChannelAgentSummary }> {
@@ -647,6 +668,9 @@ export async function updateOrganizationAgent(
       description: input.description,
       responsibility: input.responsibility,
       effort: input.effort ?? undefined,
+      computerUsePolicy: input.computerUsePolicy === undefined
+        ? undefined
+        : computerUsePolicyToProto(input.computerUsePolicy),
       skills: input.skills.map(projectAgentSkillToMessage),
     },
     appCallOptions(token),
@@ -719,6 +743,9 @@ export async function createProjectAgent(
       provider: agentProviderToProto(input.provider),
       model: input.model ?? undefined,
       effort: input.effort ?? undefined,
+      computerUsePolicy: computerUsePolicyToProto(
+        input.computerUsePolicy ?? "disabled",
+      ),
       designatedWorkerId: input.designatedWorkerId ?? undefined,
       description: input.description,
       responsibility: input.responsibility,
@@ -765,6 +792,9 @@ export async function updateProjectAgent(
           : input.effort === null
             ? { case: "clearEffort", value: {} }
             : { case: "effort", value: input.effort },
+      computerUsePolicy: input.computerUsePolicy === undefined
+        ? undefined
+        : computerUsePolicyToProto(input.computerUsePolicy),
       designatedWorkerUpdate:
         input.designatedWorkerId === undefined
           ? { case: undefined }

@@ -12,6 +12,11 @@ import {
   type ManagedComputerRemoteRelayControlFrame,
 } from "../src/lib/managed-computer-remote-protocol";
 import { ManagedComputerSetupAgent } from "./managed-computer-setup-agent";
+import {
+  configuredComputerUseAssignmentPath,
+  FileComputerUseAssignmentStore,
+} from "./computer-use-desktop-manager";
+import { computerUseRfbPort } from "./computer-use-window-supervisor";
 
 const RemoteAgentConfig = Schema.Struct({
   credential: Schema.String.check(
@@ -68,6 +73,34 @@ export function managedComputerRemoteDisplayEndpoint(environment = process.env) 
   return { host, port };
 }
 
+export interface ManagedComputerRemoteDisplayResolver {
+  resolve(agentId?: string): Promise<{ readonly host: string; readonly port: number }>;
+}
+
+export function managedComputerRemoteDisplayResolver(
+  environment: NodeJS.ProcessEnv = process.env,
+): ManagedComputerRemoteDisplayResolver {
+  const primary = managedComputerRemoteDisplayEndpoint(environment);
+  const assignments = new FileComputerUseAssignmentStore(
+    configuredComputerUseAssignmentPath(environment),
+  );
+  return {
+    resolve: async (agentId) => {
+      if (agentId === undefined) return primary;
+      const assignment = (await assignments.load()).find(
+        (candidate) => candidate.agentId === agentId,
+      );
+      if (assignment === undefined) {
+        throw new Error("Computer Use desktop assignment was not found");
+      }
+      return {
+        host: primary.host,
+        port: computerUseRfbPort(assignment.displayIndex),
+      };
+    },
+  };
+}
+
 function event(name: string, detail: Record<string, unknown> = {}) {
   console.log(JSON.stringify({ event: name, ...detail }));
 }
@@ -98,7 +131,7 @@ export class ManagedComputerRemoteSessionAgent {
 
   constructor(
     private readonly config: ManagedComputerRemoteAgentConfig,
-    private readonly display = managedComputerRemoteDisplayEndpoint(),
+    private readonly displayResolver = managedComputerRemoteDisplayResolver(),
   ) {}
 
   start() {
@@ -195,9 +228,20 @@ export class ManagedComputerRemoteSessionAgent {
     this.activeSessionId = control.sessionId;
     if (this.localSocket || this.localConnect) return;
     const sessionId = control.sessionId;
+    let display: { readonly host: string; readonly port: number };
+    try {
+      display = await this.displayResolver.resolve(control.agentId);
+    } catch (error) {
+      event("remote_display_assignment_failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      this.reportDisplayFailure("display_connect_failed", sessionId);
+      return;
+    }
+    if (this.activeSessionId !== sessionId) return;
     const localConnect = Bun.connect({
-      hostname: this.display.host,
-      port: this.display.port,
+      hostname: display.host,
+      port: display.port,
       socket: {
         open: (socket) => {
           if (this.activeSessionId !== sessionId) {
@@ -210,6 +254,7 @@ export class ManagedComputerRemoteSessionAgent {
           this.pendingInputBytes = 0;
           event("remote_display_connected", {
             managedComputerId: this.config.managedComputerId,
+            target: control.agentId ? "agent" : "primary",
           });
         },
         data: (socket, data) => {

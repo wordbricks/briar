@@ -44,6 +44,7 @@
 		30E4605D2D2ABE4D53975FE2 /* issue.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9178761C6C06EBFE0C17E556 /* issue.pb.swift */; };
 		32C49F7F08A6EC8D1D32DD1B /* CompanionViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B0BE22C1849DA483E8B7BFF /* CompanionViews.swift */; };
 		33C89C70A3059DB3849337A0 /* dm_memory.mock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4684CCE43652DD2F547108EA /* dm_memory.mock.swift */; };
+		37ACD61615A175D692E72641 /* computer_use.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 742814409F618CD4D5422095 /* computer_use.pb.swift */; };
 		3B4D6409E11267AE58A8C0F2 /* ProfileImageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DBAE843F4181E4041EE9A69 /* ProfileImageTests.swift */; };
 		3B68476B05A282979F276747 /* fleet.connect.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D4C094542374E3999AFEB38 /* fleet.connect.swift */; };
 		3C2F3D1E9973B1EA2A461D44 /* CompanionRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D2CC4C3D7F505A0B3A0C564 /* CompanionRootView.swift */; };
@@ -331,6 +332,7 @@
 		71BEF122F4A451C82E235ED0 /* issue.mock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = issue.mock.swift; sourceTree = "<group>"; };
 		729B823EA515249BC7C460F2 /* IssueMutationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueMutationStore.swift; sourceTree = "<group>"; };
 		73C8DE502A3DAA054172B395 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		742814409F618CD4D5422095 /* computer_use.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = computer_use.pb.swift; sourceTree = "<group>"; };
 		7676C67C89753875EA0F9DDE /* github.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = github.pb.swift; sourceTree = "<group>"; };
 		78BCFF20096EA979837ADEBC /* RealtimeConnect.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealtimeConnect.swift; sourceTree = "<group>"; };
 		78CFA41B950A7B2C95B54652 /* dashboard.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = dashboard.pb.swift; sourceTree = "<group>"; };
@@ -645,6 +647,7 @@
 			children = (
 				26B48D4369CF90BDF9892925 /* agent_event.pb.swift */,
 				A231FC159634EA821A13C4D3 /* agent_execution.pb.swift */,
+				742814409F618CD4D5422095 /* computer_use.pb.swift */,
 				D388D7198B7FA49827CD3F52 /* error.pb.swift */,
 				8C38A5FA46AD37662E8ABC31 /* github_identity.pb.swift */,
 				279214785628E863F8B7FB7A /* provider.pb.swift */,
@@ -1065,6 +1068,7 @@
 				80D11047E59F6029C83E8470 /* channel.connect.swift in Sources */,
 				B1E8E711BE8CE2B5234E617D /* channel.pb.swift in Sources */,
 				4E6CAE6AE05A124E46CF5411 /* common.pb.swift in Sources */,
+				37ACD61615A175D692E72641 /* computer_use.pb.swift in Sources */,
 				6B326F011260ACFD4E776FA8 /* dashboard.connect.swift in Sources */,
 				52A457910284AD216750AE87 /* dashboard.pb.swift in Sources */,
 				4AE2A8C703E6920D4F955702 /* dm_memory.connect.swift in Sources */,

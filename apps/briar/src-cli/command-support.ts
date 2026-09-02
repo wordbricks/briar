@@ -63,6 +63,12 @@ function providerExecutionEnvironment(
     ...environment,
     BRIAR_BROWSER_AUTOMATION_PROVIDER:
       config.appSettings.browserAutomationProvider,
+    ...(config.managedComputer
+      ? {
+          BRIAR_MANAGED_COMPUTER_ID:
+            config.managedComputer.managedComputerId,
+        }
+      : {}),
   };
   if (provider !== "openrouter") return browserEnvironment;
   const apiKey = config.openrouterApiKey?.trim();

@@ -18,6 +18,7 @@ export const projectAgentJson = (row: ProjectAgentRow) => ({
   provider: row.provider,
   model: row.model,
   effort: row.effort,
+  computerUsePolicy: row.computer_use_policy,
   designatedWorkerId: row.designated_worker_id,
   designatedWorkerLabel: row.designated_worker_label,
   description: row.description,

@@ -21,6 +21,7 @@ import {
   channelAgentSkillInputSchema,
   organizationAgentInputSchema,
 } from "../../src/lib/channels-contract";
+import { ComputerUsePolicySchema } from "../../src/lib/computer-use-contract";
 import { IsoDateTimeWithOffset } from "../../src/lib/date-time-schema";
 import {
   defaulted,
@@ -84,6 +85,7 @@ export const ProjectAgentInput = strictSchema(Schema.Struct({
   provider: Schema.Literals(agentProviders),
   model: Schema.optional(Schema.NullOr(trimmedText(1, 100))),
   effort: Schema.optional(Schema.NullOr(ModelEffort)),
+  computerUsePolicy: Schema.optional(ComputerUsePolicySchema),
   designatedWorkerId: Schema.optional(Schema.NullOr(trimmedText(1, 128))),
   responsibility: trimmedText(1, agentResponsibilityMaxLength),
   skills: Schema.optional(

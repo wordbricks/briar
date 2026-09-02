@@ -512,6 +512,9 @@ export const organizationAgentInputSchema = strict(Schema.Struct({
     Schema.isLengthBetween(1, agentResponsibilityMaxLength),
   ),
   effort: nullableDefault(ModelEffort),
+  computerUsePolicy: Schema.optional(
+    Schema.Literals(["disabled", "unattended"]),
+  ),
   skills: Schema.optional(
     mutableArray(channelAgentSkillInputSchema).check(
       Schema.isMaxLength(agentSkillsMaxCount),
@@ -618,6 +621,7 @@ export type ChannelAgentSummary = {
   provider: ChannelAgentProvider;
   model: string | null;
   effort: ChannelAgentEffort | null;
+  computerUsePolicy?: "disabled" | "unattended";
   projectId: string | null;
   projectName: string | null;
   responsibility: string;

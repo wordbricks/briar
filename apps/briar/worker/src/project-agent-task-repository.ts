@@ -127,6 +127,7 @@ export async function claimNextProjectAgentTask(
     claimTokenHash: string;
     claimedAt: string;
     leaseExpiresAt: string;
+    computerUseProvidersJson?: string;
   },
 ) {
   // Migration 0092 is a deployment prerequisite, so this hot path never
@@ -167,6 +168,13 @@ export async function claimNextProjectAgentTask(
              from briar_execution_worker_healthy_providers healthy
              where healthy.worker_id = ?
                and healthy.provider = skill.provider
+           )
+           and (
+             agent.computer_use_policy = 'disabled'
+             or exists (
+               select 1 from json_each(?) computer_provider
+               where computer_provider.value = skill.provider
+             )
            )
            ${skillExecutionEligibility}
            and exists (
@@ -232,6 +240,7 @@ export async function claimNextProjectAgentTask(
       projectId,
       input.workerId,
       input.workerId,
+      input.computerUseProvidersJson ?? "[]",
       input.workerId,
       input.claimedAt,
       input.claimedAt,
@@ -255,11 +264,13 @@ export async function claimNextProjectAgentTask(
   if (claimed.skill_execution_proposal_id) {
     const approval = await db
       .prepare(
-        `select approval.*, skill.description as skill_description
+        `select approval.*, skill.description as skill_description,
+                agent.computer_use_policy as agent_computer_use_policy
          from briar_agent_skill_execution_approval_audit approval
          join briar_agent_skills skill
            on skill.id = approval.skill_id
           and skill.agent_id = approval.agent_id
+         join briar_project_agents agent on agent.id = approval.agent_id
          where approval.proposal_id = ? and approval.project_id = ?
            and approval.result_session_id = ?
            and approval.agent_id = ? and approval.skill_id = ?
@@ -285,6 +296,7 @@ export async function claimNextProjectAgentTask(
         provider: ProjectAgentProvider;
         model: string | null;
         effort: AgentSkillEffort | null;
+        agent_computer_use_policy: ClaimedProjectAgentTaskRow["agent_computer_use_policy"];
         execution_mode: "conversation" | "task";
         approval_policy: "invoke_is_consent" | "explicit";
         approved_at: string;
@@ -317,6 +329,7 @@ export async function claimNextProjectAgentTask(
       agent_provider: approval.provider,
       agent_model: approval.model,
       agent_effort: approval.effort,
+      agent_computer_use_policy: approval.agent_computer_use_policy,
       agent_responsibility: approval.agent_responsibility,
       selected_skill_id: approval.skill_id,
       selected_skill_name: approval.skill_name,
@@ -327,6 +340,7 @@ export async function claimNextProjectAgentTask(
     .prepare(
       `select job.*, agent.name as agent_name, skill.provider as agent_provider,
               skill.model as agent_model, skill.effort as agent_effort,
+              agent.computer_use_policy as agent_computer_use_policy,
               agent.responsibility as agent_responsibility,
               skill.id as selected_skill_id,
               skill.name as selected_skill_name

@@ -214,6 +214,7 @@ export async function claimNextIssueAgentReply(
     claimedAt: string;
     leaseExpiresAt: string;
     staleBefore: string;
+    computerUseProvidersJson?: string;
   },
 ) {
   // Migration 0092 is a deployment prerequisite, so every claim enforces the
@@ -347,6 +348,24 @@ export async function claimNextIssueAgentReply(
              )
            )
            ${selectedSkillGuard}
+           and (
+             not exists (
+               select 1
+               from briar_project_agents computer_agent
+               where computer_agent.id = coalesce(job.agent_id, run.agent_id)
+                 and computer_agent.project_id = run.project_id
+                 and computer_agent.computer_use_policy = 'unattended'
+             )
+             or exists (
+               select 1 from json_each(?) computer_provider
+               where computer_provider.value = case when exists (
+                 select 1
+                 from briar_execution_worker_healthy_providers healthy
+                 where healthy.worker_id = ?
+                   and healthy.provider = job.preferred_provider
+               ) then job.preferred_provider else ? end
+             )
+           )
          order by job.created_at, job.id
          limit 1
        )
@@ -367,6 +386,9 @@ export async function claimNextIssueAgentReply(
       input.workerId,
       input.staleBefore,
       input.workerId,
+      input.computerUseProvidersJson ?? "[]",
+      input.workerId,
+      input.agentProvider,
     )
     .first<IssueAgentReplyJobRow>();
 }

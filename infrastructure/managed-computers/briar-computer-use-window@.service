@@ -1,0 +1,22 @@
+[Unit]
+Description=Briar Computer Use desktop :%i
+After=network-online.target briar-managed-enroll.service
+Wants=network-online.target
+Requires=briar-managed-enroll.service
+
+[Service]
+Type=simple
+User=briar
+Group=briar
+Environment=HOME=/home/briar
+Environment=GH_BROWSER=/opt/briar/bin/briar-open-browser
+Environment=BRIAR_REMOTE_DISPLAY_GEOMETRY=1280x720
+Environment=BRIAR_REMOTE_DISPLAY_STARTUP_TIMEOUT_SECONDS=120
+WorkingDirectory=/home/briar
+ExecStartPre=/opt/briar/bin/verify-managed-admin
+ExecStart=/opt/briar/bin/briar-computer-use-window %i
+Restart=on-failure
+RestartSec=2
+TimeoutStopSec=15
+UMask=0077
+NoNewPrivileges=false

@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+display_number="${1:-}"
+if ! [[ "$display_number" =~ ^[0-9]+$ ]] ||
+  ((display_number < 2 || display_number > 100)); then
+  echo "Computer Use display index must be between 2 and 100" >&2
+  exit 64
+fi
+
+export BRIAR_REMOTE_DISPLAY_NUMBER="$display_number"
+export BRIAR_REMOTE_DISPLAY_PORT="$((5900 + display_number))"
+export BRIAR_REMOTE_DISPLAY_NAME="Briar Computer Use :${display_number}"
+export BRIAR_BROWSER_PROFILE_DIRECTORY="/var/lib/briar-computer-use/profiles/display-${display_number}"
+exec /opt/briar/bin/briar-remote-desktop

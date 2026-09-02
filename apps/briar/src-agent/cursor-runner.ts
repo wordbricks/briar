@@ -22,6 +22,8 @@ import {
   readOnlySeatbeltSpawnSpec,
 } from "./read-only-seatbelt";
 import { createRunnerIo } from "./runner-io";
+import { prepareComputerUseMcp } from "./computer-use-mcp-config";
+import { acpComputerUseServers } from "./computer-use-provider-adapters";
 
 const CURSOR_AUTH_METHOD = "cursor_login";
 
@@ -152,6 +154,7 @@ async function main(runnerIo: CursorRunnerIo) {
   }
 
   const readOnly = request.sandboxMode === "readOnly";
+  const computerUseMcp = await prepareComputerUseMcp(request);
   const spawnSpec = cursorAgentSpawnSpec({
     binary: request.providerBinaryPath,
     workspaceRoot: request.workspaceRoot,
@@ -252,7 +255,7 @@ async function main(runnerIo: CursorRunnerIo) {
       const params = {
         sessionId: resumeId,
         cwd: request.workspaceRoot,
-        mcpServers: [],
+        mcpServers: acpComputerUseServers(computerUseMcp.servers),
         ...(sessionMeta ? { _meta: sessionMeta } : {}),
       };
       sessionLoadInProgress = true;
@@ -266,7 +269,7 @@ async function main(runnerIo: CursorRunnerIo) {
     } else {
       const params = {
         cwd: request.workspaceRoot,
-        mcpServers: [],
+        mcpServers: acpComputerUseServers(computerUseMcp.servers),
         ...(sessionMeta ? { _meta: sessionMeta } : {}),
       };
       setup = await connection.request("session/new", params) as CursorSessionSetup;
@@ -360,6 +363,7 @@ async function main(runnerIo: CursorRunnerIo) {
     });
   } finally {
     connection.close();
+    await computerUseMcp.cleanup();
   }
 }
 

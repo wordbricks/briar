@@ -2365,6 +2365,55 @@ describe("detached execution workers", () => {
     });
   });
 
+  it("does not claim unattended Computer Use work without provider capability", async () => {
+    const registered = await register("computer-use-gate");
+    const agent = await db
+      .prepare(
+        `select id from briar_project_agents
+         where project_id = ? and provider = 'codex' limit 1`,
+      )
+      .bind(projectId)
+      .first<{ id: string }>();
+    expect(agent).not.toBeNull();
+    await db.prepare(
+      `update briar_project_agents
+       set computer_use_policy = 'unattended' where id = ?`,
+    ).bind(agent!.id).run();
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      queuedEvent("computer-use-gated-issue", 2),
+    );
+    await dispatchHuntRun(db, projectId, projectId, {
+      runId,
+      agentId: agent!.id,
+      workerId: registered.worker.id,
+      requestedByUserId: "member",
+      requestId: "7a56e693-b2e7-4c6d-93f1-0d173401ed64",
+      occurredAt: atMinute(2),
+    });
+
+    await expect(claimNextQueuedHuntRun(db, projectId, {
+      claimTokenHash: fingerprint("computer-use-missing-capability"),
+      claimedBy: registered.worker.label,
+      claimedAt: atMinute(3),
+      leaseExpiresAt: leaseExpiryFrom(atMinute(3)),
+      workerId: registered.worker.id,
+      detachedOnly: true,
+      computerUseProvidersJson: "[]",
+    })).resolves.toBeNull();
+
+    await expect(claimNextQueuedHuntRun(db, projectId, {
+      claimTokenHash: fingerprint("computer-use-capable"),
+      claimedBy: registered.worker.label,
+      claimedAt: atMinute(3),
+      leaseExpiresAt: leaseExpiryFrom(atMinute(3)),
+      workerId: registered.worker.id,
+      detachedOnly: true,
+      computerUseProvidersJson: '["codex"]',
+    })).resolves.toMatchObject({ id: runId, agent_id: agent!.id });
+  });
+
   it("dispatches and claims Agents through every provider advertised by a Worker", async () => {
     const registered = await register("multi-provider");
     const providers = [

@@ -7,6 +7,7 @@ import {
   OrganizationAgentSchema,
   ProjectAgentSkillSchema,
 } from "@briar/contracts/gen/briar/app/v1/agent_pb";
+import { ComputerUsePolicy } from "@briar/contracts/gen/briar/types/v1/computer_use_pb";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
 import { Code, ConnectError } from "@connectrpc/connect";
 import type { AgentSkillRow } from "./agent-skills";
@@ -29,6 +30,14 @@ const provider = {
   opencode: AgentProvider.OPENCODE,
   openrouter: AgentProvider.OPENROUTER,
 } as const satisfies Record<OrganizationAgentRow["provider"], AgentProvider>;
+
+const computerUsePolicy = {
+  disabled: ComputerUsePolicy.DISABLED,
+  unattended: ComputerUsePolicy.UNATTENDED,
+} as const satisfies Record<
+  OrganizationAgentRow["computer_use_policy"],
+  ComputerUsePolicy
+>;
 
 const skillKind = {
   issue_processing: AgentSkillKind.ISSUE_PROCESSING,
@@ -72,6 +81,7 @@ export const appOrganizationAgent = (row: OrganizationAgentRow) =>
     provider: provider[row.provider],
     model: row.model ?? undefined,
     effort: row.effort ?? undefined,
+    computerUsePolicy: computerUsePolicy[row.computer_use_policy],
     projectId: row.project_id ?? undefined,
     projectName: row.project_name ?? undefined,
     description: row.description || undefined,

@@ -119,6 +119,7 @@ export async function createManagedComputerRemoteSession(
     id: string;
     organizationId: string;
     managedComputerId: string;
+    agentId?: string;
     controllerUserId: string;
     requestId: string;
     clientTokenHash: string;
@@ -135,11 +136,11 @@ export async function createManagedComputerRemoteSession(
   try {
     await db.prepare(
       `insert into briar_managed_computer_remote_sessions (
-         id, organization_id, managed_computer_id, controller_user_id,
+         id, organization_id, managed_computer_id, agent_id, controller_user_id,
          request_id, state, client_token_hash, token_expires_at,
          connection_generation, max_expires_at, created_at, updated_at
        )
-       select ?, ?, ?, ?, ?, 'created', ?, ?, 1, ?, ?, ?
+       select ?, ?, ?, ?, ?, ?, 'created', ?, ?, 1, ?, ?, ?
        where
          (select count(*) from briar_managed_computer_remote_sessions
           where organization_id = ? and state in (${activeRemoteSessionSql})) < ?
@@ -156,6 +157,7 @@ export async function createManagedComputerRemoteSession(
       input.id,
       input.organizationId,
       input.managedComputerId,
+      input.agentId ?? null,
       input.controllerUserId,
       input.requestId,
       input.clientTokenHash,
@@ -186,6 +188,7 @@ export async function reconnectManagedComputerRemoteSession(
     sessionId: string;
     organizationId: string;
     managedComputerId: string;
+    agentId?: string;
     controllerUserId: string;
     requestId: string;
     clientTokenHash: string;
@@ -201,6 +204,7 @@ export async function reconnectManagedComputerRemoteSession(
          disconnected_at = null, end_reason = null, updated_at = ?
      where id = ? and organization_id = ? and managed_computer_id = ?
        and controller_user_id = ?
+       and agent_id is ?
        and state in (${activeRemoteSessionSql}) and max_expires_at > ?
      returning *`,
   ).bind(
@@ -212,6 +216,7 @@ export async function reconnectManagedComputerRemoteSession(
     input.organizationId,
     input.managedComputerId,
     input.controllerUserId,
+    input.agentId ?? null,
     ...activeRemoteSessionStates,
     input.observedAt,
   ).first<ManagedComputerRemoteSessionRow>();

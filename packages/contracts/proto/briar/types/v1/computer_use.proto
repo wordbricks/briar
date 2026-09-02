@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package briar.types.v1;
+
+import "briar/types/v1/provider.proto";
+
+option swift_prefix = "BriarTypes_";
+
+enum ComputerUsePolicy {
+  COMPUTER_USE_POLICY_UNSPECIFIED = 0;
+  COMPUTER_USE_POLICY_DISABLED = 1;
+  COMPUTER_USE_POLICY_UNATTENDED = 2;
+}
+
+message ComputerUseCapability {
+  uint32 protocol = 1;
+  string transport = 2;
+  repeated AgentProvider providers = 3;
+  uint32 max_windows = 4;
+  bool shared_desktop = 5;
+  bool human_takeover = 6;
+  string schema_digest = 7;
+}

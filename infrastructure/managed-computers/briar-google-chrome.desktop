@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Google Chrome
+GenericName=Web Browser
+Comment=Open the web browser on this Briar desktop
+Exec=/opt/briar/bin/briar-open-browser %u
+Icon=google-chrome
+Terminal=false
+StartupNotify=true
+Categories=Network;WebBrowser;

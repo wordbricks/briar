@@ -380,6 +380,7 @@ export async function claimNextChannelReplyWork(
           provider: job.agent_provider,
           model: replyModel,
           effort: replyEffort,
+          computerUsePolicy: agent.computer_use_policy,
           responsibility: agent.responsibility,
           skills: agent.skills.map(agentSkillJson),
         },

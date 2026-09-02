@@ -116,6 +116,7 @@ export function createCodexAppServerState(
 export function codexAppServerArgs(
   request: Pick<RunnerRequest, "networkAccess" | "externalTools">,
   browserAutomationProvider?: string,
+  computerUseArguments: readonly string[] = [],
 ): string[] {
   const argumentsList = ["app-server", "--listen", "stdio://"];
   if (request.externalTools === false) {
@@ -152,6 +153,7 @@ export function codexAppServerArgs(
       'mcp_servers.aside.args=["mcp"]',
     );
   }
+  argumentsList.push(...computerUseArguments);
   if (request.networkAccess) {
     argumentsList.push(
       "--config",

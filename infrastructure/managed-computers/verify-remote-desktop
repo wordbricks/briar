@@ -9,6 +9,7 @@ expected_port="${BRIAR_REMOTE_DISPLAY_PORT:-5901}"
 test "$(stat -c '%U:%G' /home/briar)" == "$expected_user:$expected_user"
 test "$(stat -c '%U:%G %a' /var/lib/briar)" == "root:$expected_user 750"
 test -s /opt/briar/remote-desktop-packages.lock
+test -x /opt/briar/bin/briar-computer-use-window
 sha256sum --check /opt/briar/remote-desktop-packages.lock.sha256
 
 for service in \
@@ -48,6 +49,10 @@ done
 if systemctl show briar-remote-desktop.service \
   --property=User --value | grep -Fxq root; then
   echo "Remote desktop must not run as root" >&2
+  exit 1
+fi
+if systemctl cat 'briar-computer-use-window@.service' | grep -q '^User=root$'; then
+  echo "Computer Use desktops must not run as root" >&2
   exit 1
 fi
 if systemctl show briar-remote-session-agent.service \

@@ -280,6 +280,7 @@ const scheduleRunSelect = `
          agent.provider as agent_provider,
          agent.model as agent_model,
          agent.effort as agent_effort,
+         agent.computer_use_policy as agent_computer_use_policy,
          agent.description as agent_description,
          agent.responsibility as agent_responsibility,
          agent.skill_markdown as agent_skill_markdown,

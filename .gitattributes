@@ -1,1 +1,2 @@
 apps/briar/src-cli/worker.ts diff
+packages/contracts/src/gen/**/*.ts whitespace=-blank-at-eof

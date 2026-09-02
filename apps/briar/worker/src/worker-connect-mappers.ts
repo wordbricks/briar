@@ -54,6 +54,7 @@ import {
   type ClaimedWork,
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
+import { ComputerUsePolicy } from "@briar/contracts/gen/briar/types/v1/computer_use_pb";
 import {
   AutoHuntWorkflowSchema,
   WorkflowCheckpoint_Position,
@@ -253,6 +254,7 @@ type AppAgent = {
   provider: string;
   model: string | null;
   effort: string | null;
+  computerUsePolicy?: "disabled" | "unattended";
   responsibility: string;
   skills: AppSkill[];
 };
@@ -263,6 +265,9 @@ const agent = (value: AppAgent) => create(DetachedAgentClaimSchema, {
   provider: provider(value.provider),
   model: value.model ?? undefined,
   effort: value.effort ?? undefined,
+  computerUsePolicy: value.computerUsePolicy === "unattended"
+    ? ComputerUsePolicy.UNATTENDED
+    : ComputerUsePolicy.DISABLED,
   responsibility: value.responsibility,
   skills: value.skills.map(skill),
 });

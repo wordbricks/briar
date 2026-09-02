@@ -5,6 +5,7 @@ package briar.app.v1;
 import "briar/app/v1/agent_transcript.proto";
 import "briar/app/v1/common.proto";
 import "briar/types/v1/provider.proto";
+import "briar/types/v1/computer_use.proto";
 import "briar/types/v1/workflow.proto";
 import "google/protobuf/timestamp.proto";
 
@@ -53,6 +54,7 @@ message CreateOrganizationAgentRequest {
   string responsibility = 6;
   optional string effort = 7;
   repeated ProjectAgentSkillInput skills = 8;
+  optional briar.types.v1.ComputerUsePolicy computer_use_policy = 9;
 }
 
 message CreateOrganizationAgentResponse {
@@ -69,6 +71,7 @@ message UpdateOrganizationAgentRequest {
   string responsibility = 7;
   optional string effort = 8;
   repeated ProjectAgentSkillInput skills = 9;
+  optional briar.types.v1.ComputerUsePolicy computer_use_policy = 10;
 }
 
 message UpdateOrganizationAgentResponse {
@@ -106,6 +109,7 @@ message CreateProjectAgentRequest {
   string responsibility = 9;
   repeated ProjectAgentSkillInput skills = 10;
   string calendar_color = 11;
+  optional briar.types.v1.ComputerUsePolicy computer_use_policy = 12;
 }
 
 message CreateProjectAgentResponse {
@@ -143,6 +147,7 @@ message UpdateProjectAgentRequest {
   string responsibility = 15;
   repeated ProjectAgentSkillInput skills = 16;
   string calendar_color = 17;
+  optional briar.types.v1.ComputerUsePolicy computer_use_policy = 18;
 }
 
 message UpdateProjectAgentResponse {
@@ -441,6 +446,7 @@ message ProjectAgent {
   google.protobuf.Timestamp created_at = 15;
   google.protobuf.Timestamp updated_at = 16;
   string skill = 17;
+  briar.types.v1.ComputerUsePolicy computer_use_policy = 18;
 }
 
 message OrganizationAgent {
@@ -456,6 +462,7 @@ message OrganizationAgent {
   string responsibility = 10;
   repeated ProjectAgentSkill skills = 11;
   google.protobuf.Timestamp created_at = 12;
+  briar.types.v1.ComputerUsePolicy computer_use_policy = 13;
 }
 
 message ProjectAgentSchedule {
@@ -488,6 +495,7 @@ message ProjectAgentScheduleRunAgent {
   string responsibility = 7;
   string skill = 8;
   repeated ProjectAgentSkill skills = 9;
+  briar.types.v1.ComputerUsePolicy computer_use_policy = 10;
 }
 
 message ProjectAgentScheduleRun {

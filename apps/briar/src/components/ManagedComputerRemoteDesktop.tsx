@@ -68,11 +68,13 @@ export function managedComputerRemoteErrorMessage(error: unknown) {
 }
 
 export function ManagedComputerRemoteDesktop({
+  agentId,
   computer,
   onClose,
   organizationId,
   token,
 }: {
+  agentId?: string;
   computer: ManagedComputer;
   onClose: () => void;
   organizationId: string;
@@ -96,7 +98,7 @@ export function ManagedComputerRemoteDesktop({
   const [error, setError] = useState<string | null>(null);
   const [fitScreen, setFitScreen] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);
-  const storageKey = `briar.remoteDesktop.${computer.id}`;
+  const storageKey = `briar.remoteDesktop.${computer.id}.${agentId ?? "primary"}`;
 
   const destroyRfb = useCallback(() => {
     pasteController.reset();
@@ -119,6 +121,7 @@ export function ManagedComputerRemoteDesktop({
         computer.id,
         {
           requestId: crypto.randomUUID(),
+          ...(agentId ? { agentId } : {}),
           ...(reconnectSessionId ? { reconnectSessionId } : {}),
         },
       );
@@ -174,7 +177,7 @@ export function ManagedComputerRemoteDesktop({
             : String(caught),
       );
     }
-  }, [computer.id, destroyRfb, organizationId, storageKey, t, token]);
+  }, [agentId, computer.id, destroyRfb, organizationId, storageKey, t, token]);
 
   const endAndClose = useCallback(async () => {
     if (endingRef.current) return;

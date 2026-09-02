@@ -17,6 +17,7 @@ const ownerToken = "remote-route-owner-token";
 const memberToken = "remote-route-member-token";
 const workerCredential = "briar_worker_remote_route_credential";
 const deviceId = `managed-${computerId}`;
+const agentId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const now = "2026-08-22T00:00:00.000Z";
 
 describe("managed computer remote desktop routes", () => {
@@ -133,12 +134,14 @@ describe("managed computer remote desktop routes", () => {
     requestId: string,
     origin: string | null = "https://briar.example",
     reconnectSessionId?: string,
+    targetAgentId?: string,
   ) => fleet().createManagedComputerRemoteSession(
     {
       organizationId,
       managedComputerId: computerId,
       requestId,
       reconnectSessionId,
+      agentId: targetAgentId,
     },
     options(token, origin),
   );
@@ -181,12 +184,18 @@ describe("managed computer remote desktop routes", () => {
 
   it("issues a short-lived protocol token without putting it in the URL", async () => {
     const requestId = "88888888-8888-4888-8888-888888888888";
-    const payload = await createRemoteSession(ownerToken, requestId);
+    const payload = await createRemoteSession(
+      ownerToken,
+      requestId,
+      "https://briar.example",
+      undefined,
+      agentId,
+    );
     if (!payload.session || !payload.socket) {
       throw new Error("FleetService remote session response is incomplete");
     }
     expect(payload).toMatchObject({
-      session: { connectionGeneration: 1 },
+      session: { connectionGeneration: 1, agentId },
       reconnected: false,
     });
     expect(payload.socket.protocol).toMatch(
@@ -194,13 +203,15 @@ describe("managed computer remote desktop routes", () => {
     );
     expect(payload.socket.url).not.toContain("briar_remote_");
     const stored = await db.prepare(
-      `select client_token_hash, token_consumed_at
+      `select client_token_hash, token_consumed_at, agent_id
        from briar_managed_computer_remote_sessions where id = ?`,
     ).bind(payload.session.id).first<{
       client_token_hash: string;
       token_consumed_at: string | null;
+      agent_id: string | null;
     }>();
     expect(stored?.client_token_hash).toMatch(/^[0-9a-f]{64}$/u);
+    expect(stored?.agent_id).toBe(agentId);
     expect(JSON.stringify(stored)).not.toContain("briar_remote_");
 
     const connect = new Request(payload.socket.url, {
@@ -230,6 +241,7 @@ describe("managed computer remote desktop routes", () => {
       "99999999-9999-4999-8999-999999999999",
       "https://briar.example",
       "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      agentId,
     );
     expect(recoveredResponse).toMatchObject({
       session: {

@@ -1,7 +1,10 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { platform } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { unlink } from "node:fs/promises";
+import { CONTRACTS_DESCRIPTOR_FINGERPRINT } from "@briar/contracts/descriptor-fingerprint";
+import { buildComputerUseArgs } from "@briar/agent-exec";
 import { Code, ConnectError } from "@connectrpc/connect";
 import { autoHuntRequirementKinds } from "../src/lib/auto-hunt-contract";
 import { runProjectAgentTaskCompletionFlow } from "./agent-runner";
@@ -83,8 +86,19 @@ import { loadManagedComputerCredential } from "./managed-computer-credential";
 import { runClaimedDmMemory } from "./dm-memory-learning";
 import { runDetachedProviderTurn } from "./detached-provider-turn";
 import { prepareReadOnlyAgentEnvironment } from "./read-only-agent-environment";
+import { ComputerUseBoxClient } from "./computer-use-box-client";
+import { defaultComputerUseScreenshotDirectory } from "./computer-use-native-executor";
+import { supportsComputerUseProvider } from
+  "../src/lib/computer-use-contract";
 
 const WORKER_SERVER_MAINTENANCE_INTERVAL_MS = 5 * 60_000;
+const COMPUTER_USE_CANARY_MAX_AGE_MS = 5 * 60_000;
+const COMPUTER_USE_CANARY_RETRY_MS = 30_000;
+
+let computerUseCanary:
+  | { readonly checkedAt: number; readonly ready: boolean }
+  | undefined;
+let computerUseCanaryPromise: Promise<boolean> | undefined;
 
 const retryableCompletionCodes = new Set([
   Code.DeadlineExceeded,
@@ -106,6 +120,7 @@ const workerRuntime = (input: {
   worktrees: boolean;
   workflowRequirements?: WorkerRuntimeInput["workflowRequirements"];
   dmMemoryLearning: WorkerRuntimeInput["dmMemoryLearning"];
+  computerUse?: WorkerRuntimeInput["computerUse"];
 }): WorkerRuntimeInput => ({
   ...input,
   versions: { briar: cliVersion },
@@ -123,6 +138,96 @@ const dmMemoryLearningCapability = (
   transports: ["agent", ...(hasOpenRouterKey ? ["openrouter" as const] : [])],
   providers,
 });
+
+const runComputerUseCanary = async (): Promise<boolean> => {
+  const client = await ComputerUseBoxClient.connect();
+  const assigned = await client.assign("briar-capability-canary");
+  let screenshotPath: string | undefined;
+  try {
+    const result = await assigned.executor.execute(buildComputerUseArgs({
+      raw: { action: "screenshot" },
+      toolCallId: `capability-${randomUUID()}`,
+      viewport: { width: 1_280, height: 720 },
+      bindUnmappedCharacters: true,
+    }), { signal: AbortSignal.timeout(35_000) });
+    screenshotPath = result.result.value?.screenshotPath;
+    if (result.result.case !== "success") return false;
+    const screenshot = result.result.value.screenshot;
+    return screenshot !== undefined
+      && Buffer.from(screenshot, "base64").subarray(0, 8).equals(
+        Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+      );
+  } finally {
+    if (
+      screenshotPath?.startsWith(`${defaultComputerUseScreenshotDirectory}/`)
+    ) {
+      await unlink(screenshotPath).catch(() => undefined);
+    }
+    await assigned.release().catch(() => undefined);
+  }
+};
+
+const computerUseCanaryReady = async (): Promise<boolean> => {
+  const now = Date.now();
+  const maxAge = computerUseCanary?.ready
+    ? COMPUTER_USE_CANARY_MAX_AGE_MS
+    : COMPUTER_USE_CANARY_RETRY_MS;
+  if (
+    computerUseCanary !== undefined
+    && now - computerUseCanary.checkedAt < maxAge
+  ) return computerUseCanary.ready;
+  if (!computerUseCanaryPromise) {
+    computerUseCanaryPromise = runComputerUseCanary()
+      .catch(() => false)
+      .then((ready) => {
+        computerUseCanary = { checkedAt: Date.now(), ready };
+        return ready;
+      })
+      .finally(() => {
+        computerUseCanaryPromise = undefined;
+      });
+  }
+  return computerUseCanaryPromise;
+};
+
+const inspectComputerUseCapability = async (
+  config: Awaited<ReturnType<typeof loadConfig>>,
+  providers: ReturnType<typeof healthyWorkerProviders>,
+): Promise<WorkerRuntimeInput["computerUse"]> => {
+  const computerUseProviders = providers.filter(supportsComputerUseProvider);
+  if (!config.managedComputer || computerUseProviders.length === 0) {
+    return undefined;
+  }
+  const mcpServerPath = [
+    resolve(import.meta.dir, "agent/computer-use-mcp-server.js"),
+    resolve(import.meta.dir, "../dist-agent/computer-use-mcp-server.js"),
+  ].find((path) => Bun.file(path).size > 0);
+  if (!mcpServerPath) return undefined;
+  try {
+    const response = await fetch("http://127.0.0.1:1337/healthz", {
+      signal: AbortSignal.timeout(1_000),
+    });
+    if (!response.ok) return undefined;
+    const health = await response.json() as Record<string, unknown>;
+    if (
+      health.ok !== true
+      || health.computerUseSupported !== true
+      || health.resource !== "computerUse"
+    ) return undefined;
+    if (!(await computerUseCanaryReady())) return undefined;
+  } catch {
+    return undefined;
+  }
+  return {
+    protocol: 1,
+    transport: "connectrpc-resource-exec",
+    providers: computerUseProviders,
+    maxWindows: 99,
+    sharedDesktop: true,
+    humanTakeover: true,
+    schemaDigest: Buffer.from(CONTRACTS_DESCRIPTOR_FINGERPRINT).toString("hex"),
+  };
+};
 
 async function workerRegisterCommand() {
   const config = await loadConfig();
@@ -148,6 +253,7 @@ async function workerRegisterCommand() {
     { refresh: true },
   );
   const providers = healthyWorkerProviders(providerHealth);
+  const computerUse = await inspectComputerUseCapability(config, providers);
   const provider = providers.includes(configuredProvider)
     ? configuredProvider
     : (providers[0] ?? configuredProvider);
@@ -171,6 +277,7 @@ async function workerRegisterCommand() {
             providers,
             Boolean(config.openrouterApiKey?.trim()),
           ),
+          computerUse,
         }),
       });
       const existing = config.projects.find(
@@ -203,6 +310,7 @@ async function workerRegisterCommand() {
         providers,
         Boolean(config.openrouterApiKey?.trim()),
       ),
+      computerUse,
     }),
     ...(Number.isInteger(requestedMaxSessions) && requestedMaxSessions > 0
       ? { maxConcurrentSessions: requestedMaxSessions }
@@ -431,6 +539,7 @@ async function workerCommand() {
       config.agentProviders,
     );
     const providers = healthyWorkerProviders(providerHealth);
+    const computerUse = await inspectComputerUseCapability(config, providers);
     const configuredProvider = project.llm?.provider ?? "codex";
     const heartbeat = await workerControl.heartbeat({
       workerId,
@@ -445,6 +554,7 @@ async function workerCommand() {
           providers,
           Boolean(config.openrouterApiKey?.trim()),
         ),
+        computerUse,
       }),
       acceptingWork: false,
       readinessState: "needs_attention",
@@ -576,6 +686,10 @@ async function workerCommand() {
           config.agentProviders,
         );
         const providers = healthyWorkerProviders(providerHealth);
+        const computerUse = await inspectComputerUseCapability(
+          config,
+          providers,
+        );
         const hasHealthyProvider = providers.length > 0;
         // Shared project workflow tools must be ready on this worker machine.
         // Prefer the requirements returned by the previous heartbeat (server is
@@ -620,6 +734,7 @@ async function workerCommand() {
               providers,
               Boolean(config.openrouterApiKey?.trim()),
             ),
+            computerUse,
           }),
           refreshMaintenance,
           acceptingWork,
@@ -692,6 +807,7 @@ async function workerCommand() {
                     providers,
                     Boolean(config.openrouterApiKey?.trim()),
                   ),
+                  computerUse,
                 }),
                 acceptingWork: false,
                 readinessState: "needs_attention",

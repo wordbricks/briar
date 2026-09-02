@@ -23,6 +23,7 @@ import {
   type ModelEffort,
 } from "../../src/lib/agent-provider-contract";
 import type { AgentProvider } from "../../src/lib/agent-provider";
+import type { ComputerUsePolicy } from "../../src/lib/computer-use-contract";
 import { isChannelApprovedIssue } from "./db";
 import {
   executionWorkerHandoffExists,
@@ -721,9 +722,14 @@ export function executionWorkerSupportsSelection(
   provider: AgentProvider,
   model: string | null,
   effort: string | null,
+  computerUsePolicy: ComputerUsePolicy = "disabled",
 ) {
   const runtime = executionWorkerRuntime(worker);
   if (!runtime.providers.includes(provider)) return false;
+  if (
+    computerUsePolicy === "unattended" &&
+    !runtime.computerUse?.providers.includes(provider)
+  ) return false;
   return agentProviderSupportsSelection(
     runtime.providerCapabilities[provider],
     model,
@@ -798,6 +804,7 @@ export async function channelReplyWorkerAvailability(
     provider: AgentProvider;
     model: string | null;
     effort: ModelEffort | null;
+    computerUsePolicy?: ComputerUsePolicy;
     observedAt: string;
   },
 ) {
@@ -880,6 +887,7 @@ export async function channelReplyWorkerAvailability(
       input.provider,
       input.model,
       input.effort,
+      input.computerUsePolicy,
     )
   )) return "available";
 
@@ -912,6 +920,7 @@ export async function getProjectDesignatedWorker(
     provider: AgentProvider;
     model: string | null;
     effort: ModelEffort | null;
+    computerUsePolicy?: ComputerUsePolicy;
     observedAt: string;
   },
 ) {
@@ -941,6 +950,7 @@ export async function getProjectDesignatedWorker(
       provider: input.provider,
       model: input.model,
       effort: input.effort,
+      computerUsePolicy: input.computerUsePolicy,
       observedAt: input.observedAt,
     }),
   };

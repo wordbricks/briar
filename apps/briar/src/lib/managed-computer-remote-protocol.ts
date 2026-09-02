@@ -9,6 +9,7 @@ export const managedComputerRemoteHeartbeatIntervalMs = 20_000;
 export const managedComputerRemoteHeartbeatTimeoutMs = 60_000;
 
 const ManagedComputerRemoteSessionId = Schema.String.check(Schema.isUUID());
+const ManagedComputerRemoteAgentId = Schema.String.check(Schema.isUUID());
 
 export const ManagedComputerRemoteDisplayErrorCode = Schema.Literals([
   "input_backpressure",
@@ -20,6 +21,7 @@ export const ManagedComputerRemoteDisplayErrorCode = Schema.Literals([
 const ManagedComputerRemoteControllerReadyFrame = Schema.Struct({
   type: Schema.Literal("controller_ready"),
   sessionId: ManagedComputerRemoteSessionId,
+  agentId: Schema.optional(ManagedComputerRemoteAgentId),
 });
 const ManagedComputerRemoteControllerEndedFrame = Schema.Struct({
   type: Schema.Literal("controller_ended"),

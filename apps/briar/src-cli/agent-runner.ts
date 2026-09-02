@@ -2,11 +2,13 @@ import { create, type JsonObject } from "@bufbuild/protobuf";
 import { timestampDate } from "@bufbuild/protobuf/wkt";
 import { CONTRACTS_DESCRIPTOR_FINGERPRINT } from "@briar/contracts/descriptor-fingerprint";
 import {
+  AgentRunKind,
   ApprovalPolicy,
   BlockReason,
   JsonSchemaSchema,
   RunRequestSchema,
   SandboxMode,
+  type ComputerUseChildBinding,
   type RunnerToParent,
 } from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
 import type { AgentAttachment } from "../src-agent/runner-attachments";
@@ -111,6 +113,7 @@ export type DetachedAgent = {
   provider: DetachedAgentProvider;
   model: string | null;
   effort?: DetachedAgentEffort | null;
+  computerUsePolicy?: "disabled" | "unattended";
   responsibility: string;
   skills: DetachedAgentSkill[];
   activeSkill?: DetachedAgentSkill | null;
@@ -718,7 +721,25 @@ export function detachedProviderRequest(input: {
   skillCatalog?: DetachedAgentSkillCatalog | null;
   outputSchema?: JsonSchema | null;
   agentBinary: string;
+  runKind?: "parent" | "computerUse";
+  computerUseBinding?: ComputerUseChildBinding;
+  computerUseMcpServerPath?: string | null;
 }) {
+  const computerUseRoleInstructions = input.computerUseBinding === undefined
+    ? null
+    : input.runKind === "computerUse"
+    ? [
+        "You are the dedicated Computer Use child for this run.",
+        "Use the Computer tool to operate the assigned screen and verify visible results.",
+        "Do not start another Computer Use child.",
+        "Stop and report when a password, 2FA, CAPTCHA, payment, or other human-only step is required.",
+      ].join(" ")
+    : [
+        "You are the parent Agent and must not click, type, scroll, or otherwise mutate the desktop directly.",
+        "Use Screenshot only to observe, and delegate each small desktop task with StartComputerUse.",
+        "Use CheckSubagent, MessageSubagent, StopSubagent, and RequestHumanTakeover to manage that child.",
+        "After RequestHumanTakeover, tell the user to open this Agent's Screen and wait for confirmation that they are done. Then resume with MessageSubagent so the child begins from a fresh screenshot.",
+      ].join(" ");
   const outputSchema = input.outputSchema === null || input.outputSchema === undefined
     ? undefined
     : create(JsonSchemaSchema, {
@@ -733,12 +754,15 @@ export function detachedProviderRequest(input: {
       message: input.prompt,
       workspaceRoot: input.workspacePath,
       conversationId: input.conversationId ?? undefined,
-      instructions: detachedAgentContext(input.agent, {
-        organizationContextManifestPath:
-          input.organizationContextManifestPath ?? null,
-        delegationTargets: input.delegationTargets,
-        skillCatalog: input.skillCatalog ?? null,
-      }),
+      instructions: [
+        detachedAgentContext(input.agent, {
+          organizationContextManifestPath:
+            input.organizationContextManifestPath ?? null,
+          delegationTargets: input.delegationTargets,
+          skillCatalog: input.skillCatalog ?? null,
+        }),
+        computerUseRoleInstructions,
+      ].filter((value): value is string => value !== null).join("\n\n"),
       outputSchema,
       model: input.agent.model ?? undefined,
       effort: input.agent.effort ?? undefined,
@@ -761,6 +785,11 @@ export function detachedProviderRequest(input: {
       externalTools: input.agent.provider === "codex"
         ? !input.readOnly
         : undefined,
+      runKind: input.runKind === "computerUse"
+        ? AgentRunKind.COMPUTER_USE
+        : AgentRunKind.PARENT,
+      computerUseBinding: input.computerUseBinding,
+      computerUseMcpServerPath: input.computerUseMcpServerPath ?? "",
       protocolFingerprint: CONTRACTS_DESCRIPTOR_FINGERPRINT,
     }),
   };

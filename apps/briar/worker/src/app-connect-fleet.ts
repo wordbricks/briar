@@ -463,6 +463,7 @@ export const createAppFleetService = (
     const decoded = decodeManagedComputerRemoteSessionRequest({
       requestId: input.requestId,
       reconnectSessionId: input.reconnectSessionId,
+      agentId: input.agentId,
     });
     const result = await withFleetErrors(
       createManagedComputerRemoteSessionApplication({

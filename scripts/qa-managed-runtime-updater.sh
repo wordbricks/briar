@@ -110,13 +110,18 @@ make_release() {
   local stage="$fixture/stage-$version"
   rm -rf -- "$stage"
   mkdir -p \
-    "$stage/bin" "$stage/lib/agent" \
+    "$stage/bin" "$stage/lib/agent" "$stage/libexec" \
     "$stage/skills/briar-workflow/scripts" "$stage/skills/browser"
   printf '#!/usr/bin/env bash\necho "briar %s"\n' "$version" > "$stage/bin/briar"
   chmod 0755 "$stage/bin/briar"
   printf 'remote agent\n' > "$stage/bin/briar-remote-session-agent.js"
+  printf 'box exec\n' > "$stage/bin/briar-box-exec.js"
+  printf '#!/usr/bin/env python3\n' > "$stage/libexec/briar-computer-executor.py"
+  chmod 0755 "$stage/libexec/briar-computer-executor.py"
   printf 'cli\n' > "$stage/lib/briar.js"
   printf 'runner\n' > "$stage/lib/agent/codex-runner.js"
+  printf 'computer use mcp\n' > \
+    "$stage/lib/agent/computer-use-mcp-server.js"
   printf 'workflow\n' > "$stage/skills/briar-workflow/SKILL.md"
   printf '%s\n' "$version" > "$stage/skills/briar-workflow/VERSION"
   printf '#!/usr/bin/env bash\nexit 0\n' > "$stage/skills/briar-workflow/scripts/briar"

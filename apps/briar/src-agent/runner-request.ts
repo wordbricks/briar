@@ -1,5 +1,6 @@
 import type { JsonObject } from "@bufbuild/protobuf";
 import {
+  AgentRunKind as ProtoAgentRunKind,
   ApprovalPolicy as ProtoApprovalPolicy,
   SandboxMode as ProtoSandboxMode,
   type RunRequest as ProtoRunRequest,
@@ -29,11 +30,13 @@ export type RunnerRequest = Omit<
   | "outputSchema"
   | "attachments"
   | "protocolFingerprint"
+  | "runKind"
 > & {
   approvalPolicy: RunnerApprovalPolicy;
   sandboxMode: RunnerSandboxMode;
   outputSchema?: JsonObject | boolean;
   attachments: AgentAttachment[];
+  runKind?: "parent" | "computerUse";
 };
 
 const unsupportedEnum = (name: string, value: number) =>
@@ -69,6 +72,10 @@ function sandboxMode(
   }
 }
 
+function runKind(value: ProtoAgentRunKind): "parent" | "computerUse" {
+  return value === ProtoAgentRunKind.COMPUTER_USE ? "computerUse" : "parent";
+}
+
 /** Map the generated wire message once at the provider-domain boundary. */
 export const decodeRunnerRequest = (request: ProtoRunRequest) =>
   Result.gen(function*() {
@@ -82,6 +89,7 @@ export const decodeRunnerRequest = (request: ProtoRunRequest) =>
       outputSchema,
       attachments,
       protocolFingerprint: _protocolFingerprint,
+      runKind: wireRunKind,
       ...shared
     } = request;
     return {
@@ -95,5 +103,6 @@ export const decodeRunnerRequest = (request: ProtoRunRequest) =>
         name: attachment.name,
         mimeType: attachment.mimeType,
       })),
+      runKind: runKind(wireRunKind),
     } satisfies RunnerRequest;
   });

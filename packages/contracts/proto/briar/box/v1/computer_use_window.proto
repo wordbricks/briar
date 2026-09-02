@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package briar.box.v1;
+
+// Briar owns desktop allocation because its managed-computer runtime does not
+// expose Grok Bot's general-purpose shell executor. Computer actions still use
+// the wire-compatible agent.v1 ExecService.
+
+message ComputerUseWindow {
+  string agent_id = 1;
+  int32 display_index = 2;
+  string owner_token = 3;
+  string updated_at = 4;
+}
+
+message EnsureComputerUseWindowRequest {
+  string agent_id = 1;
+}
+
+message EnsureComputerUseWindowResponse {
+  ComputerUseWindow window = 1;
+}
+
+message ReleaseComputerUseWindowRequest {
+  string agent_id = 1;
+  string owner_token = 2;
+}
+
+message ReleaseComputerUseWindowResponse {}
+
+service ComputerUseWindowService {
+  rpc EnsureComputerUseWindow(EnsureComputerUseWindowRequest)
+      returns (EnsureComputerUseWindowResponse);
+  rpc ReleaseComputerUseWindow(ReleaseComputerUseWindowRequest)
+      returns (ReleaseComputerUseWindowResponse);
+}

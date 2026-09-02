@@ -82,6 +82,7 @@ import {
   type ProjectAgentTaskDialogSubmit,
 } from "./ProjectAgentTaskDialog";
 import { cn } from "../lib/utils";
+import { ComputerUsePolicySwitch } from "./ComputerUsePolicySwitch";
 
 export function ProjectAgents({
   agentListRequestKey = 0,
@@ -790,6 +791,9 @@ export function ProjectAgentDialog({
   const [designatedWorkerId, setDesignatedWorkerId] = useState<string | null>(
     agent?.designatedWorkerId ?? null,
   );
+  const [computerUsePolicy, setComputerUsePolicy] = useState<
+    "disabled" | "unattended"
+  >(agent?.computerUsePolicy ?? "disabled");
   const [description, setDescription] = useState(agent?.description ?? "");
   const [responsibility, setResponsibility] = useState(
     agent?.responsibility ?? "",
@@ -826,6 +830,7 @@ export function ProjectAgentDialog({
     setModel("");
     setEffort(null);
     setDesignatedWorkerId(null);
+    setComputerUsePolicy("disabled");
     setDescription("");
     setResponsibility("");
     setCalendarColor(defaultProjectAgentCalendarColor);
@@ -869,6 +874,7 @@ export function ProjectAgentDialog({
             provider,
             model: model || null,
             effort,
+            computerUsePolicy,
             designatedWorkerId,
             description: description.trim(),
             responsibility: responsibility.trim(),
@@ -1156,6 +1162,7 @@ export function ProjectAgentDialog({
                     label={t("agents.provider")}
                     onValueChange={(value) => {
                       setProvider(value as AgentProvider);
+                      if (value !== "grok") setComputerUsePolicy("disabled");
                       setModel("");
                       setEffort(null);
                     }}
@@ -1221,6 +1228,12 @@ export function ProjectAgentDialog({
                 selectedWorkerId={designatedWorkerId}
                 selectedWorkerLabel={agent?.designatedWorkerLabel ?? null}
                 workers={workers}
+              />
+              <ComputerUsePolicySwitch
+                disabled={isSubmitting}
+                onChange={setComputerUsePolicy}
+                policy={computerUsePolicy}
+                provider={provider}
               />
               <label>
                 <span>
@@ -1309,6 +1322,7 @@ function localProjectAgent(
     provider: input.provider,
     model: input.model,
     effort: input.effort ?? null,
+    computerUsePolicy: input.computerUsePolicy ?? "disabled",
     designatedWorkerId: input.designatedWorkerId ?? null,
     designatedWorkerLabel: workers.find(
       (worker) => worker.id === input.designatedWorkerId,

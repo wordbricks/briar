@@ -220,6 +220,7 @@ const remoteSessionState = {
 export const appManagedComputerRemoteSession = (session: {
   readonly id: string;
   readonly managedComputerId: string;
+  readonly agentId: string | null;
   readonly state: RemoteSessionState;
   readonly connectionGeneration: number;
   readonly tokenExpiresAt: string;
@@ -230,6 +231,7 @@ export const appManagedComputerRemoteSession = (session: {
 }) => create(ManagedComputerRemoteSessionSchema, {
   id: session.id,
   managedComputerId: session.managedComputerId,
+  agentId: session.agentId ?? undefined,
   state: remoteSessionState[session.state],
   connectionGeneration: session.connectionGeneration,
   tokenExpiresAt: appFleetTimestamp(session.tokenExpiresAt),

@@ -26,6 +26,7 @@ export const ManagedComputerSetupSession = strictSchema(Schema.Struct({
 export const ManagedComputerRemoteSessionRequest = strictSchema(Schema.Struct({
   requestId: UuidString,
   reconnectSessionId: Schema.optional(UuidString),
+  agentId: Schema.optional(UuidString),
 }));
 
 export const InstanceIdentityDocument = strictSchema(Schema.Struct({

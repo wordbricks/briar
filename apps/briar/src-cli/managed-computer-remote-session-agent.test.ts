@@ -126,6 +126,47 @@ describe("managed computer remote session agent", () => {
     agent.stop();
   });
 
+  it("resolves an Agent assignment before opening its fork display", async () => {
+    vi.stubGlobal("WebSocket", FakeWebSocket);
+    const localSocket = {
+      write: vi.fn(),
+      end: vi.fn(),
+    } as unknown as Bun.Socket<undefined>;
+    const connect = vi.fn(async (
+      options: Bun.TCPSocketConnectOptions<undefined>,
+    ) => {
+      options.socket.open?.(localSocket);
+      return localSocket;
+    });
+    vi.stubGlobal("Bun", { connect });
+    const agentId = "33333333-3333-4333-8333-333333333333";
+    const resolve = vi.fn().mockResolvedValue({
+      host: "127.0.0.1",
+      port: 5_907,
+    });
+    const agent = new ManagedComputerRemoteSessionAgent(config, { resolve });
+
+    agent.start();
+    const socket = fakeWebSockets[0];
+    socket.readyState = FakeWebSocket.OPEN;
+    socket.emit("open");
+    socket.emit("message", {
+      data: encodeManagedComputerRemoteRelayControlFrame({
+        type: "controller_ready",
+        sessionId: managedComputerId,
+        agentId,
+      }),
+    });
+
+    await vi.waitFor(() => expect(connect).toHaveBeenCalledOnce());
+    expect(resolve).toHaveBeenCalledWith(agentId);
+    expect(connect.mock.calls[0]?.[0]).toMatchObject({
+      hostname: "127.0.0.1",
+      port: 5_907,
+    });
+    agent.stop();
+  });
+
   it("reports a display connection failure for the active session", async () => {
     vi.stubGlobal("WebSocket", FakeWebSocket);
     const connect = vi.fn(async () => {

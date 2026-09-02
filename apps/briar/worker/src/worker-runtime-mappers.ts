@@ -144,6 +144,52 @@ const providerHealth = (
   return result;
 };
 
+const computerUseCapability = (
+  runtime: WorkerRuntimeAdvertisement,
+  healthyProviders: ReadonlySet<AgentProvider>,
+) => {
+  const capability = runtime.capabilities?.computerUse;
+  if (!capability) return null;
+  if (capability.protocol !== 1) {
+    return invalid("Computer Use protocol must be version 1");
+  }
+  if (capability.transport !== "connectrpc-resource-exec") {
+    return invalid("Computer Use transport must be ConnectRPC Resource Exec");
+  }
+  if (
+    !Number.isInteger(capability.maxWindows) ||
+    capability.maxWindows < 1 ||
+    capability.maxWindows > 99
+  ) {
+    return invalid("Computer Use max windows must be between 1 and 99");
+  }
+  if (!capability.sharedDesktop) {
+    return invalid("Computer Use must use the shared desktop");
+  }
+  if (!/^[0-9a-f]{64}$/.test(capability.schemaDigest)) {
+    return invalid("Computer Use schema digest must be a SHA-256 hex digest");
+  }
+  if (capability.providers.length === 0) {
+    return invalid("Computer Use must advertise at least one provider");
+  }
+  const providers = capability.providers.map(workerAgentProviderFromProto);
+  if (new Set(providers).size !== providers.length) {
+    return invalid("Computer Use providers must be unique");
+  }
+  if (providers.some((provider) => !healthyProviders.has(provider))) {
+    return invalid("Computer Use providers must also be healthy");
+  }
+  return {
+    protocol: 1 as const,
+    transport: "connectrpc-resource-exec" as const,
+    providers,
+    maxWindows: capability.maxWindows,
+    sharedDesktop: true as const,
+    humanTakeover: capability.humanTakeover,
+    schemaDigest: capability.schemaDigest,
+  };
+};
+
 export type WorkerRuntimeMetadata = ReturnType<
   typeof workerRuntimeMetadataFromProto
 >;
@@ -166,6 +212,7 @@ export const workerRuntimeMetadataFromProto = (
   const providers = agentProviders.filter((provider) =>
     health[provider]?.healthy === true
   );
+  const computerUse = computerUseCapability(runtime, new Set(providers));
   const runtimeProtoJson = toJsonString(
     WorkerRuntimeAdvertisementSchema,
     runtime,
@@ -183,6 +230,7 @@ export const workerRuntimeMetadataFromProto = (
     providers,
     providerHealth: health,
     providerCapabilities: capabilityCatalog,
+    computerUse,
     versions,
   };
 };

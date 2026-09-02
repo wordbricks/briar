@@ -21,6 +21,9 @@ minisign
 patchelf
 pkg-config
 procps
+python3
+python3-pil
+python3-xlib
 sudo
 thunar
 tigervnc-standalone-server

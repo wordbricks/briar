@@ -11,6 +11,7 @@ import "briar/app/v1/fleet.proto";
 import "briar/realtime/v1/realtime.proto";
 import "briar/types/v1/agent_event.proto";
 import "briar/types/v1/agent_execution.proto";
+import "briar/types/v1/computer_use.proto";
 import "briar/types/v1/github_identity.proto";
 import "briar/types/v1/provider.proto";
 import "briar/types/v1/upload.proto";
@@ -1003,6 +1004,7 @@ message DetachedAgentClaim {
   optional string effort = 5;
   string responsibility = 6;
   repeated DetachedAgentSkill skills = 8;
+  briar.types.v1.ComputerUsePolicy computer_use_policy = 9;
 }
 
 message DetachedAgentSkillExecutionTarget {

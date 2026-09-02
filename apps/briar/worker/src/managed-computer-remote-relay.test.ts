@@ -29,6 +29,7 @@ type Attachment = {
   maxExpiresAt: string | null;
   controllerBytes: number;
   screenBytes: number;
+  agentId: string | null;
 };
 
 const sessionId = "11111111-1111-4111-8111-111111111111";
@@ -202,6 +203,7 @@ function attachSocket(
     maxExpiresAt: null,
     controllerBytes: 0,
     screenBytes: 0,
+    agentId: null,
     ...overrides,
   } satisfies Attachment);
   client.accept();

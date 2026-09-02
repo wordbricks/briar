@@ -1341,7 +1341,8 @@ export async function listChannelAgents(db: D1Database, channelId: string) {
               project.name as project_name, agent.name, agent.avatar,
               agent.provider, agent.model, agent.description,
               agent.responsibility,
-              agent.effort, agent.designated_worker_id,
+              agent.effort, agent.computer_use_policy,
+              agent.designated_worker_id,
               agent.designated_worker_label, agent.created_at, agent.updated_at
        from briar_channel_agents roster
        join briar_project_agents agent on agent.id = roster.agent_id
@@ -1367,6 +1368,7 @@ export async function listChannelAgents(db: D1Database, channelId: string) {
       description: string;
       responsibility: string;
       effort: AgentSkillEffort | null;
+      computer_use_policy: "disabled" | "unattended";
       designated_worker_id: string | null;
       designated_worker_label: string | null;
       created_at: string;
@@ -3208,7 +3210,7 @@ export async function claimNextChannelAgentReply(
     .bind(input.claimedAt, organizationId, MAX_REPLY_ATTEMPTS, input.claimedAt)
     .run();
   const assignedJobs = await db.prepare(
-    `select job.id, job.project_id,
+    `select job.id, job.project_id, agent.computer_use_policy,
             case when current_skill.execution_mode = 'conversation'
               then session.provider else job.agent_provider end as agent_provider,
             case when job.selected_skill_id_snapshot is null
@@ -3235,6 +3237,7 @@ export async function claimNextChannelAgentReply(
     agent_provider: AgentProvider | null;
     runtime_model: string | null;
     runtime_effort: AgentSkillEffort | null;
+    computer_use_policy: "disabled" | "unattended";
     owner_device_id: string | null;
     owner_worker_id: string;
     owner_worker_label: string | null;
@@ -3249,6 +3252,7 @@ export async function claimNextChannelAgentReply(
       provider: assigned.agent_provider,
       model: assigned.runtime_model,
       effort: assigned.runtime_effort,
+      computerUsePolicy: assigned.computer_use_policy,
       observedAt: input.claimedAt,
     });
     if (availability === "available") continue;
@@ -3294,6 +3298,7 @@ export async function claimNextChannelAgentReply(
             session.provider as session_provider,
             session.model as session_model,
             session.effort as session_effort,
+            current_agent.computer_use_policy,
             case when job.selected_skill_id_snapshot is null
               then current_agent.model
               when current_skill.execution_mode = 'conversation'
@@ -3371,6 +3376,7 @@ export async function claimNextChannelAgentReply(
     session_provider: AgentProvider;
     session_model: string | null;
     session_effort: AgentSkillEffort | null;
+    computer_use_policy: "disabled" | "unattended";
   }>();
 
   const preferredAvailability = new Map<string, boolean>();
@@ -3382,6 +3388,10 @@ export async function claimNextChannelAgentReply(
       candidate.runtime_effort,
     );
     if (!supportsSelection) continue;
+    if (
+      candidate.computer_use_policy === "unattended" &&
+      !input.runtime.computerUse?.providers.includes(candidate.agent_provider)
+    ) continue;
 
     const sessionExpired = candidate.session_retained_until <= input.claimedAt;
     if (
@@ -3405,6 +3415,7 @@ export async function claimNextChannelAgentReply(
         candidate.agent_provider,
         candidate.runtime_model,
         candidate.runtime_effort,
+        candidate.computer_use_policy,
       ]);
       let available = preferredAvailability.get(preferenceKey);
       if (available === undefined) {
@@ -3415,6 +3426,7 @@ export async function claimNextChannelAgentReply(
           provider: candidate.agent_provider,
           model: candidate.runtime_model,
           effort: candidate.runtime_effort,
+          computerUsePolicy: candidate.computer_use_policy,
           observedAt: input.claimedAt,
         });
         preferredAvailability.set(preferenceKey, available);
@@ -3466,6 +3478,11 @@ export async function claimNextChannelAgentReply(
          and ${liveChannelReplyRuntime("briar_channel_agent_reply_jobs")}
          and ${liveSkillSnapshot("briar_channel_agent_reply_jobs")}
          and exists (
+           select 1 from briar_project_agents current_agent
+           where current_agent.id = briar_channel_agent_reply_jobs.agent_id
+             and current_agent.computer_use_policy = ?
+         )
+         and exists (
            select 1 from briar_execution_workers binding
            where binding.id = ? and binding.device_id = ?
              and binding.state <> 'disabled'
@@ -3503,6 +3520,7 @@ export async function claimNextChannelAgentReply(
         input.claimedAt,
         candidate.session_updated_at,
         candidate.session_owner_worker_id,
+        candidate.computer_use_policy,
         input.workerId,
         input.deviceId,
       ),

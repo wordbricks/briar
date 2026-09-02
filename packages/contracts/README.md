@@ -27,6 +27,14 @@ messages compose secret-free Worker payloads so claim credentials cannot be
 serialized into CLI output. Effect schemas remain responsible for domain
 invariants and cross-field rules that protobuf cannot express.
 
+`agent.v1` is a compatibility namespace for the Grok Bot Computer Use wire
+contract. Its field numbers, enum values, optional presence, and oneof members
+must stay descriptor-compatible with the reference implementation. Briar code
+may add policy around this contract, but it must not fork the wire schema. The
+exec envelope implements only the Computer Use arm. Field numbers owned by
+other Grok executors remain reserved instead of pulling duplicate shell, file,
+MCP, and subagent contracts into Briar.
+
 Protobuf defines data and service contracts; Connect is only the HTTP RPC
 transport used for the app and Worker control planes. Other boundaries reuse
 the same descriptor graph without adding an HTTP server:

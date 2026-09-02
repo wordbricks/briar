@@ -24,6 +24,7 @@ const existing: ProjectAgentRow & {
   provider: "codex",
   model: null,
   effort: null,
+  computer_use_policy: "disabled",
   designated_worker_id: null,
   designated_worker_label: null,
   description: "Build carefully.",

@@ -19,6 +19,8 @@ import {
 import { decodeJsonRpcMessageJsonResult } from "./json-rpc-message";
 import { createRunnerIo } from "./runner-io";
 import type { RunnerRequest } from "./runner-request";
+import { prepareComputerUseMcp } from "./computer-use-mcp-config";
+import { codexComputerUseArgs } from "./computer-use-provider-adapters";
 
 let activeChild: ChildProcessWithoutNullStreams | null = null;
 const runnerIo = createRunnerIo({
@@ -71,10 +73,15 @@ async function runCodexAttempt(
   request: RunnerRequest,
   isolation: CodexMcpIsolation,
   emittedSessions: Set<string>,
+  computerUseArguments: readonly string[],
 ): Promise<CodexAttemptResult> {
   const child = spawn(
     request.providerBinaryPath,
-    codexAppServerArgs(request, process.env.BRIAR_BROWSER_AUTOMATION_PROVIDER),
+    codexAppServerArgs(
+      request,
+      process.env.BRIAR_BROWSER_AUTOMATION_PROVIDER,
+      computerUseArguments,
+    ),
     {
       cwd: request.workspaceRoot,
       env: process.env,
@@ -193,66 +200,73 @@ async function main() {
     throw new Error("Codex runner received an empty message.");
   }
 
-  const emittedSessions = new Set<string>();
-  let isolation: CodexMcpIsolation = {
-    mcpServers: [],
-    apps: [],
-    disableApps: false,
-    disablePlugins: false,
-  };
-  let attemptRequest = request;
-  let recoveryCount = 0;
-
-  for (;;) {
-    const result = await runCodexAttempt(
-      attemptRequest,
-      isolation,
-      emittedSessions,
-    );
-    if (result.type === "completed") {
-      emit.result({
-        sessionId: result.threadId,
-        message: result.message,
-      });
-      return;
-    }
-
-    if (result.failure.disposition === "blocked") {
-      emit.blocked({
-        reason: "mcp_auth_required",
-        provider: "codex",
-        message: `Authentication is required for MCP server(s): ${result.failure.serverNames.join(", ")}.`,
-        serverNames: result.failure.serverNames,
-        nextRetryAt: null,
-      });
-      return;
-    }
-
-    if (recoveryCount >= maxOptionalMcpRecoveries) {
-      throw new Error(
-        "Codex could not continue after isolating optional MCP startup failures.",
-      );
-    }
-    const nextIsolation = mergeIsolation(isolation, result.failure.isolation);
-    if (isolationKey(nextIsolation) === isolationKey(isolation)) {
-      throw new Error(
-        "Codex could not isolate the optional MCP startup failure.",
-      );
-    }
-    if (!result.threadId) {
-      throw new Error(
-        "Codex App Server did not return a thread ID for MCP recovery.",
-      );
-    }
-
-    recoveryCount += 1;
-    isolation = nextIsolation;
-    attemptRequest = {
-      ...request,
-      conversationId: result.threadId,
-      message: codexMcpRecoveryPrompt(),
-      attachments: [],
+  const computerUseMcp = await prepareComputerUseMcp(request);
+  const computerUseArguments = codexComputerUseArgs(computerUseMcp.servers);
+  try {
+    const emittedSessions = new Set<string>();
+    let isolation: CodexMcpIsolation = {
+      mcpServers: [],
+      apps: [],
+      disableApps: false,
+      disablePlugins: false,
     };
+    let attemptRequest = request;
+    let recoveryCount = 0;
+
+    for (;;) {
+      const result = await runCodexAttempt(
+        attemptRequest,
+        isolation,
+        emittedSessions,
+        computerUseArguments,
+      );
+      if (result.type === "completed") {
+        emit.result({
+          sessionId: result.threadId,
+          message: result.message,
+        });
+        return;
+      }
+
+      if (result.failure.disposition === "blocked") {
+        emit.blocked({
+          reason: "mcp_auth_required",
+          provider: "codex",
+          message: `Authentication is required for MCP server(s): ${result.failure.serverNames.join(", ")}.`,
+          serverNames: result.failure.serverNames,
+          nextRetryAt: null,
+        });
+        return;
+      }
+
+      if (recoveryCount >= maxOptionalMcpRecoveries) {
+        throw new Error(
+          "Codex could not continue after isolating optional MCP startup failures.",
+        );
+      }
+      const nextIsolation = mergeIsolation(isolation, result.failure.isolation);
+      if (isolationKey(nextIsolation) === isolationKey(isolation)) {
+        throw new Error(
+          "Codex could not isolate the optional MCP startup failure.",
+        );
+      }
+      if (!result.threadId) {
+        throw new Error(
+          "Codex App Server did not return a thread ID for MCP recovery.",
+        );
+      }
+
+      recoveryCount += 1;
+      isolation = nextIsolation;
+      attemptRequest = {
+        ...request,
+        conversationId: result.threadId,
+        message: codexMcpRecoveryPrompt(),
+        attachments: [],
+      };
+    }
+  } finally {
+    await computerUseMcp.cleanup();
   }
 }
 

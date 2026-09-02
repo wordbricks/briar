@@ -1,4 +1,4 @@
-import { ArrowLeft, Play } from "lucide-react";
+import { ArrowLeft, MonitorUp, Play } from "lucide-react";
 import { Spinner } from "./ui/spinner";
 import { useEffect, useState } from "react";
 
@@ -18,7 +18,16 @@ import {
   agentWithSkillsRuntime,
 } from "../lib/project-agent";
 import { runProjectAgent } from "../lib/project-llm";
-import type { DashboardPayload, HuntRun, ProjectAgent } from "../types";
+import { loadManagedComputers } from "../lib/api";
+import { supportsManagedComputerRemoteDesktop } from "../lib/platform";
+import type {
+  DashboardPayload,
+  HuntRun,
+  ManagedComputer,
+  ProjectAgent,
+} from "../types";
+import { ManagedComputerRemoteDesktop } from
+  "./ManagedComputerRemoteDesktop";
 import { ProjectAgentSessionDetail } from "./ProjectAgentSessionDetail";
 import { ProjectAgentSessions } from "./ProjectAgentSessions";
 import {
@@ -87,6 +96,11 @@ export function ProjectAgentDetail({
   const { toast } = useToast();
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
+  const [remoteComputer, setRemoteComputer] = useState<ManagedComputer | null>(
+    null,
+  );
+  const [remoteComputerTarget, setRemoteComputerTarget] =
+    useState<ManagedComputer | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
     requestedSessionId,
   );
@@ -139,6 +153,39 @@ export function ProjectAgentDetail({
   useEffect(() => {
     if (selectedSession) setIsTaskDialogOpen(false);
   }, [selectedSession]);
+
+  useEffect(() => {
+    setRemoteComputerTarget(null);
+    if (
+      !token ||
+      !dashboard?.project.organizationId ||
+      !agent.designatedWorkerId ||
+      agent.computerUsePolicy !== "unattended" ||
+      !supportsManagedComputerRemoteDesktop()
+    ) {
+      return;
+    }
+    let cancelled = false;
+    void loadManagedComputers(token, dashboard.project.organizationId)
+      .then((response) => {
+        if (cancelled) return;
+        setRemoteComputerTarget(response.computers.find((computer) =>
+          computer.deviceId === agent.designatedWorkerId &&
+          (computer.state === "needs_setup" || computer.state === "ready")
+        ) ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setRemoteComputerTarget(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    agent.computerUsePolicy,
+    agent.designatedWorkerId,
+    dashboard?.project.organizationId,
+    token,
+  ]);
 
   useEffect(() => {
     if (selectedSession?.sessionType !== "task") return;
@@ -265,7 +312,21 @@ export function ProjectAgentDetail({
     <MainContent id="project-agent-detail">
       <PageHeader
         action={
-          <Button
+          <div className="flex items-center gap-2">
+            {remoteComputerTarget ? (
+              <Button
+                aria-label={t("managedComputer.remote.open")}
+                className="h-[34px] px-3 text-xs active:scale-[.97]"
+                onClick={() => setRemoteComputer(remoteComputerTarget)}
+                title={t("managedComputer.remote.open")}
+                type="button"
+                variant="outline"
+              >
+                <MonitorUp size={16} />
+                {t("managedComputer.remote.open")}
+              </Button>
+            ) : null}
+            <Button
             className="h-[34px] px-3 text-xs active:scale-[.97]"
             disabled={isTaskStarting || !dashboard || agent.skills.length === 0}
             onClick={openTaskDialog}
@@ -283,7 +344,8 @@ export function ProjectAgentDetail({
                   ? "agents.runNow"
                   : "agents.runTask",
             )}
-          </Button>
+            </Button>
+          </div>
         }
         className={cn(
           "app-page-header h-12 shrink-0 px-5 [&_.page-header-description]:hidden",
@@ -326,6 +388,16 @@ export function ProjectAgentDetail({
         onSubmit={submit}
         workerSelectionRequired={Boolean(onStartRemoteTask)}
       />
+
+      {remoteComputer && token && dashboard?.project.organizationId ? (
+        <ManagedComputerRemoteDesktop
+          agentId={agent.id}
+          computer={remoteComputer}
+          onClose={() => setRemoteComputer(null)}
+          organizationId={dashboard.project.organizationId}
+          token={token}
+        />
+      ) : null}
     </MainContent>
   );
 }
