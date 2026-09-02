@@ -96,6 +96,9 @@ const retryableCompletionCodes = new Set([
 const isRetryableWorkerCompletionError = (error: unknown) =>
   !(error instanceof ConnectError) || retryableCompletionCodes.has(error.code);
 
+const isMissingWorkerError = (error: unknown) =>
+  error instanceof ConnectError && error.code === Code.NotFound;
+
 const workerRuntime = (input: {
   agentProvider: WorkerRuntimeInput["agentProvider"];
   providerHealth: WorkerRuntimeInput["providerHealth"];
@@ -263,12 +266,18 @@ async function workerUnregisterCommand() {
   const lifecycleReason = requestedLifecycleReason === "managed-deprovision"
     ? "managed_deprovision"
     : "explicit_user_unlink";
-  await createWorkerEnrollmentClient(config.apiUrl, userToken).unbind({
-    projectId: project.id,
-    workerId: project.executionWorker.workerId,
-    requestId: `worker-unlink:${project.id}:${project.executionWorker.workerId}`,
-    reason: lifecycleReason,
-  });
+  try {
+    await createWorkerEnrollmentClient(config.apiUrl, userToken).unbind({
+      projectId: project.id,
+      workerId: project.executionWorker.workerId,
+      requestId: `worker-unlink:${project.id}:${project.executionWorker.workerId}`,
+      reason: lifecycleReason,
+    });
+  } catch (error) {
+    if (!isMissingWorkerError(error)) throw error;
+    // The local config can outlive a worker that was removed remotely. Treat
+    // that state as already unbound so the user can register the device again.
+  }
   config.projects = config.projects.map((candidate) =>
     candidate.id === project.id
       ? { ...candidate, executionWorker: undefined }

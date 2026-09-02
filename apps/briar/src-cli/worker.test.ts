@@ -15,10 +15,12 @@ import {
   heartbeatDelayMs,
   heartbeatErrorDelayMs,
   idleDelayWithBackoffMs,
+  isLaunchdServiceNotFound,
   issueWorkerSessionDirectory,
   isReplyWork,
   leaseRenewDelayMs,
   launchdPlist,
+  launchdServiceTarget,
   runWorkerLoop,
   restartInstalledServices,
   removeServiceDefinition,
@@ -842,6 +844,21 @@ describe("worker service definitions", () => {
       "-k",
       `gui/${process.getuid?.() ?? 501}/${serviceLabel(projectId)}`,
     ]);
+  });
+
+  it("recognizes an already-removed launchd service", () => {
+    const definition = serviceDefinition({ ...input, platform: "darwin" });
+
+    expect(launchdServiceTarget(definition)).toBe(
+      `gui/${process.getuid?.() ?? 501}/${serviceLabel(projectId)}`,
+    );
+    expect(
+      isLaunchdServiceNotFound(
+        `Could not find service "${serviceLabel(projectId)}" in domain for user gui`,
+      ),
+    ).toBe(true);
+    expect(isLaunchdServiceNotFound("Boot-out failed: 5: Input/output error"))
+      .toBe(false);
   });
 
   it("runs a packaged CLI with the bundled runtime on macOS", () => {

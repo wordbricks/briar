@@ -1,5 +1,7 @@
 import { existsSync } from "node:fs";
 import {
+  isLaunchdServiceNotFound,
+  launchdServiceTarget,
   restartInstalledServices,
   removeServiceDefinition,
   serviceDefinition,
@@ -165,15 +167,33 @@ async function workerService(action: "install" | "uninstall") {
   if (action === "install") {
     await writeServiceDefinition(definition);
   }
-  const argv =
-    command[0] === "launchctl"
-      ? [...command, definition.path]
-      : command;
-  const spawned = Bun.spawnSync({ cmd: argv, stdout: "pipe", stderr: "pipe" });
-  if (!spawned.success) {
-    throw new Error(
-      `서비스 ${action === "install" ? "설치" : "제거"}에 실패했습니다: ${new TextDecoder().decode(spawned.stderr).trim()}`,
-    );
+  const launchdTarget = action === "uninstall"
+    ? launchdServiceTarget(definition)
+    : null;
+  const launchdServiceAlreadyGone = launchdTarget !== null && (() => {
+    const probe = Bun.spawnSync({
+      cmd: ["launchctl", "print", launchdTarget],
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    if (probe.success) return false;
+    const output = [
+      new TextDecoder().decode(probe.stdout),
+      new TextDecoder().decode(probe.stderr),
+    ].join("\n");
+    return isLaunchdServiceNotFound(output);
+  })();
+  if (!launchdServiceAlreadyGone) {
+    const argv =
+      command[0] === "launchctl"
+        ? [...command, definition.path]
+        : command;
+    const spawned = Bun.spawnSync({ cmd: argv, stdout: "pipe", stderr: "pipe" });
+    if (!spawned.success) {
+      throw new Error(
+        `서비스 ${action === "install" ? "설치" : "제거"}에 실패했습니다: ${new TextDecoder().decode(spawned.stderr).trim()}`,
+      );
+    }
   }
   if (action === "uninstall") {
     await removeServiceDefinition(definition);

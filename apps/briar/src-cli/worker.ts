@@ -686,6 +686,20 @@ export type ServiceDefinition = {
   logPath: string;
 };
 
+export function launchdServiceTarget(
+  definition: Pick<ServiceDefinition, "label" | "disableCommand">,
+): string | null {
+  if (definition.disableCommand[0] !== "launchctl") return null;
+  const domain = definition.disableCommand[2];
+  return domain ? `${domain}/${definition.label}` : null;
+}
+
+export function isLaunchdServiceNotFound(output: string): boolean {
+  const normalized = output.toLowerCase();
+  return normalized.includes("could not find service") ||
+    normalized.includes("service not found");
+}
+
 export type RestartServicesResult = {
   restarted: number;
   skipped: number;
