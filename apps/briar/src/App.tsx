@@ -3848,7 +3848,6 @@ export function App({
               setIssueListRequestKey((key) => key + 1);
               navigateToPage("issues");
             }}
-            onProjectsOpen={(teamId) => navigateToPage("projects", teamId)}
             onAgentSessionOpen={(sessionId) => {
               setRequestedRunId(null);
               setRequestedSessionId(sessionId);

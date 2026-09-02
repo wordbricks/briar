@@ -32,6 +32,8 @@
 .dark .sidebar-project-menu-trigger[aria-expanded="true"],
 .dark .sidebar-section-heading button:hover,
 .dark .sidebar-issue-add:hover,
+.dark .sidebar-planning-project-row > button:first-child:hover,
+.dark .sidebar-planning-project-row > button:not(:first-child):hover,
 .dark .user-card:hover,
 .dark .user-card[aria-expanded="true"] {
   color: var(--sidebar-accent-foreground);
@@ -41,7 +43,8 @@
 .dark .sidebar-primary-nav a.active,
 .dark .sidebar-channel-list button.active,
 .dark .sidebar-project-heading.active,
-.dark .sidebar-project-view.active {
+.dark .sidebar-project-view.active,
+.dark .sidebar-planning-project-row > button:first-child.active {
   color: var(--sidebar-accent-foreground);
   background: var(--sidebar-active);
 }
