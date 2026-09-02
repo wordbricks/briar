@@ -30,6 +30,20 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.183",
+        date: "2026년 9월 2일",
+        title: "관리형 컴퓨터에서 에이전트가 화면을 안전하게 조작합니다",
+        summary:
+          "관리형 컴퓨터에 Computer Use 실행과 화면 격리를 추가하고, Worker 서비스 제거와 프로바이더 상태 처리를 보강합니다.",
+        items: [
+          "관리형 컴퓨터에서 타입이 지정된 Computer Use 도구, 격리된 디스플레이 세션, 사람에게 제어권을 넘기는 흐름을 지원합니다.",
+          "Codex, Claude, Cursor, Grok, OpenCode, OpenRouter 연결을 프로바이더별 MCP 어댑터로 같은 Computer Use 실행 흐름에 연결합니다.",
+          "Agent Computer Use 정책을 저장하고 정상 상태인 지원 프로바이더에만 Worker capability를 광고합니다.",
+          "이미 사라진 launchd 서비스를 Worker에서 제거할 때 실패하지 않고 오래된 등록을 정리합니다.",
+          "Worker 서비스 등록 해제 전에 Workflow requirements에서 Protobuf 메타데이터를 제거합니다.",
+        ],
+      },
+      {
         version: "1.2.182",
         date: "2026년 9월 2일",
         title: "프로젝트를 안전하게 관리하고 데스크톱 작업 흐름을 다듬습니다",
@@ -1438,6 +1452,20 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.183",
+        date: "September 2, 2026",
+        title: "Give managed agents safe access to computer use",
+        summary:
+          "Add typed Computer Use execution and display isolation for managed computers while hardening provider checks and Worker service removal.",
+        items: [
+          "Add typed Computer Use tools, isolated display sessions, and human takeover for managed computers.",
+          "Connect Codex, Claude, Cursor, Grok, OpenCode, and OpenRouter through provider-specific MCP adapters.",
+          "Persist Agent Computer Use policy and advertise Worker capability only for healthy supported providers.",
+          "Let Worker service removal tolerate an already-removed launchd service and clean stale registrations.",
+          "Strip Protobuf metadata from workflow requirements before unregistering a Worker service.",
+        ],
+      },
       {
         version: "1.2.182",
         date: "September 2, 2026",
@@ -2938,7 +2966,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-182">
+          <a href="#v1-2-183">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -2960,7 +2988,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.182"
+                      entry.version === "1.2.183"
+                        ? "2026-09-02"
+                        : entry.version === "1.2.182"
                         ? "2026-09-02"
                         : entry.version === "1.2.181" ||
                             entry.version === "1.2.180" ||
