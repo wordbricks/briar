@@ -31,7 +31,7 @@ const project = (input: Partial<PlanningProject> = {}): PlanningProject => ({
 });
 
 describe("Projects", () => {
-  it("renders the organization project list and opens rows and settings", async () => {
+  it("renders only the selected Team's projects and opens rows and settings", async () => {
     const onCreate = vi.fn();
     const onOpen = vi.fn();
     const onSettings = vi.fn();
@@ -46,7 +46,6 @@ describe("Projects", () => {
           onCreate={onCreate}
           onOpen={onOpen}
           onSettings={onSettings}
-          organizationName="Briar"
           projects={[
             project(),
             project({
@@ -54,13 +53,25 @@ describe("Projects", () => {
               name: "Later project",
               status: "planned",
             }),
+            project({
+              id: "planning-3",
+              name: "Another Team project",
+              teamId: "team-2",
+              teamName: "Mobile",
+            }),
           ]}
+          teamId="team-1"
+          teamName="Desktop"
         />
       </I18nProvider>,
     );
 
     expect(container.textContent).toContain("Project navigation");
     expect(container.textContent).toContain("Later project");
+    expect(container.textContent).not.toContain("Another Team project");
+    expect(container.textContent).toContain(
+      "View every project in Desktop in one place.",
+    );
     const rows = container.querySelectorAll<HTMLButtonElement>(
       'section .group > button:first-child',
     );

@@ -21,6 +21,7 @@ export type ChannelNavigationPage = typeof ChannelNavigationPage.Type;
 
 export const projectNavigationPages = [
   "lobby",
+  "projects",
   "issues",
   "agents",
   "schedule",
@@ -63,7 +64,6 @@ export const ProjectSettingsSection = Schema.Literals([
 export type ProjectSettingsSection = typeof ProjectSettingsSection.Type;
 
 export const organizationNavigationPages = [
-  "projects",
   "inbox",
   "my-issues",
 ] as const;

@@ -39,7 +39,7 @@ describe("app navigation locations", () => {
     );
   });
 
-  it.each(["lobby", "issues", "agents", "schedule"] as const)(
+  it.each(["lobby", "projects", "issues", "agents", "schedule"] as const)(
     "stores and restores the %s page with its project context",
     (page) => {
       const location = projectNavigationLocation(
@@ -136,17 +136,12 @@ describe("app navigation locations", () => {
     );
   });
 
-  it("stores Projects with its organization context", () => {
-    const location = organizationNavigationLocation(
-      "organization/one",
-      "projects",
-    );
+  it("rejects the removed organization-scoped Projects location", () => {
+    const location = "organizations/organization%2Fone/projects" as never;
 
-    expect(location).toBe("organizations/organization%2Fone/projects");
-    expect(pageFromNavigationLocation(location)).toBe("projects");
-    expect(organizationIdFromNavigationLocation(location)).toBe(
-      "organization/one",
-    );
+    expect(pageFromNavigationLocation(location)).toBe("lobby");
+    expect(organizationIdFromNavigationLocation(location)).toBeNull();
+    expect(projectIdFromNavigationLocation(location)).toBeNull();
   });
 
   it.each([
