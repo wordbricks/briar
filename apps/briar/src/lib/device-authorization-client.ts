@@ -124,6 +124,35 @@ export type DeviceAuthorizationClientId =
   | "briar-web"
   | "briar-cli";
 
+export type DeviceAuthorizationLaunchOptions = {
+  method?: "email" | "google";
+  locale?: "ko" | "en" | "zh";
+  switchAccount?: boolean;
+};
+
+export const createDeviceVerificationUrl = (
+  verificationUriComplete: string,
+  clientId: Exclude<DeviceAuthorizationClientId, "briar-cli">,
+  options: DeviceAuthorizationLaunchOptions = {},
+) => {
+  const verificationUrl = new URL(verificationUriComplete);
+  if (clientId === "briar-mobile" || clientId === "briar-android") {
+    verificationUrl.searchParams.set("client", "mobile");
+  } else if (clientId === "briar-web") {
+    verificationUrl.searchParams.set("client", "web");
+  }
+  if (options.method) {
+    verificationUrl.searchParams.set("method", options.method);
+  }
+  if (options.locale) {
+    verificationUrl.searchParams.set("locale", options.locale);
+  }
+  if (options.switchAccount) {
+    verificationUrl.searchParams.set("switch_account", "1");
+  }
+  return verificationUrl.toString();
+};
+
 export type DeviceAuthorizationCode = {
   deviceCode: OfficialDeviceCodeResponse["device_code"];
   userCode: OfficialDeviceCodeResponse["user_code"];
