@@ -129,8 +129,11 @@ const workflowRequirement = (value: {
     throw new Error(`Unknown workflow requirement kind: ${value.kind}`);
   }
   return {
-    ...value,
+    id: value.id,
+    label: value.label,
     kind: value.kind as AutoHuntWorkflowRequirement["kind"],
+    tool: value.tool,
+    reason: value.reason,
   };
 };
 
