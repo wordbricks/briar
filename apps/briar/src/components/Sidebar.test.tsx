@@ -109,7 +109,8 @@ describe("Sidebar", () => {
     await cleanup();
   });
 
-  it("shows projects as an organization accordion and opens its list and rows", async () => {
+  it("keeps each Projects accordion and its rows inside the owning Team", async () => {
+    const onAddPlanningProject = vi.fn();
     const onProjectsOpen = vi.fn();
     const onPlanningProjectOpen = vi.fn();
     const onPlanningProjectEdit = vi.fn();
@@ -121,46 +122,100 @@ describe("Sidebar", () => {
       <Sidebar
         {...sidebarProps}
         activePlanningProjectId="planning-1"
+        onAddPlanningProject={onAddPlanningProject}
         onPlanningProjectEdit={onPlanningProjectEdit}
         onPlanningProjectOpen={onPlanningProjectOpen}
         onProjectsOpen={onProjectsOpen}
-        planningProjects={[{
-          id: "planning-1",
-          workspaceId: "organization-1",
-          workspaceName: "Briar",
-          teamId: "project-1",
-          teamName: "Briar",
-          name: "Desktop navigation",
-          description: "Expose organization projects",
-          status: "active",
-          leadUserId: null,
-          leadName: null,
-          startDate: null,
-          targetDate: null,
-          icon: null,
-          color: "#7c3aed",
-          sortOrder: 1,
-          isDefault: false,
-          role: "owner",
-          createdAt: "2026-09-01T00:00:00Z",
-          updatedAt: "2026-09-01T00:00:00Z",
-        }]}
+        planningProjects={[
+          {
+            id: "planning-1",
+            workspaceId: "organization-1",
+            workspaceName: "Briar",
+            teamId: "project-1",
+            teamName: "Briar",
+            name: "Desktop navigation",
+            description: "Expose Team projects",
+            status: "active",
+            leadUserId: null,
+            leadName: null,
+            startDate: null,
+            targetDate: null,
+            icon: null,
+            color: "#7c3aed",
+            sortOrder: 1,
+            isDefault: false,
+            role: "owner",
+            createdAt: "2026-09-01T00:00:00Z",
+            updatedAt: "2026-09-01T00:00:00Z",
+          },
+          {
+            id: "planning-2",
+            workspaceId: "organization-1",
+            workspaceName: "Briar",
+            teamId: "project-2",
+            teamName: "Console",
+            name: "Console navigation",
+            description: "Keep this in Console",
+            status: "planned",
+            leadUserId: null,
+            leadName: null,
+            startDate: null,
+            targetDate: null,
+            icon: null,
+            color: null,
+            sortOrder: 1,
+            isDefault: false,
+            role: "owner",
+            createdAt: "2026-09-01T00:00:00Z",
+            updatedAt: "2026-09-01T00:00:00Z",
+          },
+        ]}
+        projects={[
+          ...sidebarProps.projects,
+          {
+            ...sidebarProps.projects[0],
+            id: "project-2",
+            name: "Console",
+          },
+        ]}
       />,
     );
 
-    const toggle = container.querySelector<HTMLButtonElement>(
-      '.sidebar-planning-projects-nav > button',
+    expect(container.querySelector(".sidebar-planning-projects-nav")).toBeNull();
+    const teamGroups = Array.from(
+      container.querySelectorAll<HTMLElement>(".sidebar-project-group"),
+    );
+    const briarGroup = teamGroups.find((group) =>
+      group.querySelector(".sidebar-project-heading")?.textContent?.includes("Briar"),
+    )!;
+    const consoleGroup = teamGroups.find((group) =>
+      group.querySelector(".sidebar-project-heading")?.textContent?.includes("Console"),
+    )!;
+    expect(briarGroup.textContent).toContain("Desktop navigation");
+    expect(briarGroup.textContent).not.toContain("Console navigation");
+    expect(consoleGroup.textContent).toContain("Console navigation");
+    expect(consoleGroup.textContent).not.toContain("Desktop navigation");
+
+    const toggle = briarGroup.querySelector<HTMLButtonElement>(
+      ".sidebar-planning-projects-toggle",
     )!;
     expect(toggle.getAttribute("aria-expanded")).toBe("true");
-    expect(container.querySelector("#sidebar-planning-project-list")?.textContent)
+    expect(container.querySelector("#planning-project-list-project-1")?.textContent)
       .toContain("Desktop navigation");
 
     await act(async () => toggle.click());
-    expect(onProjectsOpen).toHaveBeenCalledOnce();
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(container.querySelector("#planning-project-list-project-1")).toBeNull();
+    expect(container.querySelector("#planning-project-list-project-2")).not.toBeNull();
 
     await act(async () => toggle.click());
-    const row = container.querySelector<HTMLButtonElement>(
+    const title = briarGroup.querySelector<HTMLButtonElement>(
+      ".sidebar-planning-projects-link",
+    )!;
+    await act(async () => title.click());
+    expect(onProjectsOpen).toHaveBeenCalledWith("project-1");
+
+    const row = briarGroup.querySelector<HTMLButtonElement>(
       ".sidebar-planning-project-row > button:first-child",
     )!;
     await act(async () => row.click());
@@ -169,11 +224,17 @@ describe("Sidebar", () => {
       "project-1",
     );
 
-    const settings = container.querySelector<HTMLButtonElement>(
-      ".sidebar-planning-project-row > button:last-child",
-    )!;
+    const settings = briarGroup.querySelectorAll<HTMLButtonElement>(
+      ".sidebar-planning-project-row > button",
+    )[1]!;
     await act(async () => settings.click());
     expect(onPlanningProjectEdit).toHaveBeenCalledWith("planning-1");
+
+    const add = briarGroup.querySelector<HTMLButtonElement>(
+      '.sidebar-planning-projects-heading > button:last-child',
+    )!;
+    await act(async () => add.click());
+    expect(onAddPlanningProject).toHaveBeenCalledWith("project-1");
 
     await cleanup();
   });

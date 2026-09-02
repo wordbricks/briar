@@ -850,7 +850,7 @@ export function App({
       projectId = navigationActiveProjectIdRef.current,
     ) =>
       navigateToLocation(
-        (page === "projects" || page === "inbox" || page === "my-issues") &&
+        (page === "inbox" || page === "my-issues") &&
         briar.activeOrganizationId
           ? organizationNavigationLocation(briar.activeOrganizationId, page)
           : (page === "channels" || page === "dms") &&
@@ -1158,11 +1158,7 @@ export function App({
             fallbackProject?.id,
           ),
         );
-      } else if (
-        activePage === "projects" ||
-        activePage === "inbox" ||
-        activePage === "my-issues"
-      ) {
+      } else if (activePage === "inbox" || activePage === "my-issues") {
         replaceNavigationLocation(
           organizationNavigationLocation(fallbackOrganization.id, activePage),
         );
@@ -1815,20 +1811,6 @@ export function App({
           project.organizationId === briar.activeOrganizationId ||
           project.id === briar.activeProjectId,
       );
-  const activeOrganizationTeamIds = new Set(
-    briar.projects
-      .filter(
-        (project) => project.organizationId === briar.activeOrganizationId,
-      )
-      .map((project) => project.id),
-  );
-  const activeOrganizationPlanningProjects = briar.planningProjects.filter(
-    (project) => activeOrganizationTeamIds.has(project.teamId),
-  );
-  const projectsPageTeamId = briar.activeProjectId &&
-      activeOrganizationTeamIds.has(briar.activeProjectId)
-    ? briar.activeProjectId
-    : activeOrganizationTeamIds.values().next().value;
   const activeDashboardRef = useRef(briar.dashboard);
   activeDashboardRef.current = briar.dashboard;
   const loadOrganizationProjectDashboard = useCallback(
@@ -2916,17 +2898,19 @@ export function App({
     }, paletteSections.continue);
   }
   if (!projectWindowProjectId && briar.activeOrganizationId) {
-    addPaletteItem({
-      active: activePage === "projects",
-      description: activeOrganization?.name,
-      icon: <FolderKanban />,
-      id: `navigation:projects:${briar.activeOrganizationId}`,
-      keywords: ["projects", "project list", "프로젝트", "项目"],
-      label: t("sidebar.projects"),
-      onSelect: () => navigateToPage("projects"),
-      priority: activePage === "projects" ? 125 : 55,
-      scope: "navigation",
-    }, paletteSections.navigation);
+    if (activeProject) {
+      addPaletteItem({
+        active: activePage === "projects",
+        description: activeProject.name,
+        icon: <FolderKanban />,
+        id: `navigation:projects:${activeProject.id}`,
+        keywords: ["projects", "project list", "프로젝트", "项目"],
+        label: t("sidebar.projects"),
+        onSelect: () => navigateToPage("projects", activeProject.id),
+        priority: activePage === "projects" ? 125 : 55,
+        scope: "navigation",
+      }, paletteSections.navigation);
+    }
     addPaletteItem({
       active: activePage === "my-issues",
       description: activeOrganization?.name,
@@ -3848,6 +3832,10 @@ export function App({
             connectedProjectIds={briar.connectedProjectIds}
             isOpen={isSidebarOpen}
             onAddProject={briar.startProjectCreation}
+            onAddPlanningProject={(teamId) => {
+              setPlanningProjectEditId(null);
+              setPlanningProjectTeamId(teamId);
+            }}
             onPlanningProjectEdit={(projectId) => {
               setPlanningProjectTeamId(null);
               setPlanningProjectEditId(projectId);
@@ -3860,11 +3848,7 @@ export function App({
               setIssueListRequestKey((key) => key + 1);
               navigateToPage("issues");
             }}
-            onProjectsOpen={
-              briar.activeOrganizationId
-                ? () => navigateToPage("projects")
-                : undefined
-            }
+            onProjectsOpen={(teamId) => navigateToPage("projects", teamId)}
             onAgentSessionOpen={(sessionId) => {
               setRequestedRunId(null);
               setRequestedSessionId(sessionId);
@@ -3954,7 +3938,7 @@ export function App({
             onLogout={() => void briar.logout()}
             organizations={briar.organizations}
             projects={visibleProjects}
-            planningProjects={activeOrganizationPlanningProjects}
+            planningProjects={briar.planningProjects}
             projectReadiness={briar.projectReadiness}
             projectReadinessError={briar.projectReadinessError}
             projectWindowProjectId={projectWindowProjectId}
@@ -4130,13 +4114,13 @@ export function App({
               title={t("dm.empty")}
             />
           </MainContent>
-        ) : activePage === "projects" && briar.activeOrganizationId ? (
+        ) : activePage === "projects" && activeProjectForTabs ? (
           <Projects
             isSidebarOpen={isSidebarOpen}
-            onCreate={projectsPageTeamId ? () => {
+            onCreate={() => {
               setPlanningProjectEditId(null);
-              setPlanningProjectTeamId(projectsPageTeamId);
-            } : undefined}
+              setPlanningProjectTeamId(activeProjectForTabs.id);
+            }}
             onOpen={(planningProjectId, teamId) => {
               setActivePlanningProjectId(planningProjectId);
               navigationActiveProjectIdRef.current = teamId;
@@ -4149,8 +4133,9 @@ export function App({
               setPlanningProjectTeamId(null);
               setPlanningProjectEditId(planningProjectId);
             }}
-            organizationName={activeOrganization?.name}
-            projects={activeOrganizationPlanningProjects}
+            projects={briar.planningProjects}
+            teamId={activeProjectForTabs.id}
+            teamName={activeProjectForTabs.name}
           />
         ) : activePage === "my-issues" && briar.activeOrganizationId ? (
           <MyIssues

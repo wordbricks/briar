@@ -39,15 +39,17 @@ export function Projects({
   onCreate,
   onOpen,
   onSettings,
-  organizationName,
   projects,
+  teamId,
+  teamName,
 }: {
   isSidebarOpen: boolean;
   onCreate?: () => void;
   onOpen: (projectId: string, teamId: string) => void;
   onSettings: (projectId: string) => void;
-  organizationName?: string;
   projects: readonly PlanningProject[];
+  teamId: string;
+  teamName: string;
 }) {
   const { localeTag, t } = useI18n();
   const dateFormatter = new Intl.DateTimeFormat(localeTag, {
@@ -56,10 +58,11 @@ export function Projects({
     year: "numeric",
     timeZone: "UTC",
   });
-  const sortedProjects = [...projects].sort(
+  const sortedProjects = projects.filter(
+    (project) => project.teamId === teamId,
+  ).sort(
     (left, right) =>
       statusOrder[left.status] - statusOrder[right.status] ||
-      left.teamName.localeCompare(right.teamName, localeTag) ||
       left.sortOrder - right.sortOrder ||
       left.name.localeCompare(right.name, localeTag),
   );
@@ -78,7 +81,7 @@ export function Projects({
           !isSidebarOpen && "sidebar-closed",
         )}
         description={t("projects.description", {
-          name: organizationName ?? t("sidebar.projects"),
+          name: teamName,
         })}
         title={t("projects.title")}
       />
@@ -102,10 +105,9 @@ export function Projects({
           >
             <div
               aria-hidden="true"
-              className="grid min-h-10 grid-cols-[minmax(260px,2fr)_minmax(120px,1fr)_minmax(110px,.7fr)_minmax(120px,.8fr)_minmax(130px,.8fr)_40px] items-center gap-4 border-b border-border bg-muted/45 px-4 text-2xs font-semibold text-muted-foreground max-[980px]:grid-cols-[minmax(220px,2fr)_minmax(120px,1fr)_minmax(110px,.7fr)_40px] max-[760px]:grid-cols-[minmax(0,1fr)_auto_40px]"
+              className="grid min-h-10 grid-cols-[minmax(260px,2fr)_minmax(110px,.7fr)_minmax(120px,.8fr)_minmax(130px,.8fr)_40px] items-center gap-4 border-b border-border bg-muted/45 px-4 text-2xs font-semibold text-muted-foreground max-[980px]:grid-cols-[minmax(220px,2fr)_minmax(110px,.7fr)_40px] max-[760px]:grid-cols-[minmax(0,1fr)_auto_40px]"
             >
               <span>{t("projects.name")}</span>
-              <span>{t("projects.team")}</span>
               <span>{t("projects.status")}</span>
               <span className="max-[980px]:hidden">{t("projects.lead")}</span>
               <span className="max-[980px]:hidden">{t("projects.targetDate")}</span>
@@ -114,7 +116,7 @@ export function Projects({
             <div className="divide-y divide-border">
               {sortedProjects.map((project) => (
                 <div
-                  className="group relative grid min-h-[68px] grid-cols-[minmax(260px,2fr)_minmax(120px,1fr)_minmax(110px,.7fr)_minmax(120px,.8fr)_minmax(130px,.8fr)_40px] items-center gap-4 px-4 transition-colors hover:bg-accent/65 focus-within:bg-accent max-[980px]:grid-cols-[minmax(220px,2fr)_minmax(120px,1fr)_minmax(110px,.7fr)_40px] max-[760px]:grid-cols-[minmax(0,1fr)_auto_40px]"
+                  className="group relative grid min-h-[68px] grid-cols-[minmax(260px,2fr)_minmax(110px,.7fr)_minmax(120px,.8fr)_minmax(130px,.8fr)_40px] items-center gap-4 px-4 transition-colors hover:bg-accent/65 focus-within:bg-accent max-[980px]:grid-cols-[minmax(220px,2fr)_minmax(110px,.7fr)_40px] max-[760px]:grid-cols-[minmax(0,1fr)_auto_40px]"
                   key={project.id}
                 >
                   <button
@@ -138,9 +140,6 @@ export function Projects({
                         {project.description || t("projects.noDescription")}
                       </small>
                     </span>
-                  </span>
-                  <span className="pointer-events-none relative z-[1] truncate text-xs text-muted-foreground max-[760px]:hidden">
-                    {project.teamName}
                   </span>
                   <Badge className="pointer-events-none relative z-[1] w-fit" variant={statusVariant[project.status]}>
                     {t(statusMessage[project.status])}
