@@ -5,9 +5,24 @@ import { configDefaults, defineConfig } from "vitest/config";
 import { resolveMaxWorkers } from "./vitest.max-workers";
 
 const host = process.env.TAURI_DEV_HOST;
+const buildsWeb = process.env.VITE_BRIAR_WEB === "true";
+
+/**
+ * Desktop builds emit a second page for the native launch intro window.
+ *
+ * The intro has to be on screen while the app bundle is still downloading, so
+ * it gets its own entry instead of loading `index.html` a second time. The web
+ * build has no such window and keeps its single-page output.
+ */
+const buildInput = {
+  index: path.resolve(__dirname, "index.html"),
+  ...(buildsWeb
+    ? {}
+    : { intro: path.resolve(__dirname, "intro.html") }),
+} satisfies Record<string, string>;
 
 export default defineConfig({
-  base: process.env.VITE_BRIAR_WEB === "true" ? "/app/" : undefined,
+  base: buildsWeb ? "/app/" : undefined,
   envDir: path.resolve(__dirname, "../.."),
   plugins: [react(), tailwindcss()],
   resolve: {
@@ -24,6 +39,7 @@ export default defineConfig({
     // the app uses dynamic imports. Grouping the vendors that every screen needs
     // keeps the request count sane and lets them stay cached across releases.
     rolldownOptions: {
+      input: buildInput,
       output: {
         codeSplitting: {
           groups: [

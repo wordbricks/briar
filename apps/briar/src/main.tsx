@@ -19,6 +19,9 @@ import { isMacDesktopTauri } from "./lib/platform";
 import { initializeTheme, ThemeProvider } from "./theme";
 import "./styles/globals.css";
 import "./styles.css";
+// Kept after styles.css so the extracted intro rules land in their original
+// cascade position; intro-main.tsx imports the same file on its own.
+import "./styles/launch-intro.css";
 import "./styles/dark.css";
 
 initializeTheme();
