@@ -1,3 +1,4 @@
+import { useStatusTray } from "../../hooks/useStatusTray";
 import { useChannelCatalogSync } from "../../state/channels/useChannelCatalogSync";
 import { useActiveOrganizationPersistence } from "../../state/organization/useActiveOrganizationPersistence";
 import { useTeamSync } from "../../state/sync/useTeamSync";
@@ -16,5 +17,6 @@ export function AppEffects() {
   useChannelCatalogSync();
   useWorkspaceSync();
   useWorkflowAutoGeneration();
+  useStatusTray();
   return null;
 }

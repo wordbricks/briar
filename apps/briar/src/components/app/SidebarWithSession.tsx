@@ -2,12 +2,27 @@ import { useAtomValue } from "@effect/atom-react";
 import type { ComponentProps, ReactNode } from "react";
 
 import {
+  activePlanningProjectIdAtom,
+  isSidebarOpenAtom,
+} from "../../state/dialogs/atoms";
+import {
+  channelsLoadingAtom,
+  organizationDirectMessagesAtom,
+  visibleOrganizationChannelsAtom,
+} from "../../state/channels/atoms";
+import {
   activeOrganizationIdAtom,
   organizationsAtom,
 } from "../../state/organization/atoms";
 import { planningProjectsAtom } from "../../state/planning/atoms";
+import { lockedTeamIdAtom } from "../../state/platform";
 import { tokenAtom, userAtom } from "../../state/session/atoms";
-import { activeTeamIdAtom } from "../../state/team/atoms";
+import { activeTeamIdAtom, visibleTeamsAtom } from "../../state/team/atoms";
+import {
+  connectedTeamIdsAtom,
+  teamReadinessErrorRecordAtom,
+  teamReadinessRecordAtom,
+} from "../../state/workspace/atoms";
 import type {
   Organization,
   PlanningProject,
@@ -52,18 +67,64 @@ export function SidebarSessionBoundary({
 }
 
 /**
- * `Sidebar` wired to the root atoms. `projects` stays a prop: a project window
- * renders a filtered list the sidebar must not widen back to every team.
+ * `Sidebar` wired to the store. Everything it lists — the teams this window may
+ * show, the channels of the active organization, what this device knows about
+ * each repository — comes from atoms; the shell keeps only the callbacks that
+ * navigate and the agent sessions it owns.
+ *
+ * `activeChannelId` stays a prop because the open channel follows the
+ * navigation history, which the shell still owns.
  */
 export function SidebarWithSession(
-  props: Omit<ComponentProps<typeof Sidebar>, keyof SidebarSessionState>,
+  props: Omit<
+    ComponentProps<typeof Sidebar>,
+    | keyof SidebarSessionState
+    | "activePlanningProjectId"
+    | "channels"
+    | "channelsLoading"
+    | "connectedTeamIds"
+    | "isOpen"
+    | "projectReadiness"
+    | "projectReadinessError"
+    | "projectWindowProjectId"
+    | "projects"
+    | "unreadDmCount"
+  >,
 ) {
+  const activePlanningProjectId = useAtomValue(activePlanningProjectIdAtom);
+  const channels = useAtomValue(visibleOrganizationChannelsAtom);
+  const channelsLoading = useAtomValue(channelsLoadingAtom);
+  const connectedTeamIds = useAtomValue(connectedTeamIdsAtom);
+  const directMessages = useAtomValue(organizationDirectMessagesAtom);
+  const isOpen = useAtomValue(isSidebarOpenAtom);
+  const lockedTeamId = useAtomValue(lockedTeamIdAtom);
+  const projectReadiness = useAtomValue(teamReadinessRecordAtom);
+  const projectReadinessError = useAtomValue(teamReadinessErrorRecordAtom);
+  const projects = useAtomValue(visibleTeamsAtom);
   return (
     <SidebarSessionBoundary>
       {({ user, ...session }) =>
         // The sidebar only exists for a signed-in account, which is also the
         // only branch App renders it from.
-        user ? <Sidebar {...props} {...session} user={user} /> : null}
+        user ? (
+          <Sidebar
+            {...props}
+            {...session}
+            activePlanningProjectId={activePlanningProjectId}
+            channels={channels}
+            channelsLoading={channelsLoading}
+            connectedTeamIds={connectedTeamIds}
+            isOpen={isOpen}
+            projectReadiness={projectReadiness}
+            projectReadinessError={projectReadinessError}
+            projectWindowProjectId={lockedTeamId}
+            projects={projects}
+            unreadDmCount={
+              directMessages.filter((channel) => channel.hasUnread).length
+            }
+            user={user}
+          />
+        ) : null}
     </SidebarSessionBoundary>
   );
 }

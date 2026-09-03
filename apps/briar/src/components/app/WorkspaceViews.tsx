@@ -14,7 +14,9 @@ import {
   userAtom,
 } from "../../state/session/atoms";
 import { remoteMode } from "../../state/platform";
+import { isSidebarOpenAtom } from "../../state/dialogs/atoms";
 import {
+  activeTeamAtom,
   activeTeamIdAtom,
   isCreatingTeamAtom,
   teamConnectionAtom,
@@ -23,6 +25,7 @@ import {
 import { useWorkflowActions } from "../../state/workflow/actions";
 import { useWorkspaceActions } from "../../state/workspace/actions";
 import {
+  activeTeamConnectionStateAtom,
   connectedTeamIdsAtom,
   healthAtom,
   localInventoryErrorAtom,
@@ -44,6 +47,9 @@ import {
   the wrapper in `lazy()` instead would add a second chunk around the first.
 */
 
+const AppSettings = lazy(() =>
+  import("../AppSettings").then((m) => ({ default: m.AppSettings })),
+);
 const ConnectionHealth = lazy(() =>
   import("../ConnectionHealth").then((m) => ({ default: m.ConnectionHealth })),
 );
@@ -200,6 +206,58 @@ export function TeamOnboardingWithWorkspace({
       onRepositorySelect={selectProjectRepository}
       onResolveGithubRepository={resolveGithubProjectRepository}
       onReviseWorkflow={reviseWorkflow}
+    />
+  );
+}
+
+/**
+ * The application settings screen. Its "source control" section shows what this
+ * device knows about the selected team's repository, which the shell used to
+ * look up in three facade records — readiness, its error, and the set of probes
+ * in flight — and hand over on every render.
+ *
+ * The `lazy()` boundary lives here, so the chunk split stays where the shell
+ * had it.
+ */
+export function AppSettingsWithWorkspace(
+  props: Omit<
+    ComponentProps<typeof AppSettings>,
+    | "connectionState"
+    | "error"
+    | "isSidebarOpen"
+    | "loading"
+    | "onRefresh"
+    | "projectId"
+    | "projectName"
+    | "readiness"
+    | "requiresLocalReadiness"
+    | "usageScopeKey"
+    | "user"
+  >,
+) {
+  const user = useAtomValue(userAtom);
+  const team = useAtomValue(activeTeamAtom);
+  const organizationId = useAtomValue(activeOrganizationIdAtom);
+  const connectionState = useAtomValue(activeTeamConnectionStateAtom);
+  const readiness = useAtomValue(teamReadinessAtom(team?.id ?? ""));
+  const isSidebarOpen = useAtomValue(isSidebarOpenAtom);
+  const { refreshProjectReadiness } = useWorkspaceActions();
+  if (!user) return null;
+  return (
+    <AppSettings
+      {...props}
+      connectionState={connectionState}
+      error={team ? readiness.error : null}
+      isSidebarOpen={isSidebarOpen}
+      loading={team ? readiness.loading : false}
+      onRefresh={() =>
+        team ? refreshProjectReadiness(team.id) : Promise.resolve(null)}
+      projectId={team?.id ?? ""}
+      projectName={team?.name ?? ""}
+      readiness={team ? readiness.readiness : null}
+      requiresLocalReadiness={!remoteMode}
+      usageScopeKey={organizationId ?? "none"}
+      user={user}
     />
   );
 }

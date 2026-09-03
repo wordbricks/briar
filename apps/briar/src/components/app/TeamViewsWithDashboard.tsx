@@ -1,8 +1,15 @@
-import { useAtomValue } from "@effect/atom-react";
+import { useAtom, useAtomValue } from "@effect/atom-react";
 import { lazy, type ComponentProps } from "react";
 
 import { isRepositoryConnectedForImport } from "../../lib/linear-import";
+import {
+  completedDispatchRunIdAtom,
+  dispatchRunAtom,
+  quickProcessErrorAtom,
+  quickStartingRunIdAtom,
+} from "../../state/dialogs/atoms";
 import { localTeamReadiness } from "../../lib/local-team-connection";
+import { remoteMode } from "../../state/platform";
 import {
   teamExecutionPolicyAtom,
   activeTeamIdAtom,
@@ -54,11 +61,33 @@ export function TeamAgentsWithDashboard(
   return <TeamAgents {...props} dashboard={dashboard} />;
 }
 
+/**
+ * The team home. Besides the payload it reads what this device knows about the
+ * team's repository, which the shell used to look up in the readiness record
+ * and hand over on every render.
+ */
 export function TeamLobbyWithDashboard(
-  props: Omit<ComponentProps<typeof TeamLobby>, "dashboard">,
+  props: Omit<
+    ComponentProps<typeof TeamLobby>,
+    | "connectionState"
+    | "dashboard"
+    | "readiness"
+    | "requiresLocalReadiness"
+  >,
 ) {
   const dashboard = useAtomValue(activeDashboardAtom);
-  return <TeamLobby {...props} dashboard={dashboard} />;
+  const connectionState = useAtomValue(activeTeamConnectionStateAtom);
+  const teamId = useAtomValue(activeTeamIdAtom);
+  const readiness = useAtomValue(teamReadinessAtom(teamId ?? ""));
+  return (
+    <TeamLobby
+      {...props}
+      connectionState={connectionState}
+      dashboard={dashboard}
+      readiness={readiness.readiness}
+      requiresLocalReadiness={!remoteMode}
+    />
+  );
 }
 
 /**
@@ -169,17 +198,36 @@ export function TeamSettingsWithDashboard(
  * The dispatch dialog only needs the team's workers and execution policy, so it
  * reads those two families rather than the reassembled payload: a run edit
  * leaves both alone and never reaches the dialog.
+ *
+ * The dispatch flow's own state — which run is being dispatched, whether the
+ * request is in flight, whether it just succeeded and what it reported — comes
+ * from `state/dialogs`. Only submitting is still the shell's: it is the one
+ * step that needs the token and a dashboard refresh.
  */
-export function WorkerDispatchDialogWithTeam(
-  props: Omit<ComponentProps<typeof WorkerDispatchDialog>, "policy" | "workers">,
-) {
+export function WorkerDispatchDialogWithTeam({
+  onSubmit,
+}: Pick<ComponentProps<typeof WorkerDispatchDialog>, "onSubmit">) {
   const teamId = useAtomValue(activeTeamIdAtom);
   const policy = useAtomValue(teamExecutionPolicyAtom(teamId ?? ""));
   const workers = useAtomValue(teamWorkersAtom(teamId ?? ""));
+  const [run, setRun] = useAtom(dispatchRunAtom);
+  const dispatchingRunId = useAtomValue(quickStartingRunIdAtom);
+  const completedRunId = useAtomValue(completedDispatchRunIdAtom);
+  const error = useAtomValue(quickProcessErrorAtom);
   return (
     <WorkerDispatchDialog
-      {...props}
+      didDispatchSuccessfully={completedRunId === run?.id}
+      error={error}
+      isDispatching={Boolean(dispatchingRunId)}
+      onOpenChange={(open) => {
+        // A dispatch in flight, and the moment of success after it, own the
+        // dialog: closing it there would drop the confirmation mid-animation.
+        if (!open && !dispatchingRunId && !completedRunId) setRun(null);
+      }}
+      onSubmit={onSubmit}
+      open={Boolean(run)}
       policy={policy ?? undefined}
+      run={run}
       workers={workers ?? []}
     />
   );

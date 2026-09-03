@@ -240,6 +240,40 @@ workspace / workflow / integrations를 옮기며 확인한, 이후 단계에 영
   셸이 정적 import 하고 있었으므로 래퍼도 정적이다. `CommandPalette`는 lazy라서
   래퍼가 경계를 들고 간다.
 
+### 기준 갱신 (2026-09-04, Phase 4-2 이후)
+
+다이얼로그·내비게이션 상태와 훅 4종을 옮기며 확인한 사실:
+
+- **훅 추출의 크기를 정하는 것은 코드가 아니라 파라미터다.** 옮길 블록이 읽는
+  값 중 atom에 있는 것은 훅이 직접 읽고, 셸이 **결정하는** 것(현재 페이지,
+  히스토리가 갈 수 있는 방향, 이동 콜백)만 파라미터로 남긴다.
+  `useCommandPaletteItems`는 610줄에 파라미터 16개, `useDeepLinks`는 290줄에
+  `navigation` / `session` 두 묶음이다. 이 경계를 지키면 Phase 5·6이 셸을
+  쪼갤 때 훅을 다시 건드릴 필요가 없다.
+- **부작용 훅에는 `deps` 오버라이드 하나면 충분하다.** `useStatusTray`처럼
+  호출부가 하나뿐인 effect 훅은 레지스트리 atom 이음매(`workspaceApiAtom` 형태)
+  없이 `useStatusTray(overrides)` 한 개로 테스트할 수 있다. 아울러
+  `isMacDesktopTauri()` 같은 플랫폼 분기도 그 `deps`에 넣어야 vitest에서 본문에
+  도달한다.
+- **`useAtom`을 쓸 자리와 `useAtomSet`을 쓸 자리가 다르다.** 훅이 App에서
+  호출되면 훅이 구독한 atom은 곧 App의 리렌더다. 쓰기만 하는 atom은
+  반드시 `useAtomSet`으로 잡는다.
+- **상태 트레이의 마운트 순서가 곧 계약이다.** 대시보드 파생 effect와 조직 폴링
+  effect가 같은 배열을 쓰는데, 폴링 쪽이 시작할 때 배열을 비운다. 마운트
+  시점에는 폴링이 이겨서 트레이가 잠깐 빈다 — 옮기기 전과 같은 동작이라
+  테스트도 그대로 고정했다.
+- **인박스 알림은 읽음 처리를 팀 전환 앞에서 한다.** 그래서 다른 팀의 알림을
+  열면 `markRead`가 두 번(전환 패스, 라우팅 패스) 호출된다. 기존 동작이며
+  `useDeepLinks.test.tsx`가 그대로 고정한다.
+- **`WorkerDispatchDialog`의 "이중 렌더"는 중복이 아니다.** 컴패니언 분기가
+  데스크톱 트리보다 먼저 return하므로 두 자리는 상호 배타적이다. 둘을 하나로
+  합치는 것은 셸 통합(Phase 5)의 일이고, 4-2는 두 자리를 모두
+  `<WorkerDispatchDialogWithTeam onSubmit={…} />` 한 줄로 만들어 두었다.
+- **파사드에 남은 것.** `App.tsx`는 이제 `briar.` 키 45개를 읽는다. 남은 것은
+  세션·조직·팀 선택과 로그인/온보딩 게이트, 그리고 `useBriar`에만 있는
+  `ensureProjectSelected` / `refresh` / `addIssueMessage` 계열이다.
+  `projectReadiness` 3종과 `connectedTeamIds`는 사라졌다.
+
 ## 목표
 
 1. `apps/briar/src/hooks/useBriar.ts`(4,668줄)와 `apps/briar/src/App.tsx`(5,116줄)가
