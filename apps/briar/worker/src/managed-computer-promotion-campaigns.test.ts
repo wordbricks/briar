@@ -4,7 +4,7 @@ import {
   applyForPromotionalManagedComputer,
   validateManagedComputerPromotion,
 } from "./managed-computer-service";
-import { executeD1Sql } from "./test-helpers/d1";
+import { executeD1Sql } from "./test-helpers/d1-sql";
 
 const organizationId = "11111111-1111-4111-8111-111111111111";
 const userId = "promotion-owner";

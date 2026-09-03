@@ -3,10 +3,8 @@ import { describe, expect, it } from "vitest";
 import { repositoryWorkflowBootstrap } from "../../src/lib/auto-hunt-contract";
 import { isChannelApprovedIssue } from "./channel-issue-approval-repository";
 import { recordHuntEvent } from "./hunt-event-repository";
-import {
-  applyD1Migrations,
-  executeD1Sql,
-} from "./test-helpers/d1";
+import { applyD1Migrations } from "./test-helpers/d1";
+import { executeD1Sql } from "./test-helpers/d1-sql";
 
 describe("channel approval authority cutover", () => {
   it("removes unverifiable authority without deleting visible issues", async () => {

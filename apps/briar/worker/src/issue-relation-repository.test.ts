@@ -10,7 +10,7 @@ import {
   listIssueRelationsByRunIds,
   setIssueParent,
 } from "./issue-relation-repository";
-import { executeD1Sql } from "./test-helpers/d1";
+import { executeD1Sql } from "./test-helpers/d1-sql";
 import { transferredIssueRelationStatements } from "./issue-transfer-relations";
 
 describe("issue hierarchy and related issue repository", () => {

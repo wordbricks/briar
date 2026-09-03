@@ -8,7 +8,7 @@ import {
 import { archiveFormatVersion } from "./archive-contract";
 import { backfillProjectAgentSessionArchives } from "./archive-storage-backfill";
 import { encodeStoredProjectAgentSessionPayload } from "./project-request-contract";
-import { executeD1Sql } from "./test-helpers/d1";
+import { executeD1Sql } from "./test-helpers/d1-sql";
 
 const encoder = new TextEncoder();
 

@@ -1,9 +1,7 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
-import {
-  applyD1Migrations,
-  executeD1Sql,
-} from "./test-helpers/d1";
+import { applyD1Migrations } from "./test-helpers/d1";
+import { executeD1Sql } from "./test-helpers/d1-sql";
 
 describe("Better Auth 1.7 account issuer migration", () => {
   it("rejects an unmapped legacy provider instead of inventing an issuer", async () => {

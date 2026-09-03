@@ -11,7 +11,7 @@ import {
   resolveIssueHierarchyLocation,
 } from "./hierarchy-repository";
 import { transferIssue } from "./issue-transfer-repository";
-import { executeD1Sql } from "./test-helpers/d1";
+import { executeD1Sql } from "./test-helpers/d1-sql";
 
 describe("Workspace Team Project Issue hierarchy", () => {
   const db = env.DB;

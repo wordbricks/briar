@@ -5,7 +5,7 @@ import {
   listInboxReadStates,
   upsertInboxReadStates,
 } from "./inbox-read-state-repository";
-import { executeD1Sql } from "./test-helpers/d1";
+import { executeD1Sql } from "./test-helpers/d1-sql";
 
 describe("inbox read state repository", () => {
   const db = env.DB;
