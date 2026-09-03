@@ -141,12 +141,10 @@
     "agent:build": { "cache": false },
     "runtime:prepare": { "cache": false },
     "skills:generate": { "cache": false },
-    "d1:migrate:local": { "cache": false },
     "d1:migrate:remote": {
       "cache": false,
       "passThroughEnv": ["CLOUDFLARE_*", "WRANGLER_*"]
     },
-    "test:d1:migrations": { "cache": false },
     "secrets:verify-encrypted": { "cache": false },
     "secrets:check": { "cache": false },
     "worker:dev": {
