@@ -141,7 +141,7 @@ async function promoteRelease(
         );
       }
       if (order === 0) {
-        if (current.text !== candidate.text) {
+        if (current?.text !== candidate.text) {
           return Response.json(
             { message: "The promoted version already points at different metadata" },
             { status: 409 },
