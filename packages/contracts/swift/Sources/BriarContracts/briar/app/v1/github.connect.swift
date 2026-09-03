@@ -52,6 +52,9 @@ public final class BriarAPI_GitHubIntegrationServiceClient: BriarAPI_GitHubInteg
 public protocol BriarAPI_ProjectGitHubServiceClientInterface: Sendable {
 
     @available(iOS 13, *)
+    func `getProjectMergeActivity`(request: BriarAPI_GetProjectMergeActivityRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_GetProjectMergeActivityResponse>
+
+    @available(iOS 13, *)
     func `createProjectGitHubCredential`(request: BriarAPI_CreateProjectGitHubCredentialRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_CreateProjectGitHubCredentialResponse>
 
     @available(iOS 13, *)
@@ -79,6 +82,11 @@ public final class BriarAPI_ProjectGitHubServiceClient: BriarAPI_ProjectGitHubSe
 
     public init(client: Connect.ProtocolClientInterface) {
         self.client = client
+    }
+
+    @available(iOS 13, *)
+    public func `getProjectMergeActivity`(request: BriarAPI_GetProjectMergeActivityRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_GetProjectMergeActivityResponse> {
+        return await self.client.unary(path: "/briar.app.v1.ProjectGitHubService/GetProjectMergeActivity", idempotencyLevel: .unknown, request: request, headers: headers)
     }
 
     @available(iOS 13, *)
@@ -118,6 +126,7 @@ public final class BriarAPI_ProjectGitHubServiceClient: BriarAPI_ProjectGitHubSe
 
     public enum Metadata {
         public enum Methods {
+            public static let getProjectMergeActivity = Connect.MethodSpec(name: "GetProjectMergeActivity", service: "briar.app.v1.ProjectGitHubService", type: .unary)
             public static let createProjectGitHubCredential = Connect.MethodSpec(name: "CreateProjectGitHubCredential", service: "briar.app.v1.ProjectGitHubService", type: .unary)
             public static let getProjectGitHubRepository = Connect.MethodSpec(name: "GetProjectGitHubRepository", service: "briar.app.v1.ProjectGitHubService", type: .unary)
             public static let createGitHubPullRequest = Connect.MethodSpec(name: "CreateGitHubPullRequest", service: "briar.app.v1.ProjectGitHubService", type: .unary)
