@@ -8,7 +8,8 @@ import {
   githubIntegrationFromProto,
   projectGithubCredentialFromProto,
 } from "./github-mappers";
-import { requiredMessage } from "./mappers";
+import { requiredMessage, requiredTimestamp } from "./mappers";
+import type { ProjectMergeActivity } from "../project-merge-activity";
 
 const integrationClient = appTransport
   ? createClient(GitHubIntegrationService, appTransport)
@@ -26,6 +27,26 @@ const requireProjectGithubClient = () => {
   if (!projectGithubClient) throw new Error("Briar API URL이 설정되지 않았습니다.");
   return projectGithubClient;
 };
+
+export async function loadProjectMergeActivity(
+  token: string,
+  projectId: string,
+  signal: AbortSignal,
+): Promise<ProjectMergeActivity> {
+  const response = await requireProjectGithubClient().getProjectMergeActivity(
+    { projectId }, appCallOptions(token, signal),
+  );
+  return {
+    repository: response.repository,
+    generatedAt: requiredTimestamp(response.generatedAt, "mergeActivity.generatedAt"),
+    pullRequests: response.pullRequests.map((pr) => ({
+      number: Number(pr.number),
+      title: pr.title,
+      url: pr.url,
+      mergedAt: requiredTimestamp(pr.mergedAt, "mergeActivity.mergedAt"),
+    })),
+  };
+}
 
 export async function loadGithubIntegration(
   token: string,

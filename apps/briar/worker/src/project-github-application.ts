@@ -6,6 +6,7 @@ import {
   createProjectGithubPullRequest,
   getProjectGithubPullRequest,
   getProjectGithubRepository,
+  getProjectGithubMergeActivity,
   GithubAppApiError,
   mergeProjectGithubPullRequest,
   type ProjectGithubIdentity,
@@ -185,6 +186,18 @@ type ProjectGithubApplicationInput = {
   readonly env: Env;
   readonly project: ProjectGithubAccess;
 };
+
+export async function getProjectMergeActivityApplication(input: {
+  db: D1Database;
+  env: Env;
+  projectId: string;
+  userId: string;
+}) {
+  const project = await getProject(input.db, input.projectId, input.userId);
+  if (!project) throw new HttpError(404, "Project not found");
+  const identity = await projectGithubIdentity(input.db, project);
+  return githubAppApiOperation(() => getProjectGithubMergeActivity(input.env, identity));
+}
 
 export async function createProjectGithubCredentialApplication(
   input: ProjectGithubApplicationInput,
