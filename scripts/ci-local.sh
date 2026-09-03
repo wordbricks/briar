@@ -65,7 +65,11 @@ timed() {
   fi
   elapsed="$(($(date +%s) - started))"
   timing_record "$context" "$label" "$elapsed" "fail"
-  return 1
+  # Exit rather than return. Context runners execute as the condition of the
+  # `if` inside this function, and bash ignores `set -e` for everything called
+  # from such a context: a `return 1` here let the runner continue past a failed
+  # step and report the context as passing as long as its last step succeeded.
+  exit 1
 }
 
 timing_summary() {
