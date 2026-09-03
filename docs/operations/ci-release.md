@@ -51,6 +51,66 @@ the miniflare-backed Worker suites). Set `VITEST_MAX_WORKERS` to pin a lower
 value on constrained machines; it is in `globalPassThroughEnv`, so it never
 changes a Turborepo cache key.
 
+### The app test suites
+
+`bun run test` at the repository root is `turbo run test:all //#test:repo-tools`.
+`test:all` owns no script anywhere; it is a Turborepo fan-out node. Every package
+except `@briar/app` resolves it to that package's own `test` task, and
+`@briar/app` overrides it in `apps/briar/turbo.json` with three independently
+cached leaf tasks:
+
+| Task | Script | Covers |
+| --- | --- | --- |
+| `test:unit` | `vitest run` | `src/`, `src-agent/`, `src-cli/` plus `worker/src/html-artifact-preview-shell.test.ts` (the Node-only suite), driven by `vite.config.ts` |
+| `test:worker:unit` | `vitest run --config vitest.worker.config.ts` | the `worker-unit` Vitest project: every Worker test that never touches D1 |
+| `test:worker:d1` | `vitest run --config vitest.worker-d1.config.ts` | the `worker-d1` Vitest project: the files listed in `vitest.worker.test-files.ts`, on the schema snapshot |
+
+Previously `@briar/app#test` was one task that ran all three behind
+`$TURBO_DEFAULT$` inputs and a `transit` dependency, so it hashed the whole
+package: editing a single React component reran the Worker suites, and editing a
+single Worker test reran the app suite. The three leaf tasks declare their inputs
+explicitly instead (no `$TURBO_DEFAULT$`, no `dependsOn: ["transit"]`, `outputs:
+[]`, `cache: true`), so each one reruns only when something it actually reads
+changes.
+
+The declared inputs were derived from the transitive import closure of each
+suite's test files and widened to whole directories, so they are supersets rather
+than exact lists. Two consequences are worth knowing:
+
+- `test:unit` hashes `worker/src/**/*.ts` minus the Worker test files, because
+  six Worker modules (`public-routes.ts`, `auth-origins.ts`, `releases.ts`, …)
+  are imported by app tests. Editing a Worker *test* therefore leaves `test:unit`
+  cached; editing Worker *source* reruns it.
+- Both Worker tasks hash all of `worker/src/**` except the migration suite and
+  the Node-only shell test, so editing any Worker test reruns both of them. The
+  alternative would be duplicating `vitest.worker.test-files.ts` into
+  `turbo.json`, which drifts silently.
+
+`test:unit` additionally hashes `src-tauri/*.json` and `src-tauri/capabilities/`,
+which several `src/lib` tests read from disk, and `$TURBO_ROOT$/.env*`, because
+Vite loads the repository root as its `envDir`.
+
+The two Worker tasks run in parallel under Turborepo, which makes
+`sequence.groupOrder` in `vitest.worker.config.ts` and `vitest.worker-d1.config.ts`
+inert: `groupOrder` only orders projects inside a single Vitest run, and the
+combined `vitest.worker-projects.config.ts` is now used only by the developer
+script `bun run --cwd apps/briar test:worker`. Both configs still cap their pools
+at 8 workers, so the parallel pair does not oversubscribe the machine.
+
+Developer entry points are unchanged in spirit:
+
+```sh
+bun run --cwd apps/briar test            # test:unit, then both Worker projects
+bun run --cwd apps/briar test:unit       # app/agent/CLI suite only
+bun run --cwd apps/briar test:worker     # both Worker projects in one Vitest run
+```
+
+To rerun a cached suite against an unchanged tree:
+
+```sh
+bunx turbo run test:unit test:worker:unit test:worker:d1 --filter=@briar/app --force
+```
+
 ### Shared Cargo target directory
 
 The `rust` context builds into a shared Cargo target directory instead of
