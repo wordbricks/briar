@@ -25,7 +25,11 @@ export default defineConfig(async () => ({
     // 118s here). The D1 projects keep the default isolation because they
     // depend on starting from an empty database.
     isolate: false,
-    // Avoid contending with the SQLite-heavy D1 project for workerd processes.
+    // Only applies to `vitest.worker-projects.config.ts`, the developer script
+    // that runs both projects in one Vitest process: this project goes first so
+    // it does not contend with the SQLite-heavy D1 project for workerd
+    // processes. CI runs the two projects as separate Turborepo tasks
+    // (`test:worker:unit` and `test:worker:d1`), where the ordering is inert.
     sequence: { groupOrder: 0 },
     // Capped: each worker boots its own workerd, so past ~8 the process
     // overhead outweighs the added parallelism.
