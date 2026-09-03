@@ -111,11 +111,35 @@ To rerun a cached suite against an unchanged tree:
 bunx turbo run test:unit test:worker:unit test:worker:d1 --filter=@briar/app --force
 ```
 
+### Rust lint and test in one compile
+
+The `rust` context runs `cargo fmt --check` and then a single `cargo test` with
+`RUSTC_WORKSPACE_WRAPPER` pointed at `scripts/ci-rust-lint-wrapper.sh`. The
+wrapper compiles the workspace crate through the toolchain's `clippy-driver`
+and appends `-D warnings`, so the test build itself enforces everything the
+former separate `cargo clippy --all-targets -- -D warnings` step enforced:
+clippy lints and rustc warnings, across the lib, bin, and test targets.
+Dependencies still compile with plain rustc, exactly as under `cargo clippy`,
+and `briar-contracts` (a path dependency, not a workspace member) is compiled
+but not lint-gated, which matches the previous behaviour. The gain is one
+compilation of the app crate instead of a check-mode pass plus a codegen pass;
+on a change to `packages/contracts/rust` this removes roughly a third of the
+context's time. Locally, `cargo clippy --all-targets -- -D warnings` remains
+the way to lint without running the tests.
+
+The rust context deliberately runs in parallel with the Vitest contexts. On a
+12-core machine the contention costs cargo about three seconds on a warm
+incremental build, and lowering the Vitest processes' priority recovered only
+one of them, so no scheduling is applied. Two worktrees running local CI at the
+same time wait on Cargo's build-directory lock (`Blocking waiting for file lock
+on build directory`); that wait is expected and a Briar-level lock would not
+shorten it.
+
 ### Shared Cargo target directory
 
 The `rust` context builds into a shared Cargo target directory instead of
-`apps/briar/src-tauri/target`, so `cargo fmt`, `cargo clippy`, and `cargo test`
-stay incremental across git worktrees: a fresh Auto Hunt worktree reuses the
+`apps/briar/src-tauri/target`, so `cargo fmt` and `cargo test` stay
+incremental across git worktrees: a fresh Auto Hunt worktree reuses the
 artifacts of previous runs rather than rebuilding every crate. The default is
 `${XDG_CACHE_HOME:-~/.cache}/briar/cargo-target`, and the release scripts use
 the same directory (Cargo keeps the `debug` and `release` profiles apart), so
