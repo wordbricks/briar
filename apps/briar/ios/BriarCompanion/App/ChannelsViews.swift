@@ -1106,6 +1106,8 @@ private struct ChannelConversationView: View {
     let showsThreadSummary: Bool
     var focusedMessageID: UUID? = nil
     @State private var skillResultMessageID: UUID?
+    @State private var showingErrorToast = false
+    @State private var errorToastMessage = ""
     private struct MemoryCitationRoute: Identifiable {
         let id = UUID()
         let store: DmMemoryStore
@@ -1129,27 +1131,6 @@ private struct ChannelConversationView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if let errorMessage = channels.errorMessage {
-                HStack(alignment: .top, spacing: 9) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.red)
-                    Text(errorMessage)
-                        .font(.caption)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    Button {
-                        channels.dismissError()
-                    } label: {
-                        Image(systemName: "xmark")
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(L10n.text("닫기", locale: locale))
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 9)
-                .background(Color.red.opacity(0.08))
-                .accessibilityElement(children: .contain)
-                .accessibilityIdentifier("channel-error-banner")
-            }
             ConversationTimeline(
                 messages: messages,
                 locale: locale,
@@ -1346,6 +1327,28 @@ private struct ChannelConversationView: View {
                     )
                 }
             )
+        }
+        .companionToast(
+            isPresented: $showingErrorToast,
+            message: errorToastMessage,
+            duration: .seconds(8)
+        )
+        .onAppear {
+            if let message = channels.errorMessage, !message.isEmpty {
+                errorToastMessage = message
+                showingErrorToast = true
+            }
+        }
+        .onChange(of: channels.errorMessage) { _, message in
+            guard let message, !message.isEmpty else {
+                showingErrorToast = false
+                return
+            }
+            errorToastMessage = message
+            showingErrorToast = true
+        }
+        .onChange(of: showingErrorToast) { _, presented in
+            if !presented { channels.dismissError() }
         }
     }
 }
