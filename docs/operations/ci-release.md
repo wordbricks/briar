@@ -131,7 +131,19 @@ several worktrees can run local CI at the same time and simply wait for each
 other.
 
 To relocate an existing cache without a cold rebuild, `mv` the directory to the
-new path (or set the override to the old one). The per-worktree
+new path (or set the override to the old one), then delete every
+`<profile>/build/*` entry whose `output` file still names the old path: Tauri
+and its plugins record absolute `OUT_DIR` paths in their build-script output,
+and `tauri-build` fails with "failed to read plugin permissions" until those
+scripts rerun (about 30s). For example:
+
+```sh
+for o in ~/.cache/briar/cargo-target/*/build/*/output; do
+  grep -q "$OLD_CACHE_PATH" "$o" && rm -rf "$(dirname "$o")"
+done
+```
+
+The per-worktree
 `apps/briar/src-tauri/target` directories are not used by local CI and can be
 deleted to reclaim disk; only `bun run tauri dev` and similar development
 builds write there.
