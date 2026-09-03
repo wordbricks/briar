@@ -16,11 +16,11 @@ import { LoadingState } from "@/components/ui/loading-state";
 import { Typography } from "@/components/ui/typography";
 import { useI18n } from "../i18n";
 import { ApiError, loadOrganizationInvitation } from "../lib/api";
+import type { DeviceLoginMethod } from "../lib/api";
 import type { OrganizationInvitationPreview, SessionUser } from "../types";
 import {
   LoginActions,
   type LoginEmailHandlers,
-  type LoginMethod,
 } from "./LoginScreen";
 import { Logo } from "./Logo";
 
@@ -67,7 +67,7 @@ export function InvitationOnboarding({
   onAccept: () => Promise<void>;
   onCancelLogin: () => void;
   onLeave: () => void;
-  onLogin: (method: LoginMethod) => void;
+  onLogin: (method: DeviceLoginMethod) => void;
   onSwitchAccount: () => Promise<void>;
   token: string;
   user: SessionUser | null;

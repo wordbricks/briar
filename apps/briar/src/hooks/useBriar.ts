@@ -73,7 +73,7 @@ import {
   updateProjectSettings,
   updateCheckpointPolicy,
   type DeviceClientId,
-  type DeviceLoginMethod,
+  type DeviceAuthorizationLaunchOptions,
 } from "../lib/api";
 import {
   demoDashboard,
@@ -1197,11 +1197,7 @@ export function useBriar(options: UseBriarOptions = {}) {
   ]);
 
   const login = useCallback(async (
-    options: {
-      method?: DeviceLoginMethod;
-      locale?: "ko" | "en" | "zh";
-      switchAccount?: boolean;
-    } = {},
+    options: DeviceAuthorizationLaunchOptions = {},
   ) => {
     const attempt = ++loginAttempt.current;
     clearLoginTimer();

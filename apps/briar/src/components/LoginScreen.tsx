@@ -7,9 +7,8 @@ import { Card } from "@/components/ui/card";
 import { Typography } from "@/components/ui/typography";
 import { cn } from "@/lib/utils";
 import { useI18n } from "../i18n";
+import type { DeviceLoginMethod } from "../lib/api";
 import { Logo } from "./Logo";
-
-export type LoginMethod = "email" | "google";
 
 export type LoginEmailHandlers = {
   onSendEmailCode?: (email: string) => Promise<void>;
@@ -27,7 +26,7 @@ export function LoginActions({
 }: LoginEmailHandlers & {
   emailButtonLabel?: string;
   loading: boolean;
-  onLogin: (method: LoginMethod) => void;
+  onLogin: (method: DeviceLoginMethod) => void;
   onReset?: () => void;
   webMode?: boolean;
 }) {
@@ -196,7 +195,7 @@ export function LoginScreen({
   loading: boolean;
   loginCode: string | null;
   onCancel: () => void;
-  onLogin: (method: LoginMethod) => void;
+  onLogin: (method: DeviceLoginMethod) => void;
   webMode?: boolean;
 }) {
   const { t } = useI18n();
