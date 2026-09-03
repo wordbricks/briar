@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import * as Schema from "effect/Schema";
 import { ChannelAgentReplyProviderOutputSchema } from "../src/lib/channel-agent-reply-contract";
 import { IssueAgentReplyProviderOutputSchema } from "../src/lib/agent-reply-contract";
 import { providerStructuredOutputContract } from "./structured-output-contract";
@@ -186,5 +187,64 @@ describe("provider structured output contracts", () => {
       const { attachments: _attachments, ...missingAttachments } = replyOutput;
       expect(() => contract.decode(missingAttachments)).toThrow();
     }
+  });
+});
+
+describe("Claude Code provider schemas", () => {
+  const replyOutput = {
+    body: "The project Agent will inspect authentication.",
+    attachments: [],
+    document: null,
+    issueProposal: null,
+    issueBatchProposal: null,
+    executionProposal: null,
+    skillExecutionProposal: null,
+    delegation: {
+      projectId: "11111111-1111-4111-8111-111111111111",
+      agentId: "22222222-2222-4222-8222-222222222222",
+      request: "Inspect authentication.",
+    },
+    contextRequests: null,
+    memoryRequests: null,
+    memoryCitations: null,
+    memorySaveRequest: null,
+  } as const;
+
+  it("drops format while the codec keeps enforcing it", () => {
+    const contract = providerStructuredOutputContract(
+      "claude",
+      ChannelAgentReplyProviderOutputSchema,
+    );
+    const serialized = JSON.stringify(contract.jsonSchema);
+
+    expect(serialized).not.toContain('"format"');
+    expect(serialized).toContain('"pattern"');
+    expect(contract.decode(replyOutput)).toMatchObject({ case: "reply" });
+    expect(() => contract.decode({
+      ...replyOutput,
+      delegation: { ...replyOutput.delegation, projectId: "not-a-uuid" },
+    })).toThrow();
+  });
+
+  it("removes the keyword without touching a member named format", () => {
+    const contract = providerStructuredOutputContract(
+      "claude",
+      Schema.Struct({ format: Schema.String.check(Schema.isUUID()) }),
+    );
+
+    expect(contract.jsonSchema).toHaveProperty(
+      ["properties", "format", "type"],
+      "string",
+    );
+    expect(JSON.stringify(contract.jsonSchema)).not.toContain('"format":"uuid"');
+  });
+
+  it("leaves other providers on their own adapter output", () => {
+    const contract = providerStructuredOutputContract(
+      "codex",
+      ChannelAgentReplyProviderOutputSchema,
+    );
+
+    expect(JSON.stringify(contract.jsonSchema)).toContain('"format":"uuid"');
   });
 });
