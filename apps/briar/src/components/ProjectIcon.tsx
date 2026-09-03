@@ -186,7 +186,7 @@ const projectLucideIcons = {
   wallet: Wallet,
   wrench: Wrench,
   zap: Zap,
-} satisfies Readonly<Record<string, LucideIcon>>;
+} satisfies Record<string, LucideIcon>;
 
 export function projectIconComponent(name: string): LucideIcon {
   return Object.hasOwn(projectLucideIcons, name)
