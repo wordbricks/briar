@@ -664,17 +664,17 @@ describe("Sidebar", () => {
     ).toBe(6);
 
     const collapseBriar = container.querySelector<HTMLButtonElement>(
-      '[aria-label="Briar 프로젝트 접기"]',
+      '[aria-label="Briar 팀 접기"]',
     );
     await act(async () => collapseBriar?.click());
 
     expect(container.querySelector("#project-views-project-1")).toBeNull();
     expect(container.querySelector("#project-views-project-2")).not.toBeNull();
     expect(
-      container.querySelector('[aria-label="Briar 프로젝트 펼치기"]'),
+      container.querySelector('[aria-label="Briar 팀 펼치기"]'),
     ).not.toBeNull();
     expect(
-      container.querySelector('[aria-label="Console 프로젝트 접기"]'),
+      container.querySelector('[aria-label="Console 팀 접기"]'),
     ).not.toBeNull();
 
     await cleanup();
@@ -1108,12 +1108,12 @@ describe("Sidebar", () => {
     );
 
     const trigger = container.querySelector<HTMLButtonElement>(
-      '[aria-label="Briar 프로젝트 메뉴"]',
+      '[aria-label="Briar 팀 메뉴"]',
     );
     await act(async () => trigger?.click());
     expect(trigger?.getAttribute("aria-expanded")).toBe("true");
     expect(container.querySelector('[role="menu"]')?.textContent).toContain(
-      "프로젝트 설정",
+      "팀 설정",
     );
 
     await act(async () => {

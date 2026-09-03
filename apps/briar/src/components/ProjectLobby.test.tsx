@@ -61,7 +61,7 @@ describe("ProjectLobby", () => {
     );
 
     expect(container.querySelector(".companion-mode")).not.toBeNull();
-    expect(container.textContent).toContain("Project overview");
+    expect(container.textContent).toContain("Team overview");
     expect(container.textContent).toContain("Recent activity");
     expect(container.querySelector(".project-lobby-date-range")).toBeNull();
 

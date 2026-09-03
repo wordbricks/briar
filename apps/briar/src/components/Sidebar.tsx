@@ -936,7 +936,9 @@ export function Sidebar({
                                       strokeWidth={1.7}
                                     />
                                   ),
-                                  label: t("sidebar.addProject"),
+                                  label: t("sidebar.addPlanningProject", {
+                                    name: project.name,
+                                  }),
                                   onSelect: () => onAddPlanningProject(project.id),
                                 },
                               ]

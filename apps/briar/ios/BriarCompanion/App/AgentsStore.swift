@@ -8,7 +8,7 @@ enum AgentsStoreError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .notConfigured:
-            L10n.text("프로젝트와 로그인 정보가 준비되지 않았습니다.")
+            L10n.text("팀과 로그인 정보가 준비되지 않았습니다.")
         case .noQueuedIssues:
             L10n.text("실행할 준비가 된 queued 이슈가 없습니다.")
         }

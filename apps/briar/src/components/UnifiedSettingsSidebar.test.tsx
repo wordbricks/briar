@@ -78,7 +78,7 @@ describe("UnifiedSettingsSidebar", () => {
     expect(container.textContent).toContain("Appearance");
     expect(container.textContent).toContain("Browser");
     expect(container.textContent).toContain("Organization settings");
-    expect(container.textContent).toContain("Project settings");
+    expect(container.textContent).toContain("Team settings");
     expect(
       container.querySelector('[data-project-settings-section="workflow"]'),
     ).toBeNull();

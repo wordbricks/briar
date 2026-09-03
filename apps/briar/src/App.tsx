@@ -3021,8 +3021,11 @@ export function App({
       icon: <Settings />,
       id: `action:project-settings:${activeProject.id}`,
       keywords: [
+        "team settings",
         "project settings",
+        "팀 설정",
         "프로젝트 설정",
+        "团队设置",
         "项目设置",
         activeProject.name,
       ],
@@ -3085,7 +3088,7 @@ export function App({
     addPaletteItem({
       icon: <FolderPlus />,
       id: "action:add-project",
-      keywords: ["new project", "add project", "프로젝트 추가", "新建项目"],
+      keywords: ["new team", "add team", "new project", "add project", "팀 추가", "프로젝트 추가", "新建团队", "新建项目"],
       label: t("sidebar.addProject"),
       onSelect: briar.startProjectCreation,
       priority: 60,
@@ -3283,8 +3286,11 @@ export function App({
       keywords: [
         project.name,
         organizationName,
+        "team",
         "project",
+        "팀",
         "프로젝트",
+        "团队",
         "项目",
       ],
       label: project.name,
