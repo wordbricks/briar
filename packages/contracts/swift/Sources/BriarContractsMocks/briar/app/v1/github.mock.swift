@@ -48,6 +48,8 @@ open class BriarAPI_GitHubIntegrationServiceClientMock: BriarAPI_GitHubIntegrati
 /// `@unchecked Sendable` conformance to simplify testing and mocking.
 @available(iOS 13, *)
 open class BriarAPI_ProjectGitHubServiceClientMock: BriarAPI_ProjectGitHubServiceClientInterface, @unchecked Sendable {
+    /// Mocked for async calls to `getProjectMergeActivity()`.
+    public var mockAsyncGetProjectMergeActivity = { (_: BriarAPI_GetProjectMergeActivityRequest) -> ResponseMessage<BriarAPI_GetProjectMergeActivityResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `createProjectGitHubCredential()`.
     public var mockAsyncCreateProjectGitHubCredential = { (_: BriarAPI_CreateProjectGitHubCredentialRequest) -> ResponseMessage<BriarAPI_CreateProjectGitHubCredentialResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `getProjectGitHubRepository()`.
@@ -64,6 +66,10 @@ open class BriarAPI_ProjectGitHubServiceClientMock: BriarAPI_ProjectGitHubServic
     public var mockAsyncCreateGitHubCommitStatus = { (_: BriarAPI_CreateGitHubCommitStatusRequest) -> ResponseMessage<BriarAPI_CreateGitHubCommitStatusResponse> in .init(result: .success(.init())) }
 
     public init() {}
+
+    open func `getProjectMergeActivity`(request: BriarAPI_GetProjectMergeActivityRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_GetProjectMergeActivityResponse> {
+        return self.mockAsyncGetProjectMergeActivity(request)
+    }
 
     open func `createProjectGitHubCredential`(request: BriarAPI_CreateProjectGitHubCredentialRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CreateProjectGitHubCredentialResponse> {
         return self.mockAsyncCreateProjectGitHubCredential(request)

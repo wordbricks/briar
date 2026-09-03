@@ -150,6 +150,71 @@ public nonisolated enum BriarAPI_GitHubCommitStatusState: SwiftProtobuf.Enum, Sw
 
 }
 
+public nonisolated struct BriarAPI_GetProjectMergeActivityRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var projectID: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_MergedPullRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var number: UInt64 = 0
+
+  public var title: String = String()
+
+  public var url: String = String()
+
+  public var mergedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_mergedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_mergedAt = newValue}
+  }
+  /// Returns true if `mergedAt` has been explicitly set.
+  public var hasMergedAt: Bool {self._mergedAt != nil}
+  /// Clears the value of `mergedAt`. Subsequent reads from it will return its default value.
+  public mutating func clearMergedAt() {self._mergedAt = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _mergedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+}
+
+/// Complete merged PR history for the 16 days ending at generated_at.
+public nonisolated struct BriarAPI_GetProjectMergeActivityResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var repository: String = String()
+
+  public var generatedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_generatedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_generatedAt = newValue}
+  }
+  /// Returns true if `generatedAt` has been explicitly set.
+  public var hasGeneratedAt: Bool {self._generatedAt != nil}
+  /// Clears the value of `generatedAt`. Subsequent reads from it will return its default value.
+  public mutating func clearGeneratedAt() {self._generatedAt = nil}
+
+  public var pullRequests: [BriarAPI_MergedPullRequest] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _generatedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+}
+
 public nonisolated struct BriarAPI_GitHubInstallationRepository: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -708,6 +773,129 @@ nonisolated extension BriarAPI_GitHubMergeMethod: SwiftProtobuf._ProtoNameProvid
 
 nonisolated extension BriarAPI_GitHubCommitStatusState: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0GIT_HUB_COMMIT_STATUS_STATE_UNSPECIFIED\0\u{1}GIT_HUB_COMMIT_STATUS_STATE_ERROR\0\u{1}GIT_HUB_COMMIT_STATUS_STATE_FAILURE\0\u{1}GIT_HUB_COMMIT_STATUS_STATE_PENDING\0\u{1}GIT_HUB_COMMIT_STATUS_STATE_SUCCESS\0")
+}
+
+nonisolated extension BriarAPI_GetProjectMergeActivityRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".GetProjectMergeActivityRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.projectID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.projectID.isEmpty {
+      try visitor.visitSingularStringField(value: self.projectID, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_GetProjectMergeActivityRequest, rhs: BriarAPI_GetProjectMergeActivityRequest) -> Bool {
+    if lhs.projectID != rhs.projectID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_MergedPullRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".MergedPullRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}number\0\u{1}title\0\u{1}url\0\u{3}merged_at\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularUInt64Field(value: &self.number) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.title) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.url) }()
+      case 4: try { try decoder.decodeSingularMessageField(value: &self._mergedAt) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.number != 0 {
+      try visitor.visitSingularUInt64Field(value: self.number, fieldNumber: 1)
+    }
+    if !self.title.isEmpty {
+      try visitor.visitSingularStringField(value: self.title, fieldNumber: 2)
+    }
+    if !self.url.isEmpty {
+      try visitor.visitSingularStringField(value: self.url, fieldNumber: 3)
+    }
+    try { if let v = self._mergedAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_MergedPullRequest, rhs: BriarAPI_MergedPullRequest) -> Bool {
+    if lhs.number != rhs.number {return false}
+    if lhs.title != rhs.title {return false}
+    if lhs.url != rhs.url {return false}
+    if lhs._mergedAt != rhs._mergedAt {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_GetProjectMergeActivityResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".GetProjectMergeActivityResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}repository\0\u{3}generated_at\0\u{3}pull_requests\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.repository) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._generatedAt) }()
+      case 3: try { try decoder.decodeRepeatedMessageField(value: &self.pullRequests) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.repository.isEmpty {
+      try visitor.visitSingularStringField(value: self.repository, fieldNumber: 1)
+    }
+    try { if let v = self._generatedAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
+    if !self.pullRequests.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.pullRequests, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_GetProjectMergeActivityResponse, rhs: BriarAPI_GetProjectMergeActivityResponse) -> Bool {
+    if lhs.repository != rhs.repository {return false}
+    if lhs._generatedAt != rhs._generatedAt {return false}
+    if lhs.pullRequests != rhs.pullRequests {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
 }
 
 nonisolated extension BriarAPI_GitHubInstallationRepository: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {

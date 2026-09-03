@@ -1,4 +1,6 @@
 import * as Schema from "effect/Schema";
+import { IsoDateTimeWithOffset } from "../../src/lib/date-time-schema";
+import { MERGE_ACTIVITY_DAY, type MergedPullRequest, type ProjectMergeActivity } from "../../src/lib/project-merge-activity";
 
 const encoder = new TextEncoder();
 
@@ -219,6 +221,51 @@ const repositoryPath = (identity: ProjectGithubIdentity) =>
   `/repos/${encodeURIComponent(identity.repository.split("/")[0])}/${
     encodeURIComponent(identity.repository.split("/")[1])
   }`;
+
+const decodeActivityPage = Schema.decodeUnknownSync(Schema.Array(Schema.Struct({
+  number: Schema.Int.check(Schema.isGreaterThan(0)),
+  title: Schema.String,
+  merged_at: Schema.NullOr(IsoDateTimeWithOffset),
+  updated_at: IsoDateTimeWithOffset,
+})));
+
+export async function getProjectGithubMergeActivity(
+  env: Pick<Env, "GITHUB_APP_ID" | "GITHUB_APP_PRIVATE_KEY">,
+  identity: ProjectGithubIdentity,
+  now = Date.now(),
+  fetchImpl: typeof fetch = fetch,
+): Promise<ProjectMergeActivity> {
+  const credential = await createGithubInstallationToken(env, identity, fetchImpl);
+  const since = now - 16 * MERGE_ACTIVITY_DAY;
+  const pullRequests = new Map<number, MergedPullRequest>();
+  // Do not silently return partial statistics if a very busy repository hits the cap.
+  for (let page = 1; page <= 100; page++) {
+    const response = await fetchImpl(
+      `https://api.github.com${repositoryPath(identity)}/pulls?state=closed&sort=updated&direction=desc&per_page=100&page=${page}`,
+      { headers: githubHeaders(credential.token), signal: AbortSignal.timeout(30_000) },
+    );
+    const entries = decodeActivityPage(await githubJson(response, "GitHub merge activity request failed"));
+    for (const entry of entries) {
+      if (entry.merged_at === null) continue;
+      const timestamp = Date.parse(entry.merged_at);
+      if (timestamp <= since || timestamp > now) continue;
+      pullRequests.set(entry.number, {
+        number: entry.number,
+        title: entry.title,
+        url: `https://github.com/${identity.repository}/pull/${entry.number}`,
+        mergedAt: entry.merged_at,
+      });
+    }
+    if (entries.length < 100 || Date.parse(entries[entries.length - 1].updated_at) <= since) {
+      return {
+        repository: identity.repository,
+        generatedAt: new Date(now).toISOString(),
+        pullRequests: [...pullRequests.values()],
+      };
+    }
+  }
+  throw new GithubAppApiError("The repository has too much activity to load a complete merge history. Try again later.", 503);
+}
 
 export async function getProjectGithubRepository(
   env: Pick<Env, "GITHUB_APP_ID" | "GITHUB_APP_PRIVATE_KEY">,
