@@ -2,6 +2,7 @@ import { useStatusTray } from "../../hooks/useStatusTray";
 import { useChannelCatalogSync } from "../../state/channels/useChannelCatalogSync";
 import { useNavigationReconciliation } from "../../state/navigation/useNavigationReconciliation";
 import { useActiveOrganizationPersistence } from "../../state/organization/useActiveOrganizationPersistence";
+import { useHydration } from "../../state/persistence/useHydration";
 import { useSnapshotWriter } from "../../state/persistence/useSnapshotWriter";
 import { usePlanningProjectsSync } from "../../state/planning/usePlanningProjectsSync";
 import { useAuthReturnListener } from "../../state/session/useAuthReturnListener";
@@ -18,9 +19,12 @@ import { useWorkspaceSync } from "../../state/workspace/useWorkspaceSync";
  *
  * The order below is the order React runs them in, and it is the order they ran
  * in before: the six that were already here, then the three the facade owned
- * (whose effects ran after a child's), and the reconciliation last.
+ * (whose effects ran after a child's), and the reconciliation last. Hydration
+ * is the exception and comes first — it opens the gate the session bootstrap
+ * waits on, and it has to be open before that bootstrap's effect starts.
  */
 export function AppEffects() {
+  useHydration();
   useActiveOrganizationPersistence();
   useTeamSync();
   useChannelCatalogSync();

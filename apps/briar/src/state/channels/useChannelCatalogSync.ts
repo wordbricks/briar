@@ -7,6 +7,7 @@ import {
   MAX_CHANNEL_DELTA_PAGES_PER_SYNC,
 } from "../../lib/channel-realtime";
 import { activeOrganizationIdAtom } from "../organization/atoms";
+import { adoptsHydratedCatalog } from "../persistence/hydration";
 import { useRegistry } from "../registry";
 import { tokenAtom } from "../session/atoms";
 import { applySyncEvent } from "../sync/apply";
@@ -54,11 +55,21 @@ export function useChannelCatalogSync(): void {
   useEffect(() => {
     Atom.batch(() => {
       const previousOrganizationId = catalogOrganizationRef.current;
+      /*
+        The catalog this run inherits is the one a stored snapshot put in the
+        store, so it is this organization's own list rather than the leftovers
+        of the previous one. Only the first run can inherit anything: after that
+        the ref names whichever organization the store holds.
+      */
+      const hydrated =
+        previousOrganizationId === null &&
+        adoptsHydratedCatalog(registry, organizationId);
       for (const staleId of new Set(
         [previousOrganizationId, organizationId].filter(
           (value): value is string => value !== null,
         ),
       )) {
+        if (hydrated && staleId === organizationId) continue;
         applySyncEvent(registry, {
           kind: "channel-catalog-cleared",
           organizationId: staleId,

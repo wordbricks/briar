@@ -395,6 +395,44 @@ workspace / workflow / integrations를 옮기며 확인한, 이후 단계에 영
   `components/app/InboxBridge.tsx` 하나이고, 인박스 결과는 `state/inbox`로 게시된다.
   `src/App.test.tsx`가 이것을 고정한다.
 
+### 기준 갱신 (2026-09-04, Phase 8 이후)
+
+영속화를 붙이며 확인한, 후속 작업에 영향을 주는 사실:
+
+- **`restoringSessionAtom`의 writer가 둘이 되었다.** 스냅샷을 찾은 부팅은
+  `state/persistence/useHydration`이 게이트를 열고, 부트스트랩은 그 뒤에서 계속
+  돈다. Phase 7까지 사실이던 "부트스트랩만 쓴다"는 더 이상 맞지 않는다.
+- **두 부팅 경로의 순서는 명시적 게이트다.** `useHydration`이 마운트하며 동기로
+  게이트를 열고(`beginHydration`), 부트스트랩이 커밋 **직전에** 기다린다. 게이트를
+  연 적이 없는 레지스트리에서 `awaitHydration`은 resolved promise가 아니라 `null`을
+  돌려주므로, 하이드레이션 없이 부트스트랩만 마운트하는 기존 테스트는 tick을 하나도
+  더 쓰지 않는다. React effect가 훅 호출 순서대로 도는 것이 이 계약의 전부이므로
+  `AppEffects`에서 `useHydration()`은 반드시 첫 줄이다.
+- **부팅 시점에 저장소를 비우는 훅이 둘 있었다.** `useTeamSync`의 토큰 변경 감지는
+  `null → 토큰` 전이를 계정 변경으로 보고 `session-cleared`를 쏘고,
+  `useChannelCatalogSync`의 첫 effect는 무조건 현재 조직의 카탈로그를 비운다. 둘 다
+  하이드레이션된 계정·조직일 때만 건너뛴다(`adoptsHydratedSession` /
+  `adoptsHydratedCatalog`). 부팅 시점에 상태를 심는 기능을 또 만든다면 이 두 자리를
+  먼저 확인한다.
+- **팀 선택을 부트스트랩에 맡기면 화면이 튄다.** `resolveActiveAccountSelection`은
+  조직의 **첫 번째** 팀을 고르므로, 마지막으로 보던 팀이 그 팀이 아니면 스냅샷을
+  렌더한 직후 다른 팀으로 이동한다. 계정이 그 팀을 여전히 갖고 있고 해석된 조직에
+  속하면 하이드레이션된 선택을 유지한다.
+- **`Schema.Struct`는 이름 짓지 않은 속성을 버린다.** 서버 DTO를 그대로 되돌려야
+  하는 엔티티는 `Schema.Record(Schema.String, Schema.Unknown)` + 식별 키 필터로
+  검사한다. 봉투(schemaVersion / userId / 인덱스 모양)만 엄격히 본다.
+- **`Schema.Number`는 typecheck를 깬다.** `tsc`가 TS377098 제안을 오류로 취급하므로
+  유한 실수는 `Schema.Finite`, 정수는 `Schema.Int`를 쓴다.
+- **jsdom에는 IndexedDB가 없다.** `defaultSnapshotStore()`가 no-op으로 떨어지므로
+  기존 테스트는 영속화를 켜도 아무 영향을 받지 않고, 저장소 테스트는 가짜
+  `IDBFactory`를 주입해 요청 배선만 검사한다.
+- **부팅 키는 네트워크 없이 알아야 한다.** `lib/active-organization`의 조직 키는
+  `userId`가 있어야 읽을 수 있어서, 마지막 계정 포인터
+  (`briar.snapshot-account.v1`)를 localStorage에 따로 둔다. 팀 창은
+  `useActiveOrganizationPersistence`와 같은 이유로 이 포인터를 쓰지 않는다.
+- **내비게이션 위치는 여전히 저장되지 않는다.** 콜드 부팅은 마지막 **데이터**를
+  즉시 렌더하지만 페이지는 기본 위치에서 시작한다. 위치 복원은 별도 결정이다.
+
 ## 목표
 
 1. `apps/briar/src/hooks/useBriar.ts`(4,668줄)와 `apps/briar/src/App.tsx`(5,116줄)가
@@ -1059,4 +1097,4 @@ Phase 2 이후 언제든 착수 가능하며 Phase 3–7과 병행할 수 있다
 | 5 | #1592, #1593, #1594, #1595 | 머지됨 | #1592: `hooks`의 `useRepositorySetup` / `useIssueAgents` / `useAgentDispatch` / `useInvitationFlow` / `useLaunchIntro`, `components/app`의 `InboxDetailContent` / `AppSettingsSidebar`, `lib`의 `inbox-detail-label` / `team-window-scope`. #1593: `AuthGate` / `AppDialogs` / `CompanionShell`, `AppEffects` 단일 마운트, `WorkerDispatchDialog` 이중 렌더 제거, 5-1이 남긴 죽은 import 정리. #1594: `DesktopShell`과 트리가 나가며 드러난 죽은 로컬 40여 개 제거. #1595: 내비게이션 블록을 `hooks/useAppNavigation.ts`로 그대로 이동(Phase 6의 첫 항목을 미리 끝냄). App.tsx 3,053줄 → 783줄, `briar.` 키 42개 → 28개. |
 | 6 | #1596, #1597, #1598 | 머지됨 | #1596: `state/navigation`의 `history` / `atoms`(방문 스택 + 파생 12종) / `actions` / `useNavigationReconciliation`, `hooks/useAppNavigation`을 호환 훅으로 축소, `setDefaultTeam` 제거. #1597: 조정 effect를 `AppEffects`로, `useAppNavigation` 삭제, `WindowNavigationControlsWithHistory` / `CompanionHeaderWithSession` 래퍼, `SidebarWithSession`의 페이지 구독, `useAppShortcuts`(11→4) / `useCommandPaletteItems`(16→5) / `useDeepLinks` / `useRepositorySetup` / `AppDialogs` / `CommandPaletteWithContext`의 내비게이션 프롭 제거. #1598: `DesktopPages` 페이지 슬롯 분리와 렌더 카운트 테스트. App.tsx 783줄 → 661줄, `briar.` 키 28개 유지(전부 세션·로그인). |
 | 7 | #1599, #1600, #1601 | 머지됨 | #1599: `state/session`의 `api` / `useSessionBootstrap` / `useAuthReturnListener`와 로그인 액션 6종(폴링 상태는 registry `WeakMap`), `state/team`의 `selectTeam` / `ensureTeamSelected`와 `getTeamActions`, `state/sync/actions`의 `refreshActiveTeam`, `state/planning/usePlanningProjectsSync`, `state/action-bridges`. `IssueActionBridge.selectTeam`과 `AppEffects` / `useNavigationReconciliation`의 `selectTeam` 프롭 제거, 데모 선택 시드를 모듈 상수로, `lib/default-organization` 삭제. #1600: `useBriar.ts` 삭제, `components/app/InboxBridge`와 `state/inbox`(atoms / actions), `state/app-error`, `hooks/useOrganizationViewData`. 훅 6종과 게이트·셸·페이지가 프롭 대신 액션 훅을 쓴다. App.tsx 661줄 → 421줄, `briar.` 키 28개 → 0개. #1601: `state/status-tray`와 `state/deep-links`의 구독형 atom 5종(`addFinalizer` + `setIdleTTL`), `MessageRow` memo 복구와 렌더 카운트 테스트. |
-| 8 | | 예정 | |
+| 8 | #1602, #1603 | 머지됨 | #1602: `state/persistence`의 `snapshot`(조직 단위 `ClientSnapshot` + Effect Schema 검증 + `collectSnapshot` / `applySnapshot`), `store`(`SnapshotStore`와 IndexedDB / 인메모리 / no-op 구현, `snapshotStoreAtom` 이음매, 예외를 삼키는 접근 래퍼), `account`(부팅 포인터), `useSnapshotWriter`(1초 창 디바운스, hidden·pagehide 즉시 기록, 조직 이탈 시 삭제). `clearSessionState`가 저장소 전체를 함께 비운다. #1603: `hydration`(게이트와 `hydratedAccountAtom`)과 `useHydration`, `AppEffects`의 첫 훅. 부트스트랩이 커밋 직전에 게이트를 기다리고 계정이 다르면 폐기하며, `useTeamSync`와 `useChannelCatalogSync`가 부팅 시점의 초기화를 건너뛴다. 저장된 커서에서 델타로 따라잡고 410이면 스냅샷으로 대체한다. |

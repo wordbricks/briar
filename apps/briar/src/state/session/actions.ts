@@ -46,6 +46,7 @@ import {
   resetHealth,
 } from "../workspace/atoms";
 import { clearSnapshotAccount } from "../persistence/account";
+import { hydratedAccountAtom } from "../persistence/hydration";
 import { clearSnapshotsSafely } from "../persistence/store";
 import { applySyncEvent } from "../sync/apply";
 import {
@@ -192,6 +193,40 @@ export interface SessionActions {
 }
 
 /**
+ * Everything a sign-out, an account deletion and a boot that cannot prove its
+ * account clear in common. Batched so subscribers observe one transition
+ * instead of eight.
+ *
+ * It is module level because the third caller is not an action: the session
+ * bootstrap discards a hydrated snapshot through this when the account it
+ * restored is not the one the snapshot belongs to.
+ */
+export function clearSignedOutSession(registry: AtomRegistry): void {
+  Atom.batch(() => {
+    registry.set(tokenAtom, null);
+    registry.set(userAtom, null);
+    registry.set(teamsAtom, []);
+    registry.set(organizationsAtom, []);
+    registry.set(activeOrganizationIdAtom, null);
+    registry.set(activeTeamIdAtom, null);
+    registry.set(teamConnectionAtom, null);
+    registry.set(isCreatingTeamAtom, false);
+    // The entity store is session scoped: nothing the previous account
+    // loaded may outlive its token.
+    applySyncEvent(registry, { kind: "session-cleared" });
+    registry.set(hydratedAccountAtom, null);
+  });
+  /*
+    …and so is the stored snapshot. This is the one place a sign-out and an
+    account deletion agree on, so it is where the persisted copy of what was
+    just cleared is dropped too: the next cold start on this device must not
+    re-render the account that signed out.
+  */
+  clearSnapshotAccount();
+  void clearSnapshotsSafely(registry);
+}
+
+/**
  * Session actions bound to one registry. They read the current state through
  * `registry.get`, so they need no dependency array and stay stable for the
  * registry's lifetime.
@@ -208,33 +243,7 @@ export function createSessionActions(
   const messageOf = (caught: unknown) =>
     caught instanceof Error ? caught.message : String(caught);
 
-  /**
-   * Everything a sign-out and an account deletion clear in common. Batched so
-   * subscribers observe one transition instead of eight.
-   */
-  const clearSessionState = () => {
-    Atom.batch(() => {
-      registry.set(tokenAtom, null);
-      registry.set(userAtom, null);
-      registry.set(teamsAtom, []);
-      registry.set(organizationsAtom, []);
-      registry.set(activeOrganizationIdAtom, null);
-      registry.set(activeTeamIdAtom, null);
-      registry.set(teamConnectionAtom, null);
-      registry.set(isCreatingTeamAtom, false);
-      // The entity store is session scoped: nothing the previous account
-      // loaded may outlive its token.
-      applySyncEvent(registry, { kind: "session-cleared" });
-    });
-    /*
-      …and so is the stored snapshot. This is the one place a sign-out and an
-      account deletion agree on, so it is where the persisted copy of what was
-      just cleared is dropped too: the next cold start on this device must not
-      re-render the account that signed out.
-    */
-    clearSnapshotAccount();
-    void clearSnapshotsSafely(registry);
-  };
+  const clearSessionState = () => clearSignedOutSession(registry);
 
   const clearLoginTimer = () => {
     if (poll.timer === null) return;
