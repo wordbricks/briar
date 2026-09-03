@@ -22,7 +22,14 @@ export const workerTestBindings = {
     "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
 } as const satisfies Record<string, string>;
 
-export async function createWorkerTestPlugin() {
+export type WorkerTestPluginOptions = {
+  migrations?: boolean;
+  excludeMigrations?: readonly string[];
+};
+
+export async function createWorkerTestPlugin(
+  options: WorkerTestPluginOptions = {},
+) {
   // Wrangler resolves `secrets.required` before applying Miniflare overrides.
   // Populate only missing process values to avoid warnings, then explicitly
   // override the runtime bindings below so tests never receive real secrets.
@@ -30,9 +37,15 @@ export async function createWorkerTestPlugin() {
     process.env[name] ??= value;
   }
 
-  const migrations = await readD1Migrations(
-    path.join(import.meta.dirname, "migrations"),
-  );
+  let migrationBindings = {};
+  if (options.migrations !== false) {
+    const excludedMigrations = new Set(options.excludeMigrations ?? []);
+    migrationBindings = {
+      TEST_MIGRATIONS: (await readD1Migrations(
+        path.join(import.meta.dirname, "migrations"),
+      )).filter((migration) => !excludedMigrations.has(migration.name)),
+    };
+  }
 
   return cloudflareTest({
     // Unit tests use injected doubles for remote-only bindings. Never open a
@@ -44,7 +57,7 @@ export async function createWorkerTestPlugin() {
     miniflare: {
       bindings: {
         ...workerTestBindings,
-        TEST_MIGRATIONS: migrations,
+        ...migrationBindings,
       },
     },
   });
