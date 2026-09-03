@@ -164,6 +164,7 @@
   },
   "secrets": {
     "required": [
+      "RELEASE_PROMOTION_SECRET",
       "BETTER_AUTH_SECRET",
       "GOOGLE_CLIENT_ID",
       "GOOGLE_CLIENT_SECRET",

@@ -5,8 +5,8 @@
 -- Whenever a migration changes the schema or seeds rows, run
 -- `bun run d1:snapshot` and commit the result; `bun run d1:snapshot:check`
 -- fails in CI otherwise.
--- migrations-digest: f5e1c3d2a1c6a3abd1728e8dc5b9a7e45b2025f17e23d107eb596f5ee82d451b
--- snapshot-digest: 5c539b70676d71f0029ebc96f9dd679a1f47cbc3252e24a14e9fb86c71493f3e
+-- migrations-digest: b6d8aeeecddd33fefa59a76b203a94a379c7384ec8942e9890b9a35cbf9e60c8
+-- snapshot-digest: 81f3e82ccee59724d37b311236b01f5e35768b47b649045e854c139fe68b63c5
 -- @statement
 CREATE TABLE IF NOT EXISTS "d1_migrations"(
 		id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -3549,6 +3549,22 @@ CREATE TABLE IF NOT EXISTS "account" (
   "createdAt" text not null,
   "updatedAt" text not null
 );
+-- @statement
+CREATE TABLE briar_production_operation_leases (
+  name text primary key not null,
+  owner text not null,
+  head_sha text not null,
+  acquired_at integer not null,
+  expires_at integer not null,
+  constraint briar_production_operation_leases_name_check
+    check (length(name) between 1 and 80),
+  constraint briar_production_operation_leases_owner_check
+    check (length(owner) between 1 and 80),
+  constraint briar_production_operation_leases_head_sha_check
+    check (head_sha not glob '*[^0-9a-f]*' and length(head_sha) = 40),
+  constraint briar_production_operation_leases_expiry_check
+    check (expires_at > acquired_at)
+) strict;
 -- @statement
 INSERT INTO "briar_managed_computer_campaigns" ("id","code_key","name","active","created_at","updated_at") VALUES('getbriar-pilot','getbriar-pilot','GETBRIAR managed computer pilot',1,'2026-08-21T00:00:00.000Z','2026-08-21T00:00:00.000Z');
 -- @statement

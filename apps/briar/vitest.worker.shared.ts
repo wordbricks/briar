@@ -6,6 +6,8 @@ import {
 } from "@cloudflare/vitest-plugin";
 
 export const workerTestBindings = {
+  RELEASE_PROMOTION_SECRET:
+    "briar-test-release-promotion-secret-0001",
   BETTER_AUTH_SECRET: "briar-test-secret-that-is-at-least-32-characters",
   GOOGLE_CLIENT_ID: "google-client-test",
   GOOGLE_CLIENT_SECRET: "google-client-secret-test",

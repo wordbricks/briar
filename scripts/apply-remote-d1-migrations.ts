@@ -1,7 +1,11 @@
+import * as BunRuntime from "@effect/platform-bun/BunRuntime";
 import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
+import * as Effect from "effect/Effect";
 import { backfillRemoteArchiveStorage } from "./backfill-archive-storage";
+import { verifyProductionGitTarget } from "./production-git-target";
+import { withRemoteOperationLease } from "./remote-operation-lease";
 
 export interface WranglerResult {
   exitCode: number;
@@ -11,6 +15,7 @@ export interface WranglerResult {
 export type WranglerRunner = (
   args: string[],
   captureOutput?: boolean,
+  signal?: AbortSignal,
 ) => Promise<WranglerResult>;
 
 const MIGRATIONS_TABLE_SQL = `CREATE TABLE IF NOT EXISTS d1_migrations(
@@ -22,6 +27,7 @@ const MIGRATIONS_TABLE_SQL = `CREATE TABLE IF NOT EXISTS d1_migrations(
 async function runWrangler(
   args: string[],
   captureOutput = false,
+  signal?: AbortSignal,
 ): Promise<WranglerResult> {
   const processHandle = Bun.spawn(["wrangler", ...args], {
     cwd: process.cwd(),
@@ -30,16 +36,23 @@ async function runWrangler(
     stdout: captureOutput ? "pipe" : "inherit",
     stderr: "inherit",
   });
+  const abortProcess = () => processHandle.kill();
+  if (signal?.aborted) abortProcess();
+  signal?.addEventListener("abort", abortProcess, { once: true });
 
-  if (!captureOutput) {
-    return { exitCode: await processHandle.exited, stdout: "" };
+  try {
+    if (!captureOutput) {
+      return { exitCode: await processHandle.exited, stdout: "" };
+    }
+
+    const [stdout, exitCode] = await Promise.all([
+      new Response(processHandle.stdout).text(),
+      processHandle.exited,
+    ]);
+    return { exitCode, stdout };
+  } finally {
+    signal?.removeEventListener("abort", abortProcess);
   }
-
-  const [stdout, exitCode] = await Promise.all([
-    new Response(processHandle.stdout).text(),
-    processHandle.exited,
-  ]);
-  return { exitCode, stdout };
 }
 
 function leadingMigrationNumber(name: string): number {
@@ -87,14 +100,18 @@ export function buildMigrationImport(
   return `${migrationSql.trimEnd()}\n\nINSERT INTO d1_migrations (name) VALUES ('${escapedName}');\n`;
 }
 
-const runRequiredMigrationPreflight = (migrationName: string) =>
+const runRequiredMigrationPreflight = (
+  migrationName: string,
+  signal?: AbortSignal,
+) =>
   migrationName.endsWith("_canonical_archive_storage.sql")
-    ? backfillRemoteArchiveStorage()
+    ? backfillRemoteArchiveStorage(signal)
     : Promise.resolve(0);
 
 async function readAppliedMigrations(
   runner: WranglerRunner,
   database: string,
+  signal?: AbortSignal,
 ): Promise<{ exitCode: number; names: Set<string> }> {
   const history = await runner(
     [
@@ -107,6 +124,7 @@ async function readAppliedMigrations(
       "--json",
     ],
     true,
+    signal,
   );
   if (history.exitCode !== 0) {
     return { exitCode: history.exitCode, names: new Set() };
@@ -122,11 +140,13 @@ export async function applyRemoteD1Migrations({
   migrationsDirectory = join(process.cwd(), "migrations"),
   runner = runWrangler,
   beforeMigration = runRequiredMigrationPreflight,
+  signal,
 }: {
   database?: string;
   migrationsDirectory?: string;
   runner?: WranglerRunner;
-  beforeMigration?: (migrationName: string) => Promise<number>;
+  beforeMigration?: (migrationName: string, signal?: AbortSignal) => Promise<number>;
+  signal?: AbortSignal;
 } = {}): Promise<number> {
   const initialize = await runner([
     "d1",
@@ -136,10 +156,10 @@ export async function applyRemoteD1Migrations({
     "--command",
     MIGRATIONS_TABLE_SQL,
     "--yes",
-  ]);
+  ], false, signal);
   if (initialize.exitCode !== 0) return initialize.exitCode;
 
-  const history = await readAppliedMigrations(runner, database);
+  const history = await readAppliedMigrations(runner, database, signal);
   if (history.exitCode !== 0) return history.exitCode;
 
   const appliedMigrations = history.names;
@@ -161,7 +181,7 @@ export async function applyRemoteD1Migrations({
   try {
     for (const migrationName of pendingMigrations) {
       if (beforeMigration) {
-        const preflightExitCode = await beforeMigration(migrationName);
+        const preflightExitCode = await beforeMigration(migrationName, signal);
         if (preflightExitCode !== 0) return preflightExitCode;
       }
       const migrationPath = join(migrationsDirectory, migrationName);
@@ -182,12 +202,12 @@ export async function applyRemoteD1Migrations({
         "--file",
         importPath,
         "--yes",
-      ]);
+      ], false, signal);
       if (result.exitCode !== 0) {
         // Wrangler can lose the final import polling race after D1 has already
         // committed the file. The history INSERT is the last statement in the
         // same atomic import, so its presence proves the migration completed.
-        const refreshedHistory = await readAppliedMigrations(runner, database);
+        const refreshedHistory = await readAppliedMigrations(runner, database, signal);
         if (!refreshedHistory.names.has(migrationName)) {
           return result.exitCode;
         }
@@ -203,9 +223,20 @@ export async function applyRemoteD1Migrations({
   return 0;
 }
 
-async function main(): Promise<void> {
-  const exitCode = await applyRemoteD1Migrations();
-  if (exitCode !== 0) process.exitCode = exitCode;
-}
+const main = Effect.fn("applyRemoteD1Migrations.main")(
+  function* applyRemoteD1MigrationsMainEffect() {
+    const headSha = yield* verifyProductionGitTarget();
+    const exitCode = yield* withRemoteOperationLease({
+      headSha,
+      name: "worker-production",
+      runner: runWrangler,
+    }, (signal) => applyRemoteD1Migrations({ signal }));
+    if (exitCode !== 0) {
+      yield* Effect.sync(() => {
+        process.exitCode = exitCode;
+      });
+    }
+  },
+);
 
-if (import.meta.main) await main();
+if (import.meta.main) main().pipe(BunRuntime.runMain);

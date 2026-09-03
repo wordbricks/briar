@@ -249,11 +249,14 @@ if [[ "$publish" == true ]]; then
   curl --fail --silent --show-error --head \
     "${BRIAR_RELEASE_BASE_URL}/${tag}/briar-managed-runtime-${version}-linux-x86_64.tar.gz" \
     >/dev/null
-  gh release edit "$tag" --repo "$repository" --draft=false --latest
-  wrangler r2 object put \
-    "briar-releases/releases/latest.json" \
-    --file "$artifact_root/latest.json" \
-    --remote
+  # Let GitHub choose Latest by date/version. The Worker promotion endpoint
+  # separately applies an authenticated ETag CAS so R2 can never move backward.
+  gh release edit "$tag" --repo "$repository" --draft=false
+  scripts/with-release-env.sh \
+    bun run apps/briar/src-cli/production-release.ts promote \
+      --version "$version" \
+      --commit-sha "$commit_sha" \
+      --endpoint "$BRIAR_UPDATE_ENDPOINT"
   curl --fail --silent --show-error \
     "${BRIAR_UPDATE_ENDPOINT}?promoted=${version}" |
     jq -e --arg version "$version" '.version == $version' >/dev/null

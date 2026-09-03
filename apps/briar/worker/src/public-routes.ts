@@ -244,7 +244,11 @@ export async function handlePublicRoute(input: {
     );
   }
 
-  const releaseResponse = await serveRelease(request, env.RELEASES);
+  const releaseResponse = await serveRelease(
+    request,
+    env.RELEASES,
+    env.RELEASE_PROMOTION_SECRET,
+  );
   if (releaseResponse) return releaseResponse;
 
   if (url.pathname === "/brand/briar-icon.png" && request.method === "GET") {

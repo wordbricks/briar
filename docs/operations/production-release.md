@@ -38,7 +38,9 @@ Repeat that command for the following variables:
 - `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`,
   `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD`
 
-Publishing additionally requires `CLOUDFLARE_API_TOKEN` in `.env.release`. The
+Publishing additionally requires `CLOUDFLARE_API_TOKEN` and the shared
+`RELEASE_PROMOTION_SECRET` in `.env.release`. The same promotion secret is a
+required Worker secret in `.env.production`. The
 repository's macOS release script separately uses an authenticated GitHub CLI
 session to publish binary releases; this is a **project-specific release tool**,
 not a Briar Worker or default Workflow requirement. The current Wrangler
@@ -113,7 +115,10 @@ wrong-commit artifact fails closed.
 creates a draft GitHub Release, uploads immutable versioned files to GitHub and
 the private R2 bucket with four concurrent workers, verifies the public updater
 archive, publishes the GitHub Release, and promotes `releases/latest.json`
-last. Set `BRIAR_RELEASE_UPLOAD_CONCURRENCY` to an integer from 1 through 8 to
+last through the Worker's HMAC-authenticated R2 CAS endpoint. The endpoint
+compares stable SemVer and conditions the write on the current object ETag, so
+a slower old release cannot overwrite a newer one. Set
+`BRIAR_RELEASE_UPLOAD_CONCURRENCY` to an integer from 1 through 8 to
 adjust the worker count when diagnosing a provider-side upload issue.
 
 Promotion is fail-closed. The mutable update manifest is the final write, so a

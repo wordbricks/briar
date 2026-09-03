@@ -11,6 +11,7 @@ export const encryptedEnvPolicies = {
   ".env.production": {
     publicKey: "DOTENV_PUBLIC_KEY_PRODUCTION",
     secrets: [
+      "RELEASE_PROMOTION_SECRET",
       "BETTER_AUTH_SECRET",
       "GOOGLE_CLIENT_ID",
       "GOOGLE_CLIENT_SECRET",
@@ -42,6 +43,7 @@ export const encryptedEnvPolicies = {
   ".env.release": {
     publicKey: "DOTENV_PUBLIC_KEY_RELEASE",
     secrets: [
+      "RELEASE_PROMOTION_SECRET",
       "APPLE_CERTIFICATE",
       "APPLE_CERTIFICATE_PASSWORD",
       "IOS_DISTRIBUTION_CERTIFICATE",

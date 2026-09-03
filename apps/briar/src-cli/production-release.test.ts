@@ -22,6 +22,7 @@ afterEach(async () => {
 
 function completeEnvironment(): NodeJS.ProcessEnv {
   return {
+    RELEASE_PROMOTION_SECRET: "test-release-promotion-secret-at-least-32-chars",
     APPLE_CERTIFICATE: "present",
     APPLE_CERTIFICATE_PASSWORD: "present",
     KEYCHAIN_PASSWORD: "present",

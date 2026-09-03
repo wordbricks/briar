@@ -86,6 +86,11 @@ require_xcode() {
 }
 
 generate_project() {
+  if [[ "${BRIAR_IOS_PROJECT_PREGENERATED:-}" == "true" ]]; then
+    [[ -d "$workspace_root/$swift_project" ]] ||
+      fail "The pre-generated Xcode project is missing: $swift_project"
+    return
+  fi
   command -v "$xcodegen_bin" >/dev/null ||
     fail "xcodegen is unavailable. Run this command through: mise exec -- bun run"
   (
