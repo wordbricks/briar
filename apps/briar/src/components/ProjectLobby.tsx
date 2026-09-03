@@ -19,6 +19,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { MainContent, PageHeader } from "./layout";
 import { ProjectIcon } from "./ProjectIcon";
+import { ProjectMergeActivity } from "./ProjectMergeActivity";
+import type { ProjectMergeActivityLoader } from "../lib/project-merge-activity";
 import { IssueDifficultyIcon } from "./hunt/IssueDifficultyIcon";
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
@@ -130,6 +132,7 @@ export function ProjectLobby({
   dashboard,
   isSidebarOpen,
   onLoadUsageSummary,
+  onLoadMergeActivity,
   onOpenAgents,
   onOpenIssue,
   onOpenIssues,
@@ -144,6 +147,7 @@ export function ProjectLobby({
   connectionState: LocalProjectConnectionState;
   dashboard: DashboardPayload | null;
   isSidebarOpen: boolean;
+  onLoadMergeActivity?: ProjectMergeActivityLoader;
   onLoadUsageSummary: (
     projectId: string,
     period: ProjectUsagePeriod,
@@ -170,9 +174,11 @@ export function ProjectLobby({
   const [draftDateRange, setDraftDateRange] = useState(dateRange);
   const [now, setNow] = useState(Date.now);
   const usageRequest = useRef(0);
+  const [mergeRefreshKey, setMergeRefreshKey] = useState(0);
 
   const refreshUsage = useCallback(
     async (force = false) => {
+      if (force) setMergeRefreshKey((value) => value + 1);
       const request = ++usageRequest.current;
       setUsageLoading(true);
       setUsageError(null);
@@ -607,6 +613,13 @@ export function ProjectLobby({
               </span>
             </p>
           ) : null}
+
+          <ProjectMergeActivity
+            projectId={project.id}
+            repository={githubRepository}
+            onLoad={onLoadMergeActivity}
+            refreshKey={mergeRefreshKey}
+          />
 
           <section
             className="mt-5 min-w-0 overflow-hidden rounded-[18px] border border-border bg-card shadow-sm [&_h2]:m-0 [&_h2]:text-md [&_h2]:font-semibold [&_h2]:tracking-tight [&_h3]:m-0 [&_h3]:text-md [&_h3]:font-semibold [&_h3]:tracking-tight"
