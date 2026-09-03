@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAtom, useAtomSet, useAtomValue } from "@effect/atom-react";
 import { keyboardShortcutsModifierLabel } from "./components/app/AppDialogViews";
 import { AppDialogs } from "./components/app/AppDialogs";
@@ -36,7 +36,6 @@ import {
 } from "./state/navigation/atoms";
 import { useActionBridges } from "./state/action-bridges";
 import { companionMode, lockedTeamId, remoteMode } from "./state/platform";
-import { useOrganizationActions } from "./state/organization/actions";
 import { organizationsAtom } from "./state/organization/atoms";
 import { useTeamActions } from "./state/team/actions";
 import {
@@ -121,8 +120,7 @@ export function App({
 
   const { cancelTeamCreation, finishTeamCreation, startTeamCreation } =
     useTeamActions();
-  const { selectOrganization } = useOrganizationActions();
-  const { openAppSettings, resetNavigation } = useNavigationActions();
+  const { resetNavigation } = useNavigationActions();
   const setRequestedRunId = useAtomSet(requestedRunIdAtom);
   const setRequestedSessionId = useAtomSet(requestedSessionIdAtom);
 

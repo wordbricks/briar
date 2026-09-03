@@ -351,6 +351,50 @@ workspace / workflow / integrations를 옮기며 확인한, 이후 단계에 영
 - **App에 남은 `briar.` 키 28개는 전부 세션·로그인·팀 선택이다.** 내비게이션이
   나가면서 더 줄일 것이 없어졌고, 다음에 줄어드는 시점은 Phase 7의 파사드 제거다.
 
+### 기준 갱신 (2026-09-04, Phase 7 이후)
+
+파사드를 지우며 확인한, Phase 8에 영향을 주는 사실:
+
+- **`useBriar`는 없다.** `apps/briar/src`에 `useBriar` 식별자 참조와 `briar.` 멤버
+  접근이 0개다(과거를 설명하는 주석만 남았다). App.tsx는 661줄 → 419줄이 되었고,
+  세션·로그인·팀 선택·재조회·플래닝 로드는 각각 `state/session`, `state/team`,
+  `state/sync`, `state/planning`에 있다.
+- **데이터 소스 시임이 하나로 합쳐졌다.** `UseBriarOptions.dataSources`가
+  `state/session/api.ts`의 `sessionApiAtom`이 되었고,
+  `setSessionDataSources(registry, …)` 한 번이 세션·`teamSyncApiAtom`·
+  `workspaceApiAtom` 세 개를 함께 심는다. 새 테스트는 이것만 쓰면 된다.
+- **데모 선택 시드는 모듈 상수다.** `state/platform.ts`가 `lockedTeamId`를 상수로
+  내보내고 `demo-fixtures.ts`의 `demoSelectionApplies`가 그것을 쓰므로,
+  `activeTeamIdAtom` / `activeOrganizationIdAtom`이 레지스트리별 시드 없이 맞는
+  값에서 시작한다. 창을 고정한 테스트는 `lockedTeamIdAtom`을 심으면 된다.
+- **`deferDefaultOrganization`은 죽은 분기였다.** App은 #1243 이후 늘 `true`를
+  넘겼으므로 `ensureDefaultOrganization`은 도달 불가능했고,
+  `lib/default-organization.ts`를 테스트와 함께 지웠다.
+- **`AtomContext`에는 `get.registry`가 있다.** 구독형 atom이 콜백 안에서 다른
+  atom을 쓸 때 `get.set`(읽기 함수 스코프)이 아니라 `get.registry.set`을 쓰면
+  안전하다. `get.addFinalizer`는 구독 해제 함수를 그대로 받는다.
+- **`setIdleTTL`은 `keepAlive`와 배타적이다.** 유한 duration을 주면 `keepAlive`가
+  꺼진다. 레지스트리의 스윕은 `setTimeout` 버킷이고 기본 `timeoutResolution`이
+  1초이므로, 해제를 검사하는 테스트는 가짜 타이머로 `TTL + 2초`를 흘려야 한다.
+- **`useAtomMount(atom)`이 구독형 atom의 마운트 지점이다.** 값은 읽지 않고
+  관찰만 하므로, 리스너 atom을 마운트하는 컴포넌트는 리렌더되지 않는다.
+- **채널 실시간 전송은 훅으로 남겼다.** `useChannelCatalogSync`의 두 effect는
+  커서 ref와 `catalogLoaded`를 공유하고, 델타 루프가 그 ref를 자기 자신과 비교해
+  최신 페이지 도착을 감지한다. atom으로 옮기려면 커서와 재시도 루프까지 함께
+  옮겨야 해서 카탈로그 동작이 바뀔 위험이 이득보다 크다.
+- **`dashboardViewAtom`은 남겼다.** 계획의 Phase 7 항목이지만 17개 모듈이 통짜
+  `DashboardPayload`를 읽고 있어, 지우려면 소비자를 전부 엔티티 atom으로 바꿔야
+  한다. Phase 8의 스냅샷 직렬화가 같은 뷰를 쓰므로 그때 함께 판단한다.
+- **`MessageRow`의 memo를 되살리려면 프롭 모양을 바꿔야 했다.** 인라인 클로저를
+  `useCallback`으로 감싸는 것만으로는 부족하다 — 훅이 메시지 목록이 바뀔 때마다
+  콜백을 다시 만들기 때문이다. 행이 **자기 메시지를 스스로 바인딩**하고 목록은
+  ref로 최신 클로저를 가리키는 아이덴티티 하나를 넘긴다(액션 브리지와 같은 형태).
+  `typingAgentNames(messageId)`처럼 호출마다 새 배열을 만드는 헬퍼도 내용이 같으면
+  이전 값을 돌려주도록 캐시해야 memo가 산다.
+- **App은 이제 런 변경에 0회 리렌더한다.** 열린 보드를 구독하는 것은
+  `components/app/InboxBridge.tsx` 하나이고, 인박스 결과는 `state/inbox`로 게시된다.
+  `src/App.test.tsx`가 이것을 고정한다.
+
 ## 목표
 
 1. `apps/briar/src/hooks/useBriar.ts`(4,668줄)와 `apps/briar/src/App.tsx`(5,116줄)가
@@ -1014,5 +1058,5 @@ Phase 2 이후 언제든 착수 가능하며 Phase 3–7과 병행할 수 있다
 | 4 | #1590, #1591 | 머지됨 | #1590: `entities/channels` 연결(저장 인덱스), `sync`의 채널 카탈로그 이벤트 4종, `state/channels`(atoms / api / actions / `useChannelCatalogSync`), `components/app`의 `ChannelViews` 3종과 `CommandPaletteWithContext`, `lockedTeamIdAtom`을 `state/platform.ts`로 통합. #1591: `state/dialogs`와 `state/navigation` atom, `hooks`의 `useStatusTray` / `useDeepLinks` / `useCommandPaletteItems` / `useAppShortcuts` / `useWorkerDispatch`, `lib/navigation-history-items`, `AppDialogViews`와 `AppSettingsWithWorkspace` 래퍼, `Sidebar` / `OrganizationSettings` / `TeamLobby` 래퍼 확장. App.tsx 4,947줄 → 3,053줄, `briar.` 키 55개 → 42개. |
 | 5 | #1592, #1593, #1594, #1595 | 머지됨 | #1592: `hooks`의 `useRepositorySetup` / `useIssueAgents` / `useAgentDispatch` / `useInvitationFlow` / `useLaunchIntro`, `components/app`의 `InboxDetailContent` / `AppSettingsSidebar`, `lib`의 `inbox-detail-label` / `team-window-scope`. #1593: `AuthGate` / `AppDialogs` / `CompanionShell`, `AppEffects` 단일 마운트, `WorkerDispatchDialog` 이중 렌더 제거, 5-1이 남긴 죽은 import 정리. #1594: `DesktopShell`과 트리가 나가며 드러난 죽은 로컬 40여 개 제거. #1595: 내비게이션 블록을 `hooks/useAppNavigation.ts`로 그대로 이동(Phase 6의 첫 항목을 미리 끝냄). App.tsx 3,053줄 → 783줄, `briar.` 키 42개 → 28개. |
 | 6 | #1596, #1597, #1598 | 머지됨 | #1596: `state/navigation`의 `history` / `atoms`(방문 스택 + 파생 12종) / `actions` / `useNavigationReconciliation`, `hooks/useAppNavigation`을 호환 훅으로 축소, `setDefaultTeam` 제거. #1597: 조정 effect를 `AppEffects`로, `useAppNavigation` 삭제, `WindowNavigationControlsWithHistory` / `CompanionHeaderWithSession` 래퍼, `SidebarWithSession`의 페이지 구독, `useAppShortcuts`(11→4) / `useCommandPaletteItems`(16→5) / `useDeepLinks` / `useRepositorySetup` / `AppDialogs` / `CommandPaletteWithContext`의 내비게이션 프롭 제거. #1598: `DesktopPages` 페이지 슬롯 분리와 렌더 카운트 테스트. App.tsx 783줄 → 661줄, `briar.` 키 28개 유지(전부 세션·로그인). |
-| 7 | | 예정 | |
+| 7 | #1599, #1600, #1601 | 머지됨 | #1599: `state/session`의 `api` / `useSessionBootstrap` / `useAuthReturnListener`와 로그인 액션 6종(폴링 상태는 registry `WeakMap`), `state/team`의 `selectTeam` / `ensureTeamSelected`와 `getTeamActions`, `state/sync/actions`의 `refreshActiveTeam`, `state/planning/usePlanningProjectsSync`, `state/action-bridges`. `IssueActionBridge.selectTeam`과 `AppEffects` / `useNavigationReconciliation`의 `selectTeam` 프롭 제거, 데모 선택 시드를 모듈 상수로, `lib/default-organization` 삭제. #1600: `useBriar.ts` 삭제, `components/app/InboxBridge`와 `state/inbox`(atoms / actions), `state/app-error`, `hooks/useOrganizationViewData`. 훅 6종과 게이트·셸·페이지가 프롭 대신 액션 훅을 쓴다. App.tsx 661줄 → 421줄, `briar.` 키 28개 → 0개. #1601: `state/status-tray`와 `state/deep-links`의 구독형 atom 5종(`addFinalizer` + `setIdleTTL`), `MessageRow` memo 복구와 렌더 카운트 테스트. |
 | 8 | | 예정 | |

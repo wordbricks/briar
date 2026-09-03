@@ -1215,6 +1215,123 @@ export function Channels({
     ],
   );
 
+  /*
+    What a row can do, as one object that outlives every render.
+
+    The conversation hook rebuilds its callbacks whenever the messages or the
+    channel change, so passing them straight through would change every row's
+    props on every incoming message. A ref holds the latest set and the bundle
+    below forwards to it, which is the same shape the registry-bound actions
+    use: one identity for the component's lifetime, always the current closure.
+  */
+  const latestMessageHandlers = useRef<MessageRowHandlers>(null as never);
+  latestMessageHandlers.current = {
+    acceptExecutionProposal,
+    acceptProposal,
+    acceptSkillExecutionProposal,
+    applyAcceptedExecutionProposal,
+    applyAcceptedSkillExecutionProposal,
+    declineProposal,
+    loadExecutionProposalContext,
+    loadSkillExecutionProposalContext,
+    openThread: (messageId) => void openThread(messageId),
+    removeMessage,
+    selectProposalProject: (proposalId, projectId) => {
+      setProposalProjects((current) => ({
+        ...current,
+        [proposalId]: projectId,
+      }));
+    },
+    toggleReaction,
+  };
+  const messageHandlers = useMemo<MessageRowHandlers>(
+    () => ({
+      acceptExecutionProposal: (message, input) =>
+        latestMessageHandlers.current.acceptExecutionProposal(message, input),
+      acceptProposal: (message, input) =>
+        latestMessageHandlers.current.acceptProposal(message, input),
+      acceptSkillExecutionProposal: (message, input) =>
+        latestMessageHandlers.current.acceptSkillExecutionProposal(
+          message,
+          input,
+        ),
+      applyAcceptedExecutionProposal: (messageId, proposal) =>
+        latestMessageHandlers.current.applyAcceptedExecutionProposal(
+          messageId,
+          proposal,
+        ),
+      applyAcceptedSkillExecutionProposal: (messageId, proposal) =>
+        latestMessageHandlers.current.applyAcceptedSkillExecutionProposal(
+          messageId,
+          proposal,
+        ),
+      declineProposal: (message) =>
+        latestMessageHandlers.current.declineProposal(message),
+      loadExecutionProposalContext: (proposal) =>
+        latestMessageHandlers.current.loadExecutionProposalContext(proposal),
+      loadSkillExecutionProposalContext: (proposal) =>
+        latestMessageHandlers.current.loadSkillExecutionProposalContext(
+          proposal,
+        ),
+      openThread: (messageId) =>
+        latestMessageHandlers.current.openThread(messageId),
+      removeMessage: (message) =>
+        latestMessageHandlers.current.removeMessage(message),
+      selectProposalProject: (proposalId, projectId) =>
+        latestMessageHandlers.current.selectProposalProject(
+          proposalId,
+          projectId,
+        ),
+      toggleReaction: (message, emoji) =>
+        latestMessageHandlers.current.toggleReaction(message, emoji),
+    }),
+    [],
+  );
+
+  /*
+    The typing state of one message, as a value rather than a fresh array or
+    record per render. Both helpers build a new object every call, which is the
+    other half of what defeated the row memo; returning the previous one when
+    the content matches lets an unrelated tick pass a row by.
+  */
+  const typingNamesCache = useRef(new Map<string, string[]>());
+  const typingActivityCache = useRef(
+    new Map<string, Readonly<Record<string, ChannelAgentActivityDescriptor>>>(),
+  );
+  const rowTypingAgentNames = useCallback(
+    (messageId: string) => {
+      const next = typingAgentNames(messageId);
+      const previous = typingNamesCache.current.get(messageId);
+      if (
+        previous &&
+        previous.length === next.length &&
+        previous.every((name, index) => name === next[index])
+      ) {
+        return previous;
+      }
+      typingNamesCache.current.set(messageId, next);
+      return next;
+    },
+    [typingAgentNames],
+  );
+  const rowTypingActivity = useCallback(
+    (messageId: string) => {
+      const next = typingActivityByAgentName(messageId);
+      const previous = typingActivityCache.current.get(messageId);
+      const nextKeys = Object.keys(next);
+      if (
+        previous &&
+        Object.keys(previous).length === nextKeys.length &&
+        nextKeys.every((key) => previous[key] === next[key])
+      ) {
+        return previous;
+      }
+      typingActivityCache.current.set(messageId, next);
+      return next;
+    },
+    [typingActivityByAgentName],
+  );
+
   const memberCount = Math.max(activeChannel?.memberCount ?? 0, members.length);
   const participantCount = memberCount + Math.max(
     activeChannel?.agentCount ?? 0,
@@ -1356,48 +1473,18 @@ export function Channels({
                     renderMessage={(message) => (
                       <MessageRow
                       agents={agents}
+                      canOpenThread={surface === "channel"}
                       channel={activeChannel}
+                      handlers={messageHandlers}
                       highlighted={message.id === requestedMessage?.messageId}
                       message={message}
                       members={members}
                       localeTag={localeTag}
                       currentUserId={currentUserId}
-                      onAcceptProposal={(input) =>
-                        acceptProposal(message, input ?? null)}
-                      onDeclineProposal={() => declineProposal(message)}
                       loadCreateExecutionProposalContext={
                         loadCreateExecutionProposalContext
                       }
-                      loadExecutionProposalContext={() =>
-                        loadExecutionProposalContext(message.executionProposal!)}
-                      loadSkillExecutionProposalContext={() =>
-                        loadSkillExecutionProposalContext(
-                          message.skillExecutionProposal!,
-                        )}
-                      onAcceptExecutionProposal={(input) =>
-                        acceptExecutionProposal(message, input)}
-                      onExecutionProposalAccepted={(proposal) =>
-                        applyAcceptedExecutionProposal(message.id, proposal)}
-                      onAcceptSkillExecutionProposal={(input) =>
-                        acceptSkillExecutionProposal(message, input)}
-                      onSkillExecutionProposalAccepted={(proposal) =>
-                        applyAcceptedSkillExecutionProposal(message.id, proposal)}
                       onIssueOpen={openIssue}
-                      onOpenThread={surface === "channel"
-                        ? () => void openThread(message.id)
-                        : undefined}
-                      onProjectChange={(projectId) => {
-                        const proposalId = message.proposal?.id;
-                        if (!proposalId) return;
-                        setProposalProjects((current) => ({
-                          ...current,
-                          [proposalId]: projectId,
-                        }));
-                      }}
-                      onToggleReaction={(emoji) =>
-                        void toggleReaction(message, emoji)
-                      }
-                      onDelete={() => void removeMessage(message)}
                       busy={busy}
                       acceptingProposal={
                         acceptingProposalId === message.proposal?.id
@@ -1412,10 +1499,8 @@ export function Channels({
                           : null
                       }
                       token={token}
-                      typingAgentNames={typingAgentNames(message.id)}
-                      typingActivityByAgentName={typingActivityByAgentName(
-                        message.id,
-                      )}
+                      typingAgentNames={rowTypingAgentNames(message.id)}
+                      typingActivityByAgentName={rowTypingActivity(message.id)}
                       showTypingState={message.id !== threadParentId}
                     />
                     )}
@@ -1542,45 +1627,17 @@ export function Channels({
               <MessageRow
                 agents={agents}
                 channel={activeChannel}
+                handlers={messageHandlers}
                 highlighted={message.id === requestedMessage?.messageId}
                 key={message.id}
                 message={message}
                 members={members}
                 localeTag={localeTag}
                 currentUserId={currentUserId}
-                onAcceptProposal={(input) =>
-                  acceptProposal(message, input ?? null)}
-                onDeclineProposal={() => declineProposal(message)}
                 loadCreateExecutionProposalContext={
                   loadCreateExecutionProposalContext
                 }
-                loadExecutionProposalContext={() =>
-                  loadExecutionProposalContext(message.executionProposal!)}
-                loadSkillExecutionProposalContext={() =>
-                  loadSkillExecutionProposalContext(
-                    message.skillExecutionProposal!,
-                  )}
-                onAcceptExecutionProposal={(input) =>
-                  acceptExecutionProposal(message, input)}
-                onExecutionProposalAccepted={(proposal) =>
-                  applyAcceptedExecutionProposal(message.id, proposal)}
-                onAcceptSkillExecutionProposal={(input) =>
-                  acceptSkillExecutionProposal(message, input)}
-                onSkillExecutionProposalAccepted={(proposal) =>
-                  applyAcceptedSkillExecutionProposal(message.id, proposal)}
                 onIssueOpen={openIssue}
-                onProjectChange={(projectId) => {
-                  const proposalId = message.proposal?.id;
-                  if (!proposalId) return;
-                  setProposalProjects((current) => ({
-                    ...current,
-                    [proposalId]: projectId,
-                  }));
-                }}
-                onToggleReaction={(emoji) =>
-                  void toggleReaction(message, emoji)
-                }
-                onDelete={() => void removeMessage(message)}
                 busy={busy}
                 acceptingProposal={
                   acceptingProposalId === message.proposal?.id
@@ -1595,10 +1652,8 @@ export function Channels({
                     : null
                 }
                 token={token}
-                typingAgentNames={typingAgentNames(message.id)}
-                typingActivityByAgentName={typingActivityByAgentName(
-                  message.id,
-                )}
+                typingAgentNames={rowTypingAgentNames(message.id)}
+                typingActivityByAgentName={rowTypingActivity(message.id)}
                 showTypingState={false}
               />
             ))}
@@ -2871,30 +2926,52 @@ function ChannelInviteDialog({
   );
 }
 
-const MessageRow = memo(function MessageRow({
+/*
+  Everything a row does to the conversation, in one object that never changes
+  identity.
+
+  The row is memoised, and it used to take a dozen props that were inline arrow
+  functions closing over its own message — so every prop was a new value on
+  every render of the list and the memo did nothing at all. The message is a
+  prop the row already has, so the row binds it here instead: what arrives is
+  message-agnostic and stable, and a row re-renders when its own message,
+  its typing state or one of the flags about it actually changes.
+*/
+export interface MessageRowHandlers
+  extends Pick<
+    ReturnType<typeof useChannelConversation>,
+    | "acceptExecutionProposal"
+    | "acceptProposal"
+    | "acceptSkillExecutionProposal"
+    | "applyAcceptedExecutionProposal"
+    | "applyAcceptedSkillExecutionProposal"
+    | "declineProposal"
+    | "loadExecutionProposalContext"
+    | "loadSkillExecutionProposalContext"
+    | "removeMessage"
+    | "toggleReaction"
+  > {
+  readonly openThread: (messageId: string) => void;
+  readonly selectProposalProject: (
+    proposalId: string,
+    projectId: string,
+  ) => void;
+}
+
+export const MessageRow = memo(function MessageRow({
   acceptingProposal,
   decliningProposal,
   agents,
+  canOpenThread = false,
   channel,
+  handlers,
   highlighted = false,
   loadCreateExecutionProposalContext,
-  loadExecutionProposalContext,
-  loadSkillExecutionProposalContext,
   message,
   members,
   localeTag,
   currentUserId,
-  onOpenThread,
-  onAcceptProposal,
-  onDeclineProposal,
-  onAcceptExecutionProposal,
-  onAcceptSkillExecutionProposal,
-  onExecutionProposalAccepted,
-  onSkillExecutionProposalAccepted,
   onIssueOpen,
-  onProjectChange,
-  onDelete,
-  onToggleReaction,
   busy,
   projects,
   selectedProjectId,
@@ -2906,19 +2983,13 @@ const MessageRow = memo(function MessageRow({
   acceptingProposal: boolean;
   decliningProposal: boolean;
   agents: ChannelAgentSummary[];
+  /** The surface has threads, so a row may offer to open one. */
+  canOpenThread?: boolean;
   channel: ChannelSummary;
+  handlers: MessageRowHandlers;
   highlighted?: boolean;
   loadCreateExecutionProposalContext: (projectId: string) => Promise<{
     run: HuntRun | null;
-    workers: ExecutionWorker[];
-    policy?: ProjectExecutionWorkerPolicy;
-  }>;
-  loadExecutionProposalContext: () => Promise<{
-    run: HuntRun | null;
-    workers: ExecutionWorker[];
-    policy?: ProjectExecutionWorkerPolicy;
-  }>;
-  loadSkillExecutionProposalContext: () => Promise<{
     workers: ExecutionWorker[];
     policy?: ProjectExecutionWorkerPolicy;
   }>;
@@ -2926,25 +2997,7 @@ const MessageRow = memo(function MessageRow({
   members: ChannelMember[];
   localeTag: string;
   currentUserId: string | null;
-  onOpenThread?: () => void;
-  onAcceptProposal: (
-    input?: IssueExecutionApprovalInput,
-  ) => Promise<string | null | undefined>;
-  onDeclineProposal: () => void | Promise<void>;
-  onAcceptExecutionProposal: (
-    input: IssueExecutionApprovalInput,
-  ) => Promise<ChannelExecutionProposal>;
-  onExecutionProposalAccepted: (proposal: ChannelExecutionProposal) => void;
-  onAcceptSkillExecutionProposal: (
-    input: AgentSkillExecutionApprovalInput,
-  ) => Promise<AgentSkillExecutionProposal>;
-  onSkillExecutionProposalAccepted: (
-    proposal: AgentSkillExecutionProposal,
-  ) => void;
   onIssueOpen?: (projectId: string, runId: string) => void | Promise<void>;
-  onProjectChange: (projectId: string) => void;
-  onDelete: () => void;
-  onToggleReaction: (emoji: string) => void;
   busy: boolean;
   projects: readonly Pick<Project, "id" | "name" | "organizationId">[];
   selectedProjectId: string | null;
@@ -2954,6 +3007,74 @@ const MessageRow = memo(function MessageRow({
   showTypingState?: boolean;
 }) {
   const { t } = useI18n();
+  /*
+    The row's own message, bound to the shared handlers. Each one depends on
+    nothing but the handler bundle and the message, so it changes exactly when
+    the row would have re-rendered anyway.
+  */
+  const onAcceptProposal = useCallback(
+    (input?: IssueExecutionApprovalInput) =>
+      handlers.acceptProposal(message, input ?? null),
+    [handlers, message],
+  );
+  const onDeclineProposal = useCallback(
+    () => handlers.declineProposal(message),
+    [handlers, message],
+  );
+  const loadExecutionProposalContext = useCallback(
+    () => handlers.loadExecutionProposalContext(message.executionProposal!),
+    [handlers, message],
+  );
+  const loadSkillExecutionProposalContext = useCallback(
+    () =>
+      handlers.loadSkillExecutionProposalContext(
+        message.skillExecutionProposal!,
+      ),
+    [handlers, message],
+  );
+  const onAcceptExecutionProposal = useCallback(
+    (input: IssueExecutionApprovalInput) =>
+      handlers.acceptExecutionProposal(message, input),
+    [handlers, message],
+  );
+  const onExecutionProposalAccepted = useCallback(
+    (proposal: ChannelExecutionProposal) =>
+      handlers.applyAcceptedExecutionProposal(message.id, proposal),
+    [handlers, message.id],
+  );
+  const onAcceptSkillExecutionProposal = useCallback(
+    (input: AgentSkillExecutionApprovalInput) =>
+      handlers.acceptSkillExecutionProposal(message, input),
+    [handlers, message],
+  );
+  const onSkillExecutionProposalAccepted = useCallback(
+    (proposal: AgentSkillExecutionProposal) =>
+      handlers.applyAcceptedSkillExecutionProposal(message.id, proposal),
+    [handlers, message.id],
+  );
+  const onProjectChange = useCallback(
+    (projectId: string) => {
+      const proposalId = message.proposal?.id;
+      if (!proposalId) return;
+      handlers.selectProposalProject(proposalId, projectId);
+    },
+    [handlers, message.proposal?.id],
+  );
+  const onToggleReaction = useCallback(
+    (emoji: string) => void handlers.toggleReaction(message, emoji),
+    [handlers, message],
+  );
+  const onDelete = useCallback(
+    () => void handlers.removeMessage(message),
+    [handlers, message],
+  );
+  const onOpenThread = useMemo(
+    () =>
+      canOpenThread
+        ? () => void handlers.openThread(message.id)
+        : undefined,
+    [canOpenThread, handlers, message.id],
+  );
   const [reacting, setReacting] = useState(false);
   const isAgent = message.author.type === "agent";
   const isWebhook = message.author.type === "webhook";

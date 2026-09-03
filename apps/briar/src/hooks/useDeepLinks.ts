@@ -1,17 +1,23 @@
-import { useAtom, useAtomSet, useAtomValue } from "@effect/atom-react";
+import {
+  useAtom,
+  useAtomMount,
+  useAtomSet,
+  useAtomValue,
+} from "@effect/atom-react";
 import { useEffect } from "react";
 
 import { useI18n } from "../i18n";
 import { useToast } from "../components/ui/toast";
 import { resolveIssueHierarchyLocation } from "../lib/api";
 import { projectNavigationLocation } from "../lib/app-navigation";
-import { listenForAppMenuSettings } from "../lib/app-menu";
-import { listenForClickedIssueLinks } from "../lib/external-links";
 import { navigateToIssueLink } from "../lib/issue-link-navigation";
-import { listenForBriarLinks } from "../lib/issue-links";
-import { isDesktopTauri, isMacDesktopTauri } from "../lib/platform";
-import { listenForStatusTrayOpenRun } from "../lib/status-tray";
 import { useChannelActions } from "../state/channels/actions";
+import {
+  appMenuSettingsListenerAtom,
+  briarLinkListenerAtom,
+  clickedIssueLinkListenerAtom,
+  statusTrayOpenRunListenerAtom,
+} from "../state/deep-links/atoms";
 import { useInboxActions } from "../state/inbox/actions";
 import {
   activeOrganizationChannelsAtom,
@@ -49,62 +55,50 @@ import { activeTeamIdAtom, teamsAtom } from "../state/team/atoms";
 /*
   Everything that opens something because the outside world asked.
 
-  Three listeners — a `briar://` link, a clicked issue link, the macOS tray —
-  put a target into `pendingBriarLinkAtom`, and one resolver drains it once the
-  session, the organization and the channel catalog it needs have settled.
-  Notifications take the same shape through `pendingInboxNotificationTarget`.
+  The listeners themselves are `state/deep-links` atoms: they register on first
+  observation and unregister through a finalizer, so this hook only mounts them.
+  What is left here is the resolver — it drains `pendingBriarLinkAtom` once the
+  session, the organization and the channel catalog it needs have settled, and
+  `pendingInboxNotificationTarget` the same way.
 
-  The resolver's shape is what kept this in the app shell: it waits on state it
+  The resolver's shape is what kept it in the app shell: it waits on state it
   does not own and then writes request atoms that a dozen views read. It reads
   the waiting conditions and where the user already is from atoms now, and moves
   through the navigation actions, the team and organization actions and the
-  inbox's own read marker — nothing is handed in but the listeners themselves,
-  which a test replaces.
+  inbox's own read marker — nothing is handed in at all.
 */
 
-/** The outside world, so a test can hand the hook its own. */
-export interface DeepLinkListeners {
-  readonly listenForBriarLinks: typeof listenForBriarLinks;
-  readonly listenForClickedIssueLinks: typeof listenForClickedIssueLinks;
-  readonly listenForStatusTrayOpenRun: typeof listenForStatusTrayOpenRun;
-  readonly listenForAppMenuSettings: typeof listenForAppMenuSettings;
+/** What the resolver reaches outside the store, so a test can replace it. */
+export interface DeepLinkResolvers {
   readonly resolveIssueHierarchyLocation: typeof resolveIssueHierarchyLocation;
   readonly navigateToIssueLink: typeof navigateToIssueLink;
-  /** The tray listener only exists in the packaged macOS app. */
-  readonly macDesktop: boolean;
-  /** The application menu only exists in a desktop build. */
-  readonly desktop: boolean;
 }
 
-const liveListeners: DeepLinkListeners = {
-  listenForBriarLinks,
-  listenForClickedIssueLinks,
-  listenForStatusTrayOpenRun,
-  listenForAppMenuSettings,
+const liveResolvers: DeepLinkResolvers = {
   resolveIssueHierarchyLocation,
   navigateToIssueLink,
-  macDesktop: isMacDesktopTauri(),
-  desktop: isDesktopTauri(),
 };
 
 export interface UseDeepLinksInput {
-  readonly listeners?: Partial<DeepLinkListeners> | undefined;
+  readonly resolvers?: Partial<DeepLinkResolvers> | undefined;
 }
 
 export function useDeepLinks({
-  listeners: listenerOverrides,
+  resolvers: resolverOverrides,
 }: UseDeepLinksInput = {}): void {
   const { t } = useI18n();
   const { toast } = useToast();
-  const listeners: DeepLinkListeners = { ...liveListeners, ...listenerOverrides };
-  const {
-    listenForBriarLinks: listenForLinks,
-    listenForClickedIssueLinks: listenForClickedLinks,
-    listenForStatusTrayOpenRun: listenForTrayOpenRun,
-    listenForAppMenuSettings: listenForMenuSettings,
-    desktop,
-    macDesktop,
-  } = listeners;
+  const listeners: DeepLinkResolvers = { ...liveResolvers, ...resolverOverrides };
+
+  /*
+    The four native listeners. Mounting is all this hook does with them: each
+    atom registers its listener on first observation and unregisters it through
+    a finalizer once nothing observes it any more.
+  */
+  useAtomMount(briarLinkListenerAtom);
+  useAtomMount(clickedIssueLinkListenerAtom);
+  useAtomMount(statusTrayOpenRunListenerAtom);
+  useAtomMount(appMenuSettingsListenerAtom);
 
   const lockedTeamId = useAtomValue(lockedTeamIdAtom);
   const user = useAtomValue(userAtom);
@@ -140,45 +134,11 @@ export function useDeepLinks({
     navigateToChannel,
     navigateToIssue,
     navigateToPage,
-    openAppSettings,
     replaceNavigationLocation,
   } = useNavigationActions();
   const { ensureTeamSelected, selectTeam } = useTeamActions();
   const { selectOrganization } = useOrganizationActions();
   const { markRead: markInboxRead } = useInboxActions();
-
-  useEffect(
-    () => (lockedTeamId ? undefined : listenForLinks(setPendingBriarLink)),
-    [listenForLinks, lockedTeamId, setPendingBriarLink],
-  );
-  useEffect(
-    () =>
-      listenForClickedLinks((target) =>
-        setPendingBriarLink({ kind: "issue", ...target }),
-      ),
-    [listenForClickedLinks, setPendingBriarLink],
-  );
-  useEffect(() => {
-    if (!macDesktop || lockedTeamId) return;
-    return listenForTrayOpenRun((payload) => {
-      setPendingBriarLink({
-        kind: "issue",
-        projectId: payload.projectId,
-        runId: payload.runId,
-      });
-    });
-  }, [
-    listenForTrayOpenRun,
-    lockedTeamId,
-    macDesktop,
-    setPendingBriarLink,
-  ]);
-  // The desktop application menu's "Settings…", which opens the same screen the
-  // sidebar's gear does.
-  useEffect(() => {
-    if (!desktop) return;
-    return listenForMenuSettings(openAppSettings);
-  }, [desktop, listenForMenuSettings, openAppSettings]);
 
   useEffect(() => {
     if (!pendingBriarLink || !user || loading) return;
