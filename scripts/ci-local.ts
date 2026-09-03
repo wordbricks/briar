@@ -705,18 +705,13 @@ const timingTsv = (timings: ReadonlyArray<Timing>) =>
   ).join("\n")}\n`;
 
 const runCi = Effect.fn("runCi")(
-  function* runCiEffect(options: CiOptions, installSeconds: number) {
+  function* runCiEffect(options: CiOptions) {
     const fileSystem = yield* FileSystem.FileSystem;
     const temporaryRoot = yield* fileSystem.makeTempDirectoryScoped({
       directory: (process.env.TMPDIR || "/tmp").replace(/\/$/u, ""),
       prefix: "briar-local-ci.",
     }).pipe(fileSystemError("create the local CI temporary directory"));
-    const timings = yield* Ref.make<ReadonlyArray<Timing>>([{
-      context: "setup",
-      label: "bun-install",
-      seconds: installSeconds,
-      status: "ok",
-    }]);
+    const timings = yield* Ref.make<ReadonlyArray<Timing>>([]);
     const startedAt = yield* Clock.currentTimeMillis;
     const timingPath = process.env.BRIAR_CI_TIMING_FILE || join(
       temporaryRoot,
@@ -835,7 +830,7 @@ const contextsArgument: Argument.Argument<
   "CI contexts to run; defaults to all",
 );
 
-const makeCiCommand = (installSeconds: number) => Command.make(
+const ciCommand = Command.make(
   "ci-local",
   {
     contexts: contextsArgument,
@@ -846,7 +841,7 @@ const makeCiCommand = (installSeconds: number) => Command.make(
   },
   Effect.fn(function* runCiCommand({ contexts, signoff }) {
     if (signoff) yield* signoffPreflight();
-    yield* runCi({ contexts: selectedContexts(contexts), signoff }, installSeconds);
+    yield* runCi({ contexts: selectedContexts(contexts), signoff });
   }),
 ).pipe(
   Command.withDescription("Run Briar repository CI checks locally"),
@@ -873,8 +868,8 @@ const errorMessage = (error: unknown) =>
     ? error.message
     : String(error);
 
-export const runCiMain = (installSeconds: number) => {
-  makeCiCommand(installSeconds).pipe(
+export const runCiMain = () => {
+  ciCommand.pipe(
     Command.run({ version: process.env.npm_package_version ?? "0.0.0" }),
     Effect.scoped,
     Effect.tapError((error) =>
@@ -886,3 +881,5 @@ export const runCiMain = (installSeconds: number) => {
     BunRuntime.runMain({ disableErrorReporting: true }),
   );
 };
+
+if (import.meta.main) runCiMain();

@@ -33,7 +33,6 @@
       "inputs": [
         "scripts/apply-remote-d1-migrations.ts",
         "scripts/apply-remote-d1-migrations.test.ts",
-        "scripts/ci-local-bootstrap.ts",
         "scripts/ci-local-arguments.ts",
         "scripts/ci-local.ts",
         "scripts/ci-local.test.ts",
