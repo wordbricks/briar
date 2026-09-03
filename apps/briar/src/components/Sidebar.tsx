@@ -44,6 +44,7 @@ import type {
 import { ProjectAgentAvatar } from "./ProjectAgentAvatar";
 import { ProjectIcon } from "./ProjectIcon";
 import {
+  SidebarCollapsibleSection,
   SidebarOrganizationChannels,
   SidebarProjectChannels,
 } from "./SidebarChannels";
@@ -82,7 +83,6 @@ export function Sidebar({
   onAddPlanningProject,
   onPlanningProjectEdit,
   onPlanningProjectOpen,
-  onProjectsOpen,
   onAgentSessionOpen,
   onAgentsOpen,
   onLobbyOpen,
@@ -130,7 +130,6 @@ export function Sidebar({
   onAddPlanningProject?: (teamId: string) => void;
   onPlanningProjectEdit?: (projectId: string) => void;
   onPlanningProjectOpen?: (projectId: string, teamId: string) => void;
-  onProjectsOpen?: (teamId: string) => void;
   onAgentSessionOpen: (sessionId: string) => void;
   onAgentsOpen: () => void;
   onLobbyOpen: () => void;
@@ -919,73 +918,54 @@ export function Sidebar({
                     id={`project-views-${project.id}`}
                   >
                     <div className="sidebar-planning-projects">
-                      <div className="sidebar-planning-projects-heading">
-                        <button
-                          aria-controls={`planning-project-list-${project.id}`}
-                          aria-expanded={arePlanningProjectsExpanded}
-                          aria-label={t(
-                            arePlanningProjectsExpanded
-                              ? "sidebar.collapseProjects"
-                              : "sidebar.expandProjects",
-                          )}
-                          className="sidebar-planning-projects-toggle"
-                          onClick={() => {
-                            setCollapsedPlanningProjectTeamIds((current) => {
-                              const next = new Set(current);
-                              if (arePlanningProjectsExpanded) next.add(project.id);
-                              else next.delete(project.id);
-                              return next;
-                            });
-                          }}
-                          type="button"
-                        >
-                          <ChevronRight
+                      <SidebarCollapsibleSection
+                        active={isActive && activePage === "projects"}
+                        ariaLabel={t(
+                          arePlanningProjectsExpanded
+                            ? "sidebar.collapseProjects"
+                            : "sidebar.expandProjects",
+                        )}
+                        contextMenuItems={
+                          onAddPlanningProject
+                            ? [
+                                {
+                                  icon: (
+                                    <Plus
+                                      aria-hidden="true"
+                                      size={15}
+                                      strokeWidth={1.7}
+                                    />
+                                  ),
+                                  label: t("sidebar.addProject"),
+                                  onSelect: () => onAddPlanningProject(project.id),
+                                },
+                              ]
+                            : null
+                        }
+                        expanded={arePlanningProjectsExpanded}
+                        icon={
+                          <FolderKanban
                             aria-hidden="true"
-                            className={arePlanningProjectsExpanded ? "open" : ""}
-                            size={13}
-                            strokeWidth={1.8}
+                            size={14}
+                            strokeWidth={1.7}
                           />
-                        </button>
-                        <button
-                          aria-current={
-                            isActive && activePage === "projects"
-                              ? "page"
-                              : undefined
-                          }
-                          className={`sidebar-planning-projects-link${
-                            isActive && activePage === "projects" ? " active" : ""
-                          }`}
-                          onClick={() => {
-                            setCollapsedPlanningProjectTeamIds((current) => {
-                              if (!current.has(project.id)) return current;
-                              const next = new Set(current);
-                              next.delete(project.id);
-                              return next;
-                            });
-                            openProjectPage(() => onProjectsOpen?.(project.id));
-                          }}
-                          type="button"
+                        }
+                        label={t("sidebar.projects")}
+                        listId={`planning-project-list-${project.id}`}
+                        onToggle={() => {
+                          setCollapsedPlanningProjectTeamIds((current) => {
+                            const next = new Set(current);
+                            if (arePlanningProjectsExpanded) next.add(project.id);
+                            else next.delete(project.id);
+                            return next;
+                          });
+                        }}
+                        toggleClassName="sidebar-project-channels-toggle"
+                      >
+                        <div
+                          className="sidebar-planning-project-list"
+                          id={`planning-project-list-${project.id}`}
                         >
-                          <FolderKanban aria-hidden="true" size={13} strokeWidth={1.7} />
-                          <span>{t("sidebar.projects")}</span>
-                        </button>
-                        {onAddPlanningProject ? (
-                          <button
-                            aria-label={t("sidebar.addPlanningProject", {
-                              name: project.name,
-                            })}
-                            onClick={() => onAddPlanningProject(project.id)}
-                            title={t("sidebar.addPlanningProject", {
-                              name: project.name,
-                            })}
-                            type="button"
-                          >
-                            <Plus size={13} strokeWidth={1.8} />
-                          </button>
-                        ) : null}
-                      </div>
-                      {arePlanningProjectsExpanded ? (
-                        <div id={`planning-project-list-${project.id}`}>
                           {teamPlanningProjects.map((planningProject) => (
                             <div
                               className="sidebar-planning-project-row"
@@ -1020,7 +1000,7 @@ export function Sidebar({
                               >
                                 <FolderKanban
                                   aria-hidden="true"
-                                  size={13}
+                                  size={14}
                                   strokeWidth={1.7}
                                 />
                                 <span>{planningProject.name}</span>
@@ -1061,7 +1041,7 @@ export function Sidebar({
                             <p>{t("sidebar.noProjects")}</p>
                           ) : null}
                         </div>
-                      ) : null}
+                      </SidebarCollapsibleSection>
                     </div>
                     <div className="sidebar-project-view-row">
                       <a
