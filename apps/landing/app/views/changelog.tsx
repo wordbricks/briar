@@ -30,6 +30,29 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.188",
+        date: "2026년 9월 4일",
+        title: "앱 시작을 빠르게 하고 프로젝트 아이콘과 에이전트 답변을 다듬습니다",
+        summary:
+          "첫 실행 인트로·코드 스플리팅·로컬 폰트로 데스크톱 시작 속도를 높이고, 프로젝트 아이콘 선택을 추가하며, Claude 로그인 상태 표시와 채널 에이전트 답변 실패를 고칩니다.",
+        items: [
+          "첫 실행 인트로를 Rust에서 즉시 띄우고 메인 창이 준비된 뒤에 공개해 빈 창 깜빡임을 없앱니다.",
+          "화면·이모지 피커·로케일을 지연 로딩해 초기 JavaScript 번들을 약 42% 줄입니다.",
+          "Google Fonts 요청 대신 Inter·DM Mono를 앱에 번들해 오프라인에서도 같은 글꼴로 표시합니다.",
+          "프로젝트를 전환할 때 대시보드를 비우지 않고 프로젝트별 캐시를 먼저 보여줍니다.",
+          "시작 시 에셋 동기화와 워커 재시작을 백그라운드 스레드로 옮겨 업데이트 직후 첫 실행이 멈추지 않게 합니다.",
+          "사이드바 접기/펼치기 애니메이션과 패널 리사이즈 드래그를 부드럽게 만듭니다.",
+          "프로젝트 이미지 업로드 대신 Lucide 아이콘과 색상을 골라 프로젝트 아이콘으로 쓸 수 있습니다.",
+          "이슈 카드 메뉴와 속성 패널에서 Team과 Project를 다른 속성처럼 바꿀 수 있습니다.",
+          "관리형 컴퓨터 OpenCode 설정에 건너뛰기 버튼을 추가하고, 인증 단계가 멈추지 않도록 시간 제한을 둡니다.",
+          "Claude 액세스 토큰만 만료된 경우를 로그인 만료로 잘못 표시하던 문제를 고칩니다.",
+          "이슈 제안 예시와 structured output 스키마 때문에 채널·DM 에이전트 답변이 생성 실패로 끝나던 문제를 고칩니다.",
+          "인박스 디테일 패널에서 연 채널에서 메시지를 보내도 맨 아래로 스크롤되지 않던 문제를 고칩니다.",
+          "웹 로그인을 브라우저 세션 기반 이메일 OTP 흐름으로 정리하고 로그아웃 시 세션 쿠키도 종료합니다.",
+          "관리형 컴퓨터를 새 Debian 13 이미지(Launch Template 버전 14)로 갱신합니다.",
+        ],
+      },
+      {
         version: "1.2.187",
         date: "2026년 9월 3일",
         title: "제공자 설정을 보호하고 로딩 스피너를 정리합니다",
@@ -1508,6 +1531,29 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.188",
+        date: "September 4, 2026",
+        title: "Speed up app startup and refine project icons and agent replies",
+        summary:
+          "Start the desktop app faster with an instant first-run intro, code splitting, and local fonts; add named project icons; and fix Claude login status and channel agent reply failures.",
+        items: [
+          "Show the first-run intro immediately from Rust and reveal the main window only once it is ready, removing the blank-window flash.",
+          "Lazy-load views, the emoji picker, and locales to cut the initial JavaScript bundle by about 42%.",
+          "Bundle Inter and DM Mono locally instead of requesting Google Fonts, so the app renders the same typefaces offline.",
+          "Keep the dashboard visible when switching projects by showing the per-project cache instead of an empty state.",
+          "Move startup asset sync and worker restarts to a background thread so the first launch after an update stays responsive.",
+          "Smooth the sidebar collapse animation and panel resize dragging.",
+          "Add named Lucide icons with a color picker as an alternative to uploaded project images.",
+          "Allow changing Team and Project from the issue card menu and property panel like any other property.",
+          "Add a Skip button to OpenCode provider setup on managed computers, with a timeout so the auth step cannot hang.",
+          "Fix an expired Claude access token being reported as an expired login in Settings.",
+          "Fix channel and DM agent replies that ended in a generation failure because of the issue proposal example and structured output schema.",
+          "Fix the channel view opened from the inbox detail panel not scrolling to the bottom after sending a message.",
+          "Streamline web sign-in onto a browser-session email OTP flow and end the session cookie on logout.",
+          "Update managed computers to the new Debian 13 image (Launch Template version 14).",
+        ],
+      },
       {
         version: "1.2.187",
         date: "September 3, 2026",
