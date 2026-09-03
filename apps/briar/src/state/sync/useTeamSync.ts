@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 
 import { startDashboardPolling } from "../../lib/dashboard-polling";
 import { activeOrganizationIdAtom } from "../organization/atoms";
+import { adoptsHydratedSession } from "../persistence/hydration";
 import { demoMode } from "../platform";
 import { useRegistry } from "../registry";
 import { tokenAtom } from "../session/atoms";
@@ -34,6 +35,13 @@ export function useTeamSync() {
     const previous = previousToken.current;
     previousToken.current = token;
     if (demoMode || previous === undefined || previous === token) return;
+    /*
+      The first credential of a boot is not a change of account when the store
+      was hydrated for the account it belongs to: the snapshot is that account's
+      own work, and clearing it here would blank the screen at the exact moment
+      the bootstrap succeeded.
+    */
+    if (previous === null && adoptsHydratedSession(registry)) return;
     applySyncEvent(registry, { kind: "session-cleared" });
   }, [registry, token]);
 

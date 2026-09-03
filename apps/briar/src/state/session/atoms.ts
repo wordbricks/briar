@@ -32,6 +32,10 @@ export const tokenAtom = Atom.make<string | null>(null).pipe(
  * True until the stored token has been exchanged for a session (or found to be
  * absent). It gates the app on a cold start so no screen flashes the login
  * form at a user who is already signed in.
+ *
+ * The session bootstrap is its main writer, and `state/persistence` is the
+ * other: a boot that finds a stored snapshot opens the gate on the last screen
+ * while the bootstrap is still running behind it.
  */
 export const restoringSessionAtom = Atom.make(!demoMode).pipe(
   Atom.keepAlive,
