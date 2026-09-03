@@ -63,15 +63,18 @@ export function useHorizontalPaneResize({
   const activePointerRef = useRef<number | null>(null);
   const pendingClientXRef = useRef<number | null>(null);
   const pendingFrameRef = useRef<number | null>(null);
-  widthRef.current = width;
 
   const effectiveWidth = width ?? defaultWidth;
 
-  // The container owns the live value of `cssVariable`. Keep it in sync with
-  // committed width here so unrelated re-renders (e.g. from an ancestor)
-  // never need to touch it, and so it falls back to the CSS default exactly
-  // like the old inline `style` prop did.
+  // The container owns the live value of `cssVariable`. Keep it — and
+  // `widthRef` — in sync with committed width here, on real commits only
+  // (initial load, keyboard steps, drag end). Syncing `widthRef` from a
+  // plain render-body assignment would let an unrelated re-render mid-drag
+  // (e.g. a poll or socket update on the owning component) stomp the live
+  // value `applyPendingFrame` just wrote, so it must only happen when
+  // `width` actually changes.
   useLayoutEffect(() => {
+    widthRef.current = width;
     const container = containerRef.current;
     if (!container) return;
     if (width === null) {

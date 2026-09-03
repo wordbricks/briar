@@ -232,6 +232,62 @@ describe("useHorizontalPaneResize", () => {
     await cleanup();
   });
 
+  it("keeps the live drag value across an unrelated re-render, so pointerup commits it (not the stale committed width)", async () => {
+    const { cleanup, container, render } = createReactTestRoot();
+    const save = vi.fn();
+    const load = () => 40;
+    await render(<Probe load={load} save={save} />);
+
+    const layout = container.firstElementChild as HTMLDivElement;
+    const separator = layout.firstElementChild as HTMLDivElement;
+    Object.defineProperties(separator, {
+      hasPointerCapture: { configurable: true, value: vi.fn(() => true) },
+      releasePointerCapture: { configurable: true, value: vi.fn() },
+      setPointerCapture: { configurable: true, value: vi.fn() },
+    });
+    vi.spyOn(layout, "getBoundingClientRect").mockReturnValue({
+      bottom: 100,
+      height: 100,
+      left: 0,
+      right: 1_000,
+      top: 0,
+      width: 1_000,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+    expect(layout.dataset.width).toBe("40");
+
+    await act(async () =>
+      separator.dispatchEvent(pointerEvent("pointerdown", 7, 600)),
+    );
+    // Drag from the persisted 40% to 55% and let the coalesced frame apply.
+    await act(async () =>
+      separator.dispatchEvent(pointerEvent("pointermove", 7, 450)),
+    );
+    await flushFrames();
+    expect(layout.style.getPropertyValue(cssVariable)).toBe("55%");
+    expect(layout.dataset.width).toBe("40");
+
+    // An unrelated re-render of the owning component (a poll, a socket
+    // update, anything with unchanged props) must not reset the live drag
+    // value back to the last committed `width` state.
+    await render(<Probe load={load} save={save} />);
+    expect(layout.style.getPropertyValue(cssVariable)).toBe("55%");
+    expect(layout.dataset.width).toBe("40");
+
+    // pointerup with no further move must commit the dragged value, not the
+    // stale 40 that a buggy re-render would have restored.
+    await act(async () =>
+      separator.dispatchEvent(pointerEvent("pointerup", 7, 450)),
+    );
+    expect(layout.dataset.width).toBe("55");
+    expect(layout.style.getPropertyValue(cssVariable)).toBe("55%");
+    expect(save).toHaveBeenLastCalledWith(55);
+
+    await cleanup();
+  });
+
   it("writes the CSS variable for a persisted width and leaves it unset otherwise", async () => {
     const unset = createReactTestRoot();
     await renderReactTestRoot(
