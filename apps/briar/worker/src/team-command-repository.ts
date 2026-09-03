@@ -3,10 +3,10 @@ import {
   encodeAutoHuntWorkflowCheckpointsJson,
 } from "../../src/lib/auto-hunt-contract";
 import {
-  defaultProjectAgentCalendarColor,
-  defaultProjectAgentCopy,
-  projectAgentSkill,
-  type ProjectAgentLocale,
+  defaultTeamAgentCalendarColor,
+  defaultTeamAgentCopy,
+  teamAgentSkill,
+  type TeamAgentLocale,
 } from "../../src/lib/team-agent";
 import type { TeamRow } from "./team-repository";
 
@@ -26,7 +26,7 @@ export async function createTeam(
     organizationId: string;
     name: string;
     agentTokenHash: string;
-    locale?: ProjectAgentLocale;
+    locale?: TeamAgentLocale;
   },
 ) {
   const createdAt = new Date().toISOString();
@@ -44,7 +44,7 @@ export async function createTeam(
     created_at: createdAt,
   };
   const locale = input.locale ?? "en";
-  const defaultAgentCopy = defaultProjectAgentCopy(locale);
+  const defaultAgentCopy = defaultTeamAgentCopy(locale);
   const defaultAgent: TeamAgentRow = {
     id: crypto.randomUUID(),
     organization_id: input.organizationId,
@@ -61,11 +61,11 @@ export async function createTeam(
     designated_worker_label: null,
     description: defaultAgentCopy.description,
     responsibility: defaultAgentCopy.responsibility,
-    skill_markdown: projectAgentSkill({
+    skill_markdown: teamAgentSkill({
       name: defaultAgentCopy.name,
       responsibility: defaultAgentCopy.responsibility,
     }),
-    calendar_color: defaultProjectAgentCalendarColor,
+    calendar_color: defaultTeamAgentCalendarColor,
     created_at: createdAt,
     updated_at: createdAt,
   };

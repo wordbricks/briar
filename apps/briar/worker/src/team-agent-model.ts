@@ -1,7 +1,7 @@
 import {
-  type ProjectAgentScheduleIntervalUnit,
-  type ProjectAgentScheduleNotificationLevel,
-  type ProjectAgentScheduleRecurrence,
+  type TeamAgentScheduleIntervalUnit,
+  type TeamAgentScheduleNotificationLevel,
+  type TeamAgentScheduleRecurrence,
 } from "../../src/lib/team-agent-schedule";
 import {
   type AgentSkillEffort,
@@ -136,13 +136,13 @@ export type TeamAgentScheduleRow = {
   agent_name: string;
   agent_provider: TeamAgentProvider;
   name: string;
-  recurrence: ProjectAgentScheduleRecurrence;
+  recurrence: TeamAgentScheduleRecurrence;
   time_of_day: string;
   day_of_week: number | null;
   interval_value: number;
-  interval_unit: ProjectAgentScheduleIntervalUnit;
+  interval_unit: TeamAgentScheduleIntervalUnit;
   days_of_week: string | null;
-  notification_level: ProjectAgentScheduleNotificationLevel;
+  notification_level: TeamAgentScheduleNotificationLevel;
   time_zone: string;
   enabled: number;
   next_run_at: string | null;

@@ -1,9 +1,9 @@
 import {
-  isProjectUsageDateRange,
-  projectUsageSummaryWindow,
-  summarizeProjectUsage,
-  type ProjectUsageDateRange,
-  type ProjectUsagePeriod,
+  isTeamUsageDateRange,
+  teamUsageSummaryWindow,
+  summarizeTeamUsage,
+  type TeamUsageDateRange,
+  type TeamUsagePeriod,
 } from "../../src/lib/team-usage-summary";
 import { normalizeAutoHuntWorkflow } from "../../src/lib/auto-hunt-contract";
 import { parseExecutionMetrics } from "./agent-result-json";
@@ -237,22 +237,22 @@ export async function getProjectUsageSummaryApplication(input: {
   readonly db: D1Database;
   readonly projectId: string;
   readonly userId: string;
-  readonly period: ProjectUsagePeriod;
-  readonly range?: ProjectUsageDateRange;
+  readonly period: TeamUsagePeriod;
+  readonly range?: TeamUsageDateRange;
   readonly generatedAt?: number;
 }) {
   const project = await getTeam(input.db, input.projectId, input.userId);
   if (!project) {
     throw new ReportingApplicationError("project_not_found", "Project not found");
   }
-  if (input.range && !isProjectUsageDateRange(input.range, input.period)) {
+  if (input.range && !isTeamUsageDateRange(input.range, input.period)) {
     throw new ReportingApplicationError(
       "invalid_usage_range",
       "Usage range is invalid or contains more than 400 timeline buckets",
     );
   }
   const generatedAt = input.generatedAt ?? Date.now();
-  const window = projectUsageSummaryWindow(input.period, generatedAt, input.range);
+  const window = teamUsageSummaryWindow(input.period, generatedAt, input.range);
   const since = new Date(window.startAt).toISOString();
   const until = new Date(window.endAt).toISOString();
   const [runs, totals] = await Promise.all([
@@ -260,7 +260,7 @@ export async function getProjectUsageSummaryApplication(input: {
     listProjectUsageTotals(input.db, project.id, since, until),
   ]);
   const totalsByRun = indexByRun(totals);
-  return summarizeProjectUsage(
+  return summarizeTeamUsage(
     runs.map((run) => projectUsageSummaryRun(run, totalsByRun.get(run.id) ?? [])),
     input.period,
     generatedAt,

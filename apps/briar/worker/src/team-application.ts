@@ -1,9 +1,9 @@
 import * as Schema from "effect/Schema";
 import * as SchemaGetter from "effect/SchemaGetter";
-import type { ProjectAgentLocale } from "../../src/lib/team-agent";
+import type { TeamAgentLocale } from "../../src/lib/team-agent";
 import {
-  isProjectIconColor,
-  isProjectIconName,
+  isTeamIconColor,
+  isTeamIconName,
 } from "../../src/lib/team-icon-library";
 import type { TeamIconUpdate } from "./team-command-repository";
 import { createOrganization } from "./organization-command-repository";
@@ -95,13 +95,13 @@ const decodeTeamIconUpdate = (
     case "image":
       return { type: "image", dataUrl: decodeTeamIconUpdateImage(update.dataUrl) };
     case "named":
-      if (!isProjectIconName(update.name)) {
+      if (!isTeamIconName(update.name)) {
         throw new TeamApplicationError(
           "invalid_project_icon",
           "Project icon is not in the predefined icon library",
         );
       }
-      if (update.color !== null && !isProjectIconColor(update.color)) {
+      if (update.color !== null && !isTeamIconColor(update.color)) {
         throw new TeamApplicationError(
           "invalid_project_icon",
           "Project icon color must be a #RRGGBB hex value",
@@ -169,7 +169,7 @@ export async function createTeamApplication(
     readonly user: TeamApplicationUser;
     readonly name: string;
     readonly organizationId?: string;
-    readonly locale: ProjectAgentLocale;
+    readonly locale: TeamAgentLocale;
   },
   services: TeamApplicationServices = teamApplicationServices,
 ) {

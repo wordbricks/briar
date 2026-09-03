@@ -1,5 +1,5 @@
 import { normalizeAutoHuntWorkflow } from "../../src/lib/auto-hunt-contract";
-import { parseProjectAgentScheduleDays } from "../../src/lib/team-agent-schedule";
+import { parseTeamAgentScheduleDays } from "../../src/lib/team-agent-schedule";
 import { agentSkillJson } from "./agent-skills";
 import { parseStructuredResult } from "./agent-result-json";
 import type {
@@ -19,7 +19,7 @@ export const teamAgentScheduleJson = (row: TeamAgentScheduleRow) => ({
   dayOfWeek: row.day_of_week,
   intervalValue: row.interval_value,
   intervalUnit: row.interval_unit,
-  daysOfWeek: parseProjectAgentScheduleDays(row.days_of_week),
+  daysOfWeek: parseTeamAgentScheduleDays(row.days_of_week),
   notificationLevel: row.notification_level,
   timeZone: row.time_zone,
   enabled: row.enabled === 1,

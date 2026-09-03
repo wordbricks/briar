@@ -1,6 +1,6 @@
 import * as Schema from "effect/Schema";
 import { IsoDateTimeWithOffset } from "../../src/lib/date-time-schema";
-import { MERGE_ACTIVITY_DAY, type MergedPullRequest, type ProjectMergeActivity } from "../../src/lib/team-merge-activity";
+import { MERGE_ACTIVITY_DAY, type MergedPullRequest, type TeamMergeActivity } from "../../src/lib/team-merge-activity";
 
 const encoder = new TextEncoder();
 
@@ -234,7 +234,7 @@ export async function getProjectGithubMergeActivity(
   identity: TeamGithubIdentity,
   now = Date.now(),
   fetchImpl: typeof fetch = fetch,
-): Promise<ProjectMergeActivity> {
+): Promise<TeamMergeActivity> {
   const credential = await createGithubInstallationToken(env, identity, fetchImpl);
   const since = now - 16 * MERGE_ACTIVITY_DAY;
   const pullRequests = new Map<number, MergedPullRequest>();

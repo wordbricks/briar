@@ -7,15 +7,15 @@ import {
   agentResponsibilityMaxLength,
   agentSkillsMaxCount,
 } from "../../src/lib/agent-limits";
-import { defaultProjectAgentCalendarColor } from "../../src/lib/team-agent";
+import { defaultTeamAgentCalendarColor } from "../../src/lib/team-agent";
 import {
-  isValidProjectAgentScheduleTimeZone,
-  normalizeProjectAgentScheduleDay,
-  normalizeProjectAgentScheduleDays,
-  normalizeProjectAgentScheduleInterval,
-  projectAgentScheduleIntervalUnits,
-  projectAgentScheduleNotificationLevels,
-  projectAgentScheduleRecurrences,
+  isValidTeamAgentScheduleTimeZone,
+  normalizeTeamAgentScheduleDay,
+  normalizeTeamAgentScheduleDays,
+  normalizeTeamAgentScheduleInterval,
+  teamAgentScheduleIntervalUnits,
+  teamAgentScheduleNotificationLevels,
+  teamAgentScheduleRecurrences,
 } from "../../src/lib/team-agent-schedule";
 import {
   channelAgentSkillInputSchema,
@@ -95,7 +95,7 @@ export const TeamAgentInput = strictSchema(Schema.Struct({
   ),
   calendarColor: defaulted(
     Schema.Trim.check(Schema.isPattern(/^#[0-9a-f]{6}$/iu)),
-    defaultProjectAgentCalendarColor,
+    defaultTeamAgentCalendarColor,
   ),
 }).check(uniqueAgentSkillNames));
 
@@ -319,25 +319,25 @@ export const TeamAgentTaskFailure = strictSchema(Schema.Struct({
 const ScheduleSource = strictSchema(Schema.Struct({
   agentId: UuidString,
   name: trimmedText(1, 120),
-  recurrence: Schema.Literals(projectAgentScheduleRecurrences),
+  recurrence: Schema.Literals(teamAgentScheduleRecurrences),
   timeOfDay: Schema.String.check(
     Schema.isPattern(/^(?:[01]\d|2[0-3]):[0-5]\d$/u),
   ),
   dayOfWeek: Schema.optional(Schema.NullOr(integerBetween(0, 6))),
   intervalValue: Schema.optional(integerBetween(1, 999)),
   intervalUnit: Schema.optional(
-    Schema.Literals(projectAgentScheduleIntervalUnits),
+    Schema.Literals(teamAgentScheduleIntervalUnits),
   ),
   daysOfWeek: Schema.optional(
     mutableArray(integerBetween(0, 6)).check(Schema.isMaxLength(7)),
   ),
   notificationLevel: Schema.optional(
-    Schema.Literals(projectAgentScheduleNotificationLevels),
+    Schema.Literals(teamAgentScheduleNotificationLevels),
   ),
   timeZone: Schema.Trim.check(
     Schema.isLengthBetween(1, 100),
     Schema.makeFilter((value) =>
-      isValidProjectAgentScheduleTimeZone(value) || "Invalid IANA time zone"
+      isValidTeamAgentScheduleTimeZone(value) || "Invalid IANA time zone"
     ),
   ),
 }).check(
@@ -372,7 +372,7 @@ const ScheduleSource = strictSchema(Schema.Struct({
     if (
       input.recurrence === "custom" &&
       intervalUnit === "week" &&
-      normalizeProjectAgentScheduleDays(input.daysOfWeek).length === 0
+      normalizeTeamAgentScheduleDays(input.daysOfWeek).length === 0
     ) {
       issues.push({
         path: ["daysOfWeek"],
@@ -386,15 +386,15 @@ const ScheduleSource = strictSchema(Schema.Struct({
 const ScheduleTarget = strictSchema(Schema.Struct({
   agentId: UuidString,
   name: trimmedText(1, 120),
-  recurrence: Schema.Literals(projectAgentScheduleRecurrences),
+  recurrence: Schema.Literals(teamAgentScheduleRecurrences),
   timeOfDay: Schema.String.check(
     Schema.isPattern(/^(?:[01]\d|2[0-3]):[0-5]\d$/u),
   ),
   dayOfWeek: Schema.NullOr(integerBetween(0, 6)),
   intervalValue: integerBetween(1, 999),
-  intervalUnit: Schema.Literals(projectAgentScheduleIntervalUnits),
+  intervalUnit: Schema.Literals(teamAgentScheduleIntervalUnits),
   daysOfWeek: mutableArray(integerBetween(0, 6)).check(Schema.isMaxLength(7)),
-  notificationLevel: Schema.Literals(projectAgentScheduleNotificationLevels),
+  notificationLevel: Schema.Literals(teamAgentScheduleNotificationLevels),
   timeZone: Schema.Trim.check(Schema.isLengthBetween(1, 100)),
 }));
 
@@ -404,11 +404,11 @@ export const TeamAgentScheduleInput = ScheduleSource.pipe(
     SchemaTransformation.transform({
       decode: (input) => ({
         ...input,
-        dayOfWeek: normalizeProjectAgentScheduleDay(
+        dayOfWeek: normalizeTeamAgentScheduleDay(
           input.recurrence,
           input.dayOfWeek,
         ),
-        intervalValue: normalizeProjectAgentScheduleInterval(
+        intervalValue: normalizeTeamAgentScheduleInterval(
           input.intervalValue,
         ),
         intervalUnit: input.intervalUnit ??
@@ -417,7 +417,7 @@ export const TeamAgentScheduleInput = ScheduleSource.pipe(
             : input.recurrence === "custom"
               ? "week"
               : "day"),
-        daysOfWeek: normalizeProjectAgentScheduleDays(input.daysOfWeek),
+        daysOfWeek: normalizeTeamAgentScheduleDays(input.daysOfWeek),
         notificationLevel: input.notificationLevel ?? "important_updates",
       }),
       encode: (input) => input,

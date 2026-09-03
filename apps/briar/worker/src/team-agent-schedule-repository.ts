@@ -3,12 +3,12 @@ import {
   type StructuredAgentResult,
 } from "../../src/lib/agent-result";
 import {
-  nextProjectAgentScheduleRunAt,
-  parseProjectAgentScheduleDays,
-  serializeProjectAgentScheduleDays,
-  type ProjectAgentScheduleIntervalUnit,
-  type ProjectAgentScheduleNotificationLevel,
-  type ProjectAgentScheduleRecurrence,
+  nextTeamAgentScheduleRunAt,
+  parseTeamAgentScheduleDays,
+  serializeTeamAgentScheduleDays,
+  type TeamAgentScheduleIntervalUnit,
+  type TeamAgentScheduleNotificationLevel,
+  type TeamAgentScheduleRecurrence,
 } from "../../src/lib/team-agent-schedule";
 import {
   listAgentSkills,
@@ -25,13 +25,13 @@ import {
 type TeamAgentScheduleInput = {
   agentId: string;
   name: string;
-  recurrence: ProjectAgentScheduleRecurrence;
+  recurrence: TeamAgentScheduleRecurrence;
   timeOfDay: string;
   dayOfWeek: number | null;
   intervalValue?: number;
-  intervalUnit?: ProjectAgentScheduleIntervalUnit;
+  intervalUnit?: TeamAgentScheduleIntervalUnit;
   daysOfWeek?: number[];
-  notificationLevel?: ProjectAgentScheduleNotificationLevel;
+  notificationLevel?: TeamAgentScheduleNotificationLevel;
   timeZone: string;
   createdByUserId?: string | null;
 };
@@ -94,7 +94,7 @@ export async function createTeamAgentSchedule(
 
   const id = crypto.randomUUID();
   const createdAt = new Date().toISOString();
-  const nextRunAt = nextProjectAgentScheduleRunAt(
+  const nextRunAt = nextTeamAgentScheduleRunAt(
     {
       recurrence: input.recurrence,
       timeOfDay: input.timeOfDay,
@@ -130,7 +130,7 @@ export async function createTeamAgentSchedule(
       input.intervalValue ?? 1,
       input.intervalUnit ??
         (input.recurrence === "interval" ? "hour" : "day"),
-      serializeProjectAgentScheduleDays(input.daysOfWeek),
+      serializeTeamAgentScheduleDays(input.daysOfWeek),
       input.notificationLevel ?? "important_updates",
       input.timeZone,
       nextRunAt,
@@ -174,7 +174,7 @@ export async function updateTeamAgentSchedule(
     )
     .bind(scheduleId, projectId)
     .first<{ created_at: string }>();
-  const nextRunAt = nextProjectAgentScheduleRunAt(
+  const nextRunAt = nextTeamAgentScheduleRunAt(
     {
       recurrence: input.recurrence,
       timeOfDay: input.timeOfDay,
@@ -213,7 +213,7 @@ export async function updateTeamAgentSchedule(
       input.intervalValue ?? 1,
       input.intervalUnit ??
         (input.recurrence === "interval" ? "hour" : "day"),
-      serializeProjectAgentScheduleDays(input.daysOfWeek),
+      serializeTeamAgentScheduleDays(input.daysOfWeek),
       input.notificationLevel ?? "important_updates",
       input.timeZone,
       nextRunAt,
@@ -357,11 +357,11 @@ async function initializeProjectAgentScheduleNextRuns(
     .bind(projectId)
     .all<{
       id: string;
-      recurrence: ProjectAgentScheduleRecurrence;
+      recurrence: TeamAgentScheduleRecurrence;
       time_of_day: string;
       day_of_week: number | null;
       interval_value: number;
-      interval_unit: ProjectAgentScheduleIntervalUnit;
+      interval_unit: TeamAgentScheduleIntervalUnit;
       days_of_week: string | null;
       time_zone: string;
       created_at: string;
@@ -371,14 +371,14 @@ async function initializeProjectAgentScheduleNextRuns(
       Date.parse(observedAt),
       Date.parse(schedule.created_at),
     );
-    const nextRunAt = nextProjectAgentScheduleRunAt(
+    const nextRunAt = nextTeamAgentScheduleRunAt(
       {
         recurrence: schedule.recurrence,
         timeOfDay: schedule.time_of_day,
         dayOfWeek: schedule.day_of_week,
         intervalValue: schedule.interval_value,
         intervalUnit: schedule.interval_unit,
-        daysOfWeek: parseProjectAgentScheduleDays(schedule.days_of_week),
+        daysOfWeek: parseTeamAgentScheduleDays(schedule.days_of_week),
         anchorAt: schedule.created_at,
         timeZone: schedule.time_zone,
       },
@@ -548,25 +548,25 @@ export async function claimDueTeamAgentScheduleRun(
       id: string;
       agent_id: string;
       next_run_at: string;
-      recurrence: ProjectAgentScheduleRecurrence;
+      recurrence: TeamAgentScheduleRecurrence;
       time_of_day: string;
       day_of_week: number | null;
       interval_value: number;
-      interval_unit: ProjectAgentScheduleIntervalUnit;
+      interval_unit: TeamAgentScheduleIntervalUnit;
       days_of_week: string | null;
       time_zone: string;
       created_at: string;
     }>();
   if (!schedule) return null;
 
-  const nextRunAt = nextProjectAgentScheduleRunAt(
+  const nextRunAt = nextTeamAgentScheduleRunAt(
     {
       recurrence: schedule.recurrence,
       timeOfDay: schedule.time_of_day,
       dayOfWeek: schedule.day_of_week,
       intervalValue: schedule.interval_value,
       intervalUnit: schedule.interval_unit,
-      daysOfWeek: parseProjectAgentScheduleDays(schedule.days_of_week),
+      daysOfWeek: parseTeamAgentScheduleDays(schedule.days_of_week),
       anchorAt: schedule.created_at,
       timeZone: schedule.time_zone,
     },

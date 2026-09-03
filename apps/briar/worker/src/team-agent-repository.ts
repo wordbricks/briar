@@ -1,4 +1,4 @@
-import { projectAgentSkill } from "../../src/lib/team-agent";
+import { teamAgentSkill } from "../../src/lib/team-agent";
 import {
   assertAgentSkillReplacementAllowed,
   hydrateAgentSkills,
@@ -92,7 +92,7 @@ export async function createTeamAgent(
     designated_worker_label: input.designatedWorkerLabel ?? null,
     description: input.description ?? "",
     responsibility: input.responsibility,
-    skill_markdown: projectAgentSkill({
+    skill_markdown: teamAgentSkill({
       name: input.name,
       responsibility: input.responsibility,
     }),
@@ -201,7 +201,7 @@ export async function updateTeamAgent(
   const updatedAt = new Date().toISOString();
   const existing = await getTeamAgent(db, projectId, agentId);
   if (!existing) return null;
-  const skill = projectAgentSkill({
+  const skill = teamAgentSkill({
     name: input.name,
     responsibility: input.responsibility,
   });

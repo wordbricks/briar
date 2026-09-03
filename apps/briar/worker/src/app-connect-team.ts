@@ -21,7 +21,7 @@ import {
   type ConnectRouter,
   type ServiceImpl,
 } from "@connectrpc/connect";
-import { normalizeProjectAgentLocale } from "../../src/lib/team-agent";
+import { normalizeTeamAgentLocale } from "../../src/lib/team-agent";
 import type {
   AutoHuntWorkflowCheckpoint,
   AutoHuntWorkflowInput,
@@ -468,7 +468,7 @@ export const createAppTeamService = (
         user: session.user,
         name: input.name,
         organizationId: input.organizationId,
-        locale: normalizeProjectAgentLocale(
+        locale: normalizeTeamAgentLocale(
           request.headers.get("accept-language"),
         ),
       }),
