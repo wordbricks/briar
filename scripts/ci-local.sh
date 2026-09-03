@@ -181,7 +181,15 @@ run_d1_migrations() {
 
   timed d1-migrations migrate-local \
     bun run d1:migrate:local -- --persist-to "$d1_state_dir"
-  timed d1-migrations test-migrations bun run test:d1:migrations
+  # This suite now overlaps app-worker's Vitest pool. Pin it to a single worker
+  # so the combined Miniflare count stays near the previous single-suite peak.
+  if includes_context app-worker &&
+    [[ "${BRIAR_CI_SERIAL_CONTEXTS:-false}" != "true" ]]; then
+    timed d1-migrations test-migrations \
+      env VITEST_MAX_WORKERS=1 bun run test:d1:migrations
+  else
+    timed d1-migrations test-migrations bun run test:d1:migrations
+  fi
 
   rm -rf "$d1_state_dir"
   trap - RETURN
@@ -230,9 +238,45 @@ run_rust() {
   )
 }
 
+gitleaks_log_opts() {
+  local candidate
+  local base_ref=""
+
+  if [[ "${BRIAR_CI_GITLEAKS_FULL:-false}" == "true" ]]; then
+    echo "[local-ci] gitleaks: full history scan (BRIAR_CI_GITLEAKS_FULL=true)." >&2
+    echo "--all"
+    return
+  fi
+
+  for candidate in ${BRIAR_CI_BASE_REF:+"$BRIAR_CI_BASE_REF"} origin/main main; do
+    if git rev-parse --verify --quiet "${candidate}^{commit}" >/dev/null; then
+      base_ref="$candidate"
+      break
+    fi
+  done
+
+  if [[ -z "$base_ref" ]]; then
+    echo "[local-ci] gitleaks: no base ref resolved; scanning full history." >&2
+    echo "--all"
+    return
+  fi
+
+  # An empty range would scan nothing. That happens on the base branch itself,
+  # which is where release sign-off runs, so keep full coverage there.
+  if [[ "$(git rev-list --count "${base_ref}..HEAD")" == "0" ]]; then
+    echo "[local-ci] gitleaks: HEAD adds nothing over ${base_ref}; scanning full history." >&2
+    echo "--all"
+    return
+  fi
+
+  echo "[local-ci] gitleaks: scanning ${base_ref}..HEAD (set BRIAR_CI_GITLEAKS_FULL=true for full history)." >&2
+  echo "${base_ref}..HEAD"
+}
+
 run_security() {
   local detected_cargo_audit_version
   local detected_gitleaks_version
+  local log_opts
 
   detected_cargo_audit_version="$(cargo-audit --version)"
   [[ "$detected_cargo_audit_version" == "cargo-audit ${cargo_audit_version}" ]] ||
@@ -245,11 +289,12 @@ run_security() {
   timed security audit-dependencies bun run audit:dependencies
   timed security audit-rust bun run audit:rust
   timed security secrets-verify-encrypted bun run secrets:verify-encrypted
+  log_opts="$(gitleaks_log_opts)"
   timed security gitleaks gitleaks git \
     --config .gitleaks.toml \
     --redact \
     --no-banner \
-    --log-opts="--all" \
+    --log-opts="$log_opts" \
     .
 }
 
@@ -285,15 +330,12 @@ run_selected_contexts() {
   local pids=()
   local logs=()
 
-  if includes_context app-worker && includes_context d1-migrations; then
-    echo
-    echo "[local-ci] Running d1-migrations before the parallel contexts."
-    run_context d1-migrations run_d1_migrations
-    contexts_to_run=()
-    for context in "${selected_contexts[@]}"; do
-      [[ "$context" == "d1-migrations" ]] || contexts_to_run+=("$context")
-    done
-  fi
+  # d1-migrations used to run before the parallel group because concurrent
+  # Miniflare pools exhausted macOS ephemeral ports (#1085). Both worker suites
+  # now cap themselves at VITEST_MAX_WORKERS, run_d1_migrations pins its own
+  # pool to one worker while app-worker runs, and d1:migrate:local keeps its
+  # wrangler state in a private --persist-to directory, so the contexts overlap
+  # safely. Set BRIAR_CI_SERIAL_CONTEXTS=true to fall back to serial execution.
 
   if [[ "${BRIAR_CI_SERIAL_CONTEXTS:-false}" == "true" ]]; then
     echo

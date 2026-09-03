@@ -83,7 +83,21 @@ Tauri application identifier or release scheme.
 The security phase uses `bun audit`, `cargo-audit`, and Gitleaks. Rust
 vulnerabilities and any warning not in the dated advisory allowlist fail the
 gate. The first Rust audit prints all known warnings before the strict allowlist
-check, so accepted debt remains visible in the local log.
+check, so accepted debt remains visible in the local log; the strict pass reuses
+the advisory database that the first pass fetched.
+
+Gitleaks scans only the commits the branch adds on top of the base ref
+(`origin/main`, falling back to `main`, or `BRIAR_CI_BASE_REF`) instead of the
+whole history. It falls back to the full `--all` history scan — and says so in
+the log — when no base ref resolves, when `HEAD` adds nothing over the base
+(for example a run on the base branch itself), or when
+`BRIAR_CI_GITLEAKS_FULL=true` is set.
+
+All four contexts, `d1-migrations` included, run in parallel. The D1 migration
+suite pins itself to a single Vitest worker while `app-worker` runs so the
+combined Miniflare pool stays small; wrangler state for `d1:migrate:local` lives
+in a private temporary directory. Set `BRIAR_CI_SERIAL_CONTEXTS=true` to run the
+contexts one at a time on constrained machines.
 
 Any audit exception must be narrow, dated, and recorded in
 [`security-exceptions.md`](security-exceptions.md) with a removal condition.
