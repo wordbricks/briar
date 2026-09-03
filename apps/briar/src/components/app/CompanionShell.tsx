@@ -31,23 +31,28 @@ import {
   unreadDirectMessageCountAtom,
   viewingIssueConversationRunIdAtom,
 } from "../../state/channels/atoms";
+import { useInboxActions } from "../../state/inbox/actions";
+import {
+  channelInboxSyncSignalAtom,
+  conversationInboxSyncSignalAtom,
+  visibleInboxMessagesAtom,
+  visibleInboxUnreadCountAtom,
+} from "../../state/inbox/atoms";
 import { useIssueActions } from "../../state/issues/actions";
+import { useOrganizationActions } from "../../state/organization/actions";
 import {
   activeOrganizationIdAtom,
   organizationsAtom,
 } from "../../state/organization/atoms";
 import { demoMode, lockedTeamIdAtom } from "../../state/platform";
 import { useRunDetailActions } from "../../state/run-detail/actions";
-import type { AccountProfileInput } from "../../state/session/actions";
-import {
-  loadingAtom,
-  sessionErrorAtom,
-  tokenAtom,
-  userAtom,
-} from "../../state/session/atoms";
+import { appErrorAtom } from "../../state/app-error";
+import { useSessionActions } from "../../state/session/actions";
+import { loadingAtom, tokenAtom, userAtom } from "../../state/session/atoms";
+import { useSyncActions } from "../../state/sync/actions";
 import { activeDashboardAtom } from "../../state/sync/view";
+import { useTeamActions } from "../../state/team/actions";
 import { activeTeamIdAtom, teamsAtom } from "../../state/team/atoms";
-import { localInventoryErrorAtom } from "../../state/workspace/atoms";
 import {
   useMobileBackHandler,
   useMobileNavigationGestures,
@@ -60,13 +65,7 @@ import {
 import { HuntDashboardWithTeam } from "./HuntDashboardWithTeam";
 import { TeamLobbyWithDashboard } from "./TeamViewsWithDashboard";
 import type { createCachedTeamUsageSummaryLoader } from "../../lib/team-usage-summary";
-import type { InboxMessageWithReadState } from "../../hooks/useInbox";
-import type {
-  AutoHuntSession,
-  Project,
-  ProjectAgent,
-  SessionUser,
-} from "../../types";
+import type { AutoHuntSession, Project, ProjectAgent } from "../../types";
 
 /*
   The phone shell: a header, one page at a time, and a bottom bar.
@@ -76,9 +75,10 @@ import type {
   above the shell choice now, and what is left here is the page chain itself.
 
   Everything the pages render from — the session, the selected organization and
-  team, the companion page and status, the requested run — is read from the
-  store. What the shell takes as props is the three things that are still the
-  app's: the inbox, the auto hunt sessions, and the session facade's calls.
+  team, the companion page and status, the requested run, the inbox — is read
+  from the store, and every call goes through a `state/` action. What the shell
+  still takes as props is the auto hunt sessions, which are not atom state yet,
+  and the team's usage loader, whose cache belongs to the app.
 */
 
 const CompanionSettings = lazy(() =>
@@ -94,34 +94,11 @@ const TeamAgentSessionDetail = lazy(() =>
 
 const lazyViewFallback = <div className="lazy-view-placeholder h-full w-full" />;
 
-/** The inbox, which is still `useInbox`'s and shared with the desktop shell. */
-export interface CompanionInbox {
-  readonly messages: InboxMessageWithReadState[];
-  readonly unreadCount: number;
-  readonly markAllRead: () => void;
-  readonly markRead: (messageId: string) => void;
-  readonly markUnread: (messageId: string) => void;
-  readonly markIssueRead: (runId: string) => void;
-}
-
 /** Auto hunt sessions, still `useAutoHuntSessions`'s. */
 export interface CompanionSessions {
   readonly list: AutoHuntSession[];
   readonly adoptRemoteSession: (session: AutoHuntSession) => string;
   readonly stopSession: (sessionId: string) => Promise<boolean>;
-}
-
-/** The session facade calls the shell has no store equivalent for yet. */
-export interface CompanionSession {
-  readonly deleteAccount: (confirmation: string) => Promise<void>;
-  readonly ensureTeamSelected: (teamId: string) => Promise<unknown>;
-  readonly logout: () => Promise<unknown>;
-  readonly refresh: () => Promise<unknown> | unknown;
-  readonly selectOrganization: (organizationId: string) => void;
-  readonly selectTeam: (teamId: string) => void;
-  readonly updateAccountProfile: (
-    input: AccountProfileInput,
-  ) => Promise<SessionUser>;
 }
 
 export interface CompanionShellProps {
@@ -131,12 +108,8 @@ export interface CompanionShellProps {
   readonly agents: ProjectAgent[];
   /** Runs a dispatch or an auto hunt session is currently working on. */
   readonly processingIssueIds: ReadonlySet<string>;
-  readonly channelInboxSyncSignal: string;
-  readonly conversationInboxSyncSignal: string;
-  readonly inbox: CompanionInbox;
   readonly sessions: CompanionSessions;
-  readonly session: CompanionSession;
-  readonly loadProjectHomeUsage: ReturnType<
+  readonly loadTeamHomeUsage: ReturnType<
     typeof createCachedTeamUsageSummaryLoader
   >;
 }
@@ -144,12 +117,8 @@ export interface CompanionShellProps {
 export function CompanionShell({
   activeTeam,
   agents,
-  channelInboxSyncSignal,
-  conversationInboxSyncSignal,
-  inbox,
-  loadProjectHomeUsage,
+  loadTeamHomeUsage,
   processingIssueIds,
-  session,
   sessions,
 }: CompanionShellProps) {
   const { t } = useI18n();
@@ -163,9 +132,13 @@ export function CompanionShell({
   const activeOrganizationId = useAtomValue(activeOrganizationIdAtom);
   const lockedTeamId = useAtomValue(lockedTeamIdAtom);
   const dashboard = useAtomValue(activeDashboardAtom);
-  const rawSessionError = useAtomValue(sessionErrorAtom);
-  const inventoryError = useAtomValue(localInventoryErrorAtom);
-  const sessionError = rawSessionError ?? inventoryError;
+  const sessionError = useAtomValue(appErrorAtom);
+  const channelInboxSyncSignal = useAtomValue(channelInboxSyncSignalAtom);
+  const conversationInboxSyncSignal = useAtomValue(
+    conversationInboxSyncSignalAtom,
+  );
+  const inboxMessages = useAtomValue(visibleInboxMessagesAtom);
+  const inboxUnreadCount = useAtomValue(visibleInboxUnreadCountAtom);
   const [companionPage, setCompanionPage] = useAtom(companionPageAtom);
   const [companionStatus, setCompanionStatus] = useAtom(companionStatusAtom);
   const [requestedRunId, setRequestedRunId] = useAtom(requestedRunIdAtom);
@@ -193,6 +166,11 @@ export function CompanionShell({
     viewingIssueConversationRunIdAtom,
   );
   const { selectChannel } = useChannelActions();
+  const inbox = useInboxActions();
+  const { deleteAccount, logout, updateAccountProfile } = useSessionActions();
+  const { selectOrganization } = useOrganizationActions();
+  const { ensureTeamSelected, selectTeam } = useTeamActions();
+  const { refreshActiveTeam } = useSyncActions();
   const { removeIssue, transferIssue } = useIssueActions();
   const { addIssueMessage } = useRunDetailActions();
   const { processIssueNow } = useWorkerDispatch();
@@ -239,25 +217,25 @@ export function CompanionShell({
     >
       <CompanionHeaderWithSession
         hasOpenAgentSession={requestedCompanionSession !== null}
-        onLogout={() => void session.logout()}
+        onLogout={() => void logout()}
         onMarkAllRead={inbox.markAllRead}
         onOrganizationChange={(organizationId) => {
-          session.selectOrganization(organizationId);
+          selectOrganization(organizationId);
           setCompanionPage("issues");
           setCompanionStatus("all");
           setRequestedRunId(null);
           setRequestedSessionId(null);
         }}
-        onRefresh={() => void session.refresh()}
+        onRefresh={() => void refreshActiveTeam()}
         onSettings={() => setCompanionPage("settings")}
         onTeamChange={(teamId) => {
-          session.selectTeam(teamId);
+          selectTeam(teamId);
           setCompanionPage("issues");
           setCompanionStatus("all");
           setRequestedRunId(null);
           setRequestedSessionId(null);
         }}
-        unreadInboxCount={inbox.unreadCount}
+        unreadInboxCount={inboxUnreadCount}
       />
       <Suspense fallback={lazyViewFallback}>
       {requestedCompanionSession ? (
@@ -283,8 +261,8 @@ export function CompanionShell({
       ) : companionPage === "settings" ? (
         <CompanionSettings
           onBack={() => setCompanionPage("issues")}
-          onAccountDelete={session.deleteAccount}
-          onAccountSave={session.updateAccountProfile}
+          onAccountDelete={deleteAccount}
+          onAccountSave={updateAccountProfile}
           user={user}
         />
       ) : companionPage === "home" &&
@@ -295,7 +273,7 @@ export function CompanionShell({
             channelInboxSyncSignal={channelInboxSyncSignal}
             onSkillSessionAccepted={sessions.adoptRemoteSession}
             onIssueOpen={async (projectId, runId) => {
-              await session.ensureTeamSelected(projectId);
+              await ensureTeamSelected(projectId);
               setRequestedRunId(runId);
               setIssueListRequestKey((key) => key + 1);
               setCompanionStatus("all");
@@ -313,7 +291,7 @@ export function CompanionShell({
               setCompanionPage("issues");
             }}
             unreadDmCount={unreadDirectMessageCount}
-            unreadInboxCount={inbox.unreadCount}
+            unreadInboxCount={inboxUnreadCount}
           />
         </>
       ) : companionPage === "lobby" && activeTeam ? (
@@ -322,7 +300,7 @@ export function CompanionShell({
             companionMode
             isSidebarOpen={false}
             onBack={() => setCompanionPage("home")}
-            onLoadUsageSummary={loadProjectHomeUsage}
+            onLoadUsageSummary={loadTeamHomeUsage}
             onOpenAgents={() => setCompanionPage("issues")}
             onOpenIssue={(runId) => {
               setRequestedRunId(runId);
@@ -348,7 +326,7 @@ export function CompanionShell({
               setCompanionPage("issues");
             }}
             unreadDmCount={unreadDirectMessageCount}
-            unreadInboxCount={inbox.unreadCount}
+            unreadInboxCount={inboxUnreadCount}
           />
         </>
       ) : companionPage === "inbox" ? (
@@ -356,7 +334,7 @@ export function CompanionShell({
           <Inbox
             companionMode
             isSidebarOpen
-            messages={inbox.messages}
+            messages={inboxMessages}
             onMarkAllRead={inbox.markAllRead}
             onMarkRead={inbox.markRead}
             onMarkUnread={inbox.markUnread}
@@ -365,7 +343,7 @@ export function CompanionShell({
                 inboxNotificationTarget(message),
               )}
             projects={organizationTeams}
-            unreadCount={inbox.unreadCount}
+            unreadCount={inboxUnreadCount}
           />
           <CompanionBottomNavigation
             activeDestination="inbox"
@@ -377,7 +355,7 @@ export function CompanionShell({
               setCompanionPage("issues");
             }}
             unreadDmCount={unreadDirectMessageCount}
-            unreadInboxCount={inbox.unreadCount}
+            unreadInboxCount={inboxUnreadCount}
           />
         </>
       ) : companionPage === "dms" && activeOrganizationId && token ? (
@@ -388,7 +366,7 @@ export function CompanionShell({
             isSidebarOpen
             onChannelSelect={selectChannel}
             onIssueCreated={async (projectId, runId) => {
-              await session.ensureTeamSelected(projectId);
+              await ensureTeamSelected(projectId);
               setRequestedRunId(runId);
               setCompanionStatus("all");
               setCompanionPage("issues");
@@ -405,7 +383,7 @@ export function CompanionShell({
               setCompanionPage("issues");
             }}
             unreadDmCount={unreadDirectMessageCount}
-            unreadInboxCount={inbox.unreadCount}
+            unreadInboxCount={inboxUnreadCount}
           />
         </>
       ) : (
@@ -415,7 +393,7 @@ export function CompanionShell({
           companionMode
           companionStatus={companionStatus}
           companionUnreadDmCount={unreadDirectMessageCount}
-          companionUnreadInboxCount={inbox.unreadCount}
+          companionUnreadInboxCount={inboxUnreadCount}
           error={quickProcessError ?? sessionError}
           isIssueDialogOpen={isIssueDialogOpen}
           requestedRunId={requestedRunId}

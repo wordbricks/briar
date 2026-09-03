@@ -51,9 +51,9 @@ export const loginCodeAtom = Atom.make<string | null>(null).pipe(
 );
 
 /**
- * The last session-scoped error message. The `useBriar` facade still merges it
- * with the local project inventory error under its `error` key, so this atom
- * holds only the half the session owns.
+ * The last session-scoped error message. It is only half of what a screen
+ * shows: `appErrorAtom` sums it with the local project inventory's error, which
+ * is what every sign-in screen and both shells render.
  */
 export const sessionErrorAtom = Atom.make<string | null>(null).pipe(
   Atom.keepAlive,

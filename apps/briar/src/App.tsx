@@ -1,38 +1,28 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAtom, useAtomSet, useAtomValue } from "@effect/atom-react";
-import * as Atom from "effect/unstable/reactivity/Atom";
 import { keyboardShortcutsModifierLabel } from "./components/app/AppDialogViews";
 import { AppDialogs } from "./components/app/AppDialogs";
 import { AppEffects } from "./components/app/AppEffects";
 import { AuthGate } from "./components/app/AuthGate";
 import { CompanionShell } from "./components/app/CompanionShell";
 import { DesktopShell } from "./components/app/DesktopShell";
+import { InboxBridge } from "./components/app/InboxBridge";
 import { loadProjectMergeActivity } from "./lib/app-rpc/github";
-import { useToast } from "./components/ui/toast";
-import { useBriar } from "./hooks/useBriar";
+import { useOrganizationViewData } from "./hooks/useOrganizationViewData";
 import { useAutoHuntSessions } from "./hooks/useAutoHuntSessions";
 import { useAgentDispatch } from "./hooks/useAgentDispatch";
 import { useAppShortcuts } from "./hooks/useAppShortcuts";
 import { useCommandPaletteItems } from "./hooks/useCommandPaletteItems";
 import { useDeepLinks } from "./hooks/useDeepLinks";
-import { useInbox } from "./hooks/useInbox";
 import { useInvitationFlow } from "./hooks/useInvitationFlow";
 import { useIssueAgents } from "./hooks/useIssueAgents";
 import { useLaunchIntro } from "./hooks/useLaunchIntro";
 import { useRepositorySetup } from "./hooks/useRepositorySetup";
 import {
-  inboxConversationSyncSignal,
-  useInboxNotificationClicks,
-  useInboxNotifications,
-} from "./hooks/useInboxNotifications";
-import {
   hasCompletedInitialOnboarding,
   markInitialOnboardingComplete,
 } from "./lib/initial-onboarding";
-import { syncAppBadgeCount } from "./lib/app-badge";
 import { loadKeybindings } from "./lib/keybindings";
-import type { InboxNotificationTarget } from "./generated/tauri";
-import { activeDashboardAtom } from "./state/sync/view";
 import {
   commandPaletteInitialQueryAtom,
   isCommandPaletteOpenAtom,
@@ -41,65 +31,64 @@ import {
 } from "./state/dialogs/atoms";
 import { useNavigationActions } from "./state/navigation/actions";
 import {
-  issueListRequestKeyAtom,
-  pendingInboxNotificationTargetAtom,
   requestedRunIdAtom,
-  requestedRunInitialTabAtom,
-  requestedRunMessageIdAtom,
   requestedSessionIdAtom,
 } from "./state/navigation/atoms";
-import {
-  activeOrganizationChannelsAtom,
-  viewingChannelIdAtom,
-  viewingChannelThreadRootMessageIdAtom,
-  viewingIssueConversationRunIdAtom,
-} from "./state/channels/atoms";
 import { useActionBridges } from "./state/action-bridges";
-import { useRegistry } from "./state/registry";
+import { companionMode, lockedTeamId, remoteMode } from "./state/platform";
+import { useOrganizationActions } from "./state/organization/actions";
+import { organizationsAtom } from "./state/organization/atoms";
+import { useTeamActions } from "./state/team/actions";
+import {
+  activeTeamAtom,
+  isCreatingTeamAtom,
+  teamConnectionAtom,
+  teamsAtom,
+} from "./state/team/atoms";
+import { tokenAtom, userAtom } from "./state/session/atoms";
 import {
   clearFirstRunTutorialPending,
   hasPendingFirstRunTutorial,
   markFirstRunTutorialPending,
   shouldShowFirstOrganizationSetup as resolveShouldShowFirstOrganizationSetup,
 } from "./lib/team-onboarding";
-import { isDesktopTauri } from "./lib/platform";
-import {
-  openTeamWindow,
-  readTeamWindowProjectId,
-} from "./lib/team-window";
-import { LITELLM_MAIN_PRICING_SOURCE } from "./lib/agent-usage-pricing";
-import { createCachedTeamUsageSummaryLoader } from "./lib/team-usage-summary";
-import {
-  loadAgentUsageReport,
-  loadDashboard,
-  loadProjectUsageSummary,
-} from "./lib/api";
-import { createInboxRealtimeTransport } from "./lib/channel-realtime";
-import { listenForAppMenuSettings } from "./lib/app-menu";
+import { openTeamWindow } from "./lib/team-window";
 import type { AppZoomCommands } from "./lib/app-zoom";
-import { useI18n } from "./i18n";
 
-type AgentAutoHuntOptions = {
-  coordinatorConversationId?: string | null;
-  parentSessionId?: string;
-  maxIssues?: number;
-  targetRunIds?: string[];
-  retryReason?: string | null;
-};
+/*
+  What is left of the app shell.
+
+  Every screen reads the store, every write goes through a `state/` action, and
+  every domain effect is mounted by `AppEffects`. `App` decides three things and
+  nothing else: which gates stand between a cold start and the shell, which
+  shell that is, and what the dialogs above both of them are showing.
+
+  It deliberately subscribes to no run and no channel. The inbox, which does
+  need the open board, lives in `InboxBridge` below — so a polling tick that
+  changes one run commits that run's subscribers and this component is not one
+  of them.
+*/
 
 export function App({
   appZoomCommands = null,
 }: {
   readonly appZoomCommands?: AppZoomCommands | null;
 }) {
-  const { t } = useI18n();
-  const { toast } = useToast();
-  const [projectWindowProjectId] = useState(readTeamWindowProjectId);
+  const user = useAtomValue(userAtom);
+  const token = useAtomValue(tokenAtom);
+  const teams = useAtomValue(teamsAtom);
+  const organizations = useAtomValue(organizationsAtom);
+  // The store says `null` for "no team selected"; the views that take it as a
+  // prop have always spelled that `undefined`.
+  const activeTeam = useAtomValue(activeTeamAtom) ?? undefined;
+  const isCreatingTeam = useAtomValue(isCreatingTeamAtom);
+  const teamConnection = useAtomValue(teamConnectionAtom);
+
   const autoHunt = useAutoHuntSessions();
   /*
-    The callbacks the registry-bound actions reach back into `useAutoHuntSessions`
-    for: adopting a session an agent proposed, and the three a claimed scheduled
-    run goes through.
+    The callbacks the registry-bound actions reach back into
+    `useAutoHuntSessions` for: adopting a session an agent proposed, and the
+    three a claimed scheduled run goes through.
   */
   useActionBridges({
     adoptRemoteAgentSession: autoHunt.adoptRemoteSession,
@@ -129,140 +118,45 @@ export function App({
       },
     ),
   });
-  const briar = useBriar();
-  const registry = useRegistry();
-  /*
-    The payload on screen, read from the store rather than through the facade.
-    The views read it themselves now; what is left here is the inbox, which
-    still derives its issue notifications from a team's runs, the worker
-    dispatch reconciliation, and the navigation history's run labels.
-  */
-  const activeDashboard = useAtomValue(activeDashboardAtom);
-  /*
-    The channel catalog lives in `state/channels`, and the views read it there.
-    What is left here is what the inbox needs for its "do not notify me about
-    what is on screen" rule, plus the catalog the history labels channels from.
-  */
-  const organizationChannels = useAtomValue(activeOrganizationChannelsAtom);
-  const viewingChannelId = useAtomValue(viewingChannelIdAtom);
-  const viewingChannelThreadRootMessageId = useAtomValue(
-    viewingChannelThreadRootMessageIdAtom,
-  );
-  const viewingIssueConversationRunId = useAtomValue(
-    viewingIssueConversationRunIdAtom,
-  );
-  const loadUsageReport = useCallback(async () => {
-    if (!briar.token || !briar.activeOrganizationId) {
-      return {
-        runs: [],
-        generatedAt: new Date().toISOString(),
-        pricing: {
-          status: "unavailable" as const,
-          source: LITELLM_MAIN_PRICING_SOURCE,
-          fetchedAt: null,
-          knownModels: 0,
-        },
-      };
-    }
-    return loadAgentUsageReport(
-      briar.token,
-      briar.activeOrganizationId,
-      90,
-    );
-  }, [briar.activeOrganizationId, briar.token]);
-  const loadProjectHomeMerges = useCallback(
-    (projectId: string, signal: AbortSignal) => {
-      if (!briar.token) return Promise.reject(new Error("Sign in to load merge activity"));
-      return loadProjectMergeActivity(briar.token, projectId, signal);
+
+  const { cancelTeamCreation, finishTeamCreation, startTeamCreation } =
+    useTeamActions();
+  const { selectOrganization } = useOrganizationActions();
+  const { openAppSettings, resetNavigation } = useNavigationActions();
+  const setRequestedRunId = useAtomSet(requestedRunIdAtom);
+  const setRequestedSessionId = useAtomSet(requestedSessionIdAtom);
+
+  const {
+    loadOrganizationTeamDashboard,
+    loadTeamHomeUsage,
+    loadUsageReport,
+    openOrganizationIssue,
+  } = useOrganizationViewData();
+  const loadTeamHomeMerges = useCallback(
+    (teamId: string, signal: AbortSignal) => {
+      if (!token) {
+        return Promise.reject(new Error("Sign in to load merge activity"));
+      }
+      return loadProjectMergeActivity(token, teamId, signal);
     },
-    [briar.token],
+    [token],
   );
-  const loadProjectHomeUsage = useMemo(
-    () => createCachedTeamUsageSummaryLoader(async (projectId, period, range) => {
-      if (!briar.token) return null;
-      return loadProjectUsageSummary(briar.token, projectId, period, range);
-    }),
-    [briar.token],
-  );
+
   useEffect(() => {
     autoHunt.configureSync(
-      briar.token,
-      briar.projects.map((project) => ({
-        id: project.id,
-        organizationId: project.organizationId,
+      token,
+      teams.map((team) => ({
+        id: team.id,
+        organizationId: team.organizationId,
       })),
     );
-  }, [autoHunt.configureSync, briar.projects, briar.token]);
-  useEffect(() => {
-    if (!activeDashboard) return;
-    autoHunt.reconcileWorkerDispatches(
-      activeDashboard.team.id,
-      activeDashboard.runs,
-    );
-  }, [autoHunt.reconcileWorkerDispatches, activeDashboard]);
-  const inboxRealtime = useMemo(
-    () =>
-      briar.token && briar.activeOrganizationId && briar.user?.id
-        ? createInboxRealtimeTransport(
-            briar.token,
-            briar.activeOrganizationId,
-          )
-        : null,
-    [briar.activeOrganizationId, briar.token, briar.user?.id],
-  );
-  const inbox = useInbox(
-    briar.user?.id ?? null,
-    briar.activeOrganizationId,
-    activeDashboard,
-    autoHunt.sessions,
-    briar.projects,
-    briar.token,
-    inboxRealtime,
-  );
-  const visibleInboxMessages = useMemo(
-    () =>
-      projectWindowProjectId
-        ? inbox.messages.filter(
-            (message) => message.projectId === projectWindowProjectId,
-          )
-        : inbox.messages,
-    [inbox.messages, projectWindowProjectId],
-  );
-  const visibleInboxUnreadCount = useMemo(
-    () => visibleInboxMessages.filter((message) => message.isUnread).length,
-    [visibleInboxMessages],
-  );
-  const markInboxIssueRead = useCallback(
-    (runId: string) => inbox.markIssueRead(runId),
-    [inbox.markIssueRead],
-  );
-  const channelInboxSyncSignal = useMemo(
-    () => inboxConversationSyncSignal(inbox.messages, "channel"),
-    [inbox.messages],
-  );
-  const conversationInboxSyncSignal = useMemo(
-    () => inboxConversationSyncSignal(inbox.messages, "conversation"),
-    [inbox.messages],
-  );
-  useInboxNotifications(
-    projectWindowProjectId ? null : (briar.user?.id ?? null),
-    briar.activeOrganizationId,
-    inbox.messages,
-    inbox.notificationBaselineId,
-    viewingChannelId,
-    viewingChannelThreadRootMessageId,
-    viewingIssueConversationRunId,
-    inbox.initialSyncComplete,
-    briar.token,
-  );
-  useEffect(() => {
-    if (projectWindowProjectId) return;
-    void syncAppBadgeCount(inbox.unreadCount).catch(() => {
-      // An unsupported desktop environment or Android launcher must not block the app.
-    });
-  }, [inbox.unreadCount, projectWindowProjectId]);
-  const runsOnDesktopTauri = isDesktopTauri();
+  }, [autoHunt.configureSync, teams, token]);
 
+  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(
+    hasCompletedInitialOnboarding,
+  );
+  const [pendingFirstRunTutorialUserId, setPendingFirstRunTutorialUserId] =
+    useState<string | null>(null);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useAtom(
     isCommandPaletteOpenAtom,
   );
@@ -271,142 +165,60 @@ export function App({
     commandPaletteInitialQueryAtom,
   );
   const isKeyboardShortcutsOpen = useAtomValue(isKeyboardShortcutsOpenAtom);
-  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(
-    hasCompletedInitialOnboarding,
-  );
-  const [pendingFirstRunTutorialUserId, setPendingFirstRunTutorialUserId] =
-    useState<string | null>(null);
-  const { navigateToIssue, openAppSettings, resetNavigation } =
-    useNavigationActions();
-  const setPendingInboxNotificationTarget = useAtomSet(
-    pendingInboxNotificationTargetAtom,
-  );
-  const handleInboxNotificationClick = useCallback(
-    (target: InboxNotificationTarget) => {
-      if (!projectWindowProjectId) setPendingInboxNotificationTarget(target);
-    },
-    [projectWindowProjectId],
-  );
-  useInboxNotificationClicks(handleInboxNotificationClick);
-  const setRequestedRunId = useAtomSet(requestedRunIdAtom);
-  const setRequestedRunMessageId = useAtomSet(requestedRunMessageIdAtom);
-  const setRequestedRunInitialTab = useAtomSet(requestedRunInitialTabAtom);
-  const setIssueListRequestKey = useAtomSet(issueListRequestKeyAtom);
-  const setRequestedSessionId = useAtomSet(requestedSessionIdAtom);
-  useDeepLinks({
-    session: {
-      ensureTeamSelected: briar.ensureProjectSelected,
-      markInboxRead: inbox.markRead,
-      selectOrganization: briar.setActiveOrganizationId,
-      selectTeam: briar.setActiveProjectId,
-    },
-  });
+
+  useDeepLinks();
   const {
     beginTeamReconnect,
     clearTrigger: clearRepositorySetupTrigger,
     closeRepositorySetup,
-    openTeamRepository: openProjectRepository,
+    openTeamRepository,
     repositorySetupTeamId,
     restoreTrigger: restoreRepositorySetupTrigger,
-  } = useRepositorySetup({
-    reconnectTeam: briar.reconnectProject,
-    selectTeam: briar.setActiveProjectId,
-  });
+  } = useRepositorySetup();
   const invitation = useInvitationFlow({
-    acceptInvitation: briar.acceptInvitation,
     onInitialOnboardingComplete: () => setHasCompletedOnboarding(true),
-    reconnectTeam: briar.reconnectProject,
-    resetNavigation,
   });
-  const activeProject = briar.projects.find(
-    (project) => project.id === briar.activeProjectId,
-  );
-  const loadOrganizationProjectDashboard = useCallback(
-    (projectId: string, signal: AbortSignal) => {
-      // Read at call time from the store, which is what the render phase ref
-      // assignment this replaces was working around.
-      const openDashboard = registry.get(activeDashboardAtom);
-      if (openDashboard?.team.id === projectId) {
-        return Promise.resolve(openDashboard);
-      }
-      if (!briar.token) return Promise.resolve(null);
-      return loadDashboard(briar.token, projectId, signal);
+  const openTeamInNewWindow = useCallback(
+    async (teamId: string) => {
+      const team = teams.find((candidate) => candidate.id === teamId);
+      if (!team) throw new Error("Project is no longer available.");
+      await openTeamWindow(team);
     },
-    [briar.token, registry],
-  );
-  const openOrganizationIssue = useCallback(
-    (projectId: string, runId: string) => {
-      void (async () => {
-        setRequestedSessionId(null);
-        setRequestedRunMessageId(null);
-        setRequestedRunInitialTab(null);
-        setRequestedRunId(runId);
-        setIssueListRequestKey((key) => key + 1);
-        if (projectId !== briar.activeProjectId) {
-          await briar.ensureProjectSelected(projectId);
-        }
-        navigateToIssue(runId, projectId);
-      })().catch((caught) => {
-        toast(caught instanceof Error ? caught.message : String(caught), {
-          tone: "error",
-        });
-      });
-    },
-    [
-      briar.activeProjectId,
-      briar.ensureProjectSelected,
-      navigateToIssue,
-      toast,
-    ],
-  );
-  const openProjectInNewWindow = useCallback(
-    async (projectId: string) => {
-      const project = briar.projects.find((candidate) => candidate.id === projectId);
-      if (!project) throw new Error("Project is no longer available.");
-      await openTeamWindow(project);
-    },
-    [briar.projects],
+    [teams],
   );
   const {
-    activeTeamAgents: activeProjectAgents,
+    activeTeamAgents,
     agents: issueAgents,
     processingIssueIds,
     rememberAgent: rememberIssueAgent,
-  } = useIssueAgents({
-    activeTeam: activeProject,
-    sessions: autoHunt.sessions,
-  });
+  } = useIssueAgents({ activeTeam, sessions: autoHunt.sessions });
   const shouldShowInitialOnboarding =
-    !briar.remoteMode &&
+    !remoteMode &&
     !hasCompletedOnboarding &&
     !invitation.hasCurrentUserInvitationProgress;
   const shouldShowFirstOrganizationSetup =
     resolveShouldShowFirstOrganizationSetup({
-    hasUser: briar.user !== null,
-    organizationCount: briar.organizations.length,
-    projectCount: briar.projects.length,
-    remoteMode: briar.remoteMode,
-  });
+      hasUser: user !== null,
+      organizationCount: organizations.length,
+      projectCount: teams.length,
+      remoteMode,
+    });
   const shouldShowFirstRunTutorial = Boolean(
-    !briar.remoteMode &&
-      briar.user &&
-      briar.organizations.length > 0 &&
-      !briar.isCreatingProject &&
-      !briar.projectConnection &&
+    !remoteMode &&
+      user &&
+      organizations.length > 0 &&
+      !isCreatingTeam &&
+      !teamConnection &&
       !invitation.invitationToken &&
       !invitation.hasCurrentUserInvitationProgress &&
-      (pendingFirstRunTutorialUserId === briar.user.id ||
-        hasPendingFirstRunTutorial(briar.user.id)),
+      (pendingFirstRunTutorialUserId === user.id ||
+        hasPendingFirstRunTutorial(user.id)),
   );
-  const {
-    startAgentAutoHunt,
-    startTeamAgentTask: startProjectAgentTask,
-  } = useAgentDispatch({
-    activeTeam: activeProject,
-    refresh: briar.refresh,
+  const { startAgentAutoHunt, startTeamAgentTask } = useAgentDispatch({
+    activeTeam,
     rememberAgent: rememberIssueAgent,
     sessions: autoHunt,
-    teamWindowTeamId: projectWindowProjectId,
+    teamWindowTeamId: lockedTeamId,
   });
 
   const {
@@ -414,23 +226,16 @@ export function App({
     isLaunchIntroVisible,
     previewsLaunchIntro,
   } = useLaunchIntro({
-    companionMode: briar.companionMode,
-    loading: briar.loading,
-    restoringSession: briar.restoringSession,
+    companionMode,
     showsInitialOnboarding: shouldShowInitialOnboarding,
-    teamWindowTeamId: projectWindowProjectId,
+    teamWindowTeamId: lockedTeamId,
   });
 
-  useEffect(() => {
-    if (!runsOnDesktopTauri) return;
-    return listenForAppMenuSettings(openAppSettings);
-  }, [openAppSettings, runsOnDesktopTauri]);
-
   const commandPaletteAvailable = Boolean(
-    briar.user &&
-      !briar.companionMode &&
-      !briar.isCreatingProject &&
-      !briar.projectConnection &&
+    user &&
+      !companionMode &&
+      !isCreatingTeam &&
+      !teamConnection &&
       !invitation.invitationToken &&
       !shouldShowInitialOnboarding &&
       !shouldShowFirstOrganizationSetup &&
@@ -473,36 +278,15 @@ export function App({
     commandPaletteAvailable,
     keybindings: configuredKeybindings,
     keyboardShortcutsShortcut: keyboardShortcutsModifierLabel(),
-    selectTeam: briar.setActiveProjectId,
     sessions: autoHunt.sessions,
-    unreadInboxCount: visibleInboxUnreadCount,
   });
 
-  const shell = briar.companionMode ? (
+  const shell = companionMode ? (
     <CompanionShell
-      activeTeam={activeProject}
-      agents={activeProjectAgents}
-      channelInboxSyncSignal={channelInboxSyncSignal}
-      conversationInboxSyncSignal={conversationInboxSyncSignal}
-      inbox={{
-        markAllRead: inbox.markAllRead,
-        markIssueRead: markInboxIssueRead,
-        markRead: inbox.markRead,
-        markUnread: inbox.markUnread,
-        messages: inbox.messages,
-        unreadCount: inbox.unreadCount,
-      }}
-      loadProjectHomeUsage={loadProjectHomeUsage}
+      activeTeam={activeTeam}
+      agents={activeTeamAgents}
+      loadTeamHomeUsage={loadTeamHomeUsage}
       processingIssueIds={processingIssueIds}
-      session={{
-        deleteAccount: briar.deleteAccount,
-        ensureTeamSelected: briar.ensureProjectSelected,
-        logout: briar.logout,
-        refresh: briar.refresh,
-        selectOrganization: briar.setActiveOrganizationId,
-        selectTeam: briar.setActiveProjectId,
-        updateAccountProfile: briar.updateAccountProfile,
-      }}
       sessions={{
         adoptRemoteSession: autoHunt.adoptRemoteSession,
         list: autoHunt.sessions,
@@ -511,9 +295,9 @@ export function App({
     />
   ) : (
     <DesktopShell
-      activeProject={activeProject}
+      activeProject={activeTeam}
       agents={{
-        activeTeamAgents: activeProjectAgents,
+        activeTeamAgents,
         all: issueAgents,
         processingIssueIds,
         rememberAgent: rememberIssueAgent,
@@ -526,45 +310,30 @@ export function App({
         startTaskSession: autoHunt.startTaskSession,
         stopSession: autoHunt.stopSession,
       }}
-      channelInboxSyncSignal={channelInboxSyncSignal}
-      conversationInboxSyncSignal={conversationInboxSyncSignal}
-      inbox={{
-        allMessages: inbox.messages,
-        markAllRead: inbox.markAllRead,
-        markIssueRead: markInboxIssueRead,
-        markRead: inbox.markRead,
-        markUnread: inbox.markUnread,
-        messages: visibleInboxMessages,
-        unreadCount: visibleInboxUnreadCount,
-      }}
-      loadOrganizationProjectDashboard={loadOrganizationProjectDashboard}
-      loadProjectHomeMerges={loadProjectHomeMerges}
-      loadProjectHomeUsage={loadProjectHomeUsage}
+      loadOrganizationProjectDashboard={loadOrganizationTeamDashboard}
+      loadProjectHomeMerges={loadTeamHomeMerges}
+      loadProjectHomeUsage={loadTeamHomeUsage}
       loadUsageReport={loadUsageReport}
       openOrganizationIssue={openOrganizationIssue}
-      openProjectInNewWindow={openProjectInNewWindow}
+      openProjectInNewWindow={openTeamInNewWindow}
       repositorySetup={{
         beginTeamReconnect,
         closeRepositorySetup,
-        openTeamRepository: openProjectRepository,
+        openTeamRepository,
         repositorySetupTeamId,
       }}
-      session={{
-        deleteAccount: briar.deleteAccount,
-        ensureTeamSelected: briar.ensureProjectSelected,
-        logout: briar.logout,
-        refresh: briar.refresh,
-        selectTeam: briar.setActiveProjectId,
-        updateAccountProfile: briar.updateAccountProfile,
-      }}
       startAgentAutoHunt={startAgentAutoHunt}
-      startProjectAgentTask={startProjectAgentTask}
+      startProjectAgentTask={startTeamAgentTask}
     />
   );
 
   return (
     <>
       <AppEffects />
+      <InboxBridge
+        reconcileWorkerDispatches={autoHunt.reconcileWorkerDispatches}
+        sessions={autoHunt.sessions}
+      />
       <AuthGate
         acceptingInvitation={invitation.acceptingInvitation}
         invitationToken={invitation.invitationToken}
@@ -578,13 +347,6 @@ export function App({
           markFirstRunTutorialPending(userId);
           setPendingFirstRunTutorialUserId(userId);
           resetNavigation("lobby");
-        }}
-        session={{
-          cancelLogin: briar.cancelLogin,
-          login: briar.login,
-          logout: briar.logout,
-          sendLoginEmailCode: briar.sendLoginEmailCode,
-          verifyLoginEmailCode: briar.verifyLoginEmailCode,
         }}
         showsFirstOrganizationSetup={shouldShowFirstOrganizationSetup}
         showsInitialOnboarding={shouldShowInitialOnboarding}
@@ -602,17 +364,17 @@ export function App({
               resetNavigation("lobby");
               return;
             }
-            if (!briar.user) return;
-            clearFirstRunTutorialPending(briar.user.id);
+            if (!user) return;
+            clearFirstRunTutorialPending(user.id);
             setPendingFirstRunTutorialUserId(null);
             resetNavigation("lobby");
           },
           onDeveloperSelect: () => {
-            if (!briar.user) return;
-            clearFirstRunTutorialPending(briar.user.id);
+            if (!user) return;
+            clearFirstRunTutorialPending(user.id);
             setPendingFirstRunTutorialUserId(null);
             invitation.setDeveloperToolsSetupRequested(true);
-            briar.startProjectCreation();
+            startTeamCreation();
           },
           open:
             shouldShowFirstRunTutorial || invitation.showsCollaboratorTutorial,
@@ -630,7 +392,7 @@ export function App({
               invitation.clearDeveloperSetupRequest();
             }
             invitation.setDeveloperToolsSetupRequested(false);
-            briar.cancelProjectCreation();
+            cancelTeamCreation();
             restoreRepositorySetupTrigger();
           },
           onFinish: () => {
@@ -640,7 +402,7 @@ export function App({
             }
             clearRepositorySetupTrigger();
             invitation.setDeveloperToolsSetupRequested(false);
-            briar.finishProjectCreation();
+            finishTeamCreation();
             setRequestedRunId(null);
             setRequestedSessionId(null);
             resetNavigation("lobby");
@@ -650,7 +412,7 @@ export function App({
           startWithDeveloperTools: Boolean(
             invitation.invitationProgress?.nextStep === "developer" &&
               invitation.invitationProgress.initialProjectId ===
-                briar.projectConnection?.project.id,
+                teamConnection?.project.id,
           ),
         }}
       />

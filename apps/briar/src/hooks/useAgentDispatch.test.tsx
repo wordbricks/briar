@@ -15,6 +15,7 @@ import {
 import { createTestRegistry, type AtomRegistry } from "../state/registry";
 import { tokenAtom } from "../state/session/atoms";
 import { applySyncEvent } from "../state/sync/apply";
+import { teamSyncApiAtom } from "../state/sync/loader";
 import { activeTeamIdAtom, teamsAtom } from "../state/team/atoms";
 import { createReactTestRoot } from "../test/react";
 import type {
@@ -87,7 +88,6 @@ class DispatchBridge {
   readonly workerTasks: { teamId: string; agentId: string }[] = [];
   readonly startedDispatches: string[] = [];
   readonly adopted: string[] = [];
-  refreshes = 0;
 
   sessions: AgentDispatchSessions = {
     adoptRemoteSession: (session) => {
@@ -127,8 +127,26 @@ class DispatchBridge {
     }) as unknown as AgentDispatchDeps["runTeamAgentTaskOnWorker"],
   };
 
-  refresh = () => {
-    this.refreshes += 1;
+}
+
+/** Counts the refetches `refreshActiveTeam` asks the shared loader for. */
+class SyncCounter {
+  refreshes = 0;
+  readonly api = {
+    loadDashboard: (async (_token: string, teamId: string) => {
+      this.refreshes += 1;
+      return payloadFor(teamOf(teamId));
+    }) as never,
+    loadDashboardDelta: (async (_token: string, teamId: string) => {
+      this.refreshes += 1;
+      return {
+        team: teamOf(teamId),
+        runs: [],
+        cursor: 2,
+        hasMore: false,
+        generatedAt: "2026-09-01T00:00:01.000Z",
+      };
+    }) as never,
   };
 }
 
@@ -144,7 +162,6 @@ function Harness({
   latest = useAgentDispatch({
     activeTeam,
     deps: bridge.deps,
-    refresh: bridge.refresh,
     rememberAgent: () => undefined,
     sessions: bridge.sessions,
     teamWindowTeamId: null,
@@ -178,11 +195,15 @@ const mount = async (
   return { render, view };
 };
 
+let sync: SyncCounter;
+
 const harness = (): AtomRegistry => {
+  sync = new SyncCounter();
   const registry = createTestRegistry([
     [tokenAtom, "token-1"],
     [teamsAtom, [teamA, teamB]],
     [activeTeamIdAtom, teamA.id],
+    [teamSyncApiAtom, sync.api],
   ]);
   applySyncEvent(registry, {
     kind: "team-snapshot",
@@ -210,7 +231,7 @@ describe("useAgentDispatch", () => {
     expect(bridge.dashboardLoads).toEqual([]);
     expect(bridge.dispatched).toEqual([{ teamId: teamA.id, runId: "run-1" }]);
     expect(bridge.startedDispatches).toEqual([teamA.id]);
-    expect(bridge.refreshes).toBe(1);
+    expect(sync.refreshes).toBe(1);
 
     await act(async () => {
       await latest.dispatchAgentAutoHunt(teamB.id, agent, [runOf("run-2")]);
@@ -221,7 +242,7 @@ describe("useAgentDispatch", () => {
       runId: "run-2",
     });
     // Another team's dispatch leaves the open board alone.
-    expect(bridge.refreshes).toBe(1);
+    expect(sync.refreshes).toBe(1);
     await view.cleanup();
   });
 
@@ -257,7 +278,7 @@ describe("useAgentDispatch", () => {
       { teamId: teamA.id, agentId: agent.id },
     ]);
     expect(bridge.adopted).toEqual(["session-remote"]);
-    expect(bridge.refreshes).toBe(1);
+    expect(sync.refreshes).toBe(1);
     await view.cleanup();
   });
 

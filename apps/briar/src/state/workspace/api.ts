@@ -82,7 +82,7 @@ export const workspaceModes = (registry: AtomRegistry): WorkspaceModes =>
   It is one seam rather than three because the readiness coordinator and the
   effects in `useWorkspaceSync` are shared with the actions — a hook and an
   action module cannot hand each other a partial API, so the overrides live in
-  an atom the registry owns. `useBriar` seeds it from its `dataSources` option
+  an atom the registry owns. `setSessionDataSources` seeds it from one option
   and tests seed it with in-memory implementations, which is what lets these
   flows be exercised without module mocking.
 */

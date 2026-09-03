@@ -10,13 +10,13 @@ import { useNavigationActions } from "../state/navigation/actions";
 import { settingsTargetAtom } from "../state/navigation/atoms";
 import { remoteMode } from "../state/platform";
 import { useRegistry } from "../state/registry";
+import { useTeamActions } from "../state/team/actions";
 import { teamsAtom } from "../state/team/atoms";
 import { useWorkspaceActions } from "../state/workspace/actions";
 import {
   connectedTeamIdsAtom,
   teamReadinessAtom,
 } from "../state/workspace/atoms";
-import type { ReconnectOutcome } from "../state/workspace/actions";
 
 /*
   Opening a team's repository, and putting the keyboard back where it was.
@@ -27,13 +27,6 @@ import type { ReconnectOutcome } from "../state/workspace/actions";
   started it, so the element is captured before the trip and restored after it.
   The request counter drops a restore whose trip was superseded.
 */
-
-export interface RepositorySetupInput {
-  /** Selecting a team, still the session facade's. */
-  readonly selectTeam: (teamId: string) => void;
-  /** Reconnecting a team's checkout, from the workspace store. */
-  readonly reconnectTeam: (teamId: string) => Promise<ReconnectOutcome>;
-}
 
 export interface RepositorySetup {
   /** The team whose repository setup dialog is open, or `null`. */
@@ -53,17 +46,16 @@ export interface RepositorySetup {
   readonly restoreTrigger: () => void;
 }
 
-export function useRepositorySetup({
-  reconnectTeam,
-  selectTeam,
-}: RepositorySetupInput): RepositorySetup {
+export function useRepositorySetup(): RepositorySetup {
   const registry = useRegistry();
+  const { selectTeam } = useTeamActions();
   const { navigateToPage } = useNavigationActions();
   const [repositorySetupTeamId, setRepositorySetupTeamId] = useAtom(
     repositorySetupTeamIdAtom,
   );
   const setSettingsTarget = useAtomSet(settingsTargetAtom);
-  const { refreshProjectReadiness } = useWorkspaceActions();
+  const { reconnectProject: reconnectTeam, refreshProjectReadiness } =
+    useWorkspaceActions();
   const triggerRef = useRef<HTMLElement | null>(null);
   const reconnectRequestRef = useRef(0);
 

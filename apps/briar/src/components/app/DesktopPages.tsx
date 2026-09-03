@@ -61,6 +61,14 @@ import {
   quickProcessErrorAtom,
 } from "../../state/dialogs/atoms";
 import { inboxDetailTargetAtom } from "../../state/inbox-selection";
+import { useInboxActions } from "../../state/inbox/actions";
+import {
+  channelInboxSyncSignalAtom,
+  conversationInboxSyncSignalAtom,
+  inboxMessagesAtom,
+  visibleInboxMessagesAtom,
+  visibleInboxUnreadCountAtom,
+} from "../../state/inbox/atoms";
 import { useIssueActions } from "../../state/issues/actions";
 import { useNavigationActions } from "../../state/navigation/actions";
 import {
@@ -86,11 +94,10 @@ import {
 } from "../../state/organization/atoms";
 import { demoMode, lockedTeamIdAtom } from "../../state/platform";
 import { useRunDetailActions } from "../../state/run-detail/actions";
-import {
-  sessionErrorAtom,
-  tokenAtom,
-  userAtom,
-} from "../../state/session/atoms";
+import { appErrorAtom } from "../../state/app-error";
+import { useSessionActions } from "../../state/session/actions";
+import { tokenAtom, userAtom } from "../../state/session/atoms";
+import { useSyncActions } from "../../state/sync/actions";
 import { activeDashboardAtom } from "../../state/sync/view";
 import { useTeamActions } from "../../state/team/actions";
 import {
@@ -99,13 +106,10 @@ import {
   teamsAtom,
 } from "../../state/team/atoms";
 import { useWorkspaceActions } from "../../state/workspace/actions";
-import { localInventoryErrorAtom } from "../../state/workspace/atoms";
 import type {
   DesktopShellAgents,
   DesktopShellAutoHunt,
-  DesktopShellInbox,
   DesktopShellRepositorySetup,
-  DesktopShellSession,
 } from "./desktop-shell-props";
 import type { createCachedTeamUsageSummaryLoader } from "../../lib/team-usage-summary";
 import type { AgentAutoHuntOptions } from "../../hooks/useAgentDispatch";
@@ -162,11 +166,7 @@ export interface DesktopPagesProps {
   readonly activeProject: Project | undefined;
   readonly agents: DesktopShellAgents;
   readonly autoHunt: DesktopShellAutoHunt;
-  readonly inbox: DesktopShellInbox;
   readonly repositorySetup: DesktopShellRepositorySetup;
-  readonly session: DesktopShellSession;
-  readonly channelInboxSyncSignal: string;
-  readonly conversationInboxSyncSignal: string;
   readonly loadUsageReport: () => Promise<AgentUsageReport>;
   readonly loadProjectHomeUsage: ReturnType<
     typeof createCachedTeamUsageSummaryLoader
@@ -192,20 +192,23 @@ export function DesktopPages({
   activeProject,
   agents,
   autoHunt,
-  channelInboxSyncSignal,
-  conversationInboxSyncSignal,
-  inbox,
   loadOrganizationProjectDashboard,
   loadProjectHomeMerges,
   loadProjectHomeUsage,
   loadUsageReport,
   openOrganizationIssue,
   repositorySetup,
-  session,
   startAgentAutoHunt,
   startProjectAgentTask,
 }: DesktopPagesProps) {
   const { t } = useI18n();
+  const channelInboxSyncSignal = useAtomValue(channelInboxSyncSignalAtom);
+  const conversationInboxSyncSignal = useAtomValue(
+    conversationInboxSyncSignalAtom,
+  );
+  const allInboxMessages = useAtomValue(inboxMessagesAtom);
+  const visibleInboxMessages = useAtomValue(visibleInboxMessagesAtom);
+  const inbox = useInboxActions();
   const activePage = useAtomValue(activePageAtom);
   const activeProjectForTabs = useAtomValue(activeTeamForTabsAtom);
   const canGoBack = useAtomValue(canGoBackAtom);
@@ -234,12 +237,6 @@ export function DesktopPages({
     openTeamRepository: openProjectRepository,
     repositorySetupTeamId,
   } = repositorySetup;
-  const {
-    markIssueRead: markInboxIssueRead,
-    messages: visibleInboxMessages,
-    unreadCount: visibleInboxUnreadCount,
-  } = inbox;
-
   const user = useAtomValue(userAtom);
   const token = useAtomValue(tokenAtom);
   const projects = useAtomValue(teamsAtom);
@@ -249,9 +246,7 @@ export function DesktopPages({
   const lockedTeamId = useAtomValue(lockedTeamIdAtom);
   const deletingProjectId = useAtomValue(deletingTeamIdAtom);
   const dashboard = useAtomValue(activeDashboardAtom);
-  const rawSessionError = useAtomValue(sessionErrorAtom);
-  const inventoryError = useAtomValue(localInventoryErrorAtom);
-  const error = rawSessionError ?? inventoryError;
+  const error = useAtomValue(appErrorAtom);
   const [isSidebarOpen, setIsSidebarOpen] = useAtom(isSidebarOpenAtom);
   const [settingsTarget, setSettingsTarget] = useAtom(settingsTargetAtom);
   const [requestedRunId, setRequestedRunId] = useAtom(requestedRunIdAtom);
@@ -297,7 +292,11 @@ export function DesktopPages({
     changeTeamScheduleTab,
     startTeamCreation,
   } = useTeamActions();
+  const visibleInboxUnreadCount = useAtomValue(visibleInboxUnreadCountAtom);
   const { removeProject } = useWorkspaceActions();
+  const { deleteAccount, logout, updateAccountProfile } = useSessionActions();
+  const { ensureTeamSelected, selectTeam } = useTeamActions();
+  const { refreshActiveTeam } = useSyncActions();
   const { removeIssue, transferIssue } = useIssueActions();
   const { addIssueMessage } = useRunDetailActions();
   const { processIssueNow } = useWorkerDispatch();
@@ -341,7 +340,7 @@ export function DesktopPages({
       onBack={closeSettings}
       onNavigate={navigateToLocation}
       onSelectOrganization={selectOrganization}
-      onSelectTeam={session.selectTeam}
+      onSelectTeam={selectTeam}
     />
   );
 
@@ -352,7 +351,7 @@ export function DesktopPages({
       agents={issueAgents}
       channelInboxSyncSignal={channelInboxSyncSignal}
       conversationInboxSyncSignal={conversationInboxSyncSignal}
-      onEnsureTeamSelected={session.ensureTeamSelected}
+      onEnsureTeamSelected={ensureTeamSelected}
       onNavigateToIssue={navigateToIssue}
       onNavigateToPage={navigateToPage}
       onSkillSessionAccepted={autoHunt.adoptRemoteSession}
@@ -390,8 +389,8 @@ export function DesktopPages({
         initialSection={settingsTarget.section}
         navigationSidebar={settingsSidebar}
         onBack={closeSettings}
-        onAccountDelete={demoMode ? undefined : session.deleteAccount}
-        onAccountSave={session.updateAccountProfile}
+        onAccountDelete={demoMode ? undefined : deleteAccount}
+        onAccountSave={updateAccountProfile}
         onLoadUsageReport={loadUsageReport}
         onSectionChange={(section) => {
           const target = { scope: "application" as const, section };
@@ -438,7 +437,7 @@ export function DesktopPages({
           navigateToPage("settings");
         }}
         onIssueCreated={async (projectId, runId) => {
-          await session.ensureTeamSelected(projectId);
+          await ensureTeamSelected(projectId);
           setRequestedRunId(runId);
           navigateToIssue(runId, projectId);
         }}
@@ -464,7 +463,7 @@ export function DesktopPages({
         }}
         onOpen={(planningProjectId, teamId) => {
           setActivePlanningProjectId(planningProjectId);
-          session.selectTeam(teamId);
+          selectTeam(teamId);
           setRequestedRunId(null);
           setIssueListRequestKey((key) => key + 1);
           navigateToPage("issues", teamId);
@@ -514,7 +513,7 @@ export function DesktopPages({
             const target = inboxNotificationTarget(message);
             inbox.markRead(message.id);
             if (target.projectId !== activeProjectId) {
-              session.selectTeam(target.projectId);
+              selectTeam(target.projectId);
             }
             if (isInboxChannelTarget(target)) {
               setRequestedRunId(null);
@@ -556,7 +555,7 @@ export function DesktopPages({
                 target
                   ? inboxDetailLabel({
                       fallback: t("inbox.messages"),
-                      messages: inbox.allMessages,
+                      messages: allInboxMessages,
                       runs: dashboard?.runs,
                       target,
                     })
@@ -696,7 +695,7 @@ export function DesktopPages({
           navigateToPage("settings");
         }}
         onIssueCreated={async (projectId, runId) => {
-          await session.ensureTeamSelected(projectId);
+          await ensureTeamSelected(projectId);
           setRequestedRunId(runId);
           navigateToIssue(runId, projectId);
         }}
@@ -721,7 +720,7 @@ export function DesktopPages({
           if (!isOpen) setCreateIssueProjectId(null);
           setIsIssueDialogOpen(isOpen);
         }}
-        onIssueViewed={markInboxIssueRead}
+        onIssueViewed={inbox.markIssueRead}
         onViewingIssueConversationChange={setViewingIssueConversationRunId}
         onSelectedRunChange={(runId) => {
           if (runId) navigateToIssue(runId);

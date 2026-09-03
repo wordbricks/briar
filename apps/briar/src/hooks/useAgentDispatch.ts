@@ -30,6 +30,7 @@ import {
 import { useRegistry } from "../state/registry";
 import { tokenAtom } from "../state/session/atoms";
 import { activeTeamIdAtom } from "../state/team/atoms";
+import { useSyncActions } from "../state/sync/actions";
 import { activeDashboardAtom } from "../state/sync/view";
 import type { AutoHuntSession, HuntRun, Project, ProjectAgent } from "../types";
 
@@ -104,8 +105,6 @@ export interface AgentDispatchInput {
   readonly teamWindowTeamId: string | null;
   /** Records an agent the dispatch just started, for the run labels. */
   readonly rememberAgent: (agent: ProjectAgent) => void;
-  /** Re-reads the selected team after a write, still the facade's. */
-  readonly refresh: () => Promise<unknown> | unknown;
   readonly sessions: AgentDispatchSessions;
   readonly deps?: AgentDispatchDeps;
 }
@@ -134,12 +133,12 @@ export interface AgentDispatch {
 export function useAgentDispatch({
   activeTeam,
   deps,
-  refresh,
   rememberAgent,
   sessions,
   teamWindowTeamId,
 }: AgentDispatchInput): AgentDispatch {
   const registry = useRegistry();
+  const { refreshActiveTeam: refresh } = useSyncActions();
   const token = useAtomValue(tokenAtom);
   const activeTeamId = useAtomValue(activeTeamIdAtom);
   const activeDashboard = useAtomValue(activeDashboardAtom);
@@ -201,8 +200,7 @@ export function useAgentDispatch({
     activeTeam?.id,
     sessions.startWorkerDispatchSession,
     activeDashboard,
-    refresh,
-    token,
+      token,
   ]);
 
   const startAgentAutoHunt = useCallback(async (
@@ -237,8 +235,7 @@ export function useAgentDispatch({
     activeTeam,
     sessions.adoptRemoteSession,
     activeTeamId,
-    refresh,
-    token,
+      token,
   ]);
 
   useEffect(() => {

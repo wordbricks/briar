@@ -24,11 +24,7 @@ import type {
   Project,
   SessionUser,
 } from "../../types";
-import {
-  AuthGate,
-  type AuthGateProps,
-  type AuthGateSession,
-} from "./AuthGate";
+import { AuthGate, type AuthGateProps } from "./AuthGate";
 
 /*
   Which screen owns a cold start.
@@ -71,14 +67,6 @@ const payload: DashboardPayload = {
   generatedAt: "2026-09-01T00:00:00.000Z",
 };
 
-const session: AuthGateSession = {
-  cancelLogin: () => undefined,
-  login: async () => undefined,
-  logout: async () => undefined,
-  sendLoginEmailCode: async () => undefined,
-  verifyLoginEmailCode: async () => undefined,
-};
-
 const gateProps: Omit<AuthGateProps, "children"> = {
   acceptingInvitation: false,
   invitationToken: null,
@@ -86,7 +74,6 @@ const gateProps: Omit<AuthGateProps, "children"> = {
   onInitialOnboardingComplete: () => undefined,
   onJoinOrganization: () => undefined,
   onOrganizationCreated: () => undefined,
-  session,
   showsFirstOrganizationSetup: false,
   showsInitialOnboarding: false,
 };

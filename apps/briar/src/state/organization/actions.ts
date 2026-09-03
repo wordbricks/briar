@@ -39,7 +39,7 @@ export const liveOrganizationActionApi: OrganizationActionApi = {
 
 /**
  * The health probe is the only piece of an organization switch these actions do
- * not own: it still lives in `useBriar` until Phase 3 moves it. The dashboard
+ * not own: it belongs to `state/workspace`. The dashboard
  * half is read and written here, through the entity store.
  */
 export interface OrganizationActionDeps {

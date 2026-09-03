@@ -39,6 +39,7 @@ import {
 } from "../state/navigation/atoms";
 import { createReactTestRoot } from "../test/react";
 import type { Organization, Project, SessionUser } from "../types";
+import { setInboxCallbacks } from "../state/inbox/actions";
 import {
   useDeepLinks,
   type DeepLinkListeners,
@@ -101,18 +102,10 @@ const channel = (overrides: Partial<ChannelSummary> = {}): ChannelSummary => ({
 });
 
 interface Recorder {
-  readonly ensured: string[];
-  readonly selectedOrganizations: string[];
-  readonly selectedTeams: string[];
   readonly inboxReads: string[];
 }
 
-const recorder = (): Recorder => ({
-  ensured: [],
-  selectedOrganizations: [],
-  selectedTeams: [],
-  inboxReads: [],
-});
+const recorder = (): Recorder => ({ inboxReads: [] });
 
 /** Where the resolver left the user, as the navigation atoms report it. */
 const destination = (registry: AtomRegistry) => ({
@@ -193,22 +186,20 @@ const harness = (
     [pendingBriarLinkAtom, null],
   ]);
   const calls = recorder();
+  /*
+    The team and organization selections are real actions now, so the store is
+    where they are observed. What still needs a stand-in is the inbox: marking a
+    notification read belongs to `useInbox`, which the bridge installs and no
+    test here mounts.
+  */
+  setInboxCallbacks(registry, {
+    markAllRead: () => undefined,
+    markIssueRead: () => undefined,
+    markRead: (messageId) => calls.inboxReads.push(messageId),
+    markUnread: () => undefined,
+  });
   const input: UseDeepLinksInput = {
     listeners: { ...inertListeners(), ...overrides },
-    session: {
-      ensureTeamSelected: async (teamId) => {
-        calls.ensured.push(teamId);
-      },
-      markInboxRead: (messageId) => calls.inboxReads.push(messageId),
-      selectOrganization: (organizationId) => {
-        calls.selectedOrganizations.push(organizationId);
-        registry.set(activeOrganizationIdAtom, organizationId);
-      },
-      selectTeam: (teamId) => {
-        calls.selectedTeams.push(teamId);
-        registry.set(activeTeamIdAtom, teamId);
-      },
-    },
   };
   return { calls, input, registry };
 };
@@ -229,7 +220,7 @@ beforeEach(() => {
 
 describe("useDeepLinks", () => {
   it("waits for the channel catalog before opening a channel link", async () => {
-    const { calls, input, registry } = harness();
+    const { input, registry } = harness();
     const view = await mount(registry, input);
 
     await act(async () => {
@@ -260,7 +251,7 @@ describe("useDeepLinks", () => {
   });
 
   it("switches organizations first when the link points at another one", async () => {
-    const { calls, input, registry } = harness({}, {
+    const { input, registry } = harness({}, {
       activeOrganizationId: "org-b",
     });
     const view = await mount(registry, input);
@@ -276,14 +267,14 @@ describe("useDeepLinks", () => {
     });
     await flush();
 
-    expect(calls.selectedOrganizations).toEqual([organization.id]);
+    expect(registry.get(activeOrganizationIdAtom)).toBe(organization.id);
     expect(destination(registry)).toEqual(nowhere);
 
     await view.cleanup();
   });
 
   it("ignores a link to an organization the account is not in", async () => {
-    const { calls, input, registry } = harness();
+    const { input, registry } = harness();
     const view = await mount(registry, input);
 
     await act(async () => {
@@ -297,7 +288,7 @@ describe("useDeepLinks", () => {
     });
     await flush();
 
-    expect(calls.selectedOrganizations).toEqual([]);
+    expect(registry.get(activeOrganizationIdAtom)).toBe(organization.id);
     expect(destination(registry)).toEqual(nowhere);
     expect(registry.get(pendingBriarLinkAtom)).not.toBeNull();
 
@@ -305,7 +296,7 @@ describe("useDeepLinks", () => {
   });
 
   it("opens a direct message link on the direct message page", async () => {
-    const { calls, input, registry } = harness();
+    const { input, registry } = harness();
     const view = await mount(registry, input);
     await act(async () => loadCatalog(registry, [channel({ kind: "dm" })]));
 
@@ -334,7 +325,7 @@ describe("useDeepLinks", () => {
   });
 
   it("opens an issue link through the shared resolver", async () => {
-    const { calls, input, registry } = harness();
+    const { input, registry } = harness();
     const view = await mount(registry, input);
 
     await act(async () => {
@@ -346,7 +337,7 @@ describe("useDeepLinks", () => {
     });
     await flush();
 
-    expect(calls.ensured).toEqual([teamB.id]);
+    expect(registry.get(activeTeamIdAtom)).toBe(teamB.id);
     expect(destination(registry)).toMatchObject({
       page: "issues",
       runId: "run-1",
@@ -359,7 +350,7 @@ describe("useDeepLinks", () => {
   });
 
   it("reports an issue link this window may not follow", async () => {
-    const { calls, input, registry } = harness();
+    const { input, registry } = harness();
     registry.set(lockedTeamIdAtom, teamA.id);
     const view = await mount(registry, input);
 
@@ -379,7 +370,7 @@ describe("useDeepLinks", () => {
   });
 
   it("opens an agent session link on the agents page", async () => {
-    const { calls, input, registry } = harness();
+    const { input, registry } = harness();
     const view = await mount(registry, input);
 
     await act(async () => {
@@ -418,7 +409,7 @@ describe("useDeepLinks", () => {
     // The read receipt is sent before the team check, so the pass that
     // switches teams and the pass that routes both send it.
     expect(calls.inboxReads).toEqual(["message-9", "message-9"]);
-    expect(calls.selectedTeams).toEqual([teamB.id]);
+    expect(registry.get(activeTeamIdAtom)).toBe(teamB.id);
     expect(destination(registry)).toMatchObject({
       page: "issues",
       runId: "run-9",

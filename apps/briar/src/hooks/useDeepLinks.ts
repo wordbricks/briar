@@ -5,12 +5,14 @@ import { useI18n } from "../i18n";
 import { useToast } from "../components/ui/toast";
 import { resolveIssueHierarchyLocation } from "../lib/api";
 import { projectNavigationLocation } from "../lib/app-navigation";
+import { listenForAppMenuSettings } from "../lib/app-menu";
 import { listenForClickedIssueLinks } from "../lib/external-links";
 import { navigateToIssueLink } from "../lib/issue-link-navigation";
 import { listenForBriarLinks } from "../lib/issue-links";
-import { isMacDesktopTauri } from "../lib/platform";
+import { isDesktopTauri, isMacDesktopTauri } from "../lib/platform";
 import { listenForStatusTrayOpenRun } from "../lib/status-tray";
 import { useChannelActions } from "../state/channels/actions";
+import { useInboxActions } from "../state/inbox/actions";
 import {
   activeOrganizationChannelsAtom,
   channelCatalogCursorAtom,
@@ -37,9 +39,11 @@ import {
   activeOrganizationIdAtom,
   organizationsAtom,
 } from "../state/organization/atoms";
+import { useOrganizationActions } from "../state/organization/actions";
 import { companionMode, lockedTeamIdAtom } from "../state/platform";
 import { loadingAtom, tokenAtom, userAtom } from "../state/session/atoms";
 import { activeDashboardAtom } from "../state/sync/view";
+import { useTeamActions } from "../state/team/actions";
 import { activeTeamIdAtom, teamsAtom } from "../state/team/atoms";
 
 /*
@@ -53,47 +57,43 @@ import { activeTeamIdAtom, teamsAtom } from "../state/team/atoms";
   The resolver's shape is what kept this in the app shell: it waits on state it
   does not own and then writes request atoms that a dozen views read. It reads
   the waiting conditions and where the user already is from atoms now, and moves
-  through the navigation actions; the two session calls that can switch teams
-  are the only thing still handed in.
+  through the navigation actions, the team and organization actions and the
+  inbox's own read marker — nothing is handed in but the listeners themselves,
+  which a test replaces.
 */
-
-/** The session and inbox calls the resolver makes on the way. */
-export interface DeepLinkSession {
-  readonly ensureTeamSelected: (teamId: string) => Promise<unknown>;
-  readonly selectOrganization: (organizationId: string) => void;
-  readonly selectTeam: (teamId: string) => void;
-  readonly markInboxRead: (messageId: string) => void;
-}
 
 /** The outside world, so a test can hand the hook its own. */
 export interface DeepLinkListeners {
   readonly listenForBriarLinks: typeof listenForBriarLinks;
   readonly listenForClickedIssueLinks: typeof listenForClickedIssueLinks;
   readonly listenForStatusTrayOpenRun: typeof listenForStatusTrayOpenRun;
+  readonly listenForAppMenuSettings: typeof listenForAppMenuSettings;
   readonly resolveIssueHierarchyLocation: typeof resolveIssueHierarchyLocation;
   readonly navigateToIssueLink: typeof navigateToIssueLink;
   /** The tray listener only exists in the packaged macOS app. */
   readonly macDesktop: boolean;
+  /** The application menu only exists in a desktop build. */
+  readonly desktop: boolean;
 }
 
 const liveListeners: DeepLinkListeners = {
   listenForBriarLinks,
   listenForClickedIssueLinks,
   listenForStatusTrayOpenRun,
+  listenForAppMenuSettings,
   resolveIssueHierarchyLocation,
   navigateToIssueLink,
   macDesktop: isMacDesktopTauri(),
+  desktop: isDesktopTauri(),
 };
 
 export interface UseDeepLinksInput {
-  readonly session: DeepLinkSession;
   readonly listeners?: Partial<DeepLinkListeners> | undefined;
 }
 
 export function useDeepLinks({
-  session,
   listeners: listenerOverrides,
-}: UseDeepLinksInput): void {
+}: UseDeepLinksInput = {}): void {
   const { t } = useI18n();
   const { toast } = useToast();
   const listeners: DeepLinkListeners = { ...liveListeners, ...listenerOverrides };
@@ -101,6 +101,8 @@ export function useDeepLinks({
     listenForBriarLinks: listenForLinks,
     listenForClickedIssueLinks: listenForClickedLinks,
     listenForStatusTrayOpenRun: listenForTrayOpenRun,
+    listenForAppMenuSettings: listenForMenuSettings,
+    desktop,
     macDesktop,
   } = listeners;
 
@@ -138,10 +140,12 @@ export function useDeepLinks({
     navigateToChannel,
     navigateToIssue,
     navigateToPage,
+    openAppSettings,
     replaceNavigationLocation,
   } = useNavigationActions();
-  const { ensureTeamSelected, markInboxRead, selectOrganization, selectTeam } =
-    session;
+  const { ensureTeamSelected, selectTeam } = useTeamActions();
+  const { selectOrganization } = useOrganizationActions();
+  const { markRead: markInboxRead } = useInboxActions();
 
   useEffect(
     () => (lockedTeamId ? undefined : listenForLinks(setPendingBriarLink)),
@@ -169,6 +173,12 @@ export function useDeepLinks({
     macDesktop,
     setPendingBriarLink,
   ]);
+  // The desktop application menu's "Settings…", which opens the same screen the
+  // sidebar's gear does.
+  useEffect(() => {
+    if (!desktop) return;
+    return listenForMenuSettings(openAppSettings);
+  }, [desktop, listenForMenuSettings, openAppSettings]);
 
   useEffect(() => {
     if (!pendingBriarLink || !user || loading) return;

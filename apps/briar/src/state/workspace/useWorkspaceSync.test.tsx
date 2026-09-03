@@ -83,7 +83,7 @@ const makeRegistry = () => {
 };
 
 /**
- * Stands in for `useBriar`: it installs the scheduled agent callbacks after
+ * Stands in for `useActionBridges`: it installs the scheduled agent callbacks after
  * every render, and every render hands over fresh closures. `renderKey` forces
  * a re-render so a test can prove the poller ignores them.
  */

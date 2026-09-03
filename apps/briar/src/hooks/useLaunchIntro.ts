@@ -1,3 +1,4 @@
+import { useAtomValue } from "@effect/atom-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { commands } from "../generated/tauri";
@@ -12,6 +13,7 @@ import {
   isMacDesktopTauri,
   isWebApp,
 } from "../lib/platform";
+import { loadingAtom, restoringSessionAtom } from "../state/session/atoms";
 
 /*
   The desktop window's first seconds: the launch intro, the compact onboarding
@@ -37,10 +39,6 @@ export interface LaunchIntroInput {
   /** Set in a team window, which shows neither intro nor onboarding. */
   readonly teamWindowTeamId: string | null;
   readonly companionMode: boolean;
-  /** A session or account request is in flight. */
-  readonly loading: boolean;
-  /** The stored session has not been exchanged yet. */
-  readonly restoringSession: boolean;
   /** The initial onboarding gate owns the screen, so the window shrinks. */
   readonly showsInitialOnboarding: boolean;
   readonly deps?: LaunchIntroDeps;
@@ -56,11 +54,11 @@ export interface LaunchIntro {
 export function useLaunchIntro({
   companionMode,
   deps,
-  loading,
-  restoringSession,
   showsInitialOnboarding,
   teamWindowTeamId,
 }: LaunchIntroInput): LaunchIntro {
+  const loading = useAtomValue(loadingAtom);
+  const restoringSession = useAtomValue(restoringSessionAtom);
   const prepareLaunchIntro = deps?.prepareLaunchIntro ??
     (() => commands.prepareLaunchIntro());
   const showMainWindow = deps?.showMainWindow ??

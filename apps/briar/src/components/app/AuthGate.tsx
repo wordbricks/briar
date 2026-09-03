@@ -8,17 +8,15 @@ import { SessionLoadingScreen } from "../SessionLoadingScreen";
 import { LoginScreenWithSession } from "./LoginScreenWithSession";
 import { useOrganizationActions } from "../../state/organization/actions";
 import { companionMode, webMode } from "../../state/platform";
+import { appErrorAtom } from "../../state/app-error";
+import { useSessionActions } from "../../state/session/actions";
 import {
   loadingAtom,
   loginCodeAtom,
   restoringSessionAtom,
-  sessionErrorAtom,
   userAtom,
 } from "../../state/session/atoms";
 import { teamsAtom } from "../../state/team/atoms";
-import { localInventoryErrorAtom } from "../../state/workspace/atoms";
-import type { DeviceAuthorizationLaunchOptions } from "../../lib/api";
-import type { BrowserAuthLocale } from "../../lib/browser-auth-client";
 
 /*
   Everything that can stand between a cold start and the shell.
@@ -30,9 +28,9 @@ import type { BrowserAuthLocale } from "../../lib/browser-auth-client";
   signed out — a signed-in companion goes straight to its own screens, and shows
   the empty state instead of the desktop's organization setup.
 
-  Every gate reads the session from the store; what it takes as props is the
-  three flags the shell derives from onboarding storage and the callbacks that
-  belong to the session facade.
+  Every gate reads the session from the store and signs in through the session
+  actions; what it takes as props is the three flags the shell derives from
+  onboarding storage and the invitation flow's own callbacks.
 */
 
 const FirstOrganizationSetup = lazy(() =>
@@ -53,24 +51,6 @@ const InvitationOnboarding = lazy(() =>
 
 const lazyViewFallback = <div className="lazy-view-placeholder h-full w-full" />;
 
-/** The sign-in calls the gates make, all still the session facade's. */
-export interface AuthGateSession {
-  readonly cancelLogin: () => void;
-  readonly login: (
-    options: DeviceAuthorizationLaunchOptions,
-  ) => Promise<unknown>;
-  readonly logout: () => Promise<unknown>;
-  readonly sendLoginEmailCode: (
-    email: string,
-    locale: BrowserAuthLocale,
-  ) => Promise<void>;
-  readonly verifyLoginEmailCode: (
-    email: string,
-    otp: string,
-    locale: BrowserAuthLocale,
-  ) => Promise<void>;
-}
-
 export interface AuthGateProps {
   /** The invitation token on the URL, or `null`. */
   readonly invitationToken: string | null;
@@ -83,7 +63,6 @@ export interface AuthGateProps {
   readonly showsFirstOrganizationSetup: boolean;
   /** The first organization was created for this user. */
   readonly onOrganizationCreated: (userId: string) => void;
-  readonly session: AuthGateSession;
   /** The shell, rendered once no gate owns the screen. */
   readonly children: ReactNode;
 }
@@ -96,7 +75,6 @@ export function AuthGate({
   onInitialOnboardingComplete,
   onJoinOrganization,
   onOrganizationCreated,
-  session,
   showsFirstOrganizationSetup,
   showsInitialOnboarding,
 }: AuthGateProps) {
@@ -106,14 +84,15 @@ export function AuthGate({
   const loading = useAtomValue(loadingAtom);
   const loginCode = useAtomValue(loginCodeAtom);
   const restoringSession = useAtomValue(restoringSessionAtom);
-  /*
-    The facade's `error` key is this sum: the session's own failures plus the
-    local project inventory's, which the sign-in screens render the same way.
-  */
-  const sessionError = useAtomValue(sessionErrorAtom);
-  const inventoryError = useAtomValue(localInventoryErrorAtom);
-  const error = sessionError ?? inventoryError;
+  const error = useAtomValue(appErrorAtom);
   const { addOrganization, checkOrganizationHandle } = useOrganizationActions();
+  const {
+    cancelLogin,
+    login,
+    logout,
+    sendLoginEmailCode,
+    verifyLoginEmailCode,
+  } = useSessionActions();
 
   const signedOutGate = () => {
     if (restoringSession) return <SessionLoadingScreen />;
@@ -126,19 +105,19 @@ export function AuthGate({
             loading={loading}
             loginCode={loginCode}
             onAccept={onAcceptInvitation}
-            onCancelLogin={session.cancelLogin}
+            onCancelLogin={cancelLogin}
             onLeave={() => {
               leaveOrganizationInvitationRoute();
               window.location.reload();
             }}
-            onLogin={(method) => void session.login({ method, locale })}
-            onSendEmailCode={(email) => session.sendLoginEmailCode(email, locale)}
+            onLogin={(method) => void login({ method, locale })}
+            onSendEmailCode={(email) => sendLoginEmailCode(email, locale)}
             onSwitchAccount={async () => {
-              await session.logout();
-              await session.login({ locale, switchAccount: true });
+              await logout();
+              await login({ locale, switchAccount: true });
             }}
             onVerifyEmailCode={(email, code) =>
-              session.verifyLoginEmailCode(email, code, locale)}
+              verifyLoginEmailCode(email, code, locale)}
             token={invitationToken}
             user={user}
             webMode={webMode}
@@ -154,12 +133,12 @@ export function AuthGate({
             error={error}
             loading={loading}
             loginCode={loginCode}
-            onCancelLogin={session.cancelLogin}
+            onCancelLogin={cancelLogin}
             onComplete={onInitialOnboardingComplete}
-            onLogin={(method) => void session.login({ method, locale })}
-            onSendEmailCode={(email) => session.sendLoginEmailCode(email, locale)}
+            onLogin={(method) => void login({ method, locale })}
+            onSendEmailCode={(email) => sendLoginEmailCode(email, locale)}
             onVerifyEmailCode={(email, code) =>
-              session.verifyLoginEmailCode(email, code, locale)}
+              verifyLoginEmailCode(email, code, locale)}
             webMode={webMode}
           />
         </Suspense>
@@ -168,11 +147,11 @@ export function AuthGate({
     return (
       <LoginScreenWithSession
         companionMode={companionMode}
-        onCancel={session.cancelLogin}
-        onLogin={(method) => void session.login({ method, locale })}
-        onSendEmailCode={(email) => session.sendLoginEmailCode(email, locale)}
+        onCancel={cancelLogin}
+        onLogin={(method) => void login({ method, locale })}
+        onSendEmailCode={(email) => sendLoginEmailCode(email, locale)}
         onVerifyEmailCode={(email, code) =>
-          session.verifyLoginEmailCode(email, code, locale)}
+          verifyLoginEmailCode(email, code, locale)}
         webMode={webMode}
       />
     );
@@ -186,7 +165,7 @@ export function AuthGate({
     */
     if (!user) return signedOutGate();
     if (teams.length === 0) {
-      return <CompanionEmptyState onLogout={() => void session.logout()} />;
+      return <CompanionEmptyState onLogout={() => void logout()} />;
     }
     return children;
   }
@@ -205,7 +184,7 @@ export function AuthGate({
             onOrganizationCreated(user.id);
           }}
           onJoin={onJoinOrganization}
-          onLogout={() => void session.logout()}
+          onLogout={() => void logout()}
           user={user}
         />
       </Suspense>

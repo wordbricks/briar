@@ -41,9 +41,9 @@ export type TeamSyncApi = {
 export const liveTeamSyncApi: TeamSyncApi = { loadDashboard, loadDashboardDelta };
 
 /**
- * The reads the shared loader uses. `useBriar` seeds it from its
- * `dataSources` option so the facade and the sync hook fetch through the same
- * seam without one having to hand the other a loader instance.
+ * The reads the shared loader uses. `setSessionDataSources` seeds it together
+ * with the session's own reads, so a test replaces every fetch the app makes in
+ * one call and nothing has to hand anything else a loader instance.
  */
 export const teamSyncApiAtom = Atom.make<TeamSyncApi>(liveTeamSyncApi).pipe(
   Atom.keepAlive,
@@ -184,9 +184,10 @@ export function createTeamSyncLoader(
 }
 
 /*
-  One loader per registry. `useBriar` and `useTeamSync` live in different
-  components but must share the in-flight map, or a facade `refresh` and a
-  polling tick would race each other instead of sharing one request.
+  One loader per registry. `useTeamSync` and the actions that refetch after a
+  write live in different components but must share the in-flight map, or a
+  `refreshActiveTeam` and a polling tick would race each other instead of
+  sharing one request.
 */
 const loaders = new WeakMap<AtomRegistry, TeamSyncLoader>();
 
