@@ -114,10 +114,14 @@ The first failed context interrupts its still-running siblings, so a known
 failure does not leave expensive builds or Miniflare pools running. Local CI
 assumes the repository dependencies have already been installed.
 
-All four contexts, `d1-migrations` included, run in parallel, each at the
-Vitest worker count `vitest.max-workers.ts` derives from the machine. Set
+All four contexts, `d1-migrations` included, run in parallel. While the
+`app-worker` context runs alongside it, `test:d1:migrations` is pinned to a
+single Vitest worker: every migration test replays the full history from an
+empty database, and at the machine-derived worker count those files time out
+against the parallel Worker suites and the Rust build. The pin costs nothing on
+a warm cache, where the step does not run at all. Set
 `BRIAR_CI_SERIAL_CONTEXTS=true` to run the contexts one at a time on constrained
-machines, or `VITEST_MAX_WORKERS` to pin the pool size.
+machines, or `VITEST_MAX_WORKERS` to pin the pool size yourself.
 
 `d1:migrate:local` and `test:d1:migrations` are cached by Turborepo, so a run
 that changes nothing under `apps/briar/migrations/` re-verifies nothing. Their

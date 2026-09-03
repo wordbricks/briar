@@ -399,6 +399,7 @@ const runD1Migrations = Effect.fn("runD1MigrationsCi")(
   function* runD1MigrationsCiEffect(
     timings: Ref.Ref<ReadonlyArray<Timing>>,
     logPath: string,
+    overlapAppWorker: boolean,
   ) {
     const fileSystem = yield* FileSystem.FileSystem;
     const stateDirectory = d1StateDirectory;
@@ -437,7 +438,15 @@ const runD1Migrations = Effect.fn("runD1MigrationsCi")(
       "d1-migrations",
       logPath,
       "test-migrations",
-      { argv: ["bun", "run", "test:d1:migrations"] },
+      {
+        argv: ["bun", "run", "test:d1:migrations"],
+        // Pinned while the app-worker context is running: the migration suite
+        // starts each file from an empty database and replays the whole
+        // history, so at full worker count it times out against the parallel
+        // Worker suites and the Rust build. Cheap now that a warm cache skips
+        // the step entirely.
+        env: overlapAppWorker ? { VITEST_MAX_WORKERS: "1" } : undefined,
+      },
     );
   },
 );
@@ -738,6 +747,7 @@ const runCi = Effect.fn("runCi")(
       "timing.tsv",
     );
     const serial = process.env.BRIAR_CI_SERIAL_CONTEXTS === "true";
+    const overlapAppWorker = !serial && options.contexts.includes("app-worker");
 
     const program = Effect.gen(function* ciProgramEffect() {
       if (options.contexts.includes("rust")) {
@@ -761,7 +771,7 @@ const runCi = Effect.fn("runCi")(
             contextProgram = runAppWorker(timings, logPath);
             break;
           case "d1-migrations":
-            contextProgram = runD1Migrations(timings, logPath);
+            contextProgram = runD1Migrations(timings, logPath, overlapAppWorker);
             break;
           case "rust":
             contextProgram = runRust(timings, logPath);
