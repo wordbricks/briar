@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useAtom, useAtomInitialValues } from "@effect/atom-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AutoHuntSession } from "./useAutoHuntSessions";
 import {
   acceptOrganizationInvitation as acceptRemoteOrganizationInvitation,
@@ -19,10 +20,7 @@ import {
   createOrganization as createRemoteOrganization,
   createIssue,
   createIssueMessage,
-  createPlanningProject as createRemotePlanningProject,
   createTeam,
-  deleteAccount as deleteRemoteAccount,
-  deletePlanningProject as deleteRemotePlanningProject,
   deleteIssue as deleteRemoteIssue,
   deleteIssueMessage,
   transferIssue as transferRemoteIssue,
@@ -46,7 +44,6 @@ import {
   loadTeams,
   loadTeamProjects,
   loadSession,
-  isOrganizationHandleAvailable as checkRemoteOrganizationHandle,
   moveHuntRun,
   moveIssueToPlanningProject as moveRemoteIssueToPlanningProject,
   pollDeviceToken,
@@ -54,7 +51,6 @@ import {
   retryHuntRun,
   reworkPausedHuntRun,
   resumeHuntRun,
-  updatePlanningProject as updateRemotePlanningProject,
   removeIssueDependency,
   removeIssueParent as removeRemoteIssueParent,
   removeRelatedIssue,
@@ -63,13 +59,7 @@ import {
   updateIssueCheckpoints,
   updateIssueExecutionPreferences,
   updateIssueSubscription,
-  updateAccountProfile as updateRemoteAccountProfile,
-  updateOrganization as updateRemoteOrganization,
-  updateOrganizationLogo as updateRemoteOrganizationLogo,
   updateTeamIcon as updateRemoteProjectIcon,
-  type TeamIconUpdate,
-  updateTeamIssueKeyPrefix as updateRemoteProjectIssueKeyPrefix,
-  updateTeamTabs as updateRemoteProjectTabs,
   updateTeamSettings,
   updateCheckpointPolicy,
   type DeviceAuthorizationLaunchOptions,
@@ -79,7 +69,6 @@ import {
   demoRunEvents,
   demoRepositoryReadiness,
 } from "../lib/demo-data";
-import { deleteAndroidPushRegistration } from "../lib/inbox-notifications";
 import {
   isRepositoryConnectedForImport,
   type LinearStatusMapping,
@@ -136,10 +125,7 @@ import {
   writeSessionToken,
 } from "../lib/token-store";
 import { restoreStoredSession } from "../lib/session-restore";
-import {
-  resolveActiveAccountSelection,
-  writeActiveOrganizationId,
-} from "../lib/active-organization";
+import { resolveActiveAccountSelection } from "../lib/active-organization";
 import { ensureDefaultOrganization } from "../lib/default-organization";
 import {
   isAuthorizationCancelled,
@@ -186,13 +172,10 @@ import type {
   IssueResultReview,
   Organization,
   PlanningProject,
-  PlanningProjectStatus,
   Project,
-  ProjectConnection,
   ProjectSettings,
   RunEvidence,
   RunEvidenceImage,
-  SessionUser,
   UpdateIssueInput,
 } from "../types";
 import {
@@ -209,6 +192,40 @@ import {
   remoteMode,
   webMode,
 } from "../state/platform";
+import { useRegistry } from "../state/registry";
+import {
+  useOrganizationActions,
+  type OrganizationActionDeps,
+} from "../state/organization/actions";
+import {
+  activeOrganizationIdAtom,
+  organizationsAtom,
+} from "../state/organization/atoms";
+import {
+  usePlanningActions,
+  type PlanningActionDeps,
+} from "../state/planning/actions";
+import { planningProjectsAtom } from "../state/planning/atoms";
+import {
+  useSessionActions,
+  type SessionActionDeps,
+} from "../state/session/actions";
+import {
+  loadingAtom,
+  loginCodeAtom,
+  restoringSessionAtom,
+  sessionErrorAtom,
+  tokenAtom,
+  userAtom,
+} from "../state/session/atoms";
+import { useTeamActions, type TeamActionDeps } from "../state/team/actions";
+import {
+  activeTeamIdAtom,
+  deletingTeamIdAtom,
+  isCreatingTeamAtom,
+  teamConnectionAtom,
+  teamsAtom,
+} from "../state/team/atoms";
 
 /**
  * Reads the hook performs on its own: session bootstrap, dashboard sync and the
@@ -282,39 +299,35 @@ export function useBriar(options: UseBriarOptions = {}) {
   const dataSourcesRef = useRef<BriarDataSources | null>(null);
   dataSourcesRef.current ??= { ...liveDataSources, ...dataSources };
   const remote = dataSourcesRef.current;
-  const [user, setUser] = useState<SessionUser | null>(demoMode ? demoUser : null);
-  const [token, setToken] = useState<string | null>(null);
-  const [projects, setProjects] = useState<Project[]>(
-    demoMode ? [demoDashboard.team] : [],
+  const registry = useRegistry();
+  /*
+    Two root atoms start from a demo default that a project window has to
+    narrow: such a window is pinned to one team, and demo mode must not preselect
+    a different one. The initial value therefore cannot live in the atom module,
+    so it is seeded here — once per registry, before the first read below.
+  */
+  useAtomInitialValues(
+    useMemo(() => {
+      const demoSelectionApplies =
+        demoMode &&
+        (!lockedProjectId || lockedProjectId === demoDashboard.team.id);
+      return [
+        [
+          activeOrganizationIdAtom,
+          demoSelectionApplies ? demoOrganization.id : null,
+        ],
+        [
+          activeTeamIdAtom,
+          demoSelectionApplies ? demoDashboard.team.id : null,
+        ],
+      ] as const;
+    }, [lockedProjectId]),
   );
-  const [planningProjects, setPlanningProjects] = useState<PlanningProject[]>(
-    demoMode
-      ? [{
-        id: demoDashboard.team.id,
-        workspaceId: demoOrganization.id,
-        workspaceName: demoOrganization.name,
-        teamId: demoDashboard.team.id,
-        teamName: demoDashboard.team.name,
-        name: "General",
-        description: "",
-        status: "active",
-        leadUserId: null,
-        leadName: null,
-        startDate: null,
-        targetDate: null,
-        icon: null,
-        color: null,
-        sortOrder: 0,
-        isDefault: true,
-        role: "owner",
-        createdAt: demoDashboard.team.createdAt,
-        updatedAt: demoDashboard.team.createdAt,
-      }]
-      : [],
-  );
-  const [organizations, setOrganizations] = useState<Organization[]>(
-    demoMode ? [demoOrganization] : [],
-  );
+  const [user, setUser] = useAtom(userAtom);
+  const [token, setToken] = useAtom(tokenAtom);
+  const [projects, setProjects] = useAtom(teamsAtom);
+  const [planningProjects, setPlanningProjects] = useAtom(planningProjectsAtom);
+  const [organizations, setOrganizations] = useAtom(organizationsAtom);
 
   useEffect(() => {
     if (demoMode) return;
@@ -336,16 +349,10 @@ export function useBriar(options: UseBriarOptions = {}) {
       cancelled = true;
     };
   }, [projects, token]);
-  const [activeOrganizationId, setActiveOrganizationId] = useState<string | null>(
-    demoMode && (!lockedProjectId || lockedProjectId === demoDashboard.team.id)
-      ? demoOrganization.id
-      : null,
+  const [activeOrganizationId, setActiveOrganizationId] = useAtom(
+    activeOrganizationIdAtom,
   );
-  const [activeProjectId, setActiveProjectId] = useState<string | null>(
-    demoMode && (!lockedProjectId || lockedProjectId === demoDashboard.team.id)
-      ? demoDashboard.team.id
-      : null,
-  );
+  const [activeProjectId, setActiveProjectId] = useAtom(activeTeamIdAtom);
   const [connectedTeamIds, setConnectedProjectIds] = useState<
     string[] | null
   >(demoMode ? [demoDashboard.team.id] : null);
@@ -354,20 +361,19 @@ export function useBriar(options: UseBriarOptions = {}) {
       ? demoDashboard
       : null,
   );
-  const [loading, setLoading] = useState(!demoMode);
-  const [restoringSession, setRestoringSession] = useState(!demoMode);
-  const [loginCode, setLoginCode] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useAtom(loadingAtom);
+  const [restoringSession, setRestoringSession] = useAtom(restoringSessionAtom);
+  const [loginCode, setLoginCode] = useAtom(loginCodeAtom);
+  const [error, setError] = useAtom(sessionErrorAtom);
   const [localProjectInventoryError, setLocalProjectInventoryError] = useState<
     string | null
   >(null);
-  const [projectConnection, setProjectConnection] =
-    useState<ProjectConnection | null>(null);
-  const [isCreatingProject, setIsCreatingProject] = useState(false);
+  const [projectConnection, setProjectConnection] = useAtom(teamConnectionAtom);
+  const [isCreatingProject, setIsCreatingProject] = useAtom(isCreatingTeamAtom);
   const [isCreatingIssue, setIsCreatingIssue] = useState(false);
   const [updatingIssueId, setUpdatingIssueId] = useState<string | null>(null);
   const [deletingIssueId, setDeletingIssueId] = useState<string | null>(null);
-  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
+  const [deletingProjectId, setDeletingProjectId] = useAtom(deletingTeamIdAtom);
   const [recoveringRunId, setRecoveringRunId] = useState<string | null>(null);
   const issueMessagesByRun = useRef<Record<string, IssueMessage[]>>(
     demoMode ? initialDemoIssueMessages : {},
@@ -400,8 +406,6 @@ export function useBriar(options: UseBriarOptions = {}) {
   const loginAttempt = useRef(0);
   const reconnectRequest = useRef(0);
   const healthRequest = useRef(0);
-  const activeProjectIdRef = useRef(activeProjectId);
-  activeProjectIdRef.current = activeProjectId;
   const readinessCoordinatorRef = useRef<ReturnType<
     typeof createLocalProjectReadinessCoordinator<RepositoryReadiness>
   > | null>(null);
@@ -570,6 +574,156 @@ export function useBriar(options: UseBriarOptions = {}) {
     setError(null);
   }, [clearLoginTimer]);
 
+  /*
+    Bridges to the domain action modules. The session, organization, team and
+    planning actions own the root atoms outright, but the dashboard, its
+    per-team cache, the health probe and the reconnect generation still live
+    here, so each transition those actions cannot express is handed back as one
+    of the stable callbacks below.
+  */
+
+  const bumpReconnectRequest = useCallback(() => {
+    reconnectRequest.current += 1;
+  }, []);
+
+  const readDashboardTeamId = useCallback(
+    () => dashboardRef.current?.team.id ?? null,
+    [],
+  );
+
+  const clearSignedOutViews = useCallback(() => {
+    setConnectedProjectIds(null);
+    setLocalProjectInventoryError(null);
+    setDashboard(null);
+    clearDashboardCache();
+  }, [clearDashboardCache, setDashboard]);
+
+  const resetTeamViews = useCallback(() => {
+    setDashboard(null);
+    setHealth(null);
+    setHealthError(null);
+  }, [setDashboard]);
+
+  const renameDashboardOrganization = useCallback(
+    (organizationId: string, organizationName: string) => {
+      setDashboard((current) =>
+        current?.team.organizationId === organizationId
+          ? { ...current, team: { ...current.team, organizationName } }
+          : current,
+      );
+    },
+    [setDashboard],
+  );
+
+  const applyTeamToDashboard = useCallback(
+    (project: Project) => {
+      setDashboard((current) =>
+        current?.team.id === project.id ? { ...current, team: project } : current,
+      );
+    },
+    [setDashboard],
+  );
+
+  const applyOrganizationSwitch = useCallback(
+    (project: Project | null, dashboardMatchesProject: boolean) => {
+      if (demoMode && project) {
+        setDashboard(
+          project.id === demoDashboard.team.id
+            ? demoDashboard
+            : emptyDashboard(project),
+        );
+      } else if (!dashboardMatchesProject) {
+        // Keep the last-known board on screen instead of blanking the UI. The
+        // organization prune effect keeps this entry because the restored
+        // project belongs to the organization we are switching to.
+        if (!project || !showCachedDashboard(project.id)) setDashboard(null);
+      }
+      if (!dashboardMatchesProject) {
+        setHealth(null);
+        setHealthError(null);
+      }
+    },
+    [setDashboard, showCachedDashboard],
+  );
+
+  const countDashboardIssues = useCallback(
+    (planningProjectId: string) =>
+      dashboardRef.current?.runs.filter(
+        (run) => run.projectId === planningProjectId,
+      ).length ?? 0,
+    [],
+  );
+
+  const movePlanningProjectIssues = useCallback(
+    (
+      teamId: string,
+      fromPlanningProjectId: string,
+      toPlanningProject: PlanningProject,
+    ) => {
+      setDashboard((current) =>
+        current?.team.id === teamId
+          ? {
+              ...current,
+              runs: current.runs.map((run) =>
+                run.projectId === fromPlanningProjectId
+                  ? {
+                      ...run,
+                      projectId: toPlanningProject.id,
+                      projectName: toPlanningProject.name,
+                    }
+                  : run,
+              ),
+            }
+          : current,
+      );
+    },
+    [setDashboard],
+  );
+
+  const sessionActionDeps: SessionActionDeps = {
+    bumpReconnectRequest,
+    cancelLogin,
+    clearSignedOutViews,
+  };
+  const { deleteAccount, logout, updateAccountProfile } =
+    useSessionActions(sessionActionDeps);
+
+  const organizationActionDeps: OrganizationActionDeps = {
+    applyOrganizationSwitch,
+    bumpReconnectRequest,
+    lockedTeamId: lockedProjectId,
+    readDashboardTeamId,
+    renameDashboardOrganization,
+    resetTeamViews,
+  };
+  const {
+    addOrganization,
+    changeOrganizationLogo,
+    checkOrganizationHandle,
+    renameOrganization,
+    selectOrganization,
+  } = useOrganizationActions(organizationActionDeps);
+
+  const teamActionDeps: TeamActionDeps = {
+    applyTeamToDashboard,
+    bumpReconnectRequest,
+  };
+  const {
+    cancelTeamCreation,
+    changeTeamIcon,
+    changeTeamIssueKeyPrefix,
+    changeTeamScheduleTab,
+    finishTeamCreation,
+    startTeamCreation,
+  } = useTeamActions(teamActionDeps);
+
+  const planningActionDeps: PlanningActionDeps = {
+    countDashboardIssues,
+    movePlanningProjectIssues,
+  };
+  const { addPlanningProject, editPlanningProject, removePlanningProject } =
+    usePlanningActions(planningActionDeps);
+
   useEffect(() => {
     if (!companionMode) return;
     const handleAuthReturn = () => {
@@ -580,11 +734,6 @@ export function useBriar(options: UseBriarOptions = {}) {
     return () =>
       window.removeEventListener("briar-auth-return", handleAuthReturn);
   }, [clearLoginTimer]);
-
-  useEffect(() => {
-    if (lockedProjectId || !user || !activeOrganizationId) return;
-    writeActiveOrganizationId(user.id, activeOrganizationId);
-  }, [activeOrganizationId, lockedProjectId, user]);
 
   useEffect(() => {
     dashboardRef.current = dashboard;
@@ -686,7 +835,7 @@ export function useBriar(options: UseBriarOptions = {}) {
           generation !== dashboardRequestGeneration.current ||
           // A response that outlived its project must never be committed under
           // another project's identity.
-          activeProjectIdRef.current !== projectId
+          registry.get(activeTeamIdAtom) !== projectId
         ) return;
         dashboardCursor.current = cursor;
         if (current !== dashboardRef.current) {
@@ -713,7 +862,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     })();
     dashboardRequest.current = { projectId, abort, promise };
     return promise;
-  }, [activeProjectId, token]);
+  }, [activeProjectId, registry, token]);
 
   useEffect(() => {
     if (demoMode) return;
@@ -1048,7 +1197,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     }
     const isCurrent = () =>
       request === healthRequest.current &&
-      activeProjectIdRef.current === projectId;
+      registry.get(activeTeamIdAtom) === projectId;
     setHealthLoading(true);
     try {
       // Project workflow tools are shared via project settings. Mirror them
@@ -1100,7 +1249,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     } finally {
       if (isCurrent()) setHealthLoading(false);
     }
-  }, [activeProjectId, connectedTeamIds, refreshProjectReadiness]);
+  }, [activeProjectId, connectedTeamIds, refreshProjectReadiness, registry]);
 
   useEffect(() => {
     void refreshHealth();
@@ -1366,95 +1515,6 @@ export function useBriar(options: UseBriarOptions = {}) {
     [token],
   );
 
-  const logout = useCallback(async () => {
-    reconnectRequest.current += 1;
-    cancelLogin();
-    if (token) {
-      await deleteAndroidPushRegistration(token).catch(() => false);
-    }
-    if (webMode && token === browserCookieSessionCredential) {
-      await browserAuthClient.signOut();
-    }
-    await clearSessionToken();
-    setToken(null);
-    setUser(null);
-    setProjects([]);
-    setOrganizations([]);
-    setConnectedProjectIds(null);
-    setLocalProjectInventoryError(null);
-    setActiveOrganizationId(null);
-    setDashboard(null);
-    clearDashboardCache();
-    setActiveProjectId(null);
-    setProjectConnection(null);
-    setIsCreatingProject(false);
-  }, [cancelLogin, clearDashboardCache, token]);
-
-  const updateAccountProfile = useCallback(
-    async (input: {
-      username: string | null;
-      name: string;
-      image: string | null;
-    }) => {
-      if (!user) throw new Error("로그인이 필요합니다.");
-      const nextUser =
-        demoMode || !token
-          ? { ...user, ...input }
-          : await updateRemoteAccountProfile(token, input);
-      setUser(nextUser);
-      return nextUser;
-    },
-    [token, user],
-  );
-
-  const deleteAccount = useCallback(
-    async (confirmation: string) => {
-      reconnectRequest.current += 1;
-      if (!token) throw new Error("로그인이 필요합니다.");
-      await deleteRemoteAccount(token, confirmation);
-      await Promise.allSettled(
-        projects.map((project) => disconnectLocalTeam(project.id)),
-      );
-      cancelLogin();
-      if (webMode && token === browserCookieSessionCredential) {
-        await browserAuthClient.signOut().catch(() => undefined);
-      }
-      await clearSessionToken();
-      setToken(null);
-      setUser(null);
-      setProjects([]);
-      setOrganizations([]);
-      setConnectedProjectIds(null);
-      setLocalProjectInventoryError(null);
-      setActiveOrganizationId(null);
-      setDashboard(null);
-      clearDashboardCache();
-      setActiveProjectId(null);
-      setProjectConnection(null);
-      setIsCreatingProject(false);
-    },
-    [cancelLogin, clearDashboardCache, projects, token],
-  );
-
-  const startProjectCreation = useCallback(() => {
-    reconnectRequest.current += 1;
-    setError(null);
-    setIsCreatingProject(true);
-  }, []);
-
-  const cancelProjectCreation = useCallback(() => {
-    reconnectRequest.current += 1;
-    setError(null);
-    setIsCreatingProject(false);
-    setProjectConnection(null);
-  }, []);
-
-  const finishProjectCreation = useCallback(() => {
-    setError(null);
-    setIsCreatingProject(false);
-    setProjectConnection(null);
-  }, []);
-
   const selectProject = useCallback(
     (projectId: string) => {
       if (lockedProjectId && projectId !== lockedProjectId) return;
@@ -1544,287 +1604,6 @@ export function useBriar(options: UseBriarOptions = {}) {
       showCachedDashboard,
       token,
     ],
-  );
-
-  const selectOrganization = useCallback(
-    (organizationId: string) => {
-      if (lockedProjectId) {
-        const lockedProject = projects.find(
-          (project) => project.id === lockedProjectId,
-        );
-        if (lockedProject?.organizationId !== organizationId) return;
-        reconnectRequest.current += 1;
-        setActiveOrganizationId(organizationId);
-        setActiveProjectId(lockedProject.id);
-        setError(null);
-        return;
-      }
-      if (!organizations.some((organization) => organization.id === organizationId)) {
-        return;
-      }
-      const project =
-        projects.find((candidate) => candidate.organizationId === organizationId) ??
-        null;
-      const dashboardMatchesProject = project
-        ? dashboardRef.current?.team.id === project.id
-        : dashboardRef.current === null;
-      if (
-        activeOrganizationId === organizationId &&
-        activeProjectId === (project?.id ?? null) &&
-        dashboardMatchesProject
-      ) {
-        setError(null);
-        return;
-      }
-      reconnectRequest.current += 1;
-      setActiveOrganizationId(organizationId);
-      setActiveProjectId(project?.id ?? null);
-      if (demoMode && project) {
-        setDashboard(
-          project.id === demoDashboard.team.id
-            ? demoDashboard
-            : emptyDashboard(project),
-        );
-      } else if (!dashboardMatchesProject) {
-        // Keep the last-known board on screen instead of blanking the UI. The
-        // organization prune effect keeps this entry because the restored
-        // project belongs to the organization we are switching to.
-        if (!project || !showCachedDashboard(project.id)) setDashboard(null);
-      }
-      if (!dashboardMatchesProject) {
-        setHealth(null);
-        setHealthError(null);
-      }
-      setError(null);
-    },
-    [
-      activeOrganizationId,
-      activeProjectId,
-      lockedProjectId,
-      organizations,
-      projects,
-      showCachedDashboard,
-    ],
-  );
-
-  const renameOrganization = useCallback(
-    async (organizationId: string, name: string) => {
-      const currentOrganization = organizations.find(
-        (organization) => organization.id === organizationId,
-      );
-      if (!currentOrganization) {
-        throw new Error("변경할 조직을 찾을 수 없습니다.");
-      }
-      if (!demoMode && !token) throw new Error("로그인이 필요합니다.");
-      const organization =
-        demoMode || !token
-          ? { ...currentOrganization, name }
-          : (
-              await updateRemoteOrganization(token, organizationId, name)
-            ).organization;
-      setOrganizations((current) =>
-        current.map((candidate) =>
-          candidate.id === organizationId ? organization : candidate,
-        ),
-      );
-      setProjects((current) =>
-        current.map((project) =>
-          project.organizationId === organizationId
-            ? { ...project, organizationName: organization.name }
-            : project,
-        ),
-      );
-      setDashboard((current) =>
-        current?.team.organizationId === organizationId
-          ? {
-              ...current,
-              team: {
-                ...current.team,
-                organizationName: organization.name,
-              },
-            }
-          : current,
-      );
-      return organization;
-    },
-    [organizations, token],
-  );
-
-  const changeOrganizationLogo = useCallback(
-    async (organizationId: string, logo: string | null) => {
-      const currentOrganization = organizations.find(
-        (organization) => organization.id === organizationId,
-      );
-      if (!currentOrganization) {
-        throw new Error("변경할 조직을 찾을 수 없습니다.");
-      }
-      if (!demoMode && !token) throw new Error("로그인이 필요합니다.");
-      const organization =
-        demoMode || !token
-          ? { ...currentOrganization, logo }
-          : (
-              await updateRemoteOrganizationLogo(token, organizationId, logo)
-            ).organization;
-      setOrganizations((current) =>
-        current.map((candidate) =>
-          candidate.id === organizationId ? organization : candidate,
-        ),
-      );
-      return organization;
-    },
-    [organizations, token],
-  );
-
-  const changeProjectIcon = useCallback(
-    async (projectId: string, update: TeamIconUpdate) => {
-      const currentProject = projects.find((project) => project.id === projectId);
-      if (!currentProject) throw new Error("변경할 프로젝트를 찾을 수 없습니다.");
-      if (!demoMode && !token) throw new Error("로그인이 필요합니다.");
-      const project =
-        demoMode || !token
-          ? {
-              ...currentProject,
-              icon: update.type === "image" ? update.dataUrl : null,
-              iconName: update.type === "named" ? update.name : null,
-              iconColor: update.type === "named" ? update.color : null,
-            }
-          : (await updateRemoteProjectIcon(token, projectId, update)).project;
-      setProjects((current) =>
-        current.map((candidate) =>
-          candidate.id === projectId ? project : candidate,
-        ),
-      );
-      setDashboard((current) =>
-        current?.team.id === projectId
-          ? { ...current, team: project }
-          : current,
-      );
-      setProjectConnection((current) =>
-        current?.project.id === projectId
-          ? { ...current, project }
-          : current,
-      );
-      return project;
-    },
-    [projects, token],
-  );
-
-  const changeProjectIssueKeyPrefix = useCallback(
-    async (projectId: string, issueKeyPrefix: string) => {
-      const currentProject = projects.find((project) => project.id === projectId);
-      if (!currentProject) throw new Error("변경할 프로젝트를 찾을 수 없습니다.");
-      if (!demoMode && !token) throw new Error("로그인이 필요합니다.");
-      const project =
-        demoMode || !token
-          ? { ...currentProject, issueKeyPrefix }
-          : (
-              await updateRemoteProjectIssueKeyPrefix(
-                token,
-                projectId,
-                issueKeyPrefix,
-              )
-            ).project;
-      setProjects((current) =>
-        current.map((candidate) =>
-          candidate.id === projectId ? project : candidate,
-        ),
-      );
-      setDashboard((current) =>
-        current?.team.id === projectId
-          ? { ...current, team: project }
-          : current,
-      );
-      setProjectConnection((current) =>
-        current?.project.id === projectId
-          ? { ...current, project }
-          : current,
-      );
-      return project;
-    },
-    [projects, token],
-  );
-
-  const changeProjectScheduleTab = useCallback(
-    async (projectId: string, scheduleTabEnabled: boolean) => {
-      const currentProject = projects.find((project) => project.id === projectId);
-      if (!currentProject) throw new Error("변경할 프로젝트를 찾을 수 없습니다.");
-      if (!demoMode && !token) throw new Error("로그인이 필요합니다.");
-      const project =
-        demoMode || !token
-          ? { ...currentProject, scheduleTabEnabled }
-          : (
-              await updateRemoteProjectTabs(token, projectId, {
-                schedule: scheduleTabEnabled,
-              })
-            ).project;
-      setProjects((current) =>
-        current.map((candidate) =>
-          candidate.id === projectId ? project : candidate,
-        ),
-      );
-      setDashboard((current) =>
-        current?.team.id === projectId
-          ? { ...current, team: project }
-          : current,
-      );
-      setProjectConnection((current) =>
-        current?.project.id === projectId
-          ? { ...current, project }
-          : current,
-      );
-      return project;
-    },
-    [projects, token],
-  );
-
-  const checkOrganizationHandle = useCallback(
-    async (handle: string) => {
-      if (demoMode) {
-        return !organizations.some(
-          (organization) => organization.handle === handle,
-        );
-      }
-      if (!token) throw new Error("로그인이 필요합니다.");
-      return checkRemoteOrganizationHandle(token, handle);
-    },
-    [organizations, token],
-  );
-
-  const addOrganization = useCallback(
-    async (input: { name: string; handle: string }) => {
-      reconnectRequest.current += 1;
-      let organization: Organization;
-      if (demoMode) {
-        if (
-          organizations.some(
-            (candidate) => candidate.handle === input.handle,
-          )
-        ) {
-          throw new Error("Organization handle already exists");
-        }
-        organization = {
-          id: crypto.randomUUID(),
-          name: input.name.trim(),
-          handle: input.handle,
-          logo: null,
-          role: "owner",
-          createdAt: new Date().toISOString(),
-        };
-      } else {
-        if (!token) throw new Error("로그인이 필요합니다.");
-        const result = await createRemoteOrganization(token, input);
-        organization = result.organization;
-      }
-      setOrganizations((current) => [...current, organization]);
-      setActiveOrganizationId(organization.id);
-      setActiveProjectId(null);
-      setDashboard(null);
-      setHealth(null);
-      setHealthError(null);
-      setError(null);
-      return organization;
-    },
-    [organizations, token],
   );
 
   const addProject = useCallback(
@@ -2308,7 +2087,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     const request = ++healthRequest.current;
     const isCurrent = () =>
       request === healthRequest.current &&
-      activeProjectIdRef.current === projectId;
+      registry.get(activeTeamIdAtom) === projectId;
     setHealthLoading(true);
     setHealthError(null);
     try {
@@ -2324,7 +2103,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     } finally {
       if (isCurrent()) setHealthLoading(false);
     }
-  }, [activeProjectId]);
+  }, [activeProjectId, registry]);
 
   const reconnectProject = useCallback(async (projectId = activeProjectId) => {
     const request = ++reconnectRequest.current;
@@ -2750,132 +2529,6 @@ export function useBriar(options: UseBriarOptions = {}) {
       }
     },
     [dashboard, token],
-  );
-
-  const addPlanningProject = useCallback(
-    async (
-      teamId: string,
-      input: {
-        name: string;
-        description?: string;
-        status?: PlanningProjectStatus;
-      },
-    ) => {
-      const team = projects.find((candidate) => candidate.id === teamId);
-      if (!team) throw new Error("프로젝트를 추가할 팀이 없습니다.");
-      if (demoMode) {
-        const observedAt = new Date().toISOString();
-        const project: PlanningProject = {
-          id: crypto.randomUUID(),
-          workspaceId: team.organizationId ?? demoOrganization.id,
-          workspaceName: team.organizationName ?? demoOrganization.name,
-          teamId,
-          teamName: team.name,
-          name: input.name.trim(),
-          description: input.description?.trim() ?? "",
-          status: input.status ?? "planned",
-          leadUserId: null,
-          leadName: null,
-          startDate: null,
-          targetDate: null,
-          icon: null,
-          color: null,
-          sortOrder: planningProjects.filter((candidate) => candidate.teamId === teamId).length,
-          isDefault: false,
-          role: team.role ?? "owner",
-          createdAt: observedAt,
-          updatedAt: observedAt,
-        };
-        setPlanningProjects((current) => [...current, project]);
-        return project;
-      }
-      if (!token) throw new Error("로그인이 필요합니다.");
-      const project = await createRemotePlanningProject(token, teamId, input);
-      setPlanningProjects((current) => [...current, project].sort(
-        (left, right) => left.teamId.localeCompare(right.teamId) ||
-          left.sortOrder - right.sortOrder ||
-          left.createdAt.localeCompare(right.createdAt),
-      ));
-      return project;
-    },
-    [planningProjects, projects, token],
-  );
-
-  const editPlanningProject = useCallback(
-    async (
-      projectId: string,
-      input: { name: string; description: string; status: PlanningProjectStatus },
-    ) => {
-      const existing = planningProjects.find((candidate) => candidate.id === projectId);
-      if (!existing) throw new Error("수정할 프로젝트가 없습니다.");
-      const normalized = {
-        name: input.name.trim(),
-        description: input.description.trim(),
-        status: input.status,
-      };
-      const project = demoMode
-        ? { ...existing, ...normalized, updatedAt: new Date().toISOString() }
-        : await (async () => {
-            if (!token) throw new Error("로그인이 필요합니다.");
-            return updateRemotePlanningProject(token, projectId, normalized);
-          })();
-      setPlanningProjects((current) => current.map((candidate) =>
-        candidate.id === projectId ? project : candidate
-      ));
-      return project;
-    },
-    [planningProjects, token],
-  );
-
-  const removePlanningProject = useCallback(
-    async (projectId: string) => {
-      const project = planningProjects.find(
-        (candidate) => candidate.id === projectId,
-      );
-      if (!project) throw new Error("삭제할 프로젝트가 없습니다.");
-      if (project.isDefault) {
-        throw new Error("팀의 기본 프로젝트는 삭제할 수 없습니다.");
-      }
-      const defaultProject = planningProjects.find(
-        (candidate) => candidate.teamId === project.teamId && candidate.isDefault,
-      );
-      if (!defaultProject) {
-        throw new Error("이슈를 옮길 기본 프로젝트를 찾을 수 없습니다.");
-      }
-      const result = demoMode
-        ? {
-            movedIssueCount: dashboard?.runs.filter(
-              (run) => run.projectId === projectId,
-            ).length ?? 0,
-          }
-        : await (async () => {
-            if (!token) throw new Error("로그인이 필요합니다.");
-            return deleteRemotePlanningProject(token, projectId);
-          })();
-      setPlanningProjects((current) =>
-        current.filter((candidate) => candidate.id !== projectId),
-      );
-      if (result.movedIssueCount > 0) {
-        setDashboard((current) =>
-          current?.team.id === project.teamId
-            ? {
-                ...current,
-                runs: current.runs.map((run) =>
-                  run.projectId === projectId
-                    ? {
-                        ...run,
-                        projectId: defaultProject.id,
-                        projectName: defaultProject.name,
-                      }
-                    : run,
-                ),
-              }
-            : current,
-        );
-      }
-      return result;
-    },
-    [dashboard?.runs, planningProjects, setDashboard, token],
   );
 
   const addIssue = useCallback(
@@ -4594,12 +4247,12 @@ export function useBriar(options: UseBriarOptions = {}) {
     addPlanningProject,
     moveIssueProject,
     addProject,
-    cancelProjectCreation,
+    cancelProjectCreation: cancelTeamCreation,
     cancelLogin,
     changeOrganizationLogo,
-    changeProjectIcon,
-    changeProjectIssueKeyPrefix,
-    changeProjectScheduleTab,
+    changeProjectIcon: changeTeamIcon,
+    changeProjectIssueKeyPrefix: changeTeamIssueKeyPrefix,
+    changeProjectScheduleTab: changeTeamScheduleTab,
     checkOrganizationHandle,
     connectProject,
     connectedTeamIds,
@@ -4624,7 +4277,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     health,
     healthError,
     healthLoading,
-    finishProjectCreation,
+    finishProjectCreation: finishTeamCreation,
     isCreatingProject,
     isCreatingIssue,
     updatingIssueId,
@@ -4708,7 +4361,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       return unassignHuntRun(token, projectId, runId).then(() => refresh());
     },
     moveRun,
-    startProjectCreation,
+    startProjectCreation: startTeamCreation,
     token,
     user,
     velen,

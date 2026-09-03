@@ -52,7 +52,8 @@ import {
   CompanionChannels,
   type CompanionChannelCache,
 } from "./components/CompanionChannels";
-import { LoginScreen } from "./components/LoginScreen";
+import { AppEffects } from "./components/app/AppEffects";
+import { LoginScreenWithSession } from "./components/app/LoginScreenWithSession";
 import { loadProjectMergeActivity } from "./lib/app-rpc/github";
 import { TeamIcon } from "./components/TeamIcon";
 import { SessionLoadingScreen } from "./components/SessionLoadingScreen";
@@ -60,7 +61,7 @@ import { EmptyState, MainContent, PageHeader } from "./components/layout";
 import { Button } from "./components/ui/button";
 import { LoadingState } from "./components/ui/loading-state";
 import { useToast } from "./components/ui/toast";
-import { Sidebar } from "./components/Sidebar";
+import { SidebarWithSession } from "./components/app/SidebarWithSession";
 import type { UnifiedSettingsTarget } from "./components/UnifiedSettingsSidebar";
 import {
   WindowNavigationControls,
@@ -307,8 +308,8 @@ const OrganizationCreate = lazy(() =>
   })),
 );
 const OrganizationSettings = lazy(() =>
-  import("./components/OrganizationSettings").then((m) => ({
-    default: m.OrganizationSettings,
+  import("./components/app/OrganizationSettingsWithSession").then((m) => ({
+    default: m.OrganizationSettingsWithSession,
   })),
 );
 const PlanningProjectDialog = lazy(() =>
@@ -353,7 +354,9 @@ const TeamSettings = lazy(() =>
   })),
 );
 const Teams = lazy(() =>
-  import("./components/Teams").then((m) => ({ default: m.Teams })),
+  import("./components/app/TeamsWithPlanningProjects").then((m) => ({
+    default: m.TeamsWithPlanningProjects,
+  })),
 );
 const UnifiedSettingsSidebar = lazy(() =>
   import("./components/UnifiedSettingsSidebar").then((m) => ({
@@ -3917,11 +3920,8 @@ export function App({
     );
   } else if (!briar.user) {
     content = (
-      <LoginScreen
+      <LoginScreenWithSession
         companionMode={briar.companionMode}
-        error={briar.error}
-        loading={briar.loading}
-        loginCode={briar.loginCode}
         onCancel={briar.cancelLogin}
         onLogin={(method) => void briar.login({ method, locale })}
         onSendEmailCode={(email) => briar.sendLoginEmailCode(email, locale)}
@@ -3966,12 +3966,10 @@ export function App({
             onSidebarToggle={() => setIsSidebarOpen((open) => !open)}
           />
         {activePage !== "settings" ? (
-          <Sidebar
+          <SidebarWithSession
             activeChannelId={desktopActiveChannelId}
             activePage={activePage}
-            activeOrganizationId={briar.activeOrganizationId}
             activePlanningProjectId={activePlanningProjectId}
-            activeProjectId={briar.activeProjectId}
             agents={issueAgents}
             channels={visibleOrganizationChannels}
             channelsLoading={channelsLoading}
@@ -4081,17 +4079,13 @@ export function App({
             }}
             onSettings={openAppSettings}
             onLogout={() => void briar.logout()}
-            organizations={briar.organizations}
             projects={visibleProjects}
-            planningProjects={briar.planningProjects}
             projectReadiness={briar.projectReadiness}
             projectReadinessError={briar.projectReadinessError}
             projectWindowProjectId={projectWindowProjectId}
             sessions={autoHunt.sessions}
-            token={briar.token}
             unreadInboxCount={visibleInboxUnreadCount}
             unreadDmCount={unreadDirectMessageCount}
-            user={briar.user}
           />
         ) : null}
         <div className="app-content-surface">
@@ -4200,8 +4194,6 @@ export function App({
             onRename={briar.renameOrganization}
             connectedTeamIds={briar.connectedTeamIds}
             projects={visibleProjects}
-            token={briar.token ?? ""}
-            userId={briar.user.id}
           />
         ) : activePage === "dms" &&
           !projectWindowProjectId &&
@@ -4281,7 +4273,6 @@ export function App({
               setPlanningProjectTeamId(null);
               setPlanningProjectEditId(planningProjectId);
             }}
-            projects={briar.planningProjects}
             teamId={activeProjectForTabs.id}
             teamName={activeProjectForTabs.name}
           />
@@ -5056,6 +5047,7 @@ export function App({
 
   return (
     <>
+      <AppEffects />
       {content}
       <Suspense fallback={null}>
       <PlanningProjectDialog
