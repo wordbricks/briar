@@ -665,7 +665,7 @@ Phase 2 이후 언제든 착수 가능하며 Phase 3–7과 병행할 수 있다
 
 | Phase | PR | 상태 | 비고 |
 |---|---|---|---|
-| 0 | | 예정 | |
+| 0 | #1581 | 머지됨 | `state/registry.ts`, `state/platform.ts`, `state/demo-fixtures.ts`, `state/inbox-selection.ts`, `test/render-count.tsx`. `ProjectConnection`은 `types.ts`로. |
 | 1 | | 예정 | |
 | 2A | | 예정 | |
 | 2B | | 예정 | |
