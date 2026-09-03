@@ -488,6 +488,8 @@ export const appProject = (project: ProjectRow) => create(ProjectSchema, {
   issueKeyPrefix: project.issue_key_prefix,
   scheduleTabEnabled: project.schedule_tab_enabled !== 0,
   icon: project.icon ?? undefined,
+  iconName: project.icon_name ?? undefined,
+  iconColor: project.icon_color ?? undefined,
   organizationId: project.organization_id,
   organizationName: project.organization_name,
   role: projectRole[project.member_role],

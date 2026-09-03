@@ -104,6 +104,8 @@ describe("Briar 1.2.174 update bootstrap", () => {
         issueKeyPrefix: "AH",
         scheduleTabEnabled: true,
         icon: null,
+        iconName: null,
+        iconColor: null,
         organizationId,
         organizationName: "Legacy Organization",
         role: "owner",

@@ -71,6 +71,8 @@ describe("app Agent Connect adapter", () => {
       issue_key_prefix: "BR",
       schedule_tab_enabled: 1,
       icon: null,
+      icon_name: null,
+      icon_color: null,
       organization_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
       organization_name: "Briar Org",
       member_role: "owner",

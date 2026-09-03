@@ -131,6 +131,52 @@ describe("ProjectService mutations", () => {
         options(tokens.owner),
       ),
     ).resolves.toMatchObject({ project: { icon } });
+    const namedIcon = await owner.updateProjectIcon(
+      {
+        projectId: projectId!,
+        iconUpdate: {
+          case: "namedIcon",
+          value: { name: "rocket", color: "#6366f1" },
+        },
+      },
+      options(tokens.owner),
+    );
+    expect(namedIcon.project).toMatchObject({
+      iconName: "rocket",
+      iconColor: "#6366f1",
+    });
+    expect(namedIcon.project?.icon).toBeUndefined();
+    const imageOverNamed = await owner.updateProjectIcon(
+      { projectId: projectId!, iconUpdate: { case: "icon", value: icon } },
+      options(tokens.owner),
+    );
+    expect(imageOverNamed.project?.icon).toBe(icon);
+    expect(imageOverNamed.project?.iconName).toBeUndefined();
+    expect(imageOverNamed.project?.iconColor).toBeUndefined();
+    const invalidNamedIcon = await owner.updateProjectIcon(
+      {
+        projectId: projectId!,
+        iconUpdate: {
+          case: "namedIcon",
+          value: { name: "definitely-not-an-icon" },
+        },
+      },
+      options(tokens.owner),
+    ).catch((error: unknown) => error);
+    expect(invalidNamedIcon).toBeInstanceOf(ConnectError);
+    expect((invalidNamedIcon as ConnectError).code).toBe(Code.InvalidArgument);
+    const invalidIconColor = await owner.updateProjectIcon(
+      {
+        projectId: projectId!,
+        iconUpdate: {
+          case: "namedIcon",
+          value: { name: "rocket", color: "purple" },
+        },
+      },
+      options(tokens.owner),
+    ).catch((error: unknown) => error);
+    expect(invalidIconColor).toBeInstanceOf(ConnectError);
+    expect((invalidIconColor as ConnectError).code).toBe(Code.InvalidArgument);
     const clearedIcon = await owner.updateProjectIcon(
       {
         projectId: projectId!,
@@ -139,6 +185,8 @@ describe("ProjectService mutations", () => {
       options(tokens.owner),
     );
     expect(clearedIcon.project?.icon).toBeUndefined();
+    expect(clearedIcon.project?.iconName).toBeUndefined();
+    expect(clearedIcon.project?.iconColor).toBeUndefined();
     await expect(
       owner.updateProjectIssueKeyPrefix(
         { projectId: projectId!, issueKeyPrefix: " br " },

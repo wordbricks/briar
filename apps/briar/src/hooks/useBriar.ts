@@ -68,6 +68,7 @@ import {
   updateOrganization as updateRemoteOrganization,
   updateOrganizationLogo as updateRemoteOrganizationLogo,
   updateProjectIcon as updateRemoteProjectIcon,
+  type ProjectIconUpdate,
   updateProjectIssueKeyPrefix as updateRemoteProjectIssueKeyPrefix,
   updateProjectTabs as updateRemoteProjectTabs,
   updateProjectSettings,
@@ -1628,14 +1629,19 @@ export function useBriar(options: UseBriarOptions = {}) {
   );
 
   const changeProjectIcon = useCallback(
-    async (projectId: string, icon: string | null) => {
+    async (projectId: string, update: ProjectIconUpdate) => {
       const currentProject = projects.find((project) => project.id === projectId);
       if (!currentProject) throw new Error("변경할 프로젝트를 찾을 수 없습니다.");
       if (!demoMode && !token) throw new Error("로그인이 필요합니다.");
       const project =
         demoMode || !token
-          ? { ...currentProject, icon }
-          : (await updateRemoteProjectIcon(token, projectId, icon)).project;
+          ? {
+              ...currentProject,
+              icon: update.type === "image" ? update.dataUrl : null,
+              iconName: update.type === "named" ? update.name : null,
+              iconColor: update.type === "named" ? update.color : null,
+            }
+          : (await updateRemoteProjectIcon(token, projectId, update)).project;
       setProjects((current) =>
         current.map((candidate) =>
           candidate.id === projectId ? project : candidate,
@@ -1787,6 +1793,8 @@ export function useBriar(options: UseBriarOptions = {}) {
           issueKeyPrefix: defaultIssueKeyPrefix,
           scheduleTabEnabled: true,
           icon: null,
+          iconName: null,
+          iconColor: null,
           organizationId: organization.id,
           organizationName: organization.name,
           role: organization.role,
@@ -2100,13 +2108,16 @@ export function useBriar(options: UseBriarOptions = {}) {
       }
 
       let connectedProject = connection.project;
-      if (token && !connectedProject.icon) {
+      if (token && !connectedProject.icon && !connectedProject.iconName) {
         try {
           const discovered = await discoverRepositoryIcon(connected.repositoryPath);
           if (discovered) {
             const icon = await projectIconFromDataUrl(discovered);
             connectedProject = (
-              await updateRemoteProjectIcon(token, connectedProject.id, icon)
+              await updateRemoteProjectIcon(token, connectedProject.id, {
+                type: "image",
+                dataUrl: icon,
+              })
             ).project;
             setProjects((current) =>
               current.map((project) =>

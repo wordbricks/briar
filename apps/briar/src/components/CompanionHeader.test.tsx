@@ -34,6 +34,8 @@ const projects = [
     organizationName: "Wordbricks",
     role: "owner" as const,
     icon: "data:image/png;base64,AA==",
+    iconName: null,
+    iconColor: null,
     createdAt: "2026-07-23",
   },
 ];

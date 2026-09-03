@@ -15,6 +15,7 @@ import {
   GitMerge,
   ImagePlus,
   LayoutList,
+  Palette,
   Plug,
   RefreshCw,
   Save,
@@ -108,8 +109,11 @@ import {
   projectIconFromFile,
 } from "../lib/project-icon";
 import { isProjectScheduleTabEnabled } from "../lib/project-tabs";
+import type { ProjectIconUpdate } from "../lib/api";
 import { LinearIssueImport } from "./LinearIssueImport";
 import { ProjectExecutionSettings } from "./ProjectExecutionSettings";
+import { ProjectIcon } from "./ProjectIcon";
+import { ProjectIconPicker } from "./ProjectIconPicker";
 import { ProjectMergeQueueSettings } from "./ProjectMergeQueueSettings";
 import { ProjectTabsSettings } from "./ProjectTabsSettings";
 import { ProviderSelect } from "./ProviderSelect";
@@ -176,7 +180,10 @@ export function ProjectSettings({
     teamIds: string[];
     statusMapping: LinearStatusMapping;
   }) => Promise<LinearImportResult>;
-  onIconChange: (projectId: string, icon: string | null) => Promise<unknown>;
+  onIconChange: (
+    projectId: string,
+    update: ProjectIconUpdate,
+  ) => Promise<unknown>;
   onIssueKeyPrefixChange: (
     projectId: string,
     issueKeyPrefix: string,
@@ -244,6 +251,17 @@ export function ProjectSettings({
   const [isIconSaving, setIsIconSaving] = useState(false);
   const [iconError, setIconError] = useState<string | null>(null);
   const [iconSaved, setIconSaved] = useState(false);
+  const [isIconPickerOpen, setIsIconPickerOpen] = useState(false);
+
+  const applyIconUpdate = (update: ProjectIconUpdate) => {
+    setIsIconSaving(true);
+    setIconError(null);
+    setIconSaved(false);
+    return Promise.resolve(onIconChange(project.id, update))
+      .then(() => setIconSaved(true))
+      .catch(() => setIconError(t("settings.iconUploadFailed")))
+      .finally(() => setIsIconSaving(false));
+  };
   const [issueKeyPrefix, setIssueKeyPrefix] = useState(
     project.issueKeyPrefix,
   );
@@ -759,6 +777,11 @@ export function ProjectSettings({
                         className="size-full object-contain"
                         src={project.icon}
                       />
+                    ) : project.iconName ? (
+                      <ProjectIcon
+                        className="size-8 text-muted-foreground"
+                        project={project}
+                      />
                     ) : (
                       <FolderGit2
                         aria-hidden="true"
@@ -781,6 +804,17 @@ export function ProjectSettings({
                       <div className="flex flex-wrap items-center gap-2">
                         <Button
                           className={isIconSaving ? "pointer-events-none opacity-50" : undefined}
+                          disabled={isIconSaving}
+                          onClick={() => setIsIconPickerOpen(true)}
+                          size="sm"
+                          type="button"
+                          variant="outline"
+                        >
+                          <Palette aria-hidden="true" size={15} strokeWidth={1.8} />
+                          {t("settings.chooseIcon")}
+                        </Button>
+                        <Button
+                          className={isIconSaving ? "pointer-events-none opacity-50" : undefined}
                           size="sm"
                           type="button"
                           variant="outline"
@@ -801,8 +835,9 @@ export function ProjectSettings({
                                 setIconError(null);
                                 setIconSaved(false);
                                 void projectIconFromFile(file)
-                                  .then((icon) => onIconChange(project.id, icon))
-                                  .then(() => setIconSaved(true))
+                                  .then((icon) =>
+                                    applyIconUpdate({ type: "image", dataUrl: icon }),
+                                  )
                                   .catch(() => setIconError(t("settings.iconUploadFailed")))
                                   .finally(() => setIsIconSaving(false));
                               }}
@@ -810,18 +845,10 @@ export function ProjectSettings({
                             />
                           </label>
                         </Button>
-                        {project.icon ? (
+                        {project.icon || project.iconName ? (
                           <Button
                             disabled={isIconSaving}
-                            onClick={() => {
-                              setIsIconSaving(true);
-                              setIconError(null);
-                              setIconSaved(false);
-                              void onIconChange(project.id, null)
-                                .then(() => setIconSaved(true))
-                                .catch(() => setIconError(t("settings.iconUploadFailed")))
-                                .finally(() => setIsIconSaving(false));
-                            }}
+                            onClick={() => void applyIconUpdate({ type: "clear" })}
                             size="sm"
                             type="button"
                             variant="ghost"
@@ -853,6 +880,15 @@ export function ProjectSettings({
               </div>
             </section>
           ) : null}
+
+          <ProjectIconPicker
+            disabled={!canManageProject || isIconSaving}
+            onOpenChange={setIsIconPickerOpen}
+            open={isIconPickerOpen}
+            selectedColor={project.iconColor}
+            selectedName={project.iconName}
+            onSelect={(icon) => applyIconUpdate({ type: "named", ...icon })}
+          />
 
           {activeSection === "tabs" ? (
             <ProjectTabsSettings

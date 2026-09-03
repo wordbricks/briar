@@ -10,6 +10,11 @@ import {
 } from "../../src/lib/project-agent";
 import type { ProjectRow } from "./project-repository";
 
+export type ProjectIconUpdate =
+  | { readonly type: "image"; readonly dataUrl: string }
+  | { readonly type: "named"; readonly name: string; readonly color: string | null }
+  | { readonly type: "clear" };
+
 import { archiveCleanupQueueUpsertSql } from "./archive-cleanup-repository";
 import { stableJson } from "./hunt-run-codec";
 import { type ProjectAgentRow } from "./project-agent-model";
@@ -31,6 +36,8 @@ export async function createProject(
     issue_key_prefix: "AH",
     schedule_tab_enabled: 1,
     icon: null,
+    icon_name: null,
+    icon_color: null,
     organization_id: input.organizationId,
     organization_name: "",
     member_role: "owner",
@@ -130,6 +137,7 @@ export async function getProject(
               project.issue_key_prefix,
               project.schedule_tab_enabled,
               coalesce(project.icon_data_url_browser, project.icon_data_url) as icon,
+              project.icon_name, project.icon_color,
               project.organization_id,
               organization.name as organization_name,
               membership.role as member_role, project.created_at
@@ -162,6 +170,7 @@ export async function getProject(
                 project.issue_key_prefix,
                 project.schedule_tab_enabled,
                 coalesce(project.icon_data_url_browser, project.icon_data_url) as icon,
+                project.icon_name, project.icon_color,
                 project.organization_id,
                 organization.name as organization_name,
                 membership.role as member_role, project.created_at
@@ -181,16 +190,29 @@ export async function getProject(
 export async function updateProjectIcon(
   db: D1Database,
   projectId: string,
-  icon: string | null,
+  update: ProjectIconUpdate,
 ) {
   const updatedAt = new Date().toISOString();
+  const columns =
+    update.type === "image"
+      ? { icon_data_url_browser: update.dataUrl, icon_name: null, icon_color: null }
+      : update.type === "named"
+      ? { icon_data_url_browser: null, icon_name: update.name, icon_color: update.color }
+      : { icon_data_url_browser: null, icon_name: null, icon_color: null };
   const result = await db
     .prepare(
       `update briar_teams
-       set icon_data_url_browser = ?, icon_data_url = null, updated_at = ?
+       set icon_data_url_browser = ?, icon_data_url = null,
+           icon_name = ?, icon_color = ?, updated_at = ?
        where id = ?`,
     )
-    .bind(icon, updatedAt, projectId)
+    .bind(
+      columns.icon_data_url_browser,
+      columns.icon_name,
+      columns.icon_color,
+      updatedAt,
+      projectId,
+    )
     .run();
   return result.meta.changes > 0;
 }
