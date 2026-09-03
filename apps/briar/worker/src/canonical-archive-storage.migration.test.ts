@@ -1,10 +1,8 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import { archiveFormatVersion } from "./archive-contract";
-import {
-  applyD1Migrations,
-  executeD1Sql,
-} from "./test-helpers/d1";
+import { applyD1Migrations } from "./test-helpers/d1";
+import { executeD1Sql } from "./test-helpers/d1-sql";
 
 describe("canonical archive storage migration", () => {
   it("requires a completed R2 backfill and preserves its D1 pointer", async () => {

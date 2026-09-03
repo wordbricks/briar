@@ -1,10 +1,8 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import { agentProviders } from "../../src/lib/agent-provider";
-import {
-  applyD1Migrations,
-  executeD1Sql,
-} from "./test-helpers/d1";
+import { applyD1Migrations } from "./test-helpers/d1";
+import { executeD1Sql } from "./test-helpers/d1-sql";
 import { workerRuntimeMetadataFromStoredProtoJson } from "./worker-runtime-mappers";
 
 describe("Worker runtime ProtoJSON migration", () => {

@@ -6,10 +6,8 @@ import {
   HuntClaimError,
 } from "./db";
 import { runIsFullAuto } from "./hunt-run-codec";
-import {
-  applyD1Migrations,
-  executeD1Sql,
-} from "./test-helpers/d1";
+import { applyD1Migrations } from "./test-helpers/d1";
+import { executeD1Sql } from "./test-helpers/d1-sql";
 
 describe("hunt run execution policy storage cutover", () => {
   it("backfills policy once and keeps claim authorization independent of context", async () => {

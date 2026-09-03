@@ -14,7 +14,7 @@ import {
 } from "./db";
 import { processSlackRevocationQueue } from "./slack-revocations";
 import { encryptSlackToken } from "./slack";
-import { executeD1Sql } from "./test-helpers/d1";
+import { executeD1Sql } from "./test-helpers/d1-sql";
 
 describe("Slack D1 integration", () => {
   const db = env.DB;

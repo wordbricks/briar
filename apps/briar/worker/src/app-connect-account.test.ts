@@ -8,7 +8,7 @@ import {
 import { env } from "cloudflare:workers";
 import { beforeAll, describe, expect, it } from "vitest";
 import worker from "./index";
-import { executeD1Sql } from "./test-helpers/d1";
+import { executeD1Sql } from "./test-helpers/d1-sql";
 
 describe("AccountService", () => {
   const now = "2026-08-31T00:00:00.000Z";

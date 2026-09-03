@@ -4,6 +4,7 @@ import {
   cleanManagedSetupOutput,
   githubSetupChallenge,
   managedComputerProviderAuthCommand,
+  OPENCODE_SKIP_SENTINEL,
   providerSetupChallenge,
 } from "./managed-computer-setup-agent";
 
@@ -71,5 +72,9 @@ describe("managed computer setup provider adapters", () => {
     expect(authenticationFailureMessage("provider secret output")).toBe(
       "Authentication command failed",
     );
+  });
+
+  it("exposes a skip sentinel for the opencode provider", () => {
+    expect(OPENCODE_SKIP_SENTINEL).toBe("SKIP");
   });
 });

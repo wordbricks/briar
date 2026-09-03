@@ -10,10 +10,8 @@ import {
   upsertProjectAgentSession,
 } from "./project-agent-session-repository";
 import { listInboxReadStates } from "./inbox-read-state-repository";
-import {
-  applyD1Migrations,
-  executeD1Sql,
-} from "./test-helpers/d1";
+import { applyD1Migrations } from "./test-helpers/d1";
+import { executeD1Sql } from "./test-helpers/d1-sql";
 
 describe("project Agent session storage cutover", () => {
   it("backfills visible history and rejects corrupt storage", async () => {
