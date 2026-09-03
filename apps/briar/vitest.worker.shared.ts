@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import {
   cloudflareTest,
@@ -25,7 +26,21 @@ export const workerTestBindings = {
 export type WorkerTestPluginOptions = {
   migrations?: boolean;
   excludeMigrations?: readonly string[];
+  /**
+   * Bind the committed schema snapshot instead of the migration list. Each test
+   * file gets an isolated D1, so replaying ~190 migrations per file dominated
+   * setup time; loading one generated dump does the same work once.
+   * `scripts/generate-d1-schema-snapshot.ts` keeps the snapshot current and
+   * `bun run d1:snapshot:check` fails CI when it drifts.
+   */
+  schemaSnapshot?: boolean;
 };
+
+export const d1SchemaSnapshotPath = path.join(
+  import.meta.dirname,
+  "migrations-snapshot",
+  "schema.sql",
+);
 
 export async function createWorkerTestPlugin(
   options: WorkerTestPluginOptions = {},
@@ -38,7 +53,11 @@ export async function createWorkerTestPlugin(
   }
 
   let migrationBindings = {};
-  if (options.migrations !== false) {
+  if (options.schemaSnapshot) {
+    migrationBindings = {
+      TEST_SCHEMA_SQL: await readFile(d1SchemaSnapshotPath, "utf8"),
+    };
+  } else if (options.migrations !== false) {
     const excludedMigrations = new Set(options.excludeMigrations ?? []);
     migrationBindings = {
       TEST_MIGRATIONS: (await readD1Migrations(

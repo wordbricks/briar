@@ -115,6 +115,38 @@ export async function executeD1Sql(db: D1Database, sql: string) {
   }
 }
 
+// Must match STATEMENT_SENTINEL in scripts/generate-d1-schema-snapshot.ts. The
+// generator records the statement boundaries so the snapshot needs no SQL
+// parsing here: splitD1Sql mis-handles the `case ... end,` bodies of several
+// triggers, and re-parsing 480 KB per test file would waste the time this
+// snapshot exists to save.
+const SCHEMA_SNAPSHOT_SENTINEL = "-- @statement\n";
+
+/**
+ * Loads apps/briar/migrations-snapshot/schema.sql into a fresh test database.
+ * The leading chunk is the generated header comment and is skipped.
+ */
+export async function applyD1SchemaSnapshot(db: D1Database, snapshot: string) {
+  const statements = snapshot
+    .split(SCHEMA_SNAPSHOT_SENTINEL)
+    .slice(1)
+    .map((statement) => statement.trim())
+    .filter((statement) => statement.length > 0);
+  if (statements.length === 0) {
+    throw new Error("The D1 schema snapshot contained no statements");
+  }
+  // One batch per chunk: a single round trip beats ~680 sequential prepares,
+  // while the chunking keeps any one batch well inside D1's request limits.
+  const chunkSize = 100;
+  for (let index = 0; index < statements.length; index += chunkSize) {
+    await db.batch(
+      statements.slice(index, index + chunkSize).map((statement) =>
+        db.prepare(statement)
+      ),
+    );
+  }
+}
+
 export async function applyD1Migrations(
   db: D1Database,
   options: ApplyD1MigrationsOptions = {},
