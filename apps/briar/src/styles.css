@@ -191,7 +191,22 @@ body { overflow: hidden; font-synthesis: none; }
 .development-badge i { width:6px; height:6px; border-radius:50%; background:#765bd0; box-shadow:0 0 0 3px rgba(118,91,208,.13); }
 .companion-shell + .development-badge { right:auto; left:max(14px,env(safe-area-inset-left)); bottom:calc(86px + env(safe-area-inset-bottom)); }
 
-.sidebar { width: 252px; flex: 0 0 252px; height: 100%; position:relative; z-index:10; overflow:visible; display: flex; flex-direction: column; border-right: 1px solid var(--sidebar-border); color:var(--sidebar-foreground); background:var(--sidebar-fallback); box-shadow:var(--sidebar-shadow); transition: width .3s cubic-bezier(.2,.8,.2,1), flex-basis .3s cubic-bezier(.2,.8,.2,1), border-color .2s ease; }
+/* Sidebar toggle: the layout-affecting properties (width/flex-basis) snap in a
+   single frame instead of animating continuously, so collapsing/expanding
+   costs one reflow of the content surface instead of one per animation frame.
+   Only compositor-friendly properties (opacity/transform) animate on the
+   sidebar itself; width/flex-basis transitions are zero-duration and merely
+   delayed so they fire after (collapse) or before (expand) the fade. */
+.sidebar { width: 252px; flex: 0 0 252px; height: 100%; position:relative; z-index:10; overflow:visible; display: flex; flex-direction: column; border-right: 1px solid var(--sidebar-border); color:var(--sidebar-foreground); background:var(--sidebar-fallback); box-shadow:var(--sidebar-shadow); opacity:1; visibility:visible; transform:translateX(0); transition: border-color .2s ease; }
+.sidebar:not(.sidebar-collapsed) {
+  transition:
+    width 0s linear,
+    flex-basis 0s linear,
+    visibility 0s linear,
+    opacity .16s ease .04s,
+    transform .16s ease .04s,
+    border-color .2s ease;
+}
 @supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
   .sidebar {
     background:
@@ -207,7 +222,24 @@ body { overflow: hidden; font-synthesis: none; }
   backdrop-filter:none;
   -webkit-backdrop-filter:none;
 }
-.sidebar.sidebar-collapsed { width: 0; flex-basis: 0; overflow:hidden; border-right-width: 0; }
+.sidebar.sidebar-collapsed {
+  width: 0;
+  flex-basis: 0;
+  overflow:hidden;
+  border-right-width: 0;
+  opacity:0;
+  visibility:hidden;
+  transform:translateX(-12px);
+  box-shadow:none;
+  pointer-events:none;
+  transition:
+    opacity .16s ease,
+    transform .16s ease,
+    width 0s linear .16s,
+    flex-basis 0s linear .16s,
+    visibility 0s linear .16s,
+    border-color .2s ease;
+}
 .sidebar-toolbar { height: 46px; flex: 0 0 46px; padding-left: var(--traffic-light-safe-inset); display: flex; align-items: center; }
 .window-navigation-controls { height:46px; position:absolute; z-index:30; top:0; left:0; padding-left:var(--traffic-light-safe-inset); display:flex; align-items:center; gap:2px; }
 .window-navigation-button { width:30px; height:30px; flex:0 0 30px; padding:0; display:grid; place-items:center; border:0; border-radius:8px; color:var(--sidebar-foreground-muted); background:transparent; cursor:pointer; transition:color .15s ease,background-color .15s ease,transform .1s ease-out; }
@@ -3269,7 +3301,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .project-empty > button:hover { background:var(--primary-hover); }
 .project-empty > button:focus-visible { outline:3px solid var(--primary-ring); outline-offset:3px; }
 @media (max-width:1080px) { }
-@media (prefers-reduced-motion: reduce) { .sidebar { transition: none; }.window-navigation-button,.sidebar-brand svg,.user-card > svg,.sidebar-update-trigger,.app-version-trigger,.kanban-card,.auto-hunt-target { transition: none; }.auto-hunt-target:hover { transform:none; }.sidebar-update-trigger.is-available,.app-version-popover,.sidebar-organization-menu,.sidebar-project-menu,.account-popover,.language-popover,.delete-project-dialog,.repository-setup-dialog,.run-page-actions-menu,.auto-hunt-event-count > i > span,.session-loading-logo::after,.window-navigation-history-popover { animation:none; }.session-loading-logo::after { background-position:center; opacity:.42; }.launch-intro { animation-duration:200ms; }.launch-intro-content,.launch-intro-brand,.launch-intro-copy > p,.launch-intro-character,.launch-intro-skip { animation:none; }.launch-intro-content,.launch-intro-brand,.launch-intro-copy > p,.launch-intro-character,.launch-intro-skip { opacity:1; filter:none; transform:none; } }
+@media (prefers-reduced-motion: reduce) { .sidebar,.sidebar:not(.sidebar-collapsed),.sidebar.sidebar-collapsed { transition: none; }.window-navigation-button,.sidebar-brand svg,.user-card > svg,.sidebar-update-trigger,.app-version-trigger,.kanban-card,.auto-hunt-target { transition: none; }.auto-hunt-target:hover { transform:none; }.sidebar-update-trigger.is-available,.app-version-popover,.sidebar-organization-menu,.sidebar-project-menu,.account-popover,.language-popover,.delete-project-dialog,.repository-setup-dialog,.run-page-actions-menu,.auto-hunt-event-count > i > span,.session-loading-logo::after,.window-navigation-history-popover { animation:none; }.session-loading-logo::after { background-position:center; opacity:.42; }.launch-intro { animation-duration:200ms; }.launch-intro-content,.launch-intro-brand,.launch-intro-copy > p,.launch-intro-character,.launch-intro-skip { animation:none; }.launch-intro-content,.launch-intro-brand,.launch-intro-copy > p,.launch-intro-character,.launch-intro-skip { opacity:1; filter:none; transform:none; } }
 @media (prefers-reduced-transparency: reduce) { .sidebar,.app-version-popover,.sidebar-organization-menu,.sidebar-project-menu,.account-popover,.language-popover,.repository-setup-dialog,.launch-intro::before,.platform-ios .companion-header,.companion-bottom-nav,.companion-filter-menu,.companion-account-popover { backdrop-filter:none; -webkit-backdrop-filter:none; }.sidebar { background:var(--sidebar-fallback); }.app-version-popover,.sidebar-organization-menu,.sidebar-project-menu,.account-popover,.language-popover,.repository-setup-dialog,.companion-filter-menu,.companion-account-popover { background:var(--card); }.launch-intro::before { background:rgba(12,11,16,.96); }.platform-ios .companion-header,.companion-bottom-nav { background:#f8f8fa; }.launch-intro-skip { background:transparent; } }
 @media (prefers-contrast: more) { .sidebar { border-right-color:var(--sidebar-border-strong); background:var(--sidebar-fallback); backdrop-filter:none; -webkit-backdrop-filter:none; }.launch-intro::before { background:rgba(8,7,11,.94); } }
 @media (prefers-reduced-transparency: reduce) { .macos-vibrant-window .sidebar { background:var(--sidebar-fallback); } }
