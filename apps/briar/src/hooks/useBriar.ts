@@ -236,9 +236,7 @@ const webMode = isWebApp();
 const remoteMode = companionMode || webMode;
 const deviceClientId: DeviceClientId = companionMode
   ? "briar-mobile"
-  : webMode
-    ? "briar-web"
-    : "briar-desktop";
+  : "briar-desktop";
 const demoUser: SessionUser = {
   id: "demo-user",
   name: "Jay",

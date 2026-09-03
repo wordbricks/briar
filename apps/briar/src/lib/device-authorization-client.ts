@@ -121,7 +121,6 @@ export type DeviceAuthorizationClientId =
   | "briar-mobile"
   | "briar-android"
   | "briar-desktop"
-  | "briar-web"
   | "briar-cli";
 
 export type DeviceAuthorizationLaunchOptions = {
@@ -138,8 +137,6 @@ export const createDeviceVerificationUrl = (
   const verificationUrl = new URL(verificationUriComplete);
   if (clientId === "briar-mobile" || clientId === "briar-android") {
     verificationUrl.searchParams.set("client", "mobile");
-  } else if (clientId === "briar-web") {
-    verificationUrl.searchParams.set("client", "web");
   }
   if (options.method) {
     verificationUrl.searchParams.set("method", options.method);

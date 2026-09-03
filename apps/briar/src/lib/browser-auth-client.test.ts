@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { createBrowserAuthClient, type BrowserAuthFetch } from "./browser-auth-client";
 import { browserCookieSessionCredential } from "./session-credential";
 
@@ -13,11 +13,10 @@ const jsonResponse = (body: unknown, status = 200) => new Response(
 );
 
 describe("Better Auth browser client", () => {
-  it("starts Google OAuth directly and returns to the requested app URL", async () => {
+  it("delegates Google OAuth and its redirect to Better Auth", async () => {
     let requestedUrl = "";
     let requestedBody: unknown;
     let requestedCredentials: RequestCredentials | undefined;
-    const navigate = vi.fn();
     const fetch: BrowserAuthFetch = async (input, init) => {
       requestedUrl = String(input);
       requestedBody = JSON.parse(String(init?.body));
@@ -27,10 +26,7 @@ describe("Better Auth browser client", () => {
         url: "https://accounts.google.com/o/oauth2/v2/auth?state=oauth-state",
       });
     };
-    const client = createBrowserAuthClient("https://briar.example", {
-      fetch,
-      navigate,
-    });
+    const client = createBrowserAuthClient("https://briar.example", { fetch });
 
     await client.signInWithGoogle({
       callbackURL: "https://briar.example/app/invitations/example",
@@ -40,22 +36,23 @@ describe("Better Auth browser client", () => {
     expect(requestedUrl).toBe(
       "https://briar.example/api/auth/sign-in/social",
     );
-    expect(requestedBody).toMatchObject({
+    expect(requestedBody).toEqual({
       callbackURL: "https://briar.example/app/invitations/example",
-      disableRedirect: true,
       provider: "google",
     });
     expect(requestedCredentials).toBe("include");
-    expect(navigate).toHaveBeenCalledWith(
-      "https://accounts.google.com/o/oauth2/v2/auth?state=oauth-state",
-    );
   });
 
-  it("uses Better Auth email OTP endpoints without device authorization", async () => {
-    const requests: Array<{ body: unknown; url: string }> = [];
+  it("uses Better Auth email OTP endpoints", async () => {
+    const requests: Array<{
+      body: unknown;
+      credentials: RequestCredentials | undefined;
+      url: string;
+    }> = [];
     const fetch: BrowserAuthFetch = async (input, init) => {
       requests.push({
         body: JSON.parse(String(init?.body)),
+        credentials: init?.credentials,
         url: String(input),
       });
       if (String(input).endsWith("/email-otp/send-verification-otp")) {
@@ -88,17 +85,47 @@ describe("Better Auth browser client", () => {
       name: "person",
       otp: "123456",
     });
+    expect(requests.every((request) => request.credentials === "include"))
+      .toBe(true);
   });
 
-  it("restores an authenticated browser from its session cookie", async () => {
-    const fetch: BrowserAuthFetch = async () => jsonResponse({
-      session: { id: "session-1" },
-      user: { id: "user-1", email: "person@example.com", name: "person" },
-    });
+  it("restores and signs out through Better Auth's cookie session APIs", async () => {
+    const requests: Array<{
+      credentials: RequestCredentials | undefined;
+      method: string | undefined;
+      url: string;
+    }> = [];
+    const fetch: BrowserAuthFetch = async (input, init) => {
+      requests.push({
+        credentials: init?.credentials,
+        method: init?.method,
+        url: String(input),
+      });
+      if (String(input).endsWith("/sign-out")) {
+        return jsonResponse({ success: true });
+      }
+      return jsonResponse({
+        session: { id: "session-1" },
+        user: { id: "user-1", email: "person@example.com", name: "person" },
+      });
+    };
     const client = createBrowserAuthClient("https://briar.example", { fetch });
 
     await expect(client.readSessionCredential()).resolves.toBe(
       browserCookieSessionCredential,
     );
+    await expect(client.signOut()).resolves.toBeUndefined();
+    expect(requests).toEqual([
+      {
+        credentials: "include",
+        method: "GET",
+        url: "https://briar.example/api/auth/get-session",
+      },
+      {
+        credentials: "include",
+        method: "POST",
+        url: "https://briar.example/api/auth/sign-out",
+      },
+    ]);
   });
 });

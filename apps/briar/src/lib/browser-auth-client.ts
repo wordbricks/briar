@@ -12,7 +12,6 @@ export type BrowserAuthFetch = (
 
 type BrowserAuthDependencies = {
   fetch?: BrowserAuthFetch;
-  navigate?: (url: string) => void;
 };
 
 const requestHeaders = (locale: BrowserAuthLocale) => ({
@@ -30,8 +29,6 @@ export function createBrowserAuthClient(
       customFetchImpl: dependencies.fetch ?? globalThis.fetch,
     },
   });
-  const navigate = dependencies.navigate ?? ((url: string) =>
-    window.location.assign(url));
 
   return {
     async readSessionCredential() {
@@ -47,14 +44,9 @@ export function createBrowserAuthClient(
       const response = await client.signIn.social({
         provider: "google",
         callbackURL: input.callbackURL,
-        disableRedirect: true,
         fetchOptions: { headers: requestHeaders(input.locale) },
       });
       if (response.error) throw new Error(response.error.message);
-      if (!response.data?.url) {
-        throw new Error("Better Auth did not return a Google authorization URL");
-      }
-      navigate(response.data.url);
     },
 
     async sendEmailOTP(email: string, locale: BrowserAuthLocale) {
