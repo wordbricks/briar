@@ -188,6 +188,11 @@ run_d1_migrations() {
 
   timed d1-migrations migrate-local \
     bun run d1:migrate:local -- --persist-to "$d1_state_dir"
+  # The worker-d1 Vitest project loads apps/briar/migrations-snapshot/schema.sql
+  # instead of replaying migrations. This compares the digests recorded in that
+  # snapshot against the migration files, so a schema change that forgot
+  # `bun run d1:snapshot` fails here instead of silently testing a stale schema.
+  timed d1-migrations snapshot-check bun run d1:snapshot:check
   # This suite now overlaps app-worker's Vitest pool. Pin it to a single worker
   # so the combined Miniflare count stays near the previous single-suite peak.
   if includes_context app-worker &&
