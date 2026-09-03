@@ -1,32 +1,38 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { en, ko, zh, type MessageKey, type Messages } from "./messages";
+import {
+  ko,
+  loadedLocaleMessages,
+  loadLocaleMessages,
+  type MessageKey,
+  type Messages,
+} from "./messages";
 import { localeTags, type Locale } from "./locale";
 
 export { localeTags, type Locale } from "./locale";
+export { loadLocaleMessages } from "./messages";
 type Variables = Record<string, string | number>;
 type Translate = (key: MessageKey, variables?: Variables) => string;
 
 const storageKey = "briar.locale.v1";
-const resources = { ko, en, zh } satisfies Record<Locale, Messages>;
 
 const interpolate = (message: string, variables?: Variables) =>
   message.replace(/\{([a-zA-Z0-9_]+)\}/gu, (_, key: string) =>
     variables?.[key] === undefined ? `{${key}}` : String(variables[key]),
   );
 
-const translate = (locale: Locale): Translate => (key, variables) =>
-  interpolate(resources[locale][key] ?? ko[key] ?? key, variables);
+const translate = (messages: Messages): Translate => (key, variables) =>
+  interpolate(messages[key] ?? ko[key] ?? key, variables);
 
 const defaultValue = {
   locale: "ko" as Locale,
   localeTag: localeTags.ko,
   setLocale: (_locale: Locale) => {},
-  t: translate("ko"),
+  t: translate(ko),
 };
 
 export const I18nContext = createContext(defaultValue);
 
-const detectLocale = (): Locale => {
+export const detectLocale = (): Locale => {
   if (typeof window === "undefined") return "ko";
   let stored: string | null = null;
   try {
@@ -41,8 +47,22 @@ const detectLocale = (): Locale => {
   return "en";
 };
 
-export function I18nProvider({ children }: { children: React.ReactNode }) {
-  const [locale, setLocale] = useState<Locale>(detectLocale);
+type LoadedMessages = { locale: Locale; messages: Messages };
+
+export function I18nProvider({
+  children,
+  initial,
+}: {
+  children: React.ReactNode;
+  /** Locale resolved before the first render, with its messages already loaded. */
+  initial?: LoadedMessages;
+}) {
+  const [locale, setLocale] = useState<Locale>(() => initial?.locale ?? detectLocale());
+  const [loaded, setLoaded] = useState<LoadedMessages>(() => {
+    if (initial) return initial;
+    const messages = loadedLocaleMessages(locale);
+    return messages ? { locale, messages } : { locale: "ko", messages: ko };
+  });
 
   useEffect(() => {
     try {
@@ -53,9 +73,26 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.lang = localeTags[locale];
   }, [locale]);
 
+  useEffect(() => {
+    if (loaded.locale === locale) return;
+    let active = true;
+    void loadLocaleMessages(locale).then(
+      (messages) => {
+        // Keep the previous locale's strings on screen until the swap lands.
+        if (active) setLoaded({ locale, messages });
+      },
+      (error: unknown) => {
+        console.error(`Failed to load the ${locale} messages`, error);
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [locale, loaded.locale]);
+
   const value = useMemo(
-    () => ({ locale, localeTag: localeTags[locale], setLocale, t: translate(locale) }),
-    [locale],
+    () => ({ locale, localeTag: localeTags[locale], setLocale, t: translate(loaded.messages) }),
+    [locale, loaded],
   );
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;

@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useAtomSet } from "@effect/atom-react";
 import {
   Activity,
@@ -23,65 +31,37 @@ import {
 import { AgentUsageStatusBar } from "./components/AgentUsageStatusBar";
 import { WorkerStatusBar } from "./components/WorkerStatusBar";
 import { AppVersionStatus } from "./components/AppVersionStatus";
-import { AppSettings } from "./components/AppSettings";
 import {
   CompanionBottomNavigation,
   type CompanionStatusFilter,
 } from "./components/CompanionBottomNavigation";
 import { CompanionEmptyState, CompanionHeader } from "./components/CompanionHeader";
-import { CompanionSettings } from "./components/CompanionSettings";
 import { ConnectionHealth } from "./components/ConnectionHealth";
 import { HuntDashboard } from "./components/hunt/HuntDashboard";
-import { RunPage } from "./components/hunt/detail/RunPage";
-import { WorkerDispatchDialog } from "./components/WorkerDispatchDialog";
 import { Inbox } from "./components/Inbox";
-import { MyIssues } from "./components/MyIssues";
 import { InboxDetailPanel } from "./components/InboxDetailPanel";
 import {
   InboxDetailTargetBoundary,
   InboxWithSelection,
 } from "./components/InboxSelectionBoundary";
 import { Channels } from "./components/Channels";
-import {
-  CommandPalette,
-  type CommandPaletteItem,
-} from "./components/CommandPalette";
+import type { CommandPaletteItem } from "./components/CommandPalette";
 import { KeyboardShortcutModeHint } from "./components/KeyboardShortcutModeHint";
-import { KeyboardShortcutsDialog } from "./components/KeyboardShortcutsDialog";
 import { DirectMessages } from "./components/DirectMessages";
 import {
   CompanionChannels,
   type CompanionChannelCache,
 } from "./components/CompanionChannels";
-import { FirstOrganizationSetup } from "./components/FirstOrganizationSetup";
-import { FirstRunTutorial } from "./components/FirstRunTutorial";
-import { InitialOnboarding } from "./components/InitialOnboarding";
-import { InvitationOnboarding } from "./components/InvitationOnboarding";
-import { LaunchIntro } from "./components/LaunchIntro";
 import { LoginScreen } from "./components/LoginScreen";
-import { OrganizationSettings } from "./components/OrganizationSettings";
-import { OrganizationCreate } from "./components/OrganizationCreate";
-import { TeamOnboarding } from "./components/TeamOnboarding";
-import { PlanningProjectDialog } from "./components/PlanningProjectDialog";
-import { Teams } from "./components/Teams";
-import { TeamLobby } from "./components/TeamLobby";
 import { loadProjectMergeActivity } from "./lib/app-rpc/github";
-import { TeamAgents } from "./components/TeamAgents";
 import { TeamIcon } from "./components/TeamIcon";
-import { TeamAgentSessionDetail } from "./components/TeamAgentSessionDetail";
-import { TeamSchedule } from "./components/TeamSchedule";
-import { TeamRepositorySetupDialog } from "./components/TeamRepositorySetupDialog";
-import { TeamSettings } from "./components/TeamSettings";
 import { SessionLoadingScreen } from "./components/SessionLoadingScreen";
 import { EmptyState, MainContent, PageHeader } from "./components/layout";
 import { Button } from "./components/ui/button";
 import { LoadingState } from "./components/ui/loading-state";
 import { useToast } from "./components/ui/toast";
 import { Sidebar } from "./components/Sidebar";
-import {
-  UnifiedSettingsSidebar,
-  type UnifiedSettingsTarget,
-} from "./components/UnifiedSettingsSidebar";
+import type { UnifiedSettingsTarget } from "./components/UnifiedSettingsSidebar";
 import {
   WindowNavigationControls,
   type WindowNavigationHistoryItem,
@@ -272,6 +252,126 @@ import {
 } from "./lib/app-navigation";
 import { useI18n } from "./i18n";
 import type { HuntRun, ProjectAgent, StatusTrayRun } from "./types";
+
+// Views and overlays that never show on the first screen load from their own
+// chunk. Each is behind a `<Suspense>` boundary whose fallback is an empty
+// surface: a local chunk resolves in a few milliseconds, so a spinner would
+// flash rather than inform.
+const AppSettings = lazy(() =>
+  import("./components/AppSettings").then((m) => ({ default: m.AppSettings })),
+);
+const CommandPalette = lazy(() =>
+  import("./components/CommandPalette").then((m) => ({
+    default: m.CommandPalette,
+  })),
+);
+const CompanionSettings = lazy(() =>
+  import("./components/CompanionSettings").then((m) => ({
+    default: m.CompanionSettings,
+  })),
+);
+const FirstOrganizationSetup = lazy(() =>
+  import("./components/FirstOrganizationSetup").then((m) => ({
+    default: m.FirstOrganizationSetup,
+  })),
+);
+const FirstRunTutorial = lazy(() =>
+  import("./components/FirstRunTutorial").then((m) => ({
+    default: m.FirstRunTutorial,
+  })),
+);
+const InitialOnboarding = lazy(() =>
+  import("./components/InitialOnboarding").then((m) => ({
+    default: m.InitialOnboarding,
+  })),
+);
+const InvitationOnboarding = lazy(() =>
+  import("./components/InvitationOnboarding").then((m) => ({
+    default: m.InvitationOnboarding,
+  })),
+);
+const KeyboardShortcutsDialog = lazy(() =>
+  import("./components/KeyboardShortcutsDialog").then((m) => ({
+    default: m.KeyboardShortcutsDialog,
+  })),
+);
+const LaunchIntro = lazy(() =>
+  import("./components/LaunchIntro").then((m) => ({ default: m.LaunchIntro })),
+);
+const MyIssues = lazy(() =>
+  import("./components/MyIssues").then((m) => ({ default: m.MyIssues })),
+);
+const OrganizationCreate = lazy(() =>
+  import("./components/OrganizationCreate").then((m) => ({
+    default: m.OrganizationCreate,
+  })),
+);
+const OrganizationSettings = lazy(() =>
+  import("./components/OrganizationSettings").then((m) => ({
+    default: m.OrganizationSettings,
+  })),
+);
+const PlanningProjectDialog = lazy(() =>
+  import("./components/PlanningProjectDialog").then((m) => ({
+    default: m.PlanningProjectDialog,
+  })),
+);
+const RunPage = lazy(() =>
+  import("./components/hunt/detail/RunPage").then((m) => ({
+    default: m.RunPage,
+  })),
+);
+const TeamAgents = lazy(() =>
+  import("./components/TeamAgents").then((m) => ({ default: m.TeamAgents })),
+);
+const TeamAgentSessionDetail = lazy(() =>
+  import("./components/TeamAgentSessionDetail").then((m) => ({
+    default: m.TeamAgentSessionDetail,
+  })),
+);
+const TeamLobby = lazy(() =>
+  import("./components/TeamLobby").then((m) => ({ default: m.TeamLobby })),
+);
+const TeamOnboarding = lazy(() =>
+  import("./components/TeamOnboarding").then((m) => ({
+    default: m.TeamOnboarding,
+  })),
+);
+const TeamRepositorySetupDialog = lazy(() =>
+  import("./components/TeamRepositorySetupDialog").then((m) => ({
+    default: m.TeamRepositorySetupDialog,
+  })),
+);
+const TeamSchedule = lazy(() =>
+  import("./components/TeamSchedule").then((m) => ({
+    default: m.TeamSchedule,
+  })),
+);
+const TeamSettings = lazy(() =>
+  import("./components/TeamSettings").then((m) => ({
+    default: m.TeamSettings,
+  })),
+);
+const Teams = lazy(() =>
+  import("./components/Teams").then((m) => ({ default: m.Teams })),
+);
+const UnifiedSettingsSidebar = lazy(() =>
+  import("./components/UnifiedSettingsSidebar").then((m) => ({
+    default: m.UnifiedSettingsSidebar,
+  })),
+);
+const WorkerDispatchDialog = lazy(() =>
+  import("./components/WorkerDispatchDialog").then((m) => ({
+    default: m.WorkerDispatchDialog,
+  })),
+);
+
+/** Neutral placeholder that fills the slot a lazy view is about to occupy. */
+const lazyViewFallback = <div className="lazy-view-placeholder h-full w-full" />;
+
+const withLazyBoundary = (view: React.ReactNode) => (
+  <Suspense fallback={lazyViewFallback}>{view}</Suspense>
+);
 
 type AgentAutoHuntOptions = {
   coordinatorConversationId?: string | null;
@@ -3448,7 +3548,7 @@ export function App({
         : paletteSections.directMessages);
   }
 
-  const unifiedSettingsSidebar = (
+  const unifiedSettingsSidebar = withLazyBoundary(
     <UnifiedSettingsSidebar
       activeTarget={settingsTarget}
       isOpen={isSidebarOpen}
@@ -3494,7 +3594,8 @@ export function App({
         briar.dashboard?.team.id !== inboxDetailTarget.projectId,
     );
 
-    return inboxDetailRun ? (
+    return withLazyBoundary(
+      inboxDetailRun ? (
       <RunPage
         availableProviders={
           briar.dashboard?.organizationProviders?.length
@@ -3732,6 +3833,7 @@ export function App({
           {t("common.close")}
         </Button>
       </div>
+      ),
     );
   };
 
@@ -3751,7 +3853,7 @@ export function App({
   if (briar.restoringSession) {
     content = <SessionLoadingScreen />;
   } else if (invitationToken) {
-    content = (
+    content = withLazyBoundary(
       <InvitationOnboarding
         accepting={acceptingInvitation}
         error={briar.error}
@@ -3777,7 +3879,7 @@ export function App({
       />
     );
   } else if (shouldShowInitialOnboarding) {
-    content = (
+    content = withLazyBoundary(
       <InitialOnboarding
         authenticated={Boolean(briar.user)}
         error={briar.error}
@@ -3811,7 +3913,7 @@ export function App({
       />
     );
   } else if (shouldShowFirstOrganizationSetup) {
-    content = (
+    content = withLazyBoundary(
       <FirstOrganizationSetup
         onCheckHandle={briar.checkOrganizationHandle}
         onCreate={async (input) => {
@@ -3975,6 +4077,7 @@ export function App({
           />
         ) : null}
         <div className="app-content-surface">
+        <Suspense fallback={null}>
         {repositorySetupProjectId ? (
           <TeamRepositorySetupDialog
             connectionState={localTeamConnectionState(
@@ -4007,6 +4110,8 @@ export function App({
             }
           />
         ) : null}
+        </Suspense>
+        <Suspense fallback={lazyViewFallback}>
         {activePage === "organization-create" ? (
           <OrganizationCreate
             onBack={() =>
@@ -4547,6 +4652,7 @@ export function App({
             token={briar.token}
           />
           )}
+        </Suspense>
         </div>
         </div>
         <div className="app-status-bar">
@@ -4649,6 +4755,7 @@ export function App({
           projects={briar.projects}
           user={briar.user}
         />
+        <Suspense fallback={lazyViewFallback}>
         {requestedCompanionSession ? (
           <TeamAgentSessionDetail
             isSidebarOpen
@@ -4907,6 +5014,8 @@ export function App({
             token={briar.token}
           />
         )}
+        </Suspense>
+        <Suspense fallback={null}>
         <WorkerDispatchDialog
           didDispatchSuccessfully={completedDispatchRunId === dispatchRun?.id}
           error={quickProcessError}
@@ -4922,6 +5031,7 @@ export function App({
           run={dispatchRun}
           workers={briar.dashboard?.workers ?? []}
         />
+        </Suspense>
       </div>
     );
   }
@@ -4929,6 +5039,7 @@ export function App({
   return (
     <>
       {content}
+      <Suspense fallback={null}>
       <PlanningProjectDialog
         onCreate={(input) => {
           if (!planningProjectTeamId) {
@@ -5106,6 +5217,7 @@ export function App({
           preview={previewsLaunchIntro}
         />
       ) : null}
+      </Suspense>
     </>
   );
 }

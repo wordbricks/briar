@@ -1,5 +1,3 @@
-import data from "@emoji-mart/data";
-import Picker from "@emoji-mart/react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Copy, EllipsisVertical, Link2, SmilePlus, Trash2 } from "lucide-react";
 import {
@@ -8,6 +6,7 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type ComponentType,
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import { createPortal } from "react-dom";
@@ -61,6 +60,36 @@ type EmojiMartSelection = {
   shortcodes?: string;
 };
 
+type EmojiPickerBundle = {
+  Picker: ComponentType<Record<string, unknown>>;
+  data: unknown;
+};
+
+/**
+ * The emoji dataset alone is ~430 kB, so both the picker component and its data
+ * stay out of the initial bundle until someone opens the picker. The promise is
+ * cached at module scope so every message shares a single fetch.
+ */
+let emojiPickerBundle: Promise<EmojiPickerBundle> | null = null;
+
+function loadEmojiPicker(): Promise<EmojiPickerBundle> {
+  emojiPickerBundle ??= Promise.all([
+    import("@emoji-mart/data"),
+    import("@emoji-mart/react"),
+  ]).then(
+    ([dataModule, pickerModule]) => ({
+      Picker: pickerModule.default as ComponentType<Record<string, unknown>>,
+      data: dataModule.default,
+    }),
+    (error: unknown) => {
+      // Let the next open retry instead of caching the failure for the session.
+      emojiPickerBundle = null;
+      throw error;
+    },
+  );
+  return emojiPickerBundle;
+}
+
 export function ChannelMessageReactions({
   message,
   currentUserId,
@@ -80,6 +109,9 @@ export function ChannelMessageReactions({
   const [menuOpen, setMenuOpen] = useState(false);
   const [pickerPosition, setPickerPosition] =
     useState<ChannelEmojiPickerPosition | null>(null);
+  const [pickerBundle, setPickerBundle] = useState<EmojiPickerBundle | null>(
+    null,
+  );
   const pickerAnchorRef = useRef<HTMLButtonElement | null>(null);
   const pickerRef = useRef<HTMLDivElement | null>(null);
   const hasReactions = message.reactions.length > 0;
@@ -87,6 +119,22 @@ export function ChannelMessageReactions({
   useEffect(() => {
     onReactingChange?.(pickerOpen || menuOpen);
   }, [onReactingChange, menuOpen, pickerOpen]);
+
+  useEffect(() => {
+    if (!pickerOpen || pickerBundle) return;
+    let active = true;
+    void loadEmojiPicker().then(
+      (bundle) => {
+        if (active) setPickerBundle(bundle);
+      },
+      (error: unknown) => {
+        console.error("Failed to load the emoji picker", error);
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [pickerBundle, pickerOpen]);
 
   useEffect(() => {
     if (!pickerOpen) return;
@@ -111,7 +159,9 @@ export function ChannelMessageReactions({
   }, [pickerOpen]);
 
   useLayoutEffect(() => {
-    if (!pickerOpen) return;
+    // Wait for the lazily loaded picker to mount so the measured rect is the
+    // real picker rather than the empty placeholder container.
+    if (!pickerOpen || !pickerBundle) return;
 
     const updatePosition = () => {
       const anchor = pickerAnchorRef.current;
@@ -158,7 +208,7 @@ export function ChannelMessageReactions({
       window.visualViewport?.removeEventListener("resize", updatePosition);
       window.visualViewport?.removeEventListener("scroll", updatePosition);
     };
-  }, [pickerOpen]);
+  }, [pickerBundle, pickerOpen]);
 
   const handleToggle = (emoji: string) => {
     if (busy || !emoji) return;
@@ -179,6 +229,8 @@ export function ChannelMessageReactions({
     setPickerOpen((open) => !open);
   };
 
+  const EmojiPicker = pickerBundle?.Picker;
+
   const picker =
     pickerOpen && typeof document !== "undefined"
       ? createPortal(
@@ -194,18 +246,20 @@ export function ChannelMessageReactions({
               visibility: pickerPosition ? "visible" : "hidden",
             }}
           >
-            <Picker
-              data={data}
-              dynamicWidth
-              emojiSize={20}
-              emojiButtonSize={32}
-              maxFrequentRows={2}
-              navPosition="bottom"
-              onEmojiSelect={handlePickerSelect}
-              previewPosition="none"
-              skinTonePosition="search"
-              theme="auto"
-            />
+            {EmojiPicker ? (
+              <EmojiPicker
+                data={pickerBundle?.data}
+                dynamicWidth
+                emojiSize={20}
+                emojiButtonSize={32}
+                maxFrequentRows={2}
+                navPosition="bottom"
+                onEmojiSelect={handlePickerSelect}
+                previewPosition="none"
+                skinTonePosition="search"
+                theme="auto"
+              />
+            ) : null}
           </div>,
           document.body,
         )
