@@ -120,7 +120,6 @@ import {
   decodeStoredTeamAgentSessionSummary,
   type StoredTeamAgentSessionPayload,
 } from "./team-request-contract";
-import { applyD1Migrations } from "./test-helpers/d1";
 import { executeD1Sql } from "./test-helpers/d1-sql";
 import { workerRuntimeMetadataFixture } from "./test-helpers/worker-runtime";
 
@@ -379,7 +378,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
 
   beforeAll(async () => {
     db = env.DB;
-    await applyD1Migrations(db);
 
     const createdAt = atMinute(0);
     await db.batch([
