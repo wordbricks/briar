@@ -28,7 +28,7 @@ import {
   readArchivedWorkLog,
   readLatestArchivedWorkLogForRun,
 } from "./archive";
-import { executeD1Sql } from "./test-helpers/d1";
+import { executeD1Sql } from "./test-helpers/d1-sql";
 import { archiveFormatVersion } from "./archive-contract";
 
 const projectId = "11111111-1111-4111-8111-111111111111";

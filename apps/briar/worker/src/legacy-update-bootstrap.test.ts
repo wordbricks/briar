@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { beforeAll, describe, expect, it } from "vitest";
 import worker from "./index";
-import { executeD1Sql } from "./test-helpers/d1";
+import { executeD1Sql } from "./test-helpers/d1-sql";
 
 describe("Briar 1.2.174 update bootstrap", () => {
   const db = env.DB;

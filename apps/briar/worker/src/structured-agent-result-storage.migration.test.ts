@@ -2,10 +2,8 @@ import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import { encodeStructuredAgentResultJson } from "../../src/lib/agent-result";
 import { parseStructuredResult } from "./agent-result-json";
-import {
-  applyD1Migrations,
-  executeD1Sql,
-} from "./test-helpers/d1";
+import { applyD1Migrations } from "./test-helpers/d1";
+import { executeD1Sql } from "./test-helpers/d1-sql";
 
 const canonicalResult = {
   summary: "Implemented and verified.",

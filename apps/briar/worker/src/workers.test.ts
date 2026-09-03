@@ -32,7 +32,7 @@ import {
   type HuntEventInput,
 } from "./db";
 import apiWorker from "./index";
-import { executeD1Sql } from "./test-helpers/d1";
+import { executeD1Sql } from "./test-helpers/d1-sql";
 import { workerRuntimeFixture } from "./test-helpers/worker-runtime";
 import {
   workerRuntimeMetadataFromProto,
