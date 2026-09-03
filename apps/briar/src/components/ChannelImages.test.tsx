@@ -4,9 +4,14 @@ import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as api from "@/lib/api";
 import { createReactTestRoot, renderReactTestRoot } from "@/test/react";
-import { ChannelMessageImages } from "./ChannelImages";
+import { I18nProvider } from "@/i18n";
+import {
+  ChannelDraftImages,
+  ChannelMessageImages,
+  draftChannelImage,
+} from "./ChannelImages";
 
-describe("ChannelMessageImages HTML artifacts", () => {
+describe("channel message attachments", () => {
   let cleanup: () => Promise<void>;
   let container: HTMLDivElement;
   let root: ReturnType<typeof createReactTestRoot>["root"];
@@ -52,5 +57,64 @@ describe("ChannelMessageImages HTML artifacts", () => {
       expect(document.querySelector(".html-artifact-dialog iframe"))
         .not.toBeNull();
     });
+  });
+
+  it("renders a PDF as a file card backed by an authenticated blob URL", async () => {
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: vi.fn(() => "blob:private-pdf"),
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      value: vi.fn(),
+    });
+    const load = vi.spyOn(api, "loadChannelMessageAttachment").mockResolvedValue(
+      new Blob(["%PDF-1.7"], { type: "application/pdf" }),
+    );
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <ChannelMessageImages
+          attachments={[{
+            id: "pdf-1",
+            filename: "product brief.pdf",
+            contentType: "application/pdf",
+            byteSize: 2048,
+            url: "/attachments/pdf-1",
+          }]}
+          token="token"
+        />
+      </I18nProvider>,
+    );
+
+    expect(container.querySelector("img")).toBeNull();
+    expect(container.querySelector("iframe")).toBeNull();
+    expect(container.textContent).toContain("product brief.pdf");
+    expect(container.textContent).toContain("2KB · PDF");
+    await vi.waitFor(() => expect(load).toHaveBeenCalledOnce());
+    const link = container.querySelector<HTMLAnchorElement>(
+      'a[href="blob:private-pdf"]',
+    );
+    expect(link?.target).toBe("_blank");
+    expect(link?.textContent).toContain("Open");
+  });
+
+  it("shows a PDF filename and size in the removable draft card", async () => {
+    const onRemove = vi.fn();
+    const pdf = new File(["%PDF-1.7"], "draft.pdf", {
+      type: "application/pdf",
+    });
+    await renderReactTestRoot(
+      root,
+      <ChannelDraftImages
+        images={[draftChannelImage(pdf)]}
+        onRemove={onRemove}
+      />,
+    );
+
+    expect(container.textContent).toContain("draft.pdf");
+    expect(container.textContent).toContain("8B");
+    await act(async () => container.querySelector("button")?.click());
+    expect(onRemove).toHaveBeenCalledOnce();
   });
 });

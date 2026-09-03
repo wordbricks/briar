@@ -101,6 +101,7 @@ import {
   ChannelMessageImages,
   useChannelMessageImageCache,
 } from "./ChannelImages";
+import { channelAttachmentAccept } from "../lib/channel-attachments";
 import { ChannelMentionMenu } from "./ChannelMentionMenu";
 import { ChannelSkillMenu } from "./ChannelSkillMenu";
 import { ChannelTypingState } from "./ChannelTypingState";
@@ -3470,7 +3471,7 @@ function Composer({
               <Paperclip size={16} />
             </button>
             <input
-              accept="image/*"
+              accept={channelAttachmentAccept}
               className="channel-composer-file-input"
               disabled={busy || images.length >= maxIssueAttachmentCount}
               multiple
