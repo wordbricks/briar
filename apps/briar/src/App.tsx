@@ -2578,6 +2578,10 @@ export function App({
     invitationProgress,
   ]);
 
+  // The main window is created hidden. On a first launch Rust already opened
+  // the intro before this bundle finished downloading, so `prepareLaunchIntro`
+  // is a no-op here and the reveal path owns the first show; otherwise this is
+  // what puts the window on screen.
   useEffect(() => {
     if (!runsOnDesktopTauri || projectWindowProjectId) return;
     let cancelled = false;
@@ -2589,10 +2593,10 @@ export function App({
       try {
         if (shouldPrepareLaunchIntro) {
           await commands.prepareLaunchIntro();
+          markLaunchIntroSeen();
         } else {
           await commands.showMainWindow();
         }
-        if (shouldPrepareLaunchIntro) markLaunchIntroSeen();
       } catch (error) {
         console.error("Failed to prepare the native launch experience", error);
         await commands.showMainWindow().catch(() => undefined);
@@ -2627,6 +2631,20 @@ export function App({
     runsOnDesktopTauri,
     shouldShowInitialOnboarding,
   ]);
+
+  // Tells Rust the window is worth showing: the session restore settled, so
+  // this render is the dashboard or the login/onboarding screen rather than
+  // the loading spinner. The intro's reveal is parked until this lands.
+  //
+  // Declared after the onboarding resize so the window is already at its final
+  // size by the time the reveal can act on it.
+  useEffect(() => {
+    if (!runsOnDesktopTauri || projectWindowProjectId) return;
+    if (briar.restoringSession) return;
+    void commands.markMainWindowReady().catch((error) => {
+      console.error("Failed to report Briar window readiness", error);
+    });
+  }, [briar.restoringSession, projectWindowProjectId, runsOnDesktopTauri]);
 
   const completeLaunchIntro = useCallback(() => {
     clearLaunchIntroPreview();
