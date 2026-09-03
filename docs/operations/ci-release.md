@@ -31,10 +31,12 @@ Briar GitHub App flow itself never asks users to install or authenticate it.
 bun run ci:signoff
 ```
 
-The signoff command is self-contained: it installs the locked dependencies,
-prepares shared build inputs once, and runs the four independent contexts in
-parallel before publishing any status. Do not precede it with a separate
-`bun run check`; that check is already part of `signoff/app-worker`.
+The signoff command is self-contained: before any expensive setup or checks, it
+fails fast unless the worktree is clean and `HEAD` exactly matches its push
+branch. It then installs the locked dependencies, prepares shared build inputs
+once, and runs the four independent contexts in parallel before publishing any
+status. Do not precede it with a separate `bun run check`; that check is already
+part of `signoff/app-worker`.
 
 `signoff/app-worker` builds the frontend twice, not three times: `build:release`
 is the authoritative desktop bundle (`apps/briar/dist`) and `web:build` is the

@@ -418,6 +418,7 @@ if $should_signoff; then
   require_command gh "Install the GitHub CLI and authenticate it."
   gh extension list | grep -q '^gh signoff' ||
     fail "Install gh-signoff first: gh extension install basecamp/gh-signoff"
+  bun run scripts/verify-signoff-ready.ts
 fi
 
 ci_temp="$(mktemp -d "$ci_temp_base/briar-local-ci.XXXXXX")"
