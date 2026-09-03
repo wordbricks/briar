@@ -1,4 +1,10 @@
-import { useCallback, useReducer } from "react";
+/*
+  The visit stack, as a pure reducer.
+
+  It was a `useReducer` inside `useNavigationHistory`, which is why it lived in
+  `hooks/`. The state is an atom now and the reducer is what the writer applies,
+  so it belongs next to the atom — unchanged, and still testable on its own.
+*/
 
 export type NavigationHistory<T extends string> = {
   entries: T[];
@@ -7,7 +13,7 @@ export type NavigationHistory<T extends string> = {
 
 export const maxNavigationHistoryEntries = 100;
 
-type NavigationAction<T extends string> =
+export type NavigationAction<T extends string> =
   | { type: "navigate"; value: T }
   | { type: "back" }
   | { type: "backTo"; predicate: (value: T) => boolean; fallback?: T }
@@ -84,56 +90,5 @@ export function reduceNavigationHistory<T extends string>(
   return {
     entries,
     index: state.index + 1,
-  };
-}
-
-export function useNavigationHistory<T extends string>(initial: T) {
-  const [history, dispatch] = useReducer(
-    reduceNavigationHistory<T>,
-    initial,
-    createNavigationHistory,
-  );
-  const navigate = useCallback(
-    (value: T) => dispatch({ type: "navigate", value }),
-    [],
-  );
-  const goBack = useCallback(() => dispatch({ type: "back" }), []);
-  const goBackTo = useCallback(
-    (predicate: (value: T) => boolean, fallback?: T) => {
-      dispatch(
-        fallback === undefined
-          ? { type: "backTo", predicate }
-          : { type: "backTo", predicate, fallback },
-      );
-    },
-    [],
-  );
-  const goForward = useCallback(() => dispatch({ type: "forward" }), []);
-  const goTo = useCallback(
-    (index: number) => dispatch({ type: "goTo", index }),
-    [],
-  );
-  const replace = useCallback(
-    (value: T) => dispatch({ type: "replace", value }),
-    [],
-  );
-  const reset = useCallback(
-    (value: T) => dispatch({ type: "reset", value }),
-    [],
-  );
-
-  return {
-    current: history.entries[history.index],
-    entries: history.entries,
-    index: history.index,
-    canGoBack: history.index > 0,
-    canGoForward: history.index < history.entries.length - 1,
-    navigate,
-    goBack,
-    goBackTo,
-    goForward,
-    goTo,
-    replace,
-    reset,
   };
 }

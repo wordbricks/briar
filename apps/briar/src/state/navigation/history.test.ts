@@ -3,7 +3,7 @@ import {
   createNavigationHistory,
   maxNavigationHistoryEntries,
   reduceNavigationHistory,
-} from "./useNavigationHistory";
+} from "./history";
 import {
   channelNavigationLocation,
   issueNavigationLocation,
@@ -11,7 +11,7 @@ import {
   projectNavigationLocation,
   settingsNavigationLocation,
   type AppNavigationLocation,
-} from "../lib/app-navigation";
+} from "../../lib/app-navigation";
 
 describe("navigation history", () => {
   it("moves backward and forward through visited destinations", () => {

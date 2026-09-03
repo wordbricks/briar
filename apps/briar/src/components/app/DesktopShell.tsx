@@ -193,8 +193,6 @@ export interface DesktopShellNavigation {
   readonly navigationProjectId: string | null;
   /** The team whose tabs the page chain shows. */
   readonly activeProjectForTabs: Project | undefined;
-  /** Records the team the navigation helpers default to. */
-  readonly setDefaultTeam: (teamId: string | null) => void;
 }
 
 /** The agent list, still `useIssueAgents`'s. */
@@ -342,7 +340,6 @@ export function DesktopShell({
     replaceNavigationLocation,
     resetNavigation,
     selectedRunId,
-    setDefaultTeam,
   } = navigation;
   const {
     activeTeamAgents: activeProjectAgents,
@@ -532,7 +529,6 @@ export function DesktopShell({
           }}
           onPlanningProjectOpen={(planningProjectId, teamId) => {
             setActivePlanningProjectId(planningProjectId);
-            setDefaultTeam(teamId);
             session.selectTeam(teamId);
             setRequestedRunId(null);
             setIssueListRequestKey((key) => key + 1);
@@ -595,7 +591,6 @@ export function DesktopShell({
             const project = projects.find(
               (candidate) => candidate.organizationId === organizationId,
             );
-            setDefaultTeam(project?.id ?? null);
             selectOrganization(organizationId);
             setRequestedRunId(null);
             setRequestedSessionId(null);
@@ -603,7 +598,6 @@ export function DesktopShell({
           }}
           onProjectChange={(projectId) => {
             setActivePlanningProjectId(null);
-            setDefaultTeam(projectId);
             session.selectTeam(projectId);
             setRequestedRunId(null);
             setRequestedSessionId(null);
@@ -729,7 +723,6 @@ export function DesktopShell({
           }}
           onOpen={(planningProjectId, teamId) => {
             setActivePlanningProjectId(planningProjectId);
-            setDefaultTeam(teamId);
             session.selectTeam(teamId);
             setRequestedRunId(null);
             setIssueListRequestKey((key) => key + 1);
