@@ -2,10 +2,12 @@ node_modules
 .turbo
 dist
 dist-cli
+dist-web
 dist-agent
 dist-worker
 apps/briar/dist
 apps/briar/dist-cli
+apps/briar/dist-web
 apps/briar/dist-agent
 apps/briar/dist-worker
 release-artifacts

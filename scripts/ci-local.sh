@@ -167,7 +167,10 @@ run_app_worker() {
     infrastructure/managed-computers/verify-managed-image \
     infrastructure/managed-computers/verify-remote-desktop
   timed app-worker ios-release-verify bun run ios:release:verify
-  timed app-worker build bun run build
+  # `build` and `build:release` are the same Vite build of @briar/app with the
+  # same task dependencies; only the env differs, so `build:release` covers it.
+  # `build:workspaces` keeps the non-app packages (notably @briar/landing) built.
+  timed app-worker build-workspaces bun run build:workspaces
   timed app-worker build-release bun run build:release
   timed app-worker worker-check bun run worker:check
   timed app-worker worker-build bun run worker:build

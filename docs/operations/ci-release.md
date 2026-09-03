@@ -36,6 +36,20 @@ prepares shared build inputs once, and runs the four independent contexts in
 parallel before publishing any status. Do not precede it with a separate
 `bun run check`; that check is already part of `signoff/app-worker`.
 
+`signoff/app-worker` builds the frontend twice, not three times: `build:release`
+is the authoritative desktop bundle (`apps/briar/dist`) and `web:build` is the
+Worker asset bundle (`apps/briar/dist-web`, served through `wrangler.jsonc`).
+The plain dev-env `bun run build` of `@briar/app` was redundant with
+`build:release` — same Vite build, same task dependencies, only the env differs
+— so CI runs `bun run build:workspaces` (every package except `@briar/app`)
+instead. Both `build:release` and `test` are now Turborepo-cached, so an
+unchanged tree replays them from `.turbo` rather than rebuilding and retesting.
+
+Vitest sizes its worker pool from `os.availableParallelism()` (capped at 8 for
+the miniflare-backed Worker suites). Set `VITEST_MAX_WORKERS` to pin a lower
+value on constrained machines; it is in `globalPassThroughEnv`, so it never
+changes a Turborepo cache key.
+
 ### Shared Cargo target directory
 
 The `rust` context builds into a shared Cargo target directory instead of

@@ -2,6 +2,7 @@ import path from "node:path";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { configDefaults, defineConfig } from "vitest/config";
+import { resolveMaxWorkers } from "./vitest.max-workers";
 
 const host = process.env.TAURI_DEV_HOST;
 
@@ -45,7 +46,7 @@ export default defineConfig({
       "worker/src/html-artifact-preview-shell.test.ts",
     ],
     exclude: [...configDefaults.exclude, "**/.claude/worktrees/**"],
-    maxWorkers: Number(process.env.VITEST_MAX_WORKERS ?? 4),
+    maxWorkers: resolveMaxWorkers(),
     setupFiles: ["./src/test/setup.ts"],
     testTimeout: 15_000,
     env: {

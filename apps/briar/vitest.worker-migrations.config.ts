@@ -1,4 +1,5 @@
 import { defineConfig } from "vitest/config";
+import { resolveMaxWorkers } from "./vitest.max-workers";
 import { createWorkerTestPlugin } from "./vitest.worker.shared";
 
 export default defineConfig(async () => ({
@@ -11,7 +12,9 @@ export default defineConfig(async () => ({
       "worker/src/workflow-v2.test.ts",
     ],
     hookTimeout: 60_000,
-    maxWorkers: Number(process.env.VITEST_MAX_WORKERS ?? 4),
+    // Capped: each worker boots its own workerd + isolated D1, so past ~8
+    // the process overhead outweighs the added parallelism.
+    maxWorkers: resolveMaxWorkers(8),
     testTimeout: 60_000,
   },
 }));
