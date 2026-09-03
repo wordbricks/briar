@@ -31,10 +31,10 @@ Briar GitHub App flow itself never asks users to install or authenticate it.
 bun run ci:signoff
 ```
 
-The signoff command is self-contained: before any expensive setup or checks, it
-fails fast unless the worktree is clean and `HEAD` exactly matches its push
-branch. It then installs the locked dependencies, prepares shared build inputs
-once, and runs the four independent contexts in parallel before publishing any
+The signoff command is self-contained: after the bootstrap ensures the locked
+dependencies are installed, it fails fast unless the worktree is clean and
+`HEAD` exactly matches its push branch. It then prepares shared build inputs
+once and runs the four independent contexts in parallel before publishing any
 status. Do not precede it with a separate `bun run check`; that check is already
 part of `signoff/app-worker`.
 
@@ -108,6 +108,12 @@ whole history. It falls back to the full `--all` history scan — and says so in
 the log — when no base ref resolves, when `HEAD` adds nothing over the base
 (for example a run on the base branch itself), or when
 `BRIAR_CI_GITLEAKS_FULL=true` is set.
+
+Local CI uses an Effect runner with `effect/unstable/cli`. A dependency-free Bun
+bootstrap performs the frozen install required by a fresh worktree, then the
+typed CLI runs the selected contexts with scoped child processes and temporary
+directories. The first failed context interrupts its still-running siblings, so
+a known failure does not leave expensive builds or Miniflare pools running.
 
 All four contexts, `d1-migrations` included, run in parallel. The D1 migration
 suite pins itself to a single Vitest worker while `app-worker` runs so the

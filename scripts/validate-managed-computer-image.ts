@@ -546,8 +546,8 @@ if (updaterPublicKey !== await text(join(image, "runtime-updater.pub"))) {
   fail("managed runtime updater public key differs from Production releases");
 }
 
-const localCi = await text(join(root, "scripts", "ci-local.sh"));
-if (!localCi.includes('"${BRIAR_CI_SERIAL_CONTEXTS:-false}" == "true"')) {
+const localCi = await text(join(root, "scripts", "ci-local.ts"));
+if (!localCi.includes('process.env.BRIAR_CI_SERIAL_CONTEXTS === "true"')) {
   fail("local CI must honor managed-computer serial context execution");
 }
 

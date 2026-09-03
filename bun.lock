@@ -7,6 +7,7 @@
       "devDependencies": {
         "@dotenvx/dotenvx": "catalog:",
         "@effect/eslint-plugin": "catalog:",
+        "@effect/platform-bun": "4.0.0-rc.112",
         "@effect/tsgo": "catalog:",
         "@oxlint/plugins": "catalog:",
         "@types/bun": "catalog:",
