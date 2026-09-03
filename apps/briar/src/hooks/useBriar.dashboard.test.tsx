@@ -4,8 +4,10 @@ import { RegistryContext } from "@effect/atom-react";
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createReactTestRoot, type ReactTestRoot } from "../test/react";
+import { AppEffects } from "../components/app/AppEffects";
 import { demoDashboard } from "../lib/demo-data";
-import { createTestRegistry } from "../state/registry";
+import { createTestRegistry, type AtomRegistry } from "../state/registry";
+import { tokenAtom } from "../state/session/atoms";
 import type {
   DashboardDeltaPayload,
   DashboardPayload,
@@ -60,7 +62,7 @@ const dashboardOf = (project: Project, revision: number): DashboardPayload => ({
 
 /**
  * In-memory stand-in for the reads `useBriar` performs on its own. Dashboard
- * snapshots stay pending until the test settles them, which is how "the cached
+ * snapshots stay pending until the test settles them, which is how "the stored
  * board is already on screen before the network answers" becomes observable.
  */
 class DashboardServer {
@@ -118,6 +120,7 @@ class DashboardServer {
 let server: DashboardServer;
 let briar: ReturnType<typeof useBriar>;
 let view: ReactTestRoot;
+let registry: AtomRegistry;
 
 function Harness({ lockedProjectId }: { lockedProjectId: string | null }) {
   briar = useBriar({
@@ -125,7 +128,9 @@ function Harness({ lockedProjectId }: { lockedProjectId: string | null }) {
     deferDefaultOrganization: true,
     lockedProjectId,
   });
-  return null;
+  // The polling, visibility and scope-invalidation effects moved to
+  // `useTeamSync`, which the app mounts here.
+  return <AppEffects />;
 }
 
 const flush = async () => {
@@ -155,8 +160,9 @@ const mount = async (
   view = createReactTestRoot();
   // `useBriar` reads its root state from atoms, which are module singletons: a
   // registry per test is what keeps one test's session out of the next one.
+  registry = createTestRegistry();
   await view.render(
-    <RegistryContext.Provider value={createTestRegistry()}>
+    <RegistryContext.Provider value={registry}>
       <Harness lockedProjectId={lockedProjectId} />
     </RegistryContext.Provider>,
   );
@@ -176,8 +182,8 @@ afterEach(async () => {
   vi.restoreAllMocks();
 });
 
-describe("useBriar dashboard cache", () => {
-  it("shows the cached dashboard immediately when returning to a visited project", async () => {
+describe("useBriar dashboard view", () => {
+  it("renders a stored dashboard immediately when returning to a visited team", async () => {
     await mount([projectA1, projectA2], [organizationA]);
 
     const firstA1 = await settleDashboard(projectA1, 1);
@@ -188,8 +194,8 @@ describe("useBriar dashboard cache", () => {
     await settleDashboard(projectA2, 2);
     expect(briar.dashboard?.team.id).toBe(projectA2.id);
 
-    // Switching back must not blank the UI: the cached payload is committed
-    // synchronously, before any network response.
+    // Switching back must not blank the UI: the entity store still holds this
+    // team's payload, so it renders before any network response.
     server.forget();
     await act(async () => briar.setActiveProjectId(projectA1.id));
     expect(briar.dashboard).toEqual(firstA1);
@@ -265,7 +271,7 @@ describe("useBriar dashboard cache", () => {
     expect(briar.dashboard).toEqual(freshA2);
   });
 
-  it("drops cached dashboards of organizations the user left", async () => {
+  it("drops the stored dashboards of organizations the user left", async () => {
     await mount(
       [projectA1, projectA2, projectB1],
       [organizationA, organizationB],
@@ -283,7 +289,7 @@ describe("useBriar dashboard cache", () => {
     expect(briar.dashboardStale).toBe(false);
   });
 
-  it("drops every cached dashboard when the session token changes", async () => {
+  it("drops every stored dashboard when the session token changes", async () => {
     await mount([projectA1, projectA2], [organizationA]);
     await settleDashboard(projectA1, 1);
     await act(async () => briar.setActiveProjectId(projectA2.id));
@@ -292,23 +298,24 @@ describe("useBriar dashboard cache", () => {
     await settleDashboard(projectA1, 3);
     expect(briar.dashboard?.team.id).toBe(projectA1.id);
 
-    // Restore a different session while the active organization stays the
-    // same, so only the token change can invalidate the cache.
+    // A different credential for the same organization: only the token change
+    // can invalidate what the previous session loaded.
     server.dropPending();
-    window.localStorage.setItem("briar.session-token", "token-2");
-    await view.render(<Harness lockedProjectId={projectA2.id} />);
-    await flush();
+    await act(async () => {
+      registry.set(tokenAtom, "token-2");
+    });
     expect(briar.token).toBe("token-2");
     expect(briar.activeOrganizationId).toBe(organizationA.id);
-    expect(briar.activeProjectId).toBe(projectA2.id);
+    expect(briar.dashboard).toBeNull();
+    expect(briar.dashboardStale).toBe(false);
 
-    // Nothing cached under the previous session may resurface.
+    // …and neither team resurfaces on the way back.
     await act(async () => briar.setActiveProjectId(projectA2.id));
     expect(briar.dashboard).toBeNull();
     expect(briar.dashboardStale).toBe(false);
   });
 
-  it("clears the dashboard and its cache on logout", async () => {
+  it("clears the dashboard and every stored team on logout", async () => {
     await mount([projectA1, projectA2], [organizationA]);
     await settleDashboard(projectA1, 1);
     await act(async () => briar.setActiveProjectId(projectA2.id));
@@ -323,7 +330,7 @@ describe("useBriar dashboard cache", () => {
     expect(window.localStorage.getItem("briar.session-token")).toBeNull();
   });
 
-  it("evicts the least recently used project once the cache is full", async () => {
+  it("evicts the least recently synced team once retention is full", async () => {
     const projects = Array.from({ length: 10 }, (_unused, index) =>
       projectOf(`project-lru-${index}`, organizationA),
     );
@@ -335,7 +342,7 @@ describe("useBriar dashboard cache", () => {
       await settleDashboard(project, 1);
     }
 
-    // Ten visits with a cache of eight evicted the two oldest entries.
+    // Ten visits with a retention bound of eight dropped the two oldest teams.
     await act(async () => briar.setActiveProjectId(projects[0]!.id));
     expect(briar.dashboard).toBeNull();
     await settleDashboard(projects[0]!, 2);

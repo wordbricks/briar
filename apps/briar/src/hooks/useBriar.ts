@@ -1,4 +1,8 @@
-import { useAtom, useAtomInitialValues } from "@effect/atom-react";
+import {
+  useAtom,
+  useAtomInitialValues,
+  useAtomValue,
+} from "@effect/atom-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AutoHuntSession } from "./useAutoHuntSessions";
 import {
@@ -136,8 +140,6 @@ import {
   type BrowserAuthLocale,
 } from "../lib/browser-auth-client";
 import { browserCookieSessionCredential } from "../lib/session-credential";
-import { startDashboardPolling } from "../lib/dashboard-polling";
-import { mergeDashboardDelta } from "../lib/dashboard-sync";
 import {
   isRepositoryWorkflowPending,
   progressForAutoHuntRun,
@@ -201,10 +203,7 @@ import {
   activeOrganizationIdAtom,
   organizationsAtom,
 } from "../state/organization/atoms";
-import {
-  usePlanningActions,
-  type PlanningActionDeps,
-} from "../state/planning/actions";
+import { usePlanningActions } from "../state/planning/actions";
 import { planningProjectsAtom } from "../state/planning/atoms";
 import {
   useSessionActions,
@@ -221,11 +220,24 @@ import {
 import { useTeamActions, type TeamActionDeps } from "../state/team/actions";
 import {
   activeTeamIdAtom,
+  dashboardStaleAtom,
   deletingTeamIdAtom,
   isCreatingTeamAtom,
   teamConnectionAtom,
+  teamSettingsAtom,
   teamsAtom,
 } from "../state/team/atoms";
+import { applySyncEvent, markTeamStale } from "../state/sync/apply";
+import {
+  teamSyncApiAtom,
+  useTeamSyncLoader,
+  type TeamSyncMode,
+} from "../state/sync/loader";
+import {
+  activeDashboardAtom,
+  dashboardViewAtom,
+  loadedDashboardTeamIdAtom,
+} from "../state/sync/view";
 
 /**
  * Reads the hook performs on its own: session bootstrap, dashboard sync and the
@@ -279,12 +291,6 @@ export type UseBriarOptions = {
   dataSources?: Partial<BriarDataSources>;
 };
 
-/**
- * How many previously visited projects keep their last-known dashboard in
- * memory. Entries are evicted least-recently-committed first.
- */
-const DASHBOARD_CACHE_LIMIT = 8;
-
 export function useBriar(options: UseBriarOptions = {}) {
   const {
     adoptRemoteAgentSession,
@@ -305,6 +311,9 @@ export function useBriar(options: UseBriarOptions = {}) {
     narrow: such a window is pinned to one team, and demo mode must not preselect
     a different one. The initial value therefore cannot live in the atom module,
     so it is seeded here — once per registry, before the first read below.
+
+    The sync loader's reads are seeded the same way: the loader is shared with
+    `useTeamSync`, which has no access to this hook's `dataSources` option.
   */
   useAtomInitialValues(
     useMemo(() => {
@@ -320,8 +329,15 @@ export function useBriar(options: UseBriarOptions = {}) {
           activeTeamIdAtom,
           demoSelectionApplies ? demoDashboard.team.id : null,
         ],
+        [
+          teamSyncApiAtom,
+          {
+            loadDashboard: remote.loadDashboard,
+            loadDashboardDelta: remote.loadDashboardDelta,
+          },
+        ],
       ] as const;
-    }, [lockedProjectId]),
+    }, [lockedProjectId, remote]),
   );
   const [user, setUser] = useAtom(userAtom);
   const [token, setToken] = useAtom(tokenAtom);
@@ -356,11 +372,15 @@ export function useBriar(options: UseBriarOptions = {}) {
   const [connectedTeamIds, setConnectedProjectIds] = useState<
     string[] | null
   >(demoMode ? [demoDashboard.team.id] : null);
-  const [dashboard, setDashboardState] = useState<DashboardPayload | null>(
-    demoMode && (!lockedProjectId || lockedProjectId === demoDashboard.team.id)
-      ? demoDashboard
-      : null,
-  );
+  /*
+    The dashboard is no longer state this hook owns. It is reassembled from the
+    normalized entity store for whichever team is selected, so a team switch
+    renders that team's last payload without a fetch and without this hook
+    holding a per-team cache.
+  */
+  const dashboard = useAtomValue(activeDashboardAtom);
+  const dashboardStale = useAtomValue(dashboardStaleAtom);
+  const loader = useTeamSyncLoader();
   const [loading, setLoading] = useAtom(loadingAtom);
   const [restoringSession, setRestoringSession] = useAtom(restoringSessionAtom);
   const [loginCode, setLoginCode] = useAtom(loginCodeAtom);
@@ -420,104 +440,39 @@ export function useBriar(options: UseBriarOptions = {}) {
   );
   const resumeRequestIds = useRef(new Map<string, string>());
   const reworkRequestIds = useRef(new Map<string, string>());
-  const dashboardRef = useRef<DashboardPayload | null>(
-    demoMode && (!lockedProjectId || lockedProjectId === demoDashboard.team.id)
-      ? demoDashboard
-      : null,
-  );
-  const dashboardCursor = useRef<number | null>(
-    demoMode && (!lockedProjectId || lockedProjectId === demoDashboard.team.id)
-      ? (demoDashboard.cursor ?? null)
-      : null,
-  );
-  const dashboardRequest = useRef<{
-    projectId: string;
-    abort: AbortController;
-    promise: Promise<void>;
-  } | null>(null);
-  const dashboardRequestGeneration = useRef(0);
   /**
-   * Last-known dashboard per project so switching back to a visited project
-   * renders instantly instead of blanking the whole UI. The delta cursor is not
-   * stored separately: it travels inside `DashboardPayload.cursor`, which is the
-   * same field `setDashboard` derives `dashboardCursor` from, so a cursor can
-   * never leak across projects.
+   * Commits a whole `DashboardPayload` for the call sites that still build one
+   * by hand. It keeps the two promises `setDashboard` always made — cancel
+   * whatever is in flight, then commit — but commits through `applySyncEvent`,
+   * so the store has exactly one writer. Phase 2B rewrites those call sites as
+   * optimistic entity updates and this shim goes with them.
    */
-  const dashboardCache = useRef(new Map<string, DashboardPayload>());
-  /**
-   * Project whose dashboard is currently rendered from the cache. It forces the
-   * next fetch for that project to be a full snapshot instead of a delta, and
-   * drives the `dashboardStale` flag consumers can surface.
-   */
-  const staleDashboardProjectId = useRef<string | null>(null);
-  const [dashboardStale, setDashboardStale] = useState(false);
-
-  const rememberDashboard = useCallback((next: DashboardPayload | null) => {
-    if (!next) return;
-    const cache = dashboardCache.current;
-    // Re-inserting moves the entry to the end, so the Map doubles as LRU order.
-    cache.delete(next.team.id);
-    cache.set(next.team.id, next);
-    while (cache.size > DASHBOARD_CACHE_LIMIT) {
-      const oldest = cache.keys().next();
-      if (oldest.done) break;
-      cache.delete(oldest.value);
-    }
-  }, []);
-
-  /**
-   * Drops the "showing a cached payload" marker. Called whenever the dashboard
-   * is intentionally emptied or replaced by fresh data.
-   */
-  const clearDashboardStaleness = useCallback(() => {
-    staleDashboardProjectId.current = null;
-    setDashboardStale(false);
-  }, []);
-
-  const clearDashboardCache = useCallback(() => {
-    dashboardCache.current.clear();
-    clearDashboardStaleness();
-  }, [clearDashboardStaleness]);
-
-  const setDashboard = useCallback((
-    value: Parameters<typeof setDashboardState>[0],
-  ) => {
-    dashboardRequestGeneration.current += 1;
-    dashboardRequest.current?.abort.abort();
-    dashboardRequest.current = null;
-    // Every intentional clear (logout, account deletion, organization change,
-    // a project with nothing cached) also drops the stale marker.
-    if (value === null) clearDashboardStaleness();
-    setDashboardState((current) => {
+  const setDashboard = useCallback(
+    (
+      value:
+        | DashboardPayload
+        | null
+        | ((current: DashboardPayload | null) => DashboardPayload | null),
+    ) => {
+      const teamId = registry.get(activeTeamIdAtom);
+      const current =
+        teamId === null ? null : registry.get(dashboardViewAtom(teamId));
       const next = typeof value === "function" ? value(current) : value;
-      dashboardRef.current = next;
-      dashboardCursor.current = next && Number.isSafeInteger(next.cursor)
-        ? (next.cursor ?? null)
-        : null;
-      rememberDashboard(next);
-      return next;
-    });
-  }, [clearDashboardStaleness, rememberDashboard]);
-
-  /**
-   * Renders the cached dashboard for `projectId` so a project switch never
-   * blanks the UI. Returns false when nothing is cached, leaving the caller to
-   * fall back to the loading state.
-   */
-  const showCachedDashboard = useCallback((projectId: string) => {
-    const cached = dashboardCache.current.get(projectId);
-    // A cached payload always carries its own project, so consumers comparing
-    // `dashboard.team.id` with the active project keep working.
-    if (!cached || cached.team.id !== projectId) return false;
-    dashboardRef.current = cached;
-    setDashboard(cached);
-    dashboardCursor.current = Number.isSafeInteger(cached.cursor)
-      ? (cached.cursor ?? null)
-      : null;
-    staleDashboardProjectId.current = projectId;
-    setDashboardStale(true);
-    return true;
-  }, [setDashboard]);
+      loader.cancelAll();
+      if (!next) {
+        // Only ever reached for a team with nothing stored: the callers that
+        // blank the board check for stored data first.
+        if (teamId) applySyncEvent(registry, { kind: "team-cleared", teamId });
+        return;
+      }
+      applySyncEvent(registry, {
+        kind: "team-snapshot",
+        teamId: next.team.id,
+        payload: next,
+      });
+    },
+    [loader, registry],
+  );
 
   const setConnectedProjectInventory = useCallback((next: string[] | null) => {
     setConnectedProjectIds((current) => {
@@ -575,126 +530,38 @@ export function useBriar(options: UseBriarOptions = {}) {
   }, [clearLoginTimer]);
 
   /*
-    Bridges to the domain action modules. The session, organization, team and
-    planning actions own the root atoms outright, but the dashboard, its
-    per-team cache, the health probe and the reconnect generation still live
-    here, so each transition those actions cannot express is handed back as one
-    of the stable callbacks below.
+    Bridges to the domain action modules. Those actions now own the dashboard
+    too — they read and write it through the entity store — so the only
+    transitions still handed back are the ones Phase 3 owns: the workspace
+    inventory, the health probe and the reconnect generation.
   */
 
   const bumpReconnectRequest = useCallback(() => {
     reconnectRequest.current += 1;
   }, []);
 
-  const readDashboardTeamId = useCallback(
-    () => dashboardRef.current?.team.id ?? null,
-    [],
-  );
-
-  const clearSignedOutViews = useCallback(() => {
+  const clearWorkspaceViews = useCallback(() => {
     setConnectedProjectIds(null);
     setLocalProjectInventoryError(null);
-    setDashboard(null);
-    clearDashboardCache();
-  }, [clearDashboardCache, setDashboard]);
+  }, []);
 
-  const resetTeamViews = useCallback(() => {
-    setDashboard(null);
+  const resetTeamHealth = useCallback(() => {
     setHealth(null);
     setHealthError(null);
-  }, [setDashboard]);
-
-  const renameDashboardOrganization = useCallback(
-    (organizationId: string, organizationName: string) => {
-      setDashboard((current) =>
-        current?.team.organizationId === organizationId
-          ? { ...current, team: { ...current.team, organizationName } }
-          : current,
-      );
-    },
-    [setDashboard],
-  );
-
-  const applyTeamToDashboard = useCallback(
-    (project: Project) => {
-      setDashboard((current) =>
-        current?.team.id === project.id ? { ...current, team: project } : current,
-      );
-    },
-    [setDashboard],
-  );
-
-  const applyOrganizationSwitch = useCallback(
-    (project: Project | null, dashboardMatchesProject: boolean) => {
-      if (demoMode && project) {
-        setDashboard(
-          project.id === demoDashboard.team.id
-            ? demoDashboard
-            : emptyDashboard(project),
-        );
-      } else if (!dashboardMatchesProject) {
-        // Keep the last-known board on screen instead of blanking the UI. The
-        // organization prune effect keeps this entry because the restored
-        // project belongs to the organization we are switching to.
-        if (!project || !showCachedDashboard(project.id)) setDashboard(null);
-      }
-      if (!dashboardMatchesProject) {
-        setHealth(null);
-        setHealthError(null);
-      }
-    },
-    [setDashboard, showCachedDashboard],
-  );
-
-  const countDashboardIssues = useCallback(
-    (planningProjectId: string) =>
-      dashboardRef.current?.runs.filter(
-        (run) => run.projectId === planningProjectId,
-      ).length ?? 0,
-    [],
-  );
-
-  const movePlanningProjectIssues = useCallback(
-    (
-      teamId: string,
-      fromPlanningProjectId: string,
-      toPlanningProject: PlanningProject,
-    ) => {
-      setDashboard((current) =>
-        current?.team.id === teamId
-          ? {
-              ...current,
-              runs: current.runs.map((run) =>
-                run.projectId === fromPlanningProjectId
-                  ? {
-                      ...run,
-                      projectId: toPlanningProject.id,
-                      projectName: toPlanningProject.name,
-                    }
-                  : run,
-              ),
-            }
-          : current,
-      );
-    },
-    [setDashboard],
-  );
+  }, []);
 
   const sessionActionDeps: SessionActionDeps = {
     bumpReconnectRequest,
     cancelLogin,
-    clearSignedOutViews,
+    clearWorkspaceViews,
   };
   const { deleteAccount, logout, updateAccountProfile } =
     useSessionActions(sessionActionDeps);
 
   const organizationActionDeps: OrganizationActionDeps = {
-    applyOrganizationSwitch,
     bumpReconnectRequest,
     lockedTeamId: lockedProjectId,
-    readDashboardTeamId,
-    renameDashboardOrganization,
-    resetTeamViews,
+    resetTeamHealth,
   };
   const {
     addOrganization,
@@ -704,10 +571,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     selectOrganization,
   } = useOrganizationActions(organizationActionDeps);
 
-  const teamActionDeps: TeamActionDeps = {
-    applyTeamToDashboard,
-    bumpReconnectRequest,
-  };
+  const teamActionDeps: TeamActionDeps = { bumpReconnectRequest };
   const {
     cancelTeamCreation,
     changeTeamIcon,
@@ -717,12 +581,8 @@ export function useBriar(options: UseBriarOptions = {}) {
     startTeamCreation,
   } = useTeamActions(teamActionDeps);
 
-  const planningActionDeps: PlanningActionDeps = {
-    countDashboardIssues,
-    movePlanningProjectIssues,
-  };
   const { addPlanningProject, editPlanningProject, removePlanningProject } =
-    usePlanningActions(planningActionDeps);
+    usePlanningActions();
 
   useEffect(() => {
     if (!companionMode) return;
@@ -735,134 +595,15 @@ export function useBriar(options: UseBriarOptions = {}) {
       window.removeEventListener("briar-auth-return", handleAuthReturn);
   }, [clearLoginTimer]);
 
-  useEffect(() => {
-    dashboardRef.current = dashboard;
-    dashboardCursor.current = dashboard && Number.isSafeInteger(dashboard.cursor)
-      ? (dashboard.cursor ?? null)
-      : null;
-  }, [dashboard]);
-
-  useEffect(() => {
-    dashboardRequestGeneration.current += 1;
-    dashboardRequest.current?.abort.abort();
-    dashboardRequest.current = null;
-    if (dashboardRef.current?.team.id !== activeProjectId) {
-      dashboardCursor.current = null;
-    }
-  }, [activeProjectId, token]);
-
-  // Cached dashboards are session scoped: a new (or cleared) token must never
-  // reuse the previous account's payloads.
-  useEffect(() => {
-    clearDashboardCache();
-  }, [clearDashboardCache, token]);
-
-  // …and organization scoped: leaving an organization drops every dashboard
-  // that belongs to it. The project selected together with the organization is
-  // restored from the cache before this effect runs, so it survives the prune.
-  useEffect(() => {
-    const cache = dashboardCache.current;
-    for (const [projectId, cached] of cache) {
-      if (cached.team.organizationId === activeOrganizationId) continue;
-      cache.delete(projectId);
-    }
-  }, [activeOrganizationId]);
-
-  const refresh = useCallback(async (
-    mode: "delta" | "snapshot" = "delta",
-  ) => {
-    if (demoMode || !token || !activeProjectId) return;
-    // While a cached (stale) dashboard is on screen the next fetch has to be a
-    // full snapshot: the cached cursor may be arbitrarily old, and the payload
-    // must be replaced rather than delta-patched.
-    const resolvedMode =
-      mode === "snapshot" || staleDashboardProjectId.current === activeProjectId
-        ? "snapshot"
-        : "delta";
-    const currentRequest = dashboardRequest.current;
-    if (currentRequest?.projectId === activeProjectId && mode === "delta") {
-      return currentRequest.promise;
-    }
-    currentRequest?.abort.abort();
-    const abort = new AbortController();
-    const generation = ++dashboardRequestGeneration.current;
-    const projectId = activeProjectId;
-    const promise = (async () => {
-      try {
-        let current = dashboardRef.current?.team.id === projectId
-          ? dashboardRef.current
-          : null;
-        let cursor = dashboardCursor.current;
-        if (resolvedMode === "snapshot" || !current || cursor === null) {
-          current = await remote.loadDashboard(token, projectId, abort.signal);
-          cursor = current.cursor ?? null;
-        } else {
-          let pages = 0;
-          while (true) {
-            let delta;
-            try {
-              delta = await remote.loadDashboardDelta(
-                token,
-                projectId,
-                cursor,
-                abort.signal,
-              );
-              if (delta.reset) {
-                current = await remote.loadDashboard(token, projectId, abort.signal);
-                cursor = current.cursor ?? null;
-                break;
-              }
-            } catch (caught) {
-              if (!isApiErrorStatus(caught, 410)) throw caught;
-              current = await remote.loadDashboard(token, projectId, abort.signal);
-              cursor = current.cursor ?? null;
-              break;
-            }
-            const merged = mergeDashboardDelta(current, delta);
-            current = merged.dashboard;
-            cursor = delta.cursor;
-            pages += 1;
-            if (!delta.hasMore) break;
-            if (pages >= 20) {
-              current = await remote.loadDashboard(token, projectId, abort.signal);
-              cursor = current.cursor ?? null;
-              break;
-            }
-          }
-        }
-        if (
-          abort.signal.aborted ||
-          generation !== dashboardRequestGeneration.current ||
-          // A response that outlived its project must never be committed under
-          // another project's identity.
-          registry.get(activeTeamIdAtom) !== projectId
-        ) return;
-        dashboardCursor.current = cursor;
-        if (current !== dashboardRef.current) {
-          dashboardRef.current = current;
-          setDashboard(current);
-        } else {
-          // The delta advanced the cursor without changing any entity; keep the
-          // cache entry warm so a project switch still restores this payload.
-          rememberDashboard(current);
-        }
-        if (staleDashboardProjectId.current === projectId) {
-          staleDashboardProjectId.current = null;
-          setDashboardStale(false);
-        }
-        setError(null);
-      } catch (caught) {
-        if (abort.signal.aborted) return;
-        setError(caught instanceof Error ? caught.message : String(caught));
-      } finally {
-        if (dashboardRequest.current?.abort === abort) {
-          dashboardRequest.current = null;
-        }
-      }
-    })();
-    dashboardRequest.current = { projectId, abort, promise };
-    return promise;
-  }, [activeProjectId, registry, token]);
+  /**
+   * Fetches the selected team through the shared loader. The polling,
+   * visibility and scope-invalidation triggers live in `useTeamSync`; this is
+   * only the imperative entry point actions still call after a write.
+   */
+  const refresh = useCallback(
+    (mode: TeamSyncMode = "delta") => loader.refresh(activeProjectId, mode),
+    [activeProjectId, loader],
+  );
 
   useEffect(() => {
     if (demoMode) return;
@@ -981,13 +722,6 @@ export function useBriar(options: UseBriarOptions = {}) {
       return null;
     }
   }, []);
-
-  useEffect(() => {
-    if (demoMode || !token || !activeProjectId) return;
-    return startDashboardPolling((reason) =>
-      void refresh(reason === "poll" ? "delta" : "snapshot")
-    );
-  }, [activeProjectId, refresh, token]);
 
   useEffect(() => {
     if (
@@ -1203,8 +937,8 @@ export function useBriar(options: UseBriarOptions = {}) {
       // Project workflow tools are shared via project settings. Mirror them
       // into the local config so this worker machine can probe readiness.
       const sharedWorkflow =
-        dashboardRef.current?.team.id === projectId
-          ? dashboardRef.current.settings.workflow
+        registry.get(loadedDashboardTeamIdAtom) === projectId
+          ? (registry.get(teamSettingsAtom(projectId))?.workflow ?? null)
           : null;
       const syncPlan = shouldSyncSharedWorkflow({
         connectedLocally: true,
@@ -1501,7 +1235,12 @@ export function useBriar(options: UseBriarOptions = {}) {
         setProjects(nextProjects);
         setActiveOrganizationId(result.invitation.organizationId);
         setActiveProjectId(result.invitation.initialProjectId);
-        setDashboard(null);
+        // A joined team starts from the server, never from anything this
+        // account happened to have stored for that id.
+        applySyncEvent(registry, {
+          kind: "team-cleared",
+          teamId: result.invitation.initialProjectId,
+        });
         setHealth(null);
         setHealthError(null);
         return result;
@@ -1521,7 +1260,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       const project = projects.find((candidate) => candidate.id === projectId);
       if (!project) return;
       const dashboardMatchesProject =
-        dashboardRef.current?.team.id === projectId;
+        registry.get(loadedDashboardTeamIdAtom) === projectId;
       if (activeProjectId === projectId && dashboardMatchesProject) {
         setActiveOrganizationId(project.organizationId);
         setError(null);
@@ -1532,8 +1271,9 @@ export function useBriar(options: UseBriarOptions = {}) {
       setActiveOrganizationId(project.organizationId);
       if (!demoMode) {
         if (!dashboardMatchesProject) {
-          // Keep the last-known board on screen instead of blanking the UI.
-          if (!showCachedDashboard(projectId)) setDashboard(null);
+          // The store still holds this team's last payload, so the board is
+          // already on screen; mark it stale so the next fetch replaces it.
+          markTeamStale(registry, projectId);
         }
         setError(null);
         if (activeProjectId === projectId && !dashboardMatchesProject) {
@@ -1548,7 +1288,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       );
       setError(null);
     },
-    [activeProjectId, lockedProjectId, projects, refresh, showCachedDashboard],
+    [activeProjectId, lockedProjectId, projects, refresh, registry],
   );
 
   const ensureProjectSelected = useCallback(
@@ -1567,7 +1307,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         throw new Error("요청한 프로젝트를 찾을 수 없습니다.");
       }
       const dashboardMatchesProject =
-        dashboardRef.current?.team.id === project.id;
+        registry.get(loadedDashboardTeamIdAtom) === project.id;
       if (activeProjectId === project.id && dashboardMatchesProject) {
         setActiveOrganizationId(project.organizationId);
         setError(null);
@@ -1578,8 +1318,9 @@ export function useBriar(options: UseBriarOptions = {}) {
       setActiveOrganizationId(project.organizationId);
       if (!demoMode) {
         if (!dashboardMatchesProject) {
-          // Keep the last-known board on screen instead of blanking the UI.
-          if (!showCachedDashboard(project.id)) setDashboard(null);
+          // The store already holds this team's last payload; mark it stale so
+          // the next fetch replaces it instead of patching an old cursor.
+          markTeamStale(registry, project.id);
         }
         setError(null);
         if (activeProjectId === project.id && !dashboardMatchesProject) {
@@ -1601,7 +1342,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       lockedProjectId,
       projects,
       refresh,
-      showCachedDashboard,
+      registry,
       token,
     ],
   );

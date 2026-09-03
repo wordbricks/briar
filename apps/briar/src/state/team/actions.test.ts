@@ -2,8 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import { demoDashboard } from "../../lib/demo-data";
 import type { Project } from "../../types";
+import { teamEntityAtom } from "../entities/teams";
 import { createTestRegistry, type AtomRegistry } from "../registry";
 import { sessionErrorAtom, tokenAtom } from "../session/atoms";
+import { applySyncEvent } from "../sync/apply";
+import { dashboardViewAtom } from "../sync/view";
 import {
   createTeamActions,
   type TeamActionApi,
@@ -56,7 +59,6 @@ class TeamServer {
 
 interface Harness {
   readonly actions: TeamActions;
-  readonly dashboardTeams: Project[];
   readonly reconnectBumps: () => number;
   readonly registry: AtomRegistry;
   readonly server: TeamServer;
@@ -68,20 +70,27 @@ const harness = (): Harness => {
     [tokenAtom, "token-1"],
   ]);
   const server = new TeamServer([teamA, teamB]);
-  const dashboardTeams: Project[] = [];
+  // Team A's board is loaded; team B's is not, which is how the "only mirror
+  // into a dashboard that exists" rule becomes observable.
+  applySyncEvent(registry, {
+    kind: "team-snapshot",
+    teamId: teamA.id,
+    payload: {
+      ...demoDashboard,
+      team: teamA,
+      runs: [],
+      generatedAt: "2026-09-01T00:00:00.000Z",
+    },
+  });
   let reconnectBumps = 0;
   const actions = createTeamActions(registry, {
     api: server.api,
-    applyTeamToDashboard: (team) => {
-      dashboardTeams.push(team);
-    },
     bumpReconnectRequest: () => {
       reconnectBumps += 1;
     },
   });
   return {
     actions,
-    dashboardTeams,
     reconnectBumps: () => reconnectBumps,
     registry,
     server,
@@ -90,7 +99,7 @@ const harness = (): Harness => {
 
 describe("createTeamActions", () => {
   it("writes an edited icon to the team list and the dashboard", async () => {
-    const { actions, dashboardTeams, registry, server } = harness();
+    const { actions, registry, server } = harness();
 
     const team = await actions.changeTeamIcon(teamA.id, {
       type: "image",
@@ -100,7 +109,15 @@ describe("createTeamActions", () => {
     expect(server.iconUpdates).toEqual([teamA.id]);
     expect(team.icon).toBe("data:image/png;base64,");
     expect(registry.get(teamsAtom)).toEqual([team, teamB]);
-    expect(dashboardTeams).toEqual([team]);
+    expect(registry.get(dashboardViewAtom(teamA.id))?.team).toBe(team);
+  });
+
+  it("leaves a team the store never loaded out of the entity map", async () => {
+    const { actions, registry } = harness();
+
+    await actions.changeTeamIssueKeyPrefix(teamB.id, "NEW");
+
+    expect(registry.get(teamEntityAtom(teamB.id))).toBeNull();
   });
 
   it("also refreshes the team held by an open connection flow", async () => {

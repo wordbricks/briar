@@ -2,7 +2,7 @@ import type { HuntRun } from "../../types";
 
 /*
   Merge primitives shared by every entity map. They are the rules
-  `lib/dashboard-sync.ts` applied to one `DashboardPayload`, lifted so the
+  the payload-level dashboard merge applied to one `DashboardPayload`, lifted so the
   normalized store can apply them per entity: an incoming value that is deep
   equal to the stored one keeps the stored reference, and a collection that did
   not change keeps its own reference too. `Object.is` based atom notifications

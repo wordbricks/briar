@@ -1,4 +1,5 @@
 import { useActiveOrganizationPersistence } from "../../state/organization/useActiveOrganizationPersistence";
+import { useTeamSync } from "../../state/sync/useTeamSync";
 
 /**
  * Mount point for the domain effect hooks that were `useEffect` blocks inside
@@ -8,5 +9,6 @@ import { useActiveOrganizationPersistence } from "../../state/organization/useAc
  */
 export function AppEffects() {
   useActiveOrganizationPersistence();
+  useTeamSync();
   return null;
 }

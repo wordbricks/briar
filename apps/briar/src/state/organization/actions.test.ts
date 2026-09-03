@@ -4,7 +4,9 @@ import { demoDashboard } from "../../lib/demo-data";
 import type { Organization, Project } from "../../types";
 import { createTestRegistry, type AtomRegistry } from "../registry";
 import { sessionErrorAtom, tokenAtom } from "../session/atoms";
-import { activeTeamIdAtom, teamsAtom } from "../team/atoms";
+import { applySyncEvent } from "../sync/apply";
+import { dashboardViewAtom } from "../sync/view";
+import { activeTeamIdAtom, staleTeamIdAtom, teamsAtom } from "../team/atoms";
 import {
   createOrganizationActions,
   type OrganizationActionApi,
@@ -98,16 +100,13 @@ interface Harness {
   readonly registry: AtomRegistry;
   readonly server: OrganizationServer;
   readonly reconnectBumps: () => number;
-  readonly switches: [string | null, boolean][];
-  readonly renames: [string, string][];
-  readonly resets: () => number;
+  /** The health probe is blanked exactly when the switch changes the board. */
+  readonly healthResets: () => number;
   readonly actions: ReturnType<typeof createOrganizationActions>;
 }
 
 const harness = (
-  overrides: Partial<
-    Pick<OrganizationActionDeps, "lockedTeamId" | "readDashboardTeamId">
-  > = {},
+  overrides: Partial<Pick<OrganizationActionDeps, "lockedTeamId">> = {},
   organizations: Organization[] = [organizationA, organizationB],
   teams: Project[] = [teamA, teamB],
 ): Harness => {
@@ -118,40 +117,45 @@ const harness = (
   ]);
   const server = new OrganizationServer(organizations);
   let reconnectBumps = 0;
-  let resets = 0;
-  const switches: [string | null, boolean][] = [];
-  const renames: [string, string][] = [];
+  let healthResets = 0;
   const actions = createOrganizationActions(registry, {
     api: server.api,
-    applyOrganizationSwitch: (team, dashboardMatchesTeam) => {
-      switches.push([team?.id ?? null, dashboardMatchesTeam]);
-    },
     bumpReconnectRequest: () => {
       reconnectBumps += 1;
     },
     lockedTeamId: overrides.lockedTeamId ?? null,
-    readDashboardTeamId: overrides.readDashboardTeamId ?? (() => null),
-    renameDashboardOrganization: (organizationId, organizationName) => {
-      renames.push([organizationId, organizationName]);
-    },
-    resetTeamViews: () => {
-      resets += 1;
+    resetTeamHealth: () => {
+      healthResets += 1;
     },
   });
   return {
     actions,
+    healthResets: () => healthResets,
     reconnectBumps: () => reconnectBumps,
     registry,
-    renames,
-    resets: () => resets,
     server,
-    switches,
   };
+};
+
+/** Puts a team's payload in the store and selects it, as a snapshot load does. */
+const loadTeam = (registry: AtomRegistry, team: Project) => {
+  registry.set(activeTeamIdAtom, team.id);
+  applySyncEvent(registry, {
+    kind: "team-snapshot",
+    teamId: team.id,
+    payload: {
+      ...demoDashboard,
+      team,
+      runs: [],
+      generatedAt: "2026-09-01T00:00:00.000Z",
+    },
+  });
 };
 
 describe("createOrganizationActions", () => {
   it("appends a created organization and selects it with no team", async () => {
-    const { actions, registry, resets, server, reconnectBumps } = harness();
+    const { actions, registry, healthResets, server, reconnectBumps } =
+      harness();
 
     const organization = await actions.addOrganization({
       name: "Org C",
@@ -166,7 +170,7 @@ describe("createOrganizationActions", () => {
     ]);
     expect(registry.get(activeOrganizationIdAtom)).toBe(organization.id);
     expect(registry.get(activeTeamIdAtom)).toBeNull();
-    expect(resets()).toBe(1);
+    expect(healthResets()).toBe(1);
     expect(reconnectBumps()).toBe(1);
   });
 
@@ -181,7 +185,8 @@ describe("createOrganizationActions", () => {
   });
 
   it("mirrors a rename into the team list and the dashboard", async () => {
-    const { actions, registry, renames, server } = harness();
+    const { actions, registry, server } = harness();
+    loadTeam(registry, teamA);
 
     const organization = await actions.renameOrganization(
       organizationA.id,
@@ -198,7 +203,9 @@ describe("createOrganizationActions", () => {
     expect(
       registry.get(teamsAtom).map((team) => team.organizationName),
     ).toEqual(["Org A renamed", "Org B"]);
-    expect(renames).toEqual([[organizationA.id, "Org A renamed"]]);
+    // …and so does the team entity the dashboard renders.
+    expect(registry.get(dashboardViewAtom(teamA.id))?.team.organizationName)
+      .toBe("Org A renamed");
   });
 
   it("rejects renaming an organization the account does not have", async () => {
@@ -235,45 +242,59 @@ describe("createOrganizationActions", () => {
   });
 
   it("selects an organization together with its first team", () => {
-    const { actions, registry, switches, reconnectBumps } = harness();
+    const { actions, registry, healthResets, reconnectBumps } = harness();
 
     actions.selectOrganization(organizationB.id);
 
     expect(registry.get(activeOrganizationIdAtom)).toBe(organizationB.id);
     expect(registry.get(activeTeamIdAtom)).toBe(teamB.id);
-    expect(switches).toEqual([[teamB.id, false]]);
+    // Nothing is stored for that team, so the board shows the loading state.
+    expect(registry.get(staleTeamIdAtom)).toBeNull();
+    expect(healthResets()).toBe(1);
     expect(reconnectBumps()).toBe(1);
   });
 
+  it("renders a stored team immediately and marks it for a fresh snapshot", () => {
+    const { actions, registry } = harness();
+    loadTeam(registry, teamB);
+    registry.set(activeTeamIdAtom, teamA.id);
+
+    actions.selectOrganization(organizationB.id);
+
+    expect(registry.get(dashboardViewAtom(teamB.id))?.team.id).toBe(teamB.id);
+    expect(registry.get(staleTeamIdAtom)).toBe(teamB.id);
+  });
+
   it("ignores an organization the account is not a member of", () => {
-    const { actions, registry, switches, reconnectBumps } = harness();
+    const { actions, registry, healthResets, reconnectBumps } = harness();
 
     actions.selectOrganization("org-missing");
 
     expect(registry.get(activeOrganizationIdAtom)).toBeNull();
-    expect(switches).toEqual([]);
+    expect(healthResets()).toBe(0);
     expect(reconnectBumps()).toBe(0);
   });
 
   it("treats reselecting the settled organization as a no-op", () => {
-    const { actions, registry, switches, reconnectBumps } = harness({
-      // The board on screen already belongs to the team this organization
-      // resolves to, so nothing has to be reloaded.
-      readDashboardTeamId: () => teamB.id,
-    });
+    const { actions, registry, healthResets, reconnectBumps } = harness();
+    // The board on screen already belongs to the team this organization
+    // resolves to, so nothing has to be reloaded.
+    loadTeam(registry, teamB);
     registry.set(activeOrganizationIdAtom, organizationB.id);
-    registry.set(activeTeamIdAtom, teamB.id);
     registry.set(sessionErrorAtom, "이전 오류");
 
     actions.selectOrganization(organizationB.id);
 
     expect(registry.get(sessionErrorAtom)).toBeNull();
-    expect(switches).toEqual([]);
+    expect(registry.get(staleTeamIdAtom)).toBeNull();
+    expect(healthResets()).toBe(0);
     expect(reconnectBumps()).toBe(0);
   });
 
   it("keeps a project window pinned to its own team's organization", () => {
-    const { actions, registry, switches } = harness({ lockedTeamId: teamB.id });
+    const { actions, registry, healthResets } = harness({
+      lockedTeamId: teamB.id,
+    });
 
     actions.selectOrganization(organizationA.id);
     expect(registry.get(activeOrganizationIdAtom)).toBeNull();
@@ -283,6 +304,6 @@ describe("createOrganizationActions", () => {
     expect(registry.get(activeOrganizationIdAtom)).toBe(organizationB.id);
     expect(registry.get(activeTeamIdAtom)).toBe(teamB.id);
     // A locked window never reloads the board: it only ever shows one team.
-    expect(switches).toEqual([]);
+    expect(healthResets()).toBe(0);
   });
 });
