@@ -110,16 +110,16 @@ describe("ManagedComputersCard", () => {
     );
 
     await vi.waitFor(() => {
-      expect(container.textContent).toContain("프로젝트 추가");
+      expect(container.textContent).toContain("팀 추가");
     });
     const addButton = Array.from(
       container.querySelectorAll<HTMLButtonElement>("button"),
-    ).find((button) => button.textContent?.includes("프로젝트 추가"));
+    ).find((button) => button.textContent?.includes("팀 추가"));
     expect(addButton?.disabled).toBe(false);
 
     await act(async () => addButton?.click());
     const dialog = document.body.querySelector<HTMLElement>('[role="dialog"]');
-    expect(dialog?.textContent).toContain("관리형 컴퓨터에 프로젝트 추가");
+    expect(dialog?.textContent).toContain("관리형 컴퓨터에 팀 추가");
     expect(dialog?.textContent).toContain("New project");
     expect(dialog?.textContent).not.toContain("Existing project");
     await cleanup();

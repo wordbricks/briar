@@ -129,9 +129,9 @@ describe("Inbox", () => {
     );
 
     const projectFilter = container.querySelector<HTMLButtonElement>(
-      '[aria-label="프로젝트 필터"]',
+      '[aria-label="팀 필터"]',
     )!;
-    expect(projectFilter?.textContent).toContain("모든 프로젝트");
+    expect(projectFilter?.textContent).toContain("모든 팀");
 
     const initialFirstMessage = container.querySelector<HTMLButtonElement>(
       ".inbox-message-open",
@@ -242,7 +242,7 @@ describe("Inbox", () => {
     expect(container.textContent).toContain("2개 표시");
 
     const projectFilter = container.querySelector<HTMLButtonElement>(
-      '[aria-label="프로젝트 필터"]',
+      '[aria-label="팀 필터"]',
     );
     await act(async () => projectFilter?.click());
     const briarOption = document.querySelector<HTMLButtonElement>(

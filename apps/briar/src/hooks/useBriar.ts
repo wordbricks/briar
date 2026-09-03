@@ -2237,7 +2237,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       nextWorkflow: ProjectSettings["workflow"],
     ) => {
       if (!token || !dashboard || dashboard.project.id !== projectId) {
-        throw new Error("워크플로우를 갱신할 프로젝트 설정이 없습니다.");
+        throw new Error("워크플로우를 갱신할 팀 설정이 없습니다.");
       }
       await updateLocalProjectWorkflow(projectId, nextWorkflow);
       try {
@@ -2280,7 +2280,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       }
       if (!token) throw new Error("로그인이 필요합니다.");
       if (!dashboard || dashboard.project.id !== projectId) {
-        throw new Error("워크플로우를 갱신할 프로젝트 설정이 없습니다.");
+        throw new Error("워크플로우를 갱신할 팀 설정이 없습니다.");
       }
 
       const previousWorkflow = dashboard.settings.workflow;
@@ -2307,7 +2307,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       }
       if (!token) throw new Error("로그인이 필요합니다.");
       if (!dashboard || dashboard.project.id !== projectId) {
-        throw new Error("필요 도구를 분석할 프로젝트 설정이 없습니다.");
+        throw new Error("필요 도구를 분석할 팀 설정이 없습니다.");
       }
 
       const previousWorkflow = dashboard.settings.workflow;
@@ -2332,7 +2332,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       }
       if (!token) throw new Error("로그인이 필요합니다.");
       if (!dashboard || dashboard.project.id !== projectId) {
-        throw new Error("워크플로우를 갱신할 프로젝트 설정이 없습니다.");
+        throw new Error("워크플로우를 갱신할 팀 설정이 없습니다.");
       }
 
       const previousWorkflow = dashboard.settings.workflow;
@@ -2361,7 +2361,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     ) => {
       if (!token) throw new Error("로그인이 필요합니다.");
       if (!dashboard || dashboard.project.id !== projectId) {
-        throw new Error("체크포인트를 저장할 프로젝트 설정이 없습니다.");
+        throw new Error("체크포인트를 저장할 팀 설정이 없습니다.");
       }
       const result = await updateCheckpointPolicy(token, projectId, {
         scope,
@@ -2548,7 +2548,7 @@ export function useBriar(options: UseBriarOptions = {}) {
   const saveVelenIntegration = useCallback(
     async (projectId: string, org: string | null) => {
       if (!dashboard || dashboard.project.id !== projectId) {
-        throw new Error("Velen 연결을 저장할 프로젝트 설정이 없습니다.");
+        throw new Error("Velen 연결을 저장할 팀 설정이 없습니다.");
       }
       const normalized = org?.trim() || null;
       if (demoMode) {
@@ -2696,13 +2696,13 @@ export function useBriar(options: UseBriarOptions = {}) {
       );
       if (!project) throw new Error("삭제할 프로젝트가 없습니다.");
       if (project.isDefault) {
-        throw new Error("팀의 기본 General 프로젝트는 삭제할 수 없습니다.");
+        throw new Error("팀의 기본 프로젝트는 삭제할 수 없습니다.");
       }
       const defaultProject = planningProjects.find(
         (candidate) => candidate.teamId === project.teamId && candidate.isDefault,
       );
       if (!defaultProject) {
-        throw new Error("이슈를 옮길 기본 General 프로젝트를 찾을 수 없습니다.");
+        throw new Error("이슈를 옮길 기본 프로젝트를 찾을 수 없습니다.");
       }
       const result = demoMode
         ? {

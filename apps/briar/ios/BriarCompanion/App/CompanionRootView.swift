@@ -478,7 +478,7 @@ struct CompanionRootView: View {
             } catch {
                 if navigation.pendingProjectID == pending {
                     navigation.failPendingNavigation(
-                        "프로젝트 정보를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요."
+                        "팀 정보를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요."
                     )
                 }
                 return
@@ -488,7 +488,7 @@ struct CompanionRootView: View {
         applyPendingProjectIfNeeded()
         if companion.selectedProjectID != pending {
             navigation.failPendingNavigation(
-                "요청한 프로젝트가 없거나 접근 권한이 없습니다."
+                "요청한 팀이 없거나 접근 권한이 없습니다."
             )
         }
     }
@@ -573,7 +573,7 @@ struct CompanionLoginView: View {
                 Text("Briar Companion")
                     .font(.largeTitle.bold())
                     .accessibilityIdentifier("login-title")
-                Text(L10n.text("프로젝트 진행 상황을 iPhone에서 안전하게 확인하세요."))
+                Text(L10n.text("팀 진행 상황을 iPhone에서 안전하게 확인하세요."))
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.secondary)
             }
@@ -640,9 +640,9 @@ struct ProjectSelectionView: View {
     var body: some View {
         if projects.isEmpty {
             ContentUnavailableView {
-                Label(L10n.text("연결된 프로젝트 없음"), systemImage: "folder.badge.questionmark")
+                Label(L10n.text("연결된 팀 없음"), systemImage: "folder.badge.questionmark")
             } description: {
-                Text(L10n.text("Briar Desktop에서 프로젝트와 저장소를 연결한 뒤 다시 확인해 주세요."))
+                Text(L10n.text("Briar Desktop에서 팀과 저장소를 연결한 뒤 다시 확인해 주세요."))
             } actions: {
                 Button(L10n.text("로그아웃"), role: .destructive, action: signOut)
             }
@@ -680,9 +680,9 @@ struct ProjectSelectionView: View {
                             .accessibilityIdentifier("project-picker")
                         }
                     } header: {
-                        Text(L10n.text("확인할 프로젝트"))
+                        Text(L10n.text("확인할 팀"))
                     } footer: {
-                        Text(L10n.text("Companion은 선택한 프로젝트의 정보를 읽기 전용으로 표시합니다."))
+                        Text(L10n.text("Companion은 선택한 팀의 정보를 읽기 전용으로 표시합니다."))
                     }
                     Section {
                         Button(L10n.text("계속")) { continueAction() }
@@ -691,7 +691,7 @@ struct ProjectSelectionView: View {
                             .accessibilityIdentifier("project-continue-button")
                     }
                 }
-                .navigationTitle(L10n.text("프로젝트 선택"))
+                .navigationTitle(L10n.text("팀 선택"))
             }
         }
     }

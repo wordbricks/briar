@@ -100,9 +100,9 @@ enum L10n {
         "알림 분류": "Notification categories",
         "접근 권한": "Access",
         "링크를 열 수 없음": "Unable to open link",
-        "요청한 프로젝트가 없거나 접근 권한이 없습니다.": "The requested project does not exist or you do not have access to it.",
+        "요청한 팀이 없거나 접근 권한이 없습니다.": "The requested team does not exist or you do not have access to it.",
         "요청한 이슈가 없거나 접근 권한이 없습니다.": "The requested issue does not exist or you do not have access to it.",
-        "프로젝트 정보를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.": "Could not check the project information. Try again in a moment.",
+        "팀 정보를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.": "Could not check the team information. Try again in a moment.",
         "읽기·쓰기": "Read and write",
         "이슈 작성, 실행 제어, 결과 검수와 대화를 지원합니다.": "Supports issue writing, run control, result review, and conversation.",
         "시스템": "System",
@@ -120,7 +120,7 @@ enum L10n {
         "메시지를 복사했습니다": "Message copied",
         "이메일": "Email",
         "공통 채널": "Common channels",
-        "다른 프로젝트": "Other project",
+        "다른 팀": "Other team",
         "채널이 없습니다.": "No channels yet.",
         "채널을 불러오는 중…": "Loading channels…",
         "채널 메시지를 불러오는 중…": "Loading channel messages…",
@@ -136,7 +136,7 @@ enum L10n {
         "참여자 목록 열기": "Open participant list",
         "프로필 보기": "View profile",
         "조직 Agent": "Organization agent",
-        "프로젝트 Agent": "Project agent",
+        "팀 Agent": "Team agent",
         "채널 멤버": "Channel member",
         "채널 소유자": "Channel owner",
         "역할": "Role",
@@ -161,12 +161,12 @@ enum L10n {
         "승인되어 이슈가 생성되었습니다.": "Accepted — the issue was created.",
         "승인하면 이슈가 생성됩니다.": "Accept to create an issue.",
         "이슈 만들기": "Create issue",
-        "프로젝트 선택": "Select project",
+        "팀 선택": "Select team",
         "이슈 보기": "View issue",
         "선택한 분류의 새 항목이 도착하면 로컬 알림을 보냅니다.": "Local notifications fire for newly arrived items in the selected categories.",
         "Agents": "Agents",
         "표시할 Agent가 없습니다.": "No agents available.",
-        "프로젝트에 연결된 Agent가 여기에 표시됩니다.": "Agents connected to this project appear here.",
+        "팀에 연결된 Agent가 여기에 표시됩니다.": "Agents connected to this team appear here.",
         "아직 동기화된 세션이 없습니다.": "No sessions have synced yet.",
         "실행 Worker": "Execution workers",
         "실행 가능": "Available",
@@ -202,7 +202,7 @@ enum L10n {
         "실행 대상 이슈를 최신 프로젝트 스냅샷에서 찾을 수 없습니다.": "The target issue was not found in the latest project snapshot.",
         "완료되지 않은 선행 이슈가 있어 아직 실행할 수 없습니다.": "This issue cannot run yet because a prerequisite is incomplete.",
         "이슈 상태가 변경되었습니다. 최신 상태를 확인해 다시 승인해 주세요.": "The issue state changed. Check the latest status and approve again.",
-        "이 프로젝트에서 사용할 수 없는 프로바이더입니다.": "This provider is not available for the project.",
+        "이 팀에서 사용할 수 없는 프로바이더입니다.": "This provider is not available for the team.",
         "선택한 모델 또는 Effort를 이 프로바이더에서 사용할 수 없습니다.": "The selected model or effort is not available from this provider.",
         "선택한 설정으로 실행 가능한 Worker가 없습니다.": "No worker can run with the selected settings.",
         "이 Agent의 세션이 아직 없습니다.": "This agent has no sessions yet.",
@@ -216,7 +216,7 @@ enum L10n {
         "이슈 메뉴": "Issue menu",
         "활성 호스트": "Active hosts",
         "연결된 호스트 없음": "No connected hosts",
-        "이 프로젝트에서 사용할 수 있는 Worker가 없습니다.": "No Worker is available for this project.",
+        "이 팀에서 사용할 수 있는 Worker가 없습니다.": "No Worker is available for this team.",
         "호스트 상태 새로고침": "Refresh host status",
         "마지막 동기화": "Last synced",
         "활성 세션 %d/%d": "%d of %d sessions active",
@@ -260,13 +260,13 @@ enum L10n {
         "다시 시도": "Retry",
         "로그아웃": "Sign out",
         "로그인을 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.": "Sign-in could not be completed. Please try again later.",
-        "프로젝트 진행 상황을 iPhone에서 안전하게 확인하세요.": "Securely check project progress on your iPhone.",
+        "팀 진행 상황을 iPhone에서 안전하게 확인하세요.": "Securely check team progress on your iPhone.",
         "Briar로 로그인": "Sign in with Briar",
-        "연결된 프로젝트 없음": "No connected projects",
-        "Briar Desktop에서 프로젝트와 저장소를 연결한 뒤 다시 확인해 주세요.": "Connect a project and repository in Briar Desktop, then try again.",
+        "연결된 팀 없음": "No connected teams",
+        "Briar Desktop에서 팀과 저장소를 연결한 뒤 다시 확인해 주세요.": "Connect a team and repository in Briar Desktop, then try again.",
         "조직": "Organization",
-        "확인할 프로젝트": "Projects to review",
-        "Companion은 선택한 프로젝트의 정보를 읽기 전용으로 표시합니다.": "Companion shows the selected project's information in read-only mode.",
+        "확인할 팀": "Teams to review",
+        "Companion은 선택한 팀의 정보를 읽기 전용으로 표시합니다.": "Companion shows the selected team's information in read-only mode.",
         "계속": "Continue",
         "이름": "Name",
         "사용자명": "Username",
@@ -402,7 +402,7 @@ enum L10n {
         "사용 가능한 Worker 자동 선택": "Automatically select an available worker",
         "재할당": "Reassign",
         "실행 완료": "Run complete",
-        "프로젝트와 로그인 정보가 준비되지 않았습니다.": "The project and sign-in information are not ready.",
+        "팀과 로그인 정보가 준비되지 않았습니다.": "The team and sign-in information are not ready.",
         "실행할 준비가 된 queued 이슈가 없습니다.": "There are no queued issues ready to run.",
         "이미 요청을 처리하고 있습니다.": "A request is already in progress.",
         "이슈 제목을 입력해 주세요.": "Enter an issue title.",
@@ -463,7 +463,7 @@ enum L10n {
         "진행 중": "In progress",
         "차단": "Blocked",
         "첨부 %d/5 · 파일당 20MB, 전체 25MB": "Attachments %d/5 · 20 MB each, 25 MB total",
-        "프로젝트, %@": "Project, %@",
+        "팀, %@": "Team, %@",
         "회귀 보호": "Regression protection",
         "%@ 크게 보기": "View %@ larger",
         "건너뜀": "Skipped",
@@ -482,9 +482,9 @@ enum L10n {
         "알림 분류": "通知分类",
         "접근 권한": "访问权限",
         "링크를 열 수 없음": "无法打开链接",
-        "요청한 프로젝트가 없거나 접근 권한이 없습니다.": "请求的项目不存在，或你没有访问权限。",
+        "요청한 팀이 없거나 접근 권한이 없습니다.": "请求的团队不存在，或你没有访问权限。",
         "요청한 이슈가 없거나 접근 권한이 없습니다.": "请求的问题不存在，或你没有访问权限。",
-        "프로젝트 정보를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.": "无法检查项目信息。请稍后重试。",
+        "팀 정보를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.": "无法检查团队信息。请稍后重试。",
         "읽기·쓰기": "读写",
         "시스템": "系统",
         "라이트": "浅色",
@@ -498,7 +498,7 @@ enum L10n {
         "링크를 복사했습니다": "链接已复制",
         "이메일": "电子邮件",
         "공통 채널": "公共频道",
-        "다른 프로젝트": "其他项目",
+        "다른 팀": "其他团队",
         "채널이 없습니다.": "还没有频道。",
         "채널을 불러오는 중…": "正在加载频道…",
         "채널 메시지를 불러오는 중…": "正在加载频道消息…",
@@ -514,7 +514,7 @@ enum L10n {
         "참여자 목록 열기": "打开参与者列表",
         "프로필 보기": "查看资料",
         "조직 Agent": "组织 Agent",
-        "프로젝트 Agent": "项目 Agent",
+        "팀 Agent": "团队 Agent",
         "채널 멤버": "频道成员",
         "채널 소유자": "频道所有者",
         "역할": "角色",
@@ -541,7 +541,7 @@ enum L10n {
         "이슈 보기": "查看问题",
         "선택한 분류의 새 항목이 도착하면 로컬 알림을 보냅니다.": "所选分类有新项目时会发送本地通知。",
         "Agents": "智能体",
-        "프로젝트에 연결된 Agent가 여기에 표시됩니다.": "与项目关联的 Agent 将显示在这里。",
+        "팀에 연결된 Agent가 여기에 표시됩니다.": "与团队关联的 Agent 将显示在这里。",
         "아직 동기화된 세션이 없습니다.": "还没有同步的会话。",
         "실행 Worker": "执行 Worker",
         "호스트": "主机",
@@ -549,7 +549,7 @@ enum L10n {
         "이슈 메뉴": "问题菜单",
         "활성 호스트": "活跃主机",
         "연결된 호스트 없음": "没有已连接的主机",
-        "이 프로젝트에서 사용할 수 있는 Worker가 없습니다.": "此项目没有可用的 Worker。",
+        "이 팀에서 사용할 수 있는 Worker가 없습니다.": "此团队没有可用的 Worker。",
         "호스트 상태 새로고침": "刷新主机状态",
         "마지막 동기화": "上次同步",
         "활성 세션 %d/%d": "%d/%d 个会话正在运行",
@@ -576,7 +576,7 @@ enum L10n {
         "실행 대상 이슈를 최신 프로젝트 스냅샷에서 찾을 수 없습니다.": "在最新项目快照中找不到目标问题。",
         "완료되지 않은 선행 이슈가 있어 아직 실행할 수 없습니다.": "由于前置问题尚未完成，目前无法执行。",
         "이슈 상태가 변경되었습니다. 최신 상태를 확인해 다시 승인해 주세요.": "问题状态已更改。请检查最新状态后重新批准。",
-        "이 프로젝트에서 사용할 수 없는 프로바이더입니다.": "此项目无法使用该提供商。",
+        "이 팀에서 사용할 수 없는 프로바이더입니다.": "此团队无法使用该提供商。",
         "선택한 모델 또는 Effort를 이 프로바이더에서 사용할 수 없습니다.": "所选提供商不支持该模型或 Effort。",
         "선택한 설정으로 실행 가능한 Worker가 없습니다.": "没有 Worker 能使用所选设置执行。",
         "Agent를 불러오는 중…": "正在加载 Agent…",
@@ -613,9 +613,14 @@ enum L10n {
         "다시 시도": "重试",
         "로그아웃": "退出登录",
         "Briar로 로그인": "使用 Briar 登录",
-        "연결된 프로젝트 없음": "没有关联的项目",
+        "연결된 팀 없음": "没有关联的团队",
+        "팀 선택": "选择团队",
+        "팀 진행 상황을 iPhone에서 안전하게 확인하세요.": "在 iPhone 上安全查看团队进展。",
+        "Briar Desktop에서 팀과 저장소를 연결한 뒤 다시 확인해 주세요.": "请先在 Briar Desktop 中连接团队和仓库，然后再试。",
+        "Companion은 선택한 팀의 정보를 읽기 전용으로 표시합니다.": "Companion 以只读方式显示所选团队的信息。",
+        "팀과 로그인 정보가 준비되지 않았습니다.": "团队和登录信息尚未准备好。",
         "조직": "组织",
-        "확인할 프로젝트": "要查看的项目",
+        "확인할 팀": "要查看的团队",
         "이름": "姓名",
         "사용자명": "用户名",
         "긴급": "紧急",
@@ -765,7 +770,7 @@ enum L10n {
         "진행 중": "进行中",
         "차단": "已阻止",
         "첨부 %d/5 · 파일당 20MB, 전체 25MB": "附件 %d/5 · 单个 20 MB，总计 25 MB",
-        "프로젝트, %@": "项目，%@",
+        "팀, %@": "团队，%@",
         "회귀 보호": "回归保护",
         "%@ 크게 보기": "查看 %@ 大图",
         "건너뜀": "已跳过",
@@ -883,7 +888,7 @@ enum L10n {
             case .notificationSound: "알림 소리"
             case .notificationSoundDescription: "새 시스템 알림이 도착하면 소리를 재생합니다."
             case .channelsCommon: "공통 채널"
-            case .channelsOtherProject: "다른 프로젝트"
+            case .channelsOtherProject: "다른 팀"
             case .channelsEmpty: "채널이 없습니다."
             case .channelThread: "스레드"
             case .channelBack: "뒤로"
@@ -902,12 +907,12 @@ enum L10n {
             case .channelMessagePlaceholder: "#%@에 메시지 보내기"
             case .channelAgentTyping: "%@님이 답변을 작성하고 있습니다…"
             case .channelHome: "홈"
-            case .projectLobbyOpen: "프로젝트 홈 보기"
+            case .projectLobbyOpen: "팀 홈 보기"
             case .projectLobbyOpenDescription: "주요 지표와 최근 작업을 확인하세요."
             case .projectAgentsOpen: "Agents 보기"
             case .projectAgentsOpenDescription: "Agent와 실행 세션을 확인하세요."
-            case .projectLobbyTitle: "프로젝트 현황"
-            case .projectLobbyDescription: "프로젝트의 현재 작업 상태를 한눈에 확인하세요."
+            case .projectLobbyTitle: "팀 현황"
+            case .projectLobbyDescription: "팀의 현재 작업 상태를 한눈에 확인하세요."
             case .projectLobbyAll: "전체 이슈"
             case .projectLobbyActive: "진행 중"
             case .projectLobbyAttention: "확인 필요"
@@ -969,7 +974,7 @@ enum L10n {
             case .notificationSound: "Play sound"
             case .notificationSoundDescription: "Play a sound when a new system notification arrives."
             case .channelsCommon: "Common channels"
-            case .channelsOtherProject: "Other project"
+            case .channelsOtherProject: "Other team"
             case .channelsEmpty: "No channels yet."
             case .channelThread: "Thread"
             case .channelBack: "Back"
@@ -988,12 +993,12 @@ enum L10n {
             case .channelMessagePlaceholder: "Message #%@"
             case .channelAgentTyping: "%@ is writing a reply…"
             case .channelHome: "Home"
-            case .projectLobbyOpen: "View project home"
+            case .projectLobbyOpen: "View team home"
             case .projectLobbyOpenDescription: "Check key metrics and recent work."
             case .projectAgentsOpen: "View agents"
             case .projectAgentsOpenDescription: "View agents and their execution sessions."
-            case .projectLobbyTitle: "Project overview"
-            case .projectLobbyDescription: "See the project's current work status at a glance."
+            case .projectLobbyTitle: "Team overview"
+            case .projectLobbyDescription: "See the team's current work status at a glance."
             case .projectLobbyAll: "All issues"
             case .projectLobbyActive: "In progress"
             case .projectLobbyAttention: "Needs attention"
@@ -1055,7 +1060,7 @@ enum L10n {
             case .notificationSound: "播放声音"
             case .notificationSoundDescription: "收到新的系统通知时播放声音。"
             case .channelsCommon: "公共频道"
-            case .channelsOtherProject: "其他项目"
+            case .channelsOtherProject: "其他团队"
             case .channelsEmpty: "还没有频道。"
             case .channelThread: "话题"
             case .channelBack: "返回"
@@ -1074,12 +1079,12 @@ enum L10n {
             case .channelMessagePlaceholder: "发送消息到 #%@"
             case .channelAgentTyping: "%@ 正在撰写回复…"
             case .channelHome: "主页"
-            case .projectLobbyOpen: "查看项目主页"
+            case .projectLobbyOpen: "查看团队主页"
             case .projectLobbyOpenDescription: "查看关键指标和最近工作。"
             case .projectAgentsOpen: "查看智能体"
             case .projectAgentsOpenDescription: "查看智能体及其运行会话。"
-            case .projectLobbyTitle: "项目概览"
-            case .projectLobbyDescription: "一目了然地查看项目当前工作状态。"
+            case .projectLobbyTitle: "团队概览"
+            case .projectLobbyDescription: "一目了然地查看团队当前工作状态。"
             case .projectLobbyAll: "全部问题"
             case .projectLobbyActive: "进行中"
             case .projectLobbyAttention: "需要关注"

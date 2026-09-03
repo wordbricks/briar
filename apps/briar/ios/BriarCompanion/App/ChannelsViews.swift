@@ -824,7 +824,7 @@ private struct ConversationProfileSheet: View {
         case let .agent(agent):
             return agent.projectId == nil
                 ? L10n.text("조직 Agent", locale: locale)
-                : L10n.text("프로젝트 Agent", locale: locale)
+                : L10n.text("팀 Agent", locale: locale)
         case let .user(user):
             if user.role == "owner" {
                 return L10n.text("채널 소유자", locale: locale)
