@@ -19,7 +19,7 @@ import {
   createIssueActionProposal,
   createIssueExecutionProposal,
   createIssueMessage,
-  createProjectAgent,
+  createTeamAgent,
   acceptIssueCreateProposal,
   claimNextQueuedHuntRun,
   failIssueAgentReply,
@@ -245,7 +245,7 @@ describe("conversational issue execution approval", () => {
         ).bind(projectId, organizationId, memberId, initialAt, initialAt)
       ),
     );
-    projectAgentId = (await createProjectAgent(db, projectAId, {
+    projectAgentId = (await createTeamAgent(db, projectAId, {
       name: "Execution Agent",
       provider: "codex",
       model: null,
@@ -1484,7 +1484,7 @@ describe("conversational issue execution approval", () => {
   });
 
   it("revokes committed runs when an approved Agent, Worker, or member disappears", async () => {
-    const disposableAgent = await createProjectAgent(db, projectAId, {
+    const disposableAgent = await createTeamAgent(db, projectAId, {
       name: `Committed Agent ${sequence}`,
       provider: "codex",
       model: null,
@@ -1650,7 +1650,7 @@ describe("conversational issue execution approval", () => {
   });
 
   it("invalidates reservations when proposed/delegated Agents or the selected Worker are deleted", async () => {
-    const proposedAgent = await createProjectAgent(db, projectAId, {
+    const proposedAgent = await createTeamAgent(db, projectAId, {
       name: `Disposable Agent ${sequence}`,
       provider: "codex",
       model: null,

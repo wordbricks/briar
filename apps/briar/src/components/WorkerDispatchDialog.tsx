@@ -23,15 +23,15 @@ import {
   agentEffortOptions,
   type AgentProvider,
   type ModelEffort,
-} from "../lib/project-llm";
+} from "../lib/team-llm";
 import { useAgentProviderModelPreferences } from "../hooks/useAgentProviderModelPreferences";
 import {
   executionWorkerSupportsSelection,
-  projectPolicyWorkers,
-  projectSupportsExecutionSelection,
-  projectWorkerCapabilityCatalog,
-  projectWorkerProviders,
-} from "../lib/project-worker-capabilities";
+  teamPolicyWorkers,
+  teamSupportsExecutionSelection,
+  teamWorkerCapabilityCatalog,
+  teamWorkerProviders,
+} from "../lib/team-worker-capabilities";
 import { recommendIssueExecution } from "../lib/issue-execution-recommendation";
 import type {
   ExecutionWorker,
@@ -89,15 +89,15 @@ export function WorkerDispatchDialog({
   const selectionDirtyRef = useRef(false);
   const initializingProviderRef = useRef<AgentProvider | null>(null);
   const policyWorkers = useMemo(
-    () => projectPolicyWorkers(workers, policy),
+    () => teamPolicyWorkers(workers, policy),
     [policy, workers],
   );
   const providerModels = useMemo(
-    () => projectWorkerCapabilityCatalog(workers, policy),
+    () => teamWorkerCapabilityCatalog(workers, policy),
     [policy, workers],
   );
   const healthyProviders = useMemo(
-    () => projectWorkerProviders(workers, policy),
+    () => teamWorkerProviders(workers, policy),
     [policy, workers],
   );
   const normalizedModel = model.trim();
@@ -142,7 +142,7 @@ export function WorkerDispatchDialog({
           run.difficulty,
           providerModels,
           run.preferredProvider,
-          (selection) => projectSupportsExecutionSelection(
+          (selection) => teamSupportsExecutionSelection(
             workers,
             policy,
             selection.provider,

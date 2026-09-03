@@ -6,11 +6,11 @@ import {
   organizationLogoFromFile,
 } from "./organization-logo";
 import {
-  isProjectAgentAvatarDataUrl,
-  maxProjectAgentAvatarDataUrlLength,
-  maxProjectAgentAvatarSourceBytes,
-  projectAgentAvatarFromFile,
-} from "./project-agent-avatar";
+  isTeamAgentAvatarDataUrl,
+  maxTeamAgentAvatarDataUrlLength,
+  maxTeamAgentAvatarSourceBytes,
+  teamAgentAvatarFromFile,
+} from "./team-agent-avatar";
 
 const adapters = [
   {
@@ -21,8 +21,8 @@ const adapters = [
   },
   {
     name: "project agent avatar",
-    fromFile: projectAgentAvatarFromFile,
-    maxSourceBytes: maxProjectAgentAvatarSourceBytes,
+    fromFile: teamAgentAvatarFromFile,
+    maxSourceBytes: maxTeamAgentAvatarSourceBytes,
     invalidSourceError: "invalid-avatar",
   },
 ] as const;
@@ -52,16 +52,16 @@ describe.each(adapters)("$name image adapter", (adapter) => {
 
 describe("project agent avatar output validation", () => {
   it("accepts supported browser image data URLs", () => {
-    expect(isProjectAgentAvatarDataUrl("data:image/png;base64,aA==")).toBe(true);
-    expect(isProjectAgentAvatarDataUrl("data:image/jpeg;base64,aA==")).toBe(true);
-    expect(isProjectAgentAvatarDataUrl("data:image/webp;base64,aA==")).toBe(true);
+    expect(isTeamAgentAvatarDataUrl("data:image/png;base64,aA==")).toBe(true);
+    expect(isTeamAgentAvatarDataUrl("data:image/jpeg;base64,aA==")).toBe(true);
+    expect(isTeamAgentAvatarDataUrl("data:image/webp;base64,aA==")).toBe(true);
   });
 
   it("rejects unsupported or oversized output", () => {
-    expect(isProjectAgentAvatarDataUrl("data:image/gif;base64,aA==")).toBe(false);
+    expect(isTeamAgentAvatarDataUrl("data:image/gif;base64,aA==")).toBe(false);
     expect(
-      isProjectAgentAvatarDataUrl(
-        `data:image/png;base64,${"a".repeat(maxProjectAgentAvatarDataUrlLength)}`,
+      isTeamAgentAvatarDataUrl(
+        `data:image/png;base64,${"a".repeat(maxTeamAgentAvatarDataUrlLength)}`,
       ),
     ).toBe(false);
   });

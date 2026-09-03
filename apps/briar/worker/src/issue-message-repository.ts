@@ -1,4 +1,4 @@
-import { type ProjectAgentProvider } from "./project-agent-model";
+import { type TeamAgentProvider } from "./team-agent-model";
 
 export type IssueMessageRow = {
   id: string;
@@ -7,7 +7,7 @@ export type IssueMessageRow = {
   author_user_id: string | null;
   author_agent_id: string | null;
   author_agent_name: string | null;
-  author_agent_provider: ProjectAgentProvider | null;
+  author_agent_provider: TeamAgentProvider | null;
   author_name: string | null;
   author_image: string | null;
   author_agent_image: string | null;
@@ -107,7 +107,7 @@ export async function createIssueMessage(
     authorUserId: string | null;
     authorAgentId?: string | null;
     authorAgentName?: string | null;
-    authorAgentProvider: ProjectAgentProvider | null;
+    authorAgentProvider: TeamAgentProvider | null;
     body: string;
     mentionedUserIds?: string[];
     createdAt: string;

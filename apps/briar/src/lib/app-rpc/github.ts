@@ -9,7 +9,7 @@ import {
   projectGithubCredentialFromProto,
 } from "./github-mappers";
 import { requiredMessage, requiredTimestamp } from "./mappers";
-import type { ProjectMergeActivity } from "../project-merge-activity";
+import type { TeamMergeActivity } from "../team-merge-activity";
 
 const integrationClient = appTransport
   ? createClient(GitHubIntegrationService, appTransport)
@@ -32,7 +32,7 @@ export async function loadProjectMergeActivity(
   token: string,
   projectId: string,
   signal: AbortSignal,
-): Promise<ProjectMergeActivity> {
+): Promise<TeamMergeActivity> {
   const response = await requireProjectGithubClient().getProjectMergeActivity(
     { projectId }, appCallOptions(token, signal),
   );

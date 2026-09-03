@@ -4,7 +4,7 @@ import {
   completeSlackEvent,
   consumeSlackOAuthState,
   getHuntRunForProject,
-  getProject,
+  getTeam,
   getSlackInstallation,
   releaseSlackEvent,
   upsertSlackInstallation,
@@ -12,9 +12,9 @@ import {
 import { HttpError, json } from "./http-response";
 import { integrationHtml as html } from "./integration-http";
 import {
-  listOrganizationProjects,
-  type ProjectRow,
-} from "./project-repository";
+  listOrganizationTeams,
+  type TeamRow,
+} from "./team-repository";
 import { flushOrganizationInboxRealtimeOutbox } from "./realtime-scheduling";
 import { createIssueFromServerFilesApplication } from "./server-issue-create-application";
 import {
@@ -78,7 +78,7 @@ async function openSlackCreateIssueModal(
       installation.token_iv,
       env.SLACK_TOKEN_ENCRYPTION_KEY,
     );
-    const projects = await listOrganizationProjects(
+    const projects = await listOrganizationTeams(
       env.DB,
       installation.organization_id,
     );
@@ -163,7 +163,7 @@ async function handleSlackCommandRequest(
 async function processSlackCreateIssueSubmission(
   env: Env,
   submission: SlackCreateIssueSubmission,
-  project: ProjectRow,
+  project: TeamRow,
   installedByUserId: string,
   token: string,
 ) {
@@ -368,7 +368,7 @@ async function handleSlackInteractionRequest(
     });
   }
   const project = (
-    await listOrganizationProjects(env.DB, installation.organization_id)
+    await listOrganizationTeams(env.DB, installation.organization_id)
   ).find((candidate) => candidate.id === submission.projectId);
   if (!project) {
     return Response.json({

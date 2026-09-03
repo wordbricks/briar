@@ -15,9 +15,9 @@ import { Input } from "@/components/ui/input";
 import { Typography } from "@/components/ui/typography";
 import { useI18n } from "../i18n";
 import {
-  projectAgentAvatarAccept,
-  projectAgentAvatarFromFile,
-} from "../lib/project-agent-avatar";
+  teamAgentAvatarAccept,
+  teamAgentAvatarFromFile,
+} from "../lib/team-agent-avatar";
 import type { SessionUser } from "../types";
 
 const usernamePattern = /^[a-z0-9_]{3,30}$/u;
@@ -116,7 +116,7 @@ export function AccountProfileSettings({
                   <ImagePlus aria-hidden="true" size={15} />
                   {t(image ? "account.changePicture" : "account.uploadPicture")}
                   <input
-                    accept={projectAgentAvatarAccept}
+                    accept={teamAgentAvatarAccept}
                     aria-label={t("account.uploadPicture")}
                     className="sr-only"
                     disabled={saving}
@@ -125,7 +125,7 @@ export function AccountProfileSettings({
                       event.currentTarget.value = "";
                       if (!file) return;
                       setError(null);
-                      void projectAgentAvatarFromFile(file)
+                      void teamAgentAvatarFromFile(file)
                         .then(setImage)
                         .catch(() => setError(t("account.pictureUploadFailed")));
                     }}

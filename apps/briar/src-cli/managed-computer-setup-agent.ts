@@ -52,7 +52,7 @@ import {
 } from "../src/lib/managed-computer-remote-protocol";
 import { dashboardWorkerFromProto } from "../src/lib/app-rpc/fleet-mappers";
 import { requiredMessage } from "../src/lib/app-rpc/mappers";
-import { projectSettingsFromProto } from "../src/lib/app-rpc/project-configuration-mappers";
+import { teamSettingsFromProto } from "../src/lib/app-rpc/team-configuration-mappers";
 import { cliVersion, gitValueAt, loadConfig, saveConfig } from "./command-support";
 import { createAuthenticatedConnectClient } from "./connect-client";
 import type { ManagedComputerRemoteAgentConfig } from "./managed-computer-remote-session-agent";
@@ -63,7 +63,7 @@ import {
   inspectWorkerProviderHealth,
   opencodeAuthenticated,
 } from "./provider-health";
-import { projectWithRemoteSettings } from "./project-settings-sync";
+import { projectWithRemoteSettings } from "./team-settings-sync";
 import { workerRuntimeToProto } from "./worker-control-client";
 
 type CommandSpec = {
@@ -153,7 +153,7 @@ function setupChallengeMessage(input: {
 }
 
 function setupCompleteMessage(input: {
-  projectId: string;
+  teamId: string;
   provider: ManagedComputerSetupProvider;
   workerId: string;
 }): ManagedComputerSetupToController {
@@ -644,10 +644,10 @@ export async function runManagedComputerGuidedSetup(
     "managedComputerSetupContext.session",
   );
   const setupProject = requiredMessage(
-    context.project,
-    "managedComputerSetupContext.project",
+    context.team,
+    "managedComputerSetupContext.team",
   );
-  const settings = projectSettingsFromProto(requiredMessage(
+  const settings = teamSettingsFromProto(requiredMessage(
     context.settings,
     "managedComputerSetupContext.settings",
   ));
@@ -742,7 +742,7 @@ export async function runManagedComputerGuidedSetup(
   if (
     binding.managedComputerId !== config.managedComputerId ||
     binding.organizationId !== config.organizationId ||
-    binding.projectId !== setupProject.id ||
+    binding.teamId !== setupProject.id ||
     binding.deviceId !== config.deviceId
   ) {
     throw new Error("Managed setup response did not match this computer");
@@ -790,7 +790,7 @@ export async function runManagedComputerGuidedSetup(
   });
   dependencies.emit(setupStateMessage("worker", "complete"));
   dependencies.emit(setupCompleteMessage({
-    projectId: setupProject.id,
+    teamId: setupProject.id,
     provider: input.provider,
     workerId: binding.worker.id,
   }));

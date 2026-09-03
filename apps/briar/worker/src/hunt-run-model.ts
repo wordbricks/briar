@@ -8,8 +8,8 @@ import {
 
 import {
   type ModelEffort,
-  type ProjectAgentProvider,
-} from "./project-agent-model";
+  type TeamAgentProvider,
+} from "./team-agent-model";
 import type { IssueDifficulty } from "../../src/lib/issue-difficulty";
 
 export type HuntRunRow = {
@@ -71,10 +71,10 @@ export type HuntRunRow = {
   waiting_checkpoint_key: string | null;
   waiting_checkpoint_revision: number | null;
   agent_id: string | null;
-  preferred_agent_provider: ProjectAgentProvider | null;
+  preferred_agent_provider: TeamAgentProvider | null;
   preferred_agent_model: string | null;
   preferred_agent_effort: ModelEffort | null;
-  requested_agent_provider: ProjectAgentProvider | null;
+  requested_agent_provider: TeamAgentProvider | null;
   requested_agent_model: string | null;
   requested_agent_effort: ModelEffort | null;
   requested_worker_id: string | null;

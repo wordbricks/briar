@@ -28,8 +28,8 @@ type RealtimeTicketServiceMocks = {
   readonly getOrganizationRole: ReturnType<
     typeof vi.fn<RealtimeTicketApplicationServices["getOrganizationRole"]>
   >;
-  readonly getProject: ReturnType<
-    typeof vi.fn<RealtimeTicketApplicationServices["getProject"]>
+  readonly getTeam: ReturnType<
+    typeof vi.fn<RealtimeTicketApplicationServices["getTeam"]>
   >;
   readonly getRun: ReturnType<
     typeof vi.fn<RealtimeTicketApplicationServices["getRun"]>
@@ -51,7 +51,7 @@ const services = (): RealtimeTicketServiceMocks => {
   const getOrganizationRole = vi.fn<
     RealtimeTicketApplicationServices["getOrganizationRole"]
   >().mockResolvedValue("viewer");
-  const getProject = vi.fn<RealtimeTicketApplicationServices["getProject"]>()
+  const getTeam = vi.fn<RealtimeTicketApplicationServices["getTeam"]>()
     .mockResolvedValue({ organization_id: organizationId } as never);
   const getRun = vi.fn<RealtimeTicketApplicationServices["getRun"]>()
     .mockResolvedValue({ id: runId } as never);
@@ -62,7 +62,7 @@ const services = (): RealtimeTicketServiceMocks => {
       createOrganizationTicket,
       getChannel,
       getOrganizationRole,
-      getProject,
+      getTeam,
       getRun,
     },
     createChannelActivityTicket,
@@ -70,7 +70,7 @@ const services = (): RealtimeTicketServiceMocks => {
     createOrganizationTicket,
     getChannel,
     getOrganizationRole,
-    getProject,
+    getTeam,
     getRun,
   };
 };
@@ -108,7 +108,7 @@ describe("realtime ticket application", () => {
       socketPath: `/projects/${projectId}/runs/${runId}/agent-activity-events`,
       ticket: "issue-ticket",
     });
-    expect(mocks.getProject).toHaveBeenCalledWith(common.db, projectId, userId);
+    expect(mocks.getTeam).toHaveBeenCalledWith(common.db, projectId, userId);
     expect(mocks.getRun).toHaveBeenCalledWith(common.db, projectId, runId);
     expect(mocks.createIssueActivityTicket).toHaveBeenCalledWith(
       "signing-secret",

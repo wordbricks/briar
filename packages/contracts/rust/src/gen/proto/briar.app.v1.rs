@@ -82839,31 +82839,31 @@ impl ::buffa::Enumeration for PlanningProjectStatus {
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct ListProjectsRequest {
+pub struct ListTeamsRequest {
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for ListProjectsRequest {
+impl ::core::fmt::Debug for ListTeamsRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("ListProjectsRequest").finish()
+        f.debug_struct("ListTeamsRequest").finish()
     }
 }
-impl ListProjectsRequest {
+impl ListTeamsRequest {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListProjectsRequest";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListTeamsRequest";
 }
-::buffa::impl_default_instance!(ListProjectsRequest);
-impl ::buffa::MessageName for ListProjectsRequest {
+::buffa::impl_default_instance!(ListTeamsRequest);
+impl ::buffa::MessageName for ListTeamsRequest {
     const PACKAGE: &'static str = "briar.app.v1";
-    const NAME: &'static str = "ListProjectsRequest";
-    const FULL_NAME: &'static str = "briar.app.v1.ListProjectsRequest";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListProjectsRequest";
+    const NAME: &'static str = "ListTeamsRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.ListTeamsRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListTeamsRequest";
 }
-impl ::buffa::Message for ListProjectsRequest {
+impl ::buffa::Message for ListTeamsRequest {
     /// Returns the total encoded size in bytes.
     ///
     /// Accumulates in `u64` (which cannot overflow for in-memory
@@ -82910,8 +82910,8 @@ impl ::buffa::Message for ListProjectsRequest {
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for ListProjectsRequest {
-    const PROTO_FQN: &'static str = "briar.app.v1.ListProjectsRequest";
+impl ::buffa::ExtensionSet for ListTeamsRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.ListTeamsRequest";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -82919,7 +82919,7 @@ impl ::buffa::ExtensionSet for ListProjectsRequest {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for ListProjectsRequest {
+impl ::buffa::json_helpers::ProtoElemJson for ListTeamsRequest {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -82933,47 +82933,47 @@ impl ::buffa::json_helpers::ProtoElemJson for ListProjectsRequest {
     }
 }
 #[doc(hidden)]
-pub const __LIST_PROJECTS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.app.v1.ListProjectsRequest",
-    to_json: ::buffa::type_registry::any_to_json::<ListProjectsRequest>,
-    from_json: ::buffa::type_registry::any_from_json::<ListProjectsRequest>,
+pub const __LIST_TEAMS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.ListTeamsRequest",
+    to_json: ::buffa::type_registry::any_to_json::<ListTeamsRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<ListTeamsRequest>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct ListProjectsResponse {
-    /// Field 1: `projects`
+pub struct ListTeamsResponse {
+    /// Field 1: `teams`
     #[serde(
-        rename = "projects",
+        rename = "teams",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
-    pub projects: ::buffa::alloc::vec::Vec<Project>,
+    pub teams: ::buffa::alloc::vec::Vec<Team>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for ListProjectsResponse {
+impl ::core::fmt::Debug for ListTeamsResponse {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("ListProjectsResponse").field("projects", &self.projects).finish()
+        f.debug_struct("ListTeamsResponse").field("teams", &self.teams).finish()
     }
 }
-impl ListProjectsResponse {
+impl ListTeamsResponse {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListProjectsResponse";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListTeamsResponse";
 }
-::buffa::impl_default_instance!(ListProjectsResponse);
-impl ::buffa::MessageName for ListProjectsResponse {
+::buffa::impl_default_instance!(ListTeamsResponse);
+impl ::buffa::MessageName for ListTeamsResponse {
     const PACKAGE: &'static str = "briar.app.v1";
-    const NAME: &'static str = "ListProjectsResponse";
-    const FULL_NAME: &'static str = "briar.app.v1.ListProjectsResponse";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListProjectsResponse";
+    const NAME: &'static str = "ListTeamsResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.ListTeamsResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListTeamsResponse";
 }
-impl ::buffa::Message for ListProjectsResponse {
+impl ::buffa::Message for ListTeamsResponse {
     /// Returns the total encoded size in bytes.
     ///
     /// Accumulates in `u64` (which cannot overflow for in-memory
@@ -82986,7 +82986,7 @@ impl ::buffa::Message for ListProjectsResponse {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        for v in &self.projects {
+        for v in &self.teams {
             let __slot = __cache.reserve();
             let inner_size = v.compute_size(__cache);
             __cache.set(__slot, inner_size);
@@ -83004,7 +83004,7 @@ impl ::buffa::Message for ListProjectsResponse {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        for v in &self.projects {
+        for v in &self.teams {
             ::buffa::types::put_len_delimited_header(
                 1u32,
                 u64::from(__cache.consume_next()),
@@ -83035,7 +83035,7 @@ impl ::buffa::Message for ListProjectsResponse {
                     ::buffa::__private::element_footprint(&elem),
                 )?;
                 ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
-                self.projects.push(elem);
+                self.teams.push(elem);
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -83045,12 +83045,12 @@ impl ::buffa::Message for ListProjectsResponse {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.projects.clear();
+        self.teams.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for ListProjectsResponse {
-    const PROTO_FQN: &'static str = "briar.app.v1.ListProjectsResponse";
+impl ::buffa::ExtensionSet for ListTeamsResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.ListTeamsResponse";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -83058,7 +83058,7 @@ impl ::buffa::ExtensionSet for ListProjectsResponse {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for ListProjectsResponse {
+impl ::buffa::json_helpers::ProtoElemJson for ListTeamsResponse {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -83072,16 +83072,16 @@ impl ::buffa::json_helpers::ProtoElemJson for ListProjectsResponse {
     }
 }
 #[doc(hidden)]
-pub const __LIST_PROJECTS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.app.v1.ListProjectsResponse",
-    to_json: ::buffa::type_registry::any_to_json::<ListProjectsResponse>,
-    from_json: ::buffa::type_registry::any_from_json::<ListProjectsResponse>,
+pub const __LIST_TEAMS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.ListTeamsResponse",
+    to_json: ::buffa::type_registry::any_to_json::<ListTeamsResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<ListTeamsResponse>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct CreateProjectRequest {
+pub struct CreateTeamRequest {
     /// Field 1: `name`
     #[serde(
         rename = "name",
@@ -83100,22 +83100,22 @@ pub struct CreateProjectRequest {
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for CreateProjectRequest {
+impl ::core::fmt::Debug for CreateTeamRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("CreateProjectRequest")
+        f.debug_struct("CreateTeamRequest")
             .field("name", &self.name)
             .field("organization_id", &self.organization_id)
             .finish()
     }
 }
-impl CreateProjectRequest {
+impl CreateTeamRequest {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateProjectRequest";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateTeamRequest";
 }
-impl CreateProjectRequest {
+impl CreateTeamRequest {
     #[must_use = "with_* setters return `self` by value; assign or chain the result"]
     #[inline]
     ///Sets [`Self::organization_id`] to `Some(value)`, consuming and returning `self`.
@@ -83127,14 +83127,14 @@ impl CreateProjectRequest {
         self
     }
 }
-::buffa::impl_default_instance!(CreateProjectRequest);
-impl ::buffa::MessageName for CreateProjectRequest {
+::buffa::impl_default_instance!(CreateTeamRequest);
+impl ::buffa::MessageName for CreateTeamRequest {
     const PACKAGE: &'static str = "briar.app.v1";
-    const NAME: &'static str = "CreateProjectRequest";
-    const FULL_NAME: &'static str = "briar.app.v1.CreateProjectRequest";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateProjectRequest";
+    const NAME: &'static str = "CreateTeamRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.CreateTeamRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateTeamRequest";
 }
-impl ::buffa::Message for CreateProjectRequest {
+impl ::buffa::Message for CreateTeamRequest {
     /// Returns the total encoded size in bytes.
     ///
     /// Accumulates in `u64` (which cannot overflow for in-memory
@@ -83214,8 +83214,8 @@ impl ::buffa::Message for CreateProjectRequest {
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for CreateProjectRequest {
-    const PROTO_FQN: &'static str = "briar.app.v1.CreateProjectRequest";
+impl ::buffa::ExtensionSet for CreateTeamRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.CreateTeamRequest";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -83223,7 +83223,7 @@ impl ::buffa::ExtensionSet for CreateProjectRequest {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for CreateProjectRequest {
+impl ::buffa::json_helpers::ProtoElemJson for CreateTeamRequest {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -83237,22 +83237,22 @@ impl ::buffa::json_helpers::ProtoElemJson for CreateProjectRequest {
     }
 }
 #[doc(hidden)]
-pub const __CREATE_PROJECT_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.app.v1.CreateProjectRequest",
-    to_json: ::buffa::type_registry::any_to_json::<CreateProjectRequest>,
-    from_json: ::buffa::type_registry::any_from_json::<CreateProjectRequest>,
+pub const __CREATE_TEAM_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.CreateTeamRequest",
+    to_json: ::buffa::type_registry::any_to_json::<CreateTeamRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<CreateTeamRequest>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct CreateProjectResponse {
-    /// Field 1: `project`
+pub struct CreateTeamResponse {
+    /// Field 1: `team`
     #[serde(
-        rename = "project",
+        rename = "team",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
-    pub project: ::buffa::MessageField<Project, ::buffa::Inline<Project>>,
+    pub team: ::buffa::MessageField<Team, ::buffa::Inline<Team>>,
     /// Field 2: `agent_token`
     #[serde(
         rename = "agentToken",
@@ -83265,29 +83265,29 @@ pub struct CreateProjectResponse {
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for CreateProjectResponse {
+impl ::core::fmt::Debug for CreateTeamResponse {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("CreateProjectResponse")
-            .field("project", &self.project)
+        f.debug_struct("CreateTeamResponse")
+            .field("team", &self.team)
             .field("agent_token", &self.agent_token)
             .finish()
     }
 }
-impl CreateProjectResponse {
+impl CreateTeamResponse {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateProjectResponse";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateTeamResponse";
 }
-::buffa::impl_default_instance!(CreateProjectResponse);
-impl ::buffa::MessageName for CreateProjectResponse {
+::buffa::impl_default_instance!(CreateTeamResponse);
+impl ::buffa::MessageName for CreateTeamResponse {
     const PACKAGE: &'static str = "briar.app.v1";
-    const NAME: &'static str = "CreateProjectResponse";
-    const FULL_NAME: &'static str = "briar.app.v1.CreateProjectResponse";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateProjectResponse";
+    const NAME: &'static str = "CreateTeamResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.CreateTeamResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateTeamResponse";
 }
-impl ::buffa::Message for CreateProjectResponse {
+impl ::buffa::Message for CreateTeamResponse {
     /// Returns the total encoded size in bytes.
     ///
     /// Accumulates in `u64` (which cannot overflow for in-memory
@@ -83300,9 +83300,9 @@ impl ::buffa::Message for CreateProjectResponse {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if self.project.is_set() {
+        if self.team.is_set() {
             let __slot = __cache.reserve();
-            let inner_size = self.project.compute_size(__cache);
+            let inner_size = self.team.compute_size(__cache);
             __cache.set(__slot, inner_size);
             size
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
@@ -83321,13 +83321,13 @@ impl ::buffa::Message for CreateProjectResponse {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if self.project.is_set() {
+        if self.team.is_set() {
             ::buffa::types::put_len_delimited_header(
                 1u32,
                 u64::from(__cache.consume_next()),
                 buf,
             );
-            self.project.write_to(__cache, buf);
+            self.team.write_to(__cache, buf);
         }
         if !self.agent_token.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.agent_token, buf);
@@ -83351,7 +83351,7 @@ impl ::buffa::Message for CreateProjectResponse {
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 ::buffa::Message::merge_length_delimited(
-                    self.project.get_or_insert_default(),
+                    self.team.get_or_insert_default(),
                     buf,
                     ctx,
                 )?;
@@ -83371,13 +83371,13 @@ impl ::buffa::Message for CreateProjectResponse {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.project = ::buffa::MessageField::none();
+        self.team = ::buffa::MessageField::none();
         self.agent_token.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for CreateProjectResponse {
-    const PROTO_FQN: &'static str = "briar.app.v1.CreateProjectResponse";
+impl ::buffa::ExtensionSet for CreateTeamResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.CreateTeamResponse";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -83385,7 +83385,7 @@ impl ::buffa::ExtensionSet for CreateProjectResponse {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for CreateProjectResponse {
+impl ::buffa::json_helpers::ProtoElemJson for CreateTeamResponse {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -83399,50 +83399,48 @@ impl ::buffa::json_helpers::ProtoElemJson for CreateProjectResponse {
     }
 }
 #[doc(hidden)]
-pub const __CREATE_PROJECT_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.app.v1.CreateProjectResponse",
-    to_json: ::buffa::type_registry::any_to_json::<CreateProjectResponse>,
-    from_json: ::buffa::type_registry::any_from_json::<CreateProjectResponse>,
+pub const __CREATE_TEAM_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.CreateTeamResponse",
+    to_json: ::buffa::type_registry::any_to_json::<CreateTeamResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<CreateTeamResponse>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct DeleteProjectRequest {
-    /// Field 1: `project_id`
+pub struct DeleteTeamRequest {
+    /// Field 1: `team_id`
     #[serde(
-        rename = "projectId",
-        alias = "project_id",
+        rename = "teamId",
+        alias = "team_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub project_id: ::buffa::alloc::string::String,
+    pub team_id: ::buffa::alloc::string::String,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for DeleteProjectRequest {
+impl ::core::fmt::Debug for DeleteTeamRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("DeleteProjectRequest")
-            .field("project_id", &self.project_id)
-            .finish()
+        f.debug_struct("DeleteTeamRequest").field("team_id", &self.team_id).finish()
     }
 }
-impl DeleteProjectRequest {
+impl DeleteTeamRequest {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DeleteProjectRequest";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DeleteTeamRequest";
 }
-::buffa::impl_default_instance!(DeleteProjectRequest);
-impl ::buffa::MessageName for DeleteProjectRequest {
+::buffa::impl_default_instance!(DeleteTeamRequest);
+impl ::buffa::MessageName for DeleteTeamRequest {
     const PACKAGE: &'static str = "briar.app.v1";
-    const NAME: &'static str = "DeleteProjectRequest";
-    const FULL_NAME: &'static str = "briar.app.v1.DeleteProjectRequest";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DeleteProjectRequest";
+    const NAME: &'static str = "DeleteTeamRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.DeleteTeamRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DeleteTeamRequest";
 }
-impl ::buffa::Message for DeleteProjectRequest {
+impl ::buffa::Message for DeleteTeamRequest {
     /// Returns the total encoded size in bytes.
     ///
     /// Accumulates in `u64` (which cannot overflow for in-memory
@@ -83455,8 +83453,8 @@ impl ::buffa::Message for DeleteProjectRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.project_id.is_empty() {
-            size += 1u64 + ::buffa::types::string_encoded_len(&self.project_id) as u64;
+        if !self.team_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.team_id) as u64;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
@@ -83468,8 +83466,8 @@ impl ::buffa::Message for DeleteProjectRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.project_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.project_id, buf);
+        if !self.team_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.team_id, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -83489,7 +83487,7 @@ impl ::buffa::Message for DeleteProjectRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.project_id, buf)?;
+                ::buffa::types::merge_string(&mut self.team_id, buf)?;
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -83499,12 +83497,12 @@ impl ::buffa::Message for DeleteProjectRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.project_id.clear();
+        self.team_id.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for DeleteProjectRequest {
-    const PROTO_FQN: &'static str = "briar.app.v1.DeleteProjectRequest";
+impl ::buffa::ExtensionSet for DeleteTeamRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.DeleteTeamRequest";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -83512,7 +83510,7 @@ impl ::buffa::ExtensionSet for DeleteProjectRequest {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for DeleteProjectRequest {
+impl ::buffa::json_helpers::ProtoElemJson for DeleteTeamRequest {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -83526,16 +83524,16 @@ impl ::buffa::json_helpers::ProtoElemJson for DeleteProjectRequest {
     }
 }
 #[doc(hidden)]
-pub const __DELETE_PROJECT_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.app.v1.DeleteProjectRequest",
-    to_json: ::buffa::type_registry::any_to_json::<DeleteProjectRequest>,
-    from_json: ::buffa::type_registry::any_from_json::<DeleteProjectRequest>,
+pub const __DELETE_TEAM_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.DeleteTeamRequest",
+    to_json: ::buffa::type_registry::any_to_json::<DeleteTeamRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<DeleteTeamRequest>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct DeleteProjectResponse {
+pub struct DeleteTeamResponse {
     /// Field 1: `deleted`
     #[serde(
         rename = "deleted",
@@ -83547,26 +83545,26 @@ pub struct DeleteProjectResponse {
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for DeleteProjectResponse {
+impl ::core::fmt::Debug for DeleteTeamResponse {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("DeleteProjectResponse").field("deleted", &self.deleted).finish()
+        f.debug_struct("DeleteTeamResponse").field("deleted", &self.deleted).finish()
     }
 }
-impl DeleteProjectResponse {
+impl DeleteTeamResponse {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DeleteProjectResponse";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DeleteTeamResponse";
 }
-::buffa::impl_default_instance!(DeleteProjectResponse);
-impl ::buffa::MessageName for DeleteProjectResponse {
+::buffa::impl_default_instance!(DeleteTeamResponse);
+impl ::buffa::MessageName for DeleteTeamResponse {
     const PACKAGE: &'static str = "briar.app.v1";
-    const NAME: &'static str = "DeleteProjectResponse";
-    const FULL_NAME: &'static str = "briar.app.v1.DeleteProjectResponse";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DeleteProjectResponse";
+    const NAME: &'static str = "DeleteTeamResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.DeleteTeamResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DeleteTeamResponse";
 }
-impl ::buffa::Message for DeleteProjectResponse {
+impl ::buffa::Message for DeleteTeamResponse {
     /// Returns the total encoded size in bytes.
     ///
     /// Accumulates in `u64` (which cannot overflow for in-memory
@@ -83627,8 +83625,8 @@ impl ::buffa::Message for DeleteProjectResponse {
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for DeleteProjectResponse {
-    const PROTO_FQN: &'static str = "briar.app.v1.DeleteProjectResponse";
+impl ::buffa::ExtensionSet for DeleteTeamResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.DeleteTeamResponse";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -83636,7 +83634,7 @@ impl ::buffa::ExtensionSet for DeleteProjectResponse {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for DeleteProjectResponse {
+impl ::buffa::json_helpers::ProtoElemJson for DeleteTeamResponse {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -83650,55 +83648,55 @@ impl ::buffa::json_helpers::ProtoElemJson for DeleteProjectResponse {
     }
 }
 #[doc(hidden)]
-pub const __DELETE_PROJECT_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.app.v1.DeleteProjectResponse",
-    to_json: ::buffa::type_registry::any_to_json::<DeleteProjectResponse>,
-    from_json: ::buffa::type_registry::any_from_json::<DeleteProjectResponse>,
+pub const __DELETE_TEAM_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.DeleteTeamResponse",
+    to_json: ::buffa::type_registry::any_to_json::<DeleteTeamResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<DeleteTeamResponse>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize)]
 #[serde(default)]
-pub struct UpdateProjectIconRequest {
-    /// Field 1: `project_id`
+pub struct UpdateTeamIconRequest {
+    /// Field 1: `team_id`
     #[serde(
-        rename = "projectId",
-        alias = "project_id",
+        rename = "teamId",
+        alias = "team_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub project_id: ::buffa::alloc::string::String,
+    pub team_id: ::buffa::alloc::string::String,
     #[serde(flatten)]
     pub icon_update: ::core::option::Option<
-        __buffa::oneof::update_project_icon_request::IconUpdate,
+        __buffa::oneof::update_team_icon_request::IconUpdate,
     >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for UpdateProjectIconRequest {
+impl ::core::fmt::Debug for UpdateTeamIconRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("UpdateProjectIconRequest")
-            .field("project_id", &self.project_id)
+        f.debug_struct("UpdateTeamIconRequest")
+            .field("team_id", &self.team_id)
             .field("icon_update", &self.icon_update)
             .finish()
     }
 }
-impl UpdateProjectIconRequest {
+impl UpdateTeamIconRequest {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateProjectIconRequest";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateTeamIconRequest";
 }
-::buffa::impl_default_instance!(UpdateProjectIconRequest);
-impl ::buffa::MessageName for UpdateProjectIconRequest {
+::buffa::impl_default_instance!(UpdateTeamIconRequest);
+impl ::buffa::MessageName for UpdateTeamIconRequest {
     const PACKAGE: &'static str = "briar.app.v1";
-    const NAME: &'static str = "UpdateProjectIconRequest";
-    const FULL_NAME: &'static str = "briar.app.v1.UpdateProjectIconRequest";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateProjectIconRequest";
+    const NAME: &'static str = "UpdateTeamIconRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.UpdateTeamIconRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateTeamIconRequest";
 }
-impl ::buffa::Message for UpdateProjectIconRequest {
+impl ::buffa::Message for UpdateTeamIconRequest {
     /// Returns the total encoded size in bytes.
     ///
     /// Accumulates in `u64` (which cannot overflow for in-memory
@@ -83711,17 +83709,15 @@ impl ::buffa::Message for UpdateProjectIconRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.project_id.is_empty() {
-            size += 1u64 + ::buffa::types::string_encoded_len(&self.project_id) as u64;
+        if !self.team_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.team_id) as u64;
         }
         if let ::core::option::Option::Some(ref v) = self.icon_update {
             match v {
-                __buffa::oneof::update_project_icon_request::IconUpdate::Icon(x) => {
+                __buffa::oneof::update_team_icon_request::IconUpdate::Icon(x) => {
                     size += 1u64 + ::buffa::types::string_encoded_len(x) as u64;
                 }
-                __buffa::oneof::update_project_icon_request::IconUpdate::ClearIcon(
-                    x,
-                ) => {
+                __buffa::oneof::update_team_icon_request::IconUpdate::ClearIcon(x) => {
                     let __slot = __cache.reserve();
                     let inner = x.compute_size(__cache);
                     __cache.set(__slot, inner);
@@ -83729,9 +83725,7 @@ impl ::buffa::Message for UpdateProjectIconRequest {
                         += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
                             + inner as u64;
                 }
-                __buffa::oneof::update_project_icon_request::IconUpdate::NamedIcon(
-                    x,
-                ) => {
+                __buffa::oneof::update_team_icon_request::IconUpdate::NamedIcon(x) => {
                     let __slot = __cache.reserve();
                     let inner = x.compute_size(__cache);
                     __cache.set(__slot, inner);
@@ -83751,17 +83745,15 @@ impl ::buffa::Message for UpdateProjectIconRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.project_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.project_id, buf);
+        if !self.team_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.team_id, buf);
         }
         if let ::core::option::Option::Some(ref v) = self.icon_update {
             match v {
-                __buffa::oneof::update_project_icon_request::IconUpdate::Icon(x) => {
+                __buffa::oneof::update_team_icon_request::IconUpdate::Icon(x) => {
                     ::buffa::types::put_string_field(2u32, x, buf);
                 }
-                __buffa::oneof::update_project_icon_request::IconUpdate::ClearIcon(
-                    x,
-                ) => {
+                __buffa::oneof::update_team_icon_request::IconUpdate::ClearIcon(x) => {
                     ::buffa::types::put_len_delimited_header(
                         3u32,
                         u64::from(__cache.consume_next()),
@@ -83769,9 +83761,7 @@ impl ::buffa::Message for UpdateProjectIconRequest {
                     );
                     x.write_to(__cache, buf);
                 }
-                __buffa::oneof::update_project_icon_request::IconUpdate::NamedIcon(
-                    x,
-                ) => {
+                __buffa::oneof::update_team_icon_request::IconUpdate::NamedIcon(x) => {
                     ::buffa::types::put_len_delimited_header(
                         4u32,
                         u64::from(__cache.consume_next()),
@@ -83799,7 +83789,7 @@ impl ::buffa::Message for UpdateProjectIconRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.project_id, buf)?;
+                ::buffa::types::merge_string(&mut self.team_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -83807,7 +83797,7 @@ impl ::buffa::Message for UpdateProjectIconRequest {
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 self.icon_update = ::core::option::Option::Some(
-                    __buffa::oneof::update_project_icon_request::IconUpdate::Icon(
+                    __buffa::oneof::update_team_icon_request::IconUpdate::Icon(
                         ::buffa::types::decode_string(buf)?,
                     ),
                 );
@@ -83818,7 +83808,7 @@ impl ::buffa::Message for UpdateProjectIconRequest {
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 if let ::core::option::Option::Some(
-                    __buffa::oneof::update_project_icon_request::IconUpdate::ClearIcon(
+                    __buffa::oneof::update_team_icon_request::IconUpdate::ClearIcon(
                         ref mut existing,
                     ),
                 ) = self.icon_update
@@ -83828,7 +83818,7 @@ impl ::buffa::Message for UpdateProjectIconRequest {
                     let mut val = ::core::default::Default::default();
                     ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
                     self.icon_update = ::core::option::Option::Some(
-                        __buffa::oneof::update_project_icon_request::IconUpdate::ClearIcon(
+                        __buffa::oneof::update_team_icon_request::IconUpdate::ClearIcon(
                             ::buffa::alloc::boxed::Box::new(val),
                         ),
                     );
@@ -83840,7 +83830,7 @@ impl ::buffa::Message for UpdateProjectIconRequest {
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 if let ::core::option::Option::Some(
-                    __buffa::oneof::update_project_icon_request::IconUpdate::NamedIcon(
+                    __buffa::oneof::update_team_icon_request::IconUpdate::NamedIcon(
                         ref mut existing,
                     ),
                 ) = self.icon_update
@@ -83850,7 +83840,7 @@ impl ::buffa::Message for UpdateProjectIconRequest {
                     let mut val = ::core::default::Default::default();
                     ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
                     self.icon_update = ::core::option::Option::Some(
-                        __buffa::oneof::update_project_icon_request::IconUpdate::NamedIcon(
+                        __buffa::oneof::update_team_icon_request::IconUpdate::NamedIcon(
                             ::buffa::alloc::boxed::Box::new(val),
                         ),
                     );
@@ -83864,13 +83854,13 @@ impl ::buffa::Message for UpdateProjectIconRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.project_id.clear();
+        self.team_id.clear();
         self.icon_update = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for UpdateProjectIconRequest {
-    const PROTO_FQN: &'static str = "briar.app.v1.UpdateProjectIconRequest";
+impl ::buffa::ExtensionSet for UpdateTeamIconRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.UpdateTeamIconRequest";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -83878,31 +83868,31 @@ impl ::buffa::ExtensionSet for UpdateProjectIconRequest {
         &mut self.__buffa_unknown_fields
     }
 }
-impl<'de> serde::Deserialize<'de> for UpdateProjectIconRequest {
+impl<'de> serde::Deserialize<'de> for UpdateTeamIconRequest {
     fn deserialize<D: serde::Deserializer<'de>>(
         d: D,
     ) -> ::core::result::Result<Self, D::Error> {
         struct _V;
         impl<'de> serde::de::Visitor<'de> for _V {
-            type Value = UpdateProjectIconRequest;
+            type Value = UpdateTeamIconRequest;
             fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-                f.write_str("struct UpdateProjectIconRequest")
+                f.write_str("struct UpdateTeamIconRequest")
             }
             #[allow(clippy::field_reassign_with_default)]
             fn visit_map<A: serde::de::MapAccess<'de>>(
                 self,
                 mut map: A,
-            ) -> ::core::result::Result<UpdateProjectIconRequest, A::Error> {
-                let mut __f_project_id: ::core::option::Option<
+            ) -> ::core::result::Result<UpdateTeamIconRequest, A::Error> {
+                let mut __f_team_id: ::core::option::Option<
                     ::buffa::alloc::string::String,
                 > = None;
                 let mut __oneof_icon_update: ::core::option::Option<
-                    __buffa::oneof::update_project_icon_request::IconUpdate,
+                    __buffa::oneof::update_team_icon_request::IconUpdate,
                 > = None;
                 while let Some(key) = map.next_key::<::buffa::alloc::string::String>()? {
                     match key.as_str() {
-                        "projectId" | "project_id" => {
-                            __f_project_id = Some({
+                        "teamId" | "team_id" => {
+                            __f_team_id = Some({
                                 struct _S;
                                 impl<'de> serde::de::DeserializeSeed<'de> for _S {
                                     type Value = ::buffa::alloc::string::String;
@@ -83939,7 +83929,7 @@ impl<'de> serde::Deserialize<'de> for UpdateProjectIconRequest {
                                     );
                                 }
                                 __oneof_icon_update = Some(
-                                    __buffa::oneof::update_project_icon_request::IconUpdate::Icon(
+                                    __buffa::oneof::update_team_icon_request::IconUpdate::Icon(
                                         v,
                                     ),
                                 );
@@ -83965,7 +83955,7 @@ impl<'de> serde::Deserialize<'de> for UpdateProjectIconRequest {
                                     );
                                 }
                                 __oneof_icon_update = Some(
-                                    __buffa::oneof::update_project_icon_request::IconUpdate::ClearIcon(
+                                    __buffa::oneof::update_team_icon_request::IconUpdate::ClearIcon(
                                         ::buffa::alloc::boxed::Box::new(v),
                                     ),
                                 );
@@ -83989,7 +83979,7 @@ impl<'de> serde::Deserialize<'de> for UpdateProjectIconRequest {
                                     );
                                 }
                                 __oneof_icon_update = Some(
-                                    __buffa::oneof::update_project_icon_request::IconUpdate::NamedIcon(
+                                    __buffa::oneof::update_team_icon_request::IconUpdate::NamedIcon(
                                         ::buffa::alloc::boxed::Box::new(v),
                                     ),
                                 );
@@ -84000,9 +83990,9 @@ impl<'de> serde::Deserialize<'de> for UpdateProjectIconRequest {
                         }
                     }
                 }
-                let mut __r = <UpdateProjectIconRequest as ::core::default::Default>::default();
-                if let ::core::option::Option::Some(v) = __f_project_id {
-                    __r.project_id = v;
+                let mut __r = <UpdateTeamIconRequest as ::core::default::Default>::default();
+                if let ::core::option::Option::Some(v) = __f_team_id {
+                    __r.team_id = v;
                 }
                 __r.icon_update = __oneof_icon_update;
                 Ok(__r)
@@ -84011,7 +84001,7 @@ impl<'de> serde::Deserialize<'de> for UpdateProjectIconRequest {
         d.deserialize_map(_V)
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for UpdateProjectIconRequest {
+impl ::buffa::json_helpers::ProtoElemJson for UpdateTeamIconRequest {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -84025,19 +84015,19 @@ impl ::buffa::json_helpers::ProtoElemJson for UpdateProjectIconRequest {
     }
 }
 #[doc(hidden)]
-pub const __UPDATE_PROJECT_ICON_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.app.v1.UpdateProjectIconRequest",
-    to_json: ::buffa::type_registry::any_to_json::<UpdateProjectIconRequest>,
-    from_json: ::buffa::type_registry::any_from_json::<UpdateProjectIconRequest>,
+pub const __UPDATE_TEAM_ICON_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.UpdateTeamIconRequest",
+    to_json: ::buffa::type_registry::any_to_json::<UpdateTeamIconRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<UpdateTeamIconRequest>,
     is_wkt: false,
 };
-pub mod update_project_icon_request {
+pub mod update_team_icon_request {
     #[allow(unused_imports)]
     use super::*;
     #[doc(inline)]
-    pub use super::__buffa::oneof::update_project_icon_request::IconUpdate;
+    pub use super::__buffa::oneof::update_team_icon_request::IconUpdate;
     #[doc(inline)]
-    pub use super::__buffa::view::oneof::update_project_icon_request::IconUpdate as IconUpdateView;
+    pub use super::__buffa::view::oneof::update_team_icon_request::IconUpdate as IconUpdateView;
 }
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
@@ -84201,39 +84191,37 @@ pub const __NAMED_ICON_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa:
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct UpdateProjectIconResponse {
-    /// Field 1: `project`
+pub struct UpdateTeamIconResponse {
+    /// Field 1: `team`
     #[serde(
-        rename = "project",
+        rename = "team",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
-    pub project: ::buffa::MessageField<Project, ::buffa::Inline<Project>>,
+    pub team: ::buffa::MessageField<Team, ::buffa::Inline<Team>>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for UpdateProjectIconResponse {
+impl ::core::fmt::Debug for UpdateTeamIconResponse {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("UpdateProjectIconResponse")
-            .field("project", &self.project)
-            .finish()
+        f.debug_struct("UpdateTeamIconResponse").field("team", &self.team).finish()
     }
 }
-impl UpdateProjectIconResponse {
+impl UpdateTeamIconResponse {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateProjectIconResponse";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateTeamIconResponse";
 }
-::buffa::impl_default_instance!(UpdateProjectIconResponse);
-impl ::buffa::MessageName for UpdateProjectIconResponse {
+::buffa::impl_default_instance!(UpdateTeamIconResponse);
+impl ::buffa::MessageName for UpdateTeamIconResponse {
     const PACKAGE: &'static str = "briar.app.v1";
-    const NAME: &'static str = "UpdateProjectIconResponse";
-    const FULL_NAME: &'static str = "briar.app.v1.UpdateProjectIconResponse";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateProjectIconResponse";
+    const NAME: &'static str = "UpdateTeamIconResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.UpdateTeamIconResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateTeamIconResponse";
 }
-impl ::buffa::Message for UpdateProjectIconResponse {
+impl ::buffa::Message for UpdateTeamIconResponse {
     /// Returns the total encoded size in bytes.
     ///
     /// Accumulates in `u64` (which cannot overflow for in-memory
@@ -84246,9 +84234,9 @@ impl ::buffa::Message for UpdateProjectIconResponse {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if self.project.is_set() {
+        if self.team.is_set() {
             let __slot = __cache.reserve();
-            let inner_size = self.project.compute_size(__cache);
+            let inner_size = self.team.compute_size(__cache);
             __cache.set(__slot, inner_size);
             size
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
@@ -84264,13 +84252,13 @@ impl ::buffa::Message for UpdateProjectIconResponse {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if self.project.is_set() {
+        if self.team.is_set() {
             ::buffa::types::put_len_delimited_header(
                 1u32,
                 u64::from(__cache.consume_next()),
                 buf,
             );
-            self.project.write_to(__cache, buf);
+            self.team.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -84291,7 +84279,7 @@ impl ::buffa::Message for UpdateProjectIconResponse {
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 ::buffa::Message::merge_length_delimited(
-                    self.project.get_or_insert_default(),
+                    self.team.get_or_insert_default(),
                     buf,
                     ctx,
                 )?;
@@ -84304,12 +84292,12 @@ impl ::buffa::Message for UpdateProjectIconResponse {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.project = ::buffa::MessageField::none();
+        self.team = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for UpdateProjectIconResponse {
-    const PROTO_FQN: &'static str = "briar.app.v1.UpdateProjectIconResponse";
+impl ::buffa::ExtensionSet for UpdateTeamIconResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.UpdateTeamIconResponse";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -84317,7 +84305,7 @@ impl ::buffa::ExtensionSet for UpdateProjectIconResponse {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for UpdateProjectIconResponse {
+impl ::buffa::json_helpers::ProtoElemJson for UpdateTeamIconResponse {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -84331,24 +84319,24 @@ impl ::buffa::json_helpers::ProtoElemJson for UpdateProjectIconResponse {
     }
 }
 #[doc(hidden)]
-pub const __UPDATE_PROJECT_ICON_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.app.v1.UpdateProjectIconResponse",
-    to_json: ::buffa::type_registry::any_to_json::<UpdateProjectIconResponse>,
-    from_json: ::buffa::type_registry::any_from_json::<UpdateProjectIconResponse>,
+pub const __UPDATE_TEAM_ICON_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.UpdateTeamIconResponse",
+    to_json: ::buffa::type_registry::any_to_json::<UpdateTeamIconResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<UpdateTeamIconResponse>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct UpdateProjectIssueKeyPrefixRequest {
-    /// Field 1: `project_id`
+pub struct UpdateTeamIssueKeyPrefixRequest {
+    /// Field 1: `team_id`
     #[serde(
-        rename = "projectId",
-        alias = "project_id",
+        rename = "teamId",
+        alias = "team_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub project_id: ::buffa::alloc::string::String,
+    pub team_id: ::buffa::alloc::string::String,
     /// Field 2: `issue_key_prefix`
     #[serde(
         rename = "issueKeyPrefix",
@@ -84361,29 +84349,29 @@ pub struct UpdateProjectIssueKeyPrefixRequest {
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for UpdateProjectIssueKeyPrefixRequest {
+impl ::core::fmt::Debug for UpdateTeamIssueKeyPrefixRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("UpdateProjectIssueKeyPrefixRequest")
-            .field("project_id", &self.project_id)
+        f.debug_struct("UpdateTeamIssueKeyPrefixRequest")
+            .field("team_id", &self.team_id)
             .field("issue_key_prefix", &self.issue_key_prefix)
             .finish()
     }
 }
-impl UpdateProjectIssueKeyPrefixRequest {
+impl UpdateTeamIssueKeyPrefixRequest {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateProjectIssueKeyPrefixRequest";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateTeamIssueKeyPrefixRequest";
 }
-::buffa::impl_default_instance!(UpdateProjectIssueKeyPrefixRequest);
-impl ::buffa::MessageName for UpdateProjectIssueKeyPrefixRequest {
+::buffa::impl_default_instance!(UpdateTeamIssueKeyPrefixRequest);
+impl ::buffa::MessageName for UpdateTeamIssueKeyPrefixRequest {
     const PACKAGE: &'static str = "briar.app.v1";
-    const NAME: &'static str = "UpdateProjectIssueKeyPrefixRequest";
-    const FULL_NAME: &'static str = "briar.app.v1.UpdateProjectIssueKeyPrefixRequest";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateProjectIssueKeyPrefixRequest";
+    const NAME: &'static str = "UpdateTeamIssueKeyPrefixRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.UpdateTeamIssueKeyPrefixRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateTeamIssueKeyPrefixRequest";
 }
-impl ::buffa::Message for UpdateProjectIssueKeyPrefixRequest {
+impl ::buffa::Message for UpdateTeamIssueKeyPrefixRequest {
     /// Returns the total encoded size in bytes.
     ///
     /// Accumulates in `u64` (which cannot overflow for in-memory
@@ -84396,8 +84384,8 @@ impl ::buffa::Message for UpdateProjectIssueKeyPrefixRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.project_id.is_empty() {
-            size += 1u64 + ::buffa::types::string_encoded_len(&self.project_id) as u64;
+        if !self.team_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.team_id) as u64;
         }
         if !self.issue_key_prefix.is_empty() {
             size
@@ -84414,8 +84402,8 @@ impl ::buffa::Message for UpdateProjectIssueKeyPrefixRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.project_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.project_id, buf);
+        if !self.team_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.team_id, buf);
         }
         if !self.issue_key_prefix.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.issue_key_prefix, buf);
@@ -84438,7 +84426,7 @@ impl ::buffa::Message for UpdateProjectIssueKeyPrefixRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.project_id, buf)?;
+                ::buffa::types::merge_string(&mut self.team_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -84455,13 +84443,13 @@ impl ::buffa::Message for UpdateProjectIssueKeyPrefixRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.project_id.clear();
+        self.team_id.clear();
         self.issue_key_prefix.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for UpdateProjectIssueKeyPrefixRequest {
-    const PROTO_FQN: &'static str = "briar.app.v1.UpdateProjectIssueKeyPrefixRequest";
+impl ::buffa::ExtensionSet for UpdateTeamIssueKeyPrefixRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.UpdateTeamIssueKeyPrefixRequest";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -84469,7 +84457,7 @@ impl ::buffa::ExtensionSet for UpdateProjectIssueKeyPrefixRequest {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for UpdateProjectIssueKeyPrefixRequest {
+impl ::buffa::json_helpers::ProtoElemJson for UpdateTeamIssueKeyPrefixRequest {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -84483,50 +84471,48 @@ impl ::buffa::json_helpers::ProtoElemJson for UpdateProjectIssueKeyPrefixRequest
     }
 }
 #[doc(hidden)]
-pub const __UPDATE_PROJECT_ISSUE_KEY_PREFIX_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.app.v1.UpdateProjectIssueKeyPrefixRequest",
-    to_json: ::buffa::type_registry::any_to_json::<UpdateProjectIssueKeyPrefixRequest>,
-    from_json: ::buffa::type_registry::any_from_json::<
-        UpdateProjectIssueKeyPrefixRequest,
-    >,
+pub const __UPDATE_TEAM_ISSUE_KEY_PREFIX_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.UpdateTeamIssueKeyPrefixRequest",
+    to_json: ::buffa::type_registry::any_to_json::<UpdateTeamIssueKeyPrefixRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<UpdateTeamIssueKeyPrefixRequest>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct UpdateProjectIssueKeyPrefixResponse {
-    /// Field 1: `project`
+pub struct UpdateTeamIssueKeyPrefixResponse {
+    /// Field 1: `team`
     #[serde(
-        rename = "project",
+        rename = "team",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
-    pub project: ::buffa::MessageField<Project, ::buffa::Inline<Project>>,
+    pub team: ::buffa::MessageField<Team, ::buffa::Inline<Team>>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for UpdateProjectIssueKeyPrefixResponse {
+impl ::core::fmt::Debug for UpdateTeamIssueKeyPrefixResponse {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("UpdateProjectIssueKeyPrefixResponse")
-            .field("project", &self.project)
+        f.debug_struct("UpdateTeamIssueKeyPrefixResponse")
+            .field("team", &self.team)
             .finish()
     }
 }
-impl UpdateProjectIssueKeyPrefixResponse {
+impl UpdateTeamIssueKeyPrefixResponse {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateProjectIssueKeyPrefixResponse";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateTeamIssueKeyPrefixResponse";
 }
-::buffa::impl_default_instance!(UpdateProjectIssueKeyPrefixResponse);
-impl ::buffa::MessageName for UpdateProjectIssueKeyPrefixResponse {
+::buffa::impl_default_instance!(UpdateTeamIssueKeyPrefixResponse);
+impl ::buffa::MessageName for UpdateTeamIssueKeyPrefixResponse {
     const PACKAGE: &'static str = "briar.app.v1";
-    const NAME: &'static str = "UpdateProjectIssueKeyPrefixResponse";
-    const FULL_NAME: &'static str = "briar.app.v1.UpdateProjectIssueKeyPrefixResponse";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateProjectIssueKeyPrefixResponse";
+    const NAME: &'static str = "UpdateTeamIssueKeyPrefixResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.UpdateTeamIssueKeyPrefixResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateTeamIssueKeyPrefixResponse";
 }
-impl ::buffa::Message for UpdateProjectIssueKeyPrefixResponse {
+impl ::buffa::Message for UpdateTeamIssueKeyPrefixResponse {
     /// Returns the total encoded size in bytes.
     ///
     /// Accumulates in `u64` (which cannot overflow for in-memory
@@ -84539,9 +84525,9 @@ impl ::buffa::Message for UpdateProjectIssueKeyPrefixResponse {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if self.project.is_set() {
+        if self.team.is_set() {
             let __slot = __cache.reserve();
-            let inner_size = self.project.compute_size(__cache);
+            let inner_size = self.team.compute_size(__cache);
             __cache.set(__slot, inner_size);
             size
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
@@ -84557,13 +84543,13 @@ impl ::buffa::Message for UpdateProjectIssueKeyPrefixResponse {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if self.project.is_set() {
+        if self.team.is_set() {
             ::buffa::types::put_len_delimited_header(
                 1u32,
                 u64::from(__cache.consume_next()),
                 buf,
             );
-            self.project.write_to(__cache, buf);
+            self.team.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -84584,7 +84570,7 @@ impl ::buffa::Message for UpdateProjectIssueKeyPrefixResponse {
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 ::buffa::Message::merge_length_delimited(
-                    self.project.get_or_insert_default(),
+                    self.team.get_or_insert_default(),
                     buf,
                     ctx,
                 )?;
@@ -84597,12 +84583,12 @@ impl ::buffa::Message for UpdateProjectIssueKeyPrefixResponse {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.project = ::buffa::MessageField::none();
+        self.team = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for UpdateProjectIssueKeyPrefixResponse {
-    const PROTO_FQN: &'static str = "briar.app.v1.UpdateProjectIssueKeyPrefixResponse";
+impl ::buffa::ExtensionSet for UpdateTeamIssueKeyPrefixResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.UpdateTeamIssueKeyPrefixResponse";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -84610,7 +84596,7 @@ impl ::buffa::ExtensionSet for UpdateProjectIssueKeyPrefixResponse {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for UpdateProjectIssueKeyPrefixResponse {
+impl ::buffa::json_helpers::ProtoElemJson for UpdateTeamIssueKeyPrefixResponse {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -84624,26 +84610,24 @@ impl ::buffa::json_helpers::ProtoElemJson for UpdateProjectIssueKeyPrefixRespons
     }
 }
 #[doc(hidden)]
-pub const __UPDATE_PROJECT_ISSUE_KEY_PREFIX_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.app.v1.UpdateProjectIssueKeyPrefixResponse",
-    to_json: ::buffa::type_registry::any_to_json::<UpdateProjectIssueKeyPrefixResponse>,
-    from_json: ::buffa::type_registry::any_from_json::<
-        UpdateProjectIssueKeyPrefixResponse,
-    >,
+pub const __UPDATE_TEAM_ISSUE_KEY_PREFIX_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.UpdateTeamIssueKeyPrefixResponse",
+    to_json: ::buffa::type_registry::any_to_json::<UpdateTeamIssueKeyPrefixResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<UpdateTeamIssueKeyPrefixResponse>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct UpdateProjectTabsRequest {
-    /// Field 1: `project_id`
+pub struct UpdateTeamTabsRequest {
+    /// Field 1: `team_id`
     #[serde(
-        rename = "projectId",
-        alias = "project_id",
+        rename = "teamId",
+        alias = "team_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub project_id: ::buffa::alloc::string::String,
+    pub team_id: ::buffa::alloc::string::String,
     /// Field 2: `schedule`
     #[serde(
         rename = "schedule",
@@ -84655,29 +84639,29 @@ pub struct UpdateProjectTabsRequest {
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for UpdateProjectTabsRequest {
+impl ::core::fmt::Debug for UpdateTeamTabsRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("UpdateProjectTabsRequest")
-            .field("project_id", &self.project_id)
+        f.debug_struct("UpdateTeamTabsRequest")
+            .field("team_id", &self.team_id)
             .field("schedule", &self.schedule)
             .finish()
     }
 }
-impl UpdateProjectTabsRequest {
+impl UpdateTeamTabsRequest {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateProjectTabsRequest";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateTeamTabsRequest";
 }
-::buffa::impl_default_instance!(UpdateProjectTabsRequest);
-impl ::buffa::MessageName for UpdateProjectTabsRequest {
+::buffa::impl_default_instance!(UpdateTeamTabsRequest);
+impl ::buffa::MessageName for UpdateTeamTabsRequest {
     const PACKAGE: &'static str = "briar.app.v1";
-    const NAME: &'static str = "UpdateProjectTabsRequest";
-    const FULL_NAME: &'static str = "briar.app.v1.UpdateProjectTabsRequest";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateProjectTabsRequest";
+    const NAME: &'static str = "UpdateTeamTabsRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.UpdateTeamTabsRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateTeamTabsRequest";
 }
-impl ::buffa::Message for UpdateProjectTabsRequest {
+impl ::buffa::Message for UpdateTeamTabsRequest {
     /// Returns the total encoded size in bytes.
     ///
     /// Accumulates in `u64` (which cannot overflow for in-memory
@@ -84690,8 +84674,8 @@ impl ::buffa::Message for UpdateProjectTabsRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.project_id.is_empty() {
-            size += 1u64 + ::buffa::types::string_encoded_len(&self.project_id) as u64;
+        if !self.team_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.team_id) as u64;
         }
         if self.schedule {
             size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
@@ -84706,8 +84690,8 @@ impl ::buffa::Message for UpdateProjectTabsRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.project_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.project_id, buf);
+        if !self.team_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.team_id, buf);
         }
         if self.schedule {
             ::buffa::types::put_bool_field(2u32, self.schedule, buf);
@@ -84730,7 +84714,7 @@ impl ::buffa::Message for UpdateProjectTabsRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.project_id, buf)?;
+                ::buffa::types::merge_string(&mut self.team_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -84747,13 +84731,13 @@ impl ::buffa::Message for UpdateProjectTabsRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.project_id.clear();
+        self.team_id.clear();
         self.schedule = false;
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for UpdateProjectTabsRequest {
-    const PROTO_FQN: &'static str = "briar.app.v1.UpdateProjectTabsRequest";
+impl ::buffa::ExtensionSet for UpdateTeamTabsRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.UpdateTeamTabsRequest";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -84761,7 +84745,7 @@ impl ::buffa::ExtensionSet for UpdateProjectTabsRequest {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for UpdateProjectTabsRequest {
+impl ::buffa::json_helpers::ProtoElemJson for UpdateTeamTabsRequest {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -84775,48 +84759,46 @@ impl ::buffa::json_helpers::ProtoElemJson for UpdateProjectTabsRequest {
     }
 }
 #[doc(hidden)]
-pub const __UPDATE_PROJECT_TABS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.app.v1.UpdateProjectTabsRequest",
-    to_json: ::buffa::type_registry::any_to_json::<UpdateProjectTabsRequest>,
-    from_json: ::buffa::type_registry::any_from_json::<UpdateProjectTabsRequest>,
+pub const __UPDATE_TEAM_TABS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.UpdateTeamTabsRequest",
+    to_json: ::buffa::type_registry::any_to_json::<UpdateTeamTabsRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<UpdateTeamTabsRequest>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct UpdateProjectTabsResponse {
-    /// Field 1: `project`
+pub struct UpdateTeamTabsResponse {
+    /// Field 1: `team`
     #[serde(
-        rename = "project",
+        rename = "team",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
-    pub project: ::buffa::MessageField<Project, ::buffa::Inline<Project>>,
+    pub team: ::buffa::MessageField<Team, ::buffa::Inline<Team>>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for UpdateProjectTabsResponse {
+impl ::core::fmt::Debug for UpdateTeamTabsResponse {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("UpdateProjectTabsResponse")
-            .field("project", &self.project)
-            .finish()
+        f.debug_struct("UpdateTeamTabsResponse").field("team", &self.team).finish()
     }
 }
-impl UpdateProjectTabsResponse {
+impl UpdateTeamTabsResponse {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateProjectTabsResponse";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateTeamTabsResponse";
 }
-::buffa::impl_default_instance!(UpdateProjectTabsResponse);
-impl ::buffa::MessageName for UpdateProjectTabsResponse {
+::buffa::impl_default_instance!(UpdateTeamTabsResponse);
+impl ::buffa::MessageName for UpdateTeamTabsResponse {
     const PACKAGE: &'static str = "briar.app.v1";
-    const NAME: &'static str = "UpdateProjectTabsResponse";
-    const FULL_NAME: &'static str = "briar.app.v1.UpdateProjectTabsResponse";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateProjectTabsResponse";
+    const NAME: &'static str = "UpdateTeamTabsResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.UpdateTeamTabsResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateTeamTabsResponse";
 }
-impl ::buffa::Message for UpdateProjectTabsResponse {
+impl ::buffa::Message for UpdateTeamTabsResponse {
     /// Returns the total encoded size in bytes.
     ///
     /// Accumulates in `u64` (which cannot overflow for in-memory
@@ -84829,9 +84811,9 @@ impl ::buffa::Message for UpdateProjectTabsResponse {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if self.project.is_set() {
+        if self.team.is_set() {
             let __slot = __cache.reserve();
-            let inner_size = self.project.compute_size(__cache);
+            let inner_size = self.team.compute_size(__cache);
             __cache.set(__slot, inner_size);
             size
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
@@ -84847,13 +84829,13 @@ impl ::buffa::Message for UpdateProjectTabsResponse {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if self.project.is_set() {
+        if self.team.is_set() {
             ::buffa::types::put_len_delimited_header(
                 1u32,
                 u64::from(__cache.consume_next()),
                 buf,
             );
-            self.project.write_to(__cache, buf);
+            self.team.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -84874,7 +84856,7 @@ impl ::buffa::Message for UpdateProjectTabsResponse {
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 ::buffa::Message::merge_length_delimited(
-                    self.project.get_or_insert_default(),
+                    self.team.get_or_insert_default(),
                     buf,
                     ctx,
                 )?;
@@ -84887,12 +84869,12 @@ impl ::buffa::Message for UpdateProjectTabsResponse {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.project = ::buffa::MessageField::none();
+        self.team = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for UpdateProjectTabsResponse {
-    const PROTO_FQN: &'static str = "briar.app.v1.UpdateProjectTabsResponse";
+impl ::buffa::ExtensionSet for UpdateTeamTabsResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.UpdateTeamTabsResponse";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -84900,7 +84882,7 @@ impl ::buffa::ExtensionSet for UpdateProjectTabsResponse {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for UpdateProjectTabsResponse {
+impl ::buffa::json_helpers::ProtoElemJson for UpdateTeamTabsResponse {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -84914,50 +84896,50 @@ impl ::buffa::json_helpers::ProtoElemJson for UpdateProjectTabsResponse {
     }
 }
 #[doc(hidden)]
-pub const __UPDATE_PROJECT_TABS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.app.v1.UpdateProjectTabsResponse",
-    to_json: ::buffa::type_registry::any_to_json::<UpdateProjectTabsResponse>,
-    from_json: ::buffa::type_registry::any_from_json::<UpdateProjectTabsResponse>,
+pub const __UPDATE_TEAM_TABS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.UpdateTeamTabsResponse",
+    to_json: ::buffa::type_registry::any_to_json::<UpdateTeamTabsResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<UpdateTeamTabsResponse>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct CreateProjectAgentTokenRequest {
-    /// Field 1: `project_id`
+pub struct CreateTeamAgentTokenRequest {
+    /// Field 1: `team_id`
     #[serde(
-        rename = "projectId",
-        alias = "project_id",
+        rename = "teamId",
+        alias = "team_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub project_id: ::buffa::alloc::string::String,
+    pub team_id: ::buffa::alloc::string::String,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for CreateProjectAgentTokenRequest {
+impl ::core::fmt::Debug for CreateTeamAgentTokenRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("CreateProjectAgentTokenRequest")
-            .field("project_id", &self.project_id)
+        f.debug_struct("CreateTeamAgentTokenRequest")
+            .field("team_id", &self.team_id)
             .finish()
     }
 }
-impl CreateProjectAgentTokenRequest {
+impl CreateTeamAgentTokenRequest {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateProjectAgentTokenRequest";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateTeamAgentTokenRequest";
 }
-::buffa::impl_default_instance!(CreateProjectAgentTokenRequest);
-impl ::buffa::MessageName for CreateProjectAgentTokenRequest {
+::buffa::impl_default_instance!(CreateTeamAgentTokenRequest);
+impl ::buffa::MessageName for CreateTeamAgentTokenRequest {
     const PACKAGE: &'static str = "briar.app.v1";
-    const NAME: &'static str = "CreateProjectAgentTokenRequest";
-    const FULL_NAME: &'static str = "briar.app.v1.CreateProjectAgentTokenRequest";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateProjectAgentTokenRequest";
+    const NAME: &'static str = "CreateTeamAgentTokenRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.CreateTeamAgentTokenRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateTeamAgentTokenRequest";
 }
-impl ::buffa::Message for CreateProjectAgentTokenRequest {
+impl ::buffa::Message for CreateTeamAgentTokenRequest {
     /// Returns the total encoded size in bytes.
     ///
     /// Accumulates in `u64` (which cannot overflow for in-memory
@@ -84970,8 +84952,8 @@ impl ::buffa::Message for CreateProjectAgentTokenRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.project_id.is_empty() {
-            size += 1u64 + ::buffa::types::string_encoded_len(&self.project_id) as u64;
+        if !self.team_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.team_id) as u64;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
@@ -84983,8 +84965,8 @@ impl ::buffa::Message for CreateProjectAgentTokenRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.project_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.project_id, buf);
+        if !self.team_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.team_id, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -85004,7 +84986,7 @@ impl ::buffa::Message for CreateProjectAgentTokenRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.project_id, buf)?;
+                ::buffa::types::merge_string(&mut self.team_id, buf)?;
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -85014,12 +84996,12 @@ impl ::buffa::Message for CreateProjectAgentTokenRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.project_id.clear();
+        self.team_id.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for CreateProjectAgentTokenRequest {
-    const PROTO_FQN: &'static str = "briar.app.v1.CreateProjectAgentTokenRequest";
+impl ::buffa::ExtensionSet for CreateTeamAgentTokenRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.CreateTeamAgentTokenRequest";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -85027,7 +85009,7 @@ impl ::buffa::ExtensionSet for CreateProjectAgentTokenRequest {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for CreateProjectAgentTokenRequest {
+impl ::buffa::json_helpers::ProtoElemJson for CreateTeamAgentTokenRequest {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -85041,16 +85023,16 @@ impl ::buffa::json_helpers::ProtoElemJson for CreateProjectAgentTokenRequest {
     }
 }
 #[doc(hidden)]
-pub const __CREATE_PROJECT_AGENT_TOKEN_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.app.v1.CreateProjectAgentTokenRequest",
-    to_json: ::buffa::type_registry::any_to_json::<CreateProjectAgentTokenRequest>,
-    from_json: ::buffa::type_registry::any_from_json::<CreateProjectAgentTokenRequest>,
+pub const __CREATE_TEAM_AGENT_TOKEN_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.CreateTeamAgentTokenRequest",
+    to_json: ::buffa::type_registry::any_to_json::<CreateTeamAgentTokenRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<CreateTeamAgentTokenRequest>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct CreateProjectAgentTokenResponse {
+pub struct CreateTeamAgentTokenResponse {
     /// Field 1: `agent_token`
     #[serde(
         rename = "agentToken",
@@ -85063,28 +85045,28 @@ pub struct CreateProjectAgentTokenResponse {
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for CreateProjectAgentTokenResponse {
+impl ::core::fmt::Debug for CreateTeamAgentTokenResponse {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("CreateProjectAgentTokenResponse")
+        f.debug_struct("CreateTeamAgentTokenResponse")
             .field("agent_token", &self.agent_token)
             .finish()
     }
 }
-impl CreateProjectAgentTokenResponse {
+impl CreateTeamAgentTokenResponse {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateProjectAgentTokenResponse";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateTeamAgentTokenResponse";
 }
-::buffa::impl_default_instance!(CreateProjectAgentTokenResponse);
-impl ::buffa::MessageName for CreateProjectAgentTokenResponse {
+::buffa::impl_default_instance!(CreateTeamAgentTokenResponse);
+impl ::buffa::MessageName for CreateTeamAgentTokenResponse {
     const PACKAGE: &'static str = "briar.app.v1";
-    const NAME: &'static str = "CreateProjectAgentTokenResponse";
-    const FULL_NAME: &'static str = "briar.app.v1.CreateProjectAgentTokenResponse";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateProjectAgentTokenResponse";
+    const NAME: &'static str = "CreateTeamAgentTokenResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.CreateTeamAgentTokenResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateTeamAgentTokenResponse";
 }
-impl ::buffa::Message for CreateProjectAgentTokenResponse {
+impl ::buffa::Message for CreateTeamAgentTokenResponse {
     /// Returns the total encoded size in bytes.
     ///
     /// Accumulates in `u64` (which cannot overflow for in-memory
@@ -85145,8 +85127,8 @@ impl ::buffa::Message for CreateProjectAgentTokenResponse {
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for CreateProjectAgentTokenResponse {
-    const PROTO_FQN: &'static str = "briar.app.v1.CreateProjectAgentTokenResponse";
+impl ::buffa::ExtensionSet for CreateTeamAgentTokenResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.CreateTeamAgentTokenResponse";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -85154,7 +85136,7 @@ impl ::buffa::ExtensionSet for CreateProjectAgentTokenResponse {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for CreateProjectAgentTokenResponse {
+impl ::buffa::json_helpers::ProtoElemJson for CreateTeamAgentTokenResponse {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -85168,10 +85150,10 @@ impl ::buffa::json_helpers::ProtoElemJson for CreateProjectAgentTokenResponse {
     }
 }
 #[doc(hidden)]
-pub const __CREATE_PROJECT_AGENT_TOKEN_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.app.v1.CreateProjectAgentTokenResponse",
-    to_json: ::buffa::type_registry::any_to_json::<CreateProjectAgentTokenResponse>,
-    from_json: ::buffa::type_registry::any_from_json::<CreateProjectAgentTokenResponse>,
+pub const __CREATE_TEAM_AGENT_TOKEN_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.CreateTeamAgentTokenResponse",
+    to_json: ::buffa::type_registry::any_to_json::<CreateTeamAgentTokenResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<CreateTeamAgentTokenResponse>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
@@ -85373,7 +85355,7 @@ pub const __LINEAR_SETTINGS_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::b
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct ProjectSettings {
+pub struct TeamSettings {
     /// Field 1: `velen_org`
     #[serde(
         rename = "velenOrg",
@@ -85432,9 +85414,9 @@ pub struct ProjectSettings {
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for ProjectSettings {
+impl ::core::fmt::Debug for TeamSettings {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("ProjectSettings")
+        f.debug_struct("TeamSettings")
             .field("velen_org", &self.velen_org)
             .field("data_source", &self.data_source)
             .field("linear", &self.linear)
@@ -85445,14 +85427,14 @@ impl ::core::fmt::Debug for ProjectSettings {
             .finish()
     }
 }
-impl ProjectSettings {
+impl TeamSettings {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ProjectSettings";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.TeamSettings";
 }
-impl ProjectSettings {
+impl TeamSettings {
     #[must_use = "with_* setters return `self` by value; assign or chain the result"]
     #[inline]
     ///Sets [`Self::velen_org`] to `Some(value)`, consuming and returning `self`.
@@ -85491,14 +85473,14 @@ impl ProjectSettings {
         self
     }
 }
-::buffa::impl_default_instance!(ProjectSettings);
-impl ::buffa::MessageName for ProjectSettings {
+::buffa::impl_default_instance!(TeamSettings);
+impl ::buffa::MessageName for TeamSettings {
     const PACKAGE: &'static str = "briar.app.v1";
-    const NAME: &'static str = "ProjectSettings";
-    const FULL_NAME: &'static str = "briar.app.v1.ProjectSettings";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ProjectSettings";
+    const NAME: &'static str = "TeamSettings";
+    const FULL_NAME: &'static str = "briar.app.v1.TeamSettings";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.TeamSettings";
 }
-impl ::buffa::Message for ProjectSettings {
+impl ::buffa::Message for TeamSettings {
     /// Returns the total encoded size in bytes.
     ///
     /// Accumulates in `u64` (which cannot overflow for in-memory
@@ -85702,8 +85684,8 @@ impl ::buffa::Message for ProjectSettings {
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for ProjectSettings {
-    const PROTO_FQN: &'static str = "briar.app.v1.ProjectSettings";
+impl ::buffa::ExtensionSet for TeamSettings {
+    const PROTO_FQN: &'static str = "briar.app.v1.TeamSettings";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -85711,7 +85693,7 @@ impl ::buffa::ExtensionSet for ProjectSettings {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for ProjectSettings {
+impl ::buffa::json_helpers::ProtoElemJson for TeamSettings {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -85725,24 +85707,24 @@ impl ::buffa::json_helpers::ProtoElemJson for ProjectSettings {
     }
 }
 #[doc(hidden)]
-pub const __PROJECT_SETTINGS_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.app.v1.ProjectSettings",
-    to_json: ::buffa::type_registry::any_to_json::<ProjectSettings>,
-    from_json: ::buffa::type_registry::any_from_json::<ProjectSettings>,
+pub const __TEAM_SETTINGS_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.TeamSettings",
+    to_json: ::buffa::type_registry::any_to_json::<TeamSettings>,
+    from_json: ::buffa::type_registry::any_from_json::<TeamSettings>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct UpdateProjectSettingsRequest {
-    /// Field 1: `project_id`
+pub struct UpdateTeamSettingsRequest {
+    /// Field 1: `team_id`
     #[serde(
-        rename = "projectId",
-        alias = "project_id",
+        rename = "teamId",
+        alias = "team_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub project_id: ::buffa::alloc::string::String,
+    pub team_id: ::buffa::alloc::string::String,
     /// Field 2: `velen_org`
     #[serde(
         rename = "velenOrg",
@@ -85783,10 +85765,10 @@ pub struct UpdateProjectSettingsRequest {
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for UpdateProjectSettingsRequest {
+impl ::core::fmt::Debug for UpdateTeamSettingsRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("UpdateProjectSettingsRequest")
-            .field("project_id", &self.project_id)
+        f.debug_struct("UpdateTeamSettingsRequest")
+            .field("team_id", &self.team_id)
             .field("velen_org", &self.velen_org)
             .field("data_source", &self.data_source)
             .field("linear", &self.linear)
@@ -85795,14 +85777,14 @@ impl ::core::fmt::Debug for UpdateProjectSettingsRequest {
             .finish()
     }
 }
-impl UpdateProjectSettingsRequest {
+impl UpdateTeamSettingsRequest {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateProjectSettingsRequest";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateTeamSettingsRequest";
 }
-impl UpdateProjectSettingsRequest {
+impl UpdateTeamSettingsRequest {
     #[must_use = "with_* setters return `self` by value; assign or chain the result"]
     #[inline]
     ///Sets [`Self::velen_org`] to `Some(value)`, consuming and returning `self`.
@@ -85834,14 +85816,14 @@ impl UpdateProjectSettingsRequest {
         self
     }
 }
-::buffa::impl_default_instance!(UpdateProjectSettingsRequest);
-impl ::buffa::MessageName for UpdateProjectSettingsRequest {
+::buffa::impl_default_instance!(UpdateTeamSettingsRequest);
+impl ::buffa::MessageName for UpdateTeamSettingsRequest {
     const PACKAGE: &'static str = "briar.app.v1";
-    const NAME: &'static str = "UpdateProjectSettingsRequest";
-    const FULL_NAME: &'static str = "briar.app.v1.UpdateProjectSettingsRequest";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateProjectSettingsRequest";
+    const NAME: &'static str = "UpdateTeamSettingsRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.UpdateTeamSettingsRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateTeamSettingsRequest";
 }
-impl ::buffa::Message for UpdateProjectSettingsRequest {
+impl ::buffa::Message for UpdateTeamSettingsRequest {
     /// Returns the total encoded size in bytes.
     ///
     /// Accumulates in `u64` (which cannot overflow for in-memory
@@ -85854,8 +85836,8 @@ impl ::buffa::Message for UpdateProjectSettingsRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.project_id.is_empty() {
-            size += 1u64 + ::buffa::types::string_encoded_len(&self.project_id) as u64;
+        if !self.team_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.team_id) as u64;
         }
         if let Some(ref v) = self.velen_org {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
@@ -85892,8 +85874,8 @@ impl ::buffa::Message for UpdateProjectSettingsRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.project_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.project_id, buf);
+        if !self.team_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.team_id, buf);
         }
         if let Some(ref v) = self.velen_org {
             ::buffa::types::put_string_field(2u32, v, buf);
@@ -85938,7 +85920,7 @@ impl ::buffa::Message for UpdateProjectSettingsRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.project_id, buf)?;
+                ::buffa::types::merge_string(&mut self.team_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -86006,7 +85988,7 @@ impl ::buffa::Message for UpdateProjectSettingsRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.project_id.clear();
+        self.team_id.clear();
         self.velen_org = ::core::option::Option::None;
         self.data_source = ::core::option::Option::None;
         self.linear = ::buffa::MessageField::none();
@@ -86015,8 +85997,8 @@ impl ::buffa::Message for UpdateProjectSettingsRequest {
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for UpdateProjectSettingsRequest {
-    const PROTO_FQN: &'static str = "briar.app.v1.UpdateProjectSettingsRequest";
+impl ::buffa::ExtensionSet for UpdateTeamSettingsRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.UpdateTeamSettingsRequest";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -86024,7 +86006,7 @@ impl ::buffa::ExtensionSet for UpdateProjectSettingsRequest {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for UpdateProjectSettingsRequest {
+impl ::buffa::json_helpers::ProtoElemJson for UpdateTeamSettingsRequest {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -86038,51 +86020,48 @@ impl ::buffa::json_helpers::ProtoElemJson for UpdateProjectSettingsRequest {
     }
 }
 #[doc(hidden)]
-pub const __UPDATE_PROJECT_SETTINGS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.app.v1.UpdateProjectSettingsRequest",
-    to_json: ::buffa::type_registry::any_to_json::<UpdateProjectSettingsRequest>,
-    from_json: ::buffa::type_registry::any_from_json::<UpdateProjectSettingsRequest>,
+pub const __UPDATE_TEAM_SETTINGS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.UpdateTeamSettingsRequest",
+    to_json: ::buffa::type_registry::any_to_json::<UpdateTeamSettingsRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<UpdateTeamSettingsRequest>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct UpdateProjectSettingsResponse {
+pub struct UpdateTeamSettingsResponse {
     /// Field 1: `settings`
     #[serde(
         rename = "settings",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
-    pub settings: ::buffa::MessageField<
-        ProjectSettings,
-        ::buffa::Inline<ProjectSettings>,
-    >,
+    pub settings: ::buffa::MessageField<TeamSettings, ::buffa::Inline<TeamSettings>>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for UpdateProjectSettingsResponse {
+impl ::core::fmt::Debug for UpdateTeamSettingsResponse {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("UpdateProjectSettingsResponse")
+        f.debug_struct("UpdateTeamSettingsResponse")
             .field("settings", &self.settings)
             .finish()
     }
 }
-impl UpdateProjectSettingsResponse {
+impl UpdateTeamSettingsResponse {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateProjectSettingsResponse";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateTeamSettingsResponse";
 }
-::buffa::impl_default_instance!(UpdateProjectSettingsResponse);
-impl ::buffa::MessageName for UpdateProjectSettingsResponse {
+::buffa::impl_default_instance!(UpdateTeamSettingsResponse);
+impl ::buffa::MessageName for UpdateTeamSettingsResponse {
     const PACKAGE: &'static str = "briar.app.v1";
-    const NAME: &'static str = "UpdateProjectSettingsResponse";
-    const FULL_NAME: &'static str = "briar.app.v1.UpdateProjectSettingsResponse";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateProjectSettingsResponse";
+    const NAME: &'static str = "UpdateTeamSettingsResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.UpdateTeamSettingsResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateTeamSettingsResponse";
 }
-impl ::buffa::Message for UpdateProjectSettingsResponse {
+impl ::buffa::Message for UpdateTeamSettingsResponse {
     /// Returns the total encoded size in bytes.
     ///
     /// Accumulates in `u64` (which cannot overflow for in-memory
@@ -86157,8 +86136,8 @@ impl ::buffa::Message for UpdateProjectSettingsResponse {
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for UpdateProjectSettingsResponse {
-    const PROTO_FQN: &'static str = "briar.app.v1.UpdateProjectSettingsResponse";
+impl ::buffa::ExtensionSet for UpdateTeamSettingsResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.UpdateTeamSettingsResponse";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -86166,7 +86145,7 @@ impl ::buffa::ExtensionSet for UpdateProjectSettingsResponse {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for UpdateProjectSettingsResponse {
+impl ::buffa::json_helpers::ProtoElemJson for UpdateTeamSettingsResponse {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -86180,24 +86159,24 @@ impl ::buffa::json_helpers::ProtoElemJson for UpdateProjectSettingsResponse {
     }
 }
 #[doc(hidden)]
-pub const __UPDATE_PROJECT_SETTINGS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.app.v1.UpdateProjectSettingsResponse",
-    to_json: ::buffa::type_registry::any_to_json::<UpdateProjectSettingsResponse>,
-    from_json: ::buffa::type_registry::any_from_json::<UpdateProjectSettingsResponse>,
+pub const __UPDATE_TEAM_SETTINGS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.UpdateTeamSettingsResponse",
+    to_json: ::buffa::type_registry::any_to_json::<UpdateTeamSettingsResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<UpdateTeamSettingsResponse>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct UpdateCheckpointPolicyRequest {
-    /// Field 1: `project_id`
+    /// Field 1: `team_id`
     #[serde(
-        rename = "projectId",
-        alias = "project_id",
+        rename = "teamId",
+        alias = "team_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub project_id: ::buffa::alloc::string::String,
+    pub team_id: ::buffa::alloc::string::String,
     /// Field 2: `scope`
     #[serde(
         rename = "scope",
@@ -86229,7 +86208,7 @@ pub struct UpdateCheckpointPolicyRequest {
 impl ::core::fmt::Debug for UpdateCheckpointPolicyRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("UpdateCheckpointPolicyRequest")
-            .field("project_id", &self.project_id)
+            .field("team_id", &self.team_id)
             .field("scope", &self.scope)
             .field("checkpoints", &self.checkpoints)
             .field("expected_revision", &self.expected_revision)
@@ -86263,8 +86242,8 @@ impl ::buffa::Message for UpdateCheckpointPolicyRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.project_id.is_empty() {
-            size += 1u64 + ::buffa::types::string_encoded_len(&self.project_id) as u64;
+        if !self.team_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.team_id) as u64;
         }
         {
             let val = self.scope.to_i32();
@@ -86295,8 +86274,8 @@ impl ::buffa::Message for UpdateCheckpointPolicyRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.project_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.project_id, buf);
+        if !self.team_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.team_id, buf);
         }
         {
             let val = self.scope.to_i32();
@@ -86333,7 +86312,7 @@ impl ::buffa::Message for UpdateCheckpointPolicyRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.project_id, buf)?;
+                ::buffa::types::merge_string(&mut self.team_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -86371,7 +86350,7 @@ impl ::buffa::Message for UpdateCheckpointPolicyRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.project_id.clear();
+        self.team_id.clear();
         self.scope = ::buffa::EnumValue::from(0);
         self.checkpoints.clear();
         self.expected_revision = 0u64;
@@ -86414,16 +86393,16 @@ pub mod update_checkpoint_policy_request {
     #[repr(i32)]
     pub enum Scope {
         SCOPE_UNSPECIFIED = 0i32,
-        SCOPE_PROJECT = 1i32,
+        SCOPE_TEAM = 1i32,
         SCOPE_USER = 2i32,
     }
     impl Scope {
         ///Idiomatic alias for [`Self::SCOPE_UNSPECIFIED`]; `Debug` prints the variant name.
         #[allow(non_upper_case_globals)]
         pub const Unspecified: Self = Self::SCOPE_UNSPECIFIED;
-        ///Idiomatic alias for [`Self::SCOPE_PROJECT`]; `Debug` prints the variant name.
+        ///Idiomatic alias for [`Self::SCOPE_TEAM`]; `Debug` prints the variant name.
         #[allow(non_upper_case_globals)]
-        pub const Project: Self = Self::SCOPE_PROJECT;
+        pub const Team: Self = Self::SCOPE_TEAM;
         ///Idiomatic alias for [`Self::SCOPE_USER`]; `Debug` prints the variant name.
         #[allow(non_upper_case_globals)]
         pub const User: Self = Self::SCOPE_USER;
@@ -86523,7 +86502,7 @@ pub mod update_checkpoint_policy_request {
         fn from_i32(value: i32) -> ::core::option::Option<Self> {
             match value {
                 0i32 => ::core::option::Option::Some(Self::SCOPE_UNSPECIFIED),
-                1i32 => ::core::option::Option::Some(Self::SCOPE_PROJECT),
+                1i32 => ::core::option::Option::Some(Self::SCOPE_TEAM),
                 2i32 => ::core::option::Option::Some(Self::SCOPE_USER),
                 _ => ::core::option::Option::None,
             }
@@ -86534,7 +86513,7 @@ pub mod update_checkpoint_policy_request {
         fn proto_name(&self) -> &'static str {
             match self {
                 Self::SCOPE_UNSPECIFIED => "SCOPE_UNSPECIFIED",
-                Self::SCOPE_PROJECT => "SCOPE_PROJECT",
+                Self::SCOPE_TEAM => "SCOPE_TEAM",
                 Self::SCOPE_USER => "SCOPE_USER",
             }
         }
@@ -86543,13 +86522,13 @@ pub mod update_checkpoint_policy_request {
                 "SCOPE_UNSPECIFIED" => {
                     ::core::option::Option::Some(Self::SCOPE_UNSPECIFIED)
                 }
-                "SCOPE_PROJECT" => ::core::option::Option::Some(Self::SCOPE_PROJECT),
+                "SCOPE_TEAM" => ::core::option::Option::Some(Self::SCOPE_TEAM),
                 "SCOPE_USER" => ::core::option::Option::Some(Self::SCOPE_USER),
                 _ => ::core::option::Option::None,
             }
         }
         fn values() -> &'static [Self] {
-            &[Self::SCOPE_UNSPECIFIED, Self::SCOPE_PROJECT, Self::SCOPE_USER]
+            &[Self::SCOPE_UNSPECIFIED, Self::SCOPE_TEAM, Self::SCOPE_USER]
         }
     }
 }
@@ -86699,7 +86678,7 @@ pub const __UPDATE_CHECKPOINT_POLICY_RESPONSE_JSON_ANY: ::buffa::type_registry::
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct ProjectExecutionWorkerPolicy {
+pub struct TeamExecutionWorkerPolicy {
     /// Field 1: `selection_mode`
     #[serde(
         rename = "selectionMode",
@@ -86707,9 +86686,7 @@ pub struct ProjectExecutionWorkerPolicy {
         with = "::buffa::json_helpers::proto_enum",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub selection_mode: ::buffa::EnumValue<
-        project_execution_worker_policy::SelectionMode,
-    >,
+    pub selection_mode: ::buffa::EnumValue<team_execution_worker_policy::SelectionMode>,
     /// Field 2: `default_worker_id`
     #[serde(
         rename = "defaultWorkerId",
@@ -86739,9 +86716,9 @@ pub struct ProjectExecutionWorkerPolicy {
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for ProjectExecutionWorkerPolicy {
+impl ::core::fmt::Debug for TeamExecutionWorkerPolicy {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("ProjectExecutionWorkerPolicy")
+        f.debug_struct("TeamExecutionWorkerPolicy")
             .field("selection_mode", &self.selection_mode)
             .field("default_worker_id", &self.default_worker_id)
             .field("allowed_worker_ids", &self.allowed_worker_ids)
@@ -86749,14 +86726,14 @@ impl ::core::fmt::Debug for ProjectExecutionWorkerPolicy {
             .finish()
     }
 }
-impl ProjectExecutionWorkerPolicy {
+impl TeamExecutionWorkerPolicy {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ProjectExecutionWorkerPolicy";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.TeamExecutionWorkerPolicy";
 }
-impl ProjectExecutionWorkerPolicy {
+impl TeamExecutionWorkerPolicy {
     #[must_use = "with_* setters return `self` by value; assign or chain the result"]
     #[inline]
     ///Sets [`Self::default_worker_id`] to `Some(value)`, consuming and returning `self`.
@@ -86768,14 +86745,14 @@ impl ProjectExecutionWorkerPolicy {
         self
     }
 }
-::buffa::impl_default_instance!(ProjectExecutionWorkerPolicy);
-impl ::buffa::MessageName for ProjectExecutionWorkerPolicy {
+::buffa::impl_default_instance!(TeamExecutionWorkerPolicy);
+impl ::buffa::MessageName for TeamExecutionWorkerPolicy {
     const PACKAGE: &'static str = "briar.app.v1";
-    const NAME: &'static str = "ProjectExecutionWorkerPolicy";
-    const FULL_NAME: &'static str = "briar.app.v1.ProjectExecutionWorkerPolicy";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ProjectExecutionWorkerPolicy";
+    const NAME: &'static str = "TeamExecutionWorkerPolicy";
+    const FULL_NAME: &'static str = "briar.app.v1.TeamExecutionWorkerPolicy";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.TeamExecutionWorkerPolicy";
 }
-impl ::buffa::Message for ProjectExecutionWorkerPolicy {
+impl ::buffa::Message for TeamExecutionWorkerPolicy {
     /// Returns the total encoded size in bytes.
     ///
     /// Accumulates in `u64` (which cannot overflow for in-memory
@@ -86909,8 +86886,8 @@ impl ::buffa::Message for ProjectExecutionWorkerPolicy {
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for ProjectExecutionWorkerPolicy {
-    const PROTO_FQN: &'static str = "briar.app.v1.ProjectExecutionWorkerPolicy";
+impl ::buffa::ExtensionSet for TeamExecutionWorkerPolicy {
+    const PROTO_FQN: &'static str = "briar.app.v1.TeamExecutionWorkerPolicy";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -86918,7 +86895,7 @@ impl ::buffa::ExtensionSet for ProjectExecutionWorkerPolicy {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for ProjectExecutionWorkerPolicy {
+impl ::buffa::json_helpers::ProtoElemJson for TeamExecutionWorkerPolicy {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -86932,13 +86909,13 @@ impl ::buffa::json_helpers::ProtoElemJson for ProjectExecutionWorkerPolicy {
     }
 }
 #[doc(hidden)]
-pub const __PROJECT_EXECUTION_WORKER_POLICY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.app.v1.ProjectExecutionWorkerPolicy",
-    to_json: ::buffa::type_registry::any_to_json::<ProjectExecutionWorkerPolicy>,
-    from_json: ::buffa::type_registry::any_from_json::<ProjectExecutionWorkerPolicy>,
+pub const __TEAM_EXECUTION_WORKER_POLICY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.TeamExecutionWorkerPolicy",
+    to_json: ::buffa::type_registry::any_to_json::<TeamExecutionWorkerPolicy>,
+    from_json: ::buffa::type_registry::any_from_json::<TeamExecutionWorkerPolicy>,
     is_wkt: false,
 };
-pub mod project_execution_worker_policy {
+pub mod team_execution_worker_policy {
     #[allow(unused_imports)]
     use super::*;
     #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -87097,41 +87074,41 @@ pub mod project_execution_worker_policy {
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct GetProjectExecutionWorkerPolicyRequest {
-    /// Field 1: `project_id`
+pub struct GetTeamExecutionWorkerPolicyRequest {
+    /// Field 1: `team_id`
     #[serde(
-        rename = "projectId",
-        alias = "project_id",
+        rename = "teamId",
+        alias = "team_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub project_id: ::buffa::alloc::string::String,
+    pub team_id: ::buffa::alloc::string::String,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for GetProjectExecutionWorkerPolicyRequest {
+impl ::core::fmt::Debug for GetTeamExecutionWorkerPolicyRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("GetProjectExecutionWorkerPolicyRequest")
-            .field("project_id", &self.project_id)
+        f.debug_struct("GetTeamExecutionWorkerPolicyRequest")
+            .field("team_id", &self.team_id)
             .finish()
     }
 }
-impl GetProjectExecutionWorkerPolicyRequest {
+impl GetTeamExecutionWorkerPolicyRequest {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.GetProjectExecutionWorkerPolicyRequest";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.GetTeamExecutionWorkerPolicyRequest";
 }
-::buffa::impl_default_instance!(GetProjectExecutionWorkerPolicyRequest);
-impl ::buffa::MessageName for GetProjectExecutionWorkerPolicyRequest {
+::buffa::impl_default_instance!(GetTeamExecutionWorkerPolicyRequest);
+impl ::buffa::MessageName for GetTeamExecutionWorkerPolicyRequest {
     const PACKAGE: &'static str = "briar.app.v1";
-    const NAME: &'static str = "GetProjectExecutionWorkerPolicyRequest";
-    const FULL_NAME: &'static str = "briar.app.v1.GetProjectExecutionWorkerPolicyRequest";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.GetProjectExecutionWorkerPolicyRequest";
+    const NAME: &'static str = "GetTeamExecutionWorkerPolicyRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.GetTeamExecutionWorkerPolicyRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.GetTeamExecutionWorkerPolicyRequest";
 }
-impl ::buffa::Message for GetProjectExecutionWorkerPolicyRequest {
+impl ::buffa::Message for GetTeamExecutionWorkerPolicyRequest {
     /// Returns the total encoded size in bytes.
     ///
     /// Accumulates in `u64` (which cannot overflow for in-memory
@@ -87144,8 +87121,8 @@ impl ::buffa::Message for GetProjectExecutionWorkerPolicyRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.project_id.is_empty() {
-            size += 1u64 + ::buffa::types::string_encoded_len(&self.project_id) as u64;
+        if !self.team_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.team_id) as u64;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
@@ -87157,8 +87134,8 @@ impl ::buffa::Message for GetProjectExecutionWorkerPolicyRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.project_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.project_id, buf);
+        if !self.team_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.team_id, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -87178,7 +87155,7 @@ impl ::buffa::Message for GetProjectExecutionWorkerPolicyRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.project_id, buf)?;
+                ::buffa::types::merge_string(&mut self.team_id, buf)?;
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -87188,12 +87165,12 @@ impl ::buffa::Message for GetProjectExecutionWorkerPolicyRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.project_id.clear();
+        self.team_id.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for GetProjectExecutionWorkerPolicyRequest {
-    const PROTO_FQN: &'static str = "briar.app.v1.GetProjectExecutionWorkerPolicyRequest";
+impl ::buffa::ExtensionSet for GetTeamExecutionWorkerPolicyRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.GetTeamExecutionWorkerPolicyRequest";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -87201,7 +87178,7 @@ impl ::buffa::ExtensionSet for GetProjectExecutionWorkerPolicyRequest {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for GetProjectExecutionWorkerPolicyRequest {
+impl ::buffa::json_helpers::ProtoElemJson for GetTeamExecutionWorkerPolicyRequest {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -87215,55 +87192,53 @@ impl ::buffa::json_helpers::ProtoElemJson for GetProjectExecutionWorkerPolicyReq
     }
 }
 #[doc(hidden)]
-pub const __GET_PROJECT_EXECUTION_WORKER_POLICY_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.app.v1.GetProjectExecutionWorkerPolicyRequest",
-    to_json: ::buffa::type_registry::any_to_json::<
-        GetProjectExecutionWorkerPolicyRequest,
-    >,
+pub const __GET_TEAM_EXECUTION_WORKER_POLICY_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.GetTeamExecutionWorkerPolicyRequest",
+    to_json: ::buffa::type_registry::any_to_json::<GetTeamExecutionWorkerPolicyRequest>,
     from_json: ::buffa::type_registry::any_from_json::<
-        GetProjectExecutionWorkerPolicyRequest,
+        GetTeamExecutionWorkerPolicyRequest,
     >,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct GetProjectExecutionWorkerPolicyResponse {
+pub struct GetTeamExecutionWorkerPolicyResponse {
     /// Field 1: `policy`
     #[serde(
         rename = "policy",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub policy: ::buffa::MessageField<
-        ProjectExecutionWorkerPolicy,
-        ::buffa::Inline<ProjectExecutionWorkerPolicy>,
+        TeamExecutionWorkerPolicy,
+        ::buffa::Inline<TeamExecutionWorkerPolicy>,
     >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for GetProjectExecutionWorkerPolicyResponse {
+impl ::core::fmt::Debug for GetTeamExecutionWorkerPolicyResponse {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("GetProjectExecutionWorkerPolicyResponse")
+        f.debug_struct("GetTeamExecutionWorkerPolicyResponse")
             .field("policy", &self.policy)
             .finish()
     }
 }
-impl GetProjectExecutionWorkerPolicyResponse {
+impl GetTeamExecutionWorkerPolicyResponse {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.GetProjectExecutionWorkerPolicyResponse";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.GetTeamExecutionWorkerPolicyResponse";
 }
-::buffa::impl_default_instance!(GetProjectExecutionWorkerPolicyResponse);
-impl ::buffa::MessageName for GetProjectExecutionWorkerPolicyResponse {
+::buffa::impl_default_instance!(GetTeamExecutionWorkerPolicyResponse);
+impl ::buffa::MessageName for GetTeamExecutionWorkerPolicyResponse {
     const PACKAGE: &'static str = "briar.app.v1";
-    const NAME: &'static str = "GetProjectExecutionWorkerPolicyResponse";
-    const FULL_NAME: &'static str = "briar.app.v1.GetProjectExecutionWorkerPolicyResponse";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.GetProjectExecutionWorkerPolicyResponse";
+    const NAME: &'static str = "GetTeamExecutionWorkerPolicyResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.GetTeamExecutionWorkerPolicyResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.GetTeamExecutionWorkerPolicyResponse";
 }
-impl ::buffa::Message for GetProjectExecutionWorkerPolicyResponse {
+impl ::buffa::Message for GetTeamExecutionWorkerPolicyResponse {
     /// Returns the total encoded size in bytes.
     ///
     /// Accumulates in `u64` (which cannot overflow for in-memory
@@ -87338,8 +87313,8 @@ impl ::buffa::Message for GetProjectExecutionWorkerPolicyResponse {
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for GetProjectExecutionWorkerPolicyResponse {
-    const PROTO_FQN: &'static str = "briar.app.v1.GetProjectExecutionWorkerPolicyResponse";
+impl ::buffa::ExtensionSet for GetTeamExecutionWorkerPolicyResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.GetTeamExecutionWorkerPolicyResponse";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -87347,7 +87322,7 @@ impl ::buffa::ExtensionSet for GetProjectExecutionWorkerPolicyResponse {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for GetProjectExecutionWorkerPolicyResponse {
+impl ::buffa::json_helpers::ProtoElemJson for GetTeamExecutionWorkerPolicyResponse {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -87361,28 +87336,26 @@ impl ::buffa::json_helpers::ProtoElemJson for GetProjectExecutionWorkerPolicyRes
     }
 }
 #[doc(hidden)]
-pub const __GET_PROJECT_EXECUTION_WORKER_POLICY_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.app.v1.GetProjectExecutionWorkerPolicyResponse",
-    to_json: ::buffa::type_registry::any_to_json::<
-        GetProjectExecutionWorkerPolicyResponse,
-    >,
+pub const __GET_TEAM_EXECUTION_WORKER_POLICY_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.GetTeamExecutionWorkerPolicyResponse",
+    to_json: ::buffa::type_registry::any_to_json::<GetTeamExecutionWorkerPolicyResponse>,
     from_json: ::buffa::type_registry::any_from_json::<
-        GetProjectExecutionWorkerPolicyResponse,
+        GetTeamExecutionWorkerPolicyResponse,
     >,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct UpdateProjectExecutionWorkerPolicyRequest {
-    /// Field 1: `project_id`
+pub struct UpdateTeamExecutionWorkerPolicyRequest {
+    /// Field 1: `team_id`
     #[serde(
-        rename = "projectId",
-        alias = "project_id",
+        rename = "teamId",
+        alias = "team_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub project_id: ::buffa::alloc::string::String,
+    pub team_id: ::buffa::alloc::string::String,
     /// Field 2: `selection_mode`
     #[serde(
         rename = "selectionMode",
@@ -87390,9 +87363,7 @@ pub struct UpdateProjectExecutionWorkerPolicyRequest {
         with = "::buffa::json_helpers::proto_enum",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub selection_mode: ::buffa::EnumValue<
-        project_execution_worker_policy::SelectionMode,
-    >,
+    pub selection_mode: ::buffa::EnumValue<team_execution_worker_policy::SelectionMode>,
     /// Field 3: `default_worker_id`
     #[serde(
         rename = "defaultWorkerId",
@@ -87412,24 +87383,24 @@ pub struct UpdateProjectExecutionWorkerPolicyRequest {
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for UpdateProjectExecutionWorkerPolicyRequest {
+impl ::core::fmt::Debug for UpdateTeamExecutionWorkerPolicyRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("UpdateProjectExecutionWorkerPolicyRequest")
-            .field("project_id", &self.project_id)
+        f.debug_struct("UpdateTeamExecutionWorkerPolicyRequest")
+            .field("team_id", &self.team_id)
             .field("selection_mode", &self.selection_mode)
             .field("default_worker_id", &self.default_worker_id)
             .field("allowed_worker_ids", &self.allowed_worker_ids)
             .finish()
     }
 }
-impl UpdateProjectExecutionWorkerPolicyRequest {
+impl UpdateTeamExecutionWorkerPolicyRequest {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateProjectExecutionWorkerPolicyRequest";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateTeamExecutionWorkerPolicyRequest";
 }
-impl UpdateProjectExecutionWorkerPolicyRequest {
+impl UpdateTeamExecutionWorkerPolicyRequest {
     #[must_use = "with_* setters return `self` by value; assign or chain the result"]
     #[inline]
     ///Sets [`Self::default_worker_id`] to `Some(value)`, consuming and returning `self`.
@@ -87441,14 +87412,14 @@ impl UpdateProjectExecutionWorkerPolicyRequest {
         self
     }
 }
-::buffa::impl_default_instance!(UpdateProjectExecutionWorkerPolicyRequest);
-impl ::buffa::MessageName for UpdateProjectExecutionWorkerPolicyRequest {
+::buffa::impl_default_instance!(UpdateTeamExecutionWorkerPolicyRequest);
+impl ::buffa::MessageName for UpdateTeamExecutionWorkerPolicyRequest {
     const PACKAGE: &'static str = "briar.app.v1";
-    const NAME: &'static str = "UpdateProjectExecutionWorkerPolicyRequest";
-    const FULL_NAME: &'static str = "briar.app.v1.UpdateProjectExecutionWorkerPolicyRequest";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateProjectExecutionWorkerPolicyRequest";
+    const NAME: &'static str = "UpdateTeamExecutionWorkerPolicyRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.UpdateTeamExecutionWorkerPolicyRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateTeamExecutionWorkerPolicyRequest";
 }
-impl ::buffa::Message for UpdateProjectExecutionWorkerPolicyRequest {
+impl ::buffa::Message for UpdateTeamExecutionWorkerPolicyRequest {
     /// Returns the total encoded size in bytes.
     ///
     /// Accumulates in `u64` (which cannot overflow for in-memory
@@ -87461,8 +87432,8 @@ impl ::buffa::Message for UpdateProjectExecutionWorkerPolicyRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.project_id.is_empty() {
-            size += 1u64 + ::buffa::types::string_encoded_len(&self.project_id) as u64;
+        if !self.team_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.team_id) as u64;
         }
         {
             let val = self.selection_mode.to_i32();
@@ -87486,8 +87457,8 @@ impl ::buffa::Message for UpdateProjectExecutionWorkerPolicyRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.project_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.project_id, buf);
+        if !self.team_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.team_id, buf);
         }
         {
             let val = self.selection_mode.to_i32();
@@ -87519,7 +87490,7 @@ impl ::buffa::Message for UpdateProjectExecutionWorkerPolicyRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.project_id, buf)?;
+                ::buffa::types::merge_string(&mut self.team_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -87561,15 +87532,15 @@ impl ::buffa::Message for UpdateProjectExecutionWorkerPolicyRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.project_id.clear();
+        self.team_id.clear();
         self.selection_mode = ::buffa::EnumValue::from(0);
         self.default_worker_id = ::core::option::Option::None;
         self.allowed_worker_ids.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for UpdateProjectExecutionWorkerPolicyRequest {
-    const PROTO_FQN: &'static str = "briar.app.v1.UpdateProjectExecutionWorkerPolicyRequest";
+impl ::buffa::ExtensionSet for UpdateTeamExecutionWorkerPolicyRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.UpdateTeamExecutionWorkerPolicyRequest";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -87577,7 +87548,7 @@ impl ::buffa::ExtensionSet for UpdateProjectExecutionWorkerPolicyRequest {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for UpdateProjectExecutionWorkerPolicyRequest {
+impl ::buffa::json_helpers::ProtoElemJson for UpdateTeamExecutionWorkerPolicyRequest {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -87591,55 +87562,55 @@ impl ::buffa::json_helpers::ProtoElemJson for UpdateProjectExecutionWorkerPolicy
     }
 }
 #[doc(hidden)]
-pub const __UPDATE_PROJECT_EXECUTION_WORKER_POLICY_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.app.v1.UpdateProjectExecutionWorkerPolicyRequest",
+pub const __UPDATE_TEAM_EXECUTION_WORKER_POLICY_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.UpdateTeamExecutionWorkerPolicyRequest",
     to_json: ::buffa::type_registry::any_to_json::<
-        UpdateProjectExecutionWorkerPolicyRequest,
+        UpdateTeamExecutionWorkerPolicyRequest,
     >,
     from_json: ::buffa::type_registry::any_from_json::<
-        UpdateProjectExecutionWorkerPolicyRequest,
+        UpdateTeamExecutionWorkerPolicyRequest,
     >,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct UpdateProjectExecutionWorkerPolicyResponse {
+pub struct UpdateTeamExecutionWorkerPolicyResponse {
     /// Field 1: `policy`
     #[serde(
         rename = "policy",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub policy: ::buffa::MessageField<
-        ProjectExecutionWorkerPolicy,
-        ::buffa::Inline<ProjectExecutionWorkerPolicy>,
+        TeamExecutionWorkerPolicy,
+        ::buffa::Inline<TeamExecutionWorkerPolicy>,
     >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for UpdateProjectExecutionWorkerPolicyResponse {
+impl ::core::fmt::Debug for UpdateTeamExecutionWorkerPolicyResponse {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("UpdateProjectExecutionWorkerPolicyResponse")
+        f.debug_struct("UpdateTeamExecutionWorkerPolicyResponse")
             .field("policy", &self.policy)
             .finish()
     }
 }
-impl UpdateProjectExecutionWorkerPolicyResponse {
+impl UpdateTeamExecutionWorkerPolicyResponse {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateProjectExecutionWorkerPolicyResponse";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateTeamExecutionWorkerPolicyResponse";
 }
-::buffa::impl_default_instance!(UpdateProjectExecutionWorkerPolicyResponse);
-impl ::buffa::MessageName for UpdateProjectExecutionWorkerPolicyResponse {
+::buffa::impl_default_instance!(UpdateTeamExecutionWorkerPolicyResponse);
+impl ::buffa::MessageName for UpdateTeamExecutionWorkerPolicyResponse {
     const PACKAGE: &'static str = "briar.app.v1";
-    const NAME: &'static str = "UpdateProjectExecutionWorkerPolicyResponse";
-    const FULL_NAME: &'static str = "briar.app.v1.UpdateProjectExecutionWorkerPolicyResponse";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateProjectExecutionWorkerPolicyResponse";
+    const NAME: &'static str = "UpdateTeamExecutionWorkerPolicyResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.UpdateTeamExecutionWorkerPolicyResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateTeamExecutionWorkerPolicyResponse";
 }
-impl ::buffa::Message for UpdateProjectExecutionWorkerPolicyResponse {
+impl ::buffa::Message for UpdateTeamExecutionWorkerPolicyResponse {
     /// Returns the total encoded size in bytes.
     ///
     /// Accumulates in `u64` (which cannot overflow for in-memory
@@ -87714,8 +87685,8 @@ impl ::buffa::Message for UpdateProjectExecutionWorkerPolicyResponse {
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for UpdateProjectExecutionWorkerPolicyResponse {
-    const PROTO_FQN: &'static str = "briar.app.v1.UpdateProjectExecutionWorkerPolicyResponse";
+impl ::buffa::ExtensionSet for UpdateTeamExecutionWorkerPolicyResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.UpdateTeamExecutionWorkerPolicyResponse";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -87723,8 +87694,7 @@ impl ::buffa::ExtensionSet for UpdateProjectExecutionWorkerPolicyResponse {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson
-for UpdateProjectExecutionWorkerPolicyResponse {
+impl ::buffa::json_helpers::ProtoElemJson for UpdateTeamExecutionWorkerPolicyResponse {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -87738,20 +87708,20 @@ for UpdateProjectExecutionWorkerPolicyResponse {
     }
 }
 #[doc(hidden)]
-pub const __UPDATE_PROJECT_EXECUTION_WORKER_POLICY_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.app.v1.UpdateProjectExecutionWorkerPolicyResponse",
+pub const __UPDATE_TEAM_EXECUTION_WORKER_POLICY_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.UpdateTeamExecutionWorkerPolicyResponse",
     to_json: ::buffa::type_registry::any_to_json::<
-        UpdateProjectExecutionWorkerPolicyResponse,
+        UpdateTeamExecutionWorkerPolicyResponse,
     >,
     from_json: ::buffa::type_registry::any_from_json::<
-        UpdateProjectExecutionWorkerPolicyResponse,
+        UpdateTeamExecutionWorkerPolicyResponse,
     >,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct Project {
+pub struct Team {
     /// Field 1: `id`
     #[serde(
         rename = "id",
@@ -87836,9 +87806,9 @@ pub struct Project {
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for Project {
+impl ::core::fmt::Debug for Team {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("Project")
+        f.debug_struct("Team")
             .field("id", &self.id)
             .field("name", &self.name)
             .field("issue_key_prefix", &self.issue_key_prefix)
@@ -87853,14 +87823,14 @@ impl ::core::fmt::Debug for Project {
             .finish()
     }
 }
-impl Project {
+impl Team {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.Project";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.Team";
 }
-impl Project {
+impl Team {
     #[must_use = "with_* setters return `self` by value; assign or chain the result"]
     #[inline]
     ///Sets [`Self::icon`] to `Some(value)`, consuming and returning `self`.
@@ -87892,14 +87862,14 @@ impl Project {
         self
     }
 }
-::buffa::impl_default_instance!(Project);
-impl ::buffa::MessageName for Project {
+::buffa::impl_default_instance!(Team);
+impl ::buffa::MessageName for Team {
     const PACKAGE: &'static str = "briar.app.v1";
-    const NAME: &'static str = "Project";
-    const FULL_NAME: &'static str = "briar.app.v1.Project";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.Project";
+    const NAME: &'static str = "Team";
+    const FULL_NAME: &'static str = "briar.app.v1.Team";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.Team";
 }
-impl ::buffa::Message for Project {
+impl ::buffa::Message for Team {
     /// Returns the total encoded size in bytes.
     ///
     /// Accumulates in `u64` (which cannot overflow for in-memory
@@ -88139,8 +88109,8 @@ impl ::buffa::Message for Project {
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for Project {
-    const PROTO_FQN: &'static str = "briar.app.v1.Project";
+impl ::buffa::ExtensionSet for Team {
+    const PROTO_FQN: &'static str = "briar.app.v1.Team";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -88148,7 +88118,7 @@ impl ::buffa::ExtensionSet for Project {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for Project {
+impl ::buffa::json_helpers::ProtoElemJson for Team {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -88162,10 +88132,10 @@ impl ::buffa::json_helpers::ProtoElemJson for Project {
     }
 }
 #[doc(hidden)]
-pub const __PROJECT_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.app.v1.Project",
-    to_json: ::buffa::type_registry::any_to_json::<Project>,
-    from_json: ::buffa::type_registry::any_from_json::<Project>,
+pub const __TEAM_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.Team",
+    to_json: ::buffa::type_registry::any_to_json::<Team>,
+    from_json: ::buffa::type_registry::any_from_json::<Team>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
@@ -91733,23 +91703,21 @@ pub const __RESOLVE_ISSUE_HIERARCHY_LOCATION_RESPONSE_JSON_ANY: ::buffa::type_re
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct GetDashboardRequest {
-    /// Field 1: `project_id`
+    /// Field 1: `team_id`
     #[serde(
-        rename = "projectId",
-        alias = "project_id",
+        rename = "teamId",
+        alias = "team_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub project_id: ::buffa::alloc::string::String,
+    pub team_id: ::buffa::alloc::string::String,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
 impl ::core::fmt::Debug for GetDashboardRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("GetDashboardRequest")
-            .field("project_id", &self.project_id)
-            .finish()
+        f.debug_struct("GetDashboardRequest").field("team_id", &self.team_id).finish()
     }
 }
 impl GetDashboardRequest {
@@ -91779,8 +91747,8 @@ impl ::buffa::Message for GetDashboardRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.project_id.is_empty() {
-            size += 1u64 + ::buffa::types::string_encoded_len(&self.project_id) as u64;
+        if !self.team_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.team_id) as u64;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
@@ -91792,8 +91760,8 @@ impl ::buffa::Message for GetDashboardRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.project_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.project_id, buf);
+        if !self.team_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.team_id, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -91813,7 +91781,7 @@ impl ::buffa::Message for GetDashboardRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.project_id, buf)?;
+                ::buffa::types::merge_string(&mut self.team_id, buf)?;
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -91823,7 +91791,7 @@ impl ::buffa::Message for GetDashboardRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.project_id.clear();
+        self.team_id.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -91860,12 +91828,12 @@ pub const __GET_DASHBOARD_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct GetDashboardResponse {
-    /// Field 1: `project`
+    /// Field 1: `team`
     #[serde(
-        rename = "project",
+        rename = "team",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
-    pub project: ::buffa::MessageField<Project, ::buffa::Inline<Project>>,
+    pub team: ::buffa::MessageField<Team, ::buffa::Inline<Team>>,
     /// Field 2: `runs`
     #[serde(
         rename = "runs",
@@ -91897,8 +91865,8 @@ pub struct GetDashboardResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub execution_policy: ::buffa::MessageField<
-        ProjectExecutionWorkerPolicy,
-        ::buffa::Inline<ProjectExecutionWorkerPolicy>,
+        TeamExecutionWorkerPolicy,
+        ::buffa::Inline<TeamExecutionWorkerPolicy>,
     >,
     /// Field 6: `members`
     #[serde(
@@ -91945,10 +91913,7 @@ pub struct GetDashboardResponse {
         rename = "settings",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
-    pub settings: ::buffa::MessageField<
-        ProjectSettings,
-        ::buffa::Inline<ProjectSettings>,
-    >,
+    pub settings: ::buffa::MessageField<TeamSettings, ::buffa::Inline<TeamSettings>>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -91956,7 +91921,7 @@ pub struct GetDashboardResponse {
 impl ::core::fmt::Debug for GetDashboardResponse {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("GetDashboardResponse")
-            .field("project", &self.project)
+            .field("team", &self.team)
             .field("runs", &self.runs)
             .field("workers", &self.workers)
             .field("organization_providers", &self.organization_providers)
@@ -91997,9 +91962,9 @@ impl ::buffa::Message for GetDashboardResponse {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if self.project.is_set() {
+        if self.team.is_set() {
             let __slot = __cache.reserve();
-            let inner_size = self.project.compute_size(__cache);
+            let inner_size = self.team.compute_size(__cache);
             __cache.set(__slot, inner_size);
             size
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
@@ -92090,13 +92055,13 @@ impl ::buffa::Message for GetDashboardResponse {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if self.project.is_set() {
+        if self.team.is_set() {
             ::buffa::types::put_len_delimited_header(
                 1u32,
                 u64::from(__cache.consume_next()),
                 buf,
             );
-            self.project.write_to(__cache, buf);
+            self.team.write_to(__cache, buf);
         }
         for v in &self.runs {
             ::buffa::types::put_len_delimited_header(
@@ -92195,7 +92160,7 @@ impl ::buffa::Message for GetDashboardResponse {
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 ::buffa::Message::merge_length_delimited(
-                    self.project.get_or_insert_default(),
+                    self.team.get_or_insert_default(),
                     buf,
                     ctx,
                 )?;
@@ -92346,7 +92311,7 @@ impl ::buffa::Message for GetDashboardResponse {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.project = ::buffa::MessageField::none();
+        self.team = ::buffa::MessageField::none();
         self.runs.clear();
         self.workers.clear();
         self.organization_providers.clear();
@@ -92393,14 +92358,14 @@ pub const __GET_DASHBOARD_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntr
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct SyncDashboardRequest {
-    /// Field 1: `project_id`
+    /// Field 1: `team_id`
     #[serde(
-        rename = "projectId",
-        alias = "project_id",
+        rename = "teamId",
+        alias = "team_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub project_id: ::buffa::alloc::string::String,
+    pub team_id: ::buffa::alloc::string::String,
     /// Field 2: `cursor`
     #[serde(
         rename = "cursor",
@@ -92415,7 +92380,7 @@ pub struct SyncDashboardRequest {
 impl ::core::fmt::Debug for SyncDashboardRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("SyncDashboardRequest")
-            .field("project_id", &self.project_id)
+            .field("team_id", &self.team_id)
             .field("cursor", &self.cursor)
             .finish()
     }
@@ -92447,8 +92412,8 @@ impl ::buffa::Message for SyncDashboardRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.project_id.is_empty() {
-            size += 1u64 + ::buffa::types::string_encoded_len(&self.project_id) as u64;
+        if !self.team_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.team_id) as u64;
         }
         if self.cursor != 0u64 {
             size += 1u64 + ::buffa::types::uint64_encoded_len(self.cursor) as u64;
@@ -92463,8 +92428,8 @@ impl ::buffa::Message for SyncDashboardRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.project_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.project_id, buf);
+        if !self.team_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.team_id, buf);
         }
         if self.cursor != 0u64 {
             ::buffa::types::put_uint64_field(2u32, self.cursor, buf);
@@ -92487,7 +92452,7 @@ impl ::buffa::Message for SyncDashboardRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.project_id, buf)?;
+                ::buffa::types::merge_string(&mut self.team_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -92504,7 +92469,7 @@ impl ::buffa::Message for SyncDashboardRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.project_id.clear();
+        self.team_id.clear();
         self.cursor = 0u64;
         self.__buffa_unknown_fields.clear();
     }
@@ -92859,12 +92824,12 @@ pub struct SyncDashboardResponse {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub deleted_run_ids: ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
-    /// Field 6: `project`
+    /// Field 6: `team`
     #[serde(
-        rename = "project",
+        rename = "team",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
-    pub project: ::buffa::MessageField<Project, ::buffa::Inline<Project>>,
+    pub team: ::buffa::MessageField<Team, ::buffa::Inline<Team>>,
     /// Field 7: `workers`
     #[serde(
         rename = "workers",
@@ -92889,8 +92854,8 @@ pub struct SyncDashboardResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub execution_policy: ::buffa::MessageField<
-        ProjectExecutionWorkerPolicy,
-        ::buffa::Inline<ProjectExecutionWorkerPolicy>,
+        TeamExecutionWorkerPolicy,
+        ::buffa::Inline<TeamExecutionWorkerPolicy>,
     >,
     /// Field 10: `members`
     #[serde(
@@ -92934,10 +92899,7 @@ pub struct SyncDashboardResponse {
         rename = "settings",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
-    pub settings: ::buffa::MessageField<
-        ProjectSettings,
-        ::buffa::Inline<ProjectSettings>,
-    >,
+    pub settings: ::buffa::MessageField<TeamSettings, ::buffa::Inline<TeamSettings>>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -92950,7 +92912,7 @@ impl ::core::fmt::Debug for SyncDashboardResponse {
             .field("reset", &self.reset)
             .field("runs", &self.runs)
             .field("deleted_run_ids", &self.deleted_run_ids)
-            .field("project", &self.project)
+            .field("team", &self.team)
             .field("workers", &self.workers)
             .field("organization_providers", &self.organization_providers)
             .field("execution_policy", &self.execution_policy)
@@ -93009,9 +92971,9 @@ impl ::buffa::Message for SyncDashboardResponse {
         for v in &self.deleted_run_ids {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
-        if self.project.is_set() {
+        if self.team.is_set() {
             let __slot = __cache.reserve();
-            let inner_size = self.project.compute_size(__cache);
+            let inner_size = self.team.compute_size(__cache);
             __cache.set(__slot, inner_size);
             size
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
@@ -93111,13 +93073,13 @@ impl ::buffa::Message for SyncDashboardResponse {
         for v in &self.deleted_run_ids {
             ::buffa::types::put_string_field(5u32, v, buf);
         }
-        if self.project.is_set() {
+        if self.team.is_set() {
             ::buffa::types::put_len_delimited_header(
                 6u32,
                 u64::from(__cache.consume_next()),
                 buf,
             );
-            self.project.write_to(__cache, buf);
+            self.team.write_to(__cache, buf);
         }
         for v in &self.workers {
             ::buffa::types::put_len_delimited_header(
@@ -93249,7 +93211,7 @@ impl ::buffa::Message for SyncDashboardResponse {
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 ::buffa::Message::merge_length_delimited(
-                    self.project.get_or_insert_default(),
+                    self.team.get_or_insert_default(),
                     buf,
                     ctx,
                 )?;
@@ -93384,7 +93346,7 @@ impl ::buffa::Message for SyncDashboardResponse {
         self.reset = false;
         self.runs.clear();
         self.deleted_run_ids.clear();
-        self.project = ::buffa::MessageField::none();
+        self.team = ::buffa::MessageField::none();
         self.workers.clear();
         self.organization_providers.clear();
         self.execution_policy = ::buffa::MessageField::none();
@@ -93429,14 +93391,14 @@ pub const __SYNC_DASHBOARD_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEnt
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct ListRunEventsRequest {
-    /// Field 1: `project_id`
+    /// Field 1: `team_id`
     #[serde(
-        rename = "projectId",
-        alias = "project_id",
+        rename = "teamId",
+        alias = "team_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub project_id: ::buffa::alloc::string::String,
+    pub team_id: ::buffa::alloc::string::String,
     /// Field 2: `run_id`
     #[serde(
         rename = "runId",
@@ -93452,7 +93414,7 @@ pub struct ListRunEventsRequest {
 impl ::core::fmt::Debug for ListRunEventsRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("ListRunEventsRequest")
-            .field("project_id", &self.project_id)
+            .field("team_id", &self.team_id)
             .field("run_id", &self.run_id)
             .finish()
     }
@@ -93484,8 +93446,8 @@ impl ::buffa::Message for ListRunEventsRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.project_id.is_empty() {
-            size += 1u64 + ::buffa::types::string_encoded_len(&self.project_id) as u64;
+        if !self.team_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.team_id) as u64;
         }
         if !self.run_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.run_id) as u64;
@@ -93500,8 +93462,8 @@ impl ::buffa::Message for ListRunEventsRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.project_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.project_id, buf);
+        if !self.team_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.team_id, buf);
         }
         if !self.run_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.run_id, buf);
@@ -93524,7 +93486,7 @@ impl ::buffa::Message for ListRunEventsRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.project_id, buf)?;
+                ::buffa::types::merge_string(&mut self.team_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -93541,7 +93503,7 @@ impl ::buffa::Message for ListRunEventsRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.project_id.clear();
+        self.team_id.clear();
         self.run_id.clear();
         self.__buffa_unknown_fields.clear();
     }
@@ -262875,11 +262837,11 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
-        pub struct ListProjectsRequestView<'a> {
+        pub struct ListTeamsRequestView<'a> {
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a> for ListProjectsRequestView<'a> {
-            type Owned = super::super::ListProjectsRequest;
+        impl<'a> ::buffa::MessageView<'a> for ListTeamsRequestView<'a> {
+            type Owned = super::super::ListTeamsRequest;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -262922,7 +262884,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::ListProjectsRequest,
+                super::super::ListTeamsRequest,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -262932,13 +262894,13 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::ListProjectsRequest,
+                super::super::ListTeamsRequest,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::ListProjectsRequest {
+                ::core::result::Result::Ok(super::super::ListTeamsRequest {
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -262947,7 +262909,7 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a> for ListProjectsRequestView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for ListTeamsRequestView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
@@ -262978,7 +262940,7 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for ListProjectsRequestView<'__a> {
+        impl<'__a> ::serde::Serialize for ListTeamsRequestView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -262988,24 +262950,24 @@ pub mod __buffa {
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for ListProjectsRequestView<'a> {
+        impl<'a> ::buffa::MessageName for ListTeamsRequestView<'a> {
             const PACKAGE: &'static str = "briar.app.v1";
-            const NAME: &'static str = "ListProjectsRequest";
-            const FULL_NAME: &'static str = "briar.app.v1.ListProjectsRequest";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListProjectsRequest";
+            const NAME: &'static str = "ListTeamsRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.ListTeamsRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListTeamsRequest";
         }
-        ::buffa::impl_default_view_instance!(ListProjectsRequestView);
-        ::buffa::impl_view_reborrow!(ListProjectsRequestView);
-        /** Self-contained, `'static` owned view of a `ListProjectsRequest` message.
+        ::buffa::impl_default_view_instance!(ListTeamsRequestView);
+        ::buffa::impl_view_reborrow!(ListTeamsRequestView);
+        /** Self-contained, `'static` owned view of a `ListTeamsRequest` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`ListProjectsRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`ListTeamsRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ListProjectsRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ListTeamsRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct ListProjectsRequestOwnedView(
-            ::buffa::OwnedView<ListProjectsRequestView<'static>>,
+        pub struct ListTeamsRequestOwnedView(
+            ::buffa::OwnedView<ListTeamsRequestView<'static>>,
         );
-        impl ListProjectsRequestOwnedView {
+        impl ListTeamsRequestOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -263019,7 +262981,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    ListProjectsRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
+                    ListTeamsRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
                 )
             }
             /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
@@ -263034,7 +262996,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    ListProjectsRequestOwnedView(
+                    ListTeamsRequestOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -263048,15 +263010,15 @@ pub mod __buffa {
             /// another [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::ListProjectsRequest,
+                msg: &super::super::ListTeamsRequest,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    ListProjectsRequestOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                    ListTeamsRequestOwnedView(::buffa::OwnedView::from_owned(msg)?),
                 )
             }
-            /// Borrow the full [`ListProjectsRequestView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`ListTeamsRequestView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &ListProjectsRequestView<'_> {
+            pub fn view(&self) -> &ListTeamsRequestView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -263067,7 +263029,7 @@ pub mod __buffa {
             /// whose contract also governs handles converted from a raw
             /// [`::buffa::OwnedView`].
             #[must_use]
-            pub fn to_owned_message(&self) -> super::super::ListProjectsRequest {
+            pub fn to_owned_message(&self) -> super::super::ListTeamsRequest {
                 self.0.to_owned_message()
             }
             /// The underlying bytes buffer.
@@ -263081,31 +263043,29 @@ pub mod __buffa {
                 self.0.into_bytes()
             }
         }
-        impl ::core::convert::From<::buffa::OwnedView<ListProjectsRequestView<'static>>>
-        for ListProjectsRequestOwnedView {
-            fn from(
-                inner: ::buffa::OwnedView<ListProjectsRequestView<'static>>,
-            ) -> Self {
-                ListProjectsRequestOwnedView(inner)
+        impl ::core::convert::From<::buffa::OwnedView<ListTeamsRequestView<'static>>>
+        for ListTeamsRequestOwnedView {
+            fn from(inner: ::buffa::OwnedView<ListTeamsRequestView<'static>>) -> Self {
+                ListTeamsRequestOwnedView(inner)
             }
         }
-        impl ::core::convert::From<ListProjectsRequestOwnedView>
-        for ::buffa::OwnedView<ListProjectsRequestView<'static>> {
-            fn from(wrapper: ListProjectsRequestOwnedView) -> Self {
+        impl ::core::convert::From<ListTeamsRequestOwnedView>
+        for ::buffa::OwnedView<ListTeamsRequestView<'static>> {
+            fn from(wrapper: ListTeamsRequestOwnedView) -> Self {
                 wrapper.0
             }
         }
-        impl ::core::convert::AsRef<::buffa::OwnedView<ListProjectsRequestView<'static>>>
-        for ListProjectsRequestOwnedView {
-            fn as_ref(&self) -> &::buffa::OwnedView<ListProjectsRequestView<'static>> {
+        impl ::core::convert::AsRef<::buffa::OwnedView<ListTeamsRequestView<'static>>>
+        for ListTeamsRequestOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<ListTeamsRequestView<'static>> {
                 &self.0
             }
         }
-        impl ::buffa::HasMessageView for super::super::ListProjectsRequest {
-            type View<'a> = ListProjectsRequestView<'a>;
-            type ViewHandle = ListProjectsRequestOwnedView;
+        impl ::buffa::HasMessageView for super::super::ListTeamsRequest {
+            type View<'a> = ListTeamsRequestView<'a>;
+            type ViewHandle = ListTeamsRequestOwnedView;
         }
-        impl ::serde::Serialize for ListProjectsRequestOwnedView {
+        impl ::serde::Serialize for ListTeamsRequestOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -263114,16 +263074,16 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
-        pub struct ListProjectsResponseView<'a> {
-            /// Field 1: `projects`
-            pub projects: ::buffa::RepeatedView<
+        pub struct ListTeamsResponseView<'a> {
+            /// Field 1: `teams`
+            pub teams: ::buffa::RepeatedView<
                 'a,
-                super::super::__buffa::view::ProjectView<'a>,
+                super::super::__buffa::view::TeamView<'a>,
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a> for ListProjectsResponseView<'a> {
-            type Owned = super::super::ListProjectsResponse;
+        impl<'a> ::buffa::MessageView<'a> for ListTeamsResponseView<'a> {
+            type Owned = super::super::ListTeamsResponse;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -263163,12 +263123,12 @@ pub mod __buffa {
                         let sub = ::buffa::types::borrow_bytes(&mut cur)?;
                         ctx.register_element_memory(
                             ::core::mem::size_of::<
-                                super::super::__buffa::view::ProjectView,
+                                super::super::__buffa::view::TeamView,
                             >(),
                         )?;
-                        view.projects
+                        view.teams
                             .push(
-                                <super::super::__buffa::view::ProjectView as ::buffa::MessageView>::decode_view_ctx(
+                                <super::super::__buffa::view::TeamView as ::buffa::MessageView>::decode_view_ctx(
                                     sub,
                                     __sub_ctx,
                                 )?,
@@ -263186,7 +263146,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::ListProjectsResponse,
+                super::super::ListTeamsResponse,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -263196,15 +263156,15 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::ListProjectsResponse,
+                super::super::ListTeamsResponse,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::ListProjectsResponse {
-                    projects: self
-                        .projects
+                ::core::result::Result::Ok(super::super::ListTeamsResponse {
+                    teams: self
+                        .teams
                         .iter()
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
@@ -263216,13 +263176,13 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a> for ListProjectsResponseView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for ListTeamsResponseView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                for v in &self.projects {
+                for v in &self.teams {
                     let __slot = __cache.reserve();
                     let inner_size = v.compute_size(__cache);
                     __cache.set(__slot, inner_size);
@@ -263241,7 +263201,7 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                for v in &self.projects {
+                for v in &self.teams {
                     ::buffa::types::put_len_delimited_header(
                         1u32,
                         u64::from(__cache.consume_next()),
@@ -263263,37 +263223,37 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for ListProjectsResponseView<'__a> {
+        impl<'__a> ::serde::Serialize for ListTeamsResponseView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !self.projects.is_empty() {
-                    __map.serialize_entry("projects", &*self.projects)?;
+                if !self.teams.is_empty() {
+                    __map.serialize_entry("teams", &*self.teams)?;
                 }
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for ListProjectsResponseView<'a> {
+        impl<'a> ::buffa::MessageName for ListTeamsResponseView<'a> {
             const PACKAGE: &'static str = "briar.app.v1";
-            const NAME: &'static str = "ListProjectsResponse";
-            const FULL_NAME: &'static str = "briar.app.v1.ListProjectsResponse";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListProjectsResponse";
+            const NAME: &'static str = "ListTeamsResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.ListTeamsResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListTeamsResponse";
         }
-        ::buffa::impl_default_view_instance!(ListProjectsResponseView);
-        ::buffa::impl_view_reborrow!(ListProjectsResponseView);
-        /** Self-contained, `'static` owned view of a `ListProjectsResponse` message.
+        ::buffa::impl_default_view_instance!(ListTeamsResponseView);
+        ::buffa::impl_view_reborrow!(ListTeamsResponseView);
+        /** Self-contained, `'static` owned view of a `ListTeamsResponse` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`ListProjectsResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`ListTeamsResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ListProjectsResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ListTeamsResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct ListProjectsResponseOwnedView(
-            ::buffa::OwnedView<ListProjectsResponseView<'static>>,
+        pub struct ListTeamsResponseOwnedView(
+            ::buffa::OwnedView<ListTeamsResponseView<'static>>,
         );
-        impl ListProjectsResponseOwnedView {
+        impl ListTeamsResponseOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -263307,7 +263267,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    ListProjectsResponseOwnedView(::buffa::OwnedView::decode(bytes)?),
+                    ListTeamsResponseOwnedView(::buffa::OwnedView::decode(bytes)?),
                 )
             }
             /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
@@ -263322,7 +263282,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    ListProjectsResponseOwnedView(
+                    ListTeamsResponseOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -263336,15 +263296,15 @@ pub mod __buffa {
             /// another [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::ListProjectsResponse,
+                msg: &super::super::ListTeamsResponse,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    ListProjectsResponseOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                    ListTeamsResponseOwnedView(::buffa::OwnedView::from_owned(msg)?),
                 )
             }
-            /// Borrow the full [`ListProjectsResponseView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`ListTeamsResponseView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &ListProjectsResponseView<'_> {
+            pub fn view(&self) -> &ListTeamsResponseView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -263355,7 +263315,7 @@ pub mod __buffa {
             /// whose contract also governs handles converted from a raw
             /// [`::buffa::OwnedView`].
             #[must_use]
-            pub fn to_owned_message(&self) -> super::super::ListProjectsResponse {
+            pub fn to_owned_message(&self) -> super::super::ListTeamsResponse {
                 self.0.to_owned_message()
             }
             /// The underlying bytes buffer.
@@ -263368,43 +263328,37 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `projects`
+            /// Field 1: `teams`
             #[must_use]
-            pub fn projects(
+            pub fn teams(
                 &self,
-            ) -> &::buffa::RepeatedView<
-                '_,
-                super::super::__buffa::view::ProjectView<'_>,
-            > {
-                &self.0.reborrow().projects
+            ) -> &::buffa::RepeatedView<'_, super::super::__buffa::view::TeamView<'_>> {
+                &self.0.reborrow().teams
             }
         }
-        impl ::core::convert::From<::buffa::OwnedView<ListProjectsResponseView<'static>>>
-        for ListProjectsResponseOwnedView {
-            fn from(
-                inner: ::buffa::OwnedView<ListProjectsResponseView<'static>>,
-            ) -> Self {
-                ListProjectsResponseOwnedView(inner)
+        impl ::core::convert::From<::buffa::OwnedView<ListTeamsResponseView<'static>>>
+        for ListTeamsResponseOwnedView {
+            fn from(inner: ::buffa::OwnedView<ListTeamsResponseView<'static>>) -> Self {
+                ListTeamsResponseOwnedView(inner)
             }
         }
-        impl ::core::convert::From<ListProjectsResponseOwnedView>
-        for ::buffa::OwnedView<ListProjectsResponseView<'static>> {
-            fn from(wrapper: ListProjectsResponseOwnedView) -> Self {
+        impl ::core::convert::From<ListTeamsResponseOwnedView>
+        for ::buffa::OwnedView<ListTeamsResponseView<'static>> {
+            fn from(wrapper: ListTeamsResponseOwnedView) -> Self {
                 wrapper.0
             }
         }
-        impl ::core::convert::AsRef<
-            ::buffa::OwnedView<ListProjectsResponseView<'static>>,
-        > for ListProjectsResponseOwnedView {
-            fn as_ref(&self) -> &::buffa::OwnedView<ListProjectsResponseView<'static>> {
+        impl ::core::convert::AsRef<::buffa::OwnedView<ListTeamsResponseView<'static>>>
+        for ListTeamsResponseOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<ListTeamsResponseView<'static>> {
                 &self.0
             }
         }
-        impl ::buffa::HasMessageView for super::super::ListProjectsResponse {
-            type View<'a> = ListProjectsResponseView<'a>;
-            type ViewHandle = ListProjectsResponseOwnedView;
+        impl ::buffa::HasMessageView for super::super::ListTeamsResponse {
+            type View<'a> = ListTeamsResponseView<'a>;
+            type ViewHandle = ListTeamsResponseOwnedView;
         }
-        impl ::serde::Serialize for ListProjectsResponseOwnedView {
+        impl ::serde::Serialize for ListTeamsResponseOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -263413,15 +263367,15 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
-        pub struct CreateProjectRequestView<'a> {
+        pub struct CreateTeamRequestView<'a> {
             /// Field 1: `name`
             pub name: &'a str,
             /// Field 2: `organization_id`
             pub organization_id: ::core::option::Option<&'a str>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a> for CreateProjectRequestView<'a> {
-            type Owned = super::super::CreateProjectRequest;
+        impl<'a> ::buffa::MessageView<'a> for CreateTeamRequestView<'a> {
+            type Owned = super::super::CreateTeamRequest;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -263480,7 +263434,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::CreateProjectRequest,
+                super::super::CreateTeamRequest,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -263490,13 +263444,13 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::CreateProjectRequest,
+                super::super::CreateTeamRequest,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::CreateProjectRequest {
+                ::core::result::Result::Ok(super::super::CreateTeamRequest {
                     name: self.name.to_string(),
                     organization_id: self.organization_id.map(|s| s.to_string()),
                     __buffa_unknown_fields: self
@@ -263507,7 +263461,7 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a> for CreateProjectRequestView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for CreateTeamRequestView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
@@ -263550,7 +263504,7 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for CreateProjectRequestView<'__a> {
+        impl<'__a> ::serde::Serialize for CreateTeamRequestView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -263566,24 +263520,24 @@ pub mod __buffa {
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for CreateProjectRequestView<'a> {
+        impl<'a> ::buffa::MessageName for CreateTeamRequestView<'a> {
             const PACKAGE: &'static str = "briar.app.v1";
-            const NAME: &'static str = "CreateProjectRequest";
-            const FULL_NAME: &'static str = "briar.app.v1.CreateProjectRequest";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateProjectRequest";
+            const NAME: &'static str = "CreateTeamRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.CreateTeamRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateTeamRequest";
         }
-        ::buffa::impl_default_view_instance!(CreateProjectRequestView);
-        ::buffa::impl_view_reborrow!(CreateProjectRequestView);
-        /** Self-contained, `'static` owned view of a `CreateProjectRequest` message.
+        ::buffa::impl_default_view_instance!(CreateTeamRequestView);
+        ::buffa::impl_view_reborrow!(CreateTeamRequestView);
+        /** Self-contained, `'static` owned view of a `CreateTeamRequest` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`CreateProjectRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`CreateTeamRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CreateProjectRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CreateTeamRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct CreateProjectRequestOwnedView(
-            ::buffa::OwnedView<CreateProjectRequestView<'static>>,
+        pub struct CreateTeamRequestOwnedView(
+            ::buffa::OwnedView<CreateTeamRequestView<'static>>,
         );
-        impl CreateProjectRequestOwnedView {
+        impl CreateTeamRequestOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -263597,7 +263551,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    CreateProjectRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
+                    CreateTeamRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
                 )
             }
             /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
@@ -263612,7 +263566,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    CreateProjectRequestOwnedView(
+                    CreateTeamRequestOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -263626,15 +263580,15 @@ pub mod __buffa {
             /// another [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::CreateProjectRequest,
+                msg: &super::super::CreateTeamRequest,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    CreateProjectRequestOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                    CreateTeamRequestOwnedView(::buffa::OwnedView::from_owned(msg)?),
                 )
             }
-            /// Borrow the full [`CreateProjectRequestView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`CreateTeamRequestView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &CreateProjectRequestView<'_> {
+            pub fn view(&self) -> &CreateTeamRequestView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -263645,7 +263599,7 @@ pub mod __buffa {
             /// whose contract also governs handles converted from a raw
             /// [`::buffa::OwnedView`].
             #[must_use]
-            pub fn to_owned_message(&self) -> super::super::CreateProjectRequest {
+            pub fn to_owned_message(&self) -> super::super::CreateTeamRequest {
                 self.0.to_owned_message()
             }
             /// The underlying bytes buffer.
@@ -263669,32 +263623,29 @@ pub mod __buffa {
                 self.0.reborrow().organization_id
             }
         }
-        impl ::core::convert::From<::buffa::OwnedView<CreateProjectRequestView<'static>>>
-        for CreateProjectRequestOwnedView {
-            fn from(
-                inner: ::buffa::OwnedView<CreateProjectRequestView<'static>>,
-            ) -> Self {
-                CreateProjectRequestOwnedView(inner)
+        impl ::core::convert::From<::buffa::OwnedView<CreateTeamRequestView<'static>>>
+        for CreateTeamRequestOwnedView {
+            fn from(inner: ::buffa::OwnedView<CreateTeamRequestView<'static>>) -> Self {
+                CreateTeamRequestOwnedView(inner)
             }
         }
-        impl ::core::convert::From<CreateProjectRequestOwnedView>
-        for ::buffa::OwnedView<CreateProjectRequestView<'static>> {
-            fn from(wrapper: CreateProjectRequestOwnedView) -> Self {
+        impl ::core::convert::From<CreateTeamRequestOwnedView>
+        for ::buffa::OwnedView<CreateTeamRequestView<'static>> {
+            fn from(wrapper: CreateTeamRequestOwnedView) -> Self {
                 wrapper.0
             }
         }
-        impl ::core::convert::AsRef<
-            ::buffa::OwnedView<CreateProjectRequestView<'static>>,
-        > for CreateProjectRequestOwnedView {
-            fn as_ref(&self) -> &::buffa::OwnedView<CreateProjectRequestView<'static>> {
+        impl ::core::convert::AsRef<::buffa::OwnedView<CreateTeamRequestView<'static>>>
+        for CreateTeamRequestOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<CreateTeamRequestView<'static>> {
                 &self.0
             }
         }
-        impl ::buffa::HasMessageView for super::super::CreateProjectRequest {
-            type View<'a> = CreateProjectRequestView<'a>;
-            type ViewHandle = CreateProjectRequestOwnedView;
+        impl ::buffa::HasMessageView for super::super::CreateTeamRequest {
+            type View<'a> = CreateTeamRequestView<'a>;
+            type ViewHandle = CreateTeamRequestOwnedView;
         }
-        impl ::serde::Serialize for CreateProjectRequestOwnedView {
+        impl ::serde::Serialize for CreateTeamRequestOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -263703,17 +263654,17 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
-        pub struct CreateProjectResponseView<'a> {
-            /// Field 1: `project`
-            pub project: ::buffa::MessageFieldView<
-                super::super::__buffa::view::ProjectView<'a>,
+        pub struct CreateTeamResponseView<'a> {
+            /// Field 1: `team`
+            pub team: ::buffa::MessageFieldView<
+                super::super::__buffa::view::TeamView<'a>,
             >,
             /// Field 2: `agent_token`
             pub agent_token: &'a str,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a> for CreateProjectResponseView<'a> {
-            type Owned = super::super::CreateProjectResponse;
+        impl<'a> ::buffa::MessageView<'a> for CreateTeamResponseView<'a> {
+            type Owned = super::super::CreateTeamResponse;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -263751,7 +263702,7 @@ pub mod __buffa {
                         )?;
                         let __sub_ctx = ctx.descend()?;
                         let sub = ::buffa::types::borrow_bytes(&mut cur)?;
-                        match view.project.as_mut() {
+                        match view.team.as_mut() {
                             Some(existing) => {
                                 ::buffa::MessageView::merge_into_view(
                                     existing,
@@ -263760,8 +263711,8 @@ pub mod __buffa {
                                 )?
                             }
                             None => {
-                                view.project = ::buffa::MessageFieldView::set(
-                                    <super::super::__buffa::view::ProjectView as ::buffa::MessageView>::decode_view_ctx(
+                                view.team = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::TeamView as ::buffa::MessageView>::decode_view_ctx(
                                         sub,
                                         __sub_ctx,
                                     )?,
@@ -263788,7 +263739,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::CreateProjectResponse,
+                super::super::CreateTeamResponse,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -263798,18 +263749,18 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::CreateProjectResponse,
+                super::super::CreateTeamResponse,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::CreateProjectResponse {
-                    project: match self.project.as_option() {
+                ::core::result::Result::Ok(super::super::CreateTeamResponse {
+                    team: match self.team.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
-                                super::super::Project,
-                                ::buffa::Inline<super::super::Project>,
+                                super::super::Team,
+                                ::buffa::Inline<super::super::Team>,
                             >::some(v.to_owned_from_source(__buffa_src)?)
                         }
                         None => ::buffa::MessageField::none(),
@@ -263823,15 +263774,15 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a> for CreateProjectResponseView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for CreateTeamResponseView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if self.project.is_set() {
+                if self.team.is_set() {
                     let __slot = __cache.reserve();
-                    let inner_size = self.project.compute_size(__cache);
+                    let inner_size = self.team.compute_size(__cache);
                     __cache.set(__slot, inner_size);
                     size
                         += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
@@ -263854,13 +263805,13 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if self.project.is_set() {
+                if self.team.is_set() {
                     ::buffa::types::put_len_delimited_header(
                         1u32,
                         u64::from(__cache.consume_next()),
                         buf,
                     );
-                    self.project.write_to(__cache, buf);
+                    self.team.write_to(__cache, buf);
                 }
                 if !self.agent_token.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.agent_token, buf);
@@ -263879,7 +263830,7 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for CreateProjectResponseView<'__a> {
+        impl<'__a> ::serde::Serialize for CreateTeamResponseView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -263887,8 +263838,8 @@ pub mod __buffa {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
                 {
-                    if let ::core::option::Option::Some(__v) = self.project.as_option() {
-                        __map.serialize_entry("project", __v)?;
+                    if let ::core::option::Option::Some(__v) = self.team.as_option() {
+                        __map.serialize_entry("team", __v)?;
                     }
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.agent_token) {
@@ -263897,24 +263848,24 @@ pub mod __buffa {
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for CreateProjectResponseView<'a> {
+        impl<'a> ::buffa::MessageName for CreateTeamResponseView<'a> {
             const PACKAGE: &'static str = "briar.app.v1";
-            const NAME: &'static str = "CreateProjectResponse";
-            const FULL_NAME: &'static str = "briar.app.v1.CreateProjectResponse";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateProjectResponse";
+            const NAME: &'static str = "CreateTeamResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.CreateTeamResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateTeamResponse";
         }
-        ::buffa::impl_default_view_instance!(CreateProjectResponseView);
-        ::buffa::impl_view_reborrow!(CreateProjectResponseView);
-        /** Self-contained, `'static` owned view of a `CreateProjectResponse` message.
+        ::buffa::impl_default_view_instance!(CreateTeamResponseView);
+        ::buffa::impl_view_reborrow!(CreateTeamResponseView);
+        /** Self-contained, `'static` owned view of a `CreateTeamResponse` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`CreateProjectResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`CreateTeamResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CreateProjectResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CreateTeamResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct CreateProjectResponseOwnedView(
-            ::buffa::OwnedView<CreateProjectResponseView<'static>>,
+        pub struct CreateTeamResponseOwnedView(
+            ::buffa::OwnedView<CreateTeamResponseView<'static>>,
         );
-        impl CreateProjectResponseOwnedView {
+        impl CreateTeamResponseOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -263928,7 +263879,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    CreateProjectResponseOwnedView(::buffa::OwnedView::decode(bytes)?),
+                    CreateTeamResponseOwnedView(::buffa::OwnedView::decode(bytes)?),
                 )
             }
             /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
@@ -263943,7 +263894,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    CreateProjectResponseOwnedView(
+                    CreateTeamResponseOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -263957,15 +263908,15 @@ pub mod __buffa {
             /// another [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::CreateProjectResponse,
+                msg: &super::super::CreateTeamResponse,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    CreateProjectResponseOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                    CreateTeamResponseOwnedView(::buffa::OwnedView::from_owned(msg)?),
                 )
             }
-            /// Borrow the full [`CreateProjectResponseView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`CreateTeamResponseView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &CreateProjectResponseView<'_> {
+            pub fn view(&self) -> &CreateTeamResponseView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -263976,7 +263927,7 @@ pub mod __buffa {
             /// whose contract also governs handles converted from a raw
             /// [`::buffa::OwnedView`].
             #[must_use]
-            pub fn to_owned_message(&self) -> super::super::CreateProjectResponse {
+            pub fn to_owned_message(&self) -> super::super::CreateTeamResponse {
                 self.0.to_owned_message()
             }
             /// The underlying bytes buffer.
@@ -263989,14 +263940,12 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `project`
+            /// Field 1: `team`
             #[must_use]
-            pub fn project(
+            pub fn team(
                 &self,
-            ) -> &::buffa::MessageFieldView<
-                super::super::__buffa::view::ProjectView<'_>,
-            > {
-                &self.0.reborrow().project
+            ) -> &::buffa::MessageFieldView<super::super::__buffa::view::TeamView<'_>> {
+                &self.0.reborrow().team
             }
             /// Field 2: `agent_token`
             #[must_use]
@@ -264004,33 +263953,29 @@ pub mod __buffa {
                 self.0.reborrow().agent_token
             }
         }
-        impl ::core::convert::From<
-            ::buffa::OwnedView<CreateProjectResponseView<'static>>,
-        > for CreateProjectResponseOwnedView {
-            fn from(
-                inner: ::buffa::OwnedView<CreateProjectResponseView<'static>>,
-            ) -> Self {
-                CreateProjectResponseOwnedView(inner)
+        impl ::core::convert::From<::buffa::OwnedView<CreateTeamResponseView<'static>>>
+        for CreateTeamResponseOwnedView {
+            fn from(inner: ::buffa::OwnedView<CreateTeamResponseView<'static>>) -> Self {
+                CreateTeamResponseOwnedView(inner)
             }
         }
-        impl ::core::convert::From<CreateProjectResponseOwnedView>
-        for ::buffa::OwnedView<CreateProjectResponseView<'static>> {
-            fn from(wrapper: CreateProjectResponseOwnedView) -> Self {
+        impl ::core::convert::From<CreateTeamResponseOwnedView>
+        for ::buffa::OwnedView<CreateTeamResponseView<'static>> {
+            fn from(wrapper: CreateTeamResponseOwnedView) -> Self {
                 wrapper.0
             }
         }
-        impl ::core::convert::AsRef<
-            ::buffa::OwnedView<CreateProjectResponseView<'static>>,
-        > for CreateProjectResponseOwnedView {
-            fn as_ref(&self) -> &::buffa::OwnedView<CreateProjectResponseView<'static>> {
+        impl ::core::convert::AsRef<::buffa::OwnedView<CreateTeamResponseView<'static>>>
+        for CreateTeamResponseOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<CreateTeamResponseView<'static>> {
                 &self.0
             }
         }
-        impl ::buffa::HasMessageView for super::super::CreateProjectResponse {
-            type View<'a> = CreateProjectResponseView<'a>;
-            type ViewHandle = CreateProjectResponseOwnedView;
+        impl ::buffa::HasMessageView for super::super::CreateTeamResponse {
+            type View<'a> = CreateTeamResponseView<'a>;
+            type ViewHandle = CreateTeamResponseOwnedView;
         }
-        impl ::serde::Serialize for CreateProjectResponseOwnedView {
+        impl ::serde::Serialize for CreateTeamResponseOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -264039,13 +263984,13 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
-        pub struct DeleteProjectRequestView<'a> {
-            /// Field 1: `project_id`
-            pub project_id: &'a str,
+        pub struct DeleteTeamRequestView<'a> {
+            /// Field 1: `team_id`
+            pub team_id: &'a str,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a> for DeleteProjectRequestView<'a> {
-            type Owned = super::super::DeleteProjectRequest;
+        impl<'a> ::buffa::MessageView<'a> for DeleteTeamRequestView<'a> {
+            type Owned = super::super::DeleteTeamRequest;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -264081,7 +264026,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.project_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.team_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -264095,7 +264040,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::DeleteProjectRequest,
+                super::super::DeleteTeamRequest,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -264105,14 +264050,14 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::DeleteProjectRequest,
+                super::super::DeleteTeamRequest,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::DeleteProjectRequest {
-                    project_id: self.project_id.to_string(),
+                ::core::result::Result::Ok(super::super::DeleteTeamRequest {
+                    team_id: self.team_id.to_string(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -264121,17 +264066,16 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a> for DeleteProjectRequestView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for DeleteTeamRequestView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.project_id.is_empty() {
+                if !self.team_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.project_id)
-                                as u64;
+                            + ::buffa::types::string_encoded_len(&self.team_id) as u64;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
@@ -264144,8 +264088,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.project_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.project_id, buf);
+                if !self.team_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.team_id, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -264161,37 +264105,37 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for DeleteProjectRequestView<'__a> {
+        impl<'__a> ::serde::Serialize for DeleteTeamRequestView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.project_id) {
-                    __map.serialize_entry("projectId", self.project_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.team_id) {
+                    __map.serialize_entry("teamId", self.team_id)?;
                 }
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for DeleteProjectRequestView<'a> {
+        impl<'a> ::buffa::MessageName for DeleteTeamRequestView<'a> {
             const PACKAGE: &'static str = "briar.app.v1";
-            const NAME: &'static str = "DeleteProjectRequest";
-            const FULL_NAME: &'static str = "briar.app.v1.DeleteProjectRequest";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DeleteProjectRequest";
+            const NAME: &'static str = "DeleteTeamRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.DeleteTeamRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DeleteTeamRequest";
         }
-        ::buffa::impl_default_view_instance!(DeleteProjectRequestView);
-        ::buffa::impl_view_reborrow!(DeleteProjectRequestView);
-        /** Self-contained, `'static` owned view of a `DeleteProjectRequest` message.
+        ::buffa::impl_default_view_instance!(DeleteTeamRequestView);
+        ::buffa::impl_view_reborrow!(DeleteTeamRequestView);
+        /** Self-contained, `'static` owned view of a `DeleteTeamRequest` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`DeleteProjectRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`DeleteTeamRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`DeleteProjectRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`DeleteTeamRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct DeleteProjectRequestOwnedView(
-            ::buffa::OwnedView<DeleteProjectRequestView<'static>>,
+        pub struct DeleteTeamRequestOwnedView(
+            ::buffa::OwnedView<DeleteTeamRequestView<'static>>,
         );
-        impl DeleteProjectRequestOwnedView {
+        impl DeleteTeamRequestOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -264205,7 +264149,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    DeleteProjectRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
+                    DeleteTeamRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
                 )
             }
             /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
@@ -264220,7 +264164,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    DeleteProjectRequestOwnedView(
+                    DeleteTeamRequestOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -264234,15 +264178,15 @@ pub mod __buffa {
             /// another [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::DeleteProjectRequest,
+                msg: &super::super::DeleteTeamRequest,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    DeleteProjectRequestOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                    DeleteTeamRequestOwnedView(::buffa::OwnedView::from_owned(msg)?),
                 )
             }
-            /// Borrow the full [`DeleteProjectRequestView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`DeleteTeamRequestView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &DeleteProjectRequestView<'_> {
+            pub fn view(&self) -> &DeleteTeamRequestView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -264253,7 +264197,7 @@ pub mod __buffa {
             /// whose contract also governs handles converted from a raw
             /// [`::buffa::OwnedView`].
             #[must_use]
-            pub fn to_owned_message(&self) -> super::super::DeleteProjectRequest {
+            pub fn to_owned_message(&self) -> super::super::DeleteTeamRequest {
                 self.0.to_owned_message()
             }
             /// The underlying bytes buffer.
@@ -264266,38 +264210,35 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `project_id`
+            /// Field 1: `team_id`
             #[must_use]
-            pub fn project_id(&self) -> &'_ str {
-                self.0.reborrow().project_id
+            pub fn team_id(&self) -> &'_ str {
+                self.0.reborrow().team_id
             }
         }
-        impl ::core::convert::From<::buffa::OwnedView<DeleteProjectRequestView<'static>>>
-        for DeleteProjectRequestOwnedView {
-            fn from(
-                inner: ::buffa::OwnedView<DeleteProjectRequestView<'static>>,
-            ) -> Self {
-                DeleteProjectRequestOwnedView(inner)
+        impl ::core::convert::From<::buffa::OwnedView<DeleteTeamRequestView<'static>>>
+        for DeleteTeamRequestOwnedView {
+            fn from(inner: ::buffa::OwnedView<DeleteTeamRequestView<'static>>) -> Self {
+                DeleteTeamRequestOwnedView(inner)
             }
         }
-        impl ::core::convert::From<DeleteProjectRequestOwnedView>
-        for ::buffa::OwnedView<DeleteProjectRequestView<'static>> {
-            fn from(wrapper: DeleteProjectRequestOwnedView) -> Self {
+        impl ::core::convert::From<DeleteTeamRequestOwnedView>
+        for ::buffa::OwnedView<DeleteTeamRequestView<'static>> {
+            fn from(wrapper: DeleteTeamRequestOwnedView) -> Self {
                 wrapper.0
             }
         }
-        impl ::core::convert::AsRef<
-            ::buffa::OwnedView<DeleteProjectRequestView<'static>>,
-        > for DeleteProjectRequestOwnedView {
-            fn as_ref(&self) -> &::buffa::OwnedView<DeleteProjectRequestView<'static>> {
+        impl ::core::convert::AsRef<::buffa::OwnedView<DeleteTeamRequestView<'static>>>
+        for DeleteTeamRequestOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<DeleteTeamRequestView<'static>> {
                 &self.0
             }
         }
-        impl ::buffa::HasMessageView for super::super::DeleteProjectRequest {
-            type View<'a> = DeleteProjectRequestView<'a>;
-            type ViewHandle = DeleteProjectRequestOwnedView;
+        impl ::buffa::HasMessageView for super::super::DeleteTeamRequest {
+            type View<'a> = DeleteTeamRequestView<'a>;
+            type ViewHandle = DeleteTeamRequestOwnedView;
         }
-        impl ::serde::Serialize for DeleteProjectRequestOwnedView {
+        impl ::serde::Serialize for DeleteTeamRequestOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -264306,13 +264247,13 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
-        pub struct DeleteProjectResponseView<'a> {
+        pub struct DeleteTeamResponseView<'a> {
             /// Field 1: `deleted`
             pub deleted: bool,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a> for DeleteProjectResponseView<'a> {
-            type Owned = super::super::DeleteProjectResponse;
+        impl<'a> ::buffa::MessageView<'a> for DeleteTeamResponseView<'a> {
+            type Owned = super::super::DeleteTeamResponse;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -264362,7 +264303,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::DeleteProjectResponse,
+                super::super::DeleteTeamResponse,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -264372,13 +264313,13 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::DeleteProjectResponse,
+                super::super::DeleteTeamResponse,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::DeleteProjectResponse {
+                ::core::result::Result::Ok(super::super::DeleteTeamResponse {
                     deleted: self.deleted,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
@@ -264388,7 +264329,7 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a> for DeleteProjectResponseView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for DeleteTeamResponseView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
@@ -264425,7 +264366,7 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for DeleteProjectResponseView<'__a> {
+        impl<'__a> ::serde::Serialize for DeleteTeamResponseView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -264438,24 +264379,24 @@ pub mod __buffa {
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for DeleteProjectResponseView<'a> {
+        impl<'a> ::buffa::MessageName for DeleteTeamResponseView<'a> {
             const PACKAGE: &'static str = "briar.app.v1";
-            const NAME: &'static str = "DeleteProjectResponse";
-            const FULL_NAME: &'static str = "briar.app.v1.DeleteProjectResponse";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DeleteProjectResponse";
+            const NAME: &'static str = "DeleteTeamResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.DeleteTeamResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DeleteTeamResponse";
         }
-        ::buffa::impl_default_view_instance!(DeleteProjectResponseView);
-        ::buffa::impl_view_reborrow!(DeleteProjectResponseView);
-        /** Self-contained, `'static` owned view of a `DeleteProjectResponse` message.
+        ::buffa::impl_default_view_instance!(DeleteTeamResponseView);
+        ::buffa::impl_view_reborrow!(DeleteTeamResponseView);
+        /** Self-contained, `'static` owned view of a `DeleteTeamResponse` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`DeleteProjectResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`DeleteTeamResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`DeleteProjectResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`DeleteTeamResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct DeleteProjectResponseOwnedView(
-            ::buffa::OwnedView<DeleteProjectResponseView<'static>>,
+        pub struct DeleteTeamResponseOwnedView(
+            ::buffa::OwnedView<DeleteTeamResponseView<'static>>,
         );
-        impl DeleteProjectResponseOwnedView {
+        impl DeleteTeamResponseOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -264469,7 +264410,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    DeleteProjectResponseOwnedView(::buffa::OwnedView::decode(bytes)?),
+                    DeleteTeamResponseOwnedView(::buffa::OwnedView::decode(bytes)?),
                 )
             }
             /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
@@ -264484,7 +264425,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    DeleteProjectResponseOwnedView(
+                    DeleteTeamResponseOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -264498,15 +264439,15 @@ pub mod __buffa {
             /// another [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::DeleteProjectResponse,
+                msg: &super::super::DeleteTeamResponse,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    DeleteProjectResponseOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                    DeleteTeamResponseOwnedView(::buffa::OwnedView::from_owned(msg)?),
                 )
             }
-            /// Borrow the full [`DeleteProjectResponseView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`DeleteTeamResponseView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &DeleteProjectResponseView<'_> {
+            pub fn view(&self) -> &DeleteTeamResponseView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -264517,7 +264458,7 @@ pub mod __buffa {
             /// whose contract also governs handles converted from a raw
             /// [`::buffa::OwnedView`].
             #[must_use]
-            pub fn to_owned_message(&self) -> super::super::DeleteProjectResponse {
+            pub fn to_owned_message(&self) -> super::super::DeleteTeamResponse {
                 self.0.to_owned_message()
             }
             /// The underlying bytes buffer.
@@ -264536,33 +264477,29 @@ pub mod __buffa {
                 self.0.reborrow().deleted
             }
         }
-        impl ::core::convert::From<
-            ::buffa::OwnedView<DeleteProjectResponseView<'static>>,
-        > for DeleteProjectResponseOwnedView {
-            fn from(
-                inner: ::buffa::OwnedView<DeleteProjectResponseView<'static>>,
-            ) -> Self {
-                DeleteProjectResponseOwnedView(inner)
+        impl ::core::convert::From<::buffa::OwnedView<DeleteTeamResponseView<'static>>>
+        for DeleteTeamResponseOwnedView {
+            fn from(inner: ::buffa::OwnedView<DeleteTeamResponseView<'static>>) -> Self {
+                DeleteTeamResponseOwnedView(inner)
             }
         }
-        impl ::core::convert::From<DeleteProjectResponseOwnedView>
-        for ::buffa::OwnedView<DeleteProjectResponseView<'static>> {
-            fn from(wrapper: DeleteProjectResponseOwnedView) -> Self {
+        impl ::core::convert::From<DeleteTeamResponseOwnedView>
+        for ::buffa::OwnedView<DeleteTeamResponseView<'static>> {
+            fn from(wrapper: DeleteTeamResponseOwnedView) -> Self {
                 wrapper.0
             }
         }
-        impl ::core::convert::AsRef<
-            ::buffa::OwnedView<DeleteProjectResponseView<'static>>,
-        > for DeleteProjectResponseOwnedView {
-            fn as_ref(&self) -> &::buffa::OwnedView<DeleteProjectResponseView<'static>> {
+        impl ::core::convert::AsRef<::buffa::OwnedView<DeleteTeamResponseView<'static>>>
+        for DeleteTeamResponseOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<DeleteTeamResponseView<'static>> {
                 &self.0
             }
         }
-        impl ::buffa::HasMessageView for super::super::DeleteProjectResponse {
-            type View<'a> = DeleteProjectResponseView<'a>;
-            type ViewHandle = DeleteProjectResponseOwnedView;
+        impl ::buffa::HasMessageView for super::super::DeleteTeamResponse {
+            type View<'a> = DeleteTeamResponseView<'a>;
+            type ViewHandle = DeleteTeamResponseOwnedView;
         }
-        impl ::serde::Serialize for DeleteProjectResponseOwnedView {
+        impl ::serde::Serialize for DeleteTeamResponseOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -264571,18 +264508,18 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
-        pub struct UpdateProjectIconRequestView<'a> {
-            /// Field 1: `project_id`
-            pub project_id: &'a str,
+        pub struct UpdateTeamIconRequestView<'a> {
+            /// Field 1: `team_id`
+            pub team_id: &'a str,
             pub icon_update: ::core::option::Option<
-                super::super::__buffa::view::oneof::update_project_icon_request::IconUpdate<
+                super::super::__buffa::view::oneof::update_team_icon_request::IconUpdate<
                     'a,
                 >,
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a> for UpdateProjectIconRequestView<'a> {
-            type Owned = super::super::UpdateProjectIconRequest;
+        impl<'a> ::buffa::MessageView<'a> for UpdateTeamIconRequestView<'a> {
+            type Owned = super::super::UpdateTeamIconRequest;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -264618,7 +264555,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.project_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.team_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -264626,7 +264563,7 @@ pub mod __buffa {
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
                         view.icon_update = Some(
-                            super::super::__buffa::view::oneof::update_project_icon_request::IconUpdate::Icon(
+                            super::super::__buffa::view::oneof::update_team_icon_request::IconUpdate::Icon(
                                 ::buffa::types::borrow_str(&mut cur)?,
                             ),
                         );
@@ -264639,7 +264576,7 @@ pub mod __buffa {
                         let __sub_ctx = ctx.descend()?;
                         let sub = ::buffa::types::borrow_bytes(&mut cur)?;
                         if let Some(
-                            super::super::__buffa::view::oneof::update_project_icon_request::IconUpdate::ClearIcon(
+                            super::super::__buffa::view::oneof::update_team_icon_request::IconUpdate::ClearIcon(
                                 ref mut existing,
                             ),
                         ) = view.icon_update
@@ -264651,7 +264588,7 @@ pub mod __buffa {
                             )?;
                         } else {
                             view.icon_update = Some(
-                                super::super::__buffa::view::oneof::update_project_icon_request::IconUpdate::ClearIcon(
+                                super::super::__buffa::view::oneof::update_team_icon_request::IconUpdate::ClearIcon(
                                     ::buffa::alloc::boxed::Box::new(
                                         <::buffa_types::google::protobuf::__buffa::view::EmptyView as ::buffa::MessageView>::decode_view_ctx(
                                             sub,
@@ -264670,7 +264607,7 @@ pub mod __buffa {
                         let __sub_ctx = ctx.descend()?;
                         let sub = ::buffa::types::borrow_bytes(&mut cur)?;
                         if let Some(
-                            super::super::__buffa::view::oneof::update_project_icon_request::IconUpdate::NamedIcon(
+                            super::super::__buffa::view::oneof::update_team_icon_request::IconUpdate::NamedIcon(
                                 ref mut existing,
                             ),
                         ) = view.icon_update
@@ -264682,7 +264619,7 @@ pub mod __buffa {
                             )?;
                         } else {
                             view.icon_update = Some(
-                                super::super::__buffa::view::oneof::update_project_icon_request::IconUpdate::NamedIcon(
+                                super::super::__buffa::view::oneof::update_team_icon_request::IconUpdate::NamedIcon(
                                     ::buffa::alloc::boxed::Box::new(
                                         <super::super::__buffa::view::NamedIconView as ::buffa::MessageView>::decode_view_ctx(
                                             sub,
@@ -264705,7 +264642,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::UpdateProjectIconRequest,
+                super::super::UpdateTeamIconRequest,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -264715,38 +264652,38 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::UpdateProjectIconRequest,
+                super::super::UpdateTeamIconRequest,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::UpdateProjectIconRequest {
-                    project_id: self.project_id.to_string(),
+                ::core::result::Result::Ok(super::super::UpdateTeamIconRequest {
+                    team_id: self.team_id.to_string(),
                     icon_update: match self.icon_update.as_ref() {
                         ::core::option::Option::Some(v) => {
                             ::core::option::Option::Some(
                                 match v {
-                                    super::super::__buffa::view::oneof::update_project_icon_request::IconUpdate::Icon(
+                                    super::super::__buffa::view::oneof::update_team_icon_request::IconUpdate::Icon(
                                         v,
                                     ) => {
-                                        super::super::__buffa::oneof::update_project_icon_request::IconUpdate::Icon(
+                                        super::super::__buffa::oneof::update_team_icon_request::IconUpdate::Icon(
                                             v.to_string(),
                                         )
                                     }
-                                    super::super::__buffa::view::oneof::update_project_icon_request::IconUpdate::ClearIcon(
+                                    super::super::__buffa::view::oneof::update_team_icon_request::IconUpdate::ClearIcon(
                                         v,
                                     ) => {
-                                        super::super::__buffa::oneof::update_project_icon_request::IconUpdate::ClearIcon(
+                                        super::super::__buffa::oneof::update_team_icon_request::IconUpdate::ClearIcon(
                                             ::buffa::alloc::boxed::Box::new(
                                                 v.to_owned_from_source(__buffa_src)?,
                                             ),
                                         )
                                     }
-                                    super::super::__buffa::view::oneof::update_project_icon_request::IconUpdate::NamedIcon(
+                                    super::super::__buffa::view::oneof::update_team_icon_request::IconUpdate::NamedIcon(
                                         v,
                                     ) => {
-                                        super::super::__buffa::oneof::update_project_icon_request::IconUpdate::NamedIcon(
+                                        super::super::__buffa::oneof::update_team_icon_request::IconUpdate::NamedIcon(
                                             ::buffa::alloc::boxed::Box::new(
                                                 v.to_owned_from_source(__buffa_src)?,
                                             ),
@@ -264765,26 +264702,25 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a> for UpdateProjectIconRequestView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for UpdateTeamIconRequestView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.project_id.is_empty() {
+                if !self.team_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.project_id)
-                                as u64;
+                            + ::buffa::types::string_encoded_len(&self.team_id) as u64;
                 }
                 if let ::core::option::Option::Some(ref v) = self.icon_update {
                     match v {
-                        super::super::__buffa::view::oneof::update_project_icon_request::IconUpdate::Icon(
+                        super::super::__buffa::view::oneof::update_team_icon_request::IconUpdate::Icon(
                             x,
                         ) => {
                             size += 1u64 + ::buffa::types::string_encoded_len(x) as u64;
                         }
-                        super::super::__buffa::view::oneof::update_project_icon_request::IconUpdate::ClearIcon(
+                        super::super::__buffa::view::oneof::update_team_icon_request::IconUpdate::ClearIcon(
                             x,
                         ) => {
                             let __slot = __cache.reserve();
@@ -264794,7 +264730,7 @@ pub mod __buffa {
                                 += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
                                     + inner as u64;
                         }
-                        super::super::__buffa::view::oneof::update_project_icon_request::IconUpdate::NamedIcon(
+                        super::super::__buffa::view::oneof::update_team_icon_request::IconUpdate::NamedIcon(
                             x,
                         ) => {
                             let __slot = __cache.reserve();
@@ -264817,17 +264753,17 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.project_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.project_id, buf);
+                if !self.team_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.team_id, buf);
                 }
                 if let ::core::option::Option::Some(ref v) = self.icon_update {
                     match v {
-                        super::super::__buffa::view::oneof::update_project_icon_request::IconUpdate::Icon(
+                        super::super::__buffa::view::oneof::update_team_icon_request::IconUpdate::Icon(
                             x,
                         ) => {
                             ::buffa::types::put_string_field(2u32, x, buf);
                         }
-                        super::super::__buffa::view::oneof::update_project_icon_request::IconUpdate::ClearIcon(
+                        super::super::__buffa::view::oneof::update_team_icon_request::IconUpdate::ClearIcon(
                             x,
                         ) => {
                             ::buffa::types::put_len_delimited_header(
@@ -264837,7 +264773,7 @@ pub mod __buffa {
                             );
                             x.write_to(__cache, buf);
                         }
-                        super::super::__buffa::view::oneof::update_project_icon_request::IconUpdate::NamedIcon(
+                        super::super::__buffa::view::oneof::update_team_icon_request::IconUpdate::NamedIcon(
                             x,
                         ) => {
                             ::buffa::types::put_len_delimited_header(
@@ -264863,29 +264799,29 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for UpdateProjectIconRequestView<'__a> {
+        impl<'__a> ::serde::Serialize for UpdateTeamIconRequestView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.project_id) {
-                    __map.serialize_entry("projectId", self.project_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.team_id) {
+                    __map.serialize_entry("teamId", self.team_id)?;
                 }
                 if let ::core::option::Option::Some(ref __ov) = self.icon_update {
                     match __ov {
-                        super::super::__buffa::view::oneof::update_project_icon_request::IconUpdate::Icon(
+                        super::super::__buffa::view::oneof::update_team_icon_request::IconUpdate::Icon(
                             v,
                         ) => {
                             __map.serialize_entry("icon", v)?;
                         }
-                        super::super::__buffa::view::oneof::update_project_icon_request::IconUpdate::ClearIcon(
+                        super::super::__buffa::view::oneof::update_team_icon_request::IconUpdate::ClearIcon(
                             v,
                         ) => {
                             __map.serialize_entry("clearIcon", v)?;
                         }
-                        super::super::__buffa::view::oneof::update_project_icon_request::IconUpdate::NamedIcon(
+                        super::super::__buffa::view::oneof::update_team_icon_request::IconUpdate::NamedIcon(
                             v,
                         ) => {
                             __map.serialize_entry("namedIcon", v)?;
@@ -264895,24 +264831,24 @@ pub mod __buffa {
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for UpdateProjectIconRequestView<'a> {
+        impl<'a> ::buffa::MessageName for UpdateTeamIconRequestView<'a> {
             const PACKAGE: &'static str = "briar.app.v1";
-            const NAME: &'static str = "UpdateProjectIconRequest";
-            const FULL_NAME: &'static str = "briar.app.v1.UpdateProjectIconRequest";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateProjectIconRequest";
+            const NAME: &'static str = "UpdateTeamIconRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.UpdateTeamIconRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateTeamIconRequest";
         }
-        ::buffa::impl_default_view_instance!(UpdateProjectIconRequestView);
-        ::buffa::impl_view_reborrow!(UpdateProjectIconRequestView);
-        /** Self-contained, `'static` owned view of a `UpdateProjectIconRequest` message.
+        ::buffa::impl_default_view_instance!(UpdateTeamIconRequestView);
+        ::buffa::impl_view_reborrow!(UpdateTeamIconRequestView);
+        /** Self-contained, `'static` owned view of a `UpdateTeamIconRequest` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`UpdateProjectIconRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`UpdateTeamIconRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UpdateProjectIconRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UpdateTeamIconRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct UpdateProjectIconRequestOwnedView(
-            ::buffa::OwnedView<UpdateProjectIconRequestView<'static>>,
+        pub struct UpdateTeamIconRequestOwnedView(
+            ::buffa::OwnedView<UpdateTeamIconRequestView<'static>>,
         );
-        impl UpdateProjectIconRequestOwnedView {
+        impl UpdateTeamIconRequestOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -264926,7 +264862,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    UpdateProjectIconRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
+                    UpdateTeamIconRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
                 )
             }
             /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
@@ -264941,7 +264877,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    UpdateProjectIconRequestOwnedView(
+                    UpdateTeamIconRequestOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -264955,17 +264891,15 @@ pub mod __buffa {
             /// another [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::UpdateProjectIconRequest,
+                msg: &super::super::UpdateTeamIconRequest,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    UpdateProjectIconRequestOwnedView(
-                        ::buffa::OwnedView::from_owned(msg)?,
-                    ),
+                    UpdateTeamIconRequestOwnedView(::buffa::OwnedView::from_owned(msg)?),
                 )
             }
-            /// Borrow the full [`UpdateProjectIconRequestView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`UpdateTeamIconRequestView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &UpdateProjectIconRequestView<'_> {
+            pub fn view(&self) -> &UpdateTeamIconRequestView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -264976,7 +264910,7 @@ pub mod __buffa {
             /// whose contract also governs handles converted from a raw
             /// [`::buffa::OwnedView`].
             #[must_use]
-            pub fn to_owned_message(&self) -> super::super::UpdateProjectIconRequest {
+            pub fn to_owned_message(&self) -> super::super::UpdateTeamIconRequest {
                 self.0.to_owned_message()
             }
             /// The underlying bytes buffer.
@@ -264989,17 +264923,17 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `project_id`
+            /// Field 1: `team_id`
             #[must_use]
-            pub fn project_id(&self) -> &'_ str {
-                self.0.reborrow().project_id
+            pub fn team_id(&self) -> &'_ str {
+                self.0.reborrow().team_id
             }
             /// Oneof `icon_update`.
             #[must_use]
             pub fn icon_update(
                 &self,
             ) -> ::core::option::Option<
-                &super::super::__buffa::view::oneof::update_project_icon_request::IconUpdate<
+                &super::super::__buffa::view::oneof::update_team_icon_request::IconUpdate<
                     '_,
                 >,
             > {
@@ -265007,34 +264941,32 @@ pub mod __buffa {
             }
         }
         impl ::core::convert::From<
-            ::buffa::OwnedView<UpdateProjectIconRequestView<'static>>,
-        > for UpdateProjectIconRequestOwnedView {
+            ::buffa::OwnedView<UpdateTeamIconRequestView<'static>>,
+        > for UpdateTeamIconRequestOwnedView {
             fn from(
-                inner: ::buffa::OwnedView<UpdateProjectIconRequestView<'static>>,
+                inner: ::buffa::OwnedView<UpdateTeamIconRequestView<'static>>,
             ) -> Self {
-                UpdateProjectIconRequestOwnedView(inner)
+                UpdateTeamIconRequestOwnedView(inner)
             }
         }
-        impl ::core::convert::From<UpdateProjectIconRequestOwnedView>
-        for ::buffa::OwnedView<UpdateProjectIconRequestView<'static>> {
-            fn from(wrapper: UpdateProjectIconRequestOwnedView) -> Self {
+        impl ::core::convert::From<UpdateTeamIconRequestOwnedView>
+        for ::buffa::OwnedView<UpdateTeamIconRequestView<'static>> {
+            fn from(wrapper: UpdateTeamIconRequestOwnedView) -> Self {
                 wrapper.0
             }
         }
         impl ::core::convert::AsRef<
-            ::buffa::OwnedView<UpdateProjectIconRequestView<'static>>,
-        > for UpdateProjectIconRequestOwnedView {
-            fn as_ref(
-                &self,
-            ) -> &::buffa::OwnedView<UpdateProjectIconRequestView<'static>> {
+            ::buffa::OwnedView<UpdateTeamIconRequestView<'static>>,
+        > for UpdateTeamIconRequestOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<UpdateTeamIconRequestView<'static>> {
                 &self.0
             }
         }
-        impl ::buffa::HasMessageView for super::super::UpdateProjectIconRequest {
-            type View<'a> = UpdateProjectIconRequestView<'a>;
-            type ViewHandle = UpdateProjectIconRequestOwnedView;
+        impl ::buffa::HasMessageView for super::super::UpdateTeamIconRequest {
+            type View<'a> = UpdateTeamIconRequestView<'a>;
+            type ViewHandle = UpdateTeamIconRequestOwnedView;
         }
-        impl ::serde::Serialize for UpdateProjectIconRequestOwnedView {
+        impl ::serde::Serialize for UpdateTeamIconRequestOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -265320,15 +265252,15 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
-        pub struct UpdateProjectIconResponseView<'a> {
-            /// Field 1: `project`
-            pub project: ::buffa::MessageFieldView<
-                super::super::__buffa::view::ProjectView<'a>,
+        pub struct UpdateTeamIconResponseView<'a> {
+            /// Field 1: `team`
+            pub team: ::buffa::MessageFieldView<
+                super::super::__buffa::view::TeamView<'a>,
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a> for UpdateProjectIconResponseView<'a> {
-            type Owned = super::super::UpdateProjectIconResponse;
+        impl<'a> ::buffa::MessageView<'a> for UpdateTeamIconResponseView<'a> {
+            type Owned = super::super::UpdateTeamIconResponse;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -265366,7 +265298,7 @@ pub mod __buffa {
                         )?;
                         let __sub_ctx = ctx.descend()?;
                         let sub = ::buffa::types::borrow_bytes(&mut cur)?;
-                        match view.project.as_mut() {
+                        match view.team.as_mut() {
                             Some(existing) => {
                                 ::buffa::MessageView::merge_into_view(
                                     existing,
@@ -265375,8 +265307,8 @@ pub mod __buffa {
                                 )?
                             }
                             None => {
-                                view.project = ::buffa::MessageFieldView::set(
-                                    <super::super::__buffa::view::ProjectView as ::buffa::MessageView>::decode_view_ctx(
+                                view.team = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::TeamView as ::buffa::MessageView>::decode_view_ctx(
                                         sub,
                                         __sub_ctx,
                                     )?,
@@ -265396,7 +265328,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::UpdateProjectIconResponse,
+                super::super::UpdateTeamIconResponse,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -265406,18 +265338,18 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::UpdateProjectIconResponse,
+                super::super::UpdateTeamIconResponse,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::UpdateProjectIconResponse {
-                    project: match self.project.as_option() {
+                ::core::result::Result::Ok(super::super::UpdateTeamIconResponse {
+                    team: match self.team.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
-                                super::super::Project,
-                                ::buffa::Inline<super::super::Project>,
+                                super::super::Team,
+                                ::buffa::Inline<super::super::Team>,
                             >::some(v.to_owned_from_source(__buffa_src)?)
                         }
                         None => ::buffa::MessageField::none(),
@@ -265430,15 +265362,15 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a> for UpdateProjectIconResponseView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for UpdateTeamIconResponseView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if self.project.is_set() {
+                if self.team.is_set() {
                     let __slot = __cache.reserve();
-                    let inner_size = self.project.compute_size(__cache);
+                    let inner_size = self.team.compute_size(__cache);
                     __cache.set(__slot, inner_size);
                     size
                         += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
@@ -265455,13 +265387,13 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if self.project.is_set() {
+                if self.team.is_set() {
                     ::buffa::types::put_len_delimited_header(
                         1u32,
                         u64::from(__cache.consume_next()),
                         buf,
                     );
-                    self.project.write_to(__cache, buf);
+                    self.team.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -265477,7 +265409,7 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for UpdateProjectIconResponseView<'__a> {
+        impl<'__a> ::serde::Serialize for UpdateTeamIconResponseView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -265485,31 +265417,31 @@ pub mod __buffa {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
                 {
-                    if let ::core::option::Option::Some(__v) = self.project.as_option() {
-                        __map.serialize_entry("project", __v)?;
+                    if let ::core::option::Option::Some(__v) = self.team.as_option() {
+                        __map.serialize_entry("team", __v)?;
                     }
                 }
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for UpdateProjectIconResponseView<'a> {
+        impl<'a> ::buffa::MessageName for UpdateTeamIconResponseView<'a> {
             const PACKAGE: &'static str = "briar.app.v1";
-            const NAME: &'static str = "UpdateProjectIconResponse";
-            const FULL_NAME: &'static str = "briar.app.v1.UpdateProjectIconResponse";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateProjectIconResponse";
+            const NAME: &'static str = "UpdateTeamIconResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.UpdateTeamIconResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateTeamIconResponse";
         }
-        ::buffa::impl_default_view_instance!(UpdateProjectIconResponseView);
-        ::buffa::impl_view_reborrow!(UpdateProjectIconResponseView);
-        /** Self-contained, `'static` owned view of a `UpdateProjectIconResponse` message.
+        ::buffa::impl_default_view_instance!(UpdateTeamIconResponseView);
+        ::buffa::impl_view_reborrow!(UpdateTeamIconResponseView);
+        /** Self-contained, `'static` owned view of a `UpdateTeamIconResponse` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`UpdateProjectIconResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`UpdateTeamIconResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UpdateProjectIconResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UpdateTeamIconResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct UpdateProjectIconResponseOwnedView(
-            ::buffa::OwnedView<UpdateProjectIconResponseView<'static>>,
+        pub struct UpdateTeamIconResponseOwnedView(
+            ::buffa::OwnedView<UpdateTeamIconResponseView<'static>>,
         );
-        impl UpdateProjectIconResponseOwnedView {
+        impl UpdateTeamIconResponseOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -265523,9 +265455,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    UpdateProjectIconResponseOwnedView(
-                        ::buffa::OwnedView::decode(bytes)?,
-                    ),
+                    UpdateTeamIconResponseOwnedView(::buffa::OwnedView::decode(bytes)?),
                 )
             }
             /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
@@ -265540,7 +265470,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    UpdateProjectIconResponseOwnedView(
+                    UpdateTeamIconResponseOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -265554,17 +265484,15 @@ pub mod __buffa {
             /// another [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::UpdateProjectIconResponse,
+                msg: &super::super::UpdateTeamIconResponse,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    UpdateProjectIconResponseOwnedView(
-                        ::buffa::OwnedView::from_owned(msg)?,
-                    ),
+                    UpdateTeamIconResponseOwnedView(::buffa::OwnedView::from_owned(msg)?),
                 )
             }
-            /// Borrow the full [`UpdateProjectIconResponseView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`UpdateTeamIconResponseView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &UpdateProjectIconResponseView<'_> {
+            pub fn view(&self) -> &UpdateTeamIconResponseView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -265575,7 +265503,7 @@ pub mod __buffa {
             /// whose contract also governs handles converted from a raw
             /// [`::buffa::OwnedView`].
             #[must_use]
-            pub fn to_owned_message(&self) -> super::super::UpdateProjectIconResponse {
+            pub fn to_owned_message(&self) -> super::super::UpdateTeamIconResponse {
                 self.0.to_owned_message()
             }
             /// The underlying bytes buffer.
@@ -265588,45 +265516,43 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `project`
+            /// Field 1: `team`
             #[must_use]
-            pub fn project(
+            pub fn team(
                 &self,
-            ) -> &::buffa::MessageFieldView<
-                super::super::__buffa::view::ProjectView<'_>,
-            > {
-                &self.0.reborrow().project
+            ) -> &::buffa::MessageFieldView<super::super::__buffa::view::TeamView<'_>> {
+                &self.0.reborrow().team
             }
         }
         impl ::core::convert::From<
-            ::buffa::OwnedView<UpdateProjectIconResponseView<'static>>,
-        > for UpdateProjectIconResponseOwnedView {
+            ::buffa::OwnedView<UpdateTeamIconResponseView<'static>>,
+        > for UpdateTeamIconResponseOwnedView {
             fn from(
-                inner: ::buffa::OwnedView<UpdateProjectIconResponseView<'static>>,
+                inner: ::buffa::OwnedView<UpdateTeamIconResponseView<'static>>,
             ) -> Self {
-                UpdateProjectIconResponseOwnedView(inner)
+                UpdateTeamIconResponseOwnedView(inner)
             }
         }
-        impl ::core::convert::From<UpdateProjectIconResponseOwnedView>
-        for ::buffa::OwnedView<UpdateProjectIconResponseView<'static>> {
-            fn from(wrapper: UpdateProjectIconResponseOwnedView) -> Self {
+        impl ::core::convert::From<UpdateTeamIconResponseOwnedView>
+        for ::buffa::OwnedView<UpdateTeamIconResponseView<'static>> {
+            fn from(wrapper: UpdateTeamIconResponseOwnedView) -> Self {
                 wrapper.0
             }
         }
         impl ::core::convert::AsRef<
-            ::buffa::OwnedView<UpdateProjectIconResponseView<'static>>,
-        > for UpdateProjectIconResponseOwnedView {
+            ::buffa::OwnedView<UpdateTeamIconResponseView<'static>>,
+        > for UpdateTeamIconResponseOwnedView {
             fn as_ref(
                 &self,
-            ) -> &::buffa::OwnedView<UpdateProjectIconResponseView<'static>> {
+            ) -> &::buffa::OwnedView<UpdateTeamIconResponseView<'static>> {
                 &self.0
             }
         }
-        impl ::buffa::HasMessageView for super::super::UpdateProjectIconResponse {
-            type View<'a> = UpdateProjectIconResponseView<'a>;
-            type ViewHandle = UpdateProjectIconResponseOwnedView;
+        impl ::buffa::HasMessageView for super::super::UpdateTeamIconResponse {
+            type View<'a> = UpdateTeamIconResponseView<'a>;
+            type ViewHandle = UpdateTeamIconResponseOwnedView;
         }
-        impl ::serde::Serialize for UpdateProjectIconResponseOwnedView {
+        impl ::serde::Serialize for UpdateTeamIconResponseOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -265635,16 +265561,15 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
-        pub struct UpdateProjectIssueKeyPrefixRequestView<'a> {
-            /// Field 1: `project_id`
-            pub project_id: &'a str,
+        pub struct UpdateTeamIssueKeyPrefixRequestView<'a> {
+            /// Field 1: `team_id`
+            pub team_id: &'a str,
             /// Field 2: `issue_key_prefix`
             pub issue_key_prefix: &'a str,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a>
-        for UpdateProjectIssueKeyPrefixRequestView<'a> {
-            type Owned = super::super::UpdateProjectIssueKeyPrefixRequest;
+        impl<'a> ::buffa::MessageView<'a> for UpdateTeamIssueKeyPrefixRequestView<'a> {
+            type Owned = super::super::UpdateTeamIssueKeyPrefixRequest;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -265680,7 +265605,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.project_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.team_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -265701,7 +265626,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::UpdateProjectIssueKeyPrefixRequest,
+                super::super::UpdateTeamIssueKeyPrefixRequest,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -265711,14 +265636,14 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::UpdateProjectIssueKeyPrefixRequest,
+                super::super::UpdateTeamIssueKeyPrefixRequest,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::UpdateProjectIssueKeyPrefixRequest {
-                    project_id: self.project_id.to_string(),
+                ::core::result::Result::Ok(super::super::UpdateTeamIssueKeyPrefixRequest {
+                    team_id: self.team_id.to_string(),
                     issue_key_prefix: self.issue_key_prefix.to_string(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
@@ -265728,17 +265653,16 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a> for UpdateProjectIssueKeyPrefixRequestView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for UpdateTeamIssueKeyPrefixRequestView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.project_id.is_empty() {
+                if !self.team_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.project_id)
-                                as u64;
+                            + ::buffa::types::string_encoded_len(&self.team_id) as u64;
                 }
                 if !self.issue_key_prefix.is_empty() {
                     size
@@ -265757,8 +265681,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.project_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.project_id, buf);
+                if !self.team_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.team_id, buf);
                 }
                 if !self.issue_key_prefix.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.issue_key_prefix, buf);
@@ -265777,15 +265701,15 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for UpdateProjectIssueKeyPrefixRequestView<'__a> {
+        impl<'__a> ::serde::Serialize for UpdateTeamIssueKeyPrefixRequestView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.project_id) {
-                    __map.serialize_entry("projectId", self.project_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.team_id) {
+                    __map.serialize_entry("teamId", self.team_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.issue_key_prefix) {
                     __map.serialize_entry("issueKeyPrefix", self.issue_key_prefix)?;
@@ -265793,24 +265717,24 @@ pub mod __buffa {
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for UpdateProjectIssueKeyPrefixRequestView<'a> {
+        impl<'a> ::buffa::MessageName for UpdateTeamIssueKeyPrefixRequestView<'a> {
             const PACKAGE: &'static str = "briar.app.v1";
-            const NAME: &'static str = "UpdateProjectIssueKeyPrefixRequest";
-            const FULL_NAME: &'static str = "briar.app.v1.UpdateProjectIssueKeyPrefixRequest";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateProjectIssueKeyPrefixRequest";
+            const NAME: &'static str = "UpdateTeamIssueKeyPrefixRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.UpdateTeamIssueKeyPrefixRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateTeamIssueKeyPrefixRequest";
         }
-        ::buffa::impl_default_view_instance!(UpdateProjectIssueKeyPrefixRequestView);
-        ::buffa::impl_view_reborrow!(UpdateProjectIssueKeyPrefixRequestView);
-        /** Self-contained, `'static` owned view of a `UpdateProjectIssueKeyPrefixRequest` message.
+        ::buffa::impl_default_view_instance!(UpdateTeamIssueKeyPrefixRequestView);
+        ::buffa::impl_view_reborrow!(UpdateTeamIssueKeyPrefixRequestView);
+        /** Self-contained, `'static` owned view of a `UpdateTeamIssueKeyPrefixRequest` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`UpdateProjectIssueKeyPrefixRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`UpdateTeamIssueKeyPrefixRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UpdateProjectIssueKeyPrefixRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UpdateTeamIssueKeyPrefixRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct UpdateProjectIssueKeyPrefixRequestOwnedView(
-            ::buffa::OwnedView<UpdateProjectIssueKeyPrefixRequestView<'static>>,
+        pub struct UpdateTeamIssueKeyPrefixRequestOwnedView(
+            ::buffa::OwnedView<UpdateTeamIssueKeyPrefixRequestView<'static>>,
         );
-        impl UpdateProjectIssueKeyPrefixRequestOwnedView {
+        impl UpdateTeamIssueKeyPrefixRequestOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -265824,7 +265748,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    UpdateProjectIssueKeyPrefixRequestOwnedView(
+                    UpdateTeamIssueKeyPrefixRequestOwnedView(
                         ::buffa::OwnedView::decode(bytes)?,
                     ),
                 )
@@ -265841,7 +265765,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    UpdateProjectIssueKeyPrefixRequestOwnedView(
+                    UpdateTeamIssueKeyPrefixRequestOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -265855,17 +265779,17 @@ pub mod __buffa {
             /// another [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::UpdateProjectIssueKeyPrefixRequest,
+                msg: &super::super::UpdateTeamIssueKeyPrefixRequest,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    UpdateProjectIssueKeyPrefixRequestOwnedView(
+                    UpdateTeamIssueKeyPrefixRequestOwnedView(
                         ::buffa::OwnedView::from_owned(msg)?,
                     ),
                 )
             }
-            /// Borrow the full [`UpdateProjectIssueKeyPrefixRequestView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`UpdateTeamIssueKeyPrefixRequestView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &UpdateProjectIssueKeyPrefixRequestView<'_> {
+            pub fn view(&self) -> &UpdateTeamIssueKeyPrefixRequestView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -265878,7 +265802,7 @@ pub mod __buffa {
             #[must_use]
             pub fn to_owned_message(
                 &self,
-            ) -> super::super::UpdateProjectIssueKeyPrefixRequest {
+            ) -> super::super::UpdateTeamIssueKeyPrefixRequest {
                 self.0.to_owned_message()
             }
             /// The underlying bytes buffer.
@@ -265891,10 +265815,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `project_id`
+            /// Field 1: `team_id`
             #[must_use]
-            pub fn project_id(&self) -> &'_ str {
-                self.0.reborrow().project_id
+            pub fn team_id(&self) -> &'_ str {
+                self.0.reborrow().team_id
             }
             /// Field 2: `issue_key_prefix`
             #[must_use]
@@ -265903,37 +265827,34 @@ pub mod __buffa {
             }
         }
         impl ::core::convert::From<
-            ::buffa::OwnedView<UpdateProjectIssueKeyPrefixRequestView<'static>>,
-        > for UpdateProjectIssueKeyPrefixRequestOwnedView {
+            ::buffa::OwnedView<UpdateTeamIssueKeyPrefixRequestView<'static>>,
+        > for UpdateTeamIssueKeyPrefixRequestOwnedView {
             fn from(
-                inner: ::buffa::OwnedView<
-                    UpdateProjectIssueKeyPrefixRequestView<'static>,
-                >,
+                inner: ::buffa::OwnedView<UpdateTeamIssueKeyPrefixRequestView<'static>>,
             ) -> Self {
-                UpdateProjectIssueKeyPrefixRequestOwnedView(inner)
+                UpdateTeamIssueKeyPrefixRequestOwnedView(inner)
             }
         }
-        impl ::core::convert::From<UpdateProjectIssueKeyPrefixRequestOwnedView>
-        for ::buffa::OwnedView<UpdateProjectIssueKeyPrefixRequestView<'static>> {
-            fn from(wrapper: UpdateProjectIssueKeyPrefixRequestOwnedView) -> Self {
+        impl ::core::convert::From<UpdateTeamIssueKeyPrefixRequestOwnedView>
+        for ::buffa::OwnedView<UpdateTeamIssueKeyPrefixRequestView<'static>> {
+            fn from(wrapper: UpdateTeamIssueKeyPrefixRequestOwnedView) -> Self {
                 wrapper.0
             }
         }
         impl ::core::convert::AsRef<
-            ::buffa::OwnedView<UpdateProjectIssueKeyPrefixRequestView<'static>>,
-        > for UpdateProjectIssueKeyPrefixRequestOwnedView {
+            ::buffa::OwnedView<UpdateTeamIssueKeyPrefixRequestView<'static>>,
+        > for UpdateTeamIssueKeyPrefixRequestOwnedView {
             fn as_ref(
                 &self,
-            ) -> &::buffa::OwnedView<UpdateProjectIssueKeyPrefixRequestView<'static>> {
+            ) -> &::buffa::OwnedView<UpdateTeamIssueKeyPrefixRequestView<'static>> {
                 &self.0
             }
         }
-        impl ::buffa::HasMessageView
-        for super::super::UpdateProjectIssueKeyPrefixRequest {
-            type View<'a> = UpdateProjectIssueKeyPrefixRequestView<'a>;
-            type ViewHandle = UpdateProjectIssueKeyPrefixRequestOwnedView;
+        impl ::buffa::HasMessageView for super::super::UpdateTeamIssueKeyPrefixRequest {
+            type View<'a> = UpdateTeamIssueKeyPrefixRequestView<'a>;
+            type ViewHandle = UpdateTeamIssueKeyPrefixRequestOwnedView;
         }
-        impl ::serde::Serialize for UpdateProjectIssueKeyPrefixRequestOwnedView {
+        impl ::serde::Serialize for UpdateTeamIssueKeyPrefixRequestOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -265942,16 +265863,15 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
-        pub struct UpdateProjectIssueKeyPrefixResponseView<'a> {
-            /// Field 1: `project`
-            pub project: ::buffa::MessageFieldView<
-                super::super::__buffa::view::ProjectView<'a>,
+        pub struct UpdateTeamIssueKeyPrefixResponseView<'a> {
+            /// Field 1: `team`
+            pub team: ::buffa::MessageFieldView<
+                super::super::__buffa::view::TeamView<'a>,
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a>
-        for UpdateProjectIssueKeyPrefixResponseView<'a> {
-            type Owned = super::super::UpdateProjectIssueKeyPrefixResponse;
+        impl<'a> ::buffa::MessageView<'a> for UpdateTeamIssueKeyPrefixResponseView<'a> {
+            type Owned = super::super::UpdateTeamIssueKeyPrefixResponse;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -265989,7 +265909,7 @@ pub mod __buffa {
                         )?;
                         let __sub_ctx = ctx.descend()?;
                         let sub = ::buffa::types::borrow_bytes(&mut cur)?;
-                        match view.project.as_mut() {
+                        match view.team.as_mut() {
                             Some(existing) => {
                                 ::buffa::MessageView::merge_into_view(
                                     existing,
@@ -265998,8 +265918,8 @@ pub mod __buffa {
                                 )?
                             }
                             None => {
-                                view.project = ::buffa::MessageFieldView::set(
-                                    <super::super::__buffa::view::ProjectView as ::buffa::MessageView>::decode_view_ctx(
+                                view.team = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::TeamView as ::buffa::MessageView>::decode_view_ctx(
                                         sub,
                                         __sub_ctx,
                                     )?,
@@ -266019,7 +265939,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::UpdateProjectIssueKeyPrefixResponse,
+                super::super::UpdateTeamIssueKeyPrefixResponse,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -266029,18 +265949,18 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::UpdateProjectIssueKeyPrefixResponse,
+                super::super::UpdateTeamIssueKeyPrefixResponse,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::UpdateProjectIssueKeyPrefixResponse {
-                    project: match self.project.as_option() {
+                ::core::result::Result::Ok(super::super::UpdateTeamIssueKeyPrefixResponse {
+                    team: match self.team.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
-                                super::super::Project,
-                                ::buffa::Inline<super::super::Project>,
+                                super::super::Team,
+                                ::buffa::Inline<super::super::Team>,
                             >::some(v.to_owned_from_source(__buffa_src)?)
                         }
                         None => ::buffa::MessageField::none(),
@@ -266053,16 +265973,15 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a>
-        for UpdateProjectIssueKeyPrefixResponseView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for UpdateTeamIssueKeyPrefixResponseView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if self.project.is_set() {
+                if self.team.is_set() {
                     let __slot = __cache.reserve();
-                    let inner_size = self.project.compute_size(__cache);
+                    let inner_size = self.team.compute_size(__cache);
                     __cache.set(__slot, inner_size);
                     size
                         += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
@@ -266079,13 +265998,13 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if self.project.is_set() {
+                if self.team.is_set() {
                     ::buffa::types::put_len_delimited_header(
                         1u32,
                         u64::from(__cache.consume_next()),
                         buf,
                     );
-                    self.project.write_to(__cache, buf);
+                    self.team.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -266101,7 +266020,7 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for UpdateProjectIssueKeyPrefixResponseView<'__a> {
+        impl<'__a> ::serde::Serialize for UpdateTeamIssueKeyPrefixResponseView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -266109,31 +266028,31 @@ pub mod __buffa {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
                 {
-                    if let ::core::option::Option::Some(__v) = self.project.as_option() {
-                        __map.serialize_entry("project", __v)?;
+                    if let ::core::option::Option::Some(__v) = self.team.as_option() {
+                        __map.serialize_entry("team", __v)?;
                     }
                 }
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for UpdateProjectIssueKeyPrefixResponseView<'a> {
+        impl<'a> ::buffa::MessageName for UpdateTeamIssueKeyPrefixResponseView<'a> {
             const PACKAGE: &'static str = "briar.app.v1";
-            const NAME: &'static str = "UpdateProjectIssueKeyPrefixResponse";
-            const FULL_NAME: &'static str = "briar.app.v1.UpdateProjectIssueKeyPrefixResponse";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateProjectIssueKeyPrefixResponse";
+            const NAME: &'static str = "UpdateTeamIssueKeyPrefixResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.UpdateTeamIssueKeyPrefixResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateTeamIssueKeyPrefixResponse";
         }
-        ::buffa::impl_default_view_instance!(UpdateProjectIssueKeyPrefixResponseView);
-        ::buffa::impl_view_reborrow!(UpdateProjectIssueKeyPrefixResponseView);
-        /** Self-contained, `'static` owned view of a `UpdateProjectIssueKeyPrefixResponse` message.
+        ::buffa::impl_default_view_instance!(UpdateTeamIssueKeyPrefixResponseView);
+        ::buffa::impl_view_reborrow!(UpdateTeamIssueKeyPrefixResponseView);
+        /** Self-contained, `'static` owned view of a `UpdateTeamIssueKeyPrefixResponse` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`UpdateProjectIssueKeyPrefixResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`UpdateTeamIssueKeyPrefixResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UpdateProjectIssueKeyPrefixResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UpdateTeamIssueKeyPrefixResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct UpdateProjectIssueKeyPrefixResponseOwnedView(
-            ::buffa::OwnedView<UpdateProjectIssueKeyPrefixResponseView<'static>>,
+        pub struct UpdateTeamIssueKeyPrefixResponseOwnedView(
+            ::buffa::OwnedView<UpdateTeamIssueKeyPrefixResponseView<'static>>,
         );
-        impl UpdateProjectIssueKeyPrefixResponseOwnedView {
+        impl UpdateTeamIssueKeyPrefixResponseOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -266147,7 +266066,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    UpdateProjectIssueKeyPrefixResponseOwnedView(
+                    UpdateTeamIssueKeyPrefixResponseOwnedView(
                         ::buffa::OwnedView::decode(bytes)?,
                     ),
                 )
@@ -266164,7 +266083,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    UpdateProjectIssueKeyPrefixResponseOwnedView(
+                    UpdateTeamIssueKeyPrefixResponseOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -266178,17 +266097,17 @@ pub mod __buffa {
             /// another [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::UpdateProjectIssueKeyPrefixResponse,
+                msg: &super::super::UpdateTeamIssueKeyPrefixResponse,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    UpdateProjectIssueKeyPrefixResponseOwnedView(
+                    UpdateTeamIssueKeyPrefixResponseOwnedView(
                         ::buffa::OwnedView::from_owned(msg)?,
                     ),
                 )
             }
-            /// Borrow the full [`UpdateProjectIssueKeyPrefixResponseView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`UpdateTeamIssueKeyPrefixResponseView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &UpdateProjectIssueKeyPrefixResponseView<'_> {
+            pub fn view(&self) -> &UpdateTeamIssueKeyPrefixResponseView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -266201,7 +266120,7 @@ pub mod __buffa {
             #[must_use]
             pub fn to_owned_message(
                 &self,
-            ) -> super::super::UpdateProjectIssueKeyPrefixResponse {
+            ) -> super::super::UpdateTeamIssueKeyPrefixResponse {
                 self.0.to_owned_message()
             }
             /// The underlying bytes buffer.
@@ -266214,48 +266133,43 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `project`
+            /// Field 1: `team`
             #[must_use]
-            pub fn project(
+            pub fn team(
                 &self,
-            ) -> &::buffa::MessageFieldView<
-                super::super::__buffa::view::ProjectView<'_>,
-            > {
-                &self.0.reborrow().project
+            ) -> &::buffa::MessageFieldView<super::super::__buffa::view::TeamView<'_>> {
+                &self.0.reborrow().team
             }
         }
         impl ::core::convert::From<
-            ::buffa::OwnedView<UpdateProjectIssueKeyPrefixResponseView<'static>>,
-        > for UpdateProjectIssueKeyPrefixResponseOwnedView {
+            ::buffa::OwnedView<UpdateTeamIssueKeyPrefixResponseView<'static>>,
+        > for UpdateTeamIssueKeyPrefixResponseOwnedView {
             fn from(
-                inner: ::buffa::OwnedView<
-                    UpdateProjectIssueKeyPrefixResponseView<'static>,
-                >,
+                inner: ::buffa::OwnedView<UpdateTeamIssueKeyPrefixResponseView<'static>>,
             ) -> Self {
-                UpdateProjectIssueKeyPrefixResponseOwnedView(inner)
+                UpdateTeamIssueKeyPrefixResponseOwnedView(inner)
             }
         }
-        impl ::core::convert::From<UpdateProjectIssueKeyPrefixResponseOwnedView>
-        for ::buffa::OwnedView<UpdateProjectIssueKeyPrefixResponseView<'static>> {
-            fn from(wrapper: UpdateProjectIssueKeyPrefixResponseOwnedView) -> Self {
+        impl ::core::convert::From<UpdateTeamIssueKeyPrefixResponseOwnedView>
+        for ::buffa::OwnedView<UpdateTeamIssueKeyPrefixResponseView<'static>> {
+            fn from(wrapper: UpdateTeamIssueKeyPrefixResponseOwnedView) -> Self {
                 wrapper.0
             }
         }
         impl ::core::convert::AsRef<
-            ::buffa::OwnedView<UpdateProjectIssueKeyPrefixResponseView<'static>>,
-        > for UpdateProjectIssueKeyPrefixResponseOwnedView {
+            ::buffa::OwnedView<UpdateTeamIssueKeyPrefixResponseView<'static>>,
+        > for UpdateTeamIssueKeyPrefixResponseOwnedView {
             fn as_ref(
                 &self,
-            ) -> &::buffa::OwnedView<UpdateProjectIssueKeyPrefixResponseView<'static>> {
+            ) -> &::buffa::OwnedView<UpdateTeamIssueKeyPrefixResponseView<'static>> {
                 &self.0
             }
         }
-        impl ::buffa::HasMessageView
-        for super::super::UpdateProjectIssueKeyPrefixResponse {
-            type View<'a> = UpdateProjectIssueKeyPrefixResponseView<'a>;
-            type ViewHandle = UpdateProjectIssueKeyPrefixResponseOwnedView;
+        impl ::buffa::HasMessageView for super::super::UpdateTeamIssueKeyPrefixResponse {
+            type View<'a> = UpdateTeamIssueKeyPrefixResponseView<'a>;
+            type ViewHandle = UpdateTeamIssueKeyPrefixResponseOwnedView;
         }
-        impl ::serde::Serialize for UpdateProjectIssueKeyPrefixResponseOwnedView {
+        impl ::serde::Serialize for UpdateTeamIssueKeyPrefixResponseOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -266264,15 +266178,15 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
-        pub struct UpdateProjectTabsRequestView<'a> {
-            /// Field 1: `project_id`
-            pub project_id: &'a str,
+        pub struct UpdateTeamTabsRequestView<'a> {
+            /// Field 1: `team_id`
+            pub team_id: &'a str,
             /// Field 2: `schedule`
             pub schedule: bool,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a> for UpdateProjectTabsRequestView<'a> {
-            type Owned = super::super::UpdateProjectTabsRequest;
+        impl<'a> ::buffa::MessageView<'a> for UpdateTeamTabsRequestView<'a> {
+            type Owned = super::super::UpdateTeamTabsRequest;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -266308,7 +266222,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.project_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.team_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -266329,7 +266243,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::UpdateProjectTabsRequest,
+                super::super::UpdateTeamTabsRequest,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -266339,14 +266253,14 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::UpdateProjectTabsRequest,
+                super::super::UpdateTeamTabsRequest,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::UpdateProjectTabsRequest {
-                    project_id: self.project_id.to_string(),
+                ::core::result::Result::Ok(super::super::UpdateTeamTabsRequest {
+                    team_id: self.team_id.to_string(),
                     schedule: self.schedule,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
@@ -266356,17 +266270,16 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a> for UpdateProjectTabsRequestView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for UpdateTeamTabsRequestView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.project_id.is_empty() {
+                if !self.team_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.project_id)
-                                as u64;
+                            + ::buffa::types::string_encoded_len(&self.team_id) as u64;
                 }
                 if self.schedule {
                     size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
@@ -266382,8 +266295,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.project_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.project_id, buf);
+                if !self.team_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.team_id, buf);
                 }
                 if self.schedule {
                     ::buffa::types::put_bool_field(2u32, self.schedule, buf);
@@ -266402,15 +266315,15 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for UpdateProjectTabsRequestView<'__a> {
+        impl<'__a> ::serde::Serialize for UpdateTeamTabsRequestView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.project_id) {
-                    __map.serialize_entry("projectId", self.project_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.team_id) {
+                    __map.serialize_entry("teamId", self.team_id)?;
                 }
                 if self.schedule {
                     __map.serialize_entry("schedule", &self.schedule)?;
@@ -266418,24 +266331,24 @@ pub mod __buffa {
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for UpdateProjectTabsRequestView<'a> {
+        impl<'a> ::buffa::MessageName for UpdateTeamTabsRequestView<'a> {
             const PACKAGE: &'static str = "briar.app.v1";
-            const NAME: &'static str = "UpdateProjectTabsRequest";
-            const FULL_NAME: &'static str = "briar.app.v1.UpdateProjectTabsRequest";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateProjectTabsRequest";
+            const NAME: &'static str = "UpdateTeamTabsRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.UpdateTeamTabsRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateTeamTabsRequest";
         }
-        ::buffa::impl_default_view_instance!(UpdateProjectTabsRequestView);
-        ::buffa::impl_view_reborrow!(UpdateProjectTabsRequestView);
-        /** Self-contained, `'static` owned view of a `UpdateProjectTabsRequest` message.
+        ::buffa::impl_default_view_instance!(UpdateTeamTabsRequestView);
+        ::buffa::impl_view_reborrow!(UpdateTeamTabsRequestView);
+        /** Self-contained, `'static` owned view of a `UpdateTeamTabsRequest` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`UpdateProjectTabsRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`UpdateTeamTabsRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UpdateProjectTabsRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UpdateTeamTabsRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct UpdateProjectTabsRequestOwnedView(
-            ::buffa::OwnedView<UpdateProjectTabsRequestView<'static>>,
+        pub struct UpdateTeamTabsRequestOwnedView(
+            ::buffa::OwnedView<UpdateTeamTabsRequestView<'static>>,
         );
-        impl UpdateProjectTabsRequestOwnedView {
+        impl UpdateTeamTabsRequestOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -266449,7 +266362,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    UpdateProjectTabsRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
+                    UpdateTeamTabsRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
                 )
             }
             /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
@@ -266464,7 +266377,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    UpdateProjectTabsRequestOwnedView(
+                    UpdateTeamTabsRequestOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -266478,17 +266391,15 @@ pub mod __buffa {
             /// another [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::UpdateProjectTabsRequest,
+                msg: &super::super::UpdateTeamTabsRequest,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    UpdateProjectTabsRequestOwnedView(
-                        ::buffa::OwnedView::from_owned(msg)?,
-                    ),
+                    UpdateTeamTabsRequestOwnedView(::buffa::OwnedView::from_owned(msg)?),
                 )
             }
-            /// Borrow the full [`UpdateProjectTabsRequestView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`UpdateTeamTabsRequestView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &UpdateProjectTabsRequestView<'_> {
+            pub fn view(&self) -> &UpdateTeamTabsRequestView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -266499,7 +266410,7 @@ pub mod __buffa {
             /// whose contract also governs handles converted from a raw
             /// [`::buffa::OwnedView`].
             #[must_use]
-            pub fn to_owned_message(&self) -> super::super::UpdateProjectTabsRequest {
+            pub fn to_owned_message(&self) -> super::super::UpdateTeamTabsRequest {
                 self.0.to_owned_message()
             }
             /// The underlying bytes buffer.
@@ -266512,10 +266423,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `project_id`
+            /// Field 1: `team_id`
             #[must_use]
-            pub fn project_id(&self) -> &'_ str {
-                self.0.reborrow().project_id
+            pub fn team_id(&self) -> &'_ str {
+                self.0.reborrow().team_id
             }
             /// Field 2: `schedule`
             #[must_use]
@@ -266524,34 +266435,32 @@ pub mod __buffa {
             }
         }
         impl ::core::convert::From<
-            ::buffa::OwnedView<UpdateProjectTabsRequestView<'static>>,
-        > for UpdateProjectTabsRequestOwnedView {
+            ::buffa::OwnedView<UpdateTeamTabsRequestView<'static>>,
+        > for UpdateTeamTabsRequestOwnedView {
             fn from(
-                inner: ::buffa::OwnedView<UpdateProjectTabsRequestView<'static>>,
+                inner: ::buffa::OwnedView<UpdateTeamTabsRequestView<'static>>,
             ) -> Self {
-                UpdateProjectTabsRequestOwnedView(inner)
+                UpdateTeamTabsRequestOwnedView(inner)
             }
         }
-        impl ::core::convert::From<UpdateProjectTabsRequestOwnedView>
-        for ::buffa::OwnedView<UpdateProjectTabsRequestView<'static>> {
-            fn from(wrapper: UpdateProjectTabsRequestOwnedView) -> Self {
+        impl ::core::convert::From<UpdateTeamTabsRequestOwnedView>
+        for ::buffa::OwnedView<UpdateTeamTabsRequestView<'static>> {
+            fn from(wrapper: UpdateTeamTabsRequestOwnedView) -> Self {
                 wrapper.0
             }
         }
         impl ::core::convert::AsRef<
-            ::buffa::OwnedView<UpdateProjectTabsRequestView<'static>>,
-        > for UpdateProjectTabsRequestOwnedView {
-            fn as_ref(
-                &self,
-            ) -> &::buffa::OwnedView<UpdateProjectTabsRequestView<'static>> {
+            ::buffa::OwnedView<UpdateTeamTabsRequestView<'static>>,
+        > for UpdateTeamTabsRequestOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<UpdateTeamTabsRequestView<'static>> {
                 &self.0
             }
         }
-        impl ::buffa::HasMessageView for super::super::UpdateProjectTabsRequest {
-            type View<'a> = UpdateProjectTabsRequestView<'a>;
-            type ViewHandle = UpdateProjectTabsRequestOwnedView;
+        impl ::buffa::HasMessageView for super::super::UpdateTeamTabsRequest {
+            type View<'a> = UpdateTeamTabsRequestView<'a>;
+            type ViewHandle = UpdateTeamTabsRequestOwnedView;
         }
-        impl ::serde::Serialize for UpdateProjectTabsRequestOwnedView {
+        impl ::serde::Serialize for UpdateTeamTabsRequestOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -266560,15 +266469,15 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
-        pub struct UpdateProjectTabsResponseView<'a> {
-            /// Field 1: `project`
-            pub project: ::buffa::MessageFieldView<
-                super::super::__buffa::view::ProjectView<'a>,
+        pub struct UpdateTeamTabsResponseView<'a> {
+            /// Field 1: `team`
+            pub team: ::buffa::MessageFieldView<
+                super::super::__buffa::view::TeamView<'a>,
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a> for UpdateProjectTabsResponseView<'a> {
-            type Owned = super::super::UpdateProjectTabsResponse;
+        impl<'a> ::buffa::MessageView<'a> for UpdateTeamTabsResponseView<'a> {
+            type Owned = super::super::UpdateTeamTabsResponse;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -266606,7 +266515,7 @@ pub mod __buffa {
                         )?;
                         let __sub_ctx = ctx.descend()?;
                         let sub = ::buffa::types::borrow_bytes(&mut cur)?;
-                        match view.project.as_mut() {
+                        match view.team.as_mut() {
                             Some(existing) => {
                                 ::buffa::MessageView::merge_into_view(
                                     existing,
@@ -266615,8 +266524,8 @@ pub mod __buffa {
                                 )?
                             }
                             None => {
-                                view.project = ::buffa::MessageFieldView::set(
-                                    <super::super::__buffa::view::ProjectView as ::buffa::MessageView>::decode_view_ctx(
+                                view.team = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::TeamView as ::buffa::MessageView>::decode_view_ctx(
                                         sub,
                                         __sub_ctx,
                                     )?,
@@ -266636,7 +266545,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::UpdateProjectTabsResponse,
+                super::super::UpdateTeamTabsResponse,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -266646,18 +266555,18 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::UpdateProjectTabsResponse,
+                super::super::UpdateTeamTabsResponse,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::UpdateProjectTabsResponse {
-                    project: match self.project.as_option() {
+                ::core::result::Result::Ok(super::super::UpdateTeamTabsResponse {
+                    team: match self.team.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
-                                super::super::Project,
-                                ::buffa::Inline<super::super::Project>,
+                                super::super::Team,
+                                ::buffa::Inline<super::super::Team>,
                             >::some(v.to_owned_from_source(__buffa_src)?)
                         }
                         None => ::buffa::MessageField::none(),
@@ -266670,15 +266579,15 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a> for UpdateProjectTabsResponseView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for UpdateTeamTabsResponseView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if self.project.is_set() {
+                if self.team.is_set() {
                     let __slot = __cache.reserve();
-                    let inner_size = self.project.compute_size(__cache);
+                    let inner_size = self.team.compute_size(__cache);
                     __cache.set(__slot, inner_size);
                     size
                         += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
@@ -266695,13 +266604,13 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if self.project.is_set() {
+                if self.team.is_set() {
                     ::buffa::types::put_len_delimited_header(
                         1u32,
                         u64::from(__cache.consume_next()),
                         buf,
                     );
-                    self.project.write_to(__cache, buf);
+                    self.team.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -266717,7 +266626,7 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for UpdateProjectTabsResponseView<'__a> {
+        impl<'__a> ::serde::Serialize for UpdateTeamTabsResponseView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -266725,31 +266634,31 @@ pub mod __buffa {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
                 {
-                    if let ::core::option::Option::Some(__v) = self.project.as_option() {
-                        __map.serialize_entry("project", __v)?;
+                    if let ::core::option::Option::Some(__v) = self.team.as_option() {
+                        __map.serialize_entry("team", __v)?;
                     }
                 }
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for UpdateProjectTabsResponseView<'a> {
+        impl<'a> ::buffa::MessageName for UpdateTeamTabsResponseView<'a> {
             const PACKAGE: &'static str = "briar.app.v1";
-            const NAME: &'static str = "UpdateProjectTabsResponse";
-            const FULL_NAME: &'static str = "briar.app.v1.UpdateProjectTabsResponse";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateProjectTabsResponse";
+            const NAME: &'static str = "UpdateTeamTabsResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.UpdateTeamTabsResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateTeamTabsResponse";
         }
-        ::buffa::impl_default_view_instance!(UpdateProjectTabsResponseView);
-        ::buffa::impl_view_reborrow!(UpdateProjectTabsResponseView);
-        /** Self-contained, `'static` owned view of a `UpdateProjectTabsResponse` message.
+        ::buffa::impl_default_view_instance!(UpdateTeamTabsResponseView);
+        ::buffa::impl_view_reborrow!(UpdateTeamTabsResponseView);
+        /** Self-contained, `'static` owned view of a `UpdateTeamTabsResponse` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`UpdateProjectTabsResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`UpdateTeamTabsResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UpdateProjectTabsResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UpdateTeamTabsResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct UpdateProjectTabsResponseOwnedView(
-            ::buffa::OwnedView<UpdateProjectTabsResponseView<'static>>,
+        pub struct UpdateTeamTabsResponseOwnedView(
+            ::buffa::OwnedView<UpdateTeamTabsResponseView<'static>>,
         );
-        impl UpdateProjectTabsResponseOwnedView {
+        impl UpdateTeamTabsResponseOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -266763,9 +266672,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    UpdateProjectTabsResponseOwnedView(
-                        ::buffa::OwnedView::decode(bytes)?,
-                    ),
+                    UpdateTeamTabsResponseOwnedView(::buffa::OwnedView::decode(bytes)?),
                 )
             }
             /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
@@ -266780,7 +266687,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    UpdateProjectTabsResponseOwnedView(
+                    UpdateTeamTabsResponseOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -266794,17 +266701,15 @@ pub mod __buffa {
             /// another [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::UpdateProjectTabsResponse,
+                msg: &super::super::UpdateTeamTabsResponse,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    UpdateProjectTabsResponseOwnedView(
-                        ::buffa::OwnedView::from_owned(msg)?,
-                    ),
+                    UpdateTeamTabsResponseOwnedView(::buffa::OwnedView::from_owned(msg)?),
                 )
             }
-            /// Borrow the full [`UpdateProjectTabsResponseView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`UpdateTeamTabsResponseView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &UpdateProjectTabsResponseView<'_> {
+            pub fn view(&self) -> &UpdateTeamTabsResponseView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -266815,7 +266720,7 @@ pub mod __buffa {
             /// whose contract also governs handles converted from a raw
             /// [`::buffa::OwnedView`].
             #[must_use]
-            pub fn to_owned_message(&self) -> super::super::UpdateProjectTabsResponse {
+            pub fn to_owned_message(&self) -> super::super::UpdateTeamTabsResponse {
                 self.0.to_owned_message()
             }
             /// The underlying bytes buffer.
@@ -266828,45 +266733,43 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `project`
+            /// Field 1: `team`
             #[must_use]
-            pub fn project(
+            pub fn team(
                 &self,
-            ) -> &::buffa::MessageFieldView<
-                super::super::__buffa::view::ProjectView<'_>,
-            > {
-                &self.0.reborrow().project
+            ) -> &::buffa::MessageFieldView<super::super::__buffa::view::TeamView<'_>> {
+                &self.0.reborrow().team
             }
         }
         impl ::core::convert::From<
-            ::buffa::OwnedView<UpdateProjectTabsResponseView<'static>>,
-        > for UpdateProjectTabsResponseOwnedView {
+            ::buffa::OwnedView<UpdateTeamTabsResponseView<'static>>,
+        > for UpdateTeamTabsResponseOwnedView {
             fn from(
-                inner: ::buffa::OwnedView<UpdateProjectTabsResponseView<'static>>,
+                inner: ::buffa::OwnedView<UpdateTeamTabsResponseView<'static>>,
             ) -> Self {
-                UpdateProjectTabsResponseOwnedView(inner)
+                UpdateTeamTabsResponseOwnedView(inner)
             }
         }
-        impl ::core::convert::From<UpdateProjectTabsResponseOwnedView>
-        for ::buffa::OwnedView<UpdateProjectTabsResponseView<'static>> {
-            fn from(wrapper: UpdateProjectTabsResponseOwnedView) -> Self {
+        impl ::core::convert::From<UpdateTeamTabsResponseOwnedView>
+        for ::buffa::OwnedView<UpdateTeamTabsResponseView<'static>> {
+            fn from(wrapper: UpdateTeamTabsResponseOwnedView) -> Self {
                 wrapper.0
             }
         }
         impl ::core::convert::AsRef<
-            ::buffa::OwnedView<UpdateProjectTabsResponseView<'static>>,
-        > for UpdateProjectTabsResponseOwnedView {
+            ::buffa::OwnedView<UpdateTeamTabsResponseView<'static>>,
+        > for UpdateTeamTabsResponseOwnedView {
             fn as_ref(
                 &self,
-            ) -> &::buffa::OwnedView<UpdateProjectTabsResponseView<'static>> {
+            ) -> &::buffa::OwnedView<UpdateTeamTabsResponseView<'static>> {
                 &self.0
             }
         }
-        impl ::buffa::HasMessageView for super::super::UpdateProjectTabsResponse {
-            type View<'a> = UpdateProjectTabsResponseView<'a>;
-            type ViewHandle = UpdateProjectTabsResponseOwnedView;
+        impl ::buffa::HasMessageView for super::super::UpdateTeamTabsResponse {
+            type View<'a> = UpdateTeamTabsResponseView<'a>;
+            type ViewHandle = UpdateTeamTabsResponseOwnedView;
         }
-        impl ::serde::Serialize for UpdateProjectTabsResponseOwnedView {
+        impl ::serde::Serialize for UpdateTeamTabsResponseOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -266875,13 +266778,13 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
-        pub struct CreateProjectAgentTokenRequestView<'a> {
-            /// Field 1: `project_id`
-            pub project_id: &'a str,
+        pub struct CreateTeamAgentTokenRequestView<'a> {
+            /// Field 1: `team_id`
+            pub team_id: &'a str,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a> for CreateProjectAgentTokenRequestView<'a> {
-            type Owned = super::super::CreateProjectAgentTokenRequest;
+        impl<'a> ::buffa::MessageView<'a> for CreateTeamAgentTokenRequestView<'a> {
+            type Owned = super::super::CreateTeamAgentTokenRequest;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -266917,7 +266820,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.project_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.team_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -266931,7 +266834,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::CreateProjectAgentTokenRequest,
+                super::super::CreateTeamAgentTokenRequest,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -266941,14 +266844,14 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::CreateProjectAgentTokenRequest,
+                super::super::CreateTeamAgentTokenRequest,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::CreateProjectAgentTokenRequest {
-                    project_id: self.project_id.to_string(),
+                ::core::result::Result::Ok(super::super::CreateTeamAgentTokenRequest {
+                    team_id: self.team_id.to_string(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -266957,17 +266860,16 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a> for CreateProjectAgentTokenRequestView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for CreateTeamAgentTokenRequestView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.project_id.is_empty() {
+                if !self.team_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.project_id)
-                                as u64;
+                            + ::buffa::types::string_encoded_len(&self.team_id) as u64;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
@@ -266980,8 +266882,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.project_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.project_id, buf);
+                if !self.team_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.team_id, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -266997,37 +266899,37 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for CreateProjectAgentTokenRequestView<'__a> {
+        impl<'__a> ::serde::Serialize for CreateTeamAgentTokenRequestView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.project_id) {
-                    __map.serialize_entry("projectId", self.project_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.team_id) {
+                    __map.serialize_entry("teamId", self.team_id)?;
                 }
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for CreateProjectAgentTokenRequestView<'a> {
+        impl<'a> ::buffa::MessageName for CreateTeamAgentTokenRequestView<'a> {
             const PACKAGE: &'static str = "briar.app.v1";
-            const NAME: &'static str = "CreateProjectAgentTokenRequest";
-            const FULL_NAME: &'static str = "briar.app.v1.CreateProjectAgentTokenRequest";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateProjectAgentTokenRequest";
+            const NAME: &'static str = "CreateTeamAgentTokenRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.CreateTeamAgentTokenRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateTeamAgentTokenRequest";
         }
-        ::buffa::impl_default_view_instance!(CreateProjectAgentTokenRequestView);
-        ::buffa::impl_view_reborrow!(CreateProjectAgentTokenRequestView);
-        /** Self-contained, `'static` owned view of a `CreateProjectAgentTokenRequest` message.
+        ::buffa::impl_default_view_instance!(CreateTeamAgentTokenRequestView);
+        ::buffa::impl_view_reborrow!(CreateTeamAgentTokenRequestView);
+        /** Self-contained, `'static` owned view of a `CreateTeamAgentTokenRequest` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`CreateProjectAgentTokenRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`CreateTeamAgentTokenRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CreateProjectAgentTokenRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CreateTeamAgentTokenRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct CreateProjectAgentTokenRequestOwnedView(
-            ::buffa::OwnedView<CreateProjectAgentTokenRequestView<'static>>,
+        pub struct CreateTeamAgentTokenRequestOwnedView(
+            ::buffa::OwnedView<CreateTeamAgentTokenRequestView<'static>>,
         );
-        impl CreateProjectAgentTokenRequestOwnedView {
+        impl CreateTeamAgentTokenRequestOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -267041,7 +266943,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    CreateProjectAgentTokenRequestOwnedView(
+                    CreateTeamAgentTokenRequestOwnedView(
                         ::buffa::OwnedView::decode(bytes)?,
                     ),
                 )
@@ -267058,7 +266960,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    CreateProjectAgentTokenRequestOwnedView(
+                    CreateTeamAgentTokenRequestOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -267072,17 +266974,17 @@ pub mod __buffa {
             /// another [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::CreateProjectAgentTokenRequest,
+                msg: &super::super::CreateTeamAgentTokenRequest,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    CreateProjectAgentTokenRequestOwnedView(
+                    CreateTeamAgentTokenRequestOwnedView(
                         ::buffa::OwnedView::from_owned(msg)?,
                     ),
                 )
             }
-            /// Borrow the full [`CreateProjectAgentTokenRequestView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`CreateTeamAgentTokenRequestView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &CreateProjectAgentTokenRequestView<'_> {
+            pub fn view(&self) -> &CreateTeamAgentTokenRequestView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -267093,9 +266995,7 @@ pub mod __buffa {
             /// whose contract also governs handles converted from a raw
             /// [`::buffa::OwnedView`].
             #[must_use]
-            pub fn to_owned_message(
-                &self,
-            ) -> super::super::CreateProjectAgentTokenRequest {
+            pub fn to_owned_message(&self) -> super::super::CreateTeamAgentTokenRequest {
                 self.0.to_owned_message()
             }
             /// The underlying bytes buffer.
@@ -267108,41 +267008,41 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `project_id`
+            /// Field 1: `team_id`
             #[must_use]
-            pub fn project_id(&self) -> &'_ str {
-                self.0.reborrow().project_id
+            pub fn team_id(&self) -> &'_ str {
+                self.0.reborrow().team_id
             }
         }
         impl ::core::convert::From<
-            ::buffa::OwnedView<CreateProjectAgentTokenRequestView<'static>>,
-        > for CreateProjectAgentTokenRequestOwnedView {
+            ::buffa::OwnedView<CreateTeamAgentTokenRequestView<'static>>,
+        > for CreateTeamAgentTokenRequestOwnedView {
             fn from(
-                inner: ::buffa::OwnedView<CreateProjectAgentTokenRequestView<'static>>,
+                inner: ::buffa::OwnedView<CreateTeamAgentTokenRequestView<'static>>,
             ) -> Self {
-                CreateProjectAgentTokenRequestOwnedView(inner)
+                CreateTeamAgentTokenRequestOwnedView(inner)
             }
         }
-        impl ::core::convert::From<CreateProjectAgentTokenRequestOwnedView>
-        for ::buffa::OwnedView<CreateProjectAgentTokenRequestView<'static>> {
-            fn from(wrapper: CreateProjectAgentTokenRequestOwnedView) -> Self {
+        impl ::core::convert::From<CreateTeamAgentTokenRequestOwnedView>
+        for ::buffa::OwnedView<CreateTeamAgentTokenRequestView<'static>> {
+            fn from(wrapper: CreateTeamAgentTokenRequestOwnedView) -> Self {
                 wrapper.0
             }
         }
         impl ::core::convert::AsRef<
-            ::buffa::OwnedView<CreateProjectAgentTokenRequestView<'static>>,
-        > for CreateProjectAgentTokenRequestOwnedView {
+            ::buffa::OwnedView<CreateTeamAgentTokenRequestView<'static>>,
+        > for CreateTeamAgentTokenRequestOwnedView {
             fn as_ref(
                 &self,
-            ) -> &::buffa::OwnedView<CreateProjectAgentTokenRequestView<'static>> {
+            ) -> &::buffa::OwnedView<CreateTeamAgentTokenRequestView<'static>> {
                 &self.0
             }
         }
-        impl ::buffa::HasMessageView for super::super::CreateProjectAgentTokenRequest {
-            type View<'a> = CreateProjectAgentTokenRequestView<'a>;
-            type ViewHandle = CreateProjectAgentTokenRequestOwnedView;
+        impl ::buffa::HasMessageView for super::super::CreateTeamAgentTokenRequest {
+            type View<'a> = CreateTeamAgentTokenRequestView<'a>;
+            type ViewHandle = CreateTeamAgentTokenRequestOwnedView;
         }
-        impl ::serde::Serialize for CreateProjectAgentTokenRequestOwnedView {
+        impl ::serde::Serialize for CreateTeamAgentTokenRequestOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -267151,13 +267051,13 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
-        pub struct CreateProjectAgentTokenResponseView<'a> {
+        pub struct CreateTeamAgentTokenResponseView<'a> {
             /// Field 1: `agent_token`
             pub agent_token: &'a str,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a> for CreateProjectAgentTokenResponseView<'a> {
-            type Owned = super::super::CreateProjectAgentTokenResponse;
+        impl<'a> ::buffa::MessageView<'a> for CreateTeamAgentTokenResponseView<'a> {
+            type Owned = super::super::CreateTeamAgentTokenResponse;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -267207,7 +267107,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::CreateProjectAgentTokenResponse,
+                super::super::CreateTeamAgentTokenResponse,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -267217,13 +267117,13 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::CreateProjectAgentTokenResponse,
+                super::super::CreateTeamAgentTokenResponse,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::CreateProjectAgentTokenResponse {
+                ::core::result::Result::Ok(super::super::CreateTeamAgentTokenResponse {
                     agent_token: self.agent_token.to_string(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
@@ -267233,7 +267133,7 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a> for CreateProjectAgentTokenResponseView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for CreateTeamAgentTokenResponseView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
@@ -267273,7 +267173,7 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for CreateProjectAgentTokenResponseView<'__a> {
+        impl<'__a> ::serde::Serialize for CreateTeamAgentTokenResponseView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -267286,24 +267186,24 @@ pub mod __buffa {
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for CreateProjectAgentTokenResponseView<'a> {
+        impl<'a> ::buffa::MessageName for CreateTeamAgentTokenResponseView<'a> {
             const PACKAGE: &'static str = "briar.app.v1";
-            const NAME: &'static str = "CreateProjectAgentTokenResponse";
-            const FULL_NAME: &'static str = "briar.app.v1.CreateProjectAgentTokenResponse";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateProjectAgentTokenResponse";
+            const NAME: &'static str = "CreateTeamAgentTokenResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.CreateTeamAgentTokenResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateTeamAgentTokenResponse";
         }
-        ::buffa::impl_default_view_instance!(CreateProjectAgentTokenResponseView);
-        ::buffa::impl_view_reborrow!(CreateProjectAgentTokenResponseView);
-        /** Self-contained, `'static` owned view of a `CreateProjectAgentTokenResponse` message.
+        ::buffa::impl_default_view_instance!(CreateTeamAgentTokenResponseView);
+        ::buffa::impl_view_reborrow!(CreateTeamAgentTokenResponseView);
+        /** Self-contained, `'static` owned view of a `CreateTeamAgentTokenResponse` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`CreateProjectAgentTokenResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`CreateTeamAgentTokenResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CreateProjectAgentTokenResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CreateTeamAgentTokenResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct CreateProjectAgentTokenResponseOwnedView(
-            ::buffa::OwnedView<CreateProjectAgentTokenResponseView<'static>>,
+        pub struct CreateTeamAgentTokenResponseOwnedView(
+            ::buffa::OwnedView<CreateTeamAgentTokenResponseView<'static>>,
         );
-        impl CreateProjectAgentTokenResponseOwnedView {
+        impl CreateTeamAgentTokenResponseOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -267317,7 +267217,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    CreateProjectAgentTokenResponseOwnedView(
+                    CreateTeamAgentTokenResponseOwnedView(
                         ::buffa::OwnedView::decode(bytes)?,
                     ),
                 )
@@ -267334,7 +267234,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    CreateProjectAgentTokenResponseOwnedView(
+                    CreateTeamAgentTokenResponseOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -267348,17 +267248,17 @@ pub mod __buffa {
             /// another [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::CreateProjectAgentTokenResponse,
+                msg: &super::super::CreateTeamAgentTokenResponse,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    CreateProjectAgentTokenResponseOwnedView(
+                    CreateTeamAgentTokenResponseOwnedView(
                         ::buffa::OwnedView::from_owned(msg)?,
                     ),
                 )
             }
-            /// Borrow the full [`CreateProjectAgentTokenResponseView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`CreateTeamAgentTokenResponseView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &CreateProjectAgentTokenResponseView<'_> {
+            pub fn view(&self) -> &CreateTeamAgentTokenResponseView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -267371,7 +267271,7 @@ pub mod __buffa {
             #[must_use]
             pub fn to_owned_message(
                 &self,
-            ) -> super::super::CreateProjectAgentTokenResponse {
+            ) -> super::super::CreateTeamAgentTokenResponse {
                 self.0.to_owned_message()
             }
             /// The underlying bytes buffer.
@@ -267391,34 +267291,34 @@ pub mod __buffa {
             }
         }
         impl ::core::convert::From<
-            ::buffa::OwnedView<CreateProjectAgentTokenResponseView<'static>>,
-        > for CreateProjectAgentTokenResponseOwnedView {
+            ::buffa::OwnedView<CreateTeamAgentTokenResponseView<'static>>,
+        > for CreateTeamAgentTokenResponseOwnedView {
             fn from(
-                inner: ::buffa::OwnedView<CreateProjectAgentTokenResponseView<'static>>,
+                inner: ::buffa::OwnedView<CreateTeamAgentTokenResponseView<'static>>,
             ) -> Self {
-                CreateProjectAgentTokenResponseOwnedView(inner)
+                CreateTeamAgentTokenResponseOwnedView(inner)
             }
         }
-        impl ::core::convert::From<CreateProjectAgentTokenResponseOwnedView>
-        for ::buffa::OwnedView<CreateProjectAgentTokenResponseView<'static>> {
-            fn from(wrapper: CreateProjectAgentTokenResponseOwnedView) -> Self {
+        impl ::core::convert::From<CreateTeamAgentTokenResponseOwnedView>
+        for ::buffa::OwnedView<CreateTeamAgentTokenResponseView<'static>> {
+            fn from(wrapper: CreateTeamAgentTokenResponseOwnedView) -> Self {
                 wrapper.0
             }
         }
         impl ::core::convert::AsRef<
-            ::buffa::OwnedView<CreateProjectAgentTokenResponseView<'static>>,
-        > for CreateProjectAgentTokenResponseOwnedView {
+            ::buffa::OwnedView<CreateTeamAgentTokenResponseView<'static>>,
+        > for CreateTeamAgentTokenResponseOwnedView {
             fn as_ref(
                 &self,
-            ) -> &::buffa::OwnedView<CreateProjectAgentTokenResponseView<'static>> {
+            ) -> &::buffa::OwnedView<CreateTeamAgentTokenResponseView<'static>> {
                 &self.0
             }
         }
-        impl ::buffa::HasMessageView for super::super::CreateProjectAgentTokenResponse {
-            type View<'a> = CreateProjectAgentTokenResponseView<'a>;
-            type ViewHandle = CreateProjectAgentTokenResponseOwnedView;
+        impl ::buffa::HasMessageView for super::super::CreateTeamAgentTokenResponse {
+            type View<'a> = CreateTeamAgentTokenResponseView<'a>;
+            type ViewHandle = CreateTeamAgentTokenResponseOwnedView;
         }
-        impl ::serde::Serialize for CreateProjectAgentTokenResponseOwnedView {
+        impl ::serde::Serialize for CreateTeamAgentTokenResponseOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -267736,7 +267636,7 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
-        pub struct ProjectSettingsView<'a> {
+        pub struct TeamSettingsView<'a> {
             /// Field 1: `velen_org`
             pub velen_org: ::core::option::Option<&'a str>,
             /// Field 2: `data_source`
@@ -267763,8 +267663,8 @@ pub mod __buffa {
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a> for ProjectSettingsView<'a> {
-            type Owned = super::super::ProjectSettings;
+        impl<'a> ::buffa::MessageView<'a> for TeamSettingsView<'a> {
+            type Owned = super::super::TeamSettings;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -267914,7 +267814,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::ProjectSettings,
+                super::super::TeamSettings,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -267924,13 +267824,13 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::ProjectSettings,
+                super::super::TeamSettings,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::ProjectSettings {
+                ::core::result::Result::Ok(super::super::TeamSettings {
                     velen_org: self.velen_org.map(|s| s.to_string()),
                     data_source: self.data_source.map(|s| s.to_string()),
                     linear: match self.linear.as_option() {
@@ -267974,7 +267874,7 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a> for ProjectSettingsView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for TeamSettingsView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
@@ -268077,7 +267977,7 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for ProjectSettingsView<'__a> {
+        impl<'__a> ::serde::Serialize for TeamSettingsView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -268122,24 +268022,22 @@ pub mod __buffa {
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for ProjectSettingsView<'a> {
+        impl<'a> ::buffa::MessageName for TeamSettingsView<'a> {
             const PACKAGE: &'static str = "briar.app.v1";
-            const NAME: &'static str = "ProjectSettings";
-            const FULL_NAME: &'static str = "briar.app.v1.ProjectSettings";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ProjectSettings";
+            const NAME: &'static str = "TeamSettings";
+            const FULL_NAME: &'static str = "briar.app.v1.TeamSettings";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.TeamSettings";
         }
-        ::buffa::impl_default_view_instance!(ProjectSettingsView);
-        ::buffa::impl_view_reborrow!(ProjectSettingsView);
-        /** Self-contained, `'static` owned view of a `ProjectSettings` message.
+        ::buffa::impl_default_view_instance!(TeamSettingsView);
+        ::buffa::impl_view_reborrow!(TeamSettingsView);
+        /** Self-contained, `'static` owned view of a `TeamSettings` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`ProjectSettingsView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`TeamSettingsView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ProjectSettingsView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`TeamSettingsView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct ProjectSettingsOwnedView(
-            ::buffa::OwnedView<ProjectSettingsView<'static>>,
-        );
-        impl ProjectSettingsOwnedView {
+        pub struct TeamSettingsOwnedView(::buffa::OwnedView<TeamSettingsView<'static>>);
+        impl TeamSettingsOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -268153,7 +268051,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    ProjectSettingsOwnedView(::buffa::OwnedView::decode(bytes)?),
+                    TeamSettingsOwnedView(::buffa::OwnedView::decode(bytes)?),
                 )
             }
             /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
@@ -268168,7 +268066,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    ProjectSettingsOwnedView(
+                    TeamSettingsOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -268182,15 +268080,15 @@ pub mod __buffa {
             /// another [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::ProjectSettings,
+                msg: &super::super::TeamSettings,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    ProjectSettingsOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                    TeamSettingsOwnedView(::buffa::OwnedView::from_owned(msg)?),
                 )
             }
-            /// Borrow the full [`ProjectSettingsView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`TeamSettingsView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &ProjectSettingsView<'_> {
+            pub fn view(&self) -> &TeamSettingsView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -268201,7 +268099,7 @@ pub mod __buffa {
             /// whose contract also governs handles converted from a raw
             /// [`::buffa::OwnedView`].
             #[must_use]
-            pub fn to_owned_message(&self) -> super::super::ProjectSettings {
+            pub fn to_owned_message(&self) -> super::super::TeamSettings {
                 self.0.to_owned_message()
             }
             /// The underlying bytes buffer.
@@ -268266,29 +268164,29 @@ pub mod __buffa {
                 &self.0.reborrow().checkpoint_policy
             }
         }
-        impl ::core::convert::From<::buffa::OwnedView<ProjectSettingsView<'static>>>
-        for ProjectSettingsOwnedView {
-            fn from(inner: ::buffa::OwnedView<ProjectSettingsView<'static>>) -> Self {
-                ProjectSettingsOwnedView(inner)
+        impl ::core::convert::From<::buffa::OwnedView<TeamSettingsView<'static>>>
+        for TeamSettingsOwnedView {
+            fn from(inner: ::buffa::OwnedView<TeamSettingsView<'static>>) -> Self {
+                TeamSettingsOwnedView(inner)
             }
         }
-        impl ::core::convert::From<ProjectSettingsOwnedView>
-        for ::buffa::OwnedView<ProjectSettingsView<'static>> {
-            fn from(wrapper: ProjectSettingsOwnedView) -> Self {
+        impl ::core::convert::From<TeamSettingsOwnedView>
+        for ::buffa::OwnedView<TeamSettingsView<'static>> {
+            fn from(wrapper: TeamSettingsOwnedView) -> Self {
                 wrapper.0
             }
         }
-        impl ::core::convert::AsRef<::buffa::OwnedView<ProjectSettingsView<'static>>>
-        for ProjectSettingsOwnedView {
-            fn as_ref(&self) -> &::buffa::OwnedView<ProjectSettingsView<'static>> {
+        impl ::core::convert::AsRef<::buffa::OwnedView<TeamSettingsView<'static>>>
+        for TeamSettingsOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<TeamSettingsView<'static>> {
                 &self.0
             }
         }
-        impl ::buffa::HasMessageView for super::super::ProjectSettings {
-            type View<'a> = ProjectSettingsView<'a>;
-            type ViewHandle = ProjectSettingsOwnedView;
+        impl ::buffa::HasMessageView for super::super::TeamSettings {
+            type View<'a> = TeamSettingsView<'a>;
+            type ViewHandle = TeamSettingsOwnedView;
         }
-        impl ::serde::Serialize for ProjectSettingsOwnedView {
+        impl ::serde::Serialize for TeamSettingsOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -268297,9 +268195,9 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
-        pub struct UpdateProjectSettingsRequestView<'a> {
-            /// Field 1: `project_id`
-            pub project_id: &'a str,
+        pub struct UpdateTeamSettingsRequestView<'a> {
+            /// Field 1: `team_id`
+            pub team_id: &'a str,
             /// Field 2: `velen_org`
             pub velen_org: ::core::option::Option<&'a str>,
             /// Field 3: `data_source`
@@ -268318,8 +268216,8 @@ pub mod __buffa {
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a> for UpdateProjectSettingsRequestView<'a> {
-            type Owned = super::super::UpdateProjectSettingsRequest;
+        impl<'a> ::buffa::MessageView<'a> for UpdateTeamSettingsRequestView<'a> {
+            type Owned = super::super::UpdateTeamSettingsRequest;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -268355,7 +268253,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.project_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.team_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -268442,7 +268340,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::UpdateProjectSettingsRequest,
+                super::super::UpdateTeamSettingsRequest,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -268452,14 +268350,14 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::UpdateProjectSettingsRequest,
+                super::super::UpdateTeamSettingsRequest,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::UpdateProjectSettingsRequest {
-                    project_id: self.project_id.to_string(),
+                ::core::result::Result::Ok(super::super::UpdateTeamSettingsRequest {
+                    team_id: self.team_id.to_string(),
                     velen_org: self.velen_org.map(|s| s.to_string()),
                     data_source: self.data_source.map(|s| s.to_string()),
                     linear: match self.linear.as_option() {
@@ -268491,17 +268389,16 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a> for UpdateProjectSettingsRequestView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for UpdateTeamSettingsRequestView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.project_id.is_empty() {
+                if !self.team_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.project_id)
-                                as u64;
+                            + ::buffa::types::string_encoded_len(&self.team_id) as u64;
                 }
                 if let Some(ref v) = self.velen_org {
                     size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
@@ -268539,8 +268436,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.project_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.project_id, buf);
+                if !self.team_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.team_id, buf);
                 }
                 if let Some(ref v) = self.velen_org {
                     ::buffa::types::put_string_field(2u32, v, buf);
@@ -268581,15 +268478,15 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for UpdateProjectSettingsRequestView<'__a> {
+        impl<'__a> ::serde::Serialize for UpdateTeamSettingsRequestView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.project_id) {
-                    __map.serialize_entry("projectId", self.project_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.team_id) {
+                    __map.serialize_entry("teamId", self.team_id)?;
                 }
                 if let ::core::option::Option::Some(__v) = self.velen_org {
                     __map.serialize_entry("velenOrg", __v)?;
@@ -268614,24 +268511,24 @@ pub mod __buffa {
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for UpdateProjectSettingsRequestView<'a> {
+        impl<'a> ::buffa::MessageName for UpdateTeamSettingsRequestView<'a> {
             const PACKAGE: &'static str = "briar.app.v1";
-            const NAME: &'static str = "UpdateProjectSettingsRequest";
-            const FULL_NAME: &'static str = "briar.app.v1.UpdateProjectSettingsRequest";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateProjectSettingsRequest";
+            const NAME: &'static str = "UpdateTeamSettingsRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.UpdateTeamSettingsRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateTeamSettingsRequest";
         }
-        ::buffa::impl_default_view_instance!(UpdateProjectSettingsRequestView);
-        ::buffa::impl_view_reborrow!(UpdateProjectSettingsRequestView);
-        /** Self-contained, `'static` owned view of a `UpdateProjectSettingsRequest` message.
+        ::buffa::impl_default_view_instance!(UpdateTeamSettingsRequestView);
+        ::buffa::impl_view_reborrow!(UpdateTeamSettingsRequestView);
+        /** Self-contained, `'static` owned view of a `UpdateTeamSettingsRequest` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`UpdateProjectSettingsRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`UpdateTeamSettingsRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UpdateProjectSettingsRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UpdateTeamSettingsRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct UpdateProjectSettingsRequestOwnedView(
-            ::buffa::OwnedView<UpdateProjectSettingsRequestView<'static>>,
+        pub struct UpdateTeamSettingsRequestOwnedView(
+            ::buffa::OwnedView<UpdateTeamSettingsRequestView<'static>>,
         );
-        impl UpdateProjectSettingsRequestOwnedView {
+        impl UpdateTeamSettingsRequestOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -268645,7 +268542,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    UpdateProjectSettingsRequestOwnedView(
+                    UpdateTeamSettingsRequestOwnedView(
                         ::buffa::OwnedView::decode(bytes)?,
                     ),
                 )
@@ -268662,7 +268559,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    UpdateProjectSettingsRequestOwnedView(
+                    UpdateTeamSettingsRequestOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -268676,17 +268573,17 @@ pub mod __buffa {
             /// another [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::UpdateProjectSettingsRequest,
+                msg: &super::super::UpdateTeamSettingsRequest,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    UpdateProjectSettingsRequestOwnedView(
+                    UpdateTeamSettingsRequestOwnedView(
                         ::buffa::OwnedView::from_owned(msg)?,
                     ),
                 )
             }
-            /// Borrow the full [`UpdateProjectSettingsRequestView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`UpdateTeamSettingsRequestView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &UpdateProjectSettingsRequestView<'_> {
+            pub fn view(&self) -> &UpdateTeamSettingsRequestView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -268697,9 +268594,7 @@ pub mod __buffa {
             /// whose contract also governs handles converted from a raw
             /// [`::buffa::OwnedView`].
             #[must_use]
-            pub fn to_owned_message(
-                &self,
-            ) -> super::super::UpdateProjectSettingsRequest {
+            pub fn to_owned_message(&self) -> super::super::UpdateTeamSettingsRequest {
                 self.0.to_owned_message()
             }
             /// The underlying bytes buffer.
@@ -268712,10 +268607,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `project_id`
+            /// Field 1: `team_id`
             #[must_use]
-            pub fn project_id(&self) -> &'_ str {
-                self.0.reborrow().project_id
+            pub fn team_id(&self) -> &'_ str {
+                self.0.reborrow().team_id
             }
             /// Field 2: `velen_org`
             #[must_use]
@@ -268754,34 +268649,34 @@ pub mod __buffa {
             }
         }
         impl ::core::convert::From<
-            ::buffa::OwnedView<UpdateProjectSettingsRequestView<'static>>,
-        > for UpdateProjectSettingsRequestOwnedView {
+            ::buffa::OwnedView<UpdateTeamSettingsRequestView<'static>>,
+        > for UpdateTeamSettingsRequestOwnedView {
             fn from(
-                inner: ::buffa::OwnedView<UpdateProjectSettingsRequestView<'static>>,
+                inner: ::buffa::OwnedView<UpdateTeamSettingsRequestView<'static>>,
             ) -> Self {
-                UpdateProjectSettingsRequestOwnedView(inner)
+                UpdateTeamSettingsRequestOwnedView(inner)
             }
         }
-        impl ::core::convert::From<UpdateProjectSettingsRequestOwnedView>
-        for ::buffa::OwnedView<UpdateProjectSettingsRequestView<'static>> {
-            fn from(wrapper: UpdateProjectSettingsRequestOwnedView) -> Self {
+        impl ::core::convert::From<UpdateTeamSettingsRequestOwnedView>
+        for ::buffa::OwnedView<UpdateTeamSettingsRequestView<'static>> {
+            fn from(wrapper: UpdateTeamSettingsRequestOwnedView) -> Self {
                 wrapper.0
             }
         }
         impl ::core::convert::AsRef<
-            ::buffa::OwnedView<UpdateProjectSettingsRequestView<'static>>,
-        > for UpdateProjectSettingsRequestOwnedView {
+            ::buffa::OwnedView<UpdateTeamSettingsRequestView<'static>>,
+        > for UpdateTeamSettingsRequestOwnedView {
             fn as_ref(
                 &self,
-            ) -> &::buffa::OwnedView<UpdateProjectSettingsRequestView<'static>> {
+            ) -> &::buffa::OwnedView<UpdateTeamSettingsRequestView<'static>> {
                 &self.0
             }
         }
-        impl ::buffa::HasMessageView for super::super::UpdateProjectSettingsRequest {
-            type View<'a> = UpdateProjectSettingsRequestView<'a>;
-            type ViewHandle = UpdateProjectSettingsRequestOwnedView;
+        impl ::buffa::HasMessageView for super::super::UpdateTeamSettingsRequest {
+            type View<'a> = UpdateTeamSettingsRequestView<'a>;
+            type ViewHandle = UpdateTeamSettingsRequestOwnedView;
         }
-        impl ::serde::Serialize for UpdateProjectSettingsRequestOwnedView {
+        impl ::serde::Serialize for UpdateTeamSettingsRequestOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -268790,15 +268685,15 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
-        pub struct UpdateProjectSettingsResponseView<'a> {
+        pub struct UpdateTeamSettingsResponseView<'a> {
             /// Field 1: `settings`
             pub settings: ::buffa::MessageFieldView<
-                super::super::__buffa::view::ProjectSettingsView<'a>,
+                super::super::__buffa::view::TeamSettingsView<'a>,
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a> for UpdateProjectSettingsResponseView<'a> {
-            type Owned = super::super::UpdateProjectSettingsResponse;
+        impl<'a> ::buffa::MessageView<'a> for UpdateTeamSettingsResponseView<'a> {
+            type Owned = super::super::UpdateTeamSettingsResponse;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -268846,7 +268741,7 @@ pub mod __buffa {
                             }
                             None => {
                                 view.settings = ::buffa::MessageFieldView::set(
-                                    <super::super::__buffa::view::ProjectSettingsView as ::buffa::MessageView>::decode_view_ctx(
+                                    <super::super::__buffa::view::TeamSettingsView as ::buffa::MessageView>::decode_view_ctx(
                                         sub,
                                         __sub_ctx,
                                     )?,
@@ -268866,7 +268761,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::UpdateProjectSettingsResponse,
+                super::super::UpdateTeamSettingsResponse,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -268876,18 +268771,18 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::UpdateProjectSettingsResponse,
+                super::super::UpdateTeamSettingsResponse,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::UpdateProjectSettingsResponse {
+                ::core::result::Result::Ok(super::super::UpdateTeamSettingsResponse {
                     settings: match self.settings.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
-                                super::super::ProjectSettings,
-                                ::buffa::Inline<super::super::ProjectSettings>,
+                                super::super::TeamSettings,
+                                ::buffa::Inline<super::super::TeamSettings>,
                             >::some(v.to_owned_from_source(__buffa_src)?)
                         }
                         None => ::buffa::MessageField::none(),
@@ -268900,7 +268795,7 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a> for UpdateProjectSettingsResponseView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for UpdateTeamSettingsResponseView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
@@ -268947,7 +268842,7 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for UpdateProjectSettingsResponseView<'__a> {
+        impl<'__a> ::serde::Serialize for UpdateTeamSettingsResponseView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -268963,24 +268858,24 @@ pub mod __buffa {
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for UpdateProjectSettingsResponseView<'a> {
+        impl<'a> ::buffa::MessageName for UpdateTeamSettingsResponseView<'a> {
             const PACKAGE: &'static str = "briar.app.v1";
-            const NAME: &'static str = "UpdateProjectSettingsResponse";
-            const FULL_NAME: &'static str = "briar.app.v1.UpdateProjectSettingsResponse";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateProjectSettingsResponse";
+            const NAME: &'static str = "UpdateTeamSettingsResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.UpdateTeamSettingsResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateTeamSettingsResponse";
         }
-        ::buffa::impl_default_view_instance!(UpdateProjectSettingsResponseView);
-        ::buffa::impl_view_reborrow!(UpdateProjectSettingsResponseView);
-        /** Self-contained, `'static` owned view of a `UpdateProjectSettingsResponse` message.
+        ::buffa::impl_default_view_instance!(UpdateTeamSettingsResponseView);
+        ::buffa::impl_view_reborrow!(UpdateTeamSettingsResponseView);
+        /** Self-contained, `'static` owned view of a `UpdateTeamSettingsResponse` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`UpdateProjectSettingsResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`UpdateTeamSettingsResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UpdateProjectSettingsResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UpdateTeamSettingsResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct UpdateProjectSettingsResponseOwnedView(
-            ::buffa::OwnedView<UpdateProjectSettingsResponseView<'static>>,
+        pub struct UpdateTeamSettingsResponseOwnedView(
+            ::buffa::OwnedView<UpdateTeamSettingsResponseView<'static>>,
         );
-        impl UpdateProjectSettingsResponseOwnedView {
+        impl UpdateTeamSettingsResponseOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -268994,7 +268889,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    UpdateProjectSettingsResponseOwnedView(
+                    UpdateTeamSettingsResponseOwnedView(
                         ::buffa::OwnedView::decode(bytes)?,
                     ),
                 )
@@ -269011,7 +268906,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    UpdateProjectSettingsResponseOwnedView(
+                    UpdateTeamSettingsResponseOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -269025,17 +268920,17 @@ pub mod __buffa {
             /// another [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::UpdateProjectSettingsResponse,
+                msg: &super::super::UpdateTeamSettingsResponse,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    UpdateProjectSettingsResponseOwnedView(
+                    UpdateTeamSettingsResponseOwnedView(
                         ::buffa::OwnedView::from_owned(msg)?,
                     ),
                 )
             }
-            /// Borrow the full [`UpdateProjectSettingsResponseView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`UpdateTeamSettingsResponseView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &UpdateProjectSettingsResponseView<'_> {
+            pub fn view(&self) -> &UpdateTeamSettingsResponseView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -269046,9 +268941,7 @@ pub mod __buffa {
             /// whose contract also governs handles converted from a raw
             /// [`::buffa::OwnedView`].
             #[must_use]
-            pub fn to_owned_message(
-                &self,
-            ) -> super::super::UpdateProjectSettingsResponse {
+            pub fn to_owned_message(&self) -> super::super::UpdateTeamSettingsResponse {
                 self.0.to_owned_message()
             }
             /// The underlying bytes buffer.
@@ -269066,40 +268959,40 @@ pub mod __buffa {
             pub fn settings(
                 &self,
             ) -> &::buffa::MessageFieldView<
-                super::super::__buffa::view::ProjectSettingsView<'_>,
+                super::super::__buffa::view::TeamSettingsView<'_>,
             > {
                 &self.0.reborrow().settings
             }
         }
         impl ::core::convert::From<
-            ::buffa::OwnedView<UpdateProjectSettingsResponseView<'static>>,
-        > for UpdateProjectSettingsResponseOwnedView {
+            ::buffa::OwnedView<UpdateTeamSettingsResponseView<'static>>,
+        > for UpdateTeamSettingsResponseOwnedView {
             fn from(
-                inner: ::buffa::OwnedView<UpdateProjectSettingsResponseView<'static>>,
+                inner: ::buffa::OwnedView<UpdateTeamSettingsResponseView<'static>>,
             ) -> Self {
-                UpdateProjectSettingsResponseOwnedView(inner)
+                UpdateTeamSettingsResponseOwnedView(inner)
             }
         }
-        impl ::core::convert::From<UpdateProjectSettingsResponseOwnedView>
-        for ::buffa::OwnedView<UpdateProjectSettingsResponseView<'static>> {
-            fn from(wrapper: UpdateProjectSettingsResponseOwnedView) -> Self {
+        impl ::core::convert::From<UpdateTeamSettingsResponseOwnedView>
+        for ::buffa::OwnedView<UpdateTeamSettingsResponseView<'static>> {
+            fn from(wrapper: UpdateTeamSettingsResponseOwnedView) -> Self {
                 wrapper.0
             }
         }
         impl ::core::convert::AsRef<
-            ::buffa::OwnedView<UpdateProjectSettingsResponseView<'static>>,
-        > for UpdateProjectSettingsResponseOwnedView {
+            ::buffa::OwnedView<UpdateTeamSettingsResponseView<'static>>,
+        > for UpdateTeamSettingsResponseOwnedView {
             fn as_ref(
                 &self,
-            ) -> &::buffa::OwnedView<UpdateProjectSettingsResponseView<'static>> {
+            ) -> &::buffa::OwnedView<UpdateTeamSettingsResponseView<'static>> {
                 &self.0
             }
         }
-        impl ::buffa::HasMessageView for super::super::UpdateProjectSettingsResponse {
-            type View<'a> = UpdateProjectSettingsResponseView<'a>;
-            type ViewHandle = UpdateProjectSettingsResponseOwnedView;
+        impl ::buffa::HasMessageView for super::super::UpdateTeamSettingsResponse {
+            type View<'a> = UpdateTeamSettingsResponseView<'a>;
+            type ViewHandle = UpdateTeamSettingsResponseOwnedView;
         }
-        impl ::serde::Serialize for UpdateProjectSettingsResponseOwnedView {
+        impl ::serde::Serialize for UpdateTeamSettingsResponseOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -269109,8 +269002,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct UpdateCheckpointPolicyRequestView<'a> {
-            /// Field 1: `project_id`
-            pub project_id: &'a str,
+            /// Field 1: `team_id`
+            pub team_id: &'a str,
             /// Field 2: `scope`
             pub scope: ::buffa::EnumValue<
                 super::super::update_checkpoint_policy_request::Scope,
@@ -269163,7 +269056,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.project_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.team_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -269232,7 +269125,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::UpdateCheckpointPolicyRequest {
-                    project_id: self.project_id.to_string(),
+                    team_id: self.team_id.to_string(),
                     scope: self.scope,
                     checkpoints: self
                         .checkpoints
@@ -269254,11 +269147,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.project_id.is_empty() {
+                if !self.team_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.project_id)
-                                as u64;
+                            + ::buffa::types::string_encoded_len(&self.team_id) as u64;
                 }
                 {
                     let val = self.scope.to_i32();
@@ -269291,8 +269183,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.project_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.project_id, buf);
+                if !self.team_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.team_id, buf);
                 }
                 {
                     let val = self.scope.to_i32();
@@ -269332,8 +269224,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.project_id) {
-                    __map.serialize_entry("projectId", self.project_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.team_id) {
+                    __map.serialize_entry("teamId", self.team_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.scope) {
                     __map.serialize_entry("scope", &self.scope)?;
@@ -269451,10 +269343,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `project_id`
+            /// Field 1: `team_id`
             #[must_use]
-            pub fn project_id(&self) -> &'_ str {
-                self.0.reborrow().project_id
+            pub fn team_id(&self) -> &'_ str {
+                self.0.reborrow().team_id
             }
             /// Field 2: `scope`
             #[must_use]
@@ -269846,10 +269738,10 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
-        pub struct ProjectExecutionWorkerPolicyView<'a> {
+        pub struct TeamExecutionWorkerPolicyView<'a> {
             /// Field 1: `selection_mode`
             pub selection_mode: ::buffa::EnumValue<
-                super::super::project_execution_worker_policy::SelectionMode,
+                super::super::team_execution_worker_policy::SelectionMode,
             >,
             /// Field 2: `default_worker_id`
             pub default_worker_id: ::core::option::Option<&'a str>,
@@ -269861,8 +269753,8 @@ pub mod __buffa {
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a> for ProjectExecutionWorkerPolicyView<'a> {
-            type Owned = super::super::ProjectExecutionWorkerPolicy;
+        impl<'a> ::buffa::MessageView<'a> for TeamExecutionWorkerPolicyView<'a> {
+            type Owned = super::super::TeamExecutionWorkerPolicy;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -269959,7 +269851,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::ProjectExecutionWorkerPolicy,
+                super::super::TeamExecutionWorkerPolicy,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -269969,13 +269861,13 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::ProjectExecutionWorkerPolicy,
+                super::super::TeamExecutionWorkerPolicy,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::ProjectExecutionWorkerPolicy {
+                ::core::result::Result::Ok(super::super::TeamExecutionWorkerPolicy {
                     selection_mode: self.selection_mode,
                     default_worker_id: self.default_worker_id.map(|s| s.to_string()),
                     allowed_worker_ids: self
@@ -270000,7 +269892,7 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a> for ProjectExecutionWorkerPolicyView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for TeamExecutionWorkerPolicyView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
@@ -270071,7 +269963,7 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for ProjectExecutionWorkerPolicyView<'__a> {
+        impl<'__a> ::serde::Serialize for TeamExecutionWorkerPolicyView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -270101,24 +269993,24 @@ pub mod __buffa {
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for ProjectExecutionWorkerPolicyView<'a> {
+        impl<'a> ::buffa::MessageName for TeamExecutionWorkerPolicyView<'a> {
             const PACKAGE: &'static str = "briar.app.v1";
-            const NAME: &'static str = "ProjectExecutionWorkerPolicy";
-            const FULL_NAME: &'static str = "briar.app.v1.ProjectExecutionWorkerPolicy";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ProjectExecutionWorkerPolicy";
+            const NAME: &'static str = "TeamExecutionWorkerPolicy";
+            const FULL_NAME: &'static str = "briar.app.v1.TeamExecutionWorkerPolicy";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.TeamExecutionWorkerPolicy";
         }
-        ::buffa::impl_default_view_instance!(ProjectExecutionWorkerPolicyView);
-        ::buffa::impl_view_reborrow!(ProjectExecutionWorkerPolicyView);
-        /** Self-contained, `'static` owned view of a `ProjectExecutionWorkerPolicy` message.
+        ::buffa::impl_default_view_instance!(TeamExecutionWorkerPolicyView);
+        ::buffa::impl_view_reborrow!(TeamExecutionWorkerPolicyView);
+        /** Self-contained, `'static` owned view of a `TeamExecutionWorkerPolicy` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`ProjectExecutionWorkerPolicyView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`TeamExecutionWorkerPolicyView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ProjectExecutionWorkerPolicyView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`TeamExecutionWorkerPolicyView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct ProjectExecutionWorkerPolicyOwnedView(
-            ::buffa::OwnedView<ProjectExecutionWorkerPolicyView<'static>>,
+        pub struct TeamExecutionWorkerPolicyOwnedView(
+            ::buffa::OwnedView<TeamExecutionWorkerPolicyView<'static>>,
         );
-        impl ProjectExecutionWorkerPolicyOwnedView {
+        impl TeamExecutionWorkerPolicyOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -270132,7 +270024,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    ProjectExecutionWorkerPolicyOwnedView(
+                    TeamExecutionWorkerPolicyOwnedView(
                         ::buffa::OwnedView::decode(bytes)?,
                     ),
                 )
@@ -270149,7 +270041,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    ProjectExecutionWorkerPolicyOwnedView(
+                    TeamExecutionWorkerPolicyOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -270163,17 +270055,17 @@ pub mod __buffa {
             /// another [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::ProjectExecutionWorkerPolicy,
+                msg: &super::super::TeamExecutionWorkerPolicy,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    ProjectExecutionWorkerPolicyOwnedView(
+                    TeamExecutionWorkerPolicyOwnedView(
                         ::buffa::OwnedView::from_owned(msg)?,
                     ),
                 )
             }
-            /// Borrow the full [`ProjectExecutionWorkerPolicyView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`TeamExecutionWorkerPolicyView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &ProjectExecutionWorkerPolicyView<'_> {
+            pub fn view(&self) -> &TeamExecutionWorkerPolicyView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -270184,9 +270076,7 @@ pub mod __buffa {
             /// whose contract also governs handles converted from a raw
             /// [`::buffa::OwnedView`].
             #[must_use]
-            pub fn to_owned_message(
-                &self,
-            ) -> super::super::ProjectExecutionWorkerPolicy {
+            pub fn to_owned_message(&self) -> super::super::TeamExecutionWorkerPolicy {
                 self.0.to_owned_message()
             }
             /// The underlying bytes buffer.
@@ -270204,7 +270094,7 @@ pub mod __buffa {
             pub fn selection_mode(
                 &self,
             ) -> ::buffa::EnumValue<
-                super::super::project_execution_worker_policy::SelectionMode,
+                super::super::team_execution_worker_policy::SelectionMode,
             > {
                 self.0.reborrow().selection_mode
             }
@@ -270229,34 +270119,34 @@ pub mod __buffa {
             }
         }
         impl ::core::convert::From<
-            ::buffa::OwnedView<ProjectExecutionWorkerPolicyView<'static>>,
-        > for ProjectExecutionWorkerPolicyOwnedView {
+            ::buffa::OwnedView<TeamExecutionWorkerPolicyView<'static>>,
+        > for TeamExecutionWorkerPolicyOwnedView {
             fn from(
-                inner: ::buffa::OwnedView<ProjectExecutionWorkerPolicyView<'static>>,
+                inner: ::buffa::OwnedView<TeamExecutionWorkerPolicyView<'static>>,
             ) -> Self {
-                ProjectExecutionWorkerPolicyOwnedView(inner)
+                TeamExecutionWorkerPolicyOwnedView(inner)
             }
         }
-        impl ::core::convert::From<ProjectExecutionWorkerPolicyOwnedView>
-        for ::buffa::OwnedView<ProjectExecutionWorkerPolicyView<'static>> {
-            fn from(wrapper: ProjectExecutionWorkerPolicyOwnedView) -> Self {
+        impl ::core::convert::From<TeamExecutionWorkerPolicyOwnedView>
+        for ::buffa::OwnedView<TeamExecutionWorkerPolicyView<'static>> {
+            fn from(wrapper: TeamExecutionWorkerPolicyOwnedView) -> Self {
                 wrapper.0
             }
         }
         impl ::core::convert::AsRef<
-            ::buffa::OwnedView<ProjectExecutionWorkerPolicyView<'static>>,
-        > for ProjectExecutionWorkerPolicyOwnedView {
+            ::buffa::OwnedView<TeamExecutionWorkerPolicyView<'static>>,
+        > for TeamExecutionWorkerPolicyOwnedView {
             fn as_ref(
                 &self,
-            ) -> &::buffa::OwnedView<ProjectExecutionWorkerPolicyView<'static>> {
+            ) -> &::buffa::OwnedView<TeamExecutionWorkerPolicyView<'static>> {
                 &self.0
             }
         }
-        impl ::buffa::HasMessageView for super::super::ProjectExecutionWorkerPolicy {
-            type View<'a> = ProjectExecutionWorkerPolicyView<'a>;
-            type ViewHandle = ProjectExecutionWorkerPolicyOwnedView;
+        impl ::buffa::HasMessageView for super::super::TeamExecutionWorkerPolicy {
+            type View<'a> = TeamExecutionWorkerPolicyView<'a>;
+            type ViewHandle = TeamExecutionWorkerPolicyOwnedView;
         }
-        impl ::serde::Serialize for ProjectExecutionWorkerPolicyOwnedView {
+        impl ::serde::Serialize for TeamExecutionWorkerPolicyOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -270265,14 +270155,14 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
-        pub struct GetProjectExecutionWorkerPolicyRequestView<'a> {
-            /// Field 1: `project_id`
-            pub project_id: &'a str,
+        pub struct GetTeamExecutionWorkerPolicyRequestView<'a> {
+            /// Field 1: `team_id`
+            pub team_id: &'a str,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a>
-        for GetProjectExecutionWorkerPolicyRequestView<'a> {
-            type Owned = super::super::GetProjectExecutionWorkerPolicyRequest;
+        for GetTeamExecutionWorkerPolicyRequestView<'a> {
+            type Owned = super::super::GetTeamExecutionWorkerPolicyRequest;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -270308,7 +270198,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.project_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.team_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -270322,7 +270212,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::GetProjectExecutionWorkerPolicyRequest,
+                super::super::GetTeamExecutionWorkerPolicyRequest,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -270332,14 +270222,14 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::GetProjectExecutionWorkerPolicyRequest,
+                super::super::GetTeamExecutionWorkerPolicyRequest,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::GetProjectExecutionWorkerPolicyRequest {
-                    project_id: self.project_id.to_string(),
+                ::core::result::Result::Ok(super::super::GetTeamExecutionWorkerPolicyRequest {
+                    team_id: self.team_id.to_string(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -270349,17 +270239,16 @@ pub mod __buffa {
             }
         }
         impl<'a> ::buffa::ViewEncode<'a>
-        for GetProjectExecutionWorkerPolicyRequestView<'a> {
+        for GetTeamExecutionWorkerPolicyRequestView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.project_id.is_empty() {
+                if !self.team_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.project_id)
-                                as u64;
+                            + ::buffa::types::string_encoded_len(&self.team_id) as u64;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
@@ -270372,8 +270261,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.project_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.project_id, buf);
+                if !self.team_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.team_id, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -270389,39 +270278,37 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize
-        for GetProjectExecutionWorkerPolicyRequestView<'__a> {
+        impl<'__a> ::serde::Serialize for GetTeamExecutionWorkerPolicyRequestView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.project_id) {
-                    __map.serialize_entry("projectId", self.project_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.team_id) {
+                    __map.serialize_entry("teamId", self.team_id)?;
                 }
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName
-        for GetProjectExecutionWorkerPolicyRequestView<'a> {
+        impl<'a> ::buffa::MessageName for GetTeamExecutionWorkerPolicyRequestView<'a> {
             const PACKAGE: &'static str = "briar.app.v1";
-            const NAME: &'static str = "GetProjectExecutionWorkerPolicyRequest";
-            const FULL_NAME: &'static str = "briar.app.v1.GetProjectExecutionWorkerPolicyRequest";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.GetProjectExecutionWorkerPolicyRequest";
+            const NAME: &'static str = "GetTeamExecutionWorkerPolicyRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.GetTeamExecutionWorkerPolicyRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.GetTeamExecutionWorkerPolicyRequest";
         }
-        ::buffa::impl_default_view_instance!(GetProjectExecutionWorkerPolicyRequestView);
-        ::buffa::impl_view_reborrow!(GetProjectExecutionWorkerPolicyRequestView);
-        /** Self-contained, `'static` owned view of a `GetProjectExecutionWorkerPolicyRequest` message.
+        ::buffa::impl_default_view_instance!(GetTeamExecutionWorkerPolicyRequestView);
+        ::buffa::impl_view_reborrow!(GetTeamExecutionWorkerPolicyRequestView);
+        /** Self-contained, `'static` owned view of a `GetTeamExecutionWorkerPolicyRequest` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`GetProjectExecutionWorkerPolicyRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`GetTeamExecutionWorkerPolicyRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetProjectExecutionWorkerPolicyRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetTeamExecutionWorkerPolicyRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct GetProjectExecutionWorkerPolicyRequestOwnedView(
-            ::buffa::OwnedView<GetProjectExecutionWorkerPolicyRequestView<'static>>,
+        pub struct GetTeamExecutionWorkerPolicyRequestOwnedView(
+            ::buffa::OwnedView<GetTeamExecutionWorkerPolicyRequestView<'static>>,
         );
-        impl GetProjectExecutionWorkerPolicyRequestOwnedView {
+        impl GetTeamExecutionWorkerPolicyRequestOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -270435,7 +270322,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    GetProjectExecutionWorkerPolicyRequestOwnedView(
+                    GetTeamExecutionWorkerPolicyRequestOwnedView(
                         ::buffa::OwnedView::decode(bytes)?,
                     ),
                 )
@@ -270452,7 +270339,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    GetProjectExecutionWorkerPolicyRequestOwnedView(
+                    GetTeamExecutionWorkerPolicyRequestOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -270466,17 +270353,17 @@ pub mod __buffa {
             /// another [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::GetProjectExecutionWorkerPolicyRequest,
+                msg: &super::super::GetTeamExecutionWorkerPolicyRequest,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    GetProjectExecutionWorkerPolicyRequestOwnedView(
+                    GetTeamExecutionWorkerPolicyRequestOwnedView(
                         ::buffa::OwnedView::from_owned(msg)?,
                     ),
                 )
             }
-            /// Borrow the full [`GetProjectExecutionWorkerPolicyRequestView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`GetTeamExecutionWorkerPolicyRequestView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &GetProjectExecutionWorkerPolicyRequestView<'_> {
+            pub fn view(&self) -> &GetTeamExecutionWorkerPolicyRequestView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -270489,7 +270376,7 @@ pub mod __buffa {
             #[must_use]
             pub fn to_owned_message(
                 &self,
-            ) -> super::super::GetProjectExecutionWorkerPolicyRequest {
+            ) -> super::super::GetTeamExecutionWorkerPolicyRequest {
                 self.0.to_owned_message()
             }
             /// The underlying bytes buffer.
@@ -270502,46 +270389,44 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `project_id`
+            /// Field 1: `team_id`
             #[must_use]
-            pub fn project_id(&self) -> &'_ str {
-                self.0.reborrow().project_id
+            pub fn team_id(&self) -> &'_ str {
+                self.0.reborrow().team_id
             }
         }
         impl ::core::convert::From<
-            ::buffa::OwnedView<GetProjectExecutionWorkerPolicyRequestView<'static>>,
-        > for GetProjectExecutionWorkerPolicyRequestOwnedView {
+            ::buffa::OwnedView<GetTeamExecutionWorkerPolicyRequestView<'static>>,
+        > for GetTeamExecutionWorkerPolicyRequestOwnedView {
             fn from(
                 inner: ::buffa::OwnedView<
-                    GetProjectExecutionWorkerPolicyRequestView<'static>,
+                    GetTeamExecutionWorkerPolicyRequestView<'static>,
                 >,
             ) -> Self {
-                GetProjectExecutionWorkerPolicyRequestOwnedView(inner)
+                GetTeamExecutionWorkerPolicyRequestOwnedView(inner)
             }
         }
-        impl ::core::convert::From<GetProjectExecutionWorkerPolicyRequestOwnedView>
-        for ::buffa::OwnedView<GetProjectExecutionWorkerPolicyRequestView<'static>> {
-            fn from(wrapper: GetProjectExecutionWorkerPolicyRequestOwnedView) -> Self {
+        impl ::core::convert::From<GetTeamExecutionWorkerPolicyRequestOwnedView>
+        for ::buffa::OwnedView<GetTeamExecutionWorkerPolicyRequestView<'static>> {
+            fn from(wrapper: GetTeamExecutionWorkerPolicyRequestOwnedView) -> Self {
                 wrapper.0
             }
         }
         impl ::core::convert::AsRef<
-            ::buffa::OwnedView<GetProjectExecutionWorkerPolicyRequestView<'static>>,
-        > for GetProjectExecutionWorkerPolicyRequestOwnedView {
+            ::buffa::OwnedView<GetTeamExecutionWorkerPolicyRequestView<'static>>,
+        > for GetTeamExecutionWorkerPolicyRequestOwnedView {
             fn as_ref(
                 &self,
-            ) -> &::buffa::OwnedView<
-                GetProjectExecutionWorkerPolicyRequestView<'static>,
-            > {
+            ) -> &::buffa::OwnedView<GetTeamExecutionWorkerPolicyRequestView<'static>> {
                 &self.0
             }
         }
         impl ::buffa::HasMessageView
-        for super::super::GetProjectExecutionWorkerPolicyRequest {
-            type View<'a> = GetProjectExecutionWorkerPolicyRequestView<'a>;
-            type ViewHandle = GetProjectExecutionWorkerPolicyRequestOwnedView;
+        for super::super::GetTeamExecutionWorkerPolicyRequest {
+            type View<'a> = GetTeamExecutionWorkerPolicyRequestView<'a>;
+            type ViewHandle = GetTeamExecutionWorkerPolicyRequestOwnedView;
         }
-        impl ::serde::Serialize for GetProjectExecutionWorkerPolicyRequestOwnedView {
+        impl ::serde::Serialize for GetTeamExecutionWorkerPolicyRequestOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -270550,16 +270435,16 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
-        pub struct GetProjectExecutionWorkerPolicyResponseView<'a> {
+        pub struct GetTeamExecutionWorkerPolicyResponseView<'a> {
             /// Field 1: `policy`
             pub policy: ::buffa::MessageFieldView<
-                super::super::__buffa::view::ProjectExecutionWorkerPolicyView<'a>,
+                super::super::__buffa::view::TeamExecutionWorkerPolicyView<'a>,
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a>
-        for GetProjectExecutionWorkerPolicyResponseView<'a> {
-            type Owned = super::super::GetProjectExecutionWorkerPolicyResponse;
+        for GetTeamExecutionWorkerPolicyResponseView<'a> {
+            type Owned = super::super::GetTeamExecutionWorkerPolicyResponse;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -270607,7 +270492,7 @@ pub mod __buffa {
                             }
                             None => {
                                 view.policy = ::buffa::MessageFieldView::set(
-                                    <super::super::__buffa::view::ProjectExecutionWorkerPolicyView as ::buffa::MessageView>::decode_view_ctx(
+                                    <super::super::__buffa::view::TeamExecutionWorkerPolicyView as ::buffa::MessageView>::decode_view_ctx(
                                         sub,
                                         __sub_ctx,
                                     )?,
@@ -270627,7 +270512,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::GetProjectExecutionWorkerPolicyResponse,
+                super::super::GetTeamExecutionWorkerPolicyResponse,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -270637,18 +270522,18 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::GetProjectExecutionWorkerPolicyResponse,
+                super::super::GetTeamExecutionWorkerPolicyResponse,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::GetProjectExecutionWorkerPolicyResponse {
+                ::core::result::Result::Ok(super::super::GetTeamExecutionWorkerPolicyResponse {
                     policy: match self.policy.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
-                                super::super::ProjectExecutionWorkerPolicy,
-                                ::buffa::Inline<super::super::ProjectExecutionWorkerPolicy>,
+                                super::super::TeamExecutionWorkerPolicy,
+                                ::buffa::Inline<super::super::TeamExecutionWorkerPolicy>,
                             >::some(v.to_owned_from_source(__buffa_src)?)
                         }
                         None => ::buffa::MessageField::none(),
@@ -270662,7 +270547,7 @@ pub mod __buffa {
             }
         }
         impl<'a> ::buffa::ViewEncode<'a>
-        for GetProjectExecutionWorkerPolicyResponseView<'a> {
+        for GetTeamExecutionWorkerPolicyResponseView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
@@ -270710,7 +270595,7 @@ pub mod __buffa {
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
         impl<'__a> ::serde::Serialize
-        for GetProjectExecutionWorkerPolicyResponseView<'__a> {
+        for GetTeamExecutionWorkerPolicyResponseView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -270725,27 +270610,24 @@ pub mod __buffa {
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName
-        for GetProjectExecutionWorkerPolicyResponseView<'a> {
+        impl<'a> ::buffa::MessageName for GetTeamExecutionWorkerPolicyResponseView<'a> {
             const PACKAGE: &'static str = "briar.app.v1";
-            const NAME: &'static str = "GetProjectExecutionWorkerPolicyResponse";
-            const FULL_NAME: &'static str = "briar.app.v1.GetProjectExecutionWorkerPolicyResponse";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.GetProjectExecutionWorkerPolicyResponse";
+            const NAME: &'static str = "GetTeamExecutionWorkerPolicyResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.GetTeamExecutionWorkerPolicyResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.GetTeamExecutionWorkerPolicyResponse";
         }
-        ::buffa::impl_default_view_instance!(
-            GetProjectExecutionWorkerPolicyResponseView
-        );
-        ::buffa::impl_view_reborrow!(GetProjectExecutionWorkerPolicyResponseView);
-        /** Self-contained, `'static` owned view of a `GetProjectExecutionWorkerPolicyResponse` message.
+        ::buffa::impl_default_view_instance!(GetTeamExecutionWorkerPolicyResponseView);
+        ::buffa::impl_view_reborrow!(GetTeamExecutionWorkerPolicyResponseView);
+        /** Self-contained, `'static` owned view of a `GetTeamExecutionWorkerPolicyResponse` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`GetProjectExecutionWorkerPolicyResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`GetTeamExecutionWorkerPolicyResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetProjectExecutionWorkerPolicyResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetTeamExecutionWorkerPolicyResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct GetProjectExecutionWorkerPolicyResponseOwnedView(
-            ::buffa::OwnedView<GetProjectExecutionWorkerPolicyResponseView<'static>>,
+        pub struct GetTeamExecutionWorkerPolicyResponseOwnedView(
+            ::buffa::OwnedView<GetTeamExecutionWorkerPolicyResponseView<'static>>,
         );
-        impl GetProjectExecutionWorkerPolicyResponseOwnedView {
+        impl GetTeamExecutionWorkerPolicyResponseOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -270759,7 +270641,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    GetProjectExecutionWorkerPolicyResponseOwnedView(
+                    GetTeamExecutionWorkerPolicyResponseOwnedView(
                         ::buffa::OwnedView::decode(bytes)?,
                     ),
                 )
@@ -270776,7 +270658,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    GetProjectExecutionWorkerPolicyResponseOwnedView(
+                    GetTeamExecutionWorkerPolicyResponseOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -270790,17 +270672,17 @@ pub mod __buffa {
             /// another [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::GetProjectExecutionWorkerPolicyResponse,
+                msg: &super::super::GetTeamExecutionWorkerPolicyResponse,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    GetProjectExecutionWorkerPolicyResponseOwnedView(
+                    GetTeamExecutionWorkerPolicyResponseOwnedView(
                         ::buffa::OwnedView::from_owned(msg)?,
                     ),
                 )
             }
-            /// Borrow the full [`GetProjectExecutionWorkerPolicyResponseView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`GetTeamExecutionWorkerPolicyResponseView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &GetProjectExecutionWorkerPolicyResponseView<'_> {
+            pub fn view(&self) -> &GetTeamExecutionWorkerPolicyResponseView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -270813,7 +270695,7 @@ pub mod __buffa {
             #[must_use]
             pub fn to_owned_message(
                 &self,
-            ) -> super::super::GetProjectExecutionWorkerPolicyResponse {
+            ) -> super::super::GetTeamExecutionWorkerPolicyResponse {
                 self.0.to_owned_message()
             }
             /// The underlying bytes buffer.
@@ -270831,45 +270713,43 @@ pub mod __buffa {
             pub fn policy(
                 &self,
             ) -> &::buffa::MessageFieldView<
-                super::super::__buffa::view::ProjectExecutionWorkerPolicyView<'_>,
+                super::super::__buffa::view::TeamExecutionWorkerPolicyView<'_>,
             > {
                 &self.0.reborrow().policy
             }
         }
         impl ::core::convert::From<
-            ::buffa::OwnedView<GetProjectExecutionWorkerPolicyResponseView<'static>>,
-        > for GetProjectExecutionWorkerPolicyResponseOwnedView {
+            ::buffa::OwnedView<GetTeamExecutionWorkerPolicyResponseView<'static>>,
+        > for GetTeamExecutionWorkerPolicyResponseOwnedView {
             fn from(
                 inner: ::buffa::OwnedView<
-                    GetProjectExecutionWorkerPolicyResponseView<'static>,
+                    GetTeamExecutionWorkerPolicyResponseView<'static>,
                 >,
             ) -> Self {
-                GetProjectExecutionWorkerPolicyResponseOwnedView(inner)
+                GetTeamExecutionWorkerPolicyResponseOwnedView(inner)
             }
         }
-        impl ::core::convert::From<GetProjectExecutionWorkerPolicyResponseOwnedView>
-        for ::buffa::OwnedView<GetProjectExecutionWorkerPolicyResponseView<'static>> {
-            fn from(wrapper: GetProjectExecutionWorkerPolicyResponseOwnedView) -> Self {
+        impl ::core::convert::From<GetTeamExecutionWorkerPolicyResponseOwnedView>
+        for ::buffa::OwnedView<GetTeamExecutionWorkerPolicyResponseView<'static>> {
+            fn from(wrapper: GetTeamExecutionWorkerPolicyResponseOwnedView) -> Self {
                 wrapper.0
             }
         }
         impl ::core::convert::AsRef<
-            ::buffa::OwnedView<GetProjectExecutionWorkerPolicyResponseView<'static>>,
-        > for GetProjectExecutionWorkerPolicyResponseOwnedView {
+            ::buffa::OwnedView<GetTeamExecutionWorkerPolicyResponseView<'static>>,
+        > for GetTeamExecutionWorkerPolicyResponseOwnedView {
             fn as_ref(
                 &self,
-            ) -> &::buffa::OwnedView<
-                GetProjectExecutionWorkerPolicyResponseView<'static>,
-            > {
+            ) -> &::buffa::OwnedView<GetTeamExecutionWorkerPolicyResponseView<'static>> {
                 &self.0
             }
         }
         impl ::buffa::HasMessageView
-        for super::super::GetProjectExecutionWorkerPolicyResponse {
-            type View<'a> = GetProjectExecutionWorkerPolicyResponseView<'a>;
-            type ViewHandle = GetProjectExecutionWorkerPolicyResponseOwnedView;
+        for super::super::GetTeamExecutionWorkerPolicyResponse {
+            type View<'a> = GetTeamExecutionWorkerPolicyResponseView<'a>;
+            type ViewHandle = GetTeamExecutionWorkerPolicyResponseOwnedView;
         }
-        impl ::serde::Serialize for GetProjectExecutionWorkerPolicyResponseOwnedView {
+        impl ::serde::Serialize for GetTeamExecutionWorkerPolicyResponseOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -270878,12 +270758,12 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
-        pub struct UpdateProjectExecutionWorkerPolicyRequestView<'a> {
-            /// Field 1: `project_id`
-            pub project_id: &'a str,
+        pub struct UpdateTeamExecutionWorkerPolicyRequestView<'a> {
+            /// Field 1: `team_id`
+            pub team_id: &'a str,
             /// Field 2: `selection_mode`
             pub selection_mode: ::buffa::EnumValue<
-                super::super::project_execution_worker_policy::SelectionMode,
+                super::super::team_execution_worker_policy::SelectionMode,
             >,
             /// Field 3: `default_worker_id`
             pub default_worker_id: ::core::option::Option<&'a str>,
@@ -270892,8 +270772,8 @@ pub mod __buffa {
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a>
-        for UpdateProjectExecutionWorkerPolicyRequestView<'a> {
-            type Owned = super::super::UpdateProjectExecutionWorkerPolicyRequest;
+        for UpdateTeamExecutionWorkerPolicyRequestView<'a> {
+            type Owned = super::super::UpdateTeamExecutionWorkerPolicyRequest;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -270929,7 +270809,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.project_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.team_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -270972,7 +270852,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::UpdateProjectExecutionWorkerPolicyRequest,
+                super::super::UpdateTeamExecutionWorkerPolicyRequest,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -270982,14 +270862,14 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::UpdateProjectExecutionWorkerPolicyRequest,
+                super::super::UpdateTeamExecutionWorkerPolicyRequest,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::UpdateProjectExecutionWorkerPolicyRequest {
-                    project_id: self.project_id.to_string(),
+                ::core::result::Result::Ok(super::super::UpdateTeamExecutionWorkerPolicyRequest {
+                    team_id: self.team_id.to_string(),
                     selection_mode: self.selection_mode,
                     default_worker_id: self.default_worker_id.map(|s| s.to_string()),
                     allowed_worker_ids: self
@@ -271006,17 +270886,16 @@ pub mod __buffa {
             }
         }
         impl<'a> ::buffa::ViewEncode<'a>
-        for UpdateProjectExecutionWorkerPolicyRequestView<'a> {
+        for UpdateTeamExecutionWorkerPolicyRequestView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.project_id.is_empty() {
+                if !self.team_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.project_id)
-                                as u64;
+                            + ::buffa::types::string_encoded_len(&self.team_id) as u64;
                 }
                 {
                     let val = self.selection_mode.to_i32();
@@ -271041,8 +270920,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.project_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.project_id, buf);
+                if !self.team_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.team_id, buf);
                 }
                 {
                     let val = self.selection_mode.to_i32();
@@ -271071,15 +270950,15 @@ pub mod __buffa {
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
         impl<'__a> ::serde::Serialize
-        for UpdateProjectExecutionWorkerPolicyRequestView<'__a> {
+        for UpdateTeamExecutionWorkerPolicyRequestView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.project_id) {
-                    __map.serialize_entry("projectId", self.project_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.team_id) {
+                    __map.serialize_entry("teamId", self.team_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(
                     &self.selection_mode,
@@ -271097,26 +270976,24 @@ pub mod __buffa {
             }
         }
         impl<'a> ::buffa::MessageName
-        for UpdateProjectExecutionWorkerPolicyRequestView<'a> {
+        for UpdateTeamExecutionWorkerPolicyRequestView<'a> {
             const PACKAGE: &'static str = "briar.app.v1";
-            const NAME: &'static str = "UpdateProjectExecutionWorkerPolicyRequest";
-            const FULL_NAME: &'static str = "briar.app.v1.UpdateProjectExecutionWorkerPolicyRequest";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateProjectExecutionWorkerPolicyRequest";
+            const NAME: &'static str = "UpdateTeamExecutionWorkerPolicyRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.UpdateTeamExecutionWorkerPolicyRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateTeamExecutionWorkerPolicyRequest";
         }
-        ::buffa::impl_default_view_instance!(
-            UpdateProjectExecutionWorkerPolicyRequestView
-        );
-        ::buffa::impl_view_reborrow!(UpdateProjectExecutionWorkerPolicyRequestView);
-        /** Self-contained, `'static` owned view of a `UpdateProjectExecutionWorkerPolicyRequest` message.
+        ::buffa::impl_default_view_instance!(UpdateTeamExecutionWorkerPolicyRequestView);
+        ::buffa::impl_view_reborrow!(UpdateTeamExecutionWorkerPolicyRequestView);
+        /** Self-contained, `'static` owned view of a `UpdateTeamExecutionWorkerPolicyRequest` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`UpdateProjectExecutionWorkerPolicyRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`UpdateTeamExecutionWorkerPolicyRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UpdateProjectExecutionWorkerPolicyRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UpdateTeamExecutionWorkerPolicyRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct UpdateProjectExecutionWorkerPolicyRequestOwnedView(
-            ::buffa::OwnedView<UpdateProjectExecutionWorkerPolicyRequestView<'static>>,
+        pub struct UpdateTeamExecutionWorkerPolicyRequestOwnedView(
+            ::buffa::OwnedView<UpdateTeamExecutionWorkerPolicyRequestView<'static>>,
         );
-        impl UpdateProjectExecutionWorkerPolicyRequestOwnedView {
+        impl UpdateTeamExecutionWorkerPolicyRequestOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -271130,7 +271007,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    UpdateProjectExecutionWorkerPolicyRequestOwnedView(
+                    UpdateTeamExecutionWorkerPolicyRequestOwnedView(
                         ::buffa::OwnedView::decode(bytes)?,
                     ),
                 )
@@ -271147,7 +271024,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    UpdateProjectExecutionWorkerPolicyRequestOwnedView(
+                    UpdateTeamExecutionWorkerPolicyRequestOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -271161,17 +271038,17 @@ pub mod __buffa {
             /// another [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::UpdateProjectExecutionWorkerPolicyRequest,
+                msg: &super::super::UpdateTeamExecutionWorkerPolicyRequest,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    UpdateProjectExecutionWorkerPolicyRequestOwnedView(
+                    UpdateTeamExecutionWorkerPolicyRequestOwnedView(
                         ::buffa::OwnedView::from_owned(msg)?,
                     ),
                 )
             }
-            /// Borrow the full [`UpdateProjectExecutionWorkerPolicyRequestView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`UpdateTeamExecutionWorkerPolicyRequestView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &UpdateProjectExecutionWorkerPolicyRequestView<'_> {
+            pub fn view(&self) -> &UpdateTeamExecutionWorkerPolicyRequestView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -271184,7 +271061,7 @@ pub mod __buffa {
             #[must_use]
             pub fn to_owned_message(
                 &self,
-            ) -> super::super::UpdateProjectExecutionWorkerPolicyRequest {
+            ) -> super::super::UpdateTeamExecutionWorkerPolicyRequest {
                 self.0.to_owned_message()
             }
             /// The underlying bytes buffer.
@@ -271197,17 +271074,17 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `project_id`
+            /// Field 1: `team_id`
             #[must_use]
-            pub fn project_id(&self) -> &'_ str {
-                self.0.reborrow().project_id
+            pub fn team_id(&self) -> &'_ str {
+                self.0.reborrow().team_id
             }
             /// Field 2: `selection_mode`
             #[must_use]
             pub fn selection_mode(
                 &self,
             ) -> ::buffa::EnumValue<
-                super::super::project_execution_worker_policy::SelectionMode,
+                super::super::team_execution_worker_policy::SelectionMode,
             > {
                 self.0.reborrow().selection_mode
             }
@@ -271223,41 +271100,39 @@ pub mod __buffa {
             }
         }
         impl ::core::convert::From<
-            ::buffa::OwnedView<UpdateProjectExecutionWorkerPolicyRequestView<'static>>,
-        > for UpdateProjectExecutionWorkerPolicyRequestOwnedView {
+            ::buffa::OwnedView<UpdateTeamExecutionWorkerPolicyRequestView<'static>>,
+        > for UpdateTeamExecutionWorkerPolicyRequestOwnedView {
             fn from(
                 inner: ::buffa::OwnedView<
-                    UpdateProjectExecutionWorkerPolicyRequestView<'static>,
+                    UpdateTeamExecutionWorkerPolicyRequestView<'static>,
                 >,
             ) -> Self {
-                UpdateProjectExecutionWorkerPolicyRequestOwnedView(inner)
+                UpdateTeamExecutionWorkerPolicyRequestOwnedView(inner)
             }
         }
-        impl ::core::convert::From<UpdateProjectExecutionWorkerPolicyRequestOwnedView>
-        for ::buffa::OwnedView<UpdateProjectExecutionWorkerPolicyRequestView<'static>> {
-            fn from(
-                wrapper: UpdateProjectExecutionWorkerPolicyRequestOwnedView,
-            ) -> Self {
+        impl ::core::convert::From<UpdateTeamExecutionWorkerPolicyRequestOwnedView>
+        for ::buffa::OwnedView<UpdateTeamExecutionWorkerPolicyRequestView<'static>> {
+            fn from(wrapper: UpdateTeamExecutionWorkerPolicyRequestOwnedView) -> Self {
                 wrapper.0
             }
         }
         impl ::core::convert::AsRef<
-            ::buffa::OwnedView<UpdateProjectExecutionWorkerPolicyRequestView<'static>>,
-        > for UpdateProjectExecutionWorkerPolicyRequestOwnedView {
+            ::buffa::OwnedView<UpdateTeamExecutionWorkerPolicyRequestView<'static>>,
+        > for UpdateTeamExecutionWorkerPolicyRequestOwnedView {
             fn as_ref(
                 &self,
             ) -> &::buffa::OwnedView<
-                UpdateProjectExecutionWorkerPolicyRequestView<'static>,
+                UpdateTeamExecutionWorkerPolicyRequestView<'static>,
             > {
                 &self.0
             }
         }
         impl ::buffa::HasMessageView
-        for super::super::UpdateProjectExecutionWorkerPolicyRequest {
-            type View<'a> = UpdateProjectExecutionWorkerPolicyRequestView<'a>;
-            type ViewHandle = UpdateProjectExecutionWorkerPolicyRequestOwnedView;
+        for super::super::UpdateTeamExecutionWorkerPolicyRequest {
+            type View<'a> = UpdateTeamExecutionWorkerPolicyRequestView<'a>;
+            type ViewHandle = UpdateTeamExecutionWorkerPolicyRequestOwnedView;
         }
-        impl ::serde::Serialize for UpdateProjectExecutionWorkerPolicyRequestOwnedView {
+        impl ::serde::Serialize for UpdateTeamExecutionWorkerPolicyRequestOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -271266,16 +271141,16 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
-        pub struct UpdateProjectExecutionWorkerPolicyResponseView<'a> {
+        pub struct UpdateTeamExecutionWorkerPolicyResponseView<'a> {
             /// Field 1: `policy`
             pub policy: ::buffa::MessageFieldView<
-                super::super::__buffa::view::ProjectExecutionWorkerPolicyView<'a>,
+                super::super::__buffa::view::TeamExecutionWorkerPolicyView<'a>,
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a>
-        for UpdateProjectExecutionWorkerPolicyResponseView<'a> {
-            type Owned = super::super::UpdateProjectExecutionWorkerPolicyResponse;
+        for UpdateTeamExecutionWorkerPolicyResponseView<'a> {
+            type Owned = super::super::UpdateTeamExecutionWorkerPolicyResponse;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -271323,7 +271198,7 @@ pub mod __buffa {
                             }
                             None => {
                                 view.policy = ::buffa::MessageFieldView::set(
-                                    <super::super::__buffa::view::ProjectExecutionWorkerPolicyView as ::buffa::MessageView>::decode_view_ctx(
+                                    <super::super::__buffa::view::TeamExecutionWorkerPolicyView as ::buffa::MessageView>::decode_view_ctx(
                                         sub,
                                         __sub_ctx,
                                     )?,
@@ -271343,7 +271218,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::UpdateProjectExecutionWorkerPolicyResponse,
+                super::super::UpdateTeamExecutionWorkerPolicyResponse,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -271353,18 +271228,18 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::UpdateProjectExecutionWorkerPolicyResponse,
+                super::super::UpdateTeamExecutionWorkerPolicyResponse,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::UpdateProjectExecutionWorkerPolicyResponse {
+                ::core::result::Result::Ok(super::super::UpdateTeamExecutionWorkerPolicyResponse {
                     policy: match self.policy.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
-                                super::super::ProjectExecutionWorkerPolicy,
-                                ::buffa::Inline<super::super::ProjectExecutionWorkerPolicy>,
+                                super::super::TeamExecutionWorkerPolicy,
+                                ::buffa::Inline<super::super::TeamExecutionWorkerPolicy>,
                             >::some(v.to_owned_from_source(__buffa_src)?)
                         }
                         None => ::buffa::MessageField::none(),
@@ -271378,7 +271253,7 @@ pub mod __buffa {
             }
         }
         impl<'a> ::buffa::ViewEncode<'a>
-        for UpdateProjectExecutionWorkerPolicyResponseView<'a> {
+        for UpdateTeamExecutionWorkerPolicyResponseView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
@@ -271426,7 +271301,7 @@ pub mod __buffa {
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
         impl<'__a> ::serde::Serialize
-        for UpdateProjectExecutionWorkerPolicyResponseView<'__a> {
+        for UpdateTeamExecutionWorkerPolicyResponseView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -271442,26 +271317,26 @@ pub mod __buffa {
             }
         }
         impl<'a> ::buffa::MessageName
-        for UpdateProjectExecutionWorkerPolicyResponseView<'a> {
+        for UpdateTeamExecutionWorkerPolicyResponseView<'a> {
             const PACKAGE: &'static str = "briar.app.v1";
-            const NAME: &'static str = "UpdateProjectExecutionWorkerPolicyResponse";
-            const FULL_NAME: &'static str = "briar.app.v1.UpdateProjectExecutionWorkerPolicyResponse";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateProjectExecutionWorkerPolicyResponse";
+            const NAME: &'static str = "UpdateTeamExecutionWorkerPolicyResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.UpdateTeamExecutionWorkerPolicyResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateTeamExecutionWorkerPolicyResponse";
         }
         ::buffa::impl_default_view_instance!(
-            UpdateProjectExecutionWorkerPolicyResponseView
+            UpdateTeamExecutionWorkerPolicyResponseView
         );
-        ::buffa::impl_view_reborrow!(UpdateProjectExecutionWorkerPolicyResponseView);
-        /** Self-contained, `'static` owned view of a `UpdateProjectExecutionWorkerPolicyResponse` message.
+        ::buffa::impl_view_reborrow!(UpdateTeamExecutionWorkerPolicyResponseView);
+        /** Self-contained, `'static` owned view of a `UpdateTeamExecutionWorkerPolicyResponse` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`UpdateProjectExecutionWorkerPolicyResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`UpdateTeamExecutionWorkerPolicyResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UpdateProjectExecutionWorkerPolicyResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UpdateTeamExecutionWorkerPolicyResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct UpdateProjectExecutionWorkerPolicyResponseOwnedView(
-            ::buffa::OwnedView<UpdateProjectExecutionWorkerPolicyResponseView<'static>>,
+        pub struct UpdateTeamExecutionWorkerPolicyResponseOwnedView(
+            ::buffa::OwnedView<UpdateTeamExecutionWorkerPolicyResponseView<'static>>,
         );
-        impl UpdateProjectExecutionWorkerPolicyResponseOwnedView {
+        impl UpdateTeamExecutionWorkerPolicyResponseOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -271475,7 +271350,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    UpdateProjectExecutionWorkerPolicyResponseOwnedView(
+                    UpdateTeamExecutionWorkerPolicyResponseOwnedView(
                         ::buffa::OwnedView::decode(bytes)?,
                     ),
                 )
@@ -271492,7 +271367,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    UpdateProjectExecutionWorkerPolicyResponseOwnedView(
+                    UpdateTeamExecutionWorkerPolicyResponseOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -271506,17 +271381,17 @@ pub mod __buffa {
             /// another [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::UpdateProjectExecutionWorkerPolicyResponse,
+                msg: &super::super::UpdateTeamExecutionWorkerPolicyResponse,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    UpdateProjectExecutionWorkerPolicyResponseOwnedView(
+                    UpdateTeamExecutionWorkerPolicyResponseOwnedView(
                         ::buffa::OwnedView::from_owned(msg)?,
                     ),
                 )
             }
-            /// Borrow the full [`UpdateProjectExecutionWorkerPolicyResponseView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`UpdateTeamExecutionWorkerPolicyResponseView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &UpdateProjectExecutionWorkerPolicyResponseView<'_> {
+            pub fn view(&self) -> &UpdateTeamExecutionWorkerPolicyResponseView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -271529,7 +271404,7 @@ pub mod __buffa {
             #[must_use]
             pub fn to_owned_message(
                 &self,
-            ) -> super::super::UpdateProjectExecutionWorkerPolicyResponse {
+            ) -> super::super::UpdateTeamExecutionWorkerPolicyResponse {
                 self.0.to_owned_message()
             }
             /// The underlying bytes buffer.
@@ -271547,47 +271422,45 @@ pub mod __buffa {
             pub fn policy(
                 &self,
             ) -> &::buffa::MessageFieldView<
-                super::super::__buffa::view::ProjectExecutionWorkerPolicyView<'_>,
+                super::super::__buffa::view::TeamExecutionWorkerPolicyView<'_>,
             > {
                 &self.0.reborrow().policy
             }
         }
         impl ::core::convert::From<
-            ::buffa::OwnedView<UpdateProjectExecutionWorkerPolicyResponseView<'static>>,
-        > for UpdateProjectExecutionWorkerPolicyResponseOwnedView {
+            ::buffa::OwnedView<UpdateTeamExecutionWorkerPolicyResponseView<'static>>,
+        > for UpdateTeamExecutionWorkerPolicyResponseOwnedView {
             fn from(
                 inner: ::buffa::OwnedView<
-                    UpdateProjectExecutionWorkerPolicyResponseView<'static>,
+                    UpdateTeamExecutionWorkerPolicyResponseView<'static>,
                 >,
             ) -> Self {
-                UpdateProjectExecutionWorkerPolicyResponseOwnedView(inner)
+                UpdateTeamExecutionWorkerPolicyResponseOwnedView(inner)
             }
         }
-        impl ::core::convert::From<UpdateProjectExecutionWorkerPolicyResponseOwnedView>
-        for ::buffa::OwnedView<UpdateProjectExecutionWorkerPolicyResponseView<'static>> {
-            fn from(
-                wrapper: UpdateProjectExecutionWorkerPolicyResponseOwnedView,
-            ) -> Self {
+        impl ::core::convert::From<UpdateTeamExecutionWorkerPolicyResponseOwnedView>
+        for ::buffa::OwnedView<UpdateTeamExecutionWorkerPolicyResponseView<'static>> {
+            fn from(wrapper: UpdateTeamExecutionWorkerPolicyResponseOwnedView) -> Self {
                 wrapper.0
             }
         }
         impl ::core::convert::AsRef<
-            ::buffa::OwnedView<UpdateProjectExecutionWorkerPolicyResponseView<'static>>,
-        > for UpdateProjectExecutionWorkerPolicyResponseOwnedView {
+            ::buffa::OwnedView<UpdateTeamExecutionWorkerPolicyResponseView<'static>>,
+        > for UpdateTeamExecutionWorkerPolicyResponseOwnedView {
             fn as_ref(
                 &self,
             ) -> &::buffa::OwnedView<
-                UpdateProjectExecutionWorkerPolicyResponseView<'static>,
+                UpdateTeamExecutionWorkerPolicyResponseView<'static>,
             > {
                 &self.0
             }
         }
         impl ::buffa::HasMessageView
-        for super::super::UpdateProjectExecutionWorkerPolicyResponse {
-            type View<'a> = UpdateProjectExecutionWorkerPolicyResponseView<'a>;
-            type ViewHandle = UpdateProjectExecutionWorkerPolicyResponseOwnedView;
+        for super::super::UpdateTeamExecutionWorkerPolicyResponse {
+            type View<'a> = UpdateTeamExecutionWorkerPolicyResponseView<'a>;
+            type ViewHandle = UpdateTeamExecutionWorkerPolicyResponseOwnedView;
         }
-        impl ::serde::Serialize for UpdateProjectExecutionWorkerPolicyResponseOwnedView {
+        impl ::serde::Serialize for UpdateTeamExecutionWorkerPolicyResponseOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -271596,7 +271469,7 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
-        pub struct ProjectView<'a> {
+        pub struct TeamView<'a> {
             /// Field 1: `id`
             pub id: &'a str,
             /// Field 2: `name`
@@ -271623,8 +271496,8 @@ pub mod __buffa {
             pub icon_color: ::core::option::Option<&'a str>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a> for ProjectView<'a> {
-            type Owned = super::super::Project;
+        impl<'a> ::buffa::MessageView<'a> for TeamView<'a> {
+            type Owned = super::super::Team;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -271765,18 +271638,18 @@ pub mod __buffa {
             }
             fn to_owned_message(
                 &self,
-            ) -> ::core::result::Result<super::super::Project, ::buffa::DecodeError> {
+            ) -> ::core::result::Result<super::super::Team, ::buffa::DecodeError> {
                 self.to_owned_from_source(None)
             }
             #[allow(clippy::useless_conversion, clippy::needless_update)]
             fn to_owned_from_source(
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
-            ) -> ::core::result::Result<super::super::Project, ::buffa::DecodeError> {
+            ) -> ::core::result::Result<super::super::Team, ::buffa::DecodeError> {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::Project {
+                ::core::result::Result::Ok(super::super::Team {
                     id: self.id.to_string(),
                     name: self.name.to_string(),
                     issue_key_prefix: self.issue_key_prefix.to_string(),
@@ -271804,7 +271677,7 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a> for ProjectView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for TeamView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
@@ -271926,7 +271799,7 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for ProjectView<'__a> {
+        impl<'__a> ::serde::Serialize for TeamView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -271980,22 +271853,22 @@ pub mod __buffa {
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for ProjectView<'a> {
+        impl<'a> ::buffa::MessageName for TeamView<'a> {
             const PACKAGE: &'static str = "briar.app.v1";
-            const NAME: &'static str = "Project";
-            const FULL_NAME: &'static str = "briar.app.v1.Project";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.Project";
+            const NAME: &'static str = "Team";
+            const FULL_NAME: &'static str = "briar.app.v1.Team";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.Team";
         }
-        ::buffa::impl_default_view_instance!(ProjectView);
-        ::buffa::impl_view_reborrow!(ProjectView);
-        /** Self-contained, `'static` owned view of a `Project` message.
+        ::buffa::impl_default_view_instance!(TeamView);
+        ::buffa::impl_view_reborrow!(TeamView);
+        /** Self-contained, `'static` owned view of a `Team` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`ProjectView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`TeamView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ProjectView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`TeamView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct ProjectOwnedView(::buffa::OwnedView<ProjectView<'static>>);
-        impl ProjectOwnedView {
+        pub struct TeamOwnedView(::buffa::OwnedView<TeamView<'static>>);
+        impl TeamOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -272009,7 +271882,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    ProjectOwnedView(::buffa::OwnedView::decode(bytes)?),
+                    TeamOwnedView(::buffa::OwnedView::decode(bytes)?),
                 )
             }
             /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
@@ -272024,9 +271897,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    ProjectOwnedView(
-                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
-                    ),
+                    TeamOwnedView(::buffa::OwnedView::decode_with_options(bytes, opts)?),
                 )
             }
             /// Build from an owned message via an encode → decode round-trip.
@@ -272038,15 +271909,15 @@ pub mod __buffa {
             /// another [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::Project,
+                msg: &super::super::Team,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    ProjectOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                    TeamOwnedView(::buffa::OwnedView::from_owned(msg)?),
                 )
             }
-            /// Borrow the full [`ProjectView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`TeamView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &ProjectView<'_> {
+            pub fn view(&self) -> &TeamView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -272057,7 +271928,7 @@ pub mod __buffa {
             /// whose contract also governs handles converted from a raw
             /// [`::buffa::OwnedView`].
             #[must_use]
-            pub fn to_owned_message(&self) -> super::super::Project {
+            pub fn to_owned_message(&self) -> super::super::Team {
                 self.0.to_owned_message()
             }
             /// The underlying bytes buffer.
@@ -272130,29 +272001,29 @@ pub mod __buffa {
                 self.0.reborrow().icon_color
             }
         }
-        impl ::core::convert::From<::buffa::OwnedView<ProjectView<'static>>>
-        for ProjectOwnedView {
-            fn from(inner: ::buffa::OwnedView<ProjectView<'static>>) -> Self {
-                ProjectOwnedView(inner)
+        impl ::core::convert::From<::buffa::OwnedView<TeamView<'static>>>
+        for TeamOwnedView {
+            fn from(inner: ::buffa::OwnedView<TeamView<'static>>) -> Self {
+                TeamOwnedView(inner)
             }
         }
-        impl ::core::convert::From<ProjectOwnedView>
-        for ::buffa::OwnedView<ProjectView<'static>> {
-            fn from(wrapper: ProjectOwnedView) -> Self {
+        impl ::core::convert::From<TeamOwnedView>
+        for ::buffa::OwnedView<TeamView<'static>> {
+            fn from(wrapper: TeamOwnedView) -> Self {
                 wrapper.0
             }
         }
-        impl ::core::convert::AsRef<::buffa::OwnedView<ProjectView<'static>>>
-        for ProjectOwnedView {
-            fn as_ref(&self) -> &::buffa::OwnedView<ProjectView<'static>> {
+        impl ::core::convert::AsRef<::buffa::OwnedView<TeamView<'static>>>
+        for TeamOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<TeamView<'static>> {
                 &self.0
             }
         }
-        impl ::buffa::HasMessageView for super::super::Project {
-            type View<'a> = ProjectView<'a>;
-            type ViewHandle = ProjectOwnedView;
+        impl ::buffa::HasMessageView for super::super::Team {
+            type View<'a> = TeamView<'a>;
+            type ViewHandle = TeamOwnedView;
         }
-        impl ::serde::Serialize for ProjectOwnedView {
+        impl ::serde::Serialize for TeamOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -277827,8 +277698,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct GetDashboardRequestView<'a> {
-            /// Field 1: `project_id`
-            pub project_id: &'a str,
+            /// Field 1: `team_id`
+            pub team_id: &'a str,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for GetDashboardRequestView<'a> {
@@ -277868,7 +277739,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.project_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.team_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -277899,7 +277770,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::GetDashboardRequest {
-                    project_id: self.project_id.to_string(),
+                    team_id: self.team_id.to_string(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -277914,11 +277785,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.project_id.is_empty() {
+                if !self.team_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.project_id)
-                                as u64;
+                            + ::buffa::types::string_encoded_len(&self.team_id) as u64;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
@@ -277931,8 +277801,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.project_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.project_id, buf);
+                if !self.team_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.team_id, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -277955,8 +277825,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.project_id) {
-                    __map.serialize_entry("projectId", self.project_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.team_id) {
+                    __map.serialize_entry("teamId", self.team_id)?;
                 }
                 __map.end()
             }
@@ -278053,10 +277923,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `project_id`
+            /// Field 1: `team_id`
             #[must_use]
-            pub fn project_id(&self) -> &'_ str {
-                self.0.reborrow().project_id
+            pub fn team_id(&self) -> &'_ str {
+                self.0.reborrow().team_id
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<GetDashboardRequestView<'static>>>
@@ -278093,9 +277963,9 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct GetDashboardResponseView<'a> {
-            /// Field 1: `project`
-            pub project: ::buffa::MessageFieldView<
-                super::super::__buffa::view::ProjectView<'a>,
+            /// Field 1: `team`
+            pub team: ::buffa::MessageFieldView<
+                super::super::__buffa::view::TeamView<'a>,
             >,
             /// Field 2: `runs`
             pub runs: ::buffa::RepeatedView<
@@ -278114,7 +277984,7 @@ pub mod __buffa {
             >,
             /// Field 5: `execution_policy`
             pub execution_policy: ::buffa::MessageFieldView<
-                super::super::__buffa::view::ProjectExecutionWorkerPolicyView<'a>,
+                super::super::__buffa::view::TeamExecutionWorkerPolicyView<'a>,
             >,
             /// Field 6: `members`
             pub members: ::buffa::RepeatedView<
@@ -278139,7 +278009,7 @@ pub mod __buffa {
             >,
             /// Field 11: `settings`
             pub settings: ::buffa::MessageFieldView<
-                super::super::__buffa::view::ProjectSettingsView<'a>,
+                super::super::__buffa::view::TeamSettingsView<'a>,
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
@@ -278182,7 +278052,7 @@ pub mod __buffa {
                         )?;
                         let __sub_ctx = ctx.descend()?;
                         let sub = ::buffa::types::borrow_bytes(&mut cur)?;
-                        match view.project.as_mut() {
+                        match view.team.as_mut() {
                             Some(existing) => {
                                 ::buffa::MessageView::merge_into_view(
                                     existing,
@@ -278191,8 +278061,8 @@ pub mod __buffa {
                                 )?
                             }
                             None => {
-                                view.project = ::buffa::MessageFieldView::set(
-                                    <super::super::__buffa::view::ProjectView as ::buffa::MessageView>::decode_view_ctx(
+                                view.team = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::TeamView as ::buffa::MessageView>::decode_view_ctx(
                                         sub,
                                         __sub_ctx,
                                     )?,
@@ -278217,7 +278087,7 @@ pub mod __buffa {
                             }
                             None => {
                                 view.execution_policy = ::buffa::MessageFieldView::set(
-                                    <super::super::__buffa::view::ProjectExecutionWorkerPolicyView as ::buffa::MessageView>::decode_view_ctx(
+                                    <super::super::__buffa::view::TeamExecutionWorkerPolicyView as ::buffa::MessageView>::decode_view_ctx(
                                         sub,
                                         __sub_ctx,
                                     )?,
@@ -278274,7 +278144,7 @@ pub mod __buffa {
                             }
                             None => {
                                 view.settings = ::buffa::MessageFieldView::set(
-                                    <super::super::__buffa::view::ProjectSettingsView as ::buffa::MessageView>::decode_view_ctx(
+                                    <super::super::__buffa::view::TeamSettingsView as ::buffa::MessageView>::decode_view_ctx(
                                         sub,
                                         __sub_ctx,
                                     )?,
@@ -278444,11 +278314,11 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::GetDashboardResponse {
-                    project: match self.project.as_option() {
+                    team: match self.team.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
-                                super::super::Project,
-                                ::buffa::Inline<super::super::Project>,
+                                super::super::Team,
+                                ::buffa::Inline<super::super::Team>,
                             >::some(v.to_owned_from_source(__buffa_src)?)
                         }
                         None => ::buffa::MessageField::none(),
@@ -278467,8 +278337,8 @@ pub mod __buffa {
                     execution_policy: match self.execution_policy.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
-                                super::super::ProjectExecutionWorkerPolicy,
-                                ::buffa::Inline<super::super::ProjectExecutionWorkerPolicy>,
+                                super::super::TeamExecutionWorkerPolicy,
+                                ::buffa::Inline<super::super::TeamExecutionWorkerPolicy>,
                             >::some(v.to_owned_from_source(__buffa_src)?)
                         }
                         None => ::buffa::MessageField::none(),
@@ -278501,8 +278371,8 @@ pub mod __buffa {
                     settings: match self.settings.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
-                                super::super::ProjectSettings,
-                                ::buffa::Inline<super::super::ProjectSettings>,
+                                super::super::TeamSettings,
+                                ::buffa::Inline<super::super::TeamSettings>,
                             >::some(v.to_owned_from_source(__buffa_src)?)
                         }
                         None => ::buffa::MessageField::none(),
@@ -278521,9 +278391,9 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if self.project.is_set() {
+                if self.team.is_set() {
                     let __slot = __cache.reserve();
-                    let inner_size = self.project.compute_size(__cache);
+                    let inner_size = self.team.compute_size(__cache);
                     __cache.set(__slot, inner_size);
                     size
                         += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
@@ -278618,13 +278488,13 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if self.project.is_set() {
+                if self.team.is_set() {
                     ::buffa::types::put_len_delimited_header(
                         1u32,
                         u64::from(__cache.consume_next()),
                         buf,
                     );
-                    self.project.write_to(__cache, buf);
+                    self.team.write_to(__cache, buf);
                 }
                 for v in &self.runs {
                     ::buffa::types::put_len_delimited_header(
@@ -278726,8 +278596,8 @@ pub mod __buffa {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
                 {
-                    if let ::core::option::Option::Some(__v) = self.project.as_option() {
-                        __map.serialize_entry("project", __v)?;
+                    if let ::core::option::Option::Some(__v) = self.team.as_option() {
+                        __map.serialize_entry("team", __v)?;
                     }
                 }
                 if !self.runs.is_empty() {
@@ -278886,14 +278756,12 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `project`
+            /// Field 1: `team`
             #[must_use]
-            pub fn project(
+            pub fn team(
                 &self,
-            ) -> &::buffa::MessageFieldView<
-                super::super::__buffa::view::ProjectView<'_>,
-            > {
-                &self.0.reborrow().project
+            ) -> &::buffa::MessageFieldView<super::super::__buffa::view::TeamView<'_>> {
+                &self.0.reborrow().team
             }
             /// Field 2: `runs`
             #[must_use]
@@ -278930,7 +278798,7 @@ pub mod __buffa {
             pub fn execution_policy(
                 &self,
             ) -> &::buffa::MessageFieldView<
-                super::super::__buffa::view::ProjectExecutionWorkerPolicyView<'_>,
+                super::super::__buffa::view::TeamExecutionWorkerPolicyView<'_>,
             > {
                 &self.0.reborrow().execution_policy
             }
@@ -278983,7 +278851,7 @@ pub mod __buffa {
             pub fn settings(
                 &self,
             ) -> &::buffa::MessageFieldView<
-                super::super::__buffa::view::ProjectSettingsView<'_>,
+                super::super::__buffa::view::TeamSettingsView<'_>,
             > {
                 &self.0.reborrow().settings
             }
@@ -279023,8 +278891,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct SyncDashboardRequestView<'a> {
-            /// Field 1: `project_id`
-            pub project_id: &'a str,
+            /// Field 1: `team_id`
+            pub team_id: &'a str,
             /// Field 2: `cursor`
             pub cursor: u64,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
@@ -279066,7 +278934,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.project_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.team_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -279104,7 +278972,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::SyncDashboardRequest {
-                    project_id: self.project_id.to_string(),
+                    team_id: self.team_id.to_string(),
                     cursor: self.cursor,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
@@ -279120,11 +278988,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.project_id.is_empty() {
+                if !self.team_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.project_id)
-                                as u64;
+                            + ::buffa::types::string_encoded_len(&self.team_id) as u64;
                 }
                 if self.cursor != 0u64 {
                     size
@@ -279141,8 +279008,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.project_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.project_id, buf);
+                if !self.team_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.team_id, buf);
                 }
                 if self.cursor != 0u64 {
                     ::buffa::types::put_uint64_field(2u32, self.cursor, buf);
@@ -279168,8 +279035,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.project_id) {
-                    __map.serialize_entry("projectId", self.project_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.team_id) {
+                    __map.serialize_entry("teamId", self.team_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_zero_u64(&self.cursor) {
                     __map
@@ -279273,10 +279140,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `project_id`
+            /// Field 1: `team_id`
             #[must_use]
-            pub fn project_id(&self) -> &'_ str {
-                self.0.reborrow().project_id
+            pub fn team_id(&self) -> &'_ str {
+                self.0.reborrow().team_id
             }
             /// Field 2: `cursor`
             #[must_use]
@@ -279944,9 +279811,9 @@ pub mod __buffa {
             >,
             /// Field 5: `deleted_run_ids`
             pub deleted_run_ids: ::buffa::RepeatedView<'a, &'a str>,
-            /// Field 6: `project`
-            pub project: ::buffa::MessageFieldView<
-                super::super::__buffa::view::ProjectView<'a>,
+            /// Field 6: `team`
+            pub team: ::buffa::MessageFieldView<
+                super::super::__buffa::view::TeamView<'a>,
             >,
             /// Field 7: `workers`
             pub workers: ::buffa::RepeatedView<
@@ -279960,7 +279827,7 @@ pub mod __buffa {
             >,
             /// Field 9: `execution_policy`
             pub execution_policy: ::buffa::MessageFieldView<
-                super::super::__buffa::view::ProjectExecutionWorkerPolicyView<'a>,
+                super::super::__buffa::view::TeamExecutionWorkerPolicyView<'a>,
             >,
             /// Field 10: `members`
             pub members: ::buffa::MessageFieldView<
@@ -279981,7 +279848,7 @@ pub mod __buffa {
             >,
             /// Field 14: `settings`
             pub settings: ::buffa::MessageFieldView<
-                super::super::__buffa::view::ProjectSettingsView<'a>,
+                super::super::__buffa::view::TeamSettingsView<'a>,
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
@@ -280045,7 +279912,7 @@ pub mod __buffa {
                         )?;
                         let __sub_ctx = ctx.descend()?;
                         let sub = ::buffa::types::borrow_bytes(&mut cur)?;
-                        match view.project.as_mut() {
+                        match view.team.as_mut() {
                             Some(existing) => {
                                 ::buffa::MessageView::merge_into_view(
                                     existing,
@@ -280054,8 +279921,8 @@ pub mod __buffa {
                                 )?
                             }
                             None => {
-                                view.project = ::buffa::MessageFieldView::set(
-                                    <super::super::__buffa::view::ProjectView as ::buffa::MessageView>::decode_view_ctx(
+                                view.team = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::TeamView as ::buffa::MessageView>::decode_view_ctx(
                                         sub,
                                         __sub_ctx,
                                     )?,
@@ -280080,7 +279947,7 @@ pub mod __buffa {
                             }
                             None => {
                                 view.execution_policy = ::buffa::MessageFieldView::set(
-                                    <super::super::__buffa::view::ProjectExecutionWorkerPolicyView as ::buffa::MessageView>::decode_view_ctx(
+                                    <super::super::__buffa::view::TeamExecutionWorkerPolicyView as ::buffa::MessageView>::decode_view_ctx(
                                         sub,
                                         __sub_ctx,
                                     )?,
@@ -280180,7 +280047,7 @@ pub mod __buffa {
                             }
                             None => {
                                 view.settings = ::buffa::MessageFieldView::set(
-                                    <super::super::__buffa::view::ProjectSettingsView as ::buffa::MessageView>::decode_view_ctx(
+                                    <super::super::__buffa::view::TeamSettingsView as ::buffa::MessageView>::decode_view_ctx(
                                         sub,
                                         __sub_ctx,
                                     )?,
@@ -280334,11 +280201,11 @@ pub mod __buffa {
                         .iter()
                         .map(|s| s.to_string())
                         .collect(),
-                    project: match self.project.as_option() {
+                    team: match self.team.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
-                                super::super::Project,
-                                ::buffa::Inline<super::super::Project>,
+                                super::super::Team,
+                                ::buffa::Inline<super::super::Team>,
                             >::some(v.to_owned_from_source(__buffa_src)?)
                         }
                         None => ::buffa::MessageField::none(),
@@ -280352,8 +280219,8 @@ pub mod __buffa {
                     execution_policy: match self.execution_policy.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
-                                super::super::ProjectExecutionWorkerPolicy,
-                                ::buffa::Inline<super::super::ProjectExecutionWorkerPolicy>,
+                                super::super::TeamExecutionWorkerPolicy,
+                                ::buffa::Inline<super::super::TeamExecutionWorkerPolicy>,
                             >::some(v.to_owned_from_source(__buffa_src)?)
                         }
                         None => ::buffa::MessageField::none(),
@@ -280398,8 +280265,8 @@ pub mod __buffa {
                     settings: match self.settings.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
-                                super::super::ProjectSettings,
-                                ::buffa::Inline<super::super::ProjectSettings>,
+                                super::super::TeamSettings,
+                                ::buffa::Inline<super::super::TeamSettings>,
                             >::some(v.to_owned_from_source(__buffa_src)?)
                         }
                         None => ::buffa::MessageField::none(),
@@ -280439,9 +280306,9 @@ pub mod __buffa {
                 for v in &self.deleted_run_ids {
                     size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
                 }
-                if self.project.is_set() {
+                if self.team.is_set() {
                     let __slot = __cache.reserve();
-                    let inner_size = self.project.compute_size(__cache);
+                    let inner_size = self.team.compute_size(__cache);
                     __cache.set(__slot, inner_size);
                     size
                         += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
@@ -280546,13 +280413,13 @@ pub mod __buffa {
                 for v in &self.deleted_run_ids {
                     ::buffa::types::put_string_field(5u32, v, buf);
                 }
-                if self.project.is_set() {
+                if self.team.is_set() {
                     ::buffa::types::put_len_delimited_header(
                         6u32,
                         u64::from(__cache.consume_next()),
                         buf,
                     );
-                    self.project.write_to(__cache, buf);
+                    self.team.write_to(__cache, buf);
                 }
                 for v in &self.workers {
                     ::buffa::types::put_len_delimited_header(
@@ -280662,8 +280529,8 @@ pub mod __buffa {
                     __map.serialize_entry("deletedRunIds", &*self.deleted_run_ids)?;
                 }
                 {
-                    if let ::core::option::Option::Some(__v) = self.project.as_option() {
-                        __map.serialize_entry("project", __v)?;
+                    if let ::core::option::Option::Some(__v) = self.team.as_option() {
+                        __map.serialize_entry("team", __v)?;
                     }
                 }
                 if !self.workers.is_empty() {
@@ -280845,14 +280712,12 @@ pub mod __buffa {
             pub fn deleted_run_ids(&self) -> &::buffa::RepeatedView<'_, &'_ str> {
                 &self.0.reborrow().deleted_run_ids
             }
-            /// Field 6: `project`
+            /// Field 6: `team`
             #[must_use]
-            pub fn project(
+            pub fn team(
                 &self,
-            ) -> &::buffa::MessageFieldView<
-                super::super::__buffa::view::ProjectView<'_>,
-            > {
-                &self.0.reborrow().project
+            ) -> &::buffa::MessageFieldView<super::super::__buffa::view::TeamView<'_>> {
+                &self.0.reborrow().team
             }
             /// Field 7: `workers`
             #[must_use]
@@ -280879,7 +280744,7 @@ pub mod __buffa {
             pub fn execution_policy(
                 &self,
             ) -> &::buffa::MessageFieldView<
-                super::super::__buffa::view::ProjectExecutionWorkerPolicyView<'_>,
+                super::super::__buffa::view::TeamExecutionWorkerPolicyView<'_>,
             > {
                 &self.0.reborrow().execution_policy
             }
@@ -280925,7 +280790,7 @@ pub mod __buffa {
             pub fn settings(
                 &self,
             ) -> &::buffa::MessageFieldView<
-                super::super::__buffa::view::ProjectSettingsView<'_>,
+                super::super::__buffa::view::TeamSettingsView<'_>,
             > {
                 &self.0.reborrow().settings
             }
@@ -280966,8 +280831,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct ListRunEventsRequestView<'a> {
-            /// Field 1: `project_id`
-            pub project_id: &'a str,
+            /// Field 1: `team_id`
+            pub team_id: &'a str,
             /// Field 2: `run_id`
             pub run_id: &'a str,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
@@ -281009,7 +280874,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.project_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.team_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -281047,7 +280912,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::ListRunEventsRequest {
-                    project_id: self.project_id.to_string(),
+                    team_id: self.team_id.to_string(),
                     run_id: self.run_id.to_string(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
@@ -281063,11 +280928,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.project_id.is_empty() {
+                if !self.team_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.project_id)
-                                as u64;
+                            + ::buffa::types::string_encoded_len(&self.team_id) as u64;
                 }
                 if !self.run_id.is_empty() {
                     size
@@ -281085,8 +280949,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.project_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.project_id, buf);
+                if !self.team_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.team_id, buf);
                 }
                 if !self.run_id.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.run_id, buf);
@@ -281112,8 +280976,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.project_id) {
-                    __map.serialize_entry("projectId", self.project_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.team_id) {
+                    __map.serialize_entry("teamId", self.team_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.run_id) {
                     __map.serialize_entry("runId", self.run_id)?;
@@ -281213,10 +281077,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `project_id`
+            /// Field 1: `team_id`
             #[must_use]
-            pub fn project_id(&self) -> &'_ str {
-                self.0.reborrow().project_id
+            pub fn team_id(&self) -> &'_ str {
+                self.0.reborrow().team_id
             }
             /// Field 2: `run_id`
             #[must_use]
@@ -357150,7 +357014,7 @@ pub mod __buffa {
                     ),
                 }
             }
-            pub mod update_project_icon_request {
+            pub mod update_team_icon_request {
                 #[allow(unused_imports)]
                 use super::*;
                 #[derive(Clone, Debug)]
@@ -358586,7 +358450,7 @@ pub mod __buffa {
                 }
             }
         }
-        pub mod update_project_icon_request {
+        pub mod update_team_icon_request {
             #[allow(unused_imports)]
             use super::*;
             #[derive(Clone, PartialEq, Debug)]
@@ -359420,43 +359284,41 @@ pub mod __buffa {
         reg.register_json_any(super::__CHANNEL_ISSUE_BATCH_RESULT_ITEM_JSON_ANY);
         reg.register_json_any(super::__CHANNEL_PROPOSAL_JSON_ANY);
         reg.register_json_any(super::__CHANNEL_AGENT_REPLY_JSON_ANY);
-        reg.register_json_any(super::__LIST_PROJECTS_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__LIST_PROJECTS_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__CREATE_PROJECT_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__CREATE_PROJECT_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__DELETE_PROJECT_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__DELETE_PROJECT_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__UPDATE_PROJECT_ICON_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_TEAMS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_TEAMS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__CREATE_TEAM_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__CREATE_TEAM_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__DELETE_TEAM_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__DELETE_TEAM_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__UPDATE_TEAM_ICON_REQUEST_JSON_ANY);
         reg.register_json_any(super::__NAMED_ICON_JSON_ANY);
-        reg.register_json_any(super::__UPDATE_PROJECT_ICON_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__UPDATE_PROJECT_ISSUE_KEY_PREFIX_REQUEST_JSON_ANY);
-        reg.register_json_any(
-            super::__UPDATE_PROJECT_ISSUE_KEY_PREFIX_RESPONSE_JSON_ANY,
-        );
-        reg.register_json_any(super::__UPDATE_PROJECT_TABS_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__UPDATE_PROJECT_TABS_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__CREATE_PROJECT_AGENT_TOKEN_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__CREATE_PROJECT_AGENT_TOKEN_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__UPDATE_TEAM_ICON_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__UPDATE_TEAM_ISSUE_KEY_PREFIX_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__UPDATE_TEAM_ISSUE_KEY_PREFIX_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__UPDATE_TEAM_TABS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__UPDATE_TEAM_TABS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__CREATE_TEAM_AGENT_TOKEN_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__CREATE_TEAM_AGENT_TOKEN_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__LINEAR_SETTINGS_JSON_ANY);
-        reg.register_json_any(super::__PROJECT_SETTINGS_JSON_ANY);
-        reg.register_json_any(super::__UPDATE_PROJECT_SETTINGS_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__UPDATE_PROJECT_SETTINGS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__TEAM_SETTINGS_JSON_ANY);
+        reg.register_json_any(super::__UPDATE_TEAM_SETTINGS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__UPDATE_TEAM_SETTINGS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__UPDATE_CHECKPOINT_POLICY_REQUEST_JSON_ANY);
         reg.register_json_any(super::__UPDATE_CHECKPOINT_POLICY_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__PROJECT_EXECUTION_WORKER_POLICY_JSON_ANY);
+        reg.register_json_any(super::__TEAM_EXECUTION_WORKER_POLICY_JSON_ANY);
         reg.register_json_any(
-            super::__GET_PROJECT_EXECUTION_WORKER_POLICY_REQUEST_JSON_ANY,
+            super::__GET_TEAM_EXECUTION_WORKER_POLICY_REQUEST_JSON_ANY,
         );
         reg.register_json_any(
-            super::__GET_PROJECT_EXECUTION_WORKER_POLICY_RESPONSE_JSON_ANY,
+            super::__GET_TEAM_EXECUTION_WORKER_POLICY_RESPONSE_JSON_ANY,
         );
         reg.register_json_any(
-            super::__UPDATE_PROJECT_EXECUTION_WORKER_POLICY_REQUEST_JSON_ANY,
+            super::__UPDATE_TEAM_EXECUTION_WORKER_POLICY_REQUEST_JSON_ANY,
         );
         reg.register_json_any(
-            super::__UPDATE_PROJECT_EXECUTION_WORKER_POLICY_RESPONSE_JSON_ANY,
+            super::__UPDATE_TEAM_EXECUTION_WORKER_POLICY_RESPONSE_JSON_ANY,
         );
-        reg.register_json_any(super::__PROJECT_JSON_ANY);
+        reg.register_json_any(super::__TEAM_JSON_ANY);
         reg.register_json_any(super::__PLANNING_PROJECT_JSON_ANY);
         reg.register_json_any(super::__LIST_TEAM_PLANNING_PROJECTS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_TEAM_PLANNING_PROJECTS_RESPONSE_JSON_ANY);
@@ -360811,81 +360673,81 @@ pub use self::__buffa::view::ChannelAgentReplyView;
 #[doc(inline)]
 pub use self::__buffa::view::ChannelAgentReplyOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::ListProjectsRequestView;
+pub use self::__buffa::view::ListTeamsRequestView;
 #[doc(inline)]
-pub use self::__buffa::view::ListProjectsRequestOwnedView;
+pub use self::__buffa::view::ListTeamsRequestOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::ListProjectsResponseView;
+pub use self::__buffa::view::ListTeamsResponseView;
 #[doc(inline)]
-pub use self::__buffa::view::ListProjectsResponseOwnedView;
+pub use self::__buffa::view::ListTeamsResponseOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::CreateProjectRequestView;
+pub use self::__buffa::view::CreateTeamRequestView;
 #[doc(inline)]
-pub use self::__buffa::view::CreateProjectRequestOwnedView;
+pub use self::__buffa::view::CreateTeamRequestOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::CreateProjectResponseView;
+pub use self::__buffa::view::CreateTeamResponseView;
 #[doc(inline)]
-pub use self::__buffa::view::CreateProjectResponseOwnedView;
+pub use self::__buffa::view::CreateTeamResponseOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::DeleteProjectRequestView;
+pub use self::__buffa::view::DeleteTeamRequestView;
 #[doc(inline)]
-pub use self::__buffa::view::DeleteProjectRequestOwnedView;
+pub use self::__buffa::view::DeleteTeamRequestOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::DeleteProjectResponseView;
+pub use self::__buffa::view::DeleteTeamResponseView;
 #[doc(inline)]
-pub use self::__buffa::view::DeleteProjectResponseOwnedView;
+pub use self::__buffa::view::DeleteTeamResponseOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::UpdateProjectIconRequestView;
+pub use self::__buffa::view::UpdateTeamIconRequestView;
 #[doc(inline)]
-pub use self::__buffa::view::UpdateProjectIconRequestOwnedView;
+pub use self::__buffa::view::UpdateTeamIconRequestOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::NamedIconView;
 #[doc(inline)]
 pub use self::__buffa::view::NamedIconOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::UpdateProjectIconResponseView;
+pub use self::__buffa::view::UpdateTeamIconResponseView;
 #[doc(inline)]
-pub use self::__buffa::view::UpdateProjectIconResponseOwnedView;
+pub use self::__buffa::view::UpdateTeamIconResponseOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::UpdateProjectIssueKeyPrefixRequestView;
+pub use self::__buffa::view::UpdateTeamIssueKeyPrefixRequestView;
 #[doc(inline)]
-pub use self::__buffa::view::UpdateProjectIssueKeyPrefixRequestOwnedView;
+pub use self::__buffa::view::UpdateTeamIssueKeyPrefixRequestOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::UpdateProjectIssueKeyPrefixResponseView;
+pub use self::__buffa::view::UpdateTeamIssueKeyPrefixResponseView;
 #[doc(inline)]
-pub use self::__buffa::view::UpdateProjectIssueKeyPrefixResponseOwnedView;
+pub use self::__buffa::view::UpdateTeamIssueKeyPrefixResponseOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::UpdateProjectTabsRequestView;
+pub use self::__buffa::view::UpdateTeamTabsRequestView;
 #[doc(inline)]
-pub use self::__buffa::view::UpdateProjectTabsRequestOwnedView;
+pub use self::__buffa::view::UpdateTeamTabsRequestOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::UpdateProjectTabsResponseView;
+pub use self::__buffa::view::UpdateTeamTabsResponseView;
 #[doc(inline)]
-pub use self::__buffa::view::UpdateProjectTabsResponseOwnedView;
+pub use self::__buffa::view::UpdateTeamTabsResponseOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::CreateProjectAgentTokenRequestView;
+pub use self::__buffa::view::CreateTeamAgentTokenRequestView;
 #[doc(inline)]
-pub use self::__buffa::view::CreateProjectAgentTokenRequestOwnedView;
+pub use self::__buffa::view::CreateTeamAgentTokenRequestOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::CreateProjectAgentTokenResponseView;
+pub use self::__buffa::view::CreateTeamAgentTokenResponseView;
 #[doc(inline)]
-pub use self::__buffa::view::CreateProjectAgentTokenResponseOwnedView;
+pub use self::__buffa::view::CreateTeamAgentTokenResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::LinearSettingsView;
 #[doc(inline)]
 pub use self::__buffa::view::LinearSettingsOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::ProjectSettingsView;
+pub use self::__buffa::view::TeamSettingsView;
 #[doc(inline)]
-pub use self::__buffa::view::ProjectSettingsOwnedView;
+pub use self::__buffa::view::TeamSettingsOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::UpdateProjectSettingsRequestView;
+pub use self::__buffa::view::UpdateTeamSettingsRequestView;
 #[doc(inline)]
-pub use self::__buffa::view::UpdateProjectSettingsRequestOwnedView;
+pub use self::__buffa::view::UpdateTeamSettingsRequestOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::UpdateProjectSettingsResponseView;
+pub use self::__buffa::view::UpdateTeamSettingsResponseView;
 #[doc(inline)]
-pub use self::__buffa::view::UpdateProjectSettingsResponseOwnedView;
+pub use self::__buffa::view::UpdateTeamSettingsResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::UpdateCheckpointPolicyRequestView;
 #[doc(inline)]
@@ -360895,29 +360757,29 @@ pub use self::__buffa::view::UpdateCheckpointPolicyResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::UpdateCheckpointPolicyResponseOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::ProjectExecutionWorkerPolicyView;
+pub use self::__buffa::view::TeamExecutionWorkerPolicyView;
 #[doc(inline)]
-pub use self::__buffa::view::ProjectExecutionWorkerPolicyOwnedView;
+pub use self::__buffa::view::TeamExecutionWorkerPolicyOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::GetProjectExecutionWorkerPolicyRequestView;
+pub use self::__buffa::view::GetTeamExecutionWorkerPolicyRequestView;
 #[doc(inline)]
-pub use self::__buffa::view::GetProjectExecutionWorkerPolicyRequestOwnedView;
+pub use self::__buffa::view::GetTeamExecutionWorkerPolicyRequestOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::GetProjectExecutionWorkerPolicyResponseView;
+pub use self::__buffa::view::GetTeamExecutionWorkerPolicyResponseView;
 #[doc(inline)]
-pub use self::__buffa::view::GetProjectExecutionWorkerPolicyResponseOwnedView;
+pub use self::__buffa::view::GetTeamExecutionWorkerPolicyResponseOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::UpdateProjectExecutionWorkerPolicyRequestView;
+pub use self::__buffa::view::UpdateTeamExecutionWorkerPolicyRequestView;
 #[doc(inline)]
-pub use self::__buffa::view::UpdateProjectExecutionWorkerPolicyRequestOwnedView;
+pub use self::__buffa::view::UpdateTeamExecutionWorkerPolicyRequestOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::UpdateProjectExecutionWorkerPolicyResponseView;
+pub use self::__buffa::view::UpdateTeamExecutionWorkerPolicyResponseView;
 #[doc(inline)]
-pub use self::__buffa::view::UpdateProjectExecutionWorkerPolicyResponseOwnedView;
+pub use self::__buffa::view::UpdateTeamExecutionWorkerPolicyResponseOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::ProjectView;
+pub use self::__buffa::view::TeamView;
 #[doc(inline)]
-pub use self::__buffa::view::ProjectOwnedView;
+pub use self::__buffa::view::TeamOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::PlanningProjectView;
 #[doc(inline)]

@@ -26,7 +26,7 @@ import {
 import {
   getOrganizationRole,
 } from "./organization-repository";
-import { getProject } from "./project-command-repository";
+import { getTeam } from "./team-command-repository";
 
 type ChannelApplicationInput = {
   readonly db: D1Database;
@@ -79,7 +79,7 @@ export async function createChannelApplication(
     channelId,
   );
   if (input.command.defaultProjectId) {
-    const project = await getProject(
+    const project = await getTeam(
       input.db,
       input.command.defaultProjectId,
       input.userId,
@@ -135,7 +135,7 @@ export async function updateChannelApplication(
     );
   }
   if (input.command.defaultProjectId) {
-    const project = await getProject(
+    const project = await getTeam(
       input.db,
       input.command.defaultProjectId,
       input.userId,
@@ -229,7 +229,7 @@ export async function setChannelAgentApplication(
     // Adding a project Agent exposes that project's context to the channel, so
     // the member doing it must be able to reach the project themselves.
     if (agent.project_id) {
-      const project = await getProject(input.db, agent.project_id, input.userId);
+      const project = await getTeam(input.db, agent.project_id, input.userId);
       if (!project) throw new HttpError(403, "Project access required");
     }
     await addChannelAgent(input.db, {

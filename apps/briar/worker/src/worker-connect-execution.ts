@@ -53,9 +53,9 @@ import {
 } from "./run-evidence-request-mapper";
 import { listRunEvidenceForProject } from "./run-evidence-routes";
 import {
-  listProjectAgentChannelMessagesApplication,
-  ProjectAgentChannelApplicationError,
-} from "./project-agent-channel-application";
+  listTeamAgentChannelMessagesApplication,
+  TeamAgentChannelApplicationError,
+} from "./team-agent-channel-application";
 import { decodeChannelMessageQuery } from "./query-contract";
 import {
   scheduleProjectRealtimePublish,
@@ -75,7 +75,7 @@ import {
   usageObservation,
 } from "./worker-transcript-mappers";
 import {
-  type AuthenticatedWorkerProject,
+  type AuthenticatedWorkerTeam,
   requireAgentProject,
   requireWorkerProjectBinding,
 } from "./worker-route-auth";
@@ -103,7 +103,7 @@ import {
 
 export type IssueClaimAuthorization = {
   readonly projectId: string;
-  readonly authenticatedWorker?: AuthenticatedWorkerProject;
+  readonly authenticatedWorker?: AuthenticatedWorkerTeam;
 };
 
 export type WorkerConnectExecutionInput = {
@@ -149,7 +149,7 @@ export type WorkerExecutionServices = {
   readonly authorizeIssueClaim: typeof authorizeIssueClaim;
   readonly claimIssue: typeof claimNextQueueWork;
   readonly listProjectChannelMessages:
-    typeof listProjectAgentChannelMessagesApplication;
+    typeof listTeamAgentChannelMessagesApplication;
   readonly listRunEvidence: typeof listRunEvidenceForProject;
   readonly requireWorkerProjectBinding: typeof requireWorkerProjectBinding;
   readonly appendTranscript: typeof appendTranscriptEventsApplication;
@@ -169,7 +169,7 @@ export type WorkerExecutionServices = {
 const workerExecutionServices: WorkerExecutionServices = {
   authorizeIssueClaim,
   claimIssue: claimNextQueueWork,
-  listProjectChannelMessages: listProjectAgentChannelMessagesApplication,
+  listProjectChannelMessages: listTeamAgentChannelMessagesApplication,
   listRunEvidence: listRunEvidenceForProject,
   requireWorkerProjectBinding,
   appendTranscript: appendTranscriptEventsApplication,
@@ -187,7 +187,7 @@ const workerExecutionServices: WorkerExecutionServices = {
 const canonicalUuid = decodeRequestSync(UuidString);
 
 const projectAgentChannelConnectError = (
-  error: ProjectAgentChannelApplicationError,
+  error: TeamAgentChannelApplicationError,
 ): never => {
   switch (error.reason) {
     case "channel_not_found":
@@ -370,7 +370,7 @@ export function createWorkerExecutionService(
           nextCursor: result.nextCursor ?? undefined,
         });
       } catch (error) {
-        if (error instanceof ProjectAgentChannelApplicationError) {
+        if (error instanceof TeamAgentChannelApplicationError) {
           return projectAgentChannelConnectError(error);
         }
         throw error;

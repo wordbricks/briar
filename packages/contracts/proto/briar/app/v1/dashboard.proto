@@ -3,7 +3,7 @@ syntax = "proto3";
 package briar.app.v1;
 
 import "briar/app/v1/common.proto";
-import "briar/app/v1/project.proto";
+import "briar/app/v1/team.proto";
 import "briar/types/v1/agent_execution.proto";
 import "briar/types/v1/provider.proto";
 import "briar/types/v1/worker.proto";
@@ -19,25 +19,25 @@ service DashboardService {
 }
 
 message GetDashboardRequest {
-  string project_id = 1;
+  string team_id = 1;
 }
 
 message GetDashboardResponse {
-  Project project = 1;
+  Team team = 1;
   repeated DashboardRun runs = 2;
   repeated DashboardWorker workers = 3;
   repeated briar.types.v1.AgentProvider organization_providers = 4;
-  optional ProjectExecutionWorkerPolicy execution_policy = 5;
+  optional TeamExecutionWorkerPolicy execution_policy = 5;
   repeated OrganizationMember members = 6;
   repeated ConversationNotification conversation_notifications = 7;
   repeated ChannelNotification channel_notifications = 8;
   uint64 cursor = 9;
   google.protobuf.Timestamp generated_at = 10;
-  ProjectSettings settings = 11;
+  TeamSettings settings = 11;
 }
 
 message SyncDashboardRequest {
-  string project_id = 1;
+  string team_id = 1;
   uint64 cursor = 2;
 }
 
@@ -55,19 +55,19 @@ message SyncDashboardResponse {
   bool reset = 3;
   repeated DashboardRun runs = 4;
   repeated string deleted_run_ids = 5;
-  optional Project project = 6;
+  optional Team team = 6;
   repeated DashboardWorker workers = 7;
   repeated briar.types.v1.AgentProvider organization_providers = 8;
-  optional ProjectExecutionWorkerPolicy execution_policy = 9;
+  optional TeamExecutionWorkerPolicy execution_policy = 9;
   optional OrganizationMembersPatch members = 10;
   optional ConversationNotificationsPatch conversation_notifications = 11;
   repeated ChannelNotification channel_notifications = 12;
   google.protobuf.Timestamp generated_at = 13;
-  optional ProjectSettings settings = 14;
+  optional TeamSettings settings = 14;
 }
 
 message ListRunEventsRequest {
-  string project_id = 1;
+  string team_id = 1;
   string run_id = 2;
 }
 

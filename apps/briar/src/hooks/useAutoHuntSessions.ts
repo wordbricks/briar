@@ -8,7 +8,7 @@ import type {
   AutoHuntDispatchEvent,
   AutoHuntDispatchGroup_Serialize,
 } from "../generated/tauri";
-import { stopProjectAgentSession } from "../lib/project-llm";
+import { stopTeamAgentSession } from "../lib/team-llm";
 import {
   cancelHuntRun,
   loadProjectAgentSessionChanges,
@@ -16,9 +16,9 @@ import {
   type ProjectAgentSessionSyncState,
 } from "../lib/api";
 import {
-  startProjectRealtimeRefresh,
-  type ProjectRealtimeTarget,
-} from "../lib/project-realtime-refresh";
+  startTeamRealtimeRefresh,
+  type TeamRealtimeTarget,
+} from "../lib/team-realtime-refresh";
 import type { HuntRun, ProjectAgent } from "../types";
 
 const storageKey = "briar.auto-hunt-sessions.v1";
@@ -110,7 +110,7 @@ export function collapseLinkedAutoHuntSessions(
   return sessions.filter((session) => !parentSessionIds.has(session.id));
 }
 
-type AutoHuntStopper = typeof stopProjectAgentSession;
+type AutoHuntStopper = typeof stopTeamAgentSession;
 
 function event(type: AutoHuntSessionEventType, occurredAt: string) {
   return { id: crypto.randomUUID(), type, occurredAt };
@@ -343,13 +343,13 @@ export function applyProjectAgentSessionSync(
 }
 
 export function useAutoHuntSessions(
-  stopper: AutoHuntStopper = stopProjectAgentSession,
+  stopper: AutoHuntStopper = stopTeamAgentSession,
 ) {
   const [sessions, setSessions] = useState<AutoHuntSession[]>(readSessions);
   const sessionsRef = useRef(sessions);
   const [syncContext, setSyncContext] = useState<{
     token: string;
-    targets: ProjectRealtimeTarget[];
+    targets: TeamRealtimeTarget[];
   } | null>(null);
   const [synchronizedProjects, setSynchronizedProjects] = useState<Set<string>>(
     () => new Set(),
@@ -370,7 +370,7 @@ export function useAutoHuntSessions(
 
   const configureSync = useCallback((
     token: string | null,
-    targets: readonly ProjectRealtimeTarget[],
+    targets: readonly TeamRealtimeTarget[],
   ) => {
     const normalizedTargets = [...new Map(
       targets.map((target) => [target.id, {
@@ -486,7 +486,7 @@ export function useAutoHuntSessions(
       }
       void drainRefreshes();
     };
-    const stopRealtimeRefresh = startProjectRealtimeRefresh({
+    const stopRealtimeRefresh = startTeamRealtimeRefresh({
       token: syncContext.token,
       targets: syncContext.targets,
       refresh: requestRefresh,

@@ -4,7 +4,7 @@ import type { Organization, Project, SessionUser } from "../types";
 type SessionRestoreDependencies = {
   clearToken: () => Promise<void>;
   loadOrganizations: (token: string) => Promise<Organization[]>;
-  loadProjects: (token: string) => Promise<Project[]>;
+  loadTeams: (token: string) => Promise<Project[]>;
   loadSession: (token: string) => Promise<SessionUser>;
   readToken: () => Promise<string | null>;
 };
@@ -24,7 +24,7 @@ export type SessionRestoreResult =
 export async function restoreStoredSession({
   clearToken,
   loadOrganizations,
-  loadProjects,
+  loadTeams,
   loadSession,
   readToken,
 }: SessionRestoreDependencies): Promise<SessionRestoreResult> {
@@ -53,7 +53,7 @@ export async function restoreStoredSession({
 
   try {
     const [projects, organizations] = await Promise.all([
-      loadProjects(token),
+      loadTeams(token),
       loadOrganizations(token),
     ]);
     return {

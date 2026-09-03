@@ -14,7 +14,7 @@ final class IssueMutationStore: ObservableObject {
 
     private let preparedUploadClient: any PreparedUploadClientProtocol
     private let issueService: any BriarAPI_IssueServiceClientInterface
-    private let projectService: any BriarAPI_ProjectServiceClientInterface
+    private let teamService: any BriarAPI_TeamServiceClientInterface
     private let projectID: UUID
     private let planningProjectID: UUID?
     private let requestID: @Sendable () -> UUID
@@ -24,7 +24,7 @@ final class IssueMutationStore: ObservableObject {
     init(
         preparedUploadClient: any PreparedUploadClientProtocol,
         issueService: any BriarAPI_IssueServiceClientInterface,
-        projectService: any BriarAPI_ProjectServiceClientInterface,
+        teamService: any BriarAPI_TeamServiceClientInterface,
         projectID: UUID,
         planningProjectID: UUID? = nil,
         requestID: @escaping @Sendable () -> UUID = UUID.init,
@@ -34,7 +34,7 @@ final class IssueMutationStore: ObservableObject {
     ) {
         self.preparedUploadClient = preparedUploadClient
         self.issueService = issueService
-        self.projectService = projectService
+        self.teamService = teamService
         self.projectID = projectID
         self.planningProjectID = planningProjectID
         self.requestID = requestID
@@ -271,7 +271,7 @@ final class IssueMutationStore: ObservableObject {
             request.sourceProjectID = coreUUIDString(sourceProjectID)
             request.runID = coreUUIDString(runID)
             request.targetProjectID = coreUUIDString(targetProjectID)
-            let response = try await projectService.moveIssueToPlanningProject(
+            let response = try await teamService.moveIssueToPlanningProject(
                 request: request,
                 headers: [:]
             ).briarValue()

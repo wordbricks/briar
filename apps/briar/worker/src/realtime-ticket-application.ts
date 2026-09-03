@@ -7,7 +7,7 @@ import { getChannel } from "./channels";
 import { getHuntRunForProject } from "./hunt-run-repository";
 import { hasOrganizationCapability } from "./organization-access";
 import { getOrganizationRole } from "./organization-repository";
-import { getProject } from "./project-command-repository";
+import { getTeam } from "./team-command-repository";
 
 export type RealtimeTicketScope =
   | {
@@ -53,7 +53,7 @@ export type RealtimeTicketApplicationServices = {
   readonly createOrganizationTicket: typeof createChannelRealtimeTicket;
   readonly getChannel: typeof getChannel;
   readonly getOrganizationRole: typeof getOrganizationRole;
-  readonly getProject: typeof getProject;
+  readonly getTeam: typeof getTeam;
   readonly getRun: typeof getHuntRunForProject;
 };
 
@@ -63,7 +63,7 @@ const realtimeTicketApplicationServices: RealtimeTicketApplicationServices = {
   createOrganizationTicket: createChannelRealtimeTicket,
   getChannel,
   getOrganizationRole,
-  getProject,
+  getTeam,
   getRun: getHuntRunForProject,
 };
 
@@ -105,7 +105,7 @@ export async function createRealtimeTicketApplication(
     }
 
     case "issueActivity": {
-      const project = await services.getProject(db, scope.projectId, userId);
+      const project = await services.getTeam(db, scope.projectId, userId);
       if (!project) return inaccessible("project_not_found", "Project not found");
       const run = await services.getRun(db, scope.projectId, scope.runId);
       if (!run) return inaccessible("run_not_found", "Run not found");

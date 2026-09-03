@@ -15,8 +15,8 @@ import * as Schema from "effect/Schema";
 
 import {
   type ModelEffort,
-  type ProjectAgentProvider,
-} from "./project-agent-model";
+  type TeamAgentProvider,
+} from "./team-agent-model";
 
 export const HuntEventRow = Schema.Struct({
   id: Schema.mutableKey(Schema.String),
@@ -83,7 +83,7 @@ export type HuntEventInput = {
   context: Record<string, unknown> | null;
   postInsertIssueDescription?: string | null;
   createdByUserId?: string | null;
-  preferredAgentProvider?: ProjectAgentProvider | null;
+  preferredAgentProvider?: TeamAgentProvider | null;
   preferredAgentModel?: string | null;
   preferredAgentEffort?: ModelEffort | null;
 };

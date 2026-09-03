@@ -7,7 +7,7 @@ import {
   ponytailDeveloperAgentTemplate,
   projectAgentTemplateSkillInputs,
 } from "./agent-templates";
-import { isProjectAgentAvatarDataUrl } from "./project-agent-avatar";
+import { isTeamAgentAvatarDataUrl } from "./team-agent-avatar";
 
 describe("project Agent templates", () => {
   it("removes source frontmatter without changing the Markdown body", () => {
@@ -56,7 +56,7 @@ describe("project Agent templates", () => {
       "Copyright (c) 2026 DietrichGebert",
     );
     expect(
-      isProjectAgentAvatarDataUrl(ponytailDeveloperAgentTemplate.avatar),
+      isTeamAgentAvatarDataUrl(ponytailDeveloperAgentTemplate.avatar),
     ).toBe(true);
   });
 

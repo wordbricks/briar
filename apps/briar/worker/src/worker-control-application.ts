@@ -1,6 +1,6 @@
 import { normalizeAutoHuntWorkflow } from "../../src/lib/auto-hunt-contract";
 import { isSemanticVersion } from "../../src/lib/semantic-version";
-import { getProjectSettings } from "./project-settings-repository";
+import { getTeamSettings } from "./team-settings-repository";
 import { pendingExecutionWorkerUpdate } from "./worker-update-repository";
 import { recordPreservedWorkerBinding } from "./worker-lifecycle-repository";
 import type { AuthenticatedWorkerPrincipal } from "./worker-route-auth";
@@ -254,7 +254,7 @@ export async function heartbeatWorkerApplication(input: {
   if (input.refreshMaintenance) {
     const [, projectSettings] = await Promise.all([
       reapStalledHuntRuns(input.db, binding.project_id, input.observedAt),
-      getProjectSettings(input.db, binding.project_id),
+      getTeamSettings(input.db, binding.project_id),
     ]);
     const projectWorkflow = projectSettings?.workflow_json
       ? normalizeAutoHuntWorkflow(JSON.parse(projectSettings.workflow_json))

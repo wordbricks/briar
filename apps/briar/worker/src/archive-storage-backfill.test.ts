@@ -7,7 +7,7 @@ import {
 } from "./archive";
 import { archiveFormatVersion } from "./archive-contract";
 import { backfillProjectAgentSessionArchives } from "./archive-storage-backfill";
-import { encodeStoredProjectAgentSessionPayload } from "./project-request-contract";
+import { encodeStoredTeamAgentSessionPayload } from "./team-request-contract";
 import { executeD1Sql } from "./test-helpers/d1-sql";
 
 const encoder = new TextEncoder();
@@ -38,7 +38,7 @@ describe("project agent session archive storage backfill", () => {
     const sessionId = "archive-backfill-session";
     const ownerId = "archive-backfill-owner";
     const objectKey = `logs/v1/${archiveId}.jsonl.gz`;
-    const payload = JSON.parse(encodeStoredProjectAgentSessionPayload({
+    const payload = JSON.parse(encodeStoredTeamAgentSessionPayload({
       dispatchGroupId: sessionId,
       agentId: null,
       agentName: "Backfilled Agent",

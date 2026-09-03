@@ -14,7 +14,7 @@ import {
   type MyIssue,
   type MyIssueScope,
 } from "./MyIssuesList";
-import { ProjectIcon } from "./ProjectIcon";
+import { TeamIcon } from "./TeamIcon";
 import { useI18n } from "../i18n";
 import { formatIssueKey } from "../lib/issue-key";
 import type { DashboardPayload, HuntRun, OrganizationMember, Project } from "../types";
@@ -128,7 +128,7 @@ function ProjectFilter({
                 <Check aria-hidden="true" size={13} />
               </DropdownMenu.ItemIndicator>
               <span className="my-issues-project-option">
-                <ProjectIcon className="my-issues-project-icon" project={project} />
+                <TeamIcon className="my-issues-project-icon" project={project} />
                 <span className="issue-property-filter-choice-label">
                   {project.name}
                 </span>
@@ -366,8 +366,8 @@ export function MyIssues({
       const dashboard = dashboardByRunId.get(run.id);
       if (!dashboard) return undefined;
       return {
-        id: dashboard.project.id,
-        label: dashboard.project.name,
+        id: dashboard.team.id,
+        label: dashboard.team.name,
         settings: dashboard.settings,
       };
     },
@@ -378,9 +378,9 @@ export function MyIssues({
     for (const issue of selectedIssues) {
       const dashboard = dashboards[issue.project.id];
       if (!dashboard) continue;
-      result.set(dashboard.project.id, {
-        id: dashboard.project.id,
-        label: dashboard.project.name,
+      result.set(dashboard.team.id, {
+        id: dashboard.team.id,
+        label: dashboard.team.name,
         settings: dashboard.settings,
       });
     }

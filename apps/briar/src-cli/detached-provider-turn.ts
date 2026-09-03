@@ -16,7 +16,7 @@ import {
   encodeSidecarApprovalResponse,
   encodeSidecarRunRequest,
 } from "../src-agent/sidecar-protocol";
-import type { JsonSchema } from "../src/lib/project-llm";
+import type { JsonSchema } from "../src/lib/team-llm";
 import { agentProviderBinaryName } from "../src/lib/agent-provider";
 import { agentProviderToProto } from "../src/lib/agent-provider-proto";
 import { supportsComputerUseProvider } from

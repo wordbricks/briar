@@ -5,7 +5,7 @@ package briar.worker.v1;
 import "briar/app/v1/dashboard.proto";
 import "briar/app/v1/fleet.proto";
 import "briar/app/v1/github.proto";
-import "briar/app/v1/project.proto";
+import "briar/app/v1/team.proto";
 import "briar/types/v1/provider.proto";
 import "briar/types/v1/worker.proto";
 
@@ -43,15 +43,15 @@ message GetManagedComputerSetupContextRequest {
   string setup_token = 2;
 }
 
-message ManagedComputerSetupProject {
+message ManagedComputerSetupTeam {
   string id = 1;
   string name = 2;
 }
 
 message GetManagedComputerSetupContextResponse {
   briar.app.v1.ManagedComputerSetupSession session = 1;
-  ManagedComputerSetupProject project = 2;
-  briar.app.v1.ProjectSettings settings = 3;
+  ManagedComputerSetupTeam team = 2;
+  briar.app.v1.TeamSettings settings = 3;
   optional briar.app.v1.ProjectGitHubCredential repository_credential = 4;
 }
 
@@ -64,7 +64,7 @@ message BindManagedComputerSetupRequest {
 message BindManagedComputerSetupResponse {
   string managed_computer_id = 1;
   string organization_id = 2;
-  string project_id = 3;
+  string team_id = 3;
   string device_id = 4;
   briar.app.v1.DashboardWorker worker = 5;
   bool duplicate = 6;
@@ -157,7 +157,7 @@ message ManagedComputerSetupChallenge {
 }
 
 message ManagedComputerSetupComplete {
-  string project_id = 1;
+  string team_id = 1;
   briar.types.v1.AgentProvider provider = 2;
   string worker_id = 3;
 }

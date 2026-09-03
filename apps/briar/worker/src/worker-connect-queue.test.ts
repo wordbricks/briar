@@ -136,12 +136,12 @@ describe("WorkerQueueService lifecycle semantics", () => {
 
   it("rejects a lost task lease before returning a response", async () => {
     const authenticate = authentication();
-    const renew = vi.fn<WorkerQueueServices["renewProjectAgentTaskLease"]>();
+    const renew = vi.fn<WorkerQueueServices["renewTeamAgentTaskLease"]>();
     renew.mockResolvedValue(null);
     const service = createWorkerQueueService(input, {
       requireWorkerProjectBinding: authenticate,
       sha256: async () => "b".repeat(64),
-      renewProjectAgentTaskLease: renew,
+      renewTeamAgentTaskLease: renew,
     });
 
     const request = create(RenewWorkLeaseRequestSchema, {
@@ -271,12 +271,12 @@ describe("WorkerQueueService lifecycle semantics", () => {
 
   it("completes a typed project task claim through the application boundary", async () => {
     const authenticate = authentication();
-    const complete = vi.fn<WorkerQueueServices["completeProjectAgentTaskWork"]>();
+    const complete = vi.fn<WorkerQueueServices["completeTeamAgentTaskWork"]>();
     complete.mockResolvedValue({ replayed: true });
     const service = createWorkerQueueService(input, {
       requireWorkerProjectBinding: authenticate,
       sha256: async () => "d".repeat(64),
-      completeProjectAgentTaskWork: complete,
+      completeTeamAgentTaskWork: complete,
     });
     const request = create(CompleteProjectAgentTaskRequestSchema, {
       projectId,

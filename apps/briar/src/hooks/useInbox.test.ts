@@ -11,7 +11,7 @@ import {
   mergeInboxReadVersions,
 } from "./useInbox";
 
-const project = demoDashboard.project;
+const project = demoDashboard.team;
 
 function session(
   status: AutoHuntSession["status"],
@@ -257,7 +257,7 @@ describe("Inbox messages", () => {
         messageId: "message-reply",
         rootMessageId: "message-root",
         authorImage: "https://example.com/member.png",
-        issueKey: `${demoDashboard.project.issueKeyPrefix}-1321`,
+        issueKey: `${demoDashboard.team.issueKeyPrefix}-1321`,
         reason: "thread_reply",
       }),
     ]);

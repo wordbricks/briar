@@ -40140,7 +40140,7 @@ pub const __GET_MANAGED_COMPUTER_SETUP_CONTEXT_REQUEST_JSON_ANY: ::buffa::type_r
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct ManagedComputerSetupProject {
+pub struct ManagedComputerSetupTeam {
     /// Field 1: `id`
     #[serde(
         rename = "id",
@@ -40159,29 +40159,29 @@ pub struct ManagedComputerSetupProject {
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for ManagedComputerSetupProject {
+impl ::core::fmt::Debug for ManagedComputerSetupTeam {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("ManagedComputerSetupProject")
+        f.debug_struct("ManagedComputerSetupTeam")
             .field("id", &self.id)
             .field("name", &self.name)
             .finish()
     }
 }
-impl ManagedComputerSetupProject {
+impl ManagedComputerSetupTeam {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.ManagedComputerSetupProject";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.ManagedComputerSetupTeam";
 }
-::buffa::impl_default_instance!(ManagedComputerSetupProject);
-impl ::buffa::MessageName for ManagedComputerSetupProject {
+::buffa::impl_default_instance!(ManagedComputerSetupTeam);
+impl ::buffa::MessageName for ManagedComputerSetupTeam {
     const PACKAGE: &'static str = "briar.worker.v1";
-    const NAME: &'static str = "ManagedComputerSetupProject";
-    const FULL_NAME: &'static str = "briar.worker.v1.ManagedComputerSetupProject";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.ManagedComputerSetupProject";
+    const NAME: &'static str = "ManagedComputerSetupTeam";
+    const FULL_NAME: &'static str = "briar.worker.v1.ManagedComputerSetupTeam";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.ManagedComputerSetupTeam";
 }
-impl ::buffa::Message for ManagedComputerSetupProject {
+impl ::buffa::Message for ManagedComputerSetupTeam {
     /// Returns the total encoded size in bytes.
     ///
     /// Accumulates in `u64` (which cannot overflow for in-memory
@@ -40256,8 +40256,8 @@ impl ::buffa::Message for ManagedComputerSetupProject {
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for ManagedComputerSetupProject {
-    const PROTO_FQN: &'static str = "briar.worker.v1.ManagedComputerSetupProject";
+impl ::buffa::ExtensionSet for ManagedComputerSetupTeam {
+    const PROTO_FQN: &'static str = "briar.worker.v1.ManagedComputerSetupTeam";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -40265,7 +40265,7 @@ impl ::buffa::ExtensionSet for ManagedComputerSetupProject {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for ManagedComputerSetupProject {
+impl ::buffa::json_helpers::ProtoElemJson for ManagedComputerSetupTeam {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -40279,10 +40279,10 @@ impl ::buffa::json_helpers::ProtoElemJson for ManagedComputerSetupProject {
     }
 }
 #[doc(hidden)]
-pub const __MANAGED_COMPUTER_SETUP_PROJECT_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.worker.v1.ManagedComputerSetupProject",
-    to_json: ::buffa::type_registry::any_to_json::<ManagedComputerSetupProject>,
-    from_json: ::buffa::type_registry::any_from_json::<ManagedComputerSetupProject>,
+pub const __MANAGED_COMPUTER_SETUP_TEAM_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.worker.v1.ManagedComputerSetupTeam",
+    to_json: ::buffa::type_registry::any_to_json::<ManagedComputerSetupTeam>,
+    from_json: ::buffa::type_registry::any_from_json::<ManagedComputerSetupTeam>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
@@ -40298,14 +40298,14 @@ pub struct GetManagedComputerSetupContextResponse {
         super::super::app::v1::ManagedComputerSetupSession,
         ::buffa::Inline<super::super::app::v1::ManagedComputerSetupSession>,
     >,
-    /// Field 2: `project`
+    /// Field 2: `team`
     #[serde(
-        rename = "project",
+        rename = "team",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
-    pub project: ::buffa::MessageField<
-        ManagedComputerSetupProject,
-        ::buffa::Inline<ManagedComputerSetupProject>,
+    pub team: ::buffa::MessageField<
+        ManagedComputerSetupTeam,
+        ::buffa::Inline<ManagedComputerSetupTeam>,
     >,
     /// Field 3: `settings`
     #[serde(
@@ -40313,8 +40313,8 @@ pub struct GetManagedComputerSetupContextResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub settings: ::buffa::MessageField<
-        super::super::app::v1::ProjectSettings,
-        ::buffa::Inline<super::super::app::v1::ProjectSettings>,
+        super::super::app::v1::TeamSettings,
+        ::buffa::Inline<super::super::app::v1::TeamSettings>,
     >,
     /// Field 4: `repository_credential`
     #[serde(
@@ -40334,7 +40334,7 @@ impl ::core::fmt::Debug for GetManagedComputerSetupContextResponse {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("GetManagedComputerSetupContextResponse")
             .field("session", &self.session)
-            .field("project", &self.project)
+            .field("team", &self.team)
             .field("settings", &self.settings)
             .field("repository_credential", &self.repository_credential)
             .finish()
@@ -40375,9 +40375,9 @@ impl ::buffa::Message for GetManagedComputerSetupContextResponse {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
-        if self.project.is_set() {
+        if self.team.is_set() {
             let __slot = __cache.reserve();
-            let inner_size = self.project.compute_size(__cache);
+            let inner_size = self.team.compute_size(__cache);
             __cache.set(__slot, inner_size);
             size
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
@@ -40417,13 +40417,13 @@ impl ::buffa::Message for GetManagedComputerSetupContextResponse {
             );
             self.session.write_to(__cache, buf);
         }
-        if self.project.is_set() {
+        if self.team.is_set() {
             ::buffa::types::put_len_delimited_header(
                 2u32,
                 u64::from(__cache.consume_next()),
                 buf,
             );
-            self.project.write_to(__cache, buf);
+            self.team.write_to(__cache, buf);
         }
         if self.settings.is_set() {
             ::buffa::types::put_len_delimited_header(
@@ -40471,7 +40471,7 @@ impl ::buffa::Message for GetManagedComputerSetupContextResponse {
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 ::buffa::Message::merge_length_delimited(
-                    self.project.get_or_insert_default(),
+                    self.team.get_or_insert_default(),
                     buf,
                     ctx,
                 )?;
@@ -40507,7 +40507,7 @@ impl ::buffa::Message for GetManagedComputerSetupContextResponse {
     }
     fn clear(&mut self) {
         self.session = ::buffa::MessageField::none();
-        self.project = ::buffa::MessageField::none();
+        self.team = ::buffa::MessageField::none();
         self.settings = ::buffa::MessageField::none();
         self.repository_credential = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
@@ -40757,14 +40757,14 @@ pub struct BindManagedComputerSetupResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub organization_id: ::buffa::alloc::string::String,
-    /// Field 3: `project_id`
+    /// Field 3: `team_id`
     #[serde(
-        rename = "projectId",
-        alias = "project_id",
+        rename = "teamId",
+        alias = "team_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub project_id: ::buffa::alloc::string::String,
+    pub team_id: ::buffa::alloc::string::String,
     /// Field 4: `device_id`
     #[serde(
         rename = "deviceId",
@@ -40798,7 +40798,7 @@ impl ::core::fmt::Debug for BindManagedComputerSetupResponse {
         f.debug_struct("BindManagedComputerSetupResponse")
             .field("managed_computer_id", &self.managed_computer_id)
             .field("organization_id", &self.organization_id)
-            .field("project_id", &self.project_id)
+            .field("team_id", &self.team_id)
             .field("device_id", &self.device_id)
             .field("worker", &self.worker)
             .field("duplicate", &self.duplicate)
@@ -40843,8 +40843,8 @@ impl ::buffa::Message for BindManagedComputerSetupResponse {
                 += 1u64
                     + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
         }
-        if !self.project_id.is_empty() {
-            size += 1u64 + ::buffa::types::string_encoded_len(&self.project_id) as u64;
+        if !self.team_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.team_id) as u64;
         }
         if !self.device_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.device_id) as u64;
@@ -40876,8 +40876,8 @@ impl ::buffa::Message for BindManagedComputerSetupResponse {
         if !self.organization_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.organization_id, buf);
         }
-        if !self.project_id.is_empty() {
-            ::buffa::types::put_string_field(3u32, &self.project_id, buf);
+        if !self.team_id.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.team_id, buf);
         }
         if !self.device_id.is_empty() {
             ::buffa::types::put_string_field(4u32, &self.device_id, buf);
@@ -40925,7 +40925,7 @@ impl ::buffa::Message for BindManagedComputerSetupResponse {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.project_id, buf)?;
+                ::buffa::types::merge_string(&mut self.team_id, buf)?;
             }
             4u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -40962,7 +40962,7 @@ impl ::buffa::Message for BindManagedComputerSetupResponse {
     fn clear(&mut self) {
         self.managed_computer_id.clear();
         self.organization_id.clear();
-        self.project_id.clear();
+        self.team_id.clear();
         self.device_id.clear();
         self.worker = ::buffa::MessageField::none();
         self.duplicate = false;
@@ -43069,14 +43069,14 @@ pub const __MANAGED_COMPUTER_SETUP_CHALLENGE_JSON_ANY: ::buffa::type_registry::J
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct ManagedComputerSetupComplete {
-    /// Field 1: `project_id`
+    /// Field 1: `team_id`
     #[serde(
-        rename = "projectId",
-        alias = "project_id",
+        rename = "teamId",
+        alias = "team_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub project_id: ::buffa::alloc::string::String,
+    pub team_id: ::buffa::alloc::string::String,
     /// Field 2: `provider`
     #[serde(
         rename = "provider",
@@ -43099,7 +43099,7 @@ pub struct ManagedComputerSetupComplete {
 impl ::core::fmt::Debug for ManagedComputerSetupComplete {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("ManagedComputerSetupComplete")
-            .field("project_id", &self.project_id)
+            .field("team_id", &self.team_id)
             .field("provider", &self.provider)
             .field("worker_id", &self.worker_id)
             .finish()
@@ -43132,8 +43132,8 @@ impl ::buffa::Message for ManagedComputerSetupComplete {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.project_id.is_empty() {
-            size += 1u64 + ::buffa::types::string_encoded_len(&self.project_id) as u64;
+        if !self.team_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.team_id) as u64;
         }
         {
             let val = self.provider.to_i32();
@@ -43154,8 +43154,8 @@ impl ::buffa::Message for ManagedComputerSetupComplete {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.project_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.project_id, buf);
+        if !self.team_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.team_id, buf);
         }
         {
             let val = self.provider.to_i32();
@@ -43184,7 +43184,7 @@ impl ::buffa::Message for ManagedComputerSetupComplete {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.project_id, buf)?;
+                ::buffa::types::merge_string(&mut self.team_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -43210,7 +43210,7 @@ impl ::buffa::Message for ManagedComputerSetupComplete {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.project_id.clear();
+        self.team_id.clear();
         self.provider = ::buffa::EnumValue::from(0);
         self.worker_id.clear();
         self.__buffa_unknown_fields.clear();
@@ -108638,15 +108638,15 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
-        pub struct ManagedComputerSetupProjectView<'a> {
+        pub struct ManagedComputerSetupTeamView<'a> {
             /// Field 1: `id`
             pub id: &'a str,
             /// Field 2: `name`
             pub name: &'a str,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a> for ManagedComputerSetupProjectView<'a> {
-            type Owned = super::super::ManagedComputerSetupProject;
+        impl<'a> ::buffa::MessageView<'a> for ManagedComputerSetupTeamView<'a> {
+            type Owned = super::super::ManagedComputerSetupTeam;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -108703,7 +108703,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::ManagedComputerSetupProject,
+                super::super::ManagedComputerSetupTeam,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -108713,13 +108713,13 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::ManagedComputerSetupProject,
+                super::super::ManagedComputerSetupTeam,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::ManagedComputerSetupProject {
+                ::core::result::Result::Ok(super::super::ManagedComputerSetupTeam {
                     id: self.id.to_string(),
                     name: self.name.to_string(),
                     __buffa_unknown_fields: self
@@ -108730,7 +108730,7 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a> for ManagedComputerSetupProjectView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for ManagedComputerSetupTeamView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
@@ -108773,7 +108773,7 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for ManagedComputerSetupProjectView<'__a> {
+        impl<'__a> ::serde::Serialize for ManagedComputerSetupTeamView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -108789,24 +108789,24 @@ pub mod __buffa {
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for ManagedComputerSetupProjectView<'a> {
+        impl<'a> ::buffa::MessageName for ManagedComputerSetupTeamView<'a> {
             const PACKAGE: &'static str = "briar.worker.v1";
-            const NAME: &'static str = "ManagedComputerSetupProject";
-            const FULL_NAME: &'static str = "briar.worker.v1.ManagedComputerSetupProject";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.ManagedComputerSetupProject";
+            const NAME: &'static str = "ManagedComputerSetupTeam";
+            const FULL_NAME: &'static str = "briar.worker.v1.ManagedComputerSetupTeam";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.ManagedComputerSetupTeam";
         }
-        ::buffa::impl_default_view_instance!(ManagedComputerSetupProjectView);
-        ::buffa::impl_view_reborrow!(ManagedComputerSetupProjectView);
-        /** Self-contained, `'static` owned view of a `ManagedComputerSetupProject` message.
+        ::buffa::impl_default_view_instance!(ManagedComputerSetupTeamView);
+        ::buffa::impl_view_reborrow!(ManagedComputerSetupTeamView);
+        /** Self-contained, `'static` owned view of a `ManagedComputerSetupTeam` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`ManagedComputerSetupProjectView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`ManagedComputerSetupTeamView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ManagedComputerSetupProjectView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ManagedComputerSetupTeamView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct ManagedComputerSetupProjectOwnedView(
-            ::buffa::OwnedView<ManagedComputerSetupProjectView<'static>>,
+        pub struct ManagedComputerSetupTeamOwnedView(
+            ::buffa::OwnedView<ManagedComputerSetupTeamView<'static>>,
         );
-        impl ManagedComputerSetupProjectOwnedView {
+        impl ManagedComputerSetupTeamOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -108820,9 +108820,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    ManagedComputerSetupProjectOwnedView(
-                        ::buffa::OwnedView::decode(bytes)?,
-                    ),
+                    ManagedComputerSetupTeamOwnedView(::buffa::OwnedView::decode(bytes)?),
                 )
             }
             /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
@@ -108837,7 +108835,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    ManagedComputerSetupProjectOwnedView(
+                    ManagedComputerSetupTeamOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -108851,17 +108849,17 @@ pub mod __buffa {
             /// another [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::ManagedComputerSetupProject,
+                msg: &super::super::ManagedComputerSetupTeam,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    ManagedComputerSetupProjectOwnedView(
+                    ManagedComputerSetupTeamOwnedView(
                         ::buffa::OwnedView::from_owned(msg)?,
                     ),
                 )
             }
-            /// Borrow the full [`ManagedComputerSetupProjectView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`ManagedComputerSetupTeamView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &ManagedComputerSetupProjectView<'_> {
+            pub fn view(&self) -> &ManagedComputerSetupTeamView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -108872,7 +108870,7 @@ pub mod __buffa {
             /// whose contract also governs handles converted from a raw
             /// [`::buffa::OwnedView`].
             #[must_use]
-            pub fn to_owned_message(&self) -> super::super::ManagedComputerSetupProject {
+            pub fn to_owned_message(&self) -> super::super::ManagedComputerSetupTeam {
                 self.0.to_owned_message()
             }
             /// The underlying bytes buffer.
@@ -108897,34 +108895,34 @@ pub mod __buffa {
             }
         }
         impl ::core::convert::From<
-            ::buffa::OwnedView<ManagedComputerSetupProjectView<'static>>,
-        > for ManagedComputerSetupProjectOwnedView {
+            ::buffa::OwnedView<ManagedComputerSetupTeamView<'static>>,
+        > for ManagedComputerSetupTeamOwnedView {
             fn from(
-                inner: ::buffa::OwnedView<ManagedComputerSetupProjectView<'static>>,
+                inner: ::buffa::OwnedView<ManagedComputerSetupTeamView<'static>>,
             ) -> Self {
-                ManagedComputerSetupProjectOwnedView(inner)
+                ManagedComputerSetupTeamOwnedView(inner)
             }
         }
-        impl ::core::convert::From<ManagedComputerSetupProjectOwnedView>
-        for ::buffa::OwnedView<ManagedComputerSetupProjectView<'static>> {
-            fn from(wrapper: ManagedComputerSetupProjectOwnedView) -> Self {
+        impl ::core::convert::From<ManagedComputerSetupTeamOwnedView>
+        for ::buffa::OwnedView<ManagedComputerSetupTeamView<'static>> {
+            fn from(wrapper: ManagedComputerSetupTeamOwnedView) -> Self {
                 wrapper.0
             }
         }
         impl ::core::convert::AsRef<
-            ::buffa::OwnedView<ManagedComputerSetupProjectView<'static>>,
-        > for ManagedComputerSetupProjectOwnedView {
+            ::buffa::OwnedView<ManagedComputerSetupTeamView<'static>>,
+        > for ManagedComputerSetupTeamOwnedView {
             fn as_ref(
                 &self,
-            ) -> &::buffa::OwnedView<ManagedComputerSetupProjectView<'static>> {
+            ) -> &::buffa::OwnedView<ManagedComputerSetupTeamView<'static>> {
                 &self.0
             }
         }
-        impl ::buffa::HasMessageView for super::super::ManagedComputerSetupProject {
-            type View<'a> = ManagedComputerSetupProjectView<'a>;
-            type ViewHandle = ManagedComputerSetupProjectOwnedView;
+        impl ::buffa::HasMessageView for super::super::ManagedComputerSetupTeam {
+            type View<'a> = ManagedComputerSetupTeamView<'a>;
+            type ViewHandle = ManagedComputerSetupTeamOwnedView;
         }
-        impl ::serde::Serialize for ManagedComputerSetupProjectOwnedView {
+        impl ::serde::Serialize for ManagedComputerSetupTeamOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -108940,15 +108938,13 @@ pub mod __buffa {
                     'a,
                 >,
             >,
-            /// Field 2: `project`
-            pub project: ::buffa::MessageFieldView<
-                super::super::__buffa::view::ManagedComputerSetupProjectView<'a>,
+            /// Field 2: `team`
+            pub team: ::buffa::MessageFieldView<
+                super::super::__buffa::view::ManagedComputerSetupTeamView<'a>,
             >,
             /// Field 3: `settings`
             pub settings: ::buffa::MessageFieldView<
-                super::super::super::super::app::v1::__buffa::view::ProjectSettingsView<
-                    'a,
-                >,
+                super::super::super::super::app::v1::__buffa::view::TeamSettingsView<'a>,
             >,
             /// Field 4: `repository_credential`
             pub repository_credential: ::buffa::MessageFieldView<
@@ -109023,7 +109019,7 @@ pub mod __buffa {
                         )?;
                         let __sub_ctx = ctx.descend()?;
                         let sub = ::buffa::types::borrow_bytes(&mut cur)?;
-                        match view.project.as_mut() {
+                        match view.team.as_mut() {
                             Some(existing) => {
                                 ::buffa::MessageView::merge_into_view(
                                     existing,
@@ -109032,8 +109028,8 @@ pub mod __buffa {
                                 )?
                             }
                             None => {
-                                view.project = ::buffa::MessageFieldView::set(
-                                    <super::super::__buffa::view::ManagedComputerSetupProjectView as ::buffa::MessageView>::decode_view_ctx(
+                                view.team = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::ManagedComputerSetupTeamView as ::buffa::MessageView>::decode_view_ctx(
                                         sub,
                                         __sub_ctx,
                                     )?,
@@ -109058,7 +109054,7 @@ pub mod __buffa {
                             }
                             None => {
                                 view.settings = ::buffa::MessageFieldView::set(
-                                    <super::super::super::super::app::v1::__buffa::view::ProjectSettingsView as ::buffa::MessageView>::decode_view_ctx(
+                                    <super::super::super::super::app::v1::__buffa::view::TeamSettingsView as ::buffa::MessageView>::decode_view_ctx(
                                         sub,
                                         __sub_ctx,
                                     )?,
@@ -109131,11 +109127,11 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
-                    project: match self.project.as_option() {
+                    team: match self.team.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
-                                super::super::ManagedComputerSetupProject,
-                                ::buffa::Inline<super::super::ManagedComputerSetupProject>,
+                                super::super::ManagedComputerSetupTeam,
+                                ::buffa::Inline<super::super::ManagedComputerSetupTeam>,
                             >::some(v.to_owned_from_source(__buffa_src)?)
                         }
                         None => ::buffa::MessageField::none(),
@@ -109143,9 +109139,9 @@ pub mod __buffa {
                     settings: match self.settings.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
-                                super::super::super::super::app::v1::ProjectSettings,
+                                super::super::super::super::app::v1::TeamSettings,
                                 ::buffa::Inline<
-                                    super::super::super::super::app::v1::ProjectSettings,
+                                    super::super::super::super::app::v1::TeamSettings,
                                 >,
                             >::some(v.to_owned_from_source(__buffa_src)?)
                         }
@@ -109185,9 +109181,9 @@ pub mod __buffa {
                         += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                             + inner_size as u64;
                 }
-                if self.project.is_set() {
+                if self.team.is_set() {
                     let __slot = __cache.reserve();
-                    let inner_size = self.project.compute_size(__cache);
+                    let inner_size = self.team.compute_size(__cache);
                     __cache.set(__slot, inner_size);
                     size
                         += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
@@ -109228,13 +109224,13 @@ pub mod __buffa {
                     );
                     self.session.write_to(__cache, buf);
                 }
-                if self.project.is_set() {
+                if self.team.is_set() {
                     ::buffa::types::put_len_delimited_header(
                         2u32,
                         u64::from(__cache.consume_next()),
                         buf,
                     );
-                    self.project.write_to(__cache, buf);
+                    self.team.write_to(__cache, buf);
                 }
                 if self.settings.is_set() {
                     ::buffa::types::put_len_delimited_header(
@@ -109280,8 +109276,8 @@ pub mod __buffa {
                     }
                 }
                 {
-                    if let ::core::option::Option::Some(__v) = self.project.as_option() {
-                        __map.serialize_entry("project", __v)?;
+                    if let ::core::option::Option::Some(__v) = self.team.as_option() {
+                        __map.serialize_entry("team", __v)?;
                     }
                 }
                 {
@@ -109411,23 +109407,21 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().session
             }
-            /// Field 2: `project`
+            /// Field 2: `team`
             #[must_use]
-            pub fn project(
+            pub fn team(
                 &self,
             ) -> &::buffa::MessageFieldView<
-                super::super::__buffa::view::ManagedComputerSetupProjectView<'_>,
+                super::super::__buffa::view::ManagedComputerSetupTeamView<'_>,
             > {
-                &self.0.reborrow().project
+                &self.0.reborrow().team
             }
             /// Field 3: `settings`
             #[must_use]
             pub fn settings(
                 &self,
             ) -> &::buffa::MessageFieldView<
-                super::super::super::super::app::v1::__buffa::view::ProjectSettingsView<
-                    '_,
-                >,
+                super::super::super::super::app::v1::__buffa::view::TeamSettingsView<'_>,
             > {
                 &self.0.reborrow().settings
             }
@@ -109875,8 +109869,8 @@ pub mod __buffa {
             pub managed_computer_id: &'a str,
             /// Field 2: `organization_id`
             pub organization_id: &'a str,
-            /// Field 3: `project_id`
-            pub project_id: &'a str,
+            /// Field 3: `team_id`
+            pub team_id: &'a str,
             /// Field 4: `device_id`
             pub device_id: &'a str,
             /// Field 5: `worker`
@@ -109940,7 +109934,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.project_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.team_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     4u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -110012,7 +110006,7 @@ pub mod __buffa {
                 ::core::result::Result::Ok(super::super::BindManagedComputerSetupResponse {
                     managed_computer_id: self.managed_computer_id.to_string(),
                     organization_id: self.organization_id.to_string(),
-                    project_id: self.project_id.to_string(),
+                    team_id: self.team_id.to_string(),
                     device_id: self.device_id.to_string(),
                     worker: match self.worker.as_option() {
                         Some(v) => {
@@ -110053,11 +110047,10 @@ pub mod __buffa {
                             + ::buffa::types::string_encoded_len(&self.organization_id)
                                 as u64;
                 }
-                if !self.project_id.is_empty() {
+                if !self.team_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.project_id)
-                                as u64;
+                            + ::buffa::types::string_encoded_len(&self.team_id) as u64;
                 }
                 if !self.device_id.is_empty() {
                     size
@@ -110096,8 +110089,8 @@ pub mod __buffa {
                 if !self.organization_id.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.organization_id, buf);
                 }
-                if !self.project_id.is_empty() {
-                    ::buffa::types::put_string_field(3u32, &self.project_id, buf);
+                if !self.team_id.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.team_id, buf);
                 }
                 if !self.device_id.is_empty() {
                     ::buffa::types::put_string_field(4u32, &self.device_id, buf);
@@ -110143,8 +110136,8 @@ pub mod __buffa {
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
                     __map.serialize_entry("organizationId", self.organization_id)?;
                 }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.project_id) {
-                    __map.serialize_entry("projectId", self.project_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.team_id) {
+                    __map.serialize_entry("teamId", self.team_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.device_id) {
                     __map.serialize_entry("deviceId", self.device_id)?;
@@ -110268,10 +110261,10 @@ pub mod __buffa {
             pub fn organization_id(&self) -> &'_ str {
                 self.0.reborrow().organization_id
             }
-            /// Field 3: `project_id`
+            /// Field 3: `team_id`
             #[must_use]
-            pub fn project_id(&self) -> &'_ str {
-                self.0.reborrow().project_id
+            pub fn team_id(&self) -> &'_ str {
+                self.0.reborrow().team_id
             }
             /// Field 4: `device_id`
             #[must_use]
@@ -113701,8 +113694,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct ManagedComputerSetupCompleteView<'a> {
-            /// Field 1: `project_id`
-            pub project_id: &'a str,
+            /// Field 1: `team_id`
+            pub team_id: &'a str,
             /// Field 2: `provider`
             pub provider: ::buffa::EnumValue<
                 super::super::super::super::types::v1::AgentProvider,
@@ -113748,7 +113741,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.project_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.team_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -113795,7 +113788,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::ManagedComputerSetupComplete {
-                    project_id: self.project_id.to_string(),
+                    team_id: self.team_id.to_string(),
                     provider: self.provider,
                     worker_id: self.worker_id.to_string(),
                     __buffa_unknown_fields: self
@@ -113812,11 +113805,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.project_id.is_empty() {
+                if !self.team_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.project_id)
-                                as u64;
+                            + ::buffa::types::string_encoded_len(&self.team_id) as u64;
                 }
                 {
                     let val = self.provider.to_i32();
@@ -113840,8 +113832,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.project_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.project_id, buf);
+                if !self.team_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.team_id, buf);
                 }
                 {
                     let val = self.provider.to_i32();
@@ -113873,8 +113865,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.project_id) {
-                    __map.serialize_entry("projectId", self.project_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.team_id) {
+                    __map.serialize_entry("teamId", self.team_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(
                     &self.provider,
@@ -113985,10 +113977,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `project_id`
+            /// Field 1: `team_id`
             #[must_use]
-            pub fn project_id(&self) -> &'_ str {
-                self.0.reborrow().project_id
+            pub fn team_id(&self) -> &'_ str {
+                self.0.reborrow().team_id
             }
             /// Field 2: `provider`
             #[must_use]
@@ -123893,7 +123885,7 @@ pub mod __buffa {
         reg.register_json_any(
             super::__GET_MANAGED_COMPUTER_SETUP_CONTEXT_REQUEST_JSON_ANY,
         );
-        reg.register_json_any(super::__MANAGED_COMPUTER_SETUP_PROJECT_JSON_ANY);
+        reg.register_json_any(super::__MANAGED_COMPUTER_SETUP_TEAM_JSON_ANY);
         reg.register_json_any(
             super::__GET_MANAGED_COMPUTER_SETUP_CONTEXT_RESPONSE_JSON_ANY,
         );
@@ -124514,9 +124506,9 @@ pub use self::__buffa::view::GetManagedComputerSetupContextRequestView;
 #[doc(inline)]
 pub use self::__buffa::view::GetManagedComputerSetupContextRequestOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::ManagedComputerSetupProjectView;
+pub use self::__buffa::view::ManagedComputerSetupTeamView;
 #[doc(inline)]
-pub use self::__buffa::view::ManagedComputerSetupProjectOwnedView;
+pub use self::__buffa::view::ManagedComputerSetupTeamOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::GetManagedComputerSetupContextResponseView;
 #[doc(inline)]

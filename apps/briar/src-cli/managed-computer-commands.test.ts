@@ -4,7 +4,7 @@ import {
   managedComputerSyncCommand,
   type ManagedComputerSyncDependencies,
 } from "./managed-computer-commands";
-import type { RemoteProjectSettings } from "./project-settings-sync";
+import type { RemoteTeamSettings } from "./team-settings-sync";
 
 const projectId = "11111111-1111-4111-8111-111111111111";
 const apiOrigin = "https://briar.example";
@@ -31,7 +31,7 @@ const settings = {
     execution: { checkpoints: [] },
     completion: { requiredStages: ["implementation"] },
   },
-} satisfies RemoteProjectSettings;
+} satisfies RemoteTeamSettings;
 
 describe("managed-computer sync", () => {
   it("is idempotent and never replaces local repository, provider, or worker fields", async () => {
@@ -75,7 +75,7 @@ describe("managed-computer sync", () => {
         },
       }],
     });
-    const fetchProjectSettings = vi.fn(async () => settings);
+    const fetchTeamSettings = vi.fn(async () => settings);
     const writeOutput = vi.fn();
     const dependencies: Partial<ManagedComputerSyncDependencies> = {
       credentialPath: () => "/var/lib/briar/worker-credential.json",
@@ -91,7 +91,7 @@ describe("managed-computer sync", () => {
         userToken: "user-session-must-not-be-printed",
       }),
       resolveProjectId: async () => projectId,
-      fetchProjectSettings,
+      fetchTeamSettings,
       persistConfig: async (config) => {
         storedConfig = config;
       },
@@ -103,7 +103,7 @@ describe("managed-computer sync", () => {
     await managedComputerSyncCommand(dependencies);
 
     expect(storedConfig).toEqual(firstConfig);
-    expect(fetchProjectSettings).toHaveBeenNthCalledWith(
+    expect(fetchTeamSettings).toHaveBeenNthCalledWith(
       1,
       apiOrigin,
       projectId,

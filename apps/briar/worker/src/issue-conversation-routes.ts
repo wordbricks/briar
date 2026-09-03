@@ -14,8 +14,8 @@ import {
   getIssueAgentReplyJob,
   getIssueAttachment,
   getIssueMessage,
-  getProject,
-  getProjectAgent,
+  getTeam,
+  getTeamAgent,
   listIssueActionProposals,
   listIssueAgentReplyJobs,
   listIssueAgentSkillExecutionProposals,
@@ -89,7 +89,7 @@ type ArchivedIssueConversationApplicationInput =
 async function requireIssueConversationProject(
   input: IssueConversationApplicationInput,
 ) {
-  const project = await getProject(input.db, input.projectId, input.userId);
+  const project = await getTeam(input.db, input.projectId, input.userId);
   if (!project) throw new HttpError(404, "Project not found");
   return project;
 }
@@ -269,11 +269,11 @@ export async function createProjectIssueMessage(
   }
   const explicitlyMentionedAgents = new Map<
     string,
-    NonNullable<Awaited<ReturnType<typeof getProjectAgent>>>
+    NonNullable<Awaited<ReturnType<typeof getTeamAgent>>>
   >();
   if (!agentProvider) {
     for (const agentId of explicitMentionedAgentIds) {
-      const agent = await getProjectAgent(input.db, project.id, agentId);
+      const agent = await getTeamAgent(input.db, project.id, agentId);
       if (!agent) {
         throw new HttpError(400, "Mentioned Agent is not in this project");
       }
@@ -308,7 +308,7 @@ export async function createProjectIssueMessage(
   const targetAgents = new Map(explicitlyMentionedAgents);
   for (const agentId of targetAgentIds) {
     if (targetAgents.has(agentId)) continue;
-    const agent = await getProjectAgent(input.db, project.id, agentId);
+    const agent = await getTeamAgent(input.db, project.id, agentId);
     if (agent) targetAgents.set(agent.id, agent);
   }
 

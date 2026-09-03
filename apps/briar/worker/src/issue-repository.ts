@@ -16,8 +16,8 @@ import { type HuntRunRow } from "./hunt-run-model";
 import { getHuntRunForProject } from "./hunt-run-repository";
 import {
   type ModelEffort,
-  type ProjectAgentProvider,
-} from "./project-agent-model";
+  type TeamAgentProvider,
+} from "./team-agent-model";
 import type { IssueDifficulty } from "../../src/lib/issue-difficulty";
 
 export async function updateIssue(
@@ -63,7 +63,7 @@ export async function updateIssueExecutionPreferences(
   projectId: string,
   runId: string,
   input: {
-    provider: ProjectAgentProvider | null;
+    provider: TeamAgentProvider | null;
     model: string | null;
     effort: ModelEffort | null;
     updatedAt: string;

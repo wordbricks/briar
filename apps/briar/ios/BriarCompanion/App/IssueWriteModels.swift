@@ -449,7 +449,7 @@ func issueExecutionApprovalUnavailable(
 func eligibleExecutionWorkers(
     workers: [DashboardWorker],
     provider: AgentProvider?,
-    policy: ProjectExecutionWorkerPolicy?
+    policy: TeamExecutionWorkerPolicy?
 ) -> [DashboardWorker] {
     guard let provider else { return [] }
     return workers.filter { worker in

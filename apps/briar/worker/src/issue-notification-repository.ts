@@ -1,5 +1,5 @@
 import { type IssueMessageRow } from "./issue-message-repository";
-import { type ProjectAgentProvider } from "./project-agent-model";
+import { type TeamAgentProvider } from "./team-agent-model";
 
 export type IssueConversationNotificationRow = IssueMessageRow & {
   run_title: string;
@@ -21,7 +21,7 @@ export type ChannelConversationNotificationRow = {
   parent_message_id: string | null;
   author_user_id: string | null;
   author_agent_id: string | null;
-  author_agent_provider: ProjectAgentProvider | null;
+  author_agent_provider: TeamAgentProvider | null;
   author_name: string | null;
   author_image: string | null;
   author_agent_image: string | null;

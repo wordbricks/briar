@@ -22,9 +22,9 @@ import {
   GitHubPullRequestIdentitySchema,
 } from "@briar/contracts/gen/briar/types/v1/github_identity_pb";
 import { Code, ConnectError } from "@connectrpc/connect";
-import type { ProjectMergeActivity } from "../../src/lib/project-merge-activity";
+import type { TeamMergeActivity } from "../../src/lib/team-merge-activity";
 
-export const appProjectMergeActivity = (activity: ProjectMergeActivity) =>
+export const appProjectMergeActivity = (activity: TeamMergeActivity) =>
   create(GetProjectMergeActivityResponseSchema, {
     repository: activity.repository,
     generatedAt: timestampFromDate(new Date(activity.generatedAt)),
@@ -48,22 +48,22 @@ type BeginInstallationResult = Awaited<
 >;
 type CredentialResult = Awaited<
   ReturnType<
-    typeof import("./project-github-application").createProjectGithubCredentialApplication
+    typeof import("./team-github-application").createTeamGithubCredentialApplication
   >
 >;
 type RepositoryResult = Awaited<
   ReturnType<
-    typeof import("./project-github-application").getProjectGithubRepositoryApplication
+    typeof import("./team-github-application").getTeamGithubRepositoryApplication
   >
 >;
 type PullRequestResult = Awaited<
   ReturnType<
-    typeof import("./project-github-application").getProjectGithubPullRequestApplication
+    typeof import("./team-github-application").getTeamGithubPullRequestApplication
   >
 >;
 type MergeResult = Awaited<
   ReturnType<
-    typeof import("./project-github-application").mergeProjectGithubPullRequestApplication
+    typeof import("./team-github-application").mergeTeamGithubPullRequestApplication
   >
 >;
 

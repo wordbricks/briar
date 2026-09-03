@@ -45,7 +45,7 @@ const agent = {
 
 const configuration = {
   id: "agent-1",
-  projectId: "project-1",
+  teamId: "project-1",
   computerUsePolicy: "unattended" as const,
   designatedWorkerId: "worker-binding-1",
   designatedWorkerLabel: "QA computer",

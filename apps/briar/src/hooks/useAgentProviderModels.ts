@@ -4,7 +4,7 @@ import {
   defaultAgentProviderModelCatalog,
   loadAgentProviderModels,
   type AgentProviderModelCatalog,
-} from "../lib/project-llm";
+} from "../lib/team-llm";
 
 export function useAgentProviderModels(
   enabled = true,

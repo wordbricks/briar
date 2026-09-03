@@ -5,14 +5,14 @@ import {
 import type { StructuredAgentResult } from "../../src/lib/agent-result";
 import { inboxSessionMessageVersion } from "../../src/lib/inbox-session-version";
 import { parseStructuredResult } from "./agent-result-json";
-import { decodeStoredProjectAgentSessionSummary } from "./project-request-contract";
+import { decodeStoredTeamAgentSessionSummary } from "./team-request-contract";
 import type {
   ChannelConversationNotificationRow,
   HuntRunRow,
   IssueConversationNotificationRow,
-  ProjectAgentSessionSummaryRow,
+  TeamAgentSessionSummaryRow,
 } from "./db";
-import type { ProjectRow } from "./project-repository";
+import type { TeamRow } from "./team-repository";
 
 const notifyingRunStatuses = new Set([
   "paused",
@@ -26,9 +26,9 @@ const builtInWorkflowStageIds = new Set<string>(
 const inboxFeedMessageLimit = 2_000;
 
 type InboxFeedProject = Pick<
-  ProjectRow,
+  TeamRow,
   "id" | "name" | "issue_key_prefix"
-> & Partial<Pick<ProjectRow, "organization_id">>;
+> & Partial<Pick<TeamRow, "organization_id">>;
 
 type InboxFeedRun = Pick<
   HuntRunRow,
@@ -84,7 +84,7 @@ type InboxFeedChannelNotification = Pick<
 >;
 
 type InboxFeedSessionSummary = Pick<
-  ProjectAgentSessionSummaryRow,
+  TeamAgentSessionSummaryRow,
   "session_id" | "summary_json" | "updated_at"
 >;
 
@@ -151,7 +151,7 @@ function parseSession(
   project: InboxFeedProject,
   row: InboxFeedSessionSummary,
 ): ParsedSession | null {
-  const payload = decodeStoredProjectAgentSessionSummary(row.summary_json);
+  const payload = decodeStoredTeamAgentSessionSummary(row.summary_json);
   const status = payload.status;
   if (status !== "completed" && status !== "failed") return null;
   return {

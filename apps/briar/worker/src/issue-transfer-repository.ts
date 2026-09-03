@@ -18,7 +18,7 @@ import { getHuntRunForProject } from "./hunt-run-repository";
 import {
   transferredIssueRelationStatements,
 } from "./issue-transfer-relations";
-import { getProjectSettings } from "./project-settings-repository";
+import { getTeamSettings } from "./team-settings-repository";
 
 export type TransferIssueOutcome =
   | "transferred"
@@ -170,7 +170,7 @@ export async function transferIssue(
     (["queued", "blocked", "failed"] as AutoHuntRunStatus[]).includes(
       run.status,
     ) && executionApprovedIssue;
-  const targetSettings = await getProjectSettings(db, input.targetProjectId);
+  const targetSettings = await getTeamSettings(db, input.targetProjectId);
   const adoptTargetWorkflow =
     run.status === "backlog" || run.status === "queued" ||
     resetExecutionApproval;

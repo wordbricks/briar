@@ -16,7 +16,7 @@ type AgentComputerConfiguration = Pick<
   | "designatedWorkerId"
   | "designatedWorkerLabel"
   | "id"
-  | "projectId"
+  | "teamId"
 >;
 
 type WorkerDevice = Pick<
@@ -43,7 +43,7 @@ export function resolveDmAgentComputerTarget(input: {
     const configuration = input.agentConfigurations.find(
       (candidate) =>
         candidate.id === agent.agentId &&
-        candidate.projectId === agent.projectId &&
+        candidate.teamId === agent.projectId &&
         candidate.computerUsePolicy === "unattended" &&
         Boolean(candidate.designatedWorkerId),
     );

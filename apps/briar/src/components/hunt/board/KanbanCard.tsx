@@ -5,12 +5,12 @@ import {
 } from "react";
 import { AgentProviderIcon } from "@/components/AgentIcons";
 import { WorkerIcon } from "@/components/WorkerIcon";
-import { ProjectAgentAvatar } from "@/components/ProjectAgentAvatar";
+import { TeamAgentAvatar } from "@/components/TeamAgentAvatar";
 import { runMeta } from "@/lib/stages";
 import { type AutoHuntWorkflowCheckpoint } from "@/lib/auto-hunt-contract";
 import { formatIssueKey } from "@/lib/issue-key";
 import type { ExecutionWorker, HuntRun, HuntRunPlacement, IssueExecutionPreferences, OrganizationMember, PlanningProject, Project, ProjectAgent } from "@/types";
-import { agentProviderLabels, type AgentProvider } from "@/lib/project-llm";
+import { agentProviderLabels, type AgentProvider } from "@/lib/team-llm";
 import { useI18n } from "@/i18n";
 import type { MessageKey } from "@/i18n/messages";
 import { IssueContextMenu } from "./IssueContextMenu";
@@ -20,7 +20,7 @@ import { RunStatusPill } from "../detail/RunStatusPill";
 import { localizeStatus, relativeTime } from "../model/formatters";
 import { hasResultReviews } from "../results/model";
 import { IssueDifficultyIcon } from "../IssueDifficultyIcon";
-import { ProjectIcon } from "../../ProjectIcon";
+import { TeamIcon } from "../../TeamIcon";
 export function KanbanCard({
   availableProviders,
   activeAgent,
@@ -121,7 +121,7 @@ export function KanbanCard({
         })} className="kanban-card-agent-badge" title={t("run.assigned", {
           agent: activeAgent.name
         })}>
-                <ProjectAgentAvatar agent={activeAgent} isRunning token={token} />
+                <TeamAgentAvatar agent={activeAgent} isRunning token={token} />
               </span>}
             {!hideAssignmentBadges && assignedProvider && <span aria-label={`${t("run.metricsProvider")}: ${agentProviderLabels[assignedProvider]}`} className={`kanban-card-provider-badge ${assignedProvider}`} title={`${t("run.metricsProvider")}: ${agentProviderLabels[assignedProvider]}`}>
                 <AgentProviderIcon provider={assignedProvider} size={13} />
@@ -138,7 +138,7 @@ export function KanbanCard({
               </span>}
         </span>}
         <span className="kanban-card-kicker">
-          {project ? <span className="kanban-card-project"><ProjectIcon className="kanban-card-project-icon" project={project} /><small>{formatIssueKey(issueKeyPrefix, run.runNumber)}</small></span> : <small>{formatIssueKey(issueKeyPrefix, run.runNumber)}</small>}
+          {project ? <span className="kanban-card-project"><TeamIcon className="kanban-card-project-icon" project={project} /><small>{formatIssueKey(issueKeyPrefix, run.runNumber)}</small></span> : <small>{formatIssueKey(issueKeyPrefix, run.runNumber)}</small>}
         </span>
         <span className="kanban-card-copy">
           <strong>{run.title}</strong>

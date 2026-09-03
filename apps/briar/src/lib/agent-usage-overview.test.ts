@@ -36,7 +36,7 @@ const usageRecord = (
   overrides: Partial<AgentUsageRecord> = {},
 ): AgentUsageRecord => ({
   executionId: "execution-1",
-  projectId: "project-1",
+  teamId: "project-1",
   runAttempt: 1,
   claimAttempt: 1,
   workerId: "worker-1",
@@ -66,7 +66,7 @@ const costRecord = (
   overrides: Partial<AgentUsageCostRecord> = {},
 ): AgentUsageCostRecord => ({
   executionId: "execution-1",
-  projectId: "project-1",
+  teamId: "project-1",
   runAttempt: 1,
   claimAttempt: 1,
   workerId: "worker-1",
@@ -93,7 +93,7 @@ const estimatedCostRecord = (
   overrides: Partial<AgentUsageEstimatedCostRecord> = {},
 ): AgentUsageEstimatedCostRecord => ({
   executionId: "execution-1",
-  projectId: "project-1",
+  teamId: "project-1",
   runAttempt: 1,
   claimAttempt: 1,
   workerId: "worker-1",

@@ -36,9 +36,9 @@ import {
   decodeAgentSkillExecutionProposalAcceptInput,
   decodeExecutionPreferences,
 } from "./issue-request-contract";
-import { getProject } from "./project-command-repository";
-import type { ProjectRow } from "./project-repository";
-import { getProjectSettings } from "./project-settings-repository";
+import { getTeam } from "./team-command-repository";
+import type { TeamRow } from "./team-repository";
+import { getTeamSettings } from "./team-settings-repository";
 import {
   newChannelBatchProposalIssueSourceKey,
   newChannelProposalIssueSourceKey,
@@ -79,7 +79,7 @@ const liveIssueExecutionProposalJson = (
 
 async function createApprovedChannelProposalIssue(input: {
   db: D1Database;
-  project: Pick<ProjectRow, "id" | "name">;
+  project: Pick<TeamRow, "id" | "name">;
   organizationId: string;
   proposalId: string;
   channelId: string;
@@ -92,7 +92,7 @@ async function createApprovedChannelProposalIssue(input: {
   createdByUserId: string;
   occurredAt: string;
 }) {
-  const settings = await getProjectSettings(input.db, input.project.id);
+  const settings = await getTeamSettings(input.db, input.project.id);
   const relatedMessage = channelRelatedMessageReference({
     organizationId: input.organizationId,
     channelId: input.channelId,
@@ -152,7 +152,7 @@ type LiveChannelExecutionProposal = NonNullable<
 async function approveChannelExecutionProposalRequest(input: {
   db: D1Database;
   channel: Pick<ChannelRow, "id" | "organization_id" | "archived_at">;
-  project: Pick<ProjectRow, "id" | "organization_id">;
+  project: Pick<TeamRow, "id" | "organization_id">;
   proposal: LiveChannelExecutionProposal;
   userId: string;
   selection: ChannelExecutionProposalAcceptInput;
@@ -374,7 +374,7 @@ export async function acceptOrganizationChannelExecutionProposal(
     model: request.model,
     effort: request.effort,
   });
-  const project = await getProject(input.db, proposal.project_id, input.userId);
+  const project = await getTeam(input.db, proposal.project_id, input.userId);
   if (!project || project.organization_id !== channel.organization_id) {
     throw new HttpError(404, "Project not found");
   }
@@ -408,7 +408,7 @@ export async function acceptOrganizationChannelSkillExecutionProposal(
     throw new HttpError(404, "Agent Skill execution proposal not found");
   }
   const request = decodeAgentSkillExecutionProposalAcceptInput(input.request);
-  const project = await getProject(input.db, proposal.project_id, input.userId);
+  const project = await getTeam(input.db, proposal.project_id, input.userId);
   if (!project || project.organization_id !== channel.organization_id) {
     throw new HttpError(404, "Project not found");
   }
@@ -486,7 +486,7 @@ export async function acceptOrganizationChannelProposal(
     targetProjectId,
   );
   if (!organizationProject) throw new HttpError(404, "Project not found");
-  const project = await getProject(input.db, targetProjectId, input.userId);
+  const project = await getTeam(input.db, targetProjectId, input.userId);
   if (!project || project.organization_id !== channel.organization_id) {
     throw new HttpError(404, "Project not found");
   }

@@ -6,13 +6,13 @@ import {
 } from "./agent-skill-execution-proposal-repository";
 import { getArchivedProjectAgentSession } from "./archive";
 import { HttpError } from "./http-response";
-import { encodeApprovedProjectAgentTaskSession } from "./project-agent-session-materialization";
-import { projectAgentSessionJson } from "./project-agent-session-json";
-import { decodeStoredProjectAgentSessionPayload } from "./project-request-contract";
+import { encodeApprovedTeamAgentTaskSession } from "./team-agent-session-materialization";
+import { teamAgentSessionJson } from "./team-agent-session-json";
+import { decodeStoredTeamAgentSessionPayload } from "./team-request-contract";
 import {
-  getProjectAgentSession,
-  upsertProjectAgentSessionSummary,
-} from "./project-agent-session-repository";
+  getTeamAgentSession,
+  upsertTeamAgentSessionSummary,
+} from "./team-agent-session-repository";
 import {
   availableExecutionWorkerForAgentSkill,
   listExecutionWorkers,
@@ -166,7 +166,7 @@ export async function approveAgentSkillExecutionProposal(
         session: null,
       };
     }
-    const session = await getProjectAgentSession(
+    const session = await getTeamAgentSession(
       db,
       current.project_id,
       current.result_session_id,
@@ -180,10 +180,10 @@ export async function approveAgentSkillExecutionProposal(
       throw stale("The approved Agent Skill execution session was not found");
     }
     let sessionPayload: ReturnType<
-      typeof decodeStoredProjectAgentSessionPayload
+      typeof decodeStoredTeamAgentSessionPayload
     >;
     try {
-      sessionPayload = decodeStoredProjectAgentSessionPayload(
+      sessionPayload = decodeStoredTeamAgentSessionPayload(
         session.payload_json,
       );
     } catch {
@@ -210,12 +210,12 @@ export async function approveAgentSkillExecutionProposal(
         "The approved Agent Skill execution session lost its Worker binding",
       );
     }
-    await upsertProjectAgentSessionSummary(db, session, false);
+    await upsertTeamAgentSessionSummary(db, session, false);
     return {
       outcome,
       proposal: agentSkillExecutionProposalJson(current),
       projectId: current.project_id,
-      session: projectAgentSessionJson(session),
+      session: teamAgentSessionJson(session),
     };
   };
 
@@ -310,7 +310,7 @@ export async function approveAgentSkillExecutionProposal(
     ? conversationBinding!.session_id
     : crypto.randomUUID();
   const materializedSessionPayloadJson = proposal.execution_mode === "task"
-    ? encodeApprovedProjectAgentTaskSession({
+    ? encodeApprovedTeamAgentTaskSession({
       sessionId: resultSessionId,
       agentId: proposal.agent_id,
       agentName: proposal.agent_name,

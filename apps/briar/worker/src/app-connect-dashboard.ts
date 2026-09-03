@@ -13,8 +13,8 @@ import {
 import { dashboardEventJson, dashboardRunJson } from "./dashboard-json";
 import {
   getHuntRunForProject,
-  getProject,
-  getProjectSettings,
+  getTeam,
+  getTeamSettings,
   listChannelConversationNotifications,
   listDashboardRuns,
   listDashboardRunsByIds,
@@ -56,7 +56,7 @@ import {
   appProjectSettings,
   appRunEvent,
 } from "./app-connect-mappers";
-import { settingsJson } from "./project-settings-json";
+import { settingsJson } from "./team-settings-json";
 import { decodeRequestSync } from "./request-schema";
 import { UuidString } from "./schema-codecs";
 import { requireSession } from "./session-auth";
@@ -75,12 +75,12 @@ export type AppConnectDashboardInput = {
   readonly archivesBucket: R2Bucket;
 };
 
-const decodeProjectId = decodeRequestSync(Schema.Struct({
-  projectId: UuidString,
+const decodeTeamId = decodeRequestSync(Schema.Struct({
+  teamId: UuidString,
 }));
 
 const decodeRunIds = decodeRequestSync(Schema.Struct({
-  projectId: UuidString,
+  teamId: UuidString,
   runId: UuidString,
 }));
 
@@ -179,9 +179,9 @@ export const createAppDashboardService = (
   { request, auth, db, archivesBucket }: AppConnectDashboardInput,
 ): ServiceImpl<typeof DashboardService> => ({
   getDashboard: async (rpcRequest) => {
-    const input = decodeProjectId({ projectId: rpcRequest.projectId });
+    const input = decodeTeamId({ teamId: rpcRequest.teamId });
     const session = await requireSession(auth, request);
-    const project = await getProject(db, input.projectId, session.user.id);
+    const project = await getTeam(db, input.teamId, session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
 
     // Read the cursor before the projection so every concurrent mutation is
@@ -205,7 +205,7 @@ export const createAppDashboardService = (
       channelNotifications,
     ] = await Promise.all([
       listDashboardRuns(db, project.id),
-      getProjectSettings(db, project.id),
+      getTeamSettings(db, project.id),
       loadWorkflowCheckpointPolicy(db, project.id, session.user.id),
       listIssueAttachments(db, project.id),
       listIssueDependencies(db, project.id),
@@ -231,7 +231,7 @@ export const createAppDashboardService = (
       resultReviews,
     );
     return {
-      project: appProject(project),
+      team: appProject(project),
       settings: appProjectSettings(settingsJson(
         projectSettings,
         checkpointPolicyJson(checkpointPolicy),
@@ -263,7 +263,7 @@ export const createAppDashboardService = (
   },
 
   syncDashboard: async (rpcRequest) => {
-    const input = decodeProjectId({ projectId: rpcRequest.projectId });
+    const input = decodeTeamId({ teamId: rpcRequest.teamId });
     if (
       rpcRequest.cursor < 0n ||
       rpcRequest.cursor > BigInt(Number.MAX_SAFE_INTEGER)
@@ -271,7 +271,7 @@ export const createAppDashboardService = (
       throw new HttpError(400, "Dashboard cursor is outside the safe range");
     }
     const session = await requireSession(auth, request);
-    const project = await getProject(db, input.projectId, session.user.id);
+    const project = await getTeam(db, input.teamId, session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
     const page = await listDashboardChanges(
       db,
@@ -337,7 +337,7 @@ export const createAppDashboardService = (
     const existingRunIds = new Set(dashboardRows.map((run) => run.id));
     const metadata = metadataChanged
       ? await Promise.all([
-          getProjectSettings(db, project.id),
+          getTeamSettings(db, project.id),
           loadWorkflowCheckpointPolicy(db, project.id, session.user.id),
           getProjectExecutionWorkerPolicy(db, project.id),
           listProjectMembers(db, project.id),
@@ -366,7 +366,7 @@ export const createAppDashboardService = (
       deletedRunIds: changedRunIdList.filter(
         (runId) => !existingRunIds.has(runId),
       ),
-      project: metadata ? appProject(project) : undefined,
+      team: metadata ? appProject(project) : undefined,
       settings: metadata
         ? appProjectSettings(settingsJson(
             metadata[0],
@@ -403,11 +403,11 @@ export const createAppDashboardService = (
 
   listRunEvents: async (rpcRequest) => {
     const input = decodeRunIds({
-      projectId: rpcRequest.projectId,
+      teamId: rpcRequest.teamId,
       runId: rpcRequest.runId,
     });
     const session = await requireSession(auth, request);
-    const project = await getProject(db, input.projectId, session.user.id);
+    const project = await getTeam(db, input.teamId, session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
     const run = await getHuntRunForProject(db, project.id, input.runId);
     if (!run) throw new HttpError(404, "Run not found");

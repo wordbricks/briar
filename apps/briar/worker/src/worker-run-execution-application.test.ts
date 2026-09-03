@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { AuthenticatedWorkerProject } from "./worker-route-auth";
+import type { AuthenticatedWorkerTeam } from "./worker-route-auth";
 import {
   recordWorkerRunEventApplication,
   transitionWorkerWorkflowStageApplication,
@@ -15,7 +15,7 @@ const claimTokenHash = "claim-token-hash";
 const db = {} as D1Database;
 const worker = {
   binding: { id: "worker-1" },
-} as AuthenticatedWorkerProject;
+} as AuthenticatedWorkerTeam;
 const workerPrincipal = {
   kind: "worker",
   worker,

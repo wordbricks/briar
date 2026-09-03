@@ -3,7 +3,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { useLayoutEffect, useRef } from "react";
 import { AgentWorkLog } from "@/components/AgentWorkLog";
 import { type AutoHuntAgentMessage } from "@/lib/auto-hunt-agent";
-import { agentProviderLabels, type AgentProvider } from "@/lib/project-llm";
+import { agentProviderLabels, type AgentProvider } from "@/lib/team-llm";
 import { useI18n } from "@/i18n";
 export function IssueAgentActivityPanel({
   activity,

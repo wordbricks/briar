@@ -96,7 +96,7 @@ export const createManagedComputerSetupService = (
         status: ManagedComputerSetupSessionStatus.PENDING,
         expiresAt: appFleetTimestamp(result.session.expiresAt),
       }),
-      project: result.project,
+      team: result.project,
       settings: appProjectSettings(result.settings),
       repositoryCredential: result.repositoryCredential
         ? appProjectGithubCredentialMessage(result.repositoryCredential)
@@ -122,7 +122,7 @@ export const createManagedComputerSetupService = (
     return {
       managedComputerId,
       organizationId: principal.organizationId,
-      projectId: result.session.project_id,
+      teamId: result.session.project_id,
       deviceId: principal.deviceId,
       worker: appDashboardWorker(workerJson(result.worker, observedAt)),
       duplicate: result.duplicate,

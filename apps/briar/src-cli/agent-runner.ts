@@ -15,7 +15,7 @@ import type { AgentAttachment } from "../src-agent/runner-attachments";
 import { sidecarProviderRaw } from "../src-agent/sidecar-protocol";
 import type { ModelEffort } from "../src/lib/agent-provider-contract";
 import type { AgentProvider } from "../src/lib/agent-provider";
-import type { JsonSchema } from "../src/lib/project-llm";
+import type { JsonSchema } from "../src/lib/team-llm";
 import type { DetachedAgentSkillCatalog } from "./agent-skill-discovery";
 
 export async function runProjectAgentTaskCompletionFlow<TPayload, TResult>(

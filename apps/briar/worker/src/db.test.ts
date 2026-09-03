@@ -18,41 +18,41 @@ import {
   listOrganizationMembers,
   listOrganizations,
 } from "./organization-repository";
-import { listProjects } from "./project-repository";
+import { listTeams } from "./team-repository";
 import {
   acceptOrganizationInvitation,
   reserveIssueCreateProposalApproval,
   acceptIssueUpdateProposal,
   acceptIssueReworkProposal,
   assertQueuedHuntClaim,
-  claimNextProjectAgentTask,
+  claimNextTeamAgentTask,
   claimNextQueuedHuntRun,
-  claimDueProjectAgentScheduleRun,
-  completeProjectAgentScheduleRun,
+  claimDueTeamAgentScheduleRun,
+  completeTeamAgentScheduleRun,
   completeIssueResultReview,
   createOrganization,
   createOrganizationInvitation,
   createIssueActionProposal,
   createIssueMessage,
-  createProjectAgentTaskJob,
+  createTeamAgentTaskJob,
   createIssueReworkProposal,
-  createProjectAgent,
-  createProjectAgentSchedule,
-  createProject,
+  createTeamAgent,
+  createTeamAgentSchedule,
+  createTeam,
   createIssueAttachments,
   createIssueDependency,
   deleteAccountData,
-  deleteProjectAgent,
+  deleteTeamAgent,
   deleteIssue,
   transferIssue,
   deleteIssueDependency,
-  deleteProjectAgentSchedule,
-  deleteProject,
+  deleteTeamAgentSchedule,
+  deleteTeam,
   enqueueIssueAgentReply,
   EventKeyConflictError,
   findProjectIdByAgentTokenHash,
-  getProject,
-  getProjectSettings,
+  getTeam,
+  getTeamSettings,
   getHuntRunForProject,
   getIssueActionProposal,
   getIssueMessage,
@@ -83,12 +83,12 @@ import {
   listOrganizationUsageRuns,
   isOrganizationHandleAvailable,
   issueProjectAgentToken,
-  listProjectAgents,
-  listProjectAgentSessionSummaries,
-  listProjectAgentSessions,
-  listClaimableProjectAgentScheduleProjectIds,
-  listProjectAgentScheduleRuns,
-  listProjectAgentSchedules,
+  listTeamAgents,
+  listTeamAgentSessionSummaries,
+  listTeamAgentSessions,
+  listClaimableTeamAgentScheduleTeamIds,
+  listTeamAgentScheduleRuns,
+  listTeamAgentSchedules,
   listProjectUsageTotals,
   listProjectUsageRuns,
   moveHuntRun,
@@ -100,26 +100,26 @@ import {
   resumeWorkflowCheckpoint,
   removeOrganizationMember,
   revokeOrganizationInvitation,
-  renewProjectAgentScheduleRunLease,
-  completeProjectAgentTask,
-  renewProjectAgentTaskLease,
-  updateProjectSettings as persistProjectSettings,
-  updateProjectAgent,
-  updateProjectAgentSchedule,
+  renewTeamAgentScheduleRunLease,
+  completeTeamAgentTask,
+  renewTeamAgentTaskLease,
+  updateTeamSettings as persistProjectSettings,
+  updateTeamAgent,
+  updateTeamAgentSchedule,
   updateOrganizationMemberRole,
   updateOrganizationMemberProjects,
   updateIssue,
   unsubscribeIssue,
-  upsertProjectAgentSession,
+  upsertTeamAgentSession,
 } from "./db";
 import { registerExecutionWorker } from "./workers";
 import apiWorker from "./index";
 import { processSlackRevocationQueue } from "./slack-revocations";
 import { encryptSlackToken } from "./slack";
 import {
-  decodeStoredProjectAgentSessionSummary,
-  type StoredProjectAgentSessionPayload,
-} from "./project-request-contract";
+  decodeStoredTeamAgentSessionSummary,
+  type StoredTeamAgentSessionPayload,
+} from "./team-request-contract";
 import { applyD1Migrations } from "./test-helpers/d1";
 import { executeD1Sql } from "./test-helpers/d1-sql";
 import { workerRuntimeMetadataFixture } from "./test-helpers/worker-runtime";
@@ -258,7 +258,7 @@ const projectAgentSessionPayload = (input: {
     type: "completed";
     occurredAt: string;
   }>;
-}): StoredProjectAgentSessionPayload => ({
+}): StoredTeamAgentSessionPayload => ({
   dispatchGroupId: input.id,
   agentId: null,
   sessionType: "task",
@@ -279,7 +279,7 @@ const projectAgentSessionPayload = (input: {
   updatedAt: input.completedAt ?? input.startedAt,
 });
 
-const updateProjectSettings = async (
+const updateTeamSettings = async (
   db: D1Database,
   targetProjectId: string,
   input: Parameters<typeof persistProjectSettings>[2],
@@ -439,7 +439,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       ),
     ]);
 
-    await createProjectAgent(db, projectId, {
+    await createTeamAgent(db, projectId, {
       name: "Developer agent",
       provider: "codex",
       model: null,
@@ -1009,7 +1009,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
   });
 
   it("serves dashboard summaries without reading the event table", async () => {
-    await updateProjectSettings(db, projectId, {
+    await updateTeamSettings(db, projectId, {
       velenOrg: "example",
       dataSource: null,
       linear: { enabled: false, source: null, teamKey: null },
@@ -1033,7 +1033,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         eventKey: `${sourceKey}:analyzing`,
       }),
     );
-    await updateProjectSettings(db, projectId, {
+    await updateTeamSettings(db, projectId, {
       velenOrg: "example",
       dataSource: null,
       linear: { enabled: false, source: null, teamKey: null },
@@ -1070,7 +1070,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
   });
 
   it("loads uncapped lightweight usage runs across an organization", async () => {
-    const usageProject = await createProject(db, {
+    const usageProject = await createTeam(db, {
       ownerUserId: "owner",
       organizationId: projectId,
       name: "Usage Project",
@@ -1227,7 +1227,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       handle: "other-usage-organization",
       ownerUserId: "owner",
     });
-    const otherProject = await createProject(db, {
+    const otherProject = await createTeam(db, {
       ownerUserId: "owner",
       organizationId: otherOrganization.id,
       name: "Other Usage Project",
@@ -1347,13 +1347,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       startedAt: atMinute(2),
       completedAt: null,
     });
-    await upsertProjectAgentSession(db, {
+    await upsertTeamAgentSession(db, {
       projectId,
       id: sessionId,
       requestedByUserId: "owner",
       payload,
     }, atMinute(2));
-    await upsertProjectAgentSession(db, {
+    await upsertTeamAgentSession(db, {
       projectId,
       id: sessionId,
       requestedByUserId: "owner",
@@ -1365,7 +1365,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       },
     }, atMinute(3));
 
-    const sessions = await listProjectAgentSessions(db, projectId);
+    const sessions = await listTeamAgentSessions(db, projectId);
     expect(sessions).toEqual([
       expect.objectContaining({
         id: sessionId,
@@ -1388,8 +1388,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         completedAt: null,
       }),
     };
-    await upsertProjectAgentSession(db, row, atMinute(5));
-    await upsertProjectAgentSession(db, {
+    await upsertTeamAgentSession(db, row, atMinute(5));
+    await upsertTeamAgentSession(db, {
       ...row,
       requestedByUserId: null,
       payload: projectAgentSessionPayload({
@@ -1400,7 +1400,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       }),
     }, atMinute(6));
 
-    const stored = (await listProjectAgentSessions(db, projectId)).find(
+    const stored = (await listTeamAgentSessions(db, projectId)).find(
       (session) => session.id === sessionId,
     );
     expect(stored).toMatchObject({
@@ -1408,13 +1408,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       requested_by_user_id: "owner",
       status: "completed",
     });
-    const [summary] = await listProjectAgentSessionSummaries(
+    const [summary] = await listTeamAgentSessionSummaries(
       db,
       projectId,
       [sessionId],
       "owner",
     );
-    expect(decodeStoredProjectAgentSessionSummary(summary!.summary_json))
+    expect(decodeStoredTeamAgentSessionSummary(summary!.summary_json))
       .toMatchObject({
       requestedByUserId: "owner",
       status: "completed",
@@ -1422,7 +1422,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
   });
 
   it("pins a direct Agent task to the selected Worker through completion", async () => {
-    const agent = (await listProjectAgents(db, projectId))[0];
+    const agent = (await listTeamAgents(db, projectId))[0];
     const skill = agent.skills[0];
     const selected = await registerExecutionWorker(db, projectId, {
       id: "direct-task-worker-selected",
@@ -1455,7 +1455,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
 
     try {
       await expect(
-        createProjectAgentTaskJob(db, {
+        createTeamAgentTaskJob(db, {
           id: taskId,
           projectId,
           agentId: agent.id,
@@ -1472,7 +1472,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       });
 
       await expect(
-        claimNextProjectAgentTask(db, projectId, {
+        claimNextTeamAgentTask(db, projectId, {
           workerId: other.worker.id,
           claimTokenHash,
           claimedAt: atMinute(12),
@@ -1480,7 +1480,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         }),
       ).resolves.toBeNull();
 
-      const claimed = await claimNextProjectAgentTask(db, projectId, {
+      const claimed = await claimNextTeamAgentTask(db, projectId, {
         workerId: selected.worker.id,
         claimTokenHash,
         claimedAt: atMinute(12),
@@ -1498,7 +1498,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       });
 
       await expect(
-        renewProjectAgentTaskLease(db, projectId, taskId, {
+        renewTeamAgentTaskLease(db, projectId, taskId, {
           workerId: selected.worker.id,
           claimTokenHash,
           leaseExpiresAt: atMinute(15),
@@ -1510,7 +1510,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       });
 
       await expect(
-        completeProjectAgentTask(db, projectId, taskId, {
+        completeTeamAgentTask(db, projectId, taskId, {
           workerId: selected.worker.id,
           claimTokenHash: "2".repeat(64),
           updatedAt: atMinute(14),
@@ -1518,7 +1518,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       ).resolves.toBeNull();
 
       await expect(
-        completeProjectAgentTask(db, projectId, taskId, {
+        completeTeamAgentTask(db, projectId, taskId, {
           workerId: selected.worker.id,
           claimTokenHash,
           updatedAt: atMinute(14),
@@ -1545,7 +1545,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
   });
 
   it("deletes an agent only within its project and cascades its schedules", async () => {
-    const agent = await createProjectAgent(db, projectId, {
+    const agent = await createTeamAgent(db, projectId, {
       name: "Disposable agent",
       provider: "codex",
       model: null,
@@ -1553,7 +1553,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       responsibility: "Validate deletion behavior.",
       calendarColor: "#d97706",
     });
-    const schedule = await createProjectAgentSchedule(db, projectId, {
+    const schedule = await createTeamAgentSchedule(db, projectId, {
       agentId: agent.id,
       name: "Disposable schedule",
       recurrence: "daily",
@@ -1563,12 +1563,12 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     });
     expect(schedule).not.toBeNull();
 
-    const claimed = await claimDueProjectAgentScheduleRun(db, projectId, {
+    const claimed = await claimDueTeamAgentScheduleRun(db, projectId, {
       claimTokenHash: "f".repeat(64),
       observedAt: "2099-07-29T00:00:00.000Z",
     });
     expect(claimed).not.toBeNull();
-    await expect(deleteProjectAgent(db, projectId, agent.id)).resolves.toBe(
+    await expect(deleteTeamAgent(db, projectId, agent.id)).resolves.toBe(
       "running",
     );
     await db
@@ -1581,25 +1581,25 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       .run();
 
     await expect(
-      deleteProjectAgent(db, "22222222-2222-4222-8222-222222222222", agent.id),
+      deleteTeamAgent(db, "22222222-2222-4222-8222-222222222222", agent.id),
     ).resolves.toBeNull();
     await expect(
-      deleteProjectAgent(db, projectId, agent.id),
+      deleteTeamAgent(db, projectId, agent.id),
     ).resolves.toMatchObject({
       id: agent.id,
       project_id: projectId,
     });
-    await expect(listProjectAgents(db, projectId)).resolves.not.toEqual(
+    await expect(listTeamAgents(db, projectId)).resolves.not.toEqual(
       expect.arrayContaining([expect.objectContaining({ id: agent.id })]),
     );
-    await expect(listProjectAgentSchedules(db, projectId)).resolves.not.toEqual(
+    await expect(listTeamAgentSchedules(db, projectId)).resolves.not.toEqual(
       expect.arrayContaining([expect.objectContaining({ id: schedule!.id })]),
     );
   });
 
   it("updates and deletes a recurring schedule within its project", async () => {
-    const agent = (await listProjectAgents(db, projectId))[0];
-    const schedule = await createProjectAgentSchedule(db, projectId, {
+    const agent = (await listTeamAgents(db, projectId))[0];
+    const schedule = await createTeamAgentSchedule(db, projectId, {
       agentId: agent.id,
       name: "Original schedule",
       recurrence: "daily",
@@ -1609,7 +1609,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     });
 
     await expect(
-      updateProjectAgentSchedule(db, projectId, schedule!.id, {
+      updateTeamAgentSchedule(db, projectId, schedule!.id, {
         agentId: agent.id,
         name: "Weekly release review",
         recurrence: "weekly",
@@ -1626,7 +1626,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       time_zone: "Asia/Seoul",
     });
     await expect(
-      updateProjectAgentSchedule(
+      updateTeamAgentSchedule(
         db,
         "22222222-2222-4222-8222-222222222222",
         schedule!.id,
@@ -1641,23 +1641,23 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       ),
     ).resolves.toBeNull();
     await expect(
-      deleteProjectAgentSchedule(
+      deleteTeamAgentSchedule(
         db,
         "22222222-2222-4222-8222-222222222222",
         schedule!.id,
       ),
     ).resolves.toBe("not_found");
     await expect(
-      deleteProjectAgentSchedule(db, projectId, schedule!.id),
+      deleteTeamAgentSchedule(db, projectId, schedule!.id),
     ).resolves.toBe("deleted");
     await expect(
-      deleteProjectAgentSchedule(db, projectId, schedule!.id),
+      deleteTeamAgentSchedule(db, projectId, schedule!.id),
     ).resolves.toBe("not_found");
   });
 
   it("claims a due schedule once and advances its next occurrence", async () => {
-    const agent = (await listProjectAgents(db, projectId))[0];
-    const schedule = await createProjectAgentSchedule(db, projectId, {
+    const agent = (await listTeamAgents(db, projectId))[0];
+    const schedule = await createTeamAgentSchedule(db, projectId, {
       agentId: agent.id,
       name: "Daily project audit",
       recurrence: "daily",
@@ -1676,7 +1676,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       .run();
 
     await expect(
-      listClaimableProjectAgentScheduleProjectIds(
+      listClaimableTeamAgentScheduleTeamIds(
         db,
         "owner",
         [projectId, "22222222-2222-4222-8222-222222222222"],
@@ -1684,7 +1684,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       ),
     ).resolves.toEqual([projectId]);
 
-    const claimed = await claimDueProjectAgentScheduleRun(db, projectId, {
+    const claimed = await claimDueTeamAgentScheduleRun(db, projectId, {
       claimTokenHash: "a".repeat(64),
       observedAt: "2026-07-27T09:00:10.000Z",
     });
@@ -1708,13 +1708,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       scheduled_for: "2026-07-27T09:00:00.000Z",
     });
     await expect(
-      claimDueProjectAgentScheduleRun(db, projectId, {
+      claimDueTeamAgentScheduleRun(db, projectId, {
         claimTokenHash: "b".repeat(64),
         observedAt: "2026-07-27T09:00:10.000Z",
       }),
     ).resolves.toBeNull();
     await expect(
-      listClaimableProjectAgentScheduleProjectIds(
+      listClaimableTeamAgentScheduleTeamIds(
         db,
         "owner",
         [projectId],
@@ -1722,7 +1722,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       ),
     ).resolves.toEqual([]);
     await expect(
-      deleteProjectAgentSchedule(db, projectId, schedule!.id),
+      deleteTeamAgentSchedule(db, projectId, schedule!.id),
     ).resolves.toBe("running");
     await expect(
       db
@@ -1733,7 +1733,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         .first<string>("next_run_at"),
     ).resolves.toBe("2026-07-28T09:00:00.000Z");
     await expect(
-      completeProjectAgentScheduleRun(db, projectId, claimed!.id, {
+      completeTeamAgentScheduleRun(db, projectId, claimed!.id, {
         claimTokenHash: "a".repeat(64),
         status: "completed",
         resultSummary: "Daily audit completed.",
@@ -1745,7 +1745,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         observedAt: "2026-07-27T09:01:00.000Z",
       }),
     ).resolves.toMatchObject({ status: "completed" });
-    await expect(listProjectAgentScheduleRuns(db, projectId)).resolves.toEqual([
+    await expect(listTeamAgentScheduleRuns(db, projectId)).resolves.toEqual([
       expect.objectContaining({
         id: claimed!.id,
         agent_id: agent.id,
@@ -1763,13 +1763,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       }),
     ]);
     await expect(
-      listProjectAgentScheduleRuns(db, "22222222-2222-4222-8222-222222222222"),
+      listTeamAgentScheduleRuns(db, "22222222-2222-4222-8222-222222222222"),
     ).resolves.toEqual([]);
   });
 
   it("requires the active claim token to complete a scheduled run", async () => {
-    const agent = (await listProjectAgents(db, projectId))[0];
-    const schedule = await createProjectAgentSchedule(db, projectId, {
+    const agent = (await listTeamAgents(db, projectId))[0];
+    const schedule = await createTeamAgentSchedule(db, projectId, {
       agentId: agent.id,
       name: "Result reporter",
       recurrence: "daily",
@@ -1786,13 +1786,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       .bind(schedule!.id)
       .run();
     const tokenHash = "c".repeat(64);
-    const claimed = await claimDueProjectAgentScheduleRun(db, projectId, {
+    const claimed = await claimDueTeamAgentScheduleRun(db, projectId, {
       claimTokenHash: tokenHash,
       observedAt: "2026-07-27T10:00:05.000Z",
     });
 
     await expect(
-      completeProjectAgentScheduleRun(db, projectId, claimed!.id, {
+      completeTeamAgentScheduleRun(db, projectId, claimed!.id, {
         claimTokenHash: "d".repeat(64),
         status: "completed",
         resultSummary: "must not persist",
@@ -1805,7 +1805,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       }),
     ).resolves.toBeNull();
     await expect(
-      completeProjectAgentScheduleRun(db, projectId, claimed!.id, {
+      completeTeamAgentScheduleRun(db, projectId, claimed!.id, {
         claimTokenHash: tokenHash,
         status: "completed",
         resultSummary: "Repository audit completed.",
@@ -1821,8 +1821,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
   });
 
   it("renews and safely reclaims an expired schedule execution", async () => {
-    const agent = (await listProjectAgents(db, projectId))[0];
-    const schedule = await createProjectAgentSchedule(db, projectId, {
+    const agent = (await listTeamAgents(db, projectId))[0];
+    const schedule = await createTeamAgentSchedule(db, projectId, {
       agentId: agent.id,
       name: "Lease recovery",
       recurrence: "daily",
@@ -1839,12 +1839,12 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       .bind(schedule!.id)
       .run();
     const originalHash = "e".repeat(64);
-    const claimed = await claimDueProjectAgentScheduleRun(db, projectId, {
+    const claimed = await claimDueTeamAgentScheduleRun(db, projectId, {
       claimTokenHash: originalHash,
       observedAt: "2026-07-27T11:00:00.000Z",
     });
     await expect(
-      renewProjectAgentScheduleRunLease(db, projectId, claimed!.id, {
+      renewTeamAgentScheduleRunLease(db, projectId, claimed!.id, {
         claimTokenHash: originalHash,
         observedAt: "2026-07-27T12:00:00.000Z",
       }),
@@ -1854,13 +1854,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     });
 
     await expect(
-      claimDueProjectAgentScheduleRun(db, projectId, {
+      claimDueTeamAgentScheduleRun(db, projectId, {
         claimTokenHash: "f".repeat(64),
         observedAt: "2026-07-27T13:00:00.000Z",
       }),
     ).resolves.toBeNull();
     await expect(
-      claimDueProjectAgentScheduleRun(db, projectId, {
+      claimDueTeamAgentScheduleRun(db, projectId, {
         claimTokenHash: "f".repeat(64),
         observedAt: "2026-07-27T14:00:01.000Z",
       }),
@@ -1872,7 +1872,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
   });
 
   it("updates a project agent only within its project", async () => {
-    const current = (await listProjectAgents(db, projectId))[0];
+    const current = (await listTeamAgents(db, projectId))[0];
     const avatar = "data:image/png;base64,aA==";
     const codexPet = {
       json: JSON.stringify({
@@ -1884,7 +1884,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       }),
       objectKey: "project-agent-spritesheets/project/agent/firefly.webp",
     };
-    const updated = await updateProjectAgent(db, projectId, current.id, {
+    const updated = await updateTeamAgent(db, projectId, current.id, {
       name: "Release coordinator",
       avatar,
       codexPet,
@@ -1954,7 +1954,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       calendar_color: "#0f9f76",
     });
     await expect(
-      updateProjectAgent(
+      updateTeamAgent(
         db,
         "22222222-2222-4222-8222-222222222222",
         current.id,
@@ -1972,7 +1972,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
   });
 
   it("preserves retained Skill job references across name swaps", async () => {
-    const agent = await createProjectAgent(db, projectId, {
+    const agent = await createTeamAgent(db, projectId, {
       name: "Durable skill agent",
       provider: "codex",
       model: null,
@@ -2015,7 +2015,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     const taskId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 
     try {
-      await createProjectAgentTaskJob(db, {
+      await createTeamAgentTaskJob(db, {
         id: taskId,
         projectId,
         agentId: agent.id,
@@ -2027,7 +2027,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       });
 
       await expect(
-        updateProjectAgent(db, projectId, agent.id, {
+        updateTeamAgent(db, projectId, agent.id, {
           name: "Must not partially update",
           provider: agent.provider,
           model: agent.model,
@@ -2052,7 +2052,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         }),
       ).rejects.toThrow("cannot be deleted while queued or running work");
       await expect(
-        updateProjectAgent(db, projectId, agent.id, {
+        updateTeamAgent(db, projectId, agent.id, {
           name: "Must not delete every active Skill",
           provider: agent.provider,
           model: agent.model,
@@ -2071,12 +2071,12 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
           .first<{ skill_id: string | null }>(),
       ).resolves.toEqual({ skill_id: releaseSkill.id });
       expect(
-        (await listProjectAgents(db, projectId)).find(
+        (await listTeamAgents(db, projectId)).find(
           (candidate) => candidate.id === agent.id,
         )?.name,
       ).toBe("Durable skill agent");
 
-      const updated = await updateProjectAgent(db, projectId, agent.id, {
+      const updated = await updateTeamAgent(db, projectId, agent.id, {
         name: agent.name,
         provider: agent.provider,
         model: agent.model,
@@ -2138,12 +2138,12 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         .prepare(`delete from briar_project_agent_task_jobs where id = ?`)
         .bind(taskId)
         .run();
-      await deleteProjectAgent(db, projectId, agent.id);
+      await deleteTeamAgent(db, projectId, agent.id);
     }
   });
 
   it("protects active direct-task Skill runtimes while allowing terminal edits", async () => {
-    const agent = await createProjectAgent(db, projectId, {
+    const agent = await createTeamAgent(db, projectId, {
       name: "Pinned runtime agent",
       provider: "codex",
       model: null,
@@ -2172,7 +2172,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       >
     >;
     const updateSkill = (overrides: RuntimeOverride) =>
-      updateProjectAgent(db, projectId, agent.id, {
+      updateTeamAgent(db, projectId, agent.id, {
         name: agent.name,
         provider: agent.provider,
         model: agent.model,
@@ -2196,7 +2196,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       });
 
     try {
-      await createProjectAgentTaskJob(db, {
+      await createTeamAgentTaskJob(db, {
         id: taskId,
         projectId,
         agentId: agent.id,
@@ -2232,7 +2232,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       }
 
       expect(
-        (await listProjectAgents(db, projectId)).find(
+        (await listTeamAgents(db, projectId)).find(
           (candidate) => candidate.id === agent.id,
         )?.skills[0],
       ).toMatchObject({
@@ -2267,7 +2267,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       });
 
       await expect(
-        createProjectAgentTaskJob(db, {
+        createTeamAgentTaskJob(db, {
           id: "ffffffff-ffff-4fff-8fff-ffffffffffff",
           projectId,
           agentId: agent.id,
@@ -2283,13 +2283,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         .prepare(`delete from briar_project_agent_task_jobs where id = ?`)
         .bind(taskId)
         .run();
-      await deleteProjectAgent(db, projectId, agent.id);
+      await deleteTeamAgent(db, projectId, agent.id);
     }
   });
 
   it("rolls back an Agent update when a Skill ID belongs to another Agent", async () => {
-    const owner = (await listProjectAgents(db, projectId))[0];
-    const agent = await createProjectAgent(db, projectId, {
+    const owner = (await listTeamAgents(db, projectId))[0];
+    const agent = await createTeamAgent(db, projectId, {
       name: "Collision target",
       provider: "codex",
       model: null,
@@ -2314,7 +2314,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
 
     try {
       await expect(
-        updateProjectAgent(db, projectId, agent.id, {
+        updateTeamAgent(db, projectId, agent.id, {
           name: "Must roll back",
           provider: "claude",
           model: "sonnet",
@@ -2339,7 +2339,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         }),
       ).rejects.toThrow();
 
-      const persisted = (await listProjectAgents(db, projectId)).find(
+      const persisted = (await listTeamAgents(db, projectId)).find(
         (candidate) => candidate.id === agent.id,
       );
       expect(persisted).toMatchObject({
@@ -2354,10 +2354,10 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         expect.objectContaining({ id: agent.skills[0].id }),
       ]);
       expect(
-        (await listProjectAgents(db, projectId))[0].skills[0].id,
+        (await listTeamAgents(db, projectId))[0].skills[0].id,
       ).toBe(owner.skills[0].id);
     } finally {
-      await deleteProjectAgent(db, projectId, agent.id);
+      await deleteTeamAgent(db, projectId, agent.id);
     }
   });
 
@@ -2386,20 +2386,20 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
   });
 
   it("deletes only a project owned by the requesting user", async () => {
-    const project = await createProject(db, {
+    const project = await createTeam(db, {
       ownerUserId: "owner",
       organizationId: projectId,
       name: "Disposable",
       agentTokenHash: "d".repeat(64),
     });
 
-    await expect(listProjectAgents(db, project.id)).resolves.toEqual([
+    await expect(listTeamAgents(db, project.id)).resolves.toEqual([
       expect.objectContaining({
         project_id: project.id,
         provider: "codex",
       }),
     ]);
-    const settings = await getProjectSettings(db, project.id);
+    const settings = await getTeamSettings(db, project.id);
     expect(JSON.parse(settings!.workflow_json)).toEqual(
       cloneAutoHuntWorkflow(),
     );
@@ -2410,17 +2410,17 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         event("queued", 12, { sourceKey: "workflow-pending" }),
       ),
     ).rejects.toThrow("Repository workflow has not been generated");
-    await expect(deleteProject(db, project.id, "someone-else")).resolves.toBe(
+    await expect(deleteTeam(db, project.id, "someone-else")).resolves.toBe(
       false,
     );
-    await expect(getProject(db, project.id, "owner")).resolves.not.toBeNull();
-    await expect(deleteProject(db, project.id, "owner")).resolves.toBe(true);
-    await expect(getProject(db, project.id, "owner")).resolves.toBeNull();
-    await expect(getProjectSettings(db, project.id)).resolves.toBeNull();
+    await expect(getTeam(db, project.id, "owner")).resolves.not.toBeNull();
+    await expect(deleteTeam(db, project.id, "owner")).resolves.toBe(true);
+    await expect(getTeam(db, project.id, "owner")).resolves.toBeNull();
+    await expect(getTeamSettings(db, project.id)).resolves.toBeNull();
   });
 
   it("scopes organization members to explicitly granted projects", async () => {
-    await updateProjectSettings(db, projectId, {
+    await updateTeamSettings(db, projectId, {
       velenOrg: "example",
       dataSource: null,
       linear: { enabled: false, source: null, teamKey: null },
@@ -2441,11 +2441,11 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     `,
     );
 
-    const projects = await listProjects(db, "member");
+    const projects = await listTeams(db, "member");
     expect(projects.map((project) => project.id)).toContain(projectId);
     expect(projects[0]?.member_role).toBe("developer");
-    expect(await getProject(db, projectId, "member")).not.toBeNull();
-    await expect(deleteProject(db, projectId, "member")).resolves.toBe(false);
+    expect(await getTeam(db, projectId, "member")).not.toBeNull();
+    await expect(deleteTeam(db, projectId, "member")).resolves.toBe(false);
     const memberTokenHash = "e".repeat(64);
     await expect(
       issueProjectAgentToken(db, projectId, "member", memberTokenHash),
@@ -2475,12 +2475,12 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     expect(await getDashboardSyncCursor(db, projectId)).toBeGreaterThan(
       cursorBeforeAccessRemoval,
     );
-    await expect(listProjects(db, "member")).resolves.toEqual([]);
-    await expect(getProject(db, projectId, "member")).resolves.toBeNull();
+    await expect(listTeams(db, "member")).resolves.toEqual([]);
+    await expect(getTeam(db, projectId, "member")).resolves.toBeNull();
     await expect(
       updateOrganizationMemberRole(db, projectId, "member", "developer"),
     ).resolves.toBe(true);
-    await expect(getProject(db, projectId, "member")).resolves.toBeNull();
+    await expect(getTeam(db, projectId, "member")).resolves.toBeNull();
     await expect(
       getHuntRunForProject(db, projectId, accessAssignedRunId),
     ).resolves.toMatchObject({ assignee_user_id: null });
@@ -2490,7 +2490,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await expect(
       updateOrganizationMemberProjects(db, projectId, "member", [projectId]),
     ).resolves.toBe("updated");
-    await expect(getProject(db, projectId, "member")).resolves.not.toBeNull();
+    await expect(getTeam(db, projectId, "member")).resolves.not.toBeNull();
 
     await expect(
       updateOrganizationMemberRole(db, projectId, "member", "co-owner"),
@@ -2529,7 +2529,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
   });
 
   it("invites an unregistered email and grants organization access on exact-email acceptance", async () => {
-    const secondProject = await createProject(db, {
+    const secondProject = await createTeam(db, {
       ownerUserId: "owner",
       organizationId: projectId,
       name: "Invitation-isolated project",
@@ -2582,7 +2582,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         acceptedAt: atMinute(31),
       }),
     ).resolves.toMatchObject({ outcome: "accepted" });
-    const invitedProjects = await listProjects(db, "new-invitee");
+    const invitedProjects = await listTeams(db, "new-invitee");
     expect(invitedProjects).toEqual([
       expect.objectContaining({ id: projectId, member_role: "editor" }),
     ]);
@@ -2688,7 +2688,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       handle: "account-deletion-personal",
       ownerUserId: userId,
     });
-    const project = await createProject(db, {
+    const project = await createTeam(db, {
       ownerUserId: userId,
       organizationId: organization.id,
       name: "Disposable Project",
@@ -2768,7 +2768,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       handle: "account-deletion-race",
       ownerUserId: ownerId,
     });
-    const project = await createProject(db, {
+    const project = await createTeam(db, {
       ownerUserId: ownerId,
       organizationId: organization.id,
       name: "Account Deletion Race Project",
@@ -2854,7 +2854,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       handle: "account-deletion-outbox",
       ownerUserId: userId,
     });
-    const project = await createProject(db, {
+    const project = await createTeam(db, {
       ownerUserId: userId,
       organizationId: organization.id,
       name: "Account Deletion Outbox Project",
@@ -3110,7 +3110,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
        (organization_id, user_id, role, created_at, updated_at)
        values (?, ?, 'developer', ?, ?)`,
     ).bind(organization.id, memberId, atMinute(0), atMinute(0)).run();
-    const sharedProject = await createProject(db, {
+    const sharedProject = await createTeam(db, {
       ownerUserId: ownerId,
       organizationId: organization.id,
       name: "Shared Project",
@@ -3671,7 +3671,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     const replyId = "77777777-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
     const mentionId = "88888888-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
     const agentReplyId = "aaaaaaaa-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
-    const agent = await createProjectAgent(db, projectId, {
+    const agent = await createTeamAgent(db, projectId, {
       name: "Inbox channel agent",
       avatar: "data:image/png;base64,aW5ib3gtY2hhbm5lbC1hZ2VudA==",
       provider: "codex",
@@ -4473,7 +4473,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       },
       completion: { requiredStages: [] },
     });
-    await updateProjectSettings(db, projectId, {
+    await updateTeamSettings(db, projectId, {
       velenOrg: null,
       dataSource: null,
       linear: { enabled: false, source: null, teamKey: null },
@@ -4984,7 +4984,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       execution: { checkpoints: [] },
       completion: { requiredStages: ["implementing", "merged"] },
     });
-    await updateProjectSettings(db, projectId, {
+    await updateTeamSettings(db, projectId, {
       velenOrg: null,
       dataSource: null,
       linear: { enabled: false, source: null, teamKey: null },

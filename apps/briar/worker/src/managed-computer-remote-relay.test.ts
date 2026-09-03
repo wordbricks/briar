@@ -83,7 +83,7 @@ const setupCompleteFrame = () => toBinary(
     payload: {
       case: "complete",
       value: create(ManagedComputerSetupCompleteSchema, {
-        projectId: "22222222-2222-4222-8222-222222222222",
+        teamId: "22222222-2222-4222-8222-222222222222",
         provider: AgentProvider.CODEX,
         workerId: "worker-1",
       }),

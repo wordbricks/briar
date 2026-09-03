@@ -20,7 +20,7 @@ import {
   sortAgentProviders,
   type AgentProvider,
   type AgentProviderModelCatalog,
-} from "../lib/project-llm";
+} from "../lib/team-llm";
 import { AgentProviderIcon } from "./AgentIcons";
 import type { SelectMenuOption } from "./SelectMenu";
 

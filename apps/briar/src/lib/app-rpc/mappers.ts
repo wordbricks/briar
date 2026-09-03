@@ -141,7 +141,7 @@ export const optionalAgentProviderFromProto = (
   value: ProtoAgentProvider | undefined,
 ): AgentProvider | null => (value === undefined ? null : agentProviderFromProto(value));
 
-export const projectRoleFromProto = (value: ProtoProjectRole): Project["role"] => {
+export const teamRoleFromProto = (value: ProtoProjectRole): Project["role"] => {
   switch (value) {
     case ProtoProjectRole.OWNER:
       return "owner";
@@ -395,7 +395,7 @@ export const organizationMemberFromProto = (
   name: value.name,
   email: value.email,
   image: value.image ?? null,
-  role: projectRoleFromProto(value.role),
+  role: teamRoleFromProto(value.role),
   projectIds: value.projectIds,
   createdAt: requiredTimestamp(value.createdAt, "organizationMember.createdAt"),
 });

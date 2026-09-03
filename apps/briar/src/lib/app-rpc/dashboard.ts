@@ -45,14 +45,14 @@ import {
   safeNumber,
   structuredResultFromProto,
 } from "./mappers";
-import { projectFromMessage } from "./project";
+import { teamFromMessage } from "./team";
 import {
   checkpointPositionFromProto as checkpointPosition,
   executionPolicyFromProto,
-  projectSettingsFromProto,
+  teamSettingsFromProto,
   workflowCheckpointFromProto,
   workflowFromProto,
-} from "./project-configuration-mappers";
+} from "./team-configuration-mappers";
 
 const dashboardClient = appTransport
   ? createClient(DashboardService, appTransport)
@@ -317,14 +317,14 @@ export async function getDashboard(
 ): Promise<DashboardPayload> {
   const client = requireDashboardClient();
   const response = await client.getDashboard(
-    { projectId },
+    { teamId: projectId },
     appCallOptions(token, signal),
   );
   return {
-    project: projectFromMessage(
-      requiredMessage(response.project, "dashboard.project"),
+    team: teamFromMessage(
+      requiredMessage(response.team, "dashboard.team"),
     ),
-    settings: projectSettingsFromProto(
+    settings: teamSettingsFromProto(
       requiredMessage(response.settings, "dashboard.settings"),
     ),
     runs: response.runs.map(dashboardRunFromProto),
@@ -356,7 +356,7 @@ export async function syncDashboard(
 ): Promise<DashboardDeltaPayload> {
   const client = requireDashboardClient();
   const response = await client.syncDashboard(
-    { projectId, cursor: BigInt(cursor) },
+    { teamId: projectId, cursor: BigInt(cursor) },
     appCallOptions(token, signal),
   );
   return {
@@ -365,12 +365,12 @@ export async function syncDashboard(
     reset: response.reset,
     runs: response.runs.map(dashboardRunFromProto),
     deletedRunIds: response.deletedRunIds,
-    project: response.project === undefined
+    team: response.team === undefined
       ? undefined
-      : projectFromMessage(response.project),
+      : teamFromMessage(response.team),
     settings: response.settings === undefined
       ? undefined
-      : projectSettingsFromProto(response.settings),
+      : teamSettingsFromProto(response.settings),
     workers: response.workers.map(dashboardWorkerFromProto),
     organizationProviders: response.organizationProviders.map(
       agentProviderFromProto,
@@ -397,7 +397,7 @@ export async function listRunEventsRpc(
 ): Promise<HuntEvent[]> {
   const client = requireDashboardClient();
   return (await client.listRunEvents(
-    { projectId, runId },
+    { teamId: projectId, runId },
     appCallOptions(token),
   )).events.map(runEventFromProto);
 }

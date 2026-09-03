@@ -6,7 +6,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import type { AutoHuntSession } from "@/hooks/useAutoHuntSessions";
 import { demoDashboard, demoRunEvents } from "@/lib/demo-data";
-import { defaultAgentProviderModelCatalog } from "@/lib/project-llm";
+import { defaultAgentProviderModelCatalog } from "@/lib/team-llm";
 import * as api from "@/lib/api";
 import * as channelRealtime from "@/lib/channel-realtime";
 import * as issueActivityHook from "@/hooks/use-issue-agent-activity";
@@ -55,7 +55,7 @@ const emptyIssueMessageContract: Pick<
 };
 const dashboardAgent: ProjectAgent = {
   id: "agent-1",
-  projectId: demoDashboard.project.id,
+  teamId: demoDashboard.team.id,
   name: "Briar Agent",
   avatar: "data:image/png;base64,avatar",
   codexPet: null,
@@ -78,8 +78,8 @@ const propertiesProject: PlanningProject = {
   id: "planning-project-1",
   workspaceId: "workspace-1",
   workspaceName: "Workspace",
-  teamId: demoDashboard.project.id,
-  teamName: demoDashboard.project.name,
+  teamId: demoDashboard.team.id,
+  teamName: demoDashboard.team.name,
   name: "GetGPT",
   description: "",
   status: "active",
@@ -145,7 +145,7 @@ function dashboardAgentSession(run: HuntRun, status: AutoHuntSession["status"] =
   return {
     id: "session-1",
     dispatchGroupId: "dispatch-1",
-    projectId: demoDashboard.project.id,
+    projectId: demoDashboard.team.id,
     agentId: dashboardAgent.id,
     sessionType: "dispatch",
     status,
@@ -1277,7 +1277,7 @@ describe("RunPage", () => {
       id: "40404040-cccc-4ccc-8ccc-cccccccccccc",
       type: "request_issue_execute" as const,
       status: "pending" as const,
-      projectId: demoDashboard.project.id,
+      projectId: demoDashboard.team.id,
       runId: targetRun.id,
       title: targetRun.title,
       createdAt: "2026-08-11T00:00:00.000Z",

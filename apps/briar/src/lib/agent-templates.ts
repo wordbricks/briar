@@ -18,7 +18,7 @@ import agencyAgentsLicense from "../../../../third-party/agency-agents-LICENSE.m
 import ponytailLicense from "../../../../third-party/ponytail-LICENSE.md?raw";
 
 import type {
-  ProjectAgentSkillInput,
+  TeamAgentSkillInput,
   ProjectAgentSkillKind,
 } from "../types";
 import {
@@ -28,8 +28,8 @@ import {
   agentSkillDescriptionMaxLength,
   agentSkillsMaxCount,
 } from "./agent-limits";
-import { isProjectAgentAvatarDataUrl } from "./project-agent-avatar";
-import type { AgentProvider, ModelEffort } from "./project-llm";
+import { isTeamAgentAvatarDataUrl } from "./team-agent-avatar";
+import type { AgentProvider, ModelEffort } from "./team-llm";
 
 export type ProjectAgentTemplate = {
   id: string;
@@ -444,7 +444,7 @@ export function projectAgentTemplateSkillInputs(
     model: string | null;
     effort: ModelEffort | null;
   },
-): ProjectAgentSkillInput[] {
+): TeamAgentSkillInput[] {
   return template.skills.map((skill, position) => ({
     ...skill,
     ...runtime,
@@ -478,7 +478,7 @@ export function projectAgentTemplateValidationErrors(
   if (!/^#[0-9a-f]{6}$/iu.test(template.calendarColor)) {
     errors.push("calendar color must be a six-digit hex value");
   }
-  if (template.avatar && !isProjectAgentAvatarDataUrl(template.avatar)) {
+  if (template.avatar && !isTeamAgentAvatarDataUrl(template.avatar)) {
     errors.push("avatar must be a supported square image data URL");
   }
   const skillNames = new Set<string>();

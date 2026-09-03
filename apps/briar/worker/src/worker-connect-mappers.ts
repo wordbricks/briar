@@ -67,7 +67,7 @@ import {
 import type { claimNextChannelReplyWork } from "./channel-reply-claim-routes";
 import type { claimNextIssueReplyWork } from "./issue-reply-worker-routes";
 import type { claimNextMergeBatchWork } from "./merge-batch-worker";
-import type { claimNextProjectAgentTaskWork } from "./project-agent-task-worker";
+import type { claimNextTeamAgentTaskWork } from "./team-agent-task-worker";
 import type { claimNextQueueWork } from "./queue-claim-routes";
 import type { claimDmLearningJob } from "./dm-memory-learning-claims";
 import { dmMemoryCanonicalJson } from "../../src/lib/dm-memory-canonical-json";
@@ -80,7 +80,7 @@ export type WorkerQueueClaim =
   | AwaitedClaim<typeof claimNextQueueWork>
   | AwaitedClaim<typeof claimNextIssueReplyWork>
   | AwaitedClaim<typeof claimNextChannelReplyWork>
-  | AwaitedClaim<typeof claimNextProjectAgentTaskWork>
+  | AwaitedClaim<typeof claimNextTeamAgentTaskWork>
   | AwaitedClaim<typeof claimNextMergeBatchWork>
   | AwaitedClaim<typeof claimDmLearningJob>;
 
@@ -438,7 +438,7 @@ const issue = (
 });
 
 const projectAgentTask = (
-  value: AwaitedClaim<typeof claimNextProjectAgentTaskWork>,
+  value: AwaitedClaim<typeof claimNextTeamAgentTaskWork>,
 ): ClaimedWork => create(ClaimedWorkSchema, {
   work: {
     case: "projectAgentTask",

@@ -9,9 +9,9 @@ import {
 import { FleetService } from "@briar/contracts/gen/briar/app/v1/fleet_pb";
 import { MergeQueueService } from "@briar/contracts/gen/briar/app/v1/merge_queue_pb";
 import {
-  ProjectService,
-  type ListProjectsResponse,
-} from "@briar/contracts/gen/briar/app/v1/project_pb";
+  TeamService,
+  type ListTeamsResponse,
+} from "@briar/contracts/gen/briar/app/v1/team_pb";
 import {
   managedComputerFromProto,
   managedComputerSetupSessionTicketFromProto,
@@ -40,12 +40,12 @@ export async function fetchCurrentUser(
 export async function fetchProjects(
   apiUrl: string,
   token: string,
-): Promise<ListProjectsResponse["projects"]> {
+): Promise<ListTeamsResponse["teams"]> {
   return (await createAuthenticatedConnectClient(
-    ProjectService,
+    TeamService,
     apiUrl,
     token,
-  ).listProjects({})).projects;
+  ).listTeams({})).teams;
 }
 
 export async function fetchManagedComputer(

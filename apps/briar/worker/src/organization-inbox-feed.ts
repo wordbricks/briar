@@ -6,8 +6,8 @@ import {
   listOrganizationIssueSubscriptionRunIds,
 } from "./issue-notification-repository";
 import { issueSubscribers } from "./issue-subscribers";
-import { listProjectAgentSessionSummaries } from "./project-agent-session-repository";
-import { listOrganizationInboxProjects } from "./project-repository";
+import { listTeamAgentSessionSummaries } from "./team-agent-session-repository";
+import { listOrganizationInboxTeams } from "./team-repository";
 
 const occurredAtOrAfter = (occurredAt: string, subscribedAt: string) => {
   const occurredTime = Date.parse(occurredAt);
@@ -22,7 +22,7 @@ export async function loadOrganizationInboxFeed(
   organizationId: string,
   userId: string,
 ) {
-  const projects = await listOrganizationInboxProjects(
+  const projects = await listOrganizationInboxTeams(
     db,
     organizationId,
     userId,
@@ -35,7 +35,7 @@ export async function loadOrganizationInboxFeed(
             await Promise.all([
               listDashboardRuns(db, project.id),
               listIssueConversationNotifications(db, project.id, userId),
-              listProjectAgentSessionSummaries(
+              listTeamAgentSessionSummaries(
                 db,
                 project.id,
                 undefined,

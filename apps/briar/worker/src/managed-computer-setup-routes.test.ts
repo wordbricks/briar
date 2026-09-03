@@ -246,7 +246,7 @@ describe("managed computer setup", () => {
     expect(responseHeaders?.get("cache-control")).toBe("private, no-store");
     expect(context).toMatchObject({
       session: { projectId },
-      project: { id: projectId, name: "Managed project" },
+      team: { id: projectId, name: "Managed project" },
     });
     expect(context.settings?.githubRepository).toBeUndefined();
   });
@@ -274,7 +274,7 @@ describe("managed computer setup", () => {
     expect(first).toMatchObject({
       managedComputerId,
       organizationId,
-      projectId,
+      teamId: projectId,
       deviceId,
       duplicate: false,
       worker: {
@@ -363,7 +363,7 @@ describe("managed computer setup", () => {
       },
       options(machineToken),
     )).resolves.toMatchObject({
-      projectId: secondProjectId,
+      teamId: secondProjectId,
       deviceId,
       worker: {
         acceptingWork: false,

@@ -7,7 +7,7 @@ import {
 } from "../../src/lib/agent-execution-metrics";
 
 import { type IssueResultReviewRow } from "./issue-result-review-repository";
-import { type ProjectAgentProvider } from "./project-agent-model";
+import { type TeamAgentProvider } from "./team-agent-model";
 
 export type OrganizationUsageRunRow = {
   id: string;
@@ -19,11 +19,11 @@ export type OrganizationUsageRunRow = {
   claimed_at: string | null;
   claim_attempts: number;
   worker_id: string | null;
-  preferred_agent_provider: ProjectAgentProvider | null;
+  preferred_agent_provider: TeamAgentProvider | null;
   preferred_agent_model: string | null;
-  requested_agent_provider: ProjectAgentProvider | null;
+  requested_agent_provider: TeamAgentProvider | null;
   requested_agent_model: string | null;
-  execution_provider: ProjectAgentProvider | null;
+  execution_provider: TeamAgentProvider | null;
   execution_model: string | null;
   started_at: string;
   updated_at: string;
@@ -60,7 +60,7 @@ export type OrganizationUsageRecordRow = {
   session_id: string | null;
   turn_id: string | null;
   scope_id: string | null;
-  agent_provider: ProjectAgentProvider;
+  agent_provider: TeamAgentProvider;
   model_provider: string | null;
   model: string | null;
   canonical_model: string | null;
@@ -96,7 +96,7 @@ export type OrganizationCostRecordRow = {
   session_id: string | null;
   turn_id: string | null;
   scope_id: string | null;
-  agent_provider: ProjectAgentProvider;
+  agent_provider: TeamAgentProvider;
   model_provider: string | null;
   model: string | null;
   canonical_model: string | null;

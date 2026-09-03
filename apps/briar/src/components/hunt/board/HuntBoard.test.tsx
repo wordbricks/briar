@@ -43,7 +43,7 @@ const dashboardProps = {
 };
 const dashboardAgent: ProjectAgent = {
   id: "agent-1",
-  projectId: demoDashboard.project.id,
+  teamId: demoDashboard.team.id,
   name: "Briar Agent",
   avatar: "data:image/png;base64,avatar",
   codexPet: null,
@@ -91,7 +91,7 @@ function dashboardAgentSession(run: HuntRun, status: AutoHuntSession["status"] =
   return {
     id: "session-1",
     dispatchGroupId: "dispatch-1",
-    projectId: demoDashboard.project.id,
+    projectId: demoDashboard.team.id,
     agentId: dashboardAgent.id,
     sessionType: "dispatch",
     status,
@@ -378,7 +378,7 @@ describe("HuntBoard", () => {
       }));
       container.querySelector<HTMLFormElement>(".issue-dialog")?.requestSubmit();
     });
-    expect(onCreateIssue).toHaveBeenCalledWith(demoDashboard.project.id, expect.objectContaining({
+    expect(onCreateIssue).toHaveBeenCalledWith(demoDashboard.team.id, expect.objectContaining({
       status: "queued",
       title: "Created in implementing",
       difficulty: null,
@@ -447,7 +447,7 @@ describe("HuntBoard", () => {
   it("collapses and expands a kanban stage column per user and project", async () => {
     window.localStorage.clear();
     const userId = "user-collapse-1";
-    const projectId = demoDashboard.project.id;
+    const projectId = demoDashboard.team.id;
     const { cleanup, container, root } = createReactTestRoot({
       attachToDocument: true,
     });
@@ -474,7 +474,7 @@ describe("HuntBoard", () => {
   it("hides a kanban column into the hidden list and can show it again", async () => {
     window.localStorage.clear();
     const userId = "user-hide-1";
-    const projectId = demoDashboard.project.id;
+    const projectId = demoDashboard.team.id;
     const { cleanup, container, root } = createReactTestRoot({
       attachToDocument: true,
     });
@@ -516,7 +516,7 @@ describe("HuntBoard", () => {
   it("restores separate column preferences while companion ignores them", async () => {
     window.localStorage.clear();
     const userId = "user-restore-1";
-    const projectId = demoDashboard.project.id;
+    const projectId = demoDashboard.team.id;
     window.localStorage.setItem(
       `briar.settings.kanbanColumnHide.v1:${encodeURIComponent(userId)}:${encodeURIComponent(projectId)}`,
       JSON.stringify(["stage:analyzing"]),
@@ -802,7 +802,7 @@ describe("HuntBoard", () => {
         workflow,
         checkpointPolicy: {
           availableBoundaries: [],
-          projectMandatory: [{
+          teamMandatory: [{
             key: "project-after-analyzing",
             stage: "analyzing",
             position: "after" as const
@@ -821,7 +821,7 @@ describe("HuntBoard", () => {
             stage: "security_review",
             position: "before" as const
           }],
-          projectRevision: 1,
+          teamRevision: 1,
           userRevision: 1
         }
       },
@@ -837,7 +837,7 @@ describe("HuntBoard", () => {
     const { cleanup, container, root } = createReactTestRoot();
     const checkpointPolicy = {
       ...demoDashboard.settings.checkpointPolicy!,
-      projectMandatory: [],
+      teamMandatory: [],
       userDefaults: [],
       effective: []
     };

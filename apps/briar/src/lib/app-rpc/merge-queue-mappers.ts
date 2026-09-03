@@ -58,7 +58,7 @@ export const mergeQueueProfileFromProto = (
     throw new Error("mergeQueue.validationCommands must contain 1 to 20 commands");
   }
   return {
-    projectId: value.projectId,
+    teamId: value.projectId,
     repositoryId: positiveSafeNumber(value.repositoryId, "mergeQueue.repositoryId"),
     repository: value.repository,
     baseBranch: value.baseBranch,

@@ -19,7 +19,7 @@ import { appCallOptions, appTransport } from "./core";
 import {
   optionalTimestamp,
   organizationMemberFromProto,
-  projectRoleFromProto,
+  teamRoleFromProto,
   requiredMessage,
   requiredTimestamp,
 } from "./mappers";
@@ -121,7 +121,7 @@ const organizationFromMessage = (
   name: organization.name,
   handle: organization.handle,
   logo: organization.logo ?? null,
-  role: projectRoleFromProto(organization.role),
+  role: teamRoleFromProto(organization.role),
   createdAt: requiredTimestamp(
     organization.createdAt,
     "organization.createdAt",

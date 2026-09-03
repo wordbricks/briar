@@ -42,7 +42,7 @@ struct CurrentUser: Equatable, Sendable {
 
 struct AuthenticatedMobileServices: Sendable {
     let account: any BriarAPI_AccountServiceClientInterface
-    let project: any BriarAPI_ProjectServiceClientInterface
+    let team: any BriarAPI_TeamServiceClientInterface
     let dashboard: any BriarAPI_DashboardServiceClientInterface
     let inbox: any BriarAPI_InboxServiceClientInterface
     let issue: any BriarAPI_IssueServiceClientInterface
@@ -54,7 +54,7 @@ struct AuthenticatedMobileServices: Sendable {
 
     init(
         account: any BriarAPI_AccountServiceClientInterface,
-        project: any BriarAPI_ProjectServiceClientInterface,
+        team: any BriarAPI_TeamServiceClientInterface,
         dashboard: any BriarAPI_DashboardServiceClientInterface,
         inbox: any BriarAPI_InboxServiceClientInterface,
         issue: any BriarAPI_IssueServiceClientInterface,
@@ -65,7 +65,7 @@ struct AuthenticatedMobileServices: Sendable {
         preparedUploadClient: any PreparedUploadClientProtocol
     ) {
         self.account = account
-        self.project = project
+        self.team = team
         self.dashboard = dashboard
         self.inbox = inbox
         self.issue = issue
@@ -88,7 +88,7 @@ struct AuthenticatedMobileServices: Sendable {
             )
         )
         account = BriarAPI_AccountServiceClient(client: protocolClient)
-        project = BriarAPI_ProjectServiceClient(client: protocolClient)
+        team = BriarAPI_TeamServiceClient(client: protocolClient)
         dashboard = BriarAPI_DashboardServiceClient(client: protocolClient)
         inbox = BriarAPI_InboxServiceClient(client: protocolClient)
         issue = BriarAPI_IssueServiceClient(client: protocolClient)
@@ -150,12 +150,12 @@ func coreUUIDString(_ value: UUID) -> String {
 
 extension DashboardSnapshot {
     init(connectMessage message: BriarAPI_GetDashboardResponse) throws {
-        guard message.hasProject, message.hasSettings, message.hasGeneratedAt else {
+        guard message.hasTeam, message.hasSettings, message.hasGeneratedAt else {
             throw MobileAPIError.invalidResponse
         }
         self.init(
-            project: try Project(connectMessage: message.project),
-            settings: try ProjectSettings(connectMessage: message.settings),
+            project: try Project(connectMessage: message.team),
+            settings: try TeamSettings(connectMessage: message.settings),
             runs: try message.runs.map(DashboardRun.init(connectMessage:)),
             workers: try message.workers.map(DashboardWorker.init(connectMessage:)),
             organizationProviders: try message.organizationProviders.map(coreProvider),
@@ -184,7 +184,7 @@ extension DashboardDelta {
             reset: message.reset,
             runs: try message.runs.map(DashboardRun.init(connectMessage:)),
             deletedRunIds: try message.deletedRunIds.map(coreUUID),
-            project: message.hasProject ? try .init(connectMessage: message.project) : nil,
+            project: message.hasTeam ? try .init(connectMessage: message.team) : nil,
             settings: message.hasSettings ? try .init(connectMessage: message.settings) : nil,
             workers: try message.workers.map(DashboardWorker.init(connectMessage:)),
             organizationProviders: try message.organizationProviders.map(coreProvider),
@@ -207,8 +207,8 @@ extension DashboardDelta {
     }
 }
 
-extension ProjectSettings {
-    init(connectMessage message: BriarAPI_ProjectSettings) throws {
+extension TeamSettings {
+    init(connectMessage message: BriarAPI_TeamSettings) throws {
         guard message.hasLinear, message.hasWorkflow else {
             throw MobileAPIError.invalidResponse
         }
@@ -232,7 +232,7 @@ extension ProjectSettings {
     }
 }
 
-extension ProjectSettings.CheckpointPolicy {
+extension TeamSettings.CheckpointPolicy {
     init(connectMessage message: BriarTypes_CheckpointPolicy) throws {
         self.init(
             availableBoundaries: try message.availableBoundaries.map { boundary in
@@ -243,13 +243,13 @@ extension ProjectSettings.CheckpointPolicy {
                 )
             },
             projectMandatory: try message.projectMandatory.map(
-                ProjectSettings.CheckpointPolicy.Checkpoint.init(connectMessage:)
+                TeamSettings.CheckpointPolicy.Checkpoint.init(connectMessage:)
             ),
             userDefaults: try message.userDefaults.map(
-                ProjectSettings.CheckpointPolicy.Checkpoint.init(connectMessage:)
+                TeamSettings.CheckpointPolicy.Checkpoint.init(connectMessage:)
             ),
             effective: try message.effective.map(
-                ProjectSettings.CheckpointPolicy.Checkpoint.init(connectMessage:)
+                TeamSettings.CheckpointPolicy.Checkpoint.init(connectMessage:)
             ),
             projectRevision: try coreSafeInt(message.projectRevision),
             userRevision: try coreSafeInt(message.userRevision)
@@ -257,7 +257,7 @@ extension ProjectSettings.CheckpointPolicy {
     }
 }
 
-extension ProjectSettings.CheckpointPolicy.Checkpoint {
+extension TeamSettings.CheckpointPolicy.Checkpoint {
     init(connectMessage message: BriarTypes_WorkflowCheckpointSpec) throws {
         self.init(
             key: message.key,
@@ -515,8 +515,8 @@ private extension AgentProviderCapability {
     }
 }
 
-extension ProjectExecutionWorkerPolicy {
-    init(connectMessage message: BriarAPI_ProjectExecutionWorkerPolicy) throws {
+extension TeamExecutionWorkerPolicy {
+    init(connectMessage message: BriarAPI_TeamExecutionWorkerPolicy) throws {
         let selectionMode: SelectionMode
         switch message.selectionMode {
         case .any: selectionMode = .any

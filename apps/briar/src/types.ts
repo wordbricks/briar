@@ -19,12 +19,12 @@ import type {
   AgentProvider,
   AgentProviderModelCatalog,
   ModelEffort,
-} from "./lib/project-llm";
+} from "./lib/team-llm";
 import type {
-  ProjectAgentScheduleIntervalUnit,
-  ProjectAgentScheduleNotificationLevel,
-  ProjectAgentScheduleRecurrence,
-} from "./lib/project-agent-schedule";
+  TeamAgentScheduleIntervalUnit,
+  TeamAgentScheduleNotificationLevel,
+  TeamAgentScheduleRecurrence,
+} from "./lib/team-agent-schedule";
 import type { IssueDifficulty } from "./lib/issue-difficulty";
 import type { ManagedComputerSetupProvider } from "./lib/agent-provider";
 
@@ -404,8 +404,8 @@ export type RelatedMessageReference = {
 };
 
 export type StatusTrayRun = {
-  projectId: string;
-  projectName: string;
+  teamId: string;
+  teamName: string;
   id: string;
   title: string;
   status: "running";
@@ -424,8 +424,8 @@ export type StatusTrayRunsPayload = {
 /** Lightweight execution projection used by the organization Usage page. */
 export type AgentUsageExecutionAttempt = {
   executionId: string;
-  /** Project that owned the run when this claim was created. */
-  projectId: string;
+  /** Team that owned the run when this claim was created. */
+  teamId: string;
   runAttempt: number;
   claimAttempt: number;
   workerId: string | null;
@@ -436,8 +436,8 @@ export type AgentUsageExecutionAttempt = {
 
 export type AgentUsageRecord = AgentExecutionUsageRecord & {
   executionId: string;
-  /** Project that owned the run when this usage was observed. */
-  projectId: string;
+  /** Team that owned the run when this usage was observed. */
+  teamId: string;
   runAttempt: number;
   claimAttempt: number;
   workerId: string | null;
@@ -447,8 +447,8 @@ export type AgentUsageRecord = AgentExecutionUsageRecord & {
 
 export type AgentUsageCostRecord = AgentExecutionCostRecord & {
   executionId: string;
-  /** Project that owned the run when this cost was observed. */
-  projectId: string;
+  /** Team that owned the run when this cost was observed. */
+  teamId: string;
   runAttempt: number;
   claimAttempt: number;
   workerId: string | null;
@@ -460,7 +460,7 @@ export type AgentUsageCostRecord = AgentExecutionCostRecord & {
 export type AgentUsageEstimatedCostRecord = Pick<
   AgentUsageRecord,
   | "executionId"
-  | "projectId"
+  | "teamId"
   | "runAttempt"
   | "claimAttempt"
   | "workerId"
@@ -490,7 +490,7 @@ export type {
 
 export type AgentUsageRun = {
   id: string;
-  projectId: string;
+  teamId: string;
   status: HuntStatus;
   executionMetrics: AgentExecutionMetrics | null;
   claimedBy: string | null;
@@ -522,7 +522,9 @@ export type AgentUsageReport = {
   pricing: AgentUsagePricing;
 };
 
-export type { ProjectUsageSummary } from "./lib/project-usage-summary";
+export type { TeamUsageSummary } from "./lib/team-usage-summary";
+/** @deprecated Use TeamUsageSummary instead. */
+export type { TeamUsageSummary as ProjectUsageSummary } from "./lib/team-usage-summary";
 
 export type IssueResultReview = {
   userId: string;
@@ -564,12 +566,15 @@ export type WorkerIcon =
   | { type: "emoji"; value: string }
   | { type: "image"; value: string };
 
-export type ProjectExecutionWorkerPolicy = {
+export type TeamExecutionWorkerPolicy = {
   selectionMode: "any" | "allowlist";
   defaultWorkerId: string | null;
   allowedWorkerIds: string[];
   updatedAt: string | null;
 };
+
+/** @deprecated Use {@link TeamExecutionWorkerPolicy} instead. */
+export type ProjectExecutionWorkerPolicy = TeamExecutionWorkerPolicy;
 
 export type OrganizationExecutionWorker = {
   deviceId: string;
@@ -697,7 +702,7 @@ export type ManagedComputerSetupSessionTicket = {
     id: string;
     managedComputerId: string;
     organizationId: string;
-    projectId: string;
+    teamId: string;
     status: "pending" | "consumed";
     expiresAt: string;
   };
@@ -714,7 +719,7 @@ export type HuntRunPlacement = {
   workflowStage: AutoHuntWorkflowStageId | null;
 };
 
-export type Project = {
+export type Team = {
   id: string;
   name: string;
   issueKeyPrefix: string;
@@ -728,8 +733,8 @@ export type Project = {
   createdAt: string;
 };
 
-/** Repository and execution boundary formerly exposed as Project. */
-export type Team = Project;
+/** @deprecated Use {@link Team} instead. */
+export type Project = Team;
 
 export type PlanningProjectStatus =
   | "planned"
@@ -759,9 +764,9 @@ export type PlanningProject = {
   updatedAt: string;
 };
 
-export type ProjectAgent = {
+export type TeamAgent = {
   id: string;
-  projectId: string;
+  teamId: string;
   name: string;
   avatar: string | null;
   codexPet: ProjectAgentCodexPet | null;
@@ -774,19 +779,29 @@ export type ProjectAgent = {
   description?: string;
   responsibility: string;
   skill: string;
-  skills: ProjectAgentSkill[];
+  skills: TeamAgentSkill[];
   calendarColor: string;
   createdAt: string;
   updatedAt: string;
 };
 
-export type ProjectAgentSkillKind = "issue_processing" | "custom";
-export type ProjectAgentSkillExecutionMode = "conversation" | "task";
-export type ProjectAgentSkillApprovalPolicy =
+/** @deprecated Use {@link TeamAgent} instead. */
+export type ProjectAgent = TeamAgent;
+
+export type TeamAgentSkillKind = "issue_processing" | "custom";
+export type TeamAgentSkillExecutionMode = "conversation" | "task";
+export type TeamAgentSkillApprovalPolicy =
   | "invoke_is_consent"
   | "explicit";
 
-export type ProjectAgentSkill = {
+/** @deprecated Use TeamAgentSkillKind instead. */
+export type ProjectAgentSkillKind = TeamAgentSkillKind;
+/** @deprecated Use TeamAgentSkillExecutionMode instead. */
+export type ProjectAgentSkillExecutionMode = TeamAgentSkillExecutionMode;
+/** @deprecated Use TeamAgentSkillApprovalPolicy instead. */
+export type ProjectAgentSkillApprovalPolicy = TeamAgentSkillApprovalPolicy;
+
+export type TeamAgentSkill = {
   id: string;
   agentId: string;
   name: string;
@@ -795,16 +810,19 @@ export type ProjectAgentSkill = {
   provider: AgentProvider;
   model: string | null;
   effort: ModelEffort | null;
-  kind: ProjectAgentSkillKind;
-  executionMode: ProjectAgentSkillExecutionMode;
-  approvalPolicy: ProjectAgentSkillApprovalPolicy;
+  kind: TeamAgentSkillKind;
+  executionMode: TeamAgentSkillExecutionMode;
+  approvalPolicy: TeamAgentSkillApprovalPolicy;
   position: number;
   createdAt: string;
   updatedAt: string;
 };
 
-export type ProjectAgentSkillInput = Pick<
-  ProjectAgentSkill,
+/** @deprecated Use {@link TeamAgentSkill} instead. */
+export type ProjectAgentSkill = TeamAgentSkill;
+
+export type TeamAgentSkillInput = Pick<
+  TeamAgentSkill,
   | "name"
   | "description"
   | "body"
@@ -819,7 +837,10 @@ export type ProjectAgentSkillInput = Pick<
   id?: string;
 };
 
-export type CreateProjectAgentInput = {
+/** @deprecated Use {@link TeamAgentSkillInput} instead. */
+export type ProjectAgentSkillInput = TeamAgentSkillInput;
+
+export type CreateTeamAgentInput = {
   name: string | null;
   avatar?: string | null;
   codexPet?: ProjectAgentCodexPet | null;
@@ -830,52 +851,64 @@ export type CreateProjectAgentInput = {
   designatedWorkerId?: string | null;
   description?: string;
   responsibility: string;
-  skills?: ProjectAgentSkillInput[];
+  skills?: TeamAgentSkillInput[];
   calendarColor: string;
 };
 
-export type ProjectAgentSchedule = {
+/** @deprecated Use {@link CreateTeamAgentInput} instead. */
+export type CreateProjectAgentInput = CreateTeamAgentInput;
+
+export type TeamAgentSchedule = {
   id: string;
-  projectId: string;
+  teamId: string;
   agentId: string;
   agentName: string;
   agentProvider: AgentProvider;
   name: string;
-  recurrence: ProjectAgentScheduleRecurrence;
+  recurrence: TeamAgentScheduleRecurrence;
   timeOfDay: string;
   dayOfWeek: number | null;
   intervalValue?: number;
-  intervalUnit?: ProjectAgentScheduleIntervalUnit;
+  intervalUnit?: TeamAgentScheduleIntervalUnit;
   daysOfWeek?: number[];
-  notificationLevel?: ProjectAgentScheduleNotificationLevel;
+  notificationLevel?: TeamAgentScheduleNotificationLevel;
   timeZone: string;
   enabled: boolean;
   createdAt: string;
   updatedAt: string;
 };
 
-export type CreateProjectAgentScheduleInput = {
+/** @deprecated Use {@link TeamAgentSchedule} instead. */
+export type ProjectAgentSchedule = TeamAgentSchedule;
+
+export type CreateTeamAgentScheduleInput = {
   agentId: string;
   name: string;
-  recurrence: ProjectAgentScheduleRecurrence;
+  recurrence: TeamAgentScheduleRecurrence;
   timeOfDay: string;
   dayOfWeek: number | null;
   intervalValue?: number;
-  intervalUnit?: ProjectAgentScheduleIntervalUnit;
+  intervalUnit?: TeamAgentScheduleIntervalUnit;
   daysOfWeek?: number[];
-  notificationLevel?: ProjectAgentScheduleNotificationLevel;
+  notificationLevel?: TeamAgentScheduleNotificationLevel;
   timeZone: string;
 };
 
-export type UpdateProjectAgentScheduleInput = CreateProjectAgentScheduleInput;
+/** @deprecated Use {@link CreateTeamAgentScheduleInput} instead. */
+export type CreateProjectAgentScheduleInput = CreateTeamAgentScheduleInput;
 
-export type ProjectAgentScheduleRun = {
+export type UpdateTeamAgentScheduleInput = CreateTeamAgentScheduleInput;
+
+/** @deprecated Use {@link UpdateTeamAgentScheduleInput} instead. */
+export type UpdateProjectAgentScheduleInput = UpdateTeamAgentScheduleInput;
+
+export type TeamAgentScheduleRun = {
   id: string;
-  projectId: string;
+  teamId: string;
   scheduleId: string;
   scheduleName: string;
   agent: Pick<
-    ProjectAgent,
+    TeamAgent,
     | "id"
     | "name"
     | "provider"
@@ -898,17 +931,26 @@ export type ProjectAgentScheduleRun = {
   error: string | null;
 };
 
-export type ClaimedProjectAgentScheduleRun = ProjectAgentScheduleRun & {
+/** @deprecated Use {@link TeamAgentScheduleRun} instead. */
+export type ProjectAgentScheduleRun = TeamAgentScheduleRun;
+
+export type ClaimedTeamAgentScheduleRun = TeamAgentScheduleRun & {
   status: "running";
   claimToken: string;
 };
 
-export type UpdateProjectAgentInput = Omit<
-  CreateProjectAgentInput,
+/** @deprecated Use {@link ClaimedTeamAgentScheduleRun} instead. */
+export type ClaimedProjectAgentScheduleRun = ClaimedTeamAgentScheduleRun;
+
+export type UpdateTeamAgentInput = Omit<
+  CreateTeamAgentInput,
   "skills"
 > & {
-  skills: ProjectAgentSkillInput[];
+  skills: TeamAgentSkillInput[];
 };
+
+/** @deprecated Use {@link UpdateTeamAgentInput} instead. */
+export type UpdateProjectAgentInput = UpdateTeamAgentInput;
 
 export type Organization = {
   id: string;
@@ -952,7 +994,7 @@ export type OrganizationInvitationPreview = Omit<
   "email"
 >;
 
-export type ProjectSettings = {
+export type TeamSettings = {
   velenOrg: string | null;
   dataSource: string | null;
   linear: {
@@ -969,16 +1011,19 @@ export type ProjectSettings = {
       stageLabel: string;
       position: "before" | "after";
     }>;
-    projectMandatory: AutoHuntWorkflowCheckpoint[];
+    teamMandatory: AutoHuntWorkflowCheckpoint[];
     userDefaults: AutoHuntWorkflowCheckpoint[];
     effective: AutoHuntWorkflowCheckpoint[];
-    projectRevision: number;
+    teamRevision: number;
     userRevision: number;
   };
 };
 
+/** @deprecated Use {@link TeamSettings} instead. */
+export type ProjectSettings = TeamSettings;
+
 export type MergeQueueProfile = {
-  projectId: string;
+  teamId: string;
   repositoryId: number;
   repository: string;
   baseBranch: "main";
@@ -1039,12 +1084,12 @@ export type MergeQueueStatus = {
 };
 
 export type DashboardPayload = {
-  project: Project;
-  settings: ProjectSettings;
+  team: Team;
+  settings: TeamSettings;
   runs: HuntRun[];
   workers?: ExecutionWorker[];
   organizationProviders?: AgentProvider[];
-  executionPolicy?: ProjectExecutionWorkerPolicy;
+  executionPolicy?: TeamExecutionWorkerPolicy;
   members?: OrganizationMember[];
   conversationNotifications?: IssueConversationNotification[];
   channelNotifications?: ChannelConversationNotification[];
@@ -1060,9 +1105,9 @@ export type DashboardDeltaPayload = {
   deletedRunIds: string[];
   workers: ExecutionWorker[];
   organizationProviders: AgentProvider[];
-  project?: Project;
-  settings?: ProjectSettings;
-  executionPolicy?: ProjectExecutionWorkerPolicy;
+  team?: Team;
+  settings?: TeamSettings;
+  executionPolicy?: TeamExecutionWorkerPolicy;
   members?: OrganizationMember[];
   conversationNotifications?: IssueConversationNotification[];
   channelNotifications?: ChannelConversationNotification[];
