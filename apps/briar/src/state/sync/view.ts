@@ -19,13 +19,12 @@ import {
 /*
   The wire shape, reassembled from the normalized store.
 
-  `useBriar` still hands `dashboard` to `App.tsx` as a whole `DashboardPayload`,
-  so the facade needs a view that looks exactly like the payload the server
-  sent — including which optional projections were absent. Each part comes
-  straight from the atom that owns it, so a part that did not change keeps its
-  reference and the equality below keeps the whole object identical. Views move
-  to the entity atoms directly in Phase 2B, and this module dies with the facade
-  in Phase 7.
+  A dozen views still take a whole `DashboardPayload`, so this rebuilds one that
+  looks exactly like what the server sent — including which optional projections
+  were absent. Each part comes straight from the atom that owns it, so a part
+  that did not change keeps its reference and the equality below keeps the whole
+  object identical: a run edit notifies the run's subscribers, and a view holding
+  the payload sees the same object it had.
 */
 
 const sameDashboardView = (

@@ -58,27 +58,8 @@ const payload: DashboardPayload = {
 const props: CompanionShellProps = {
   activeTeam: team,
   agents: [],
-  channelInboxSyncSignal: "",
-  conversationInboxSyncSignal: "",
-  inbox: {
-    markAllRead: () => undefined,
-    markIssueRead: () => undefined,
-    markRead: () => undefined,
-    markUnread: () => undefined,
-    messages: [],
-    unreadCount: 0,
-  },
-  loadProjectHomeUsage: createCachedTeamUsageSummaryLoader(async () => null),
+  loadTeamHomeUsage: createCachedTeamUsageSummaryLoader(async () => null),
   processingIssueIds: new Set<string>(),
-  session: {
-    deleteAccount: async () => undefined,
-    ensureTeamSelected: async () => undefined,
-    logout: async () => undefined,
-    refresh: async () => undefined,
-    selectOrganization: () => undefined,
-    selectTeam: () => undefined,
-    updateAccountProfile: async () => demoUser,
-  },
   sessions: {
     adoptRemoteSession: () => "session-1",
     list: [],

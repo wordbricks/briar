@@ -33,7 +33,7 @@ export function LoginSessionBoundary({
 /**
  * `LoginScreen` wired to the session atoms.
  *
- * The `useBriar` facade's `error` key merges the session error with the local
+ * `appErrorAtom` merges the session error with the local
  * team inventory error; only the session half is read here, because the
  * inventory error is written after a session is restored and cleared on the way
  * out, so it is always `null` while the login screen is the visible content.

@@ -13,7 +13,12 @@ import {
   settingsTargetAtom,
 } from "../state/navigation/atoms";
 import { createTestRegistry, type AtomRegistry } from "../state/registry";
-import { teamsAtom } from "../state/team/atoms";
+import { tokenAtom } from "../state/session/atoms";
+import {
+  activeTeamIdAtom,
+  teamConnectionAtom,
+  teamsAtom,
+} from "../state/team/atoms";
 import { workspaceApiAtom } from "../state/workspace/api";
 import {
   connectedTeamIdsAtom,
@@ -21,7 +26,6 @@ import {
 } from "../state/workspace/atoms";
 import { createReactTestRoot } from "../test/react";
 import type { Project } from "../types";
-import type { ReconnectOutcome } from "../state/workspace/actions";
 import { useRepositorySetup, type RepositorySetup } from "./useRepositorySetup";
 
 /*
@@ -41,27 +45,10 @@ const teamOf = (id: string): Project => ({
 const readyTeam = teamOf("team-ready");
 const unconnectedTeam = teamOf("team-unconnected");
 
-class SetupBridge {
-  readonly selectedTeams: string[] = [];
-  readonly reconnects: string[] = [];
-  reconnectOutcome: ReconnectOutcome = "opened";
-
-  selectTeam = (teamId: string) => {
-    this.selectedTeams.push(teamId);
-  };
-  reconnectTeam = async (teamId: string) => {
-    this.reconnects.push(teamId);
-    return this.reconnectOutcome;
-  };
-}
-
 let latest: RepositorySetup;
 
-function Harness({ bridge }: { readonly bridge: SetupBridge }) {
-  latest = useRepositorySetup({
-    reconnectTeam: bridge.reconnectTeam,
-    selectTeam: bridge.selectTeam,
-  });
+function Harness() {
+  latest = useRepositorySetup();
   return null;
 }
 
@@ -73,12 +60,12 @@ const flush = async () => {
   }
 };
 
-const mount = async (registry: AtomRegistry, bridge: SetupBridge) => {
+const mount = async (registry: AtomRegistry) => {
   const view = createReactTestRoot();
   await view.render(
     <RegistryContext.Provider value={registry}>
       <I18nProvider>
-        <Harness bridge={bridge} />
+        <Harness />
       </I18nProvider>
     </RegistryContext.Provider>,
   );
@@ -89,6 +76,8 @@ const mount = async (registry: AtomRegistry, bridge: SetupBridge) => {
 const harness = (): AtomRegistry =>
   createTestRegistry([
     [teamsAtom, [readyTeam, unconnectedTeam]],
+    // Reconnecting reads the team's workflow, which needs a credential.
+    [tokenAtom, "token-1"],
     [connectedTeamIdsAtom, [readyTeam.id]],
     [
       teamReadinessAtom(readyTeam.id),
@@ -98,6 +87,7 @@ const harness = (): AtomRegistry =>
       workspaceApiAtom,
       {
         loadTeamRepositoryReadiness: async () => demoRepositoryReadiness,
+        loadDashboard: (async () => demoDashboard) as never,
       },
     ],
   ]);
@@ -110,14 +100,13 @@ beforeEach(() => {
 describe("useRepositorySetup", () => {
   it("opens the dialog for a team whose checkout is not connected", async () => {
     const registry = harness();
-    const bridge = new SetupBridge();
-    const view = await mount(registry, bridge);
+    const view = await mount(registry);
 
     await act(async () => {
       latest.openTeamRepository(unconnectedTeam.id);
     });
     await flush();
-    expect(bridge.selectedTeams).toEqual([unconnectedTeam.id]);
+    expect(registry.get(activeTeamIdAtom)).toBe(unconnectedTeam.id);
     expect(registry.get(repositorySetupTeamIdAtom)).toBe(unconnectedTeam.id);
     expect(registry.get(navigationLocationAtom)).toBe("lobby");
     await view.cleanup();
@@ -125,14 +114,13 @@ describe("useRepositorySetup", () => {
 
   it("routes a ready team straight to its settings page", async () => {
     const registry = harness();
-    const bridge = new SetupBridge();
-    const view = await mount(registry, bridge);
+    const view = await mount(registry);
 
     await act(async () => {
       latest.openTeamRepository(readyTeam.id);
     });
     await flush();
-    expect(bridge.selectedTeams).toEqual([readyTeam.id]);
+    expect(registry.get(activeTeamIdAtom)).toBe(readyTeam.id);
     expect(registry.get(repositorySetupTeamIdAtom)).toBeNull();
     expect(registry.get(activePageAtom)).toBe("settings");
     expect(registry.get(settingsTargetAtom)).toEqual({
@@ -145,28 +133,26 @@ describe("useRepositorySetup", () => {
 
   it("ignores a team the account no longer has", async () => {
     const registry = harness();
-    const bridge = new SetupBridge();
-    const view = await mount(registry, bridge);
+    const view = await mount(registry);
 
     await act(async () => {
       latest.openTeamRepository("team-gone");
     });
     await flush();
-    expect(bridge.selectedTeams).toEqual([]);
+    expect(registry.get(activeTeamIdAtom)).toBeNull();
     expect(registry.get(repositorySetupTeamIdAtom)).toBeNull();
     await view.cleanup();
   });
 
   it("returns focus to the control that opened the dialog", async () => {
     const registry = harness();
-    const bridge = new SetupBridge();
     const container = document.createElement("div");
     document.body.append(container);
     const trigger = document.createElement("button");
     container.append(trigger);
     trigger.focus();
 
-    const view = await mount(registry, bridge);
+    const view = await mount(registry);
     await act(async () => {
       latest.openTeamRepository(unconnectedTeam.id);
     });
@@ -189,14 +175,16 @@ describe("useRepositorySetup", () => {
 
   it("reconnects a team and keeps the captured trigger while the picker is open", async () => {
     const registry = harness();
-    const bridge = new SetupBridge();
-    const view = await mount(registry, bridge);
+    const view = await mount(registry);
 
     await act(async () => {
       latest.beginTeamReconnect(readyTeam.id);
     });
     await flush();
-    expect(bridge.reconnects).toEqual([readyTeam.id]);
+    expect(registry.get(teamConnectionAtom)).toMatchObject({
+      kind: "reconnect",
+      project: { id: readyTeam.id },
+    });
     await view.cleanup();
   });
 });

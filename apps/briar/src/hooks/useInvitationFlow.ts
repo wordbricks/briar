@@ -16,18 +16,20 @@ import {
   createIssueTeamIdAtom,
   isIssueDialogOpenAtom,
 } from "../state/dialogs/atoms";
+import { useNavigationActions } from "../state/navigation/actions";
 import {
   requestedRunIdAtom,
   requestedSessionIdAtom,
 } from "../state/navigation/atoms";
 import { remoteMode } from "../state/platform";
+import { useSessionActions } from "../state/session/actions";
 import { userAtom } from "../state/session/atoms";
 import {
   isCreatingTeamAtom,
   teamConnectionAtom,
   teamsAtom,
 } from "../state/team/atoms";
-import type { OrganizationInvitationPreview } from "../types";
+import { useWorkspaceActions } from "../state/workspace/actions";
 
 /*
   Joining an organization from an invitation link, and the setup step that
@@ -39,14 +41,6 @@ import type { OrganizationInvitationPreview } from "../types";
 */
 
 export interface InvitationFlowInput {
-  /** Accepts the invitation, still the session facade's. */
-  readonly acceptInvitation: (
-    token: string,
-  ) => Promise<{ invitation: OrganizationInvitationPreview }>;
-  /** Reconnects the team the developer step sets up, from the workspace store. */
-  readonly reconnectTeam: (teamId: string) => Promise<unknown>;
-  /** Clears the navigation history, still the shell's. */
-  readonly resetNavigation: (page: "lobby") => void;
   /** Records that the initial onboarding gate is satisfied. */
   readonly onInitialOnboardingComplete: () => void;
 }
@@ -76,11 +70,11 @@ export interface InvitationFlow {
 }
 
 export function useInvitationFlow({
-  acceptInvitation,
   onInitialOnboardingComplete,
-  reconnectTeam,
-  resetNavigation,
 }: InvitationFlowInput): InvitationFlow {
+  const { acceptInvitation } = useSessionActions();
+  const { reconnectProject: reconnectTeam } = useWorkspaceActions();
+  const { resetNavigation } = useNavigationActions();
   const user = useAtomValue(userAtom);
   const teams = useAtomValue(teamsAtom);
   const isCreatingTeam = useAtomValue(isCreatingTeamAtom);

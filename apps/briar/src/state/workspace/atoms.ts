@@ -43,7 +43,7 @@ export const connectedTeamIdsAtom = Atom.make<string[] | null>(
 
 /**
  * Why the local inventory could not be read. The facade folds it into
- * `briar.error` together with the session error.
+ * `appErrorAtom` together with the session error.
  */
 export const localInventoryErrorAtom = Atom.make<string | null>(null).pipe(
   Atom.keepAlive,
@@ -124,7 +124,7 @@ export const activeTeamConnectionStateAtom = Atom.make(
 ).pipe(Atom.keepAlive, Atom.withLabel("workspace/activeConnectionState"));
 
 /*
-  The three record shaped projections `useBriar` still returns. They exist only
+  The three record shaped projections the readiness views read. They exist only
   so `App.tsx` keeps compiling while its views move to the family above one at a
   time, and they die with the facade. Each keeps its previous instance when the
   contents did not change, because `App.tsx` lists them in dependency arrays.

@@ -31,10 +31,13 @@ import {
   requestedSessionIdAtom,
   settingsTargetAtom,
 } from "../../state/navigation/atoms";
+import { visibleInboxUnreadCountAtom } from "../../state/inbox/atoms";
 import { useOrganizationActions } from "../../state/organization/actions";
 import { activeOrganizationIdAtom } from "../../state/organization/atoms";
 import { lockedTeamIdAtom } from "../../state/platform";
+import { useSessionActions } from "../../state/session/actions";
 import { tokenAtom } from "../../state/session/atoms";
+import { useSyncActions } from "../../state/sync/actions";
 import { useTeamActions } from "../../state/team/actions";
 import { activeTeamIdAtom, teamsAtom } from "../../state/team/atoms";
 
@@ -44,10 +47,9 @@ import { activeTeamIdAtom, teamsAtom } from "../../state/team/atoms";
 
   It was the `else` branch of `App.tsx`'s gate chain, which is why the shell had
   to hold every value any page might want. The pages read the store themselves
-  now, so what arrives here is what the app still owns: the inbox, the auto hunt
-  sessions, the agent list, and the few session calls that have no store
-  equivalent yet — and every one of them is passed straight through to the page
-  slot.
+  now, so what arrives here is what the app still owns: the auto hunt sessions,
+  the agent list and the repository setup flow — and every one of them is passed
+  straight through to the page slot.
 
   Nothing this component reads moves when the user navigates. That is the point:
   a visit commits `DesktopPages` and `SidebarWithSession`, which subscribe to the
@@ -62,8 +64,9 @@ export function DesktopShell({
   openProjectInNewWindow,
   ...pages
 }: DesktopShellProps) {
-  const { agents, autoHunt, inbox, repositorySetup, session } = pages;
+  const { agents, autoHunt, repositorySetup } = pages;
   const runsOnDesktopTauri = isDesktopTauri();
+  const unreadInboxCount = useAtomValue(visibleInboxUnreadCountAtom);
   const token = useAtomValue(tokenAtom);
   const projects = useAtomValue(teamsAtom);
   const activeProjectId = useAtomValue(activeTeamIdAtom);
@@ -92,7 +95,9 @@ export function DesktopShell({
     openOrganizationChannelSettings,
   } = useChannelActions();
   const { selectOrganization } = useOrganizationActions();
-  const { startTeamCreation } = useTeamActions();
+  const { selectTeam, startTeamCreation } = useTeamActions();
+  const { logout } = useSessionActions();
+  const { refreshActiveTeam } = useSyncActions();
 
   return (
     <div className="desktop-app-frame">
@@ -111,7 +116,7 @@ export function DesktopShell({
           }}
           onPlanningProjectOpen={(planningProjectId, teamId) => {
             setActivePlanningProjectId(planningProjectId);
-            session.selectTeam(teamId);
+            selectTeam(teamId);
             setRequestedRunId(null);
             setIssueListRequestKey((key) => key + 1);
             navigateToPage("issues");
@@ -180,7 +185,7 @@ export function DesktopShell({
           }}
           onProjectChange={(projectId) => {
             setActivePlanningProjectId(null);
-            session.selectTeam(projectId);
+            selectTeam(projectId);
             setRequestedRunId(null);
             setRequestedSessionId(null);
           }}
@@ -191,7 +196,7 @@ export function DesktopShell({
           }
           onProjectRepositoryOpen={repositorySetup.openTeamRepository}
           onProjectSettings={(projectId) => {
-            session.selectTeam(projectId);
+            selectTeam(projectId);
             setSettingsTarget({
               scope: "project",
               projectId,
@@ -200,9 +205,9 @@ export function DesktopShell({
             navigateToPage("settings");
           }}
           onSettings={openAppSettings}
-          onLogout={() => void session.logout()}
+          onLogout={() => void logout()}
           sessions={autoHunt.sessions}
-          unreadInboxCount={inbox.unreadCount}
+          unreadInboxCount={unreadInboxCount}
         />
         <DesktopPages {...pages} />
       </div>
@@ -234,7 +239,7 @@ export function DesktopShell({
             setIsSidebarOpen(true);
             navigateToPage("settings");
           }}
-          onRefresh={() => session.refresh("snapshot")}
+          onRefresh={() => refreshActiveTeam("snapshot")}
         />
         <AppVersionStatus />
         <ConnectionHealthWithWorkspace

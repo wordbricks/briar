@@ -62,6 +62,7 @@ import {
 import { lockedTeamIdAtom } from "../state/platform";
 import { tokenAtom, userAtom } from "../state/session/atoms";
 import { activeDashboardAtom } from "../state/sync/view";
+import { visibleInboxUnreadCountAtom } from "../state/inbox/atoms";
 import { useTeamActions } from "../state/team/actions";
 import {
   activeOrganizationTeamsAtom,
@@ -83,31 +84,26 @@ import type { AutoHuntSession } from "../types";
 
   It reads what it shows from atoms now, including where the user is and what
   the history can do. What is still a parameter is what the app decides: whether
-  a gate owns the screen, the auto hunt sessions, the inbox count, and the team
-  selection the session facade still owns.
+  a gate owns the screen, and the auto hunt sessions.
 */
 
 /** What the shell knows and the palette cannot read from the store. */
 export interface CommandPaletteItemsInput {
   /** False while a gate — login, onboarding, the intro — owns the screen. */
   readonly commandPaletteAvailable: boolean;
-  /** Selects a team, still the session facade's. */
-  readonly selectTeam: (teamId: string) => void;
   readonly sessions: readonly AutoHuntSession[];
-  readonly unreadInboxCount: number;
   readonly keybindings: Keybindings;
   readonly keyboardShortcutsShortcut: string;
 }
 
 export function useCommandPaletteItems({
   commandPaletteAvailable,
-  selectTeam,
   sessions,
-  unreadInboxCount,
   keybindings,
   keyboardShortcutsShortcut,
 }: CommandPaletteItemsInput): CommandPaletteItem[] {
   const { t } = useI18n();
+  const unreadInboxCount = useAtomValue(visibleInboxUnreadCountAtom);
   const activePage = useAtomValue(activePageAtom);
   const selectedRunId = useAtomValue(activeRunIdAtom);
   const canGoBack = useAtomValue(canGoBackAtom);
@@ -119,7 +115,7 @@ export function useCommandPaletteItems({
     navigateToPage,
     openAppSettings,
   } = useNavigationActions();
-  const { startTeamCreation } = useTeamActions();
+  const { selectTeam, startTeamCreation } = useTeamActions();
   const user = useAtomValue(userAtom);
   const token = useAtomValue(tokenAtom);
   const organizations = useAtomValue(organizationsAtom);

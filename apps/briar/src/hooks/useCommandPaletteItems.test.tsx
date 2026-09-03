@@ -11,6 +11,7 @@ import { demoDashboard } from "../lib/demo-data";
 import { loadKeybindings } from "../lib/keybindings";
 import { channelCatalogCursorAtom } from "../state/channels/atoms";
 import { isCommandPaletteOpenAtom } from "../state/dialogs/atoms";
+import { inboxMessagesAtom } from "../state/inbox/atoms";
 import {
   activeOrganizationIdAtom,
   organizationsAtom,
@@ -81,13 +82,30 @@ const channel = (overrides: Partial<ChannelSummary> = {}): ChannelSummary => ({
   ...overrides,
 });
 
+/** One unread issue notification, which is what promotes the inbox entry. */
+const unreadInboxMessage = (id: string) =>
+  ({
+    id,
+    kind: "issue",
+    projectId: team.id,
+    projectName: team.name,
+    targetId: "run-1",
+    title: "run-1",
+    occurredAt: "2026-09-01T00:00:00.000Z",
+    version: "1",
+    runNumber: 1,
+    status: "failed",
+    workflowStage: null,
+    priority: null,
+    structuredResult: null,
+    isUnread: true,
+  }) as never;
+
 const baseInput: CommandPaletteItemsInput = {
   commandPaletteAvailable: true,
   keybindings: loadKeybindings(),
   keyboardShortcutsShortcut: "⌘/",
-  selectTeam: () => undefined,
   sessions: [],
-  unreadInboxCount: 0,
 };
 
 function Probe({
@@ -216,10 +234,12 @@ describe("useCommandPaletteItems", () => {
       quiet.find((item) => item.id === "navigation:inbox")?.section,
     ).toBe("navigation");
 
-    const busy = await build(harness(), { unreadInboxCount: 3 });
+    const registry = harness();
+    registry.set(inboxMessagesAtom, [unreadInboxMessage("m-1")]);
+    const busy = await build(registry);
     const inbox = busy.find((item) => item.id === "navigation:inbox");
     expect(inbox?.section).toBe("continue");
-    expect(inbox?.priority).toBe(183);
+    expect(inbox?.priority).toBe(181);
   });
 
   it("offers history entries only when the history can move", async () => {
