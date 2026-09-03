@@ -30,6 +30,18 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.187",
+        date: "2026년 9월 3일",
+        title: "제공자 설정을 보호하고 로딩 스피너를 정리합니다",
+        summary:
+          "로컬 워커의 하트비트가 제공자 설정을 되돌리는 문제를 고치고, 로딩 표시를 공통 스피너로 통일합니다.",
+        items: [
+          "데스크톱 앱에서 바꾼 제공자 설정이 워커 하트비트로 덮어써지지 않도록 고칩니다.",
+          "로딩 중 표시를 공통 Spinner 컴포넌트로 통일해 화면 깜박임을 줄입니다.",
+          "기기 로그인 옵션을 하나의 계약으로 정리해 로그인 화면 동작을 일관되게 합니다.",
+        ],
+      },
+      {
         version: "1.2.186",
         date: "2026년 9월 3일",
         title: "채널·DM에서 PDF를 공유하고 관리형 컴퓨터·프로젝트 관리를 다듬습니다",
@@ -1496,6 +1508,18 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.187",
+        date: "September 3, 2026",
+        title: "Keep provider settings intact and tidy up loading spinners",
+        summary:
+          "Stop the local worker heartbeat from reverting provider settings and unify loading indicators onto the shared spinner.",
+        items: [
+          "Stop the local worker heartbeat from overwriting provider settings changed in the desktop app.",
+          "Unify loading indicators onto the shared Spinner component to reduce visual jitter.",
+          "Consolidate device login options onto a single contract for a consistent sign-in surface.",
+        ],
+      },
       {
         version: "1.2.186",
         date: "September 3, 2026",
@@ -3054,7 +3078,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-186">
+          <a href="#v1-2-187">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -3076,7 +3100,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.186"
+                      entry.version === "1.2.187"
+                        ? "2026-09-03"
+                        : entry.version === "1.2.186"
                         ? "2026-09-03"
                         : entry.version === "1.2.185"
                         ? "2026-09-02"
