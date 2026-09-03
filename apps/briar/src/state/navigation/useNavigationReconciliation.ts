@@ -27,6 +27,7 @@ import {
 import { companionMode } from "../platform";
 import { useRegistry } from "../registry";
 import { loadingAtom, userAtom } from "../session/atoms";
+import { useTeamActions } from "../team/actions";
 import { activeTeamIdAtom, teamsAtom } from "../team/atoms";
 import { useNavigationActions } from "./actions";
 import {
@@ -71,16 +72,10 @@ import {
   below is saying.
 */
 
-export interface NavigationReconciliationInput {
-  /** Selecting a team, still the session facade's. */
-  readonly selectTeam: (teamId: string) => void;
-}
-
-export function useNavigationReconciliation({
-  selectTeam,
-}: NavigationReconciliationInput): void {
+export function useNavigationReconciliation(): void {
   const registry = useRegistry();
   const actions = useNavigationActions();
+  const { selectTeam } = useTeamActions();
   const user = useAtomValue(userAtom);
   const loading = useAtomValue(loadingAtom);
   const teams = useAtomValue(teamsAtom);

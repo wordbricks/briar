@@ -1,7 +1,7 @@
 import * as Atom from "effect/unstable/reactivity/Atom";
 
 import type { Organization } from "../../types";
-import { demoOrganization } from "../demo-fixtures";
+import { demoOrganization, demoSelectionApplies } from "../demo-fixtures";
 import { demoMode } from "../platform";
 
 /*
@@ -17,12 +17,12 @@ export const organizationsAtom = Atom.make<Organization[]>(
 ).pipe(Atom.keepAlive, Atom.withLabel("organization/list"));
 
 /**
- * The organization the app is scoped to. A project window pins this to the
- * locked team's organization, so `useBriar` seeds it per registry rather than
- * relying on the module default.
+ * The organization the app is scoped to. Demo mode preselects its own, except
+ * in a project window pinned to a team that is not the demo team's — which is
+ * what {@link demoSelectionApplies} decides.
  */
 export const activeOrganizationIdAtom = Atom.make<string | null>(
-  demoMode ? demoOrganization.id : null,
+  demoSelectionApplies ? demoOrganization.id : null,
 ).pipe(Atom.keepAlive, Atom.withLabel("organization/activeId"));
 
 /**

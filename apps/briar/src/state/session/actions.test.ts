@@ -26,7 +26,7 @@ import {
   type SessionActionApi,
   type SessionActions,
 } from "./actions";
-import { tokenAtom, userAtom } from "./atoms";
+import { loadingAtom, loginCodeAtom, tokenAtom, userAtom } from "./atoms";
 
 const user: SessionUser = {
   id: "user-1",
@@ -56,7 +56,7 @@ class AccountServer {
   sessionTokenCleared = 0;
   deleteAccountError: Error | null = null;
 
-  readonly api: SessionActionApi = {
+  readonly api: Partial<SessionActionApi> = {
     clearSessionToken: async () => {
       this.sessionTokenCleared += 1;
     },
@@ -81,7 +81,6 @@ class AccountServer {
 
 interface Harness {
   readonly actions: SessionActions;
-  readonly cancelledLogins: () => number;
   /** The reconnect generation these actions share with the workspace flows. */
   readonly reconnectBumps: () => number;
   readonly registry: AtomRegistry;
@@ -100,6 +99,9 @@ const harness = (): Harness => {
     // Signing out has to drop the device's workspace inventory with the session.
     [connectedTeamIdsAtom, [teamA.id]],
     [localInventoryErrorAtom, "이전 오류"],
+    // A sign-in in progress, so a sign-out's cancellation of it is observable.
+    [loginCodeAtom, "ABCD-EFGH"],
+    [loadingAtom, true],
   ]);
   // A signed-in account has its team's board in the entity store; signing out
   // has to take that with it.
@@ -114,17 +116,10 @@ const harness = (): Harness => {
     },
   });
   const server = new AccountServer();
-  let cancelledLogins = 0;
   const baseReconnectGeneration = reconnectRequestGeneration(registry);
-  const actions = createSessionActions(registry, {
-    api: server.api,
-    cancelLogin: () => {
-      cancelledLogins += 1;
-    },
-  });
+  const actions = createSessionActions(registry, { api: server.api });
   return {
     actions,
-    cancelledLogins: () => cancelledLogins,
     reconnectBumps: () =>
       reconnectRequestGeneration(registry) - baseReconnectGeneration,
     registry,
@@ -148,14 +143,16 @@ const expectSignedOut = (registry: AtomRegistry) => {
 
 describe("createSessionActions", () => {
   it("clears every root atom on logout", async () => {
-    const { actions, cancelledLogins, registry, server } = harness();
+    const { actions, registry, server } = harness();
 
     await actions.logout();
 
     expectSignedOut(registry);
     expect(server.pushRegistrationsDeleted).toEqual(["token-1"]);
     expect(server.sessionTokenCleared).toBe(1);
-    expect(cancelledLogins()).toBe(1);
+    // The sign-in in progress was abandoned with the session.
+    expect(registry.get(loginCodeAtom)).toBeNull();
+    expect(registry.get(loadingAtom)).toBe(false);
     expect(registry.get(connectedTeamIdsAtom)).toBeNull();
     expect(registry.get(localInventoryErrorAtom)).toBeNull();
   });

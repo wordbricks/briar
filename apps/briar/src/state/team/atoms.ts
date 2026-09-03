@@ -9,6 +9,7 @@ import type {
   TeamExecutionWorkerPolicy,
   TeamSettings,
 } from "../../types";
+import { demoSelectionApplies } from "../demo-fixtures";
 import { shallowArrayEqual } from "../entities/upsert";
 import { activeOrganizationIdAtom } from "../organization/atoms";
 import { demoMode, lockedTeamIdAtom } from "../platform";
@@ -28,11 +29,12 @@ export const teamsAtom = Atom.make<Project[]>(
 ).pipe(Atom.keepAlive, Atom.withLabel("team/list"));
 
 /**
- * The selected team. A project window pins this to its locked team, so
- * `useBriar` seeds it per registry rather than relying on the module default.
+ * The selected team. Demo mode preselects its own, except in a project window
+ * pinned to another team — see {@link demoSelectionApplies}. The session
+ * bootstrap replaces it as soon as a real session is restored.
  */
 export const activeTeamIdAtom = Atom.make<string | null>(
-  demoMode ? demoDashboard.team.id : null,
+  demoSelectionApplies ? demoDashboard.team.id : null,
 ).pipe(Atom.keepAlive, Atom.withLabel("team/activeId"));
 
 /**

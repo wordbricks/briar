@@ -9,7 +9,7 @@ import { CompanionShell } from "./components/app/CompanionShell";
 import { DesktopShell } from "./components/app/DesktopShell";
 import { loadProjectMergeActivity } from "./lib/app-rpc/github";
 import { useToast } from "./components/ui/toast";
-import { useBriar, type UseBriarOptions } from "./hooks/useBriar";
+import { useBriar } from "./hooks/useBriar";
 import { useAutoHuntSessions } from "./hooks/useAutoHuntSessions";
 import { useAgentDispatch } from "./hooks/useAgentDispatch";
 import { useAppShortcuts } from "./hooks/useAppShortcuts";
@@ -54,6 +54,7 @@ import {
   viewingChannelThreadRootMessageIdAtom,
   viewingIssueConversationRunIdAtom,
 } from "./state/channels/atoms";
+import { useActionBridges } from "./state/action-bridges";
 import { useRegistry } from "./state/registry";
 import {
   clearFirstRunTutorialPending,
@@ -95,10 +96,13 @@ export function App({
   const { toast } = useToast();
   const [projectWindowProjectId] = useState(readTeamWindowProjectId);
   const autoHunt = useAutoHuntSessions();
-  const scheduleSessionOptions = useMemo<UseBriarOptions>(() => ({
+  /*
+    The callbacks the registry-bound actions reach back into `useAutoHuntSessions`
+    for: adopting a session an agent proposed, and the three a claimed scheduled
+    run goes through.
+  */
+  useActionBridges({
     adoptRemoteAgentSession: autoHunt.adoptRemoteSession,
-    deferDefaultOrganization: true,
-    lockedProjectId: projectWindowProjectId,
     startScheduledAgentSession: (run) =>
       autoHunt.startTaskSession(run.teamId, run.agent.id, {
         agentName: run.agent.name,
@@ -124,14 +128,8 @@ export function App({
         startedAt: run.startedAt,
       },
     ),
-  }), [
-    autoHunt.adoptRemoteSession,
-    autoHunt.settleTaskSession,
-    autoHunt.startTaskSession,
-    autoHunt.startWorkerDispatchSession,
-    projectWindowProjectId,
-  ]);
-  const briar = useBriar(scheduleSessionOptions);
+  });
+  const briar = useBriar();
   const registry = useRegistry();
   /*
     The payload on screen, read from the store rather than through the facade.
@@ -566,7 +564,7 @@ export function App({
 
   return (
     <>
-      <AppEffects selectTeam={briar.setActiveProjectId} />
+      <AppEffects />
       <AuthGate
         acceptingInvitation={invitation.acceptingInvitation}
         invitationToken={invitation.invitationToken}

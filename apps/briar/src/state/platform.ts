@@ -19,13 +19,16 @@ export const deviceClientId: DeviceClientId = companionMode
   : "briar-desktop";
 
 /**
- * The team a project window is pinned to, or `null` in the main window.
- *
- * It is a window scoped constant read from the URL, so it belongs with the
- * other platform facts. It is an atom rather than a plain constant because
- * tests need to reach the pinned-window branches without mocking the module,
- * and because `useBriar` seeds it per registry from its own option.
+ * The team a project window is pinned to, or `null` in the main window. Read
+ * once at module load, like every other fact in this file.
  */
-export const lockedTeamIdAtom = Atom.make<string | null>(
-  readTeamWindowProjectId(),
-).pipe(Atom.keepAlive, Atom.withLabel("platform/lockedTeamId"));
+export const lockedTeamId: string | null = readTeamWindowProjectId();
+
+/**
+ * {@link lockedTeamId} as an atom, so tests can reach the pinned-window
+ * branches without mocking the module: they seed it on their own registry.
+ */
+export const lockedTeamIdAtom = Atom.make<string | null>(lockedTeamId).pipe(
+  Atom.keepAlive,
+  Atom.withLabel("platform/lockedTeamId"),
+);

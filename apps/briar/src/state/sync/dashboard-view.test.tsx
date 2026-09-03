@@ -3,11 +3,19 @@
 import { RegistryContext } from "@effect/atom-react";
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createReactTestRoot, type ReactTestRoot } from "../test/react";
-import { AppEffects } from "../components/app/AppEffects";
-import { demoDashboard } from "../lib/demo-data";
-import { createTestRegistry, type AtomRegistry } from "../state/registry";
-import { tokenAtom } from "../state/session/atoms";
+import { createReactTestRoot, type ReactTestRoot } from "../../test/react";
+import { demoDashboard } from "../../lib/demo-data";
+import { createOrganizationActions } from "../organization/actions";
+import { createTestRegistry, type AtomRegistry } from "../registry";
+import {
+  setSessionDataSources,
+  type SessionDataSources,
+} from "../session/api";
+import { createSessionActions } from "../session/actions";
+import { useSessionBootstrap } from "../session/useSessionBootstrap";
+import { tokenAtom } from "../session/atoms";
+import { createTeamActions } from "../team/actions";
+import { dashboardStaleAtom } from "../team/atoms";
 import type {
   DashboardDeltaPayload,
   DashboardPayload,
@@ -15,8 +23,36 @@ import type {
   PlanningProject,
   Project,
   SessionUser,
-} from "../types";
-import { type BriarDataSources, useBriar } from "./useBriar";
+} from "../../types";
+import { createSyncActions } from "./actions";
+import { getTeamSyncLoader } from "./loader";
+import { useTeamSync } from "./useTeamSync";
+import { activeDashboardAtom } from "./view";
+
+/**
+ * The two effects these cases need: the bootstrap that restores the stored
+ * credential and the sync that fetches whichever team is selected. The desktop
+ * navigation reconciliation is deliberately not mounted — it owns the location,
+ * and these cases select teams directly.
+ */
+function Harness() {
+  useSessionBootstrap();
+  useTeamSync();
+  return null;
+}
+
+/*
+  What a team switch looks like from the outside, driven end to end: the session
+  bootstrap restores a stored credential, `useTeamSync` fetches the selected
+  team, and the team actions move the selection around.
+
+  These were `useBriar.dashboard.test.tsx`'s cases. They outlived the facade
+  because none of them was ever about the facade: each one fixes an invariant of
+  the entity store and the loader — a visited team renders before the network
+  answers, a never visited one does not, a late or misaddressed response is
+  dropped, and a credential or organization change discards what the previous
+  one loaded.
+*/
 
 const user: SessionUser = {
   id: "user-1",
@@ -61,7 +97,7 @@ const dashboardOf = (project: Project, revision: number): DashboardPayload => ({
 });
 
 /**
- * In-memory stand-in for the reads `useBriar` performs on its own. Dashboard
+ * In-memory stand-in for the reads the session performs on its own. Dashboard
  * snapshots stay pending until the test settles them, which is how "the stored
  * board is already on screen before the network answers" becomes observable.
  */
@@ -78,7 +114,7 @@ class DashboardServer {
     private organizations: Organization[],
   ) {}
 
-  readonly dataSources: BriarDataSources = {
+  readonly dataSources: SessionDataSources = {
     loadConnectedTeamIds: async () => [],
     loadDashboard: (_token: string, projectId: string) => {
       this.snapshotRequests.push(projectId);
@@ -118,20 +154,21 @@ class DashboardServer {
 }
 
 let server: DashboardServer;
-let briar: ReturnType<typeof useBriar>;
 let view: ReactTestRoot;
 let registry: AtomRegistry;
 
-function Harness({ lockedProjectId }: { lockedProjectId: string | null }) {
-  briar = useBriar({
-    dataSources: server.dataSources,
-    deferDefaultOrganization: true,
-    lockedProjectId,
+const dashboard = () => registry.get(activeDashboardAtom);
+const dashboardStale = () => registry.get(dashboardStaleAtom);
+const selectTeam = async (teamId: string) => {
+  await act(async () => {
+    createTeamActions(registry).selectTeam(teamId);
   });
-  // The polling, visibility and scope-invalidation effects moved to
-  // `useTeamSync`, which the app mounts here.
-  return <AppEffects selectTeam={() => undefined} />;
-}
+};
+const selectOrganization = async (organizationId: string) => {
+  await act(async () => {
+    createOrganizationActions(registry, {}).selectOrganization(organizationId);
+  });
+};
 
 const flush = async () => {
   await act(async () => {
@@ -151,19 +188,16 @@ const settleDashboard = async (project: Project, revision: number) => {
   return payload;
 };
 
-const mount = async (
-  projects: Project[],
-  organizations: Organization[],
-  lockedProjectId: string | null = null,
-) => {
+const mount = async (projects: Project[], organizations: Organization[]) => {
   server = new DashboardServer(projects, organizations);
   view = createReactTestRoot();
-  // `useBriar` reads its root state from atoms, which are module singletons: a
-  // registry per test is what keeps one test's session out of the next one.
+  // The domain state lives in module level atoms, so a registry per test is
+  // what keeps one test's session out of the next one.
   registry = createTestRegistry();
+  setSessionDataSources(registry, server.dataSources);
   await view.render(
     <RegistryContext.Provider value={registry}>
-      <Harness lockedProjectId={lockedProjectId} />
+      <Harness />
     </RegistryContext.Provider>,
   );
   await flush();
@@ -172,7 +206,7 @@ const mount = async (
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   window.localStorage.clear();
-  // `token-store` falls back to localStorage outside Tauri, so the hook
+  // `token-store` falls back to localStorage outside Tauri, so the bootstrap
   // restores a real session without any module mocking.
   window.localStorage.setItem("briar.session-token", "token-1");
 });
@@ -182,46 +216,46 @@ afterEach(async () => {
   vi.restoreAllMocks();
 });
 
-describe("useBriar dashboard view", () => {
+describe("team dashboard view", () => {
   it("renders a stored dashboard immediately when returning to a visited team", async () => {
     await mount([projectA1, projectA2], [organizationA]);
 
     const firstA1 = await settleDashboard(projectA1, 1);
-    expect(briar.dashboard).toEqual(firstA1);
-    expect(briar.dashboardStale).toBe(false);
+    expect(dashboard()).toEqual(firstA1);
+    expect(dashboardStale()).toBe(false);
 
-    await act(async () => briar.setActiveProjectId(projectA2.id));
+    await selectTeam(projectA2.id);
     await settleDashboard(projectA2, 2);
-    expect(briar.dashboard?.team.id).toBe(projectA2.id);
+    expect(dashboard()?.team.id).toBe(projectA2.id);
 
     // Switching back must not blank the UI: the entity store still holds this
     // team's payload, so it renders before any network response.
     server.forget();
-    await act(async () => briar.setActiveProjectId(projectA1.id));
-    expect(briar.dashboard).toEqual(firstA1);
-    expect(briar.dashboard?.team.id).toBe(projectA1.id);
-    expect(briar.dashboardStale).toBe(true);
+    await selectTeam(projectA1.id);
+    expect(dashboard()).toEqual(firstA1);
+    expect(dashboard()?.team.id).toBe(projectA1.id);
+    expect(dashboardStale()).toBe(true);
 
     // …and the stale payload is replaced by a full snapshot, never a delta.
     expect(server.deltaRequests).toEqual([]);
     expect(server.snapshotRequests).toEqual([projectA1.id]);
 
     const freshA1 = await settleDashboard(projectA1, 3);
-    expect(briar.dashboard).toEqual(freshA1);
-    expect(briar.dashboardStale).toBe(false);
+    expect(dashboard()).toEqual(freshA1);
+    expect(dashboardStale()).toBe(false);
   });
 
   it("keeps the loading state when switching to a never visited project", async () => {
     await mount([projectA1, projectA2], [organizationA]);
     await settleDashboard(projectA1, 1);
 
-    await act(async () => briar.setActiveProjectId(projectA2.id));
-    expect(briar.dashboard).toBeNull();
-    expect(briar.dashboardStale).toBe(false);
+    await selectTeam(projectA2.id);
+    expect(dashboard()).toBeNull();
+    expect(dashboardStale()).toBe(false);
 
     const freshA2 = await settleDashboard(projectA2, 2);
-    expect(briar.dashboard).toEqual(freshA2);
-    expect(briar.dashboardStale).toBe(false);
+    expect(dashboard()).toEqual(freshA2);
+    expect(dashboardStale()).toBe(false);
   });
 
   it("ignores a late response for the project that is no longer active", async () => {
@@ -229,46 +263,47 @@ describe("useBriar dashboard view", () => {
     const firstA1 = await settleDashboard(projectA1, 1);
 
     // Leave project A2's snapshot in flight, then return to A1.
-    await act(async () => briar.setActiveProjectId(projectA2.id));
-    expect(briar.dashboard).toBeNull();
+    await selectTeam(projectA2.id);
+    expect(dashboard()).toBeNull();
 
-    await act(async () => briar.setActiveProjectId(projectA1.id));
-    expect(briar.dashboard).toEqual(firstA1);
+    await selectTeam(projectA1.id);
+    expect(dashboard()).toEqual(firstA1);
 
     await settleDashboard(projectA2, 99);
-    expect(briar.dashboard?.team.id).toBe(projectA1.id);
-    expect(briar.dashboard).toEqual(firstA1);
+    expect(dashboard()?.team.id).toBe(projectA1.id);
+    expect(dashboard()).toEqual(firstA1);
 
     const freshA1 = await settleDashboard(projectA1, 2);
-    expect(briar.dashboard).toEqual(freshA1);
+    expect(dashboard()).toEqual(freshA1);
   });
 
-  it("ignores a response from a refresh closure bound to the previous project", async () => {
+  it("ignores a response for a team that stopped being the active one", async () => {
     await mount([projectA1, projectA2], [organizationA]);
     await settleDashboard(projectA1, 1);
 
-    // A consumer can hold on to the `refresh` bound to the project that was
-    // active when it rendered (`unassignRun` does exactly that).
-    const staleRefresh = briar.refresh;
+    await selectTeam(projectA2.id);
+    expect(dashboard()).toBeNull();
 
-    await act(async () => briar.setActiveProjectId(projectA2.id));
-    expect(briar.dashboard).toBeNull();
-
-    // The stale closure starts a brand new request for project A1, so the
-    // request generation alone cannot invalidate it.
+    /*
+      A refetch aimed at the team that was active when its caller was built.
+      `refreshActiveTeam` reads the selection at call time and can no longer
+      produce one, but the loader is the guard that matters: a response whose
+      team is no longer selected is dropped rather than committed under the
+      selected team's identity.
+    */
     await act(async () => {
-      void staleRefresh("snapshot");
+      void getTeamSyncLoader(registry).refresh(projectA1.id, "snapshot");
       await Promise.resolve();
     });
     await settleDashboard(projectA1, 42);
-    expect(briar.dashboard).toBeNull();
+    expect(dashboard()).toBeNull();
 
     await act(async () => {
-      void briar.refresh("snapshot");
+      void createSyncActions(registry).refreshActiveTeam("snapshot");
       await Promise.resolve();
     });
     const freshA2 = await settleDashboard(projectA2, 2);
-    expect(briar.dashboard).toEqual(freshA2);
+    expect(dashboard()).toEqual(freshA2);
   });
 
   it("drops the stored dashboards of organizations the user left", async () => {
@@ -278,25 +313,26 @@ describe("useBriar dashboard view", () => {
     );
     await settleDashboard(projectA1, 1);
 
-    await act(async () => briar.setActiveOrganizationId(organizationB.id));
-    expect(briar.dashboard).toBeNull();
+    await selectOrganization(organizationB.id);
+    expect(dashboard()).toBeNull();
     await settleDashboard(projectB1, 2);
-    expect(briar.dashboard?.team.id).toBe(projectB1.id);
+    expect(dashboard()?.team.id).toBe(projectB1.id);
 
-    // Organization A's cache was pruned when the active organization changed.
-    await act(async () => briar.setActiveOrganizationId(organizationA.id));
-    expect(briar.dashboard).toBeNull();
-    expect(briar.dashboardStale).toBe(false);
+    // Organization A's stored teams were pruned when the active organization
+    // changed.
+    await selectOrganization(organizationA.id);
+    expect(dashboard()).toBeNull();
+    expect(dashboardStale()).toBe(false);
   });
 
   it("drops every stored dashboard when the session token changes", async () => {
     await mount([projectA1, projectA2], [organizationA]);
     await settleDashboard(projectA1, 1);
-    await act(async () => briar.setActiveProjectId(projectA2.id));
+    await selectTeam(projectA2.id);
     await settleDashboard(projectA2, 2);
-    await act(async () => briar.setActiveProjectId(projectA1.id));
+    await selectTeam(projectA1.id);
     await settleDashboard(projectA1, 3);
-    expect(briar.dashboard?.team.id).toBe(projectA1.id);
+    expect(dashboard()?.team.id).toBe(projectA1.id);
 
     // A different credential for the same organization: only the token change
     // can invalidate what the previous session loaded.
@@ -304,29 +340,28 @@ describe("useBriar dashboard view", () => {
     await act(async () => {
       registry.set(tokenAtom, "token-2");
     });
-    expect(briar.token).toBe("token-2");
-    expect(briar.activeOrganizationId).toBe(organizationA.id);
-    expect(briar.dashboard).toBeNull();
-    expect(briar.dashboardStale).toBe(false);
+    expect(registry.get(tokenAtom)).toBe("token-2");
+    expect(dashboard()).toBeNull();
+    expect(dashboardStale()).toBe(false);
 
     // …and neither team resurfaces on the way back.
-    await act(async () => briar.setActiveProjectId(projectA2.id));
-    expect(briar.dashboard).toBeNull();
-    expect(briar.dashboardStale).toBe(false);
+    await selectTeam(projectA2.id);
+    expect(dashboard()).toBeNull();
+    expect(dashboardStale()).toBe(false);
   });
 
   it("clears the dashboard and every stored team on logout", async () => {
     await mount([projectA1, projectA2], [organizationA]);
     await settleDashboard(projectA1, 1);
-    await act(async () => briar.setActiveProjectId(projectA2.id));
+    await selectTeam(projectA2.id);
     await settleDashboard(projectA2, 2);
 
     await act(async () => {
-      await briar.logout();
+      await createSessionActions(registry).logout();
     });
-    expect(briar.dashboard).toBeNull();
-    expect(briar.dashboardStale).toBe(false);
-    expect(briar.token).toBeNull();
+    expect(dashboard()).toBeNull();
+    expect(dashboardStale()).toBe(false);
+    expect(registry.get(tokenAtom)).toBeNull();
     expect(window.localStorage.getItem("briar.session-token")).toBeNull();
   });
 
@@ -338,18 +373,18 @@ describe("useBriar dashboard view", () => {
 
     await settleDashboard(projects[0]!, 1);
     for (const project of projects.slice(1)) {
-      await act(async () => briar.setActiveProjectId(project.id));
+      await selectTeam(project.id);
       await settleDashboard(project, 1);
     }
 
     // Ten visits with a retention bound of eight dropped the two oldest teams.
-    await act(async () => briar.setActiveProjectId(projects[0]!.id));
-    expect(briar.dashboard).toBeNull();
+    await selectTeam(projects[0]!.id);
+    expect(dashboard()).toBeNull();
     await settleDashboard(projects[0]!, 2);
 
     // The most recently visited projects are still warm.
-    await act(async () => briar.setActiveProjectId(projects[9]!.id));
-    expect(briar.dashboard?.team.id).toBe(projects[9]!.id);
-    expect(briar.dashboardStale).toBe(true);
+    await selectTeam(projects[9]!.id);
+    expect(dashboard()?.team.id).toBe(projects[9]!.id);
+    expect(dashboardStale()).toBe(true);
   });
 });

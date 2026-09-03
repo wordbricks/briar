@@ -69,6 +69,7 @@ import { applySyncEvent } from "../sync/apply";
 import { getTeamSyncLoader } from "../sync/loader";
 import { applyRunPatch, applyRunPatches } from "../sync/optimistic";
 import { dashboardViewAtom } from "../sync/view";
+import { getTeamActions } from "../team/actions";
 import { activeTeamIdAtom, teamLoadedAtom, teamsAtom } from "../team/atoms";
 import { beginIssueMutation, recoveryErrorAtom } from "./atoms";
 
@@ -147,20 +148,18 @@ export const liveIssueActionApi: IssueActionApi = {
 };
 
 /**
- * The two things an issue action needs that only the app shell can supply: the
- * team selector, which a project window narrows to a single team, and the agent
- * session adopter owned by `useAutoHuntSessions`.
+ * The one thing an issue action needs that only the app shell can supply: the
+ * agent session adopter owned by `useAutoHuntSessions`.
  *
- * They are held per registry rather than passed as hook dependencies because
- * the views that call these actions render far below the hook that owns them,
- * and because keeping them out of the dependency list is what lets
+ * It is held per registry rather than passed as a hook dependency because the
+ * views that call these actions render far below the hook that owns it, and
+ * because keeping it out of the dependency list is what lets
  * {@link useIssueActions} hand back one stable object forever.
  */
 export interface IssueActionBridge {
   readonly adoptRemoteAgentSession?:
     | ((session: AutoHuntSession) => void)
     | undefined;
-  readonly selectTeam?: ((teamId: string) => void) | undefined;
 }
 
 const bridges = new WeakMap<AtomRegistry, IssueActionBridge>();
@@ -457,7 +456,7 @@ export function createIssueActions(
         if (teamId === registry.get(activeTeamIdAtom)) {
           await refresh();
         } else {
-          bridge().selectTeam?.(teamId);
+          getTeamActions(registry).selectTeam(teamId);
         }
         return result;
       } catch (caught) {
