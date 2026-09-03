@@ -6,7 +6,8 @@ lockfile="apps/briar/src-tauri/Cargo.lock"
 # Keep accepted warnings visible before enforcing the exact dated allowlist.
 "$cargo_audit_bin" audit --file "$lockfile"
 
-"$cargo_audit_bin" audit --file "$lockfile" --deny warnings \
+# The advisory DB was just fetched above; reuse it instead of fetching twice.
+"$cargo_audit_bin" audit --file "$lockfile" --no-fetch --deny warnings \
   --ignore RUSTSEC-2024-0370 \
   --ignore RUSTSEC-2024-0411 \
   --ignore RUSTSEC-2024-0412 \

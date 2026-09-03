@@ -1,4 +1,5 @@
 import { configDefaults, defineConfig } from "vitest/config";
+import { resolveMaxWorkers } from "./vitest.max-workers";
 import { createWorkerTestPlugin } from "./vitest.worker.shared";
 
 const migrationTestGlobs = [
@@ -21,7 +22,9 @@ export default defineConfig(async () => ({
     // database starts from the same fully migrated schema.
     setupFiles: ["./worker/src/test-setup.ts"],
     hookTimeout: 60_000,
-    maxWorkers: Number(process.env.VITEST_MAX_WORKERS ?? 4),
+    // Capped: each worker boots its own workerd + isolated D1, so past ~8
+    // the process overhead outweighs the added parallelism.
+    maxWorkers: resolveMaxWorkers(8),
     testTimeout: 15_000,
   },
 }));

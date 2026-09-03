@@ -36,6 +36,35 @@ prepares shared build inputs once, and runs the four independent contexts in
 parallel before publishing any status. Do not precede it with a separate
 `bun run check`; that check is already part of `signoff/app-worker`.
 
+`signoff/app-worker` builds the frontend twice, not three times: `build:release`
+is the authoritative desktop bundle (`apps/briar/dist`) and `web:build` is the
+Worker asset bundle (`apps/briar/dist-web`, served through `wrangler.jsonc`).
+The plain dev-env `bun run build` of `@briar/app` was redundant with
+`build:release` — same Vite build, same task dependencies, only the env differs
+— so CI runs `bun run build:workspaces` (every package except `@briar/app`)
+instead. Both `build:release` and `test` are now Turborepo-cached, so an
+unchanged tree replays them from `.turbo` rather than rebuilding and retesting.
+
+Vitest sizes its worker pool from `os.availableParallelism()` (capped at 8 for
+the miniflare-backed Worker suites). Set `VITEST_MAX_WORKERS` to pin a lower
+value on constrained machines; it is in `globalPassThroughEnv`, so it never
+changes a Turborepo cache key.
+
+### Shared Cargo target directory
+
+The `rust` context builds into a shared Cargo target directory instead of
+`apps/briar/src-tauri/target`, so `cargo fmt`, `cargo clippy`, and `cargo test`
+stay incremental across git worktrees: a fresh Auto Hunt worktree reuses the
+artifacts of previous runs rather than rebuilding every crate. The default is
+`$(getconf DARWIN_USER_CACHE_DIR)/briar/ci/cargo-target` (falling back to
+`$TMPDIR` when that is unavailable). Override it with
+`BRIAR_CI_CARGO_TARGET_DIR`, which must be an absolute path ending in
+`/cargo-target`, or set `BRIAR_CI_CARGO_TARGET_DIR=local` to fall back to the
+per-worktree target directory when debugging a build. Unlike the release cache,
+the CI cache takes no exclusive lock: Cargo's own file lock serialises
+concurrent access, so several worktrees can run local CI at the same time and
+simply wait for each other.
+
 Mobile contract validation is separate from the required pull request
 signoffs. On a macOS worker with Xcode, JDK 17, and Android SDK 36, install the
 repository-pinned tools and explicitly provision the required iOS runtime and
@@ -68,7 +97,21 @@ Tauri application identifier or release scheme.
 The security phase uses `bun audit`, `cargo-audit`, and Gitleaks. Rust
 vulnerabilities and any warning not in the dated advisory allowlist fail the
 gate. The first Rust audit prints all known warnings before the strict allowlist
-check, so accepted debt remains visible in the local log.
+check, so accepted debt remains visible in the local log; the strict pass reuses
+the advisory database that the first pass fetched.
+
+Gitleaks scans only the commits the branch adds on top of the base ref
+(`origin/main`, falling back to `main`, or `BRIAR_CI_BASE_REF`) instead of the
+whole history. It falls back to the full `--all` history scan — and says so in
+the log — when no base ref resolves, when `HEAD` adds nothing over the base
+(for example a run on the base branch itself), or when
+`BRIAR_CI_GITLEAKS_FULL=true` is set.
+
+All four contexts, `d1-migrations` included, run in parallel. The D1 migration
+suite pins itself to a single Vitest worker while `app-worker` runs so the
+combined Miniflare pool stays small; wrangler state for `d1:migrate:local` lives
+in a private temporary directory. Set `BRIAR_CI_SERIAL_CONTEXTS=true` to run the
+contexts one at a time on constrained machines.
 
 Any audit exception must be narrow, dated, and recorded in
 [`security-exceptions.md`](security-exceptions.md) with a removal condition.

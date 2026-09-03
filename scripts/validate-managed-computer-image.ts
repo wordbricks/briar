@@ -552,7 +552,13 @@ if (!localCi.includes('"${BRIAR_CI_SERIAL_CONTEXTS:-false}" == "true"')) {
 }
 
 const viteConfig = await text(join(root, "apps", "briar", "vite.config.ts"));
-if (!viteConfig.includes("process.env.VITEST_MAX_WORKERS ?? 4")) {
+if (!viteConfig.includes("maxWorkers: resolveMaxWorkers(")) {
+  fail("Vitest must resolve its worker count through vitest.max-workers.ts");
+}
+const maxWorkersHelper = await text(
+  join(root, "apps", "briar", "vitest.max-workers.ts"),
+);
+if (!maxWorkersHelper.includes("process.env.VITEST_MAX_WORKERS")) {
   fail("Vitest must honor the managed-computer worker limit");
 }
 const turboConfig = await Bun.file(join(root, "turbo.json")).json() as {
