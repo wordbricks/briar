@@ -748,6 +748,11 @@ export type ProviderUsage = {
 	planType: string | null,
 	accountLabel: string | null,
 	authenticated: boolean,
+	/**
+	 *  True when the stored credentials cannot be used again without a fresh
+	 *  sign-in, so the UI must stop reporting the account as connected.
+	 */
+	reauthenticationRequired: boolean,
 	updatedAt: number,
 	error: string | null,
 };

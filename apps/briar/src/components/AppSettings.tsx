@@ -1737,7 +1737,11 @@ function ProviderDetails({
   usage?: ProviderUsage;
 }) {
   const { t } = useI18n();
-  const connected = Boolean(installed && authenticated);
+  // A usage probe that hit revoked or expired credentials outranks the local
+  // CLI auth check, which only sees that a credential file exists.
+  const connected = Boolean(
+    installed && authenticated && !usage?.reauthenticationRequired,
+  );
   const connectionLabel = loading
     ? t("appSettings.checkingProviders")
     : !installed

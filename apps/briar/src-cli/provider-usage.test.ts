@@ -4,6 +4,7 @@ import {
   parseClaudeUsageResponse,
   parseCodexRateLimits,
   parseGrokBilling,
+  readClaudeStoredToken,
 } from "./provider-usage";
 
 describe("provider usage probes", () => {
@@ -48,6 +49,43 @@ describe("provider usage probes", () => {
     });
     expect(exhausted.exhausted).toBe(true);
     expect(exhausted.maxUsedPercent).toBe(100);
+  });
+
+  it("separates a stale Claude access token from an expired login", () => {
+    const now = 1_800_000_000_000;
+    expect(
+      readClaudeStoredToken(
+        JSON.stringify({
+          claudeAiOauth: { accessToken: "secret", expiresAt: now + 3_600_000 },
+        }),
+        now,
+      ),
+    ).toEqual({ accessToken: "secret", state: "usable" });
+    expect(
+      readClaudeStoredToken(
+        JSON.stringify({
+          claudeAiOauth: {
+            accessToken: "secret",
+            refreshToken: "refresh",
+            expiresAt: now - 1_000,
+          },
+        }),
+        now,
+      )?.state,
+    ).toBe("stale");
+    expect(
+      readClaudeStoredToken(
+        JSON.stringify({
+          claudeAiOauth: {
+            accessToken: "secret",
+            refreshToken: "refresh",
+            expiresAt: now - 1_000,
+            refreshTokenExpiresAt: now - 1_000,
+          },
+        }),
+        now,
+      )?.state,
+    ).toBe("expired");
   });
 
   it("marks Claude as exhausted from utilization windows", () => {

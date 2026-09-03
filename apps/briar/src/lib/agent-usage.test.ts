@@ -27,6 +27,7 @@ const provider: ProviderUsage = {
   planType: "plus",
   accountLabel: null,
   authenticated: true,
+  reauthenticationRequired: false,
   updatedAt: 1,
   error: null,
 };

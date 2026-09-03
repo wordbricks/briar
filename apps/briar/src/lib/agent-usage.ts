@@ -30,6 +30,7 @@ export function emptyUsageProvider(
     planType: null,
     accountLabel: null,
     authenticated: false,
+    reauthenticationRequired: false,
     updatedAt: 0,
     error: null,
   };
@@ -113,6 +114,7 @@ function usageProviderFrom(
       ? provider.accountLabel
       : null,
     authenticated: provider.authenticated === true,
+    reauthenticationRequired: provider.reauthenticationRequired === true,
     updatedAt: provider.updatedAt,
     error: typeof provider.error === "string" ? provider.error : null,
   };
