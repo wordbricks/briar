@@ -95,7 +95,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { Project } from "../types";
 
-const projectLucideIcons: Record<string, LucideIcon> = {
+const projectLucideIcons = {
   anchor: Anchor,
   atom: Atom,
   award: Award,
@@ -186,10 +186,12 @@ const projectLucideIcons: Record<string, LucideIcon> = {
   wallet: Wallet,
   wrench: Wrench,
   zap: Zap,
-};
+} satisfies Record<string, LucideIcon>;
 
 export function projectIconComponent(name: string): LucideIcon {
-  return projectLucideIcons[name] ?? FolderGit2;
+  return Object.hasOwn(projectLucideIcons, name)
+    ? projectLucideIcons[name as keyof typeof projectLucideIcons]
+    : FolderGit2;
 }
 
 export function ProjectIcon({
