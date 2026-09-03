@@ -2,6 +2,7 @@ import { useAtomValue } from "@effect/atom-react";
 import { useEffect, useMemo, useRef } from "react";
 
 import { isTeamConnectedLocally } from "../../lib/local-team-connection";
+import { lockedTeamIdAtom } from "../platform";
 import { useRegistry } from "../registry";
 import { tokenAtom } from "../session/atoms";
 import { activeTeamIdAtom, teamSettingsAtom, teamsAtom } from "../team/atoms";
@@ -11,7 +12,7 @@ import {
   resolveWorkspaceApi,
   workspaceModes,
 } from "./api";
-import { connectedTeamIdsAtom, lockedTeamIdAtom } from "./atoms";
+import { connectedTeamIdsAtom } from "./atoms";
 import { refreshTeamHealth } from "./health";
 import { inspectTeamReadiness, refreshTeamReadiness } from "./readiness";
 

@@ -1,3 +1,4 @@
+import { useChannelCatalogSync } from "../../state/channels/useChannelCatalogSync";
 import { useActiveOrganizationPersistence } from "../../state/organization/useActiveOrganizationPersistence";
 import { useTeamSync } from "../../state/sync/useTeamSync";
 import { useWorkflowAutoGeneration } from "../../state/workflow/useWorkflowAutoGeneration";
@@ -12,6 +13,7 @@ import { useWorkspaceSync } from "../../state/workspace/useWorkspaceSync";
 export function AppEffects() {
   useActiveOrganizationPersistence();
   useTeamSync();
+  useChannelCatalogSync();
   useWorkspaceSync();
   useWorkflowAutoGeneration();
   return null;

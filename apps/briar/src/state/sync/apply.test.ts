@@ -1,11 +1,17 @@
 import { describe, expect, it } from "vitest";
 
+import type { ChannelSummary } from "../../lib/channels-contract";
 import { demoDashboard } from "../../lib/demo-data";
 import type {
   DashboardDeltaPayload,
   DashboardPayload,
   Team,
 } from "../../types";
+import {
+  channelAtom,
+  channelsByIdAtom,
+  organizationChannelIdsAtom,
+} from "../entities/channels";
 import { membersByIdAtom, teamMembersAtom } from "../entities/members";
 import { retainedTeamIdsAtom, TEAM_RETENTION_LIMIT } from "../entities/retention";
 import { runsByIdAtom, teamRunIdsAtom } from "../entities/runs";
@@ -421,5 +427,154 @@ describe("staleness", () => {
 
     expect(registry.get(teamSettingsAtom(teamA))).toBe(payload.settings);
     expect(registry.get(teamGeneratedAtAtom(teamA))).toBe(payload.generatedAt);
+  });
+});
+
+const channelOf = (
+  id: string,
+  overrides: Partial<ChannelSummary> = {},
+): ChannelSummary => ({
+  id,
+  organizationId: "org-a",
+  kind: "channel",
+  slug: id,
+  name: id,
+  topic: null,
+  visibility: "public",
+  defaultProjectId: null,
+  archivedAt: null,
+  memberCount: 1,
+  agentCount: 0,
+  createdByUserId: null,
+  createdAt: "2026-01-01T00:00:00.000Z",
+  updatedAt: "2026-01-01T00:00:00.000Z",
+  lastMessageAt: null,
+  lastMessagePreview: null,
+  lastReadAt: null,
+  hasUnread: false,
+  dmParticipants: [],
+  ...overrides,
+});
+
+describe("channel catalog", () => {
+  it("keeps the server's order for a snapshot and name order for a delta", () => {
+    const registry = createTestRegistry();
+    applySyncEvent(registry, {
+      kind: "channel-catalog-snapshot",
+      organizationId: "org-a",
+      channels: [channelOf("zeta"), channelOf("alpha")],
+    });
+    expect(registry.get(organizationChannelIdsAtom("org-a"))).toEqual([
+      "zeta",
+      "alpha",
+    ]);
+
+    applySyncEvent(registry, {
+      kind: "channel-catalog-delta",
+      organizationId: "org-a",
+      channels: [channelOf("mid")],
+      removedChannelIds: [],
+      reset: false,
+    });
+    expect(registry.get(organizationChannelIdsAtom("org-a"))).toEqual([
+      "alpha",
+      "mid",
+      "zeta",
+    ]);
+  });
+
+  it("drops what a reset delta did not re-send", () => {
+    const registry = createTestRegistry();
+    applySyncEvent(registry, {
+      kind: "channel-catalog-snapshot",
+      organizationId: "org-a",
+      channels: [channelOf("alpha"), channelOf("zeta")],
+    });
+
+    applySyncEvent(registry, {
+      kind: "channel-catalog-delta",
+      organizationId: "org-a",
+      channels: [channelOf("zeta")],
+      removedChannelIds: [],
+      reset: true,
+    });
+
+    expect(registry.get(organizationChannelIdsAtom("org-a"))).toEqual(["zeta"]);
+    expect(registry.get(channelsByIdAtom).has("alpha")).toBe(false);
+  });
+
+  it("leaves the list alone for a change to a channel it already lists", () => {
+    const registry = createTestRegistry();
+    applySyncEvent(registry, {
+      kind: "channel-catalog-snapshot",
+      organizationId: "org-a",
+      channels: [channelOf("zeta"), channelOf("alpha")],
+    });
+    const before = registry.get(organizationChannelIdsAtom("org-a"));
+
+    applySyncEvent(registry, {
+      kind: "channel-changed",
+      channel: channelOf("zeta", { hasUnread: true }),
+    });
+
+    expect(registry.get(organizationChannelIdsAtom("org-a"))).toBe(before);
+    expect(registry.get(channelAtom("zeta"))?.hasUnread).toBe(true);
+  });
+
+  it("appends a channel the organization does not list yet", () => {
+    const registry = createTestRegistry();
+    applySyncEvent(registry, {
+      kind: "channel-catalog-snapshot",
+      organizationId: "org-a",
+      channels: [channelOf("zeta")],
+    });
+
+    applySyncEvent(registry, {
+      kind: "channel-changed",
+      channel: channelOf("new"),
+    });
+
+    expect(registry.get(organizationChannelIdsAtom("org-a"))).toEqual([
+      "zeta",
+      "new",
+    ]);
+  });
+
+  it("removes a channel from the index and the store", () => {
+    const registry = createTestRegistry();
+    applySyncEvent(registry, {
+      kind: "channel-catalog-snapshot",
+      organizationId: "org-a",
+      channels: [channelOf("zeta"), channelOf("alpha")],
+    });
+
+    applySyncEvent(registry, {
+      kind: "channel-removed",
+      organizationId: "org-a",
+      channelId: "alpha",
+    });
+
+    expect(registry.get(organizationChannelIdsAtom("org-a"))).toEqual(["zeta"]);
+    expect(registry.get(channelsByIdAtom).has("alpha")).toBe(false);
+  });
+
+  it("forgets every catalog when the session ends", () => {
+    const registry = createTestRegistry();
+    applySyncEvent(registry, {
+      kind: "channel-catalog-snapshot",
+      organizationId: "org-a",
+      channels: [channelOf("zeta")],
+    });
+    applySyncEvent(registry, {
+      kind: "channel-catalog-snapshot",
+      organizationId: "org-b",
+      channels: [channelOf("other", { organizationId: "org-b" })],
+    });
+
+    applySyncEvent(registry, { kind: "session-cleared" });
+
+    expect(registry.get(organizationChannelIdsAtom("org-a"))).toBeNull();
+    expect(registry.get(organizationChannelIdsAtom("org-b"))).toBeNull();
+    expect(registry.get(channelsByIdAtom).size).toBe(0);
   });
 });

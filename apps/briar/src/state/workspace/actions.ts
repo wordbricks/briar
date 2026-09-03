@@ -42,6 +42,7 @@ import {
   teamConnectionAtom,
   teamsAtom,
 } from "../team/atoms";
+import { lockedTeamIdAtom } from "../platform";
 import { getAutomaticWorkflowGenerations } from "../workflow/actions";
 import {
   bumpReconnectRequest,
@@ -56,7 +57,6 @@ import {
   clearTeamReadinessError,
   connectedTeamIdsAtom,
   forgetTeamReadiness,
-  lockedTeamIdAtom,
   resetHealth,
   setTeamReadiness,
   setTeamReadinessError,

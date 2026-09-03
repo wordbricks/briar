@@ -9,10 +9,10 @@ import { sessionErrorAtom, tokenAtom } from "../session/atoms";
 import { applySyncEvent } from "../sync/apply";
 import { dashboardViewAtom } from "../sync/view";
 import { activeTeamIdAtom, staleTeamIdAtom, teamsAtom } from "../team/atoms";
+import { lockedTeamIdAtom } from "../platform";
 import {
   createOrganizationActions,
   type OrganizationActionApi,
-  type OrganizationActionDeps,
 } from "./actions";
 import { activeOrganizationIdAtom, organizationsAtom } from "./atoms";
 
@@ -110,7 +110,7 @@ interface Harness {
 }
 
 const harness = (
-  overrides: Partial<Pick<OrganizationActionDeps, "lockedTeamId">> = {},
+  overrides: { lockedTeamId?: string | null } = {},
   organizations: Organization[] = [organizationA, organizationB],
   teams: Project[] = [teamA, teamB],
 ): Harness => {
@@ -118,13 +118,11 @@ const harness = (
     [organizationsAtom, organizations],
     [teamsAtom, teams],
     [tokenAtom, "token-1"],
+    [lockedTeamIdAtom, overrides.lockedTeamId ?? null],
   ]);
   const server = new OrganizationServer(organizations);
   const baseReconnectGeneration = reconnectRequestGeneration(registry);
-  const actions = createOrganizationActions(registry, {
-    api: server.api,
-    lockedTeamId: overrides.lockedTeamId ?? null,
-  });
+  const actions = createOrganizationActions(registry, { api: server.api });
   /*
     The health probe is workspace state now, so "was it blanked" is read off the
     atom rather than counted through an injected callback. Each assertion arms

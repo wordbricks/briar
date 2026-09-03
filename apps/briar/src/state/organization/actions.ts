@@ -12,7 +12,7 @@ import type { Organization } from "../../types";
 import { emptyDashboard } from "../demo-fixtures";
 import { teamsByIdAtom } from "../entities/teams";
 import { upsertManyBy } from "../entities/upsert";
-import { demoMode } from "../platform";
+import { demoMode, lockedTeamIdAtom } from "../platform";
 import { useRegistry, type AtomRegistry } from "../registry";
 import { bumpReconnectRequest } from "../workspace/api";
 import { resetHealth } from "../workspace/atoms";
@@ -44,11 +44,6 @@ export const liveOrganizationActionApi: OrganizationActionApi = {
  */
 export interface OrganizationActionDeps {
   readonly api?: Partial<OrganizationActionApi> | undefined;
-  /**
-   * The team a project window is pinned to, if any. Such a window may only ever
-   * select that team's organization.
-   */
-  readonly lockedTeamId: string | null;
 }
 
 export interface CreateOrganizationInput {
@@ -202,8 +197,14 @@ export function createOrganizationActions(
 
     selectOrganization(organizationId) {
       const teams = registry.get(teamsAtom);
-      if (deps.lockedTeamId) {
-        const lockedTeam = teams.find((team) => team.id === deps.lockedTeamId);
+      /*
+        A project window is pinned to one team by its query string, and may only
+        ever select that team's organization. The pin is a platform fact rather
+        than something the caller decides, so it is read from the atom here.
+      */
+      const lockedTeamId = registry.get(lockedTeamIdAtom);
+      if (lockedTeamId) {
+        const lockedTeam = teams.find((team) => team.id === lockedTeamId);
         if (lockedTeam?.organizationId !== organizationId) return;
         bumpReconnectRequest(registry);
         Atom.batch(() => {
@@ -260,12 +261,12 @@ export function createOrganizationActions(
 }
 
 export function useOrganizationActions(
-  deps: OrganizationActionDeps,
+  deps: OrganizationActionDeps = {},
 ): OrganizationActions {
   const registry = useRegistry();
-  const { api, lockedTeamId } = deps;
+  const { api } = deps;
   return useMemo(
-    () => createOrganizationActions(registry, { api, lockedTeamId }),
-    [api, lockedTeamId, registry],
+    () => createOrganizationActions(registry, { api }),
+    [api, registry],
   );
 }

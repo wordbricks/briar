@@ -50,16 +50,6 @@ export const localInventoryErrorAtom = Atom.make<string | null>(null).pipe(
   Atom.withLabel("workspace/localInventoryError"),
 );
 
-/**
- * The team a project window is pinned to, or `null` in the main window. It is a
- * window scoped constant read from the URL, so `useBriar` seeds it once per
- * registry and nothing writes it afterwards.
- */
-export const lockedTeamIdAtom = Atom.make<string | null>(null).pipe(
-  Atom.keepAlive,
-  Atom.withLabel("workspace/lockedTeamId"),
-);
-
 /** The local install probe for the selected team, as one value. */
 export type WorkspaceHealth = {
   /** `loading` keeps the previous value on screen, exactly as the flag did. */

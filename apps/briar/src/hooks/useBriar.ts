@@ -48,6 +48,7 @@ import {
   companionMode,
   demoMode,
   deviceClientId,
+  lockedTeamIdAtom,
   remoteMode,
   webMode,
 } from "../state/platform";
@@ -64,10 +65,7 @@ import {
 } from "../state/issues/atoms";
 import { useRegistry } from "../state/registry";
 import { useRunDetailActions } from "../state/run-detail/actions";
-import {
-  useOrganizationActions,
-  type OrganizationActionDeps,
-} from "../state/organization/actions";
+import { useOrganizationActions } from "../state/organization/actions";
 import {
   activeOrganizationIdAtom,
   organizationsAtom,
@@ -118,7 +116,6 @@ import {
   applyInventoryObservation,
   connectedTeamIdsAtom,
   localInventoryErrorAtom,
-  lockedTeamIdAtom,
   readinessLoadingTeamIdsAtom,
   resetHealth,
   teamReadinessErrorRecordAtom,
@@ -328,16 +325,13 @@ export function useBriar(options: UseBriarOptions = {}) {
   const { deleteAccount, logout, updateAccountProfile } =
     useSessionActions(sessionActionDeps);
 
-  const organizationActionDeps: OrganizationActionDeps = {
-    lockedTeamId: lockedProjectId,
-  };
   const {
     addOrganization,
     changeOrganizationLogo,
     checkOrganizationHandle,
     renameOrganization,
     selectOrganization,
-  } = useOrganizationActions(organizationActionDeps);
+  } = useOrganizationActions();
 
   const {
     cancelTeamCreation,
