@@ -314,7 +314,7 @@ function convertInlineElement(element: Element, inherited: InlineMarks): string 
   const marks = marksFromElement(element, inherited);
   if (tag === "a") {
     const href = safeHref(element.getAttribute("href"));
-    const label = convertInlines(element, marks).trim() || href;
+    const label = convertInlines(element, marks).trim() || href || "";
     if (!href || !label) return wrapMarks(label, inherited, marks);
     return wrapMarks(`[${escapeLinkLabel(label)}](${href})`, inherited, {
       ...marks,
