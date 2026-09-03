@@ -507,7 +507,20 @@ const runRust = Effect.fn("runRustCi")(
       ],
     });
     const targetDirectory = yield* resolveCargoTargetDirectory(logPath);
-    const env = targetDirectory ? { CARGO_TARGET_DIR: targetDirectory } : undefined;
+    // Lint and build in one pass: scripts/ci-rust-lint-wrapper.sh compiles the
+    // workspace crates through clippy-driver with `-D warnings`, so `cargo test`
+    // enforces exactly what the separate `cargo clippy --all-targets -- -D
+    // warnings` step did (clippy and rustc warnings, lib/bin/test targets) while
+    // compiling the crate once instead of once in check mode and once for the
+    // test binaries. Dependencies still compile with plain rustc.
+    const clippyDriver = yield* capture("rust", "clippy-driver-path", [
+      "rustup", "which", "--toolchain", rustToolchain, "clippy-driver",
+    ]);
+    const env = {
+      ...(targetDirectory ? { CARGO_TARGET_DIR: targetDirectory } : {}),
+      BRIAR_CLIPPY_DRIVER: clippyDriver.output.trim(),
+      RUSTC_WORKSPACE_WRAPPER: join(workspaceRoot, "scripts", "ci-rust-lint-wrapper.sh"),
+    };
     yield* runTimedCommand(timings, "rust", logPath, "cargo-fmt", {
       argv: [
         "rustup", "run", rustToolchain, "cargo", "fmt",
@@ -515,14 +528,10 @@ const runRust = Effect.fn("runRustCi")(
       ],
       env,
     });
-    yield* runTimedCommand(timings, "rust", logPath, "cargo-clippy", {
-      argv: [
-        "rustup", "run", rustToolchain, "cargo", "clippy",
-        "--manifest-path", "apps/briar/src-tauri/Cargo.toml",
-        "--all-targets", "--", "-D", "warnings",
-      ],
-      env,
-    });
+    yield* appendLog(
+      logPath,
+      "[local-ci] rust: clippy runs inside cargo test via RUSTC_WORKSPACE_WRAPPER.\n",
+    );
     yield* runTimedCommand(timings, "rust", logPath, "cargo-test", {
       argv: [
         "rustup", "run", rustToolchain, "cargo", "test",
