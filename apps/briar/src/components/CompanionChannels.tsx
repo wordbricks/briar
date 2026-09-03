@@ -273,6 +273,7 @@ export function CompanionChannels({
   channelCache,
 }: CompanionChannelsProps) {
   const { t } = useI18n();
+  const { toast } = useToast();
   const imageCache = useChannelMessageImageCache(`${organizationId}\0${token}`);
   const [channels, setChannels] = useState<ChannelSummary[]>([]);
   const [channel, setChannel] = useState<ChannelSummary | null>(null);
@@ -449,7 +450,6 @@ export function CompanionChannels({
     closeThread: closeConversationThread,
     declineProposal,
     decliningProposalId,
-    error,
     invalidateChannelSurface,
     loadCreateExecutionProposalContext,
     loadChannelConversation,
@@ -616,7 +616,7 @@ export function CompanionChannels({
           setChannels(result.channels);
         }
       } catch (cause) {
-        if (!cancelled) setError(channelConversationError(cause));
+        if (!cancelled) toast(channelConversationError(cause), { tone: "error" });
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -629,6 +629,7 @@ export function CompanionChannels({
     invalidateChannelSurface,
     organizationId,
     setError,
+    toast,
     token,
   ]);
 
@@ -896,7 +897,6 @@ export function CompanionChannels({
           )}
           title={t("companion.channelThread")}
         />
-        {error ? <p className="companion-channel-error" role="alert">{error}</p> : null}
         <div className="conversation-scroll-region">
           <div
             className="companion-channel-messages"
@@ -1004,7 +1004,6 @@ export function CompanionChannels({
           onBack={closeChannel}
           channel={channel}
         />
-        {error ? <p className="companion-channel-error" role="alert">{error}</p> : null}
         <div className="conversation-scroll-region">
           <div
             className="companion-channel-messages"
@@ -1122,7 +1121,6 @@ export function CompanionChannels({
             <ChevronRight aria-hidden className="text-muted-foreground" size={18} />
           </button>
         ) : null}
-        {error ? <p className="companion-channel-error" role="alert">{error}</p> : null}
         {loading && channels.length === 0 ? <CompanionChannelLoadingSpinner /> : null}
         {groups.map((group) => (
         <div className="companion-channel-group" key={group.key}>

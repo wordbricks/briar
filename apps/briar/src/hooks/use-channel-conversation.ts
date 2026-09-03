@@ -322,6 +322,9 @@ export function useChannelConversation({
   const { toast } = useToast();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const reportConversationError = useCallback((cause: unknown) => {
+    toast(channelConversationError(cause), { tone: "error" });
+  }, [toast]);
   const [acceptingProposalId, setAcceptingProposalId] = useState<string | null>(
     null,
   );
@@ -481,6 +484,9 @@ export function useChannelConversation({
   const applyAgentReplies = useCallback(
     (incoming: ChannelAgentReply[], reset = false) => {
       if (incoming.length === 0 && !reset) return;
+      const previousById = new Map(
+        repliesRef.current.map((item) => [item.id, item]),
+      );
       for (const reply of incoming) {
         replyVersion.current += 1;
         replyVersions.current.set(reply.id, replyVersion.current);
@@ -497,9 +503,12 @@ export function useChannelConversation({
         (reply) =>
           reply.channelId === channelIdRef.current && reply.status === "failed",
       );
-      if (failed) setError(replyFailureMessage(failed));
+      if (!failed) return;
+      const previous = previousById.get(failed.id);
+      if (previous?.status === "failed") return;
+      toast(replyFailureMessage(failed), { tone: "error" });
     },
-    [replyFailureMessage, setReplies],
+    [replyFailureMessage, setReplies, toast],
   );
 
   const applyAuthoritativeAgentReplies = useCallback(
@@ -872,7 +881,7 @@ export function useChannelConversation({
           version === requestVersion.current &&
           channelSurfaceIsCurrent(context)
         ) {
-          setError(channelConversationError(cause));
+          reportConversationError(cause);
         }
         return null;
       }
@@ -886,6 +895,7 @@ export function useChannelConversation({
       onConversationLoaded,
       organizationId,
       recordProposalMessages,
+      reportConversationError,
       setAgents,
       setMembers,
       setMessageNextCursor,
@@ -931,7 +941,7 @@ export function useChannelConversation({
         return { applied: true, nextCursor };
       } catch (cause) {
         if (!signal?.aborted && channelSurfaceIsCurrent(context)) {
-          setError(channelConversationError(cause));
+          reportConversationError(cause);
         }
         return { applied: false, nextCursor: cursor };
       } finally {
@@ -945,6 +955,7 @@ export function useChannelConversation({
       organizationId,
       pageSize,
       recordProposalMessages,
+      reportConversationError,
       setMessageNextCursor,
       token,
       updateRootMessages,
@@ -983,7 +994,7 @@ export function useChannelConversation({
           version === requestVersion.current &&
           channelSurfaceIsCurrent(context)
         ) {
-          setError(channelConversationError(cause));
+          reportConversationError(cause);
         }
         return false;
       } finally {
@@ -1001,6 +1012,7 @@ export function useChannelConversation({
       invalidateChannelSurface,
       organizationId,
       recordProposalMessages,
+      reportConversationError,
       setThreadParentId,
       token,
       updateThreadMessages,
@@ -1147,7 +1159,7 @@ export function useChannelConversation({
                 )
               : removed;
           });
-          setError(channelConversationError(cause));
+          reportConversationError(cause);
         }
       } finally {
         optimisticThreadMessageIds.current.delete(clientMessageId);
@@ -1166,6 +1178,7 @@ export function useChannelConversation({
       messages,
       onRootMessagePending,
       organizationId,
+      reportConversationError,
       t,
       token,
       updateRootMessages,
@@ -1183,11 +1196,11 @@ export function useChannelConversation({
         await onIssueOpen?.(projectId, runId);
       } catch (cause) {
         if (channelSurfaceIsCurrent(context)) {
-          setError(channelConversationError(cause));
+          reportConversationError(cause);
         }
       }
     },
-    [captureChannelSurface, channelSurfaceIsCurrent, onIssueOpen],
+    [captureChannelSurface, channelSurfaceIsCurrent, onIssueOpen, reportConversationError],
   );
 
   const loadExecutionProposalContext = useCallback(
@@ -1499,9 +1512,8 @@ export function useChannelConversation({
         }
         return null;
       } catch (cause) {
-        const failure = channelConversationError(cause);
-        if (approvalContextIsCurrent()) setError(failure);
-        return failure;
+        if (approvalContextIsCurrent()) reportConversationError(cause);
+        return channelConversationError(cause);
       } finally {
         if (approvalContextIsCurrent()) {
           setBusy(false);
@@ -1517,6 +1529,7 @@ export function useChannelConversation({
       proposalProjects,
       recordProposalMessages,
       refreshProposalState,
+      reportConversationError,
       t,
       token,
       updateRootMessages,
@@ -1559,7 +1572,7 @@ export function useChannelConversation({
         recordProposalMessages([applyDecline(item)]);
       } catch (cause) {
         if (channelSurfaceIsCurrent(declineContext)) {
-          setError(channelConversationError(cause));
+          reportConversationError(cause);
         }
       } finally {
         if (channelSurfaceIsCurrent(declineContext)) {
@@ -1573,6 +1586,7 @@ export function useChannelConversation({
       channelSurfaceIsCurrent,
       organizationId,
       recordProposalMessages,
+      reportConversationError,
       token,
       updateRootMessages,
       updateThreadMessages,
@@ -1710,7 +1724,7 @@ export function useChannelConversation({
         updateThreadMessages(apply);
       } catch (cause) {
         if (channelSurfaceIsCurrent(context)) {
-          setError(channelConversationError(cause));
+          reportConversationError(cause);
         }
       } finally {
         if (channelSurfaceIsCurrent(context)) {
@@ -1722,6 +1736,7 @@ export function useChannelConversation({
       captureChannelSurface,
       channelSurfaceIsCurrent,
       organizationId,
+      reportConversationError,
       threadSubscriptionPending,
       token,
       updateRootMessages,

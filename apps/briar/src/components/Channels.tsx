@@ -43,6 +43,7 @@ import {
 } from "react";
 import { LoadingState } from "@/components/ui/loading-state";
 import { useI18n } from "../i18n";
+import { useToast } from "./ui/toast";
 import {
   useChannelComposer,
   type ChannelSkillCommandTarget,
@@ -322,6 +323,7 @@ export function Channels({
 }: ChannelsProps) {
   const [memoryOpen, setMemoryOpen] = useState(false);
   const { t, localeTag } = useI18n();
+  const { toast } = useToast();
   const imageCache = useChannelMessageImageCache(`${organizationId}\0${token}`);
   useEffect(() => {
     if (!activeChannelId) return;
@@ -513,7 +515,6 @@ export function Channels({
     closeThread,
     declineProposal,
     decliningProposalId,
-    error,
     invalidateChannelSurface,
     loadCreateExecutionProposalContext,
     loadChannelConversation,
@@ -917,7 +918,7 @@ export function Channels({
         }
       } catch (cause) {
         if (!cancelled) {
-          setError(errorMessage(cause));
+          toast(errorMessage(cause), { tone: "error" });
           // A channel detail can still load from the parent's last catalog;
           // polling from cursor zero will reconcile once connectivity returns.
           setChannelListReady(true);
@@ -933,6 +934,7 @@ export function Channels({
     onChannelFallback,
     onChannelsChange,
     organizationId,
+    toast,
     token,
   ]);
 
@@ -1315,8 +1317,6 @@ export function Channels({
                 </button> : null}
               </div>
             </header>
-
-            {error ? <div className="channel-error" role="alert">{error}</div> : null}
 
             <div
               className="channel-messages"
