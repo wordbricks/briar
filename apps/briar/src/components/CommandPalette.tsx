@@ -1,4 +1,4 @@
-import { Check, CornerDownLeft, LoaderCircle, Search } from "lucide-react";
+import { Check, CornerDownLeft, Search } from "lucide-react";
 import {
   useEffect,
   useId,
@@ -16,6 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
+import { Spinner } from "@/components/ui/spinner";
 import { useI18n } from "../i18n";
 import {
   groupCommandPaletteItems,
@@ -411,11 +412,7 @@ export function CommandPalette({
             >
               {loading ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <LoaderCircle
-                    aria-hidden="true"
-                    className="animate-spin"
-                    size={17}
-                  />
+                  <Spinner aria-hidden="true" size={17} />
                   {t("commandPalette.loading")}
                 </div>
               ) : (
