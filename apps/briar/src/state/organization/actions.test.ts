@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import { demoDashboard } from "../../lib/demo-data";
 import type { Organization, Project } from "../../types";
 import { createTestRegistry, type AtomRegistry } from "../registry";
+import { reconnectRequestGeneration } from "../workspace/api";
+import { healthAtom } from "../workspace/atoms";
 import { sessionErrorAtom, tokenAtom } from "../session/atoms";
 import { applySyncEvent } from "../sync/apply";
 import { dashboardViewAtom } from "../sync/view";
@@ -100,6 +102,8 @@ interface Harness {
   readonly registry: AtomRegistry;
   readonly server: OrganizationServer;
   readonly reconnectBumps: () => number;
+  /** Puts a probed value back on the health atom. */
+  readonly armHealth: () => void;
   /** The health probe is blanked exactly when the switch changes the board. */
   readonly healthResets: () => number;
   readonly actions: ReturnType<typeof createOrganizationActions>;
@@ -116,22 +120,30 @@ const harness = (
     [tokenAtom, "token-1"],
   ]);
   const server = new OrganizationServer(organizations);
-  let reconnectBumps = 0;
-  let healthResets = 0;
+  const baseReconnectGeneration = reconnectRequestGeneration(registry);
   const actions = createOrganizationActions(registry, {
     api: server.api,
-    bumpReconnectRequest: () => {
-      reconnectBumps += 1;
-    },
     lockedTeamId: overrides.lockedTeamId ?? null,
-    resetTeamHealth: () => {
-      healthResets += 1;
-    },
   });
+  /*
+    The health probe is workspace state now, so "was it blanked" is read off the
+    atom rather than counted through an injected callback. Each assertion arms
+    it with a probed value first, and a reset takes it back to idle.
+  */
+  const armHealth = () =>
+    registry.set(healthAtom, {
+      status: "ready",
+      value: null,
+      error: "이전 오류",
+    });
+  armHealth();
   return {
     actions,
-    healthResets: () => healthResets,
-    reconnectBumps: () => reconnectBumps,
+    armHealth,
+    healthResets: () =>
+      registry.get(healthAtom).status === "idle" ? 1 : 0,
+    reconnectBumps: () =>
+      reconnectRequestGeneration(registry) - baseReconnectGeneration,
     registry,
     server,
   };

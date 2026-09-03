@@ -12,6 +12,7 @@ import { teamsByIdAtom } from "../entities/teams";
 import { upsertManyBy } from "../entities/upsert";
 import { demoMode } from "../platform";
 import { useRegistry, type AtomRegistry } from "../registry";
+import { bumpReconnectRequest } from "../workspace/api";
 import { sessionErrorAtom, tokenAtom } from "../session/atoms";
 import { isCreatingTeamAtom, teamConnectionAtom, teamsAtom } from "./atoms";
 
@@ -30,8 +31,6 @@ export const liveTeamActionApi: TeamActionApi = {
 
 export interface TeamActionDeps {
   readonly api?: Partial<TeamActionApi> | undefined;
-  /** Invalidates in-flight reconnect attempts. */
-  readonly bumpReconnectRequest: () => void;
 }
 
 export interface TeamActions {
@@ -54,7 +53,7 @@ export interface TeamActions {
 
 export function createTeamActions(
   registry: AtomRegistry,
-  deps: TeamActionDeps,
+  deps: TeamActionDeps = {},
 ): TeamActions {
   const api: TeamActionApi = { ...liveTeamActionApi, ...deps.api };
 
@@ -91,7 +90,7 @@ export function createTeamActions(
 
   return {
     cancelTeamCreation() {
-      deps.bumpReconnectRequest();
+      bumpReconnectRequest(registry);
       Atom.batch(() => {
         registry.set(sessionErrorAtom, null);
         registry.set(isCreatingTeamAtom, false);
@@ -151,7 +150,7 @@ export function createTeamActions(
     },
 
     startTeamCreation() {
-      deps.bumpReconnectRequest();
+      bumpReconnectRequest(registry);
       Atom.batch(() => {
         registry.set(sessionErrorAtom, null);
         registry.set(isCreatingTeamAtom, true);
@@ -160,11 +159,8 @@ export function createTeamActions(
   };
 }
 
-export function useTeamActions(deps: TeamActionDeps): TeamActions {
+export function useTeamActions(deps: TeamActionDeps = {}): TeamActions {
   const registry = useRegistry();
-  const { api, bumpReconnectRequest } = deps;
-  return useMemo(
-    () => createTeamActions(registry, { api, bumpReconnectRequest }),
-    [api, bumpReconnectRequest, registry],
-  );
+  const { api } = deps;
+  return useMemo(() => createTeamActions(registry, { api }), [api, registry]);
 }
