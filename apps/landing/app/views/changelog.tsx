@@ -30,6 +30,26 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.186",
+        date: "2026년 9월 3일",
+        title: "채널·DM에서 PDF를 공유하고 관리형 컴퓨터·프로젝트 관리를 다듬습니다",
+        summary:
+          "채널과 DM에서 PDF 첨부를 지원하고, 관리형 컴퓨터 클립보드 동기화와 프로젝트 PR 병합 현황을 추가했습니다.",
+        items: [
+          "채널과 DM에서 PDF 첨부 파일을 보내고 미리보기와 다운로드로 확인할 수 있습니다.",
+          "전체 화면 원격 데스크톱에서 관리형 컴퓨터의 클립보드 내용을 붙여넣을 수 있도록 클립보드를 동기화합니다.",
+          "프로젝트 로비에 풀 리퀘스트 병합 활동 개요를 추가해 PR이 어떻게 병합되는지 한눈에 볼 수 있습니다.",
+          "중지된 관리형 컴퓨터를 긴 정리 주기를 기다리지 않고 바로 종료할 수 있습니다.",
+          "관리형 컴퓨터 파일럿 프로모션 코드를 GETBRIARJAY6부터 GETBRIARJAY10까지 추가했습니다.",
+          "채널과 DM의 전송 오류를 배너 대신 토스트로 표시합니다.",
+          "사이드바 Projects 목록을 Channels 아코디언과 같은 스타일로 정리합니다.",
+          "팀을 다시 선택해도 Issues 보드가 사라지지 않고 복원됩니다.",
+          "DM·채널 입력창에서 서식이 포함된 붙여넣기가 한 줄로 합쳐지지 않도록 고칩니다.",
+          "Team/Project 명칭 정리 후 남아있던 오래된 문구를 수정합니다.",
+          "내 이슈 목록 화면을 공통 PageHeader와 디자인 토큰에 맞춰 정렬합니다.",
+        ],
+      },
+      {
         version: "1.2.185",
         date: "2026년 9월 2일",
         title: "로그인 세션 복구와 관리형 컴퓨터 실행 환경을 고칩니다",
@@ -1476,6 +1496,26 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.186",
+        date: "September 3, 2026",
+        title: "Share PDFs in channels and DMs, and refine managed computer and project management",
+        summary:
+          "Support PDF attachments in channels and direct messages, sync the managed computer clipboard, and add a project PR merge activity overview.",
+        items: [
+          "Support PDF attachments in channels and direct messages with inline preview and download.",
+          "Copy the managed computer clipboard so a full-screen remote desktop can paste its contents.",
+          "Add a project PR merge activity overview to the project lobby.",
+          "Allow immediate termination of stopped managed computers without waiting for a longer cleanup cycle.",
+          "Add GETBRIARJAY6 through GETBRIARJAY10 managed-computer pilot promotion slots.",
+          "Show channel and DM send errors as toasts instead of a banner.",
+          "Restyle the sidebar Projects list to match the Channels accordion.",
+          "Restore the Issues board after reselecting a Team.",
+          "Fix loss of formatted paste in DM and channel composers.",
+          "Fix leftover Team/Project copy after the hierarchy rename.",
+          "Align the My issues list view with the shared PageHeader and design tokens.",
+        ],
+      },
       {
         version: "1.2.185",
         date: "September 2, 2026",
@@ -3014,7 +3054,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-185">
+          <a href="#v1-2-186">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -3036,7 +3076,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.185"
+                      entry.version === "1.2.186"
+                        ? "2026-09-03"
+                        : entry.version === "1.2.185"
                         ? "2026-09-02"
                         : entry.version === "1.2.184"
                         ? "2026-09-02"
