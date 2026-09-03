@@ -1352,12 +1352,24 @@ export function useBriar(options: UseBriarOptions = {}) {
       if (lockedProjectId && projectId !== lockedProjectId) return;
       const project = projects.find((candidate) => candidate.id === projectId);
       if (!project) return;
+      const dashboardMatchesProject =
+        dashboardRef.current?.project.id === projectId;
+      if (activeProjectId === projectId && dashboardMatchesProject) {
+        setActiveOrganizationId(project.organizationId);
+        setError(null);
+        return;
+      }
       reconnectRequest.current += 1;
       setActiveProjectId(projectId);
       setActiveOrganizationId(project.organizationId);
       if (!demoMode) {
-        setDashboard(null);
+        if (!dashboardMatchesProject) {
+          setDashboard(null);
+        }
         setError(null);
+        if (activeProjectId === projectId && !dashboardMatchesProject) {
+          void refresh("snapshot");
+        }
         return;
       }
       setDashboard(
@@ -1367,12 +1379,11 @@ export function useBriar(options: UseBriarOptions = {}) {
       );
       setError(null);
     },
-    [lockedProjectId, projects],
+    [activeProjectId, lockedProjectId, projects, refresh],
   );
 
   const ensureProjectSelected = useCallback(
     async (projectId: string) => {
-      reconnectRequest.current += 1;
       if (lockedProjectId && projectId !== lockedProjectId) {
         throw new Error("이 윈도우에서는 다른 프로젝트를 열 수 없습니다.");
       }
@@ -1386,11 +1397,24 @@ export function useBriar(options: UseBriarOptions = {}) {
       if (!project) {
         throw new Error("요청한 프로젝트를 찾을 수 없습니다.");
       }
+      const dashboardMatchesProject =
+        dashboardRef.current?.project.id === project.id;
+      if (activeProjectId === project.id && dashboardMatchesProject) {
+        setActiveOrganizationId(project.organizationId);
+        setError(null);
+        return project;
+      }
+      reconnectRequest.current += 1;
       setActiveProjectId(project.id);
       setActiveOrganizationId(project.organizationId);
       if (!demoMode) {
-        setDashboard(null);
+        if (!dashboardMatchesProject) {
+          setDashboard(null);
+        }
         setError(null);
+        if (activeProjectId === project.id && !dashboardMatchesProject) {
+          void refresh("snapshot");
+        }
         return project;
       }
       setDashboard(
@@ -1401,7 +1425,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       setError(null);
       return project;
     },
-    [demoMode, lockedProjectId, projects, token],
+    [activeProjectId, demoMode, lockedProjectId, projects, refresh, token],
   );
 
   const selectOrganization = useCallback(
@@ -1420,24 +1444,39 @@ export function useBriar(options: UseBriarOptions = {}) {
       if (!organizations.some((organization) => organization.id === organizationId)) {
         return;
       }
-      reconnectRequest.current += 1;
       const project =
         projects.find((candidate) => candidate.organizationId === organizationId) ??
         null;
+      const dashboardMatchesProject = project
+        ? dashboardRef.current?.project.id === project.id
+        : dashboardRef.current === null;
+      if (
+        activeOrganizationId === organizationId &&
+        activeProjectId === (project?.id ?? null) &&
+        dashboardMatchesProject
+      ) {
+        setError(null);
+        return;
+      }
+      reconnectRequest.current += 1;
       setActiveOrganizationId(organizationId);
       setActiveProjectId(project?.id ?? null);
-      setDashboard(
-        demoMode && project
-          ? project.id === demoDashboard.project.id
+      if (demoMode && project) {
+        setDashboard(
+          project.id === demoDashboard.project.id
             ? demoDashboard
-            : emptyDashboard(project)
-          : null,
-      );
-      setHealth(null);
-      setHealthError(null);
+            : emptyDashboard(project),
+        );
+      } else if (!dashboardMatchesProject) {
+        setDashboard(null);
+      }
+      if (!dashboardMatchesProject) {
+        setHealth(null);
+        setHealthError(null);
+      }
       setError(null);
     },
-    [lockedProjectId, organizations, projects],
+    [activeOrganizationId, activeProjectId, lockedProjectId, organizations, projects],
   );
 
   const renameOrganization = useCallback(

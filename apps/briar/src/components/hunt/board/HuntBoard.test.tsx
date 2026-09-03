@@ -298,6 +298,44 @@ describe("HuntBoard", () => {
     expect(container.querySelector('[aria-label="새 이슈"]')).toBeNull();
     await cleanup();
   });
+  it("shows loading issues while the dashboard snapshot is missing", async () => {
+    const { cleanup, container, root } = createReactTestRoot();
+    await renderReactTestRoot(root, <HuntDashboard {...dashboardProps} dashboard={null} />);
+    expect(container.querySelector(".issues-loading-overlay")).not.toBeNull();
+    expect(container.textContent).toContain("이슈를 불러오는 중입니다");
+    expect(container.textContent).toContain("0개 작업");
+    await cleanup();
+  });
+  it("filters the board to the active planning project", async () => {
+    const { cleanup, container, root } = createReactTestRoot();
+    const [firstRun, ...otherRuns] = demoDashboard.runs;
+    if (!firstRun) throw new Error("demo dashboard has no runs");
+    await renderReactTestRoot(
+      root,
+      <HuntDashboard
+        {...dashboardProps}
+        activeIssueProjectId="planning-general"
+        dashboard={{
+          ...demoDashboard,
+          runs: [
+            { ...firstRun, projectId: "planning-general", projectName: "General" },
+            ...otherRuns.map((run) => ({
+              ...run,
+              projectId: "planning-other",
+              projectName: "Other",
+            })),
+          ],
+        }}
+      />,
+    );
+    expect(container.querySelectorAll(".kanban-card")).toHaveLength(1);
+    expect(container.textContent).toContain(firstRun.title);
+    expect(container.textContent).toContain("1개 작업");
+    for (const run of otherRuns) {
+      expect(container.textContent).not.toContain(run.title);
+    }
+    await cleanup();
+  });
   it("adds a bottom drop space and opens issue creation for a kanban column", async () => {
     const { cleanup, container, root } = createReactTestRoot({
       attachToDocument: true,

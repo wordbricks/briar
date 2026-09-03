@@ -125,8 +125,12 @@ const dispatchMode = (
   }
 };
 
-const dashboardRunFromProto = (run: DashboardRunMessage): HuntRun => ({
+export const dashboardRunFromProto = (run: DashboardRunMessage): HuntRun => ({
   id: run.id,
+  workspaceId: run.workspaceId || null,
+  teamId: run.teamId || undefined,
+  projectId: run.planningProjectId || undefined,
+  projectName: run.planningProjectName || null,
   runNumber: run.runNumber,
   currentAttempt: run.currentAttempt,
   currentRevision: run.currentRevision,
