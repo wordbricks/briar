@@ -200,6 +200,46 @@ workspace / workflow / integrations를 옮기며 확인한, 이후 단계에 영
   `Sidebar`, `AppSettings`, `TeamLobby`, `OrganizationSettings`가 프롭으로 받기
   때문이며, 그 뷰들을 옮기는 단계에서 파사드의 마지막 레코드 파생이 사라진다.
 
+### 기준 갱신 (2026-09-04, Phase 4-1 이후)
+
+채널을 옮기며 확인한, 이후 단계에 영향을 주는 사실:
+
+- **채널 인덱스는 파생이 아니라 저장이다.** `entities/channels.ts`의 원래 주석은
+  "채널이 `organizationId`를 들고 있으니 인덱스는 파생"이라고 적었지만, 순서가
+  눈에 보이는 값이고 두 경로가 서로 다르게 만든다. 스냅샷은 **서버 순서 그대로**,
+  델타는 병합 후 **이름순 재정렬**이다. Map 삽입 순서는 둘 중 어느 것도 아니라서
+  `organizationChannelIdsAtom(orgId)`는 `teamRunIdsAtom`과 같은 저장 인덱스가
+  되었다. 열거할 수 없는 `Atom.family`를 로그아웃 때 비우기 위해
+  `channelCatalogOrganizationIdsAtom`(보유 조직 목록)도 함께 둔다.
+- **순서를 바꾸는 로컬 쓰기는 "스냅샷"으로 표현한다.** 채널 생성과 뷰가 스스로
+  넘기는 `onChannelsChange`는 배열 전체를 새로 만든다. 개별 채널 이벤트로는 순서를
+  실어 나를 수 없어 `channel-catalog-snapshot`이 그 역할을 겸한다. 읽음 표시처럼
+  순서를 건드리지 않는 갱신만 `channel-changed`다.
+- **조직 스코프 리셋은 파생으로 만들 수 있지만 절반만이다.**
+  `state/channels/atoms.ts`의 선택 상태는 `{organizationId, value}`를 저장하고
+  현재 조직이 다르면 초기값을 돌려주는 `Atom.writable` 파생이다. 조직 전환 즉시
+  리셋되지만, **되돌아오면 값이 되살아난다.** 그래서 카탈로그 훅이 전환 시
+  `resetChannelSelection`으로 도장을 지운다(하나의 `Atom.batch`). 같은 형태의
+  스코프 상태를 만들 때 이 한 쌍이 필요하다.
+- **`lockedTeamIdAtom`은 `state/platform.ts`로 옮겼다.**
+  `OrganizationActionDeps.lockedTeamId`와 중복이었고,
+  `useActiveOrganizationPersistence`는 `readTeamWindowProjectId()`를 다시 읽고
+  있었다. 셋을 하나의 atom으로 합쳤고 초기값이 `readTeamWindowProjectId()`이므로
+  `useBriar`의 시드는 옵션을 존중하는 용도로만 남는다.
+- **콜백 아이덴티티가 effect 재실행 주기였다.** `markOrganizationChannelRead`는
+  `organizationChannels`에서 만들어졌기 때문에 카탈로그가 바뀔 때마다 새로
+  생성되었고, 그것을 의존성에 넣은 내비게이션 조정 effect가 함께 재실행되며 열려
+  있는 채널을 다시 읽음 처리했다. 액션이 안정 객체가 되면 그 주기가 사라지므로,
+  액션으로 바꾼 자리마다 **그 콜백이 의존성으로서 하던 일**을 확인해야 한다.
+  이 자리에서는 `organizationChannels`를 의존성에 명시해 주기를 유지했다.
+- **연결 래퍼의 게이트는 조직 **id**다.** 셸은 `briar.activeOrganizationId`만으로
+  대화 뷰를 그렸고 이름은 `undefined`여도 됐다. 래퍼가
+  `activeOrganizationAtom`(목록에서 해석한 객체)으로 게이트하면 조직 목록이 아직
+  안 온 순간에 화면이 비므로, id로 게이트하고 이름만 해석한다.
+- **`Channels` / `DirectMessages` / `CompanionChannels`에는 `lazy()` 경계가 없다.**
+  셸이 정적 import 하고 있었으므로 래퍼도 정적이다. `CommandPalette`는 lazy라서
+  래퍼가 경계를 들고 간다.
+
 ## 목표
 
 1. `apps/briar/src/hooks/useBriar.ts`(4,668줄)와 `apps/briar/src/App.tsx`(5,116줄)가
@@ -845,7 +885,7 @@ Phase 2 이후 언제든 착수 가능하며 Phase 3–7과 병행할 수 있다
 | 2A | #1584, #1585 | 머지됨 | #1584: `state/entities`(runs / teams / workers / members / providers / channels / upsert / retention), `state/team`의 팀별 family, `state/sync`의 `events` / `apply` / `view`. #1585: `sync/loader`, `sync/useTeamSync`, `useBriar` 파사드를 `dashboardViewAtom` 위로 옮기고 `dashboardRef` / `dashboardCursor` / `dashboardRequest` / `dashboardRequestGeneration` / `dashboardCache` 제거. Phase 1의 대시보드 주입 콜백 8개 삭제. |
 | 2B | #1586, #1587 | 머지됨 | #1586: `sync/optimistic`, `state/issues`(atoms / actions), `state/run-detail`(atoms / actions), `useBriar`의 `setDashboard` 제거. #1587: `components/app`의 `HuntDashboardWithTeam` / `RunPageWithRun` / `TeamViewsWithDashboard`, App.tsx의 삼중 이슈·런 프롭 블록 삭제와 렌더 카운트 테스트. 보드 목록의 id 전용 렌더는 후속. |
 | 3 | #1588, #1589 | 머지됨 | #1588: `state/workspace`(atoms / api / health / readiness / actions / `useWorkspaceSync`), `state/workflow`(actions / `useWorkflowAutoGeneration`), `state/integrations`(atoms / actions), `sync/events`의 `team-settings-changed`와 `sync/commit`. `useBriar`의 workspace `useState` 7개·ref 5개와 `commitTeamDashboard` / `commitTeamSettings` 제거, Phase 1 주입 콜백 3개(`bumpReconnectRequest`, `clearWorkspaceViews`, `resetTeamHealth`) 삭제. `AutoHuntSession` 계열 타입을 `types.ts`로. #1589: `components/app/WorkspaceViews`의 연결 래퍼 4종과 `TeamSettingsWithDashboard` 확장, App.tsx 프롭 블록 삭제, 파사드에서 25개 키 제거. |
-| 4 | | 예정 | |
+| 4 | #1590 | 진행 중 | #1590: `entities/channels` 연결(저장 인덱스), `sync`의 채널 카탈로그 이벤트 4종, `state/channels`(atoms / api / actions / `useChannelCatalogSync`), `components/app`의 `ChannelViews` 3종과 `CommandPaletteWithContext`, `lockedTeamIdAtom`을 `state/platform.ts`로 통합. |
 | 5 | | 예정 | |
 | 6 | | 예정 | |
 | 7 | | 예정 | |

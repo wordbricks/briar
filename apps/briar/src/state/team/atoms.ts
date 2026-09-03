@@ -9,7 +9,9 @@ import type {
   TeamExecutionWorkerPolicy,
   TeamSettings,
 } from "../../types";
-import { demoMode } from "../platform";
+import { shallowArrayEqual } from "../entities/upsert";
+import { activeOrganizationIdAtom } from "../organization/atoms";
+import { demoMode, lockedTeamIdAtom } from "../platform";
 
 /*
   Teams (`Project` in the type layer) the account can open, which one is
@@ -63,6 +65,41 @@ export const activeTeamAtom = Atom.make((get) => {
   if (!activeTeamId) return null;
   return get(teamsAtom).find((team) => team.id === activeTeamId) ?? null;
 }).pipe(Atom.keepAlive, Atom.withLabel("team/active"));
+
+/**
+ * The teams this window may show at all. A project window is pinned to one, so
+ * it shows that one and nothing else.
+ */
+export const visibleTeamsAtom = Atom.make((get): Project[] => {
+  const teams = get(teamsAtom);
+  const lockedTeamId = get(lockedTeamIdAtom);
+  if (!lockedTeamId) return teams;
+  const lockedTeam = teams.find((team) => team.id === lockedTeamId);
+  return lockedTeam ? [lockedTeam] : [];
+}).pipe(
+  Atom.keepAlive,
+  Atom.withEquality<Project[]>(shallowArrayEqual),
+  Atom.withLabel("team/visible"),
+);
+
+/**
+ * The teams a view scoped to the active organization offers. The selected team
+ * is always included: it stays reachable for the moment between switching
+ * organizations and the team selection catching up.
+ */
+export const activeOrganizationTeamsAtom = Atom.make((get): Project[] => {
+  if (get(lockedTeamIdAtom)) return get(visibleTeamsAtom);
+  const activeOrganizationId = get(activeOrganizationIdAtom);
+  const activeTeamId = get(activeTeamIdAtom);
+  return get(teamsAtom).filter(
+    (team) =>
+      team.organizationId === activeOrganizationId || team.id === activeTeamId,
+  );
+}).pipe(
+  Atom.keepAlive,
+  Atom.withEquality<Project[]>(shallowArrayEqual),
+  Atom.withLabel("team/activeOrganization"),
+);
 
 /*
   Per-team state that is team scoped but not an entity: the settings, policy,

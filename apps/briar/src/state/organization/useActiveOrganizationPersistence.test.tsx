@@ -9,6 +9,7 @@ import { createReactTestRoot } from "../../test/react";
 import type { SessionUser } from "../../types";
 import { createTestRegistry, type AtomRegistry } from "../registry";
 import { userAtom } from "../session/atoms";
+import { lockedTeamIdAtom } from "../platform";
 import { activeOrganizationIdAtom } from "./atoms";
 import { useActiveOrganizationPersistence } from "./useActiveOrganizationPersistence";
 
@@ -18,16 +19,16 @@ const user: SessionUser = {
   email: "tester@briar.local",
 };
 
-function Effects({ lockedTeamId }: { lockedTeamId: string | null }) {
-  useActiveOrganizationPersistence(lockedTeamId);
+function Effects() {
+  useActiveOrganizationPersistence();
   return null;
 }
 
-const mount = async (registry: AtomRegistry, lockedTeamId: string | null) => {
+const mount = async (registry: AtomRegistry) => {
   const view = createReactTestRoot();
   await view.render(
     <RegistryContext.Provider value={registry}>
-      <Effects lockedTeamId={lockedTeamId} />
+      <Effects />
     </RegistryContext.Provider>,
   );
   return view;
@@ -43,8 +44,9 @@ describe("useActiveOrganizationPersistence", () => {
     const registry = createTestRegistry([
       [userAtom, user],
       [activeOrganizationIdAtom, "org-a"],
+      [lockedTeamIdAtom, null],
     ]);
-    const view = await mount(registry, null);
+    const view = await mount(registry);
 
     expect(readActiveOrganizationId(user.id)).toBe("org-a");
 
@@ -55,8 +57,11 @@ describe("useActiveOrganizationPersistence", () => {
   });
 
   it("writes nothing while signed out or with nothing selected", async () => {
-    const registry = createTestRegistry([[activeOrganizationIdAtom, "org-a"]]);
-    const view = await mount(registry, null);
+    const registry = createTestRegistry([
+      [activeOrganizationIdAtom, "org-a"],
+      [lockedTeamIdAtom, null],
+    ]);
+    const view = await mount(registry);
 
     expect(readActiveOrganizationId(user.id)).toBeNull();
 
@@ -75,8 +80,9 @@ describe("useActiveOrganizationPersistence", () => {
     const registry = createTestRegistry([
       [userAtom, user],
       [activeOrganizationIdAtom, "org-a"],
+      [lockedTeamIdAtom, "team-a"],
     ]);
-    const view = await mount(registry, "team-a");
+    const view = await mount(registry);
 
     expect(readActiveOrganizationId(user.id)).toBeNull();
 

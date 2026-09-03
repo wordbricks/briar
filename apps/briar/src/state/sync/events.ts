@@ -34,8 +34,43 @@ export type SyncEvent =
   | { readonly kind: "run-changed"; readonly run: HuntRun; readonly teamId?: string }
   /** One run is gone. */
   | { readonly kind: "run-deleted"; readonly teamId: string; readonly runId: string }
-  /** One channel summary was created or changed. */
+  /**
+   * One channel summary was created or changed without moving in the list — a
+   * read receipt or a realtime edit. A channel the organization does not list
+   * yet is appended.
+   */
   | { readonly kind: "channel-changed"; readonly channel: ChannelSummary }
+  /**
+   * The organization's whole channel list, in the order it renders. Both the
+   * catalog load and the local writes that reorder the list (creating a
+   * channel, a conversation view replacing its own copy) describe themselves
+   * this way, because order is the one thing a per-channel event cannot carry.
+   */
+  | {
+      readonly kind: "channel-catalog-snapshot";
+      readonly organizationId: string;
+      readonly channels: readonly ChannelSummary[];
+    }
+  /**
+   * One cursor page of the channel catalog. `reset` drops what is stored before
+   * merging, and the merged list is re-sorted by name — the order the catalog
+   * has always taken after a delta.
+   */
+  | {
+      readonly kind: "channel-catalog-delta";
+      readonly organizationId: string;
+      readonly channels: readonly ChannelSummary[];
+      readonly removedChannelIds: readonly string[];
+      readonly reset: boolean;
+    }
+  /** One channel is gone from an organization. */
+  | {
+      readonly kind: "channel-removed";
+      readonly organizationId: string;
+      readonly channelId: string;
+    }
+  /** The organization's catalog is dropped: nothing is known about it again. */
+  | { readonly kind: "channel-catalog-cleared"; readonly organizationId: string }
   /**
    * A confirmed settings write for one team. Applied only to the team whose
    * payload is the one on screen: a write for any other team would otherwise

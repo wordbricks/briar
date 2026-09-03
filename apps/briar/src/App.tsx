@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { useAtomSet } from "@effect/atom-react";
+import { useAtom, useAtomSet, useAtomValue } from "@effect/atom-react";
 import {
   Activity,
   ArrowLeft,
@@ -55,14 +55,14 @@ import {
   InboxDetailTargetBoundary,
   InboxWithSelection,
 } from "./components/InboxSelectionBoundary";
-import { Channels } from "./components/Channels";
 import type { CommandPaletteItem } from "./components/CommandPalette";
 import { KeyboardShortcutModeHint } from "./components/KeyboardShortcutModeHint";
-import { DirectMessages } from "./components/DirectMessages";
 import {
-  CompanionChannels,
-  type CompanionChannelCache,
-} from "./components/CompanionChannels";
+  ChannelsWithCatalog,
+  CompanionChannelsWithCatalog,
+  DirectMessagesWithCatalog,
+} from "./components/app/ChannelViews";
+import { CommandPaletteWithContext } from "./components/app/CommandPaletteWithContext";
 import { AppEffects } from "./components/app/AppEffects";
 import { LoginScreenWithSession } from "./components/app/LoginScreenWithSession";
 import { loadProjectMergeActivity } from "./lib/app-rpc/github";
@@ -146,6 +146,25 @@ import {
 import type { InboxNotificationTarget } from "./generated/tauri";
 import { inboxDetailTargetAtom } from "./state/inbox-selection";
 import {
+  setChannelNavigationBridge,
+  useChannelActions,
+} from "./state/channels/actions";
+import {
+  activeChannelIdAtom,
+  activeOrganizationChannelsAtom,
+  channelCatalogCursorAtom,
+  channelsLoadingAtom,
+  organizationDirectMessagesAtom,
+  requestedChannelIdAtom,
+  requestedChannelMessageAtom,
+  unreadDirectMessageCountAtom,
+  viewingChannelIdAtom,
+  viewingChannelThreadRootMessageIdAtom,
+  viewingIssueConversationRunIdAtom,
+  visibleOrganizationChannelsAtom,
+} from "./state/channels/atoms";
+import { useRegistry } from "./state/registry";
+import {
   clearFirstRunTutorialPending,
   hasPendingFirstRunTutorial,
   markFirstRunTutorialPending,
@@ -177,12 +196,7 @@ import { settingsAccountSelection } from "./lib/settings-account-selection";
 import { LITELLM_MAIN_PRICING_SOURCE } from "./lib/agent-usage-pricing";
 import { createCachedTeamUsageSummaryLoader } from "./lib/team-usage-summary";
 import {
-  createChannel,
-  deleteChannel,
   dispatchHuntRun,
-  listChannels,
-  loadChannelDelta,
-  markChannelRead,
   loadAgentUsageReport,
   loadDashboard,
   loadStatusTrayRuns,
@@ -192,20 +206,7 @@ import {
   retryHuntRun,
   resolveIssueHierarchyLocation,
 } from "./lib/api";
-import type {
-  ChannelSummary,
-  ChannelVisibility,
-} from "./lib/channels-contract";
-import {
-  laterTimestamp,
-  markChannelCatalogRead,
-} from "./lib/channel-unread";
-import {
-  CHANNEL_REALTIME_FALLBACK_MS,
-  createChannelRealtimeTransport,
-  createInboxRealtimeTransport,
-  MAX_CHANNEL_DELTA_PAGES_PER_SYNC,
-} from "./lib/channel-realtime";
+import { createInboxRealtimeTransport } from "./lib/channel-realtime";
 import { startDesktopChannelTransition } from "./lib/channel-performance";
 import { directMessageDisplayName } from "./lib/direct-messages";
 import { cn } from "./lib/utils";
@@ -269,11 +270,6 @@ import type { HuntRun, ProjectAgent, StatusTrayRun } from "./types";
 // flash rather than inform.
 const AppSettings = lazy(() =>
   import("./components/AppSettings").then((m) => ({ default: m.AppSettings })),
-);
-const CommandPalette = lazy(() =>
-  import("./components/CommandPalette").then((m) => ({
-    default: m.CommandPalette,
-  })),
 );
 const CompanionSettings = lazy(() =>
   import("./components/CompanionSettings").then((m) => ({
@@ -362,8 +358,6 @@ type AgentAutoHuntOptions = {
   retryReason?: string | null;
 };
 
-const CHANNEL_CATALOG_RETRY_MS = 3_000;
-
 export function App({
   appZoomCommands = null,
 }: {
@@ -419,209 +413,41 @@ export function App({
     projectWindowProjectId,
   ]);
   const briar = useBriar(scheduleSessionOptions);
-  const [organizationChannels, setOrganizationChannels] = useState<
-    ChannelSummary[]
-  >([]);
-  const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
-  const [requestedChannelSettingsId, setRequestedChannelSettingsId] =
-    useState<string | null>(null);
-  const [requestedChannelId, setRequestedChannelId] = useState<string | null>(
-    null,
+  const registry = useRegistry();
+  /*
+    The channel catalog and everything selected inside it live in
+    `state/channels` now. The shell reads the few values its own navigation and
+    keyboard handlers need; the conversation views subscribe on their own.
+  */
+  const organizationChannels = useAtomValue(activeOrganizationChannelsAtom);
+  const visibleOrganizationChannels = useAtomValue(
+    visibleOrganizationChannelsAtom,
   );
-  const [requestedChannelMessage, setRequestedChannelMessage] = useState<{
-    channelId: string;
-    messageId: string;
-    rootMessageId: string;
-  } | null>(null);
-  const [initialChannelInviteId, setInitialChannelInviteId] = useState<string | null>(
-    null,
+  const organizationDirectMessages = useAtomValue(
+    organizationDirectMessagesAtom,
   );
-  const [viewingChannelId, setViewingChannelId] = useState<string | null>(null);
-  const [viewingChannelThreadRootMessageId, setViewingChannelThreadRootMessageId]
-    = useState<string | null>(null);
+  const unreadDirectMessageCount = useAtomValue(unreadDirectMessageCountAtom);
+  const activeChannelId = useAtomValue(activeChannelIdAtom);
+  const channelsLoading = useAtomValue(channelsLoadingAtom);
+  const channelCatalogCursor = useAtomValue(channelCatalogCursorAtom);
+  const setRequestedChannelMessage = useAtomSet(requestedChannelMessageAtom);
+  const setRequestedChannelId = useAtomSet(requestedChannelIdAtom);
+  const viewingChannelId = useAtomValue(viewingChannelIdAtom);
+  const viewingChannelThreadRootMessageId = useAtomValue(
+    viewingChannelThreadRootMessageIdAtom,
+  );
   const [viewingIssueConversationRunId, setViewingIssueConversationRunId] =
-    useState<string | null>(null);
-  const handleViewingChannelChange = useCallback(
-    (channelId: string | null, threadRootMessageId: string | null = null) => {
-      setViewingChannelId(channelId);
-      setViewingChannelThreadRootMessageId(
-        channelId ? threadRootMessageId : null,
-      );
-    },
-    [],
-  );
-  const [channelsLoading, setChannelsLoading] = useState(false);
-  const [channelCatalogSnapshot, setChannelCatalogSnapshot] = useState<{
-    organizationId: string;
-    cursor: number;
-  } | null>(null);
-  const [channelCatalogRetry, setChannelCatalogRetry] = useState(0);
-  const channelCatalogCursorRef = useRef(0);
-  const companionChannelCache = useRef<CompanionChannelCache>(new Map());
-  useEffect(() => {
-    const organizationId = briar.activeOrganizationId;
-    const token = briar.token;
-    setOrganizationChannels([]);
-    setActiveChannelId(null);
-    setInitialChannelInviteId(null);
-    setRequestedChannelSettingsId(null);
-    setRequestedChannelId(null);
-    setChannelCatalogSnapshot(null);
-    channelCatalogCursorRef.current = 0;
-    companionChannelCache.current.clear();
-    if (!organizationId || !token) {
-      setChannelsLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-    let retryTimer: number | null = null;
-    setChannelsLoading(true);
-    void listChannels(token, organizationId)
-      .then((result) => {
-        if (!cancelled) {
-          channelCatalogCursorRef.current = result.cursor;
-          setChannelCatalogSnapshot({ organizationId, cursor: result.cursor });
-          setOrganizationChannels(result.channels);
-        }
-      })
-      .catch(() => {
-        // The conversation view reports request errors when opened. Keep the
-        // sidebar usable so channel creation can still be retried.
-        if (!cancelled) {
-          retryTimer = window.setTimeout(
-            () => setChannelCatalogRetry((retry) => retry + 1),
-            CHANNEL_CATALOG_RETRY_MS,
-          );
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setChannelsLoading(false);
-      });
-    return () => {
-      cancelled = true;
-      if (retryTimer !== null) window.clearTimeout(retryTimer);
-    };
-  }, [briar.activeOrganizationId, briar.token, channelCatalogRetry]);
-  useEffect(() => {
-    const organizationId = briar.activeOrganizationId;
-    const token = briar.token;
-    if (
-      !organizationId ||
-      !token ||
-      channelCatalogSnapshot?.organizationId !== organizationId
-    ) return;
-
-    let stopped = false;
-    let inFlight = false;
-    let pending = false;
-    const abortController = new AbortController();
-    const transport = createChannelRealtimeTransport(token, organizationId);
-    const sync = async () => {
-      pending = true;
-      if (stopped || inFlight || document.hidden) return;
-      inFlight = true;
-      try {
-        while (pending && !stopped) {
-          pending = false;
-          for (
-            let page = 0;
-            page < MAX_CHANNEL_DELTA_PAGES_PER_SYNC;
-            page += 1
-          ) {
-            const requestedCursor = channelCatalogCursorRef.current;
-            const delta = await loadChannelDelta(
-              token,
-              organizationId,
-              requestedCursor,
-              abortController.signal,
-            );
-            if (stopped || requestedCursor !== channelCatalogCursorRef.current) {
-              return;
-            }
-            channelCatalogCursorRef.current = delta.cursor;
-            if (
-              delta.reset ||
-              delta.channels.length ||
-              delta.removedChannelIds.length
-            ) {
-              setOrganizationChannels((current) => {
-                const byId = new Map(
-                  (delta.reset ? [] : current).map((channel) => [channel.id, channel]),
-                );
-                for (const channel of delta.channels) byId.set(channel.id, channel);
-                for (const id of delta.removedChannelIds) byId.delete(id);
-                return [...byId.values()].sort((left, right) =>
-                  left.name.localeCompare(right.name)
-                );
-              });
-            }
-            if (!delta.hasMore || delta.cursor <= requestedCursor) break;
-          }
-        }
-      } catch (error) {
-        if (!abortController.signal.aborted) {
-          console.warn("Channel catalog delta refresh failed", error);
-        }
-      } finally {
-        inFlight = false;
-        if (pending && !stopped) window.queueMicrotask(() => void sync());
-      }
-    };
-    const unsubscribe = transport.subscribe((notification) => {
-      if (
-        notification.topic === "channels" &&
-        notification.cursor > channelCatalogCursorRef.current
-      ) {
-        void sync();
-      }
-    });
-    const updateVisibility = () => {
-      if (document.hidden) transport.stop();
-      else {
-        transport.start();
-        void sync();
-      }
-    };
-    document.addEventListener("visibilitychange", updateVisibility);
-    updateVisibility();
-    const interval = window.setInterval(() => {
-      if (!document.hidden) void sync();
-    }, CHANNEL_REALTIME_FALLBACK_MS);
-    return () => {
-      stopped = true;
-      unsubscribe();
-      transport.stop();
-      abortController.abort();
-      document.removeEventListener("visibilitychange", updateVisibility);
-      window.clearInterval(interval);
-    };
-  }, [
-    briar.activeOrganizationId,
-    briar.token,
-    channelCatalogSnapshot?.organizationId,
-  ]);
-  const markOrganizationChannelRead = useCallback(
-    (channelId: string) => {
-      const token = briar.token;
-      const organizationId = briar.activeOrganizationId;
-      if (!token || !organizationId) return;
-      const channel = organizationChannels.find((item) => item.id === channelId);
-      if (!channel?.hasUnread) return;
-      const lastReadAt = laterTimestamp(
-        channel.lastMessageAt,
-        new Date().toISOString(),
-      );
-      setOrganizationChannels((current) =>
-        markChannelCatalogRead(current, channelId, lastReadAt),
-      );
-      void markChannelRead(token, organizationId, channelId, { lastReadAt })
-        .catch(() => {
-          // The next catalog snapshot restores unread if the write failed.
-        });
-    },
-    [briar.activeOrganizationId, briar.token, organizationChannels],
-  );
+    useAtom(viewingIssueConversationRunIdAtom);
+  const {
+    clearRequestedChannelMessage,
+    createOrganizationChannel,
+    deleteOrganizationChannel,
+    markOrganizationChannelRead,
+    openOrganizationChannel,
+    openOrganizationChannelSettings,
+    selectChannel,
+    setViewingChannel,
+  } = useChannelActions();
   const [statusTrayRuns, setStatusTrayRuns] = useState<StatusTrayRun[]>([]);
   const loadUsageReport = useCallback(async () => {
     if (!briar.token || !briar.activeOrganizationId) {
@@ -995,7 +821,7 @@ export function App({
     ) => {
       if (!organizationId) return;
       startDesktopChannelTransition(channelId);
-      setActiveChannelId(channelId);
+      selectChannel(channelId);
       markOrganizationChannelRead(channelId);
       navigateToLocation(
         channelNavigationLocation(
@@ -1010,6 +836,7 @@ export function App({
       briar.activeOrganizationId,
       markOrganizationChannelRead,
       navigateToLocation,
+      selectChannel,
     ],
   );
   const replaceChannelDestination = useCallback(
@@ -1019,7 +846,7 @@ export function App({
       organizationId = briar.activeOrganizationId,
       projectId = navigationActiveProjectIdRef.current,
     ) => {
-      setActiveChannelId(channelId);
+      selectChannel(channelId);
       if (!channelId || !organizationId) {
         replaceNavigationLocation(
           organizationId
@@ -1043,6 +870,7 @@ export function App({
       briar.activeOrganizationId,
       markOrganizationChannelRead,
       replaceNavigationLocation,
+      selectChannel,
     ],
   );
   const handleDesktopChannelFallback = useCallback(
@@ -1267,13 +1095,13 @@ export function App({
     }
     if (!navigationChannelId) {
       if (navigationHasChannelPageContext && activeChannelId !== null) {
-        setActiveChannelId(null);
+        selectChannel(null);
       }
       return;
     }
     if (activeChannelId !== navigationChannelId) {
       startDesktopChannelTransition(navigationChannelId);
-      setActiveChannelId(navigationChannelId);
+      selectChannel(navigationChannelId);
     }
     markOrganizationChannelRead(navigationChannelId);
   }, [
@@ -1292,6 +1120,11 @@ export function App({
     navigationHasChannelPageContext,
     navigationOrganizationId,
     navigationUserBoundaryChanged,
+    // The catalog kept this effect re-running while the read marker was a
+    // callback rebuilt from it, which is what re-marks the open channel when a
+    // message lands in it. The action is stable now, so the list is the
+    // dependency.
+    organizationChannels,
     replaceNavigationLocation,
   ]);
   const activeProjectForTabs = briar.projects.find(
@@ -1316,96 +1149,15 @@ export function App({
     navigationUserBoundaryChanged,
     replaceNavigationLocation,
   ]);
-  const createOrganizationChannel = useCallback(
-    async (
-      name: string,
-      visibility: ChannelVisibility,
-      defaultProjectId?: string | null,
-    ) => {
-      if (!briar.activeOrganizationId || !briar.token) {
-        throw new Error("Organization is not available");
-      }
-      const result = await createChannel(
-        briar.token,
-        briar.activeOrganizationId,
-        { name, visibility, defaultProjectId },
-      );
-      setOrganizationChannels((current) =>
-        [
-          ...current.filter((channel) => channel.id !== result.channel.id),
-          result.channel,
-        ].sort((left, right) => left.name.localeCompare(right.name)),
-      );
-      setInitialChannelInviteId(result.channel.id);
-      navigateToChannel(
-        result.channel.id,
-        "channels",
-        briar.activeOrganizationId,
-      );
-    },
-    [
-      briar.activeOrganizationId,
-      briar.token,
-      navigateToChannel,
-    ],
-  );
-  const openOrganizationChannel = useCallback(
-    (channelId: string) => {
-      if (!briar.activeOrganizationId) return;
-      if (
-        projectWindowProjectId &&
-        organizationChannels.find((channel) => channel.id === channelId)
-          ?.defaultProjectId !== projectWindowProjectId
-      ) return;
-      navigateToChannel(
-        channelId,
-        organizationChannels.find((channel) => channel.id === channelId)
-          ?.kind === "dm"
-          ? "dms"
-          : "channels",
-      );
-    },
-    [
-      briar.activeOrganizationId,
-      navigateToChannel,
-      organizationChannels,
-      projectWindowProjectId,
-    ],
-  );
-  const openOrganizationChannelSettings = useCallback(
-    (channelId: string) => {
-      setRequestedChannelSettingsId(channelId);
-      openOrganizationChannel(channelId);
-    },
-    [openOrganizationChannel],
-  );
-  const deleteOrganizationChannel = useCallback(
-    async (channelId: string) => {
-      if (!briar.activeOrganizationId || !briar.token) {
-        throw new Error("Organization is not available");
-      }
-      await deleteChannel(briar.token, briar.activeOrganizationId, channelId);
-      setOrganizationChannels((current) =>
-        current.filter((channel) => channel.id !== channelId),
-      );
-      setRequestedChannelMessage((current) =>
-        current?.channelId === channelId ? null : current,
-      );
-      setRequestedChannelSettingsId((current) =>
-        current === channelId ? null : current,
-      );
-      if (activeChannelId === channelId) {
-        setActiveChannelId(null);
-        navigateToPage("lobby");
-      }
-    },
-    [
-      activeChannelId,
-      briar.activeOrganizationId,
-      briar.token,
-      navigateToPage,
-    ],
-  );
+  /*
+    The channel actions navigate, and navigation is still the shell's. They ask
+    for it through the registry rather than through hook dependencies, so
+    `useChannelActions()` keeps returning the same object to every view that
+    took it while these closures keep tracking the latest render.
+  */
+  useEffect(() => {
+    setChannelNavigationBridge(registry, { navigateToChannel, navigateToPage });
+  }, [navigateToChannel, navigateToPage, registry]);
   const [pendingBriarLink, setPendingBriarLink] =
     useState<BriarLinkTarget | null>(() => {
       if (!runsOnWeb) return null;
@@ -1426,10 +1178,6 @@ export function App({
   const [requestedRunMessageId, setRequestedRunMessageId] = useState<string | null>(null);
   const [requestedRunInitialTab, setRequestedRunInitialTab] =
     useState<IssueDetailTab | null>(null);
-  const clearRequestedChannelMessage = useCallback(
-    () => setRequestedChannelMessage(null),
-    [],
-  );
   const [issueListRequestKey, setIssueListRequestKey] = useState(0);
   const [agentListRequestKey, setAgentListRequestKey] = useState(0);
   const [requestedSessionId, setRequestedSessionId] = useState<string | null>(
@@ -1502,11 +1250,7 @@ export function App({
         briar.setActiveOrganizationId(pendingBriarLink.organizationId);
         return;
       }
-      if (
-        channelsLoading ||
-        channelCatalogSnapshot?.organizationId !==
-          pendingBriarLink.organizationId
-      ) {
+      if (channelsLoading || channelCatalogCursor === null) {
         return;
       }
       setRequestedRunInitialTab(null);
@@ -1527,7 +1271,7 @@ export function App({
           ? pendingBriarLink.channelId
           : null,
       );
-      setActiveChannelId(pendingBriarLink.channelId);
+      selectChannel(pendingBriarLink.channelId);
       markOrganizationChannelRead(pendingBriarLink.channelId);
       if (briar.companionMode) {
         setCompanionPage(
@@ -1631,7 +1375,7 @@ export function App({
     briar.setActiveOrganizationId,
     briar.setActiveProjectId,
     briar.user,
-    channelCatalogSnapshot?.organizationId,
+    channelCatalogCursor,
     channelsLoading,
     markOrganizationChannelRead,
     navigateToChannel,
@@ -1687,7 +1431,8 @@ export function App({
     if (
       pendingInboxNotificationTarget.kind === "channel" &&
       (channelsLoading ||
-        channelCatalogSnapshot?.organizationId !== targetProject.organizationId)
+        channelCatalogCursor === null ||
+        briar.activeOrganizationId !== targetProject.organizationId)
     ) {
       return;
     }
@@ -1728,7 +1473,7 @@ export function App({
         messageId: channelMessageId,
         rootMessageId,
       });
-      setActiveChannelId(pendingInboxNotificationTarget.targetId);
+      selectChannel(pendingInboxNotificationTarget.targetId);
       markOrganizationChannelRead(pendingInboxNotificationTarget.targetId);
       if (briar.companionMode) {
         setCompanionPage(
@@ -1769,7 +1514,7 @@ export function App({
     briar.projects,
     briar.setActiveProjectId,
     briar.user,
-    channelCatalogSnapshot?.organizationId,
+    channelCatalogCursor,
     channelsLoading,
     inbox.markRead,
     markOrganizationChannelRead,
@@ -1938,19 +1683,6 @@ export function App({
       toast,
     ],
   );
-  const visibleOrganizationChannels = projectWindowProjectId
-    ? organizationChannels.filter(
-        (channel) =>
-          channel.kind !== "dm" &&
-          channel.defaultProjectId === projectWindowProjectId,
-      )
-    : organizationChannels.filter((channel) => channel.kind !== "dm");
-  const organizationDirectMessages = projectWindowProjectId
-    ? []
-    : organizationChannels.filter((channel) => channel.kind === "dm");
-  const unreadDirectMessageCount = organizationDirectMessages.filter(
-    (channel) => channel.hasUnread,
-  ).length;
   const visibleOrganizations = projectWindowProjectId
     ? projectWindowProject?.organizationId
       ? briar.organizations.filter(
@@ -2972,22 +2704,6 @@ export function App({
     setRequestedRunId(runId);
     navigateToIssue(runId);
   };
-  const currentPaletteRun = selectedRunId
-    ? briar.dashboard?.runs.find((run) => run.id === selectedRunId) ?? null
-    : null;
-  const currentPaletteChannel = activeChannelId
-    ? organizationChannels.find((channel) => channel.id === activeChannelId) ?? null
-    : null;
-  const commandPaletteContextLabel = currentPaletteRun && activeProject
-    ? `${formatIssueKey(activeProject.issueKeyPrefix, currentPaletteRun.runNumber)} · ${currentPaletteRun.title}`
-    : currentPaletteChannel && (activePage === "channels" || activePage === "dms")
-      ? activePage === "dms"
-        ? directMessageDisplayName(
-            currentPaletteChannel,
-            briar.user?.id ?? null,
-          )
-        : `#${currentPaletteChannel.name}`
-      : activeProject?.name ?? activeOrganization?.name ?? null;
 
   if (visibleInboxUnreadCount > 0) {
     addPaletteItem({
@@ -3683,19 +3399,11 @@ export function App({
         workers={briar.dashboard?.workers ?? []}
       />
     ) : inboxDetailChannelId && briar.activeOrganizationId && briar.token ? (
-      <Channels
+      <ChannelsWithCatalog
         activeChannelId={inboxDetailChannelId}
-        channelCatalogCursor={
-          channelCatalogSnapshot?.organizationId === briar.activeOrganizationId
-            ? channelCatalogSnapshot.cursor
-            : null
-        }
         channelInboxSyncSignal={channelInboxSyncSignal}
-        channels={visibleOrganizationChannels}
-        currentUserId={briar.user?.id ?? null}
         inboxDetail
-        onChannelSelect={setActiveChannelId}
-        onChannelsChange={setOrganizationChannels}
+        onChannelSelect={selectChannel}
         onInboxDetailClose={() => {
           setRequestedChannelMessage(null);
           setInboxDetailTarget(null);
@@ -3721,13 +3429,6 @@ export function App({
           navigateToIssue(runId, projectId);
         }}
         onSkillSessionAccepted={autoHunt.adoptRemoteSession}
-        onViewingChannelChange={handleViewingChannelChange}
-        organizationId={briar.activeOrganizationId}
-        organizationName={activeOrganization?.name}
-        projects={activeOrganizationProjects}
-        requestedMessage={requestedChannelMessage}
-        onRequestedMessageOpen={clearRequestedChannelMessage}
-        token={briar.token}
       />
     ) : isInboxDetailLoading ? (
       <div
@@ -4074,16 +3775,9 @@ export function App({
           !projectWindowProjectId &&
           briar.activeOrganizationId &&
           briar.token ? (
-          <DirectMessages
+          <DirectMessagesWithCatalog
             activeChannelId={desktopActiveChannelId}
-            channelCatalogCursor={
-              channelCatalogSnapshot?.organizationId === briar.activeOrganizationId
-                ? channelCatalogSnapshot.cursor
-                : null
-            }
             channelInboxSyncSignal={channelInboxSyncSignal}
-            channels={organizationDirectMessages}
-            currentUserId={briar.user?.id ?? null}
             isSidebarOpen={isSidebarOpen}
             key={`desktop-dms:${briar.activeOrganizationId}`}
             onChannelFallback={(channelId) =>
@@ -4092,11 +3786,10 @@ export function App({
             onChannelSelect={(channelId) => {
               if (channelId) navigateToChannel(channelId, "dms");
               else {
-                setActiveChannelId(null);
+                selectChannel(null);
                 navigateToPage("dms");
               }
             }}
-            onChannelsChange={setOrganizationChannels}
             onCreateAgent={() => {
               setSettingsTarget({
                 scope: "organization",
@@ -4112,11 +3805,6 @@ export function App({
               navigateToIssue(runId, projectId);
             }}
             onSkillSessionAccepted={autoHunt.adoptRemoteSession}
-            onViewingChannelChange={handleViewingChannelChange}
-            organizationId={briar.activeOrganizationId}
-            organizationName={activeOrganization?.name}
-            projects={activeOrganizationProjects}
-            token={briar.token}
           />
         ) : activePage === "dms" &&
           !projectWindowProjectId &&
@@ -4199,7 +3887,7 @@ export function App({
                     messageId: target.channelMessageId,
                     rootMessageId: target.rootMessageId,
                   });
-                  setActiveChannelId(target.targetId);
+                  selectChannel(target.targetId);
                   markOrganizationChannelRead(target.targetId);
                 } else {
                   setRequestedChannelMessage(null);
@@ -4344,17 +4032,9 @@ export function App({
         ) : activePage === "channels" &&
           briar.activeOrganizationId &&
           briar.token ? (
-          <Channels
+          <ChannelsWithCatalog
             activeChannelId={desktopActiveChannelId}
-            channelCatalogCursor={
-              channelCatalogSnapshot?.organizationId === briar.activeOrganizationId
-                ? channelCatalogSnapshot.cursor
-                : null
-            }
             channelInboxSyncSignal={channelInboxSyncSignal}
-            channels={visibleOrganizationChannels}
-            projects={activeOrganizationProjects}
-            currentUserId={briar.user?.id ?? null}
             key={`desktop-channels:${briar.activeOrganizationId}`}
             onChannelFallback={(channelId) =>
               handleDesktopChannelFallback(channelId, "channels")
@@ -4362,22 +4042,11 @@ export function App({
             onChannelSelect={(channelId) => {
               if (channelId) navigateToChannel(channelId, "channels");
               else {
-                setActiveChannelId(null);
+                selectChannel(null);
                 navigateToPage("channels");
               }
             }}
-            onChannelsChange={setOrganizationChannels}
             onSkillSessionAccepted={autoHunt.adoptRemoteSession}
-            onViewingChannelChange={handleViewingChannelChange}
-            organizationId={briar.activeOrganizationId}
-            organizationName={activeOrganization?.name}
-            initialInviteChannelId={initialChannelInviteId}
-            onInitialInviteHandled={() => setInitialChannelInviteId(null)}
-            initialSettingsChannelId={requestedChannelSettingsId}
-            onInitialSettingsHandled={() => setRequestedChannelSettingsId(null)}
-            token={briar.token}
-            requestedMessage={requestedChannelMessage}
-            onRequestedMessageOpen={clearRequestedChannelMessage}
             onCreateAgent={() => {
               setSettingsTarget({
                 scope: "organization",
@@ -4582,20 +4251,9 @@ export function App({
           briar.activeOrganizationId &&
           (briar.token || briar.demoMode) ? (
           <>
-            <CompanionChannels
-              activeProjectId={activeProject?.id ?? null}
+            <CompanionChannelsWithCatalog
               channelInboxSyncSignal={channelInboxSyncSignal}
-              currentUserId={briar.user?.id ?? null}
-              organizationId={briar.activeOrganizationId}
-              projects={activeOrganizationProjects}
               onSkillSessionAccepted={autoHunt.adoptRemoteSession}
-              onViewingChannelChange={handleViewingChannelChange}
-              token={briar.token ?? ""}
-              channelCache={companionChannelCache.current}
-              requestedMessage={requestedChannelMessage}
-              requestedChannelId={requestedChannelId}
-              onRequestedChannelOpen={() => setRequestedChannelId(null)}
-              onRequestedMessageOpen={clearRequestedChannelMessage}
               onIssueOpen={async (projectId, runId) => {
                 await briar.ensureProjectSelected(projectId);
                 setRequestedRunId(runId);
@@ -4687,19 +4345,11 @@ export function App({
           </>
         ) : companionPage === "dms" && briar.activeOrganizationId && briar.token ? (
           <>
-            <DirectMessages
+            <DirectMessagesWithCatalog
               activeChannelId={activeChannelId}
-              channelCatalogCursor={
-                channelCatalogSnapshot?.organizationId === briar.activeOrganizationId
-                  ? channelCatalogSnapshot.cursor
-                  : null
-              }
               channelInboxSyncSignal={channelInboxSyncSignal}
-              channels={organizationDirectMessages}
-              currentUserId={briar.user?.id ?? null}
               isSidebarOpen
-              onChannelSelect={setActiveChannelId}
-              onChannelsChange={setOrganizationChannels}
+              onChannelSelect={selectChannel}
               onIssueCreated={async (projectId, runId) => {
                 await briar.ensureProjectSelected(projectId);
                 setRequestedRunId(runId);
@@ -4707,11 +4357,6 @@ export function App({
                 setCompanionPage("issues");
               }}
               onSkillSessionAccepted={autoHunt.adoptRemoteSession}
-              onViewingChannelChange={handleViewingChannelChange}
-              organizationId={briar.activeOrganizationId}
-              organizationName={activeOrganization?.name}
-              projects={activeOrganizationProjects}
-              token={briar.token}
             />
             <CompanionBottomNavigation
               activeDestination="dms"
@@ -4832,13 +4477,13 @@ export function App({
         }
       />
       {commandPaletteAvailable && isCommandPaletteOpen ? (
-        <CommandPalette
-          contextLabel={commandPaletteContextLabel}
+        <CommandPaletteWithContext
+          activePage={activePage}
           initialQuery={commandPaletteInitialQuery}
           items={commandPaletteItems}
-          loading={briar.loading || channelsLoading}
           onOpenChange={handleCommandPaletteOpenChange}
           open={isCommandPaletteOpen}
+          selectedRunId={selectedRunId}
           shortcutLabel={formatShortcut(configuredKeybindings.commandPalette)}
         />
       ) : null}

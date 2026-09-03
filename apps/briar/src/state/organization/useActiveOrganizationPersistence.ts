@@ -2,7 +2,7 @@ import { useAtomValue } from "@effect/atom-react";
 import { useEffect } from "react";
 
 import { writeActiveOrganizationId } from "../../lib/active-organization";
-import { readTeamWindowProjectId } from "../../lib/team-window";
+import { lockedTeamIdAtom } from "../platform";
 import { userAtom } from "../session/atoms";
 import { activeOrganizationIdAtom } from "./atoms";
 
@@ -11,12 +11,11 @@ import { activeOrganizationIdAtom } from "./atoms";
  * reopens it (`resolveActiveAccountSelection` reads the same key back).
  *
  * A project window is pinned to one team by its query string, so it must never
- * overwrite the main window's choice; `lockedTeamId` defaults to that pin and
- * suppresses the write.
+ * overwrite the main window's choice; the platform level pin suppresses the
+ * write.
  */
-export function useActiveOrganizationPersistence(
-  lockedTeamId: string | null = readTeamWindowProjectId(),
-) {
+export function useActiveOrganizationPersistence() {
+  const lockedTeamId = useAtomValue(lockedTeamIdAtom);
   const user = useAtomValue(userAtom);
   const activeOrganizationId = useAtomValue(activeOrganizationIdAtom);
 

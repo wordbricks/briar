@@ -7,7 +7,13 @@ import type {
   HuntRun,
   OrganizationMember,
 } from "../../types";
-import { channelsByIdAtom } from "../entities/channels";
+import {
+  channelCatalogOrganizationIdsAtom,
+  channelsByIdAtom,
+  organizationChannelIdsAtom,
+  organizationChannelsAtom,
+} from "../entities/channels";
+import type { ChannelSummary } from "../../lib/channels-contract";
 import {
   membersByIdAtom,
   teamMemberIdsAtom,
@@ -377,6 +383,102 @@ function applyRunDeleted(
   releaseSharedIds(registry, runsByIdAtom, teamRunIdsAtom, teamId, [runId]);
 }
 
+/**
+ * Replaces one organization's ordered channel list. Summaries that did not
+ * change keep their stored reference, and ids the new list dropped leave the
+ * shared map — channels belong to exactly one organization, so nothing else can
+ * still be referencing them.
+ */
+function writeChannelCatalog(
+  registry: AtomRegistry,
+  organizationId: string,
+  channels: readonly ChannelSummary[],
+) {
+  const previousIds = registry.get(organizationChannelIdsAtom(organizationId));
+  const nextIds = channels.map((channel) => channel.id);
+  registry.update(channelsByIdAtom, (stored) => upsertMany(stored, channels));
+  registry.set(organizationChannelIdsAtom(organizationId), nextIds);
+  const kept = new Set(nextIds);
+  const dropped = (previousIds ?? []).filter((id) => !kept.has(id));
+  if (dropped.length > 0) {
+    registry.update(channelsByIdAtom, (stored) => removeMany(stored, dropped));
+  }
+  registry.update(channelCatalogOrganizationIdsAtom, (organizationIds) =>
+    organizationIds.includes(organizationId)
+      ? organizationIds
+      : [...organizationIds, organizationId],
+  );
+}
+
+/**
+ * Merges one catalog delta page. The merge and the name ordering are the ones
+ * the catalog sync in the app shell applied to its own array, kept intact: a
+ * page that carries nothing leaves the list — and its reference — alone.
+ */
+function applyChannelCatalogDelta(
+  registry: AtomRegistry,
+  organizationId: string,
+  channels: readonly ChannelSummary[],
+  removedChannelIds: readonly string[],
+  reset: boolean,
+) {
+  if (!reset && channels.length === 0 && removedChannelIds.length === 0) return;
+  const current = registry.get(organizationChannelsAtom(organizationId));
+  const byId = new Map(
+    (reset ? [] : current).map((channel) => [channel.id, channel] as const),
+  );
+  for (const channel of channels) byId.set(channel.id, channel);
+  for (const id of removedChannelIds) byId.delete(id);
+  writeChannelCatalog(
+    registry,
+    organizationId,
+    [...byId.values()].sort((left, right) => left.name.localeCompare(right.name)),
+  );
+}
+
+/**
+ * Upserts one summary. The organization's list is left in place unless the
+ * channel is new to it, which keeps a read receipt from reordering anything.
+ */
+function applyChannelChanged(registry: AtomRegistry, channel: ChannelSummary) {
+  registry.update(channelsByIdAtom, (stored) => upsertMany(stored, [channel]));
+  const ids = registry.get(organizationChannelIdsAtom(channel.organizationId));
+  if (!ids || ids.includes(channel.id)) return;
+  registry.set(organizationChannelIdsAtom(channel.organizationId), [
+    ...ids,
+    channel.id,
+  ]);
+}
+
+function applyChannelRemoved(
+  registry: AtomRegistry,
+  organizationId: string,
+  channelId: string,
+) {
+  const ids = registry.get(organizationChannelIdsAtom(organizationId));
+  if (ids?.includes(channelId)) {
+    registry.set(
+      organizationChannelIdsAtom(organizationId),
+      ids.filter((candidate) => candidate !== channelId),
+    );
+  }
+  registry.update(channelsByIdAtom, (stored) => removeMany(stored, [channelId]));
+}
+
+/** Forgets an organization's catalog entirely, summaries included. */
+function clearChannelCatalog(registry: AtomRegistry, organizationId: string) {
+  const ids = registry.get(organizationChannelIdsAtom(organizationId));
+  registry.set(organizationChannelIdsAtom(organizationId), null);
+  if (ids && ids.length > 0) {
+    registry.update(channelsByIdAtom, (stored) => removeMany(stored, ids));
+  }
+  registry.update(channelCatalogOrganizationIdsAtom, (organizationIds) =>
+    organizationIds.includes(organizationId)
+      ? organizationIds.filter((candidate) => candidate !== organizationId)
+      : organizationIds,
+  );
+}
+
 function applySessionCleared(registry: AtomRegistry) {
   for (const teamId of [...registry.get(retainedTeamIdsAtom)]) {
     clearTeamState(registry, teamId);
@@ -385,6 +487,12 @@ function applySessionCleared(registry: AtomRegistry) {
   registry.set(workersByIdAtom, new Map());
   registry.set(membersByIdAtom, new Map());
   registry.set(teamsByIdAtom, new Map());
+  for (const organizationId of [
+    ...registry.get(channelCatalogOrganizationIdsAtom),
+  ]) {
+    registry.set(organizationChannelIdsAtom(organizationId), null);
+  }
+  registry.set(channelCatalogOrganizationIdsAtom, []);
   registry.set(channelsByIdAtom, new Map());
   registry.set(retainedTeamIdsAtom, []);
   registry.set(staleTeamIdAtom, null);
@@ -410,9 +518,25 @@ export function applySyncEvent(registry: AtomRegistry, event: SyncEvent): void {
         applyRunDeleted(registry, event.teamId, event.runId);
         return;
       case "channel-changed":
-        registry.update(channelsByIdAtom, (channels) =>
-          upsertMany(channels, [event.channel]),
+        applyChannelChanged(registry, event.channel);
+        return;
+      case "channel-catalog-snapshot":
+        writeChannelCatalog(registry, event.organizationId, event.channels);
+        return;
+      case "channel-catalog-delta":
+        applyChannelCatalogDelta(
+          registry,
+          event.organizationId,
+          event.channels,
+          event.removedChannelIds,
+          event.reset,
         );
+        return;
+      case "channel-removed":
+        applyChannelRemoved(registry, event.organizationId, event.channelId);
+        return;
+      case "channel-catalog-cleared":
+        clearChannelCatalog(registry, event.organizationId);
         return;
       case "team-settings-changed": {
         // The guard the payload level commit had: settings replace a payload
