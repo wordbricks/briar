@@ -5,7 +5,7 @@ import { useControlledCollectionNavigation } from "@/hooks/useControlledCollecti
 import { runMeta } from "@/lib/stages";
 import { type AutoHuntWorkflowCheckpoint } from "@/lib/auto-hunt-contract";
 import { formatIssueKey } from "@/lib/issue-key";
-import type { HuntRun, HuntRunPlacement, IssueExecutionPreferences, OrganizationMember, Project } from "@/types";
+import type { HuntRun, HuntRunPlacement, IssueExecutionPreferences, OrganizationMember, PlanningProject, Project } from "@/types";
 import { type AgentProvider } from "@/lib/project-llm";
 import { useI18n } from "@/i18n";
 import type { MessageKey } from "@/i18n/messages";
@@ -22,6 +22,11 @@ export function IssueList({
   deletingIssueId,
   onDelete,
   onTransfer,
+  onTeamChange,
+  onProjectChange,
+  teams = [],
+  currentTeamId = null,
+  planningProjects = [],
   onEdit,
   onMove,
   onOpen,
@@ -42,6 +47,11 @@ export function IssueList({
   deletingIssueId: string | null;
   onDelete: (runId: string) => void;
   onTransfer?: (runId: string) => void;
+  onTeamChange?: (run: HuntRun, teamId: string) => void;
+  onProjectChange?: (run: HuntRun, projectId: string) => void;
+  teams?: Array<Pick<Project, "id" | "name">>;
+  currentTeamId?: string | null;
+  planningProjects?: Array<Pick<PlanningProject, "id" | "name" | "teamId">>;
   onEdit: (runId: string) => void;
   onMove: (run: HuntRun, placement: HuntRunPlacement) => void;
   onOpen: (runId: string) => void;
@@ -147,7 +157,9 @@ export function IssueList({
                 </span>
                 <ChevronRight aria-hidden="true" size={15} />
               </div>;
-        return readOnly ? <Fragment key={run.id}>{row}</Fragment> : <IssueContextMenu availableProviders={availableProviders} disabled={deletingIssueId === run.id || updatingIssueId === run.id} key={run.id} onDelete={() => onDelete(run.id)} onTransfer={onTransfer ? () => onTransfer(run.id) : undefined} onEdit={() => onEdit(run.id)} onMove={placement => onMove(run, placement)} onOpen={() => onOpen(run.id)} onProcessNow={onProcessIssueNow ? () => onProcessIssueNow(run) : undefined} onPriorityChange={priority => onPriorityChange(run, priority)} onPreferencesChange={preferences => onPreferencesChange(run, preferences)} onCheckpointsChange={checkpoints => onCheckpointsChange(run, checkpoints)} run={run} isProcessing={processingIssueIds.has(run.id)}>
+        const teamIdForRun = run.teamId ?? currentTeamId;
+        const planningProjectsForRun = teamIdForRun ? planningProjects.filter(project => project.teamId === teamIdForRun) : planningProjects;
+        return readOnly ? <Fragment key={run.id}>{row}</Fragment> : <IssueContextMenu availableProviders={availableProviders} disabled={deletingIssueId === run.id || updatingIssueId === run.id} key={run.id} onDelete={() => onDelete(run.id)} onTransfer={onTransfer ? () => onTransfer(run.id) : undefined} onTeamChange={onTeamChange ? teamId => onTeamChange(run, teamId) : undefined} onProjectChange={onProjectChange ? projectId => onProjectChange(run, projectId) : undefined} teams={teams} currentTeamId={currentTeamId} planningProjects={planningProjectsForRun} onEdit={() => onEdit(run.id)} onMove={placement => onMove(run, placement)} onOpen={() => onOpen(run.id)} onProcessNow={onProcessIssueNow ? () => onProcessIssueNow(run) : undefined} onPriorityChange={priority => onPriorityChange(run, priority)} onPreferencesChange={preferences => onPreferencesChange(run, preferences)} onCheckpointsChange={checkpoints => onCheckpointsChange(run, checkpoints)} run={run} isProcessing={processingIssueIds.has(run.id)}>
             {row}
           </IssueContextMenu>;
       })}

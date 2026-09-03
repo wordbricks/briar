@@ -18,6 +18,9 @@ const deviceCodeErrorCodes =
   exhaustiveLiterals<OfficialDeviceCodeErrorCode>()([
     "invalid_request",
     "invalid_client",
+    "invalid_scope",
+    "server_error",
+    "unauthorized_client",
   ]);
 
 const deviceTokenErrorCodes =
@@ -122,7 +125,6 @@ export type DeviceAuthorizationClientId =
   | "briar-mobile"
   | "briar-android"
   | "briar-desktop"
-  | "briar-web"
   | "briar-cli";
 
 export type DeviceLoginMethod = "email" | "google";
@@ -141,8 +143,6 @@ export const createDeviceVerificationUrl = (
   const verificationUrl = new URL(verificationUriComplete);
   if (clientId === "briar-mobile" || clientId === "briar-android") {
     verificationUrl.searchParams.set("client", "mobile");
-  } else if (clientId === "briar-web") {
-    verificationUrl.searchParams.set("client", "web");
   }
   if (options.method) {
     verificationUrl.searchParams.set("method", options.method);

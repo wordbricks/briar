@@ -1,4 +1,4 @@
-import { Activity, ArrowLeft, ArrowUp, BadgeCheck, Bot, BrainCircuit, Check, ChevronRight, CircleAlert, Clock3, Columns3, FolderGit2, FolderInput, Gauge, GitCommitHorizontal, GitFork, GitPullRequest, Image as ImageIcon, ListChecks, Maximize2, MessageSquare, Play, RefreshCw, RotateCcw, Signal, Trash2, UserRound, Waypoints, X } from "lucide-react";
+import { Activity, ArrowLeft, ArrowUp, BadgeCheck, Bot, BrainCircuit, Check, ChevronRight, CircleAlert, Clock3, Columns3, FolderGit2, FolderInput, Gauge, GitCommitHorizontal, GitFork, GitPullRequest, Image as ImageIcon, ListChecks, Maximize2, MessageSquare, Play, RefreshCw, RotateCcw, Signal, Trash2, UserRound, Users, Waypoints, X } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { MainContent } from "@/components/layout";
 import { Button } from "@/components/ui/button";
@@ -84,6 +84,8 @@ export function RunPage({
   onDelete,
   onTransfer,
   transferProjects = [],
+  teams = [],
+  currentTeam = null,
   onDependencyOpen,
   onCreateSubIssue,
   onLinkSubIssue,
@@ -156,6 +158,8 @@ export function RunPage({
   onDelete?: () => Promise<unknown>;
   onTransfer?: (targetProjectId: string) => Promise<unknown>;
   transferProjects?: Project[];
+  teams?: Project[];
+  currentTeam?: Pick<Project, "id" | "name" | "icon"> | null;
   onDependencyOpen?: (runId: string) => void;
   onCreateSubIssue?: () => void;
   onLinkSubIssue?: (childRunId: string) => Promise<unknown>;
@@ -642,6 +646,25 @@ export function RunPage({
   const projectValue = currentProject?.id ?? "";
   const projectLabel = currentProject?.name ?? run.projectName ?? t("run.notSet");
   const canEditProject = Boolean(onMoveIssueProject && run.projectId && projectOptions.length > 1);
+  const currentTeamId = run.teamId ?? currentTeam?.id ?? null;
+  const currentTeamName = currentTeam?.name ?? null;
+  const teamOptionsBase = teams.length > 0 ? teams : [...(currentTeam ? [currentTeam] : []), ...transferProjects];
+  const teamOptionsMap = new Map(teamOptionsBase.map((team) => [team.id, team]));
+  const teamOptions = [...teamOptionsMap.values()].map((team) => ({
+    label: team.name,
+    value: team.id,
+    leading: <ProjectIcon project={team} className="run-project-option-icon" />,
+  }));
+  if (currentTeamId && !teamOptions.some((option) => option.value === currentTeamId)) {
+    teamOptions.unshift({
+      label: currentTeamName ?? t("run.notSet"),
+      value: currentTeamId,
+      leading: <ProjectIcon project={currentTeam ?? { name: currentTeamName ?? t("run.notSet"), icon: null }} className="run-project-option-icon" />,
+    });
+  }
+  const teamValue = currentTeamId ?? "";
+  const teamLabel = teamOptions.find((option) => option.value === currentTeamId)?.label ?? currentTeamName ?? t("run.notSet");
+  const canEditTeam = Boolean(onTransfer && teamOptions.length > 1);
   const issueContent = run.issueDescription?.trim() || null;
   const editableIssueAttachments = run.attachments.filter(attachment => inlineKeptAttachmentIds.includes(attachment.id)).map(attachment => ({
     attachment,
@@ -872,6 +895,12 @@ export function RunPage({
   const updateIssueProject = (value: string) => {
     if (!onMoveIssueProject || !run.projectId || value === run.projectId) return;
     void runAction(() => onMoveIssueProject(value));
+  };
+  const updateIssueTeam = (value: string) => {
+    if (!onTransfer || !value || value === (run.teamId ?? currentTeam?.id ?? '')) return;
+    setTransferError(null);
+    setTransferTargetProjectId(value);
+    setIsTransferDialogOpen(true);
   };
   const resumePausedRun = async () => {
     if (isResumePending || isRecovering || run.resumeRequestedAt) return;
@@ -1494,6 +1523,24 @@ export function RunPage({
                       }, ...(run.preferredProvider ? agentEffortOptions(providerModels, run.preferredProvider, run.preferredModel, run.preferredEffort) : [])]} placeholder={t("issue.selectModelFirst")} size="small" value={run.preferredEffort ?? ""} />
                     </span>
                   </label>
+                  {canEditTeam ? <label aria-label={`${t("issue.team")}: ${teamLabel}`} className="run-property run-property-editable" title={t("issue.team")}>
+                      <span className="run-property-icon team"><Users size={15} /></span>
+                      <span className="run-property-copy">
+                        <SelectMenu align="end" className="run-team-select" disabled={isUpdatingIssue} label={t("issue.team")} onValueChange={updateIssueTeam} options={teamOptions} searchEmptyMessage={t("organization.noResults")} searchPlaceholder={t("organization.search")} searchable={teamOptions.length > 8} size="small" value={teamValue} />
+                      </span>
+                    </label> : <div aria-label={`${t("issue.team")}: ${teamLabel}`} className="run-property" title={t("issue.team")}>
+                      <span className="run-property-icon team"><Users size={15} /></span>
+                      <span className="run-property-copy"><strong>{teamLabel}</strong></span>
+                    </div>}
+                  {canEditProject ? <label aria-label={`${t("issue.project")}: ${projectLabel}`} className="run-property run-property-editable" title={t("issue.project")}>
+                      <span className="run-property-icon project"><ProjectIcon className="run-project-option-icon" project={currentProject ?? { name: projectLabel, icon: null }} /></span>
+                      <span className="run-property-copy">
+                        <SelectMenu align="end" className="run-project-select" disabled={isUpdatingIssue} label={t("issue.project")} onValueChange={updateIssueProject} options={projectOptions} searchEmptyMessage={t("organization.noResults")} searchPlaceholder={t("organization.search")} searchable={projectOptions.length > 8} size="small" value={projectValue} />
+                      </span>
+                    </label> : <div aria-label={`${t("issue.project")}: ${projectLabel}`} className="run-property" title={t("issue.project")}>
+                      <span className="run-property-icon project"><ProjectIcon className="run-project-option-icon" project={currentProject ?? { name: projectLabel, icon: null }} /></span>
+                      <span className="run-property-copy"><strong>{projectLabel}</strong></span>
+                    </div>}
                   {run.fullAuto ? <div aria-label={`${t("issue.fullAuto")}: ${t("issue.fullAutoDescription")}`} className="run-property" title={t("issue.fullAutoDescription")}>
                       <span className="run-property-icon agent">
                         <Bot size={15} />
@@ -1545,18 +1592,6 @@ export function RunPage({
                       {executionIdentity}
                     </span>
                   </div>
-                </section>
-                <section>
-                  <h2>{t("issue.project")}</h2>
-                  {canEditProject ? <label aria-label={`${t("issue.project")}: ${projectLabel}`} className="run-property run-property-editable" title={t("issue.project")}>
-                      <span className="run-property-icon project"><ProjectIcon className="run-property-project-icon" project={currentProject ?? { name: projectLabel, icon: null }} /></span>
-                      <span className="run-property-copy">
-                        <SelectMenu align="end" className="run-project-select" disabled={isUpdatingIssue} label={t("issue.project")} onValueChange={updateIssueProject} options={projectOptions} searchEmptyMessage={t("organization.noResults")} searchPlaceholder={t("organization.search")} searchable={projectOptions.length > 8} size="small" value={projectValue} />
-                      </span>
-                    </label> : <div aria-label={`${t("issue.project")}: ${projectLabel}`} className="run-property" title={t("issue.project")}>
-                      <span className="run-property-icon project"><ProjectIcon className="run-property-project-icon" project={currentProject ?? { name: projectLabel, icon: null }} /></span>
-                      <span className="run-property-copy"><strong>{projectLabel}</strong></span>
-                    </div>}
                 </section>
                 <IssueDependenciesPanel
                   availableRuns={availableRuns}

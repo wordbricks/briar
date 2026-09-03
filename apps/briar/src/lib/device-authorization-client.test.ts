@@ -57,6 +57,25 @@ describe("Better Auth device authorization boundary", () => {
     });
   });
 
+  it("preserves Better Auth 1.7 device-code request errors", async () => {
+    const fetch: DeviceAuthorizationFetch = async () => jsonResponse({
+      error: "invalid_scope",
+      error_description: "The requested scope is not available",
+    }, 400);
+    const client = createDeviceAuthorizationClient(
+      "https://briar.example",
+      { fetch },
+    );
+
+    await expect(client.requestCode({
+      clientId: "briar-cli",
+      scope: "unsupported",
+    })).rejects.toMatchObject({
+      code: "invalid_scope",
+      status: 400,
+    });
+  });
+
   it("classifies RFC polling errors from structured bodies", async () => {
     const responses = [
       jsonResponse({

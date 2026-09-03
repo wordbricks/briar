@@ -223,6 +223,7 @@ import type {
   ProjectSettings,
   RunEvidenceImage,
 } from "../types";
+import { withSessionCredential } from "./session-credential";
 
 const apiUrl = briarApiUrl;
 const deviceAuthorizationClient = briarAuthUrl
@@ -402,12 +403,11 @@ export async function loadProjectAgentSpriteSheet(
   if (!apiUrl) throw new Error("Briar API URL이 설정되지 않았습니다.");
   const response = await fetch(
     `${apiUrl}/projects/${encodeURIComponent(projectId)}/agents/${encodeURIComponent(agentId)}/spritesheet`,
-    {
+    withSessionCredential(token, {
       headers: {
         Accept: "image/webp",
-        Authorization: `Bearer ${token}`,
       },
-    },
+    }),
   );
   if (!response.ok) {
     throw new ApiError(response.status, "Agent sprite sheet request failed");
@@ -426,9 +426,10 @@ export async function loadChannelMessageAttachment(
   if (!apiUrl || !attachment.url.startsWith("/")) {
     throw new Error("첨부 파일 경로가 유효하지 않습니다.");
   }
-  const response = await fetch(`${apiUrl}${attachment.url}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const response = await fetch(
+    `${apiUrl}${attachment.url}`,
+    withSessionCredential(token),
+  );
   if (!response.ok) {
     throw new Error(`첨부 파일을 열 수 없습니다. (${response.status})`);
   }
@@ -447,9 +448,10 @@ export async function loadIssueAttachment(
   if (!apiUrl || !attachment.url.startsWith("/")) {
     throw new Error("첨부 파일 경로가 유효하지 않습니다.");
   }
-  const response = await fetch(`${apiUrl}${attachment.url}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const response = await fetch(
+    `${apiUrl}${attachment.url}`,
+    withSessionCredential(token),
+  );
   if (!response.ok) {
     throw new Error(`첨부 파일을 열 수 없습니다. (${response.status})`);
   }
@@ -463,9 +465,10 @@ export async function loadRunEvidenceImage(
   if (!apiUrl || !image.url.startsWith("/")) {
     throw new Error("증빙 이미지 경로가 유효하지 않습니다.");
   }
-  const response = await fetch(`${apiUrl}${image.url}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const response = await fetch(
+    `${apiUrl}${image.url}`,
+    withSessionCredential(token),
+  );
   if (!response.ok) {
     throw new Error(`증빙 이미지를 열 수 없습니다. (${response.status})`);
   }
