@@ -25,6 +25,41 @@ useBriar.ts는 4,830줄이 되었다. 계획에 영향을 주는 변경:
 - #1578: 런치 인트로가 별도 엔트리(`intro-main.tsx`)로 분리되었다. `main.tsx`의
   `RegistryProvider` 위치를 다시 확인한다.
 
+### 기준 갱신 (2026-09-04, Phase 1 `#1583` 이후)
+
+Phase 1을 구현하며 확인한, 이후 단계에 영향을 주는 사실:
+
+- `RegistryProvider`(`@effect/atom-react`)는 레지스트리를 **직접 만들며** 기존
+  레지스트리를 받는 prop이 없다. 테스트가 atom을 직접 쓰려면
+  `RegistryContext.Provider value={createTestRegistry()}`를 쓴다. 프로바이더가
+  아예 없으면 컴포넌트는 **모듈 전역 기본 레지스트리**로 떨어져 테스트 사이에
+  상태가 샌다. atom을 읽는 훅·컴포넌트를 렌더하는 기존 테스트는 전부 프로바이더로
+  감싸야 한다.
+- `registry.set`에는 updater 함수 오버로드가 없다. 함수형 갱신은
+  `registry.update(atom, f)`다. (`useAtom`이 돌려주는 setter는 React 헬퍼가
+  풀어 주므로 둘 다 받는다.)
+- `registry.subscribe(atom, f)`는 `{ immediate: true }` 없이는 파생 atom의
+  의존 그래프를 만들지 않아 **알림이 오지 않는다.** 파생 atom 단위 테스트는
+  `immediate: true`를 주거나 먼저 한 번 `get`해야 한다.
+- `Atom.batch`는 가장 바깥 배치가 끝나는 시점에 알림을 **동기로** 흘린다.
+- `main.tsx`의 `RegistryProvider`가 `defaultIdleTTL`을 넘기지 않는 것을 확인했다.
+  keepAlive가 아닌 atom은 구독자가 0이 되는 즉시 노드 제거가 예약되므로, 장수
+  atom의 `Atom.keepAlive`는 선택이 아니라 필수다.
+- Phase 1이 "옮길 수 있다"고 본 액션 중 `addOrganization`, `renameOrganization`,
+  `selectOrganization`, `changeTeam*` 3종, `logout`, `deleteAccount`,
+  `removePlanningProject`은 실제로는 `dashboard` / `health` /
+  `connectedTeamIds`도 함께 쓴다. 주입 콜백(`applyOrganizationSwitch`,
+  `applyTeamToDashboard`, `renameDashboardOrganization`, `resetTeamViews`,
+  `clearSignedOutViews`, `readDashboardTeamId`, `countDashboardIssues`,
+  `movePlanningProjectIssues`)으로 분리했으니, Phase 2는 엔티티 저장소를 넣으면서
+  이 콜백들을 지우는 것을 완료 조건에 넣는다.
+- `useBriar()` 호출부는 `App.tsx` 한 곳뿐이라 모듈 싱글턴 atom이 안전하다.
+  프로젝트 창은 별도 브라우저 창이므로 레지스트리도 별도다. 반대로
+  `lockedProjectId`(`readTeamWindowProjectId()`)는 `window.location.search`에서
+  읽는 창 단위 상수이므로 Phase 4 이후 `state/platform.ts`류 상수로 다뤄도 된다.
+- `briar.error`는 세션 오류와 `localProjectInventoryError`(workspace, Phase 3)의
+  합이다. Phase 3이 workspace atom을 만들 때까지 파사드가 이 합을 유지한다.
+
 ## 목표
 
 1. `apps/briar/src/hooks/useBriar.ts`(4,668줄)와 `apps/briar/src/App.tsx`(5,116줄)가
@@ -666,7 +701,7 @@ Phase 2 이후 언제든 착수 가능하며 Phase 3–7과 병행할 수 있다
 | Phase | PR | 상태 | 비고 |
 |---|---|---|---|
 | 0 | #1581 | 머지됨 | `state/registry.ts`, `state/platform.ts`, `state/demo-fixtures.ts`, `state/inbox-selection.ts`, `test/render-count.tsx`. `ProjectConnection`은 `types.ts`로. |
-| 1 | | 예정 | |
+| 1 | #1583 | 머지됨 | `state/session|organization|team|planning`의 atoms/actions, `useActiveOrganizationPersistence`, `components/app/`의 연결 래퍼 4종과 `AppEffects`. `activeProjectIdRef` 제거. |
 | 2A | | 예정 | |
 | 2B | | 예정 | |
 | 3 | | 예정 | |
