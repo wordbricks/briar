@@ -147,10 +147,10 @@ async function runScenario(scenario: "invalid" | "optional" | "required") {
       child.once("error", reject);
       child.once("close", resolveExit);
     });
-    if (exitCode !== 0 && stderr) {
-      throw new Error(`Codex runner failed: ${stderr}`);
-    }
     const payloads = await outputPromise;
+    if (exitCode !== 0 && payloads.length === 0) {
+      throw new Error(`Codex runner failed: ${stderr || `exit ${exitCode}`}`);
+    }
     return { exitCode, payloads };
   } finally {
     clearTimeout(timeout);
