@@ -339,6 +339,8 @@ export const demoDashboard: DashboardPayload = {
     issueKeyPrefix: "AH",
     scheduleTabEnabled: true,
     icon: null,
+    iconName: null,
+    iconColor: null,
     organizationId: "demo-organization",
     organizationName: "Briar",
     role: "owner",

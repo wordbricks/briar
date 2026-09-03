@@ -1,6 +1,11 @@
 import * as Schema from "effect/Schema";
 import * as SchemaGetter from "effect/SchemaGetter";
 import type { ProjectAgentLocale } from "../../src/lib/project-agent";
+import {
+  isProjectIconColor,
+  isProjectIconName,
+} from "../../src/lib/project-icon-library";
+import type { ProjectIconUpdate } from "./project-command-repository";
 import { createOrganization } from "./organization-command-repository";
 import { hasOrganizationCapability } from "./organization-access";
 import { listOrganizations } from "./organization-repository";
@@ -26,6 +31,7 @@ type ProjectApplicationUser = {
 
 export type ProjectApplicationErrorReason =
   | "development_management_required"
+  | "invalid_project_icon"
   | "project_management_required"
   | "project_not_found"
   | "repository_connection_permission_denied"
@@ -73,7 +79,7 @@ const projectImagePattern =
   /^data:image\/(?:jpeg|png|webp);base64,[a-z0-9+/]+={0,2}$/iu;
 const decodeProjectName = decodeRequestSync(trimmedText(1, 100));
 const decodeOrganizationId = decodeRequestSync(UuidString);
-const decodeProjectIcon = decodeRequestSync(
+const decodeProjectIconImage = decodeRequestSync(
   Schema.NullOr(
     Schema.String.check(
       Schema.isMaxLength(400_000),
@@ -81,6 +87,42 @@ const decodeProjectIcon = decodeRequestSync(
     ),
   ),
 );
+
+const decodeProjectIconUpdate = (
+  update: ProjectIconUpdate,
+): ProjectIconUpdate => {
+  switch (update.type) {
+    case "image":
+      return { type: "image", dataUrl: decodeProjectIconUpdateImage(update.dataUrl) };
+    case "named":
+      if (!isProjectIconName(update.name)) {
+        throw new ProjectApplicationError(
+          "invalid_project_icon",
+          "Project icon is not in the predefined icon library",
+        );
+      }
+      if (update.color !== null && !isProjectIconColor(update.color)) {
+        throw new ProjectApplicationError(
+          "invalid_project_icon",
+          "Project icon color must be a #RRGGBB hex value",
+        );
+      }
+      return update;
+    case "clear":
+      return update;
+  }
+};
+
+const decodeProjectIconUpdateImage = (dataUrl: string) => {
+  const decoded = decodeProjectIconImage(dataUrl);
+  if (decoded === null) {
+    throw new ProjectApplicationError(
+      "invalid_project_icon",
+      "Project icon image is required",
+    );
+  }
+  return decoded;
+};
 const decodeProjectIssueKeyPrefix = decodeRequestSync(
   Schema.Trim.pipe(
     Schema.decode({
@@ -230,7 +272,7 @@ export async function updateProjectIconApplication(
     readonly db: D1Database;
     readonly projectId: string;
     readonly userId: string;
-    readonly icon: string | null;
+    readonly iconUpdate: ProjectIconUpdate;
   },
   services: ProjectApplicationServices = projectApplicationServices,
 ) {
@@ -241,14 +283,19 @@ export async function updateProjectIconApplication(
     "projects:manage",
     services,
   );
-  const icon = decodeProjectIcon(input.icon);
-  if (!(await services.updateProjectIcon(input.db, project.id, icon))) {
+  const iconUpdate = decodeProjectIconUpdate(input.iconUpdate);
+  if (!(await services.updateProjectIcon(input.db, project.id, iconUpdate))) {
     throw new ProjectApplicationError(
       "project_not_found",
       "Project not found",
     );
   }
-  return { ...project, icon };
+  return {
+    ...project,
+    icon: iconUpdate.type === "image" ? iconUpdate.dataUrl : null,
+    icon_name: iconUpdate.type === "named" ? iconUpdate.name : null,
+    icon_color: iconUpdate.type === "named" ? iconUpdate.color : null,
+  };
 }
 
 export async function updateProjectIssueKeyPrefixApplication(

@@ -31,6 +31,8 @@ describe("ProjectOnboarding", () => {
               issueKeyPrefix: "BRIAR",
               scheduleTabEnabled: false,
               icon: null,
+              iconName: null,
+              iconColor: null,
               createdAt: "2026-08-31T00:00:00.000Z",
             },
             workflow: repositoryWorkflowBootstrap,

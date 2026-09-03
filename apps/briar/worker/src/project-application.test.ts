@@ -15,6 +15,8 @@ const project = {
   issue_key_prefix: "AH",
   schedule_tab_enabled: 1,
   icon: null,
+  icon_name: null,
+  icon_color: null,
   organization_id: "33333333-3333-4333-8333-333333333333",
   organization_name: "Wordbricks",
   member_role: "owner",

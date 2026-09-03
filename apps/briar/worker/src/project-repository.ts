@@ -12,6 +12,8 @@ const ProjectRow = Schema.Struct({
   issue_key_prefix: Schema.mutableKey(Schema.String),
   schedule_tab_enabled: Schema.mutableKey(Schema.Int),
   icon: Schema.mutableKey(Schema.NullOr(Schema.String)),
+  icon_name: Schema.mutableKey(Schema.NullOr(Schema.String)),
+  icon_color: Schema.mutableKey(Schema.NullOr(Schema.String)),
   organization_id: Schema.mutableKey(Schema.String),
   organization_name: Schema.mutableKey(Schema.String),
   member_role: Schema.mutableKey(OrganizationRole),
@@ -30,6 +32,7 @@ const makeProjectQueries = (sql: SqlClient.SqlClient) => {
                project.issue_key_prefix,
                project.schedule_tab_enabled,
                coalesce(project.icon_data_url_browser, project.icon_data_url) as icon,
+               project.icon_name, project.icon_color,
                project.organization_id,
                organization.name as organization_name,
                membership.role as member_role, project.created_at
@@ -57,6 +60,7 @@ const makeProjectQueries = (sql: SqlClient.SqlClient) => {
                project.issue_key_prefix,
                project.schedule_tab_enabled,
                coalesce(project.icon_data_url_browser, project.icon_data_url) as icon,
+               project.icon_name, project.icon_color,
                project.organization_id,
                organization.name as organization_name,
                'viewer' as member_role, project.created_at

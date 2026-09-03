@@ -18,6 +18,8 @@ const projectRow = {
   issue_key_prefix: "BR",
   schedule_tab_enabled: 1,
   icon: null,
+  icon_name: null,
+  icon_color: null,
   organization_id: "22222222-2222-4222-8222-222222222222",
   organization_name: "Wordbricks",
   member_role: "owner",
