@@ -3,6 +3,7 @@ import {
   deviceAuthorizationClient as betterAuthDeviceAuthorizationClient,
 } from "better-auth/client/plugins";
 import * as Schema from "effect/Schema";
+import type { Locale } from "../i18n/locale";
 
 const exhaustiveLiterals =
   <Expected extends string>() =>
@@ -124,9 +125,11 @@ export type DeviceAuthorizationClientId =
   | "briar-web"
   | "briar-cli";
 
+export type DeviceLoginMethod = "email" | "google";
+
 export type DeviceAuthorizationLaunchOptions = {
-  method?: "email" | "google";
-  locale?: "ko" | "en" | "zh";
+  method?: DeviceLoginMethod;
+  locale?: Locale;
   switchAccount?: boolean;
 };
 
