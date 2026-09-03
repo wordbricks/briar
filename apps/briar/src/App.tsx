@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAtom, useAtomSet, useAtomValue } from "@effect/atom-react";
 import * as Atom from "effect/unstable/reactivity/Atom";
 import { keyboardShortcutsModifierLabel } from "./components/app/AppDialogViews";
@@ -12,6 +12,7 @@ import { useToast } from "./components/ui/toast";
 import { useBriar, type UseBriarOptions } from "./hooks/useBriar";
 import { useAutoHuntSessions } from "./hooks/useAutoHuntSessions";
 import { useAgentDispatch } from "./hooks/useAgentDispatch";
+import { useAppNavigation } from "./hooks/useAppNavigation";
 import { useAppShortcuts } from "./hooks/useAppShortcuts";
 import { useCommandPaletteItems } from "./hooks/useCommandPaletteItems";
 import { useDeepLinks } from "./hooks/useDeepLinks";
@@ -25,9 +26,6 @@ import {
   useInboxNotificationClicks,
   useInboxNotifications,
 } from "./hooks/useInboxNotifications";
-import { useNavigationHistory } from "./hooks/useNavigationHistory";
-import { useAppKeyboardCommandScope } from "./hooks/appKeyboardCommands";
-import { isTeamScheduleTabEnabled } from "./lib/team-tabs";
 import {
   hasCompletedInitialOnboarding,
   markInitialOnboardingComplete,
@@ -53,11 +51,6 @@ import {
   settingsTargetAtom,
 } from "./state/navigation/atoms";
 import {
-  setChannelNavigationBridge,
-  useChannelActions,
-} from "./state/channels/actions";
-import {
-  activeChannelIdAtom,
   activeOrganizationChannelsAtom,
   viewingChannelIdAtom,
   viewingChannelThreadRootMessageIdAtom,
@@ -83,28 +76,8 @@ import {
   loadProjectUsageSummary,
 } from "./lib/api";
 import { createInboxRealtimeTransport } from "./lib/channel-realtime";
-import { startDesktopChannelTransition } from "./lib/channel-performance";
-import { hasOpenKeyboardShortcutOverlay } from "./lib/keyboard-shortcuts";
 import { listenForAppMenuSettings } from "./lib/app-menu";
 import type { AppZoomCommands } from "./lib/app-zoom";
-import {
-  channelIdFromNavigationLocation,
-  channelNavigationLocation,
-  channelPageNavigationLocation,
-  isProjectNavigationPage,
-  issueNavigationLocation,
-  organizationNavigationLocation,
-  organizationIdFromNavigationLocation,
-  pageFromNavigationLocation,
-  projectIdFromNavigationLocation,
-  projectNavigationLocation,
-  runIdFromNavigationLocation,
-  settingsNavigationLocation,
-  settingsTargetFromNavigationLocation,
-  type ActivePage,
-  type AppNavigationLocation,
-  type ChannelNavigationPage,
-} from "./lib/app-navigation";
 import { useI18n } from "./i18n";
 
 type AgentAutoHuntOptions = {
@@ -171,12 +144,10 @@ export function App({
   const activeDashboard = useAtomValue(activeDashboardAtom);
   /*
     The channel catalog lives in `state/channels`, and the views read it there.
-    What is left here is what the navigation effects still decide: which channel
-    the location names, and which one is being looked at for the inbox's
-    "do not notify me about what is on screen" rule.
+    What is left here is what the inbox needs for its "do not notify me about
+    what is on screen" rule, plus the catalog the history labels channels from.
   */
   const organizationChannels = useAtomValue(activeOrganizationChannelsAtom);
-  const activeChannelId = useAtomValue(activeChannelIdAtom);
   const viewingChannelId = useAtomValue(viewingChannelIdAtom);
   const viewingChannelThreadRootMessageId = useAtomValue(
     viewingChannelThreadRootMessageIdAtom,
@@ -184,7 +155,6 @@ export function App({
   const viewingIssueConversationRunId = useAtomValue(
     viewingIssueConversationRunIdAtom,
   );
-  const { markOrganizationChannelRead, selectChannel } = useChannelActions();
   const loadUsageReport = useCallback(async () => {
     if (!briar.token || !briar.activeOrganizationId) {
       return {
@@ -305,447 +275,39 @@ export function App({
     commandPaletteInitialQueryAtom,
   );
   const isKeyboardShortcutsOpen = useAtomValue(isKeyboardShortcutsOpenAtom);
-  const [settingsTarget, setSettingsTarget] = useAtom(settingsTargetAtom);
+  const setSettingsTarget = useAtomSet(settingsTargetAtom);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(
     hasCompletedInitialOnboarding,
   );
   const [pendingFirstRunTutorialUserId, setPendingFirstRunTutorialUserId] =
     useState<string | null>(null);
-  const {
-    current: activeNavigationLocation,
-    entries: navigationHistoryEntries,
-    index: navigationHistoryIndex,
-    canGoBack,
-    canGoForward,
-    goBack,
-    goBackTo,
-    goForward,
-    goTo: goToNavigationHistory,
-    navigate: navigateToLocation,
-    replace: replaceNavigationLocation,
-    reset: resetNavigationLocation,
-  } = useNavigationHistory<AppNavigationLocation>("lobby");
-  const activePage = pageFromNavigationLocation(activeNavigationLocation);
-  const selectedRunId = runIdFromNavigationLocation(activeNavigationLocation);
-  const navigationProjectId = projectIdFromNavigationLocation(
-    activeNavigationLocation,
-  );
-  const navigationOrganizationId = organizationIdFromNavigationLocation(
-    activeNavigationLocation,
-  );
-  const navigationChannelId = channelIdFromNavigationLocation(
-    activeNavigationLocation,
-  );
-  const navigationSettingsTarget = settingsTargetFromNavigationLocation(
-    activeNavigationLocation,
-  );
-  const navigationHasChannelPageContext =
-    (activePage === "channels" || activePage === "dms") &&
-    navigationOrganizationId !== null;
-  const desktopActiveChannelId = navigationHasChannelPageContext
-    ? navigationChannelId
-    : activeChannelId;
-  const navigationActiveProjectIdRef = useRef(briar.activeProjectId);
-  navigationActiveProjectIdRef.current = briar.activeProjectId;
-  const navigateToPage = useCallback(
-    (
-      page: ActivePage,
-      projectId = navigationActiveProjectIdRef.current,
-    ) =>
-      navigateToLocation(
-        (page === "inbox" || page === "my-issues") &&
-        briar.activeOrganizationId
-          ? organizationNavigationLocation(briar.activeOrganizationId, page)
-          : (page === "channels" || page === "dms") &&
-          briar.activeOrganizationId
-          ? channelPageNavigationLocation(
-              page,
-              briar.activeOrganizationId,
-              projectId,
-            )
-          : projectId && isProjectNavigationPage(page)
-            ? projectNavigationLocation(page, projectId)
-            : page,
-      ),
-    [briar.activeOrganizationId, navigateToLocation],
-  );
-  const closeSettings = useCallback(() => {
-    const projectId = navigationActiveProjectIdRef.current;
-    goBackTo(
-      (location) => pageFromNavigationLocation(location) !== "settings",
-      projectId ? projectNavigationLocation("issues", projectId) : "issues",
-    );
-  }, [goBackTo]);
-  useAppKeyboardCommandScope({
-    fallthrough: true,
-    handlers: {
-      closeSettings: {
-        isAvailable: () =>
-          activePage === "settings" &&
-          !briar.companionMode &&
-          !hasOpenKeyboardShortcutOverlay(document),
-        run: () => {
-          closeSettings();
-          return "handled";
-        },
-      },
-    },
-    id: "settings-page",
-    priority: 100,
+  const navigation = useAppNavigation({
+    selectTeam: briar.setActiveProjectId,
   });
-  const navigateToIssue = useCallback(
-    (runId: string, projectId = navigationActiveProjectIdRef.current) => {
-      if (!projectId) return;
-      navigateToLocation(issueNavigationLocation(projectId, runId));
-    },
-    [navigateToLocation],
-  );
-  const navigateToChannel = useCallback(
-    (
-      channelId: string,
-      page: ChannelNavigationPage,
-      organizationId = briar.activeOrganizationId,
-      projectId = navigationActiveProjectIdRef.current,
-    ) => {
-      if (!organizationId) return;
-      startDesktopChannelTransition(channelId);
-      selectChannel(channelId);
-      markOrganizationChannelRead(channelId);
-      navigateToLocation(
-        channelNavigationLocation(
-          page,
-          organizationId,
-          channelId,
-          projectId,
-        ),
-      );
-    },
-    [
-      briar.activeOrganizationId,
-      markOrganizationChannelRead,
-      navigateToLocation,
-      selectChannel,
-    ],
-  );
-  const replaceChannelDestination = useCallback(
-    (
-      channelId: string | null,
-      page: ChannelNavigationPage,
-      organizationId = briar.activeOrganizationId,
-      projectId = navigationActiveProjectIdRef.current,
-    ) => {
-      selectChannel(channelId);
-      if (!channelId || !organizationId) {
-        replaceNavigationLocation(
-          organizationId
-            ? channelPageNavigationLocation(page, organizationId, projectId)
-            : page,
-        );
-        return;
-      }
-      startDesktopChannelTransition(channelId);
-      markOrganizationChannelRead(channelId);
-      replaceNavigationLocation(
-        channelNavigationLocation(
-          page,
-          organizationId,
-          channelId,
-          projectId,
-        ),
-      );
-    },
-    [
-      briar.activeOrganizationId,
-      markOrganizationChannelRead,
-      replaceNavigationLocation,
-      selectChannel,
-    ],
-  );
-  const handleDesktopChannelFallback = useCallback(
-    (channelId: string | null, page: ChannelNavigationPage) => {
-      if (
-        navigationChannelId &&
-        navigationOrganizationId !== briar.activeOrganizationId
-      ) {
-        return;
-      }
-      replaceChannelDestination(
-        channelId,
-        page,
-        navigationOrganizationId ?? briar.activeOrganizationId,
-        navigationProjectId ?? navigationActiveProjectIdRef.current,
-      );
-    },
-    [
-      briar.activeOrganizationId,
-      navigationChannelId,
-      navigationOrganizationId,
-      navigationProjectId,
-      replaceChannelDestination,
-    ],
-  );
-  const resetNavigation = useCallback(
-    (page: ActivePage) => resetNavigationLocation(page),
-    [resetNavigationLocation],
-  );
-  const navigationUserIdRef = useRef<string | null | undefined>(undefined);
-  const navigationUserId = briar.user?.id ?? null;
-  const navigationUserBoundaryChanged =
-    navigationUserIdRef.current !== undefined &&
-    navigationUserIdRef.current !== navigationUserId;
-  useEffect(() => {
-    if (navigationUserIdRef.current === undefined) {
-      navigationUserIdRef.current = navigationUserId;
-      return;
-    }
-    if (navigationUserIdRef.current === navigationUserId) return;
-    navigationUserIdRef.current = navigationUserId;
-    resetNavigation("lobby");
-  }, [navigationUserId, resetNavigation]);
-  useEffect(() => {
-    if (
-      navigationUserBoundaryChanged ||
-      briar.companionMode ||
-      activePage !== "settings"
-    ) {
-      return;
-    }
-    if (navigationSettingsTarget) {
-      setSettingsTarget((current) =>
-        settingsNavigationLocation(current) === activeNavigationLocation
-          ? current
-          : navigationSettingsTarget,
-      );
-      return;
-    }
-    replaceNavigationLocation(settingsNavigationLocation(settingsTarget));
-  }, [
-    activeNavigationLocation,
-    activePage,
-    briar.companionMode,
-    navigationSettingsTarget,
-    navigationUserBoundaryChanged,
-    replaceNavigationLocation,
-    settingsTarget,
-  ]);
-  useEffect(() => {
-    if (
-      navigationUserBoundaryChanged ||
-      briar.companionMode ||
-      !briar.user ||
-      navigationProjectId ||
-      !briar.activeProjectId ||
-      !isProjectNavigationPage(activePage)
-    ) {
-      return;
-    }
-    replaceNavigationLocation(
-      projectNavigationLocation(activePage, briar.activeProjectId),
-    );
-  }, [
-    activePage,
-    briar.activeProjectId,
-    briar.companionMode,
-    briar.user,
-    navigationProjectId,
-    navigationUserBoundaryChanged,
-    replaceNavigationLocation,
-  ]);
-  useEffect(() => {
-    if (
-      navigationUserBoundaryChanged ||
-      briar.companionMode ||
-      !navigationProjectId
-    ) {
-      return;
-    }
-    const navigationProjectExists = briar.projects.some(
-      (project) => project.id === navigationProjectId,
-    );
-    if (navigationProjectExists) {
-      if (navigationProjectId !== briar.activeProjectId) {
-        briar.setActiveProjectId(navigationProjectId);
-      }
-      return;
-    }
-    if (briar.loading || !briar.user) return;
-
-    if (
-      (activePage === "channels" || activePage === "dms") &&
-      navigationOrganizationId
-    ) {
-      const fallbackProject = briar.projects.find(
-        (project) =>
-          project.organizationId === navigationOrganizationId &&
-          project.id === briar.activeProjectId,
-      ) ?? briar.projects.find(
-        (project) => project.organizationId === navigationOrganizationId,
-      );
-      replaceNavigationLocation(
-        navigationChannelId
-          ? channelNavigationLocation(
-              activePage,
-              navigationOrganizationId,
-              navigationChannelId,
-              fallbackProject?.id,
-            )
-          : channelPageNavigationLocation(
-              activePage,
-              navigationOrganizationId,
-              fallbackProject?.id,
-            ),
-      );
-      return;
-    }
-    if (activePage === "settings") {
-      replaceNavigationLocation(
-        settingsNavigationLocation({
-          scope: "application",
-          section: "account",
-        }),
-      );
-      return;
-    }
-    const fallbackProject =
-      briar.projects.find(
-        (project) => project.id === briar.activeProjectId,
-      ) ?? briar.projects[0];
-    replaceNavigationLocation(
-      fallbackProject && isProjectNavigationPage(activePage)
-        ? projectNavigationLocation(activePage, fallbackProject.id)
-        : "lobby",
-    );
-  }, [
-    activePage,
-    briar.activeProjectId,
-    briar.companionMode,
-    briar.loading,
-    briar.projects,
-    briar.setActiveProjectId,
-    briar.user,
-    navigationChannelId,
-    navigationOrganizationId,
-    navigationProjectId,
-    navigationUserBoundaryChanged,
-    replaceNavigationLocation,
-  ]);
-  useEffect(() => {
-    if (
-      navigationUserBoundaryChanged ||
-      briar.companionMode ||
-      !navigationOrganizationId
-    ) return;
-    const navigationOrganizationExists = briar.organizations.some(
-      (organization) => organization.id === navigationOrganizationId,
-    );
-    if (!navigationOrganizationExists) {
-      if (briar.loading || !briar.user) return;
-      const fallbackOrganization =
-        briar.organizations.find(
-          (organization) => organization.id === briar.activeOrganizationId,
-        ) ?? briar.organizations[0];
-      if (!fallbackOrganization) {
-        replaceNavigationLocation("lobby");
-        return;
-      }
-      if (activePage === "channels" || activePage === "dms") {
-        const fallbackProject = briar.projects.find(
-          (project) =>
-            project.organizationId === fallbackOrganization.id &&
-            project.id === briar.activeProjectId,
-        ) ?? briar.projects.find(
-          (project) => project.organizationId === fallbackOrganization.id,
-        );
-        replaceNavigationLocation(
-          channelPageNavigationLocation(
-            activePage,
-            fallbackOrganization.id,
-            fallbackProject?.id,
-          ),
-        );
-      } else if (activePage === "inbox" || activePage === "my-issues") {
-        replaceNavigationLocation(
-          organizationNavigationLocation(fallbackOrganization.id, activePage),
-        );
-      } else {
-        replaceNavigationLocation(
-          settingsNavigationLocation({
-            scope: "application",
-            section: "account",
-          }),
-        );
-      }
-      return;
-    }
-    if (navigationOrganizationId !== briar.activeOrganizationId) {
-      briar.setActiveOrganizationId(navigationOrganizationId);
-      return;
-    }
-    if (!navigationChannelId) {
-      if (navigationHasChannelPageContext && activeChannelId !== null) {
-        selectChannel(null);
-      }
-      return;
-    }
-    if (activeChannelId !== navigationChannelId) {
-      startDesktopChannelTransition(navigationChannelId);
-      selectChannel(navigationChannelId);
-    }
-    markOrganizationChannelRead(navigationChannelId);
-  }, [
-    activeChannelId,
-    briar.activeOrganizationId,
-    briar.activeProjectId,
-    briar.companionMode,
-    briar.loading,
-    briar.organizations,
-    briar.projects,
-    briar.setActiveOrganizationId,
-    briar.user,
-    activePage,
-    markOrganizationChannelRead,
-    navigationChannelId,
-    navigationHasChannelPageContext,
-    navigationOrganizationId,
-    navigationUserBoundaryChanged,
-    // The catalog kept this effect re-running while the read marker was a
-    // callback rebuilt from it, which is what re-marks the open channel when a
-    // message lands in it. The action is stable now, so the list is the
-    // dependency.
-    organizationChannels,
-    replaceNavigationLocation,
-  ]);
-  const activeProjectForTabs = briar.projects.find(
-    (project) =>
-      project.id === (navigationProjectId ?? briar.activeProjectId),
-  );
-  useEffect(() => {
-    if (
-      !navigationUserBoundaryChanged &&
-      activePage === "schedule" &&
-      !isTeamScheduleTabEnabled(activeProjectForTabs)
-    ) {
-      replaceNavigationLocation(
-        activeProjectForTabs
-          ? projectNavigationLocation("issues", activeProjectForTabs.id)
-          : "issues",
-      );
-    }
-  }, [
+  const {
     activePage,
     activeProjectForTabs,
+    canGoBack,
+    canGoForward,
+    closeSettings,
+    desktopActiveChannelId,
+    goBack,
+    goForward,
+    goToNavigationHistory,
+    handleDesktopChannelFallback,
+    navigateToChannel,
+    navigateToIssue,
+    navigateToLocation,
+    navigateToPage,
+    navigationHistoryEntries,
+    navigationHistoryIndex,
+    navigationProjectId,
     navigationUserBoundaryChanged,
     replaceNavigationLocation,
-  ]);
-  /*
-    The channel actions navigate, and navigation is still the shell's. They ask
-    for it through the registry rather than through hook dependencies, so
-    `useChannelActions()` keeps returning the same object to every view that
-    took it while these closures keep tracking the latest render.
-  */
-  useEffect(() => {
-    setChannelNavigationBridge(registry, { navigateToChannel, navigateToPage });
-  }, [navigateToChannel, navigateToPage, registry]);
+    resetNavigation,
+    selectedRunId,
+    setDefaultTeam,
+  } = navigation;
   const setPendingInboxNotificationTarget = useAtomSet(
     pendingInboxNotificationTargetAtom,
   );
@@ -924,21 +486,12 @@ export function App({
    * Selecting a team from the palette, including the "where am I" ref the
    * navigation helpers default their team id from.
    */
-  /**
-   * Records where the navigation helpers default their team id from. The shell
-   * writes it whenever it selects a team, so a later `navigateToPage()` with no
-   * explicit team lands on the one the user just picked.
-   */
-  const rememberNavigationTeam = useCallback((teamId: string | null) => {
-    navigationActiveProjectIdRef.current = teamId;
-  }, []);
-
   const selectPaletteTeam = useCallback(
     (teamId: string) => {
-      rememberNavigationTeam(teamId);
+      setDefaultTeam(teamId);
       briar.setActiveProjectId(teamId);
     },
-    [briar.setActiveProjectId, rememberNavigationTeam],
+    [briar.setActiveProjectId, setDefaultTeam],
   );
 
   const openAppSettings = useCallback(() => {
@@ -1107,7 +660,7 @@ export function App({
         replaceNavigationLocation,
         resetNavigation,
         selectedRunId,
-        setDefaultTeam: rememberNavigationTeam,
+        setDefaultTeam,
       }}
       openAppSettings={openAppSettings}
       openOrganizationIssue={openOrganizationIssue}
