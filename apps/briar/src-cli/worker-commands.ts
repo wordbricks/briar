@@ -405,6 +405,42 @@ interface WorkerLabelSyncFailure {
   error: unknown;
 }
 
+type WorkflowRequirementRecord = {
+  id: string;
+  label: string;
+  kind: (typeof autoHuntRequirementKinds)[number];
+  tool: string;
+  reason: string;
+};
+
+// The long-running worker loop loads its config once at startup and can stay
+// up for hours, so it must never persist that stale in-memory snapshot back
+// to disk (that would clobber settings changed elsewhere in the meantime,
+// e.g. a provider toggled in the desktop app). Re-read the current config
+// immediately before writing and patch only this project's workflow
+// requirements, leaving everything else on disk untouched.
+async function persistProjectWorkflowRequirements(
+  projectId: string,
+  requirements: WorkflowRequirementRecord[],
+) {
+  const freshConfig = await loadConfig();
+  const freshProject = freshConfig.projects.find(
+    (candidate) => candidate.id === projectId,
+  );
+  if (!freshProject?.autoHunt?.workflow) return;
+  const updatedProject = {
+    ...freshProject,
+    autoHunt: {
+      ...freshProject.autoHunt,
+      workflow: { ...freshProject.autoHunt.workflow, requirements },
+    },
+  };
+  freshConfig.projects = freshConfig.projects.map((candidate) =>
+    candidate.id === projectId ? updatedProject : candidate,
+  );
+  await saveConfig(freshConfig);
+}
+
 async function workerSyncLabelCommand() {
   const config = await loadConfig();
   const label = defaultWorkerLabel();
@@ -513,15 +549,8 @@ async function workerCommand() {
     });
     child.unref();
   };
-  let sharedWorkflowRequirements:
-    | Array<{
-        id: string;
-        label: string;
-        kind: (typeof autoHuntRequirementKinds)[number];
-        tool: string;
-        reason: string;
-      }>
-    | null = project.autoHunt?.workflow?.requirements ?? null;
+  let sharedWorkflowRequirements: WorkflowRequirementRecord[] | null =
+    project.autoHunt?.workflow?.requirements ?? null;
   const readinessProblem = !gitValueAt(project.repositoryPath, [
     "rev-parse",
     "--show-toplevel",
@@ -767,19 +796,10 @@ async function workerCommand() {
           if (previousKey !== nextKey) {
             // Keep the local mirror aligned so desktop health and the next
             // worker restart see the same shared tool list.
-            if (project.autoHunt?.workflow) {
-              project.autoHunt = {
-                ...project.autoHunt,
-                workflow: {
-                  ...project.autoHunt.workflow,
-                  requirements: heartbeat.workflowRequirements,
-                },
-              };
-              config.projects = config.projects.map((candidate) =>
-                candidate.id === project.id ? project : candidate,
-              );
-              await saveConfig(config);
-            }
+            await persistProjectWorkflowRequirements(
+              project.id,
+              heartbeat.workflowRequirements,
+            );
             // Re-probe immediately so a stale empty local list cannot claim
             // work before the next heartbeat interval.
             const refreshedHealth = inspectWorkflowRequirements(
