@@ -713,7 +713,7 @@ export async function runManagedComputerGuidedSetup(
   const enabled = onlyProviderEnabled(input.provider);
   const [providerHealth, providerCapabilities] = await Promise.all([
     inspectWorkerProviderHealth(enabled, providerSkipped ? {
-      authenticated: async (provider) => provider === input.provider || false,
+      authenticated: async (provider) => provider === input.provider,
     } : undefined),
     discoverWorkerProviderCapabilities(enabled, { refresh: true }),
   ]);
