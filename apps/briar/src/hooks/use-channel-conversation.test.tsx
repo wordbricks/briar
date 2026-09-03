@@ -5,13 +5,15 @@ import { act } from "react";
 import type { Root } from "react-dom/client";
 import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type {
-  ChannelAgentReply,
-  ChannelAgentSummary,
-  ChannelMember,
-  ChannelMessage,
-  ChannelSummary,
+import {
+  channelReplyProviderUsageExhaustedError,
+  type ChannelAgentReply,
+  type ChannelAgentSummary,
+  type ChannelMember,
+  type ChannelMessage,
+  type ChannelSummary,
 } from "../lib/channels-contract";
+import { ToastProvider } from "../components/ui/toast";
 import type {
   RealtimeNotification,
   RealtimeTransport,
@@ -242,8 +244,19 @@ function Harness({
 }
 
 async function renderHarness(props: React.ComponentProps<typeof Harness>) {
-  const { cleanup, container, root } = createReactTestRoot();
+  const { cleanup, root } = createReactTestRoot();
   await renderReactTestRoot(root, <Harness {...props} />);
+  return { cleanup, root };
+}
+
+async function renderToastHarness(props: React.ComponentProps<typeof Harness>) {
+  const { cleanup, root } = createReactTestRoot({ attachToDocument: true });
+  await renderReactTestRoot(
+    root,
+    <ToastProvider>
+      <Harness {...props} />
+    </ToastProvider>,
+  );
   return { cleanup, root };
 }
 
@@ -816,5 +829,58 @@ describe("useChannelConversation", () => {
     expect(current().messages[0]?.proposal).toMatchObject({ status: "pending" });
     expect(current().busy).toBe(false);
     expect(current().error).toBeNull();
+  });
+
+  it("toasts a newly failed Agent reply instead of setting a banner error", async () => {
+    ({ cleanup, root } = await renderToastHarness({
+      activeChannel: channel("channel-a"),
+      initialReplies: [agentReply("reply-a", { status: "running" })],
+    }));
+
+    act(() => current().applyAgentReplies([
+      agentReply("reply-a", {
+        status: "failed",
+        error: channelReplyProviderUsageExhaustedError,
+        updatedAt: "2026-08-01T02:00:00.000Z",
+      }),
+    ]));
+
+    expect(current().error).toBeNull();
+    const toast = document.body.querySelector('[data-testid="app-toast"]');
+    expect(toast?.className).toContain("error");
+    expect(toast?.textContent).toContain("Agent 답변을 생성하지 못했습니다");
+    expect(toast?.textContent).toContain("사용량 한도");
+  });
+
+  it("does not toast an Agent reply that was already failed", async () => {
+    const failed = agentReply("reply-a", {
+      status: "failed",
+      error: channelReplyProviderUsageExhaustedError,
+    });
+    ({ cleanup, root } = await renderToastHarness({
+      activeChannel: channel("channel-a"),
+      initialReplies: [failed],
+    }));
+
+    act(() => current().applyAgentReplies([failed]));
+
+    expect(current().error).toBeNull();
+    expect(document.body.querySelector('[data-testid="app-toast"]')).toBeNull();
+  });
+
+  it("toasts a send failure instead of setting a banner error", async () => {
+    api.sendChannelMessage.mockRejectedValueOnce(new Error("offline"));
+    ({ cleanup, root } = await renderToastHarness({
+      activeChannel: channel("channel-a"),
+    }));
+
+    await act(async () => {
+      await current().send("hello", [], null, [], []);
+    });
+
+    expect(current().error).toBeNull();
+    expect(
+      document.body.querySelector('[data-testid="app-toast"]')?.textContent,
+    ).toContain("offline");
   });
 });
