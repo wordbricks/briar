@@ -199,6 +199,32 @@ import type {
   UpdateIssueInput,
 } from "../types";
 
+/**
+ * Reads the hook performs on its own: session bootstrap, dashboard sync and the
+ * local project inventory. They default to the live API, and tests supply
+ * in-memory implementations so `useBriar` can be exercised without module
+ * mocking. User triggered mutations keep calling the API directly.
+ */
+export type BriarDataSources = {
+  loadConnectedTeamIds: typeof loadConnectedTeamIds;
+  loadDashboard: typeof loadDashboard;
+  loadDashboardDelta: typeof loadDashboardDelta;
+  loadOrganizations: typeof loadOrganizations;
+  loadSession: typeof loadSession;
+  loadTeamProjects: typeof loadTeamProjects;
+  loadTeams: typeof loadTeams;
+};
+
+const liveDataSources: BriarDataSources = {
+  loadConnectedTeamIds,
+  loadDashboard,
+  loadDashboardDelta,
+  loadOrganizations,
+  loadSession,
+  loadTeamProjects,
+  loadTeams,
+};
+
 export type UseBriarOptions = {
   adoptRemoteAgentSession?: (session: AutoHuntSession) => void;
   deferDefaultOrganization?: boolean;
@@ -222,6 +248,7 @@ export type UseBriarOptions = {
     runs: readonly HuntRun[],
     dispatch: { dispatchId: string; runIds: string[] },
   ) => void;
+  dataSources?: Partial<BriarDataSources>;
 };
 
 export type ProjectConnection = {
@@ -335,6 +362,12 @@ const initialDemoRunEvidence = {
   ],
 } satisfies Record<string, RunEvidence[]>;
 
+/**
+ * How many previously visited projects keep their last-known dashboard in
+ * memory. Entries are evicted least-recently-committed first.
+ */
+const DASHBOARD_CACHE_LIMIT = 8;
+
 const emptyDashboard = (project: Project): DashboardPayload => ({
   team: project,
   settings: {
@@ -352,12 +385,17 @@ const emptyDashboard = (project: Project): DashboardPayload => ({
 export function useBriar(options: UseBriarOptions = {}) {
   const {
     adoptRemoteAgentSession,
+    dataSources,
     deferDefaultOrganization = false,
     lockedProjectId = null,
     startScheduledAgentSession,
     startScheduledAgentWorkerDispatch,
     settleScheduledAgentSession,
   } = options;
+  // Resolved once per hook instance so the seam keeps a stable identity.
+  const dataSourcesRef = useRef<BriarDataSources | null>(null);
+  dataSourcesRef.current ??= { ...liveDataSources, ...dataSources };
+  const remote = dataSourcesRef.current;
   const [user, setUser] = useState<SessionUser | null>(demoMode ? demoUser : null);
   const [token, setToken] = useState<string | null>(null);
   const [projects, setProjects] = useState<Project[]>(
@@ -400,7 +438,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     }
     let cancelled = false;
     void Promise.all(
-      projects.map((team) => loadTeamProjects(token, team.id)),
+      projects.map((team) => remote.loadTeamProjects(token, team.id)),
     ).then((groups) => {
       if (!cancelled) setPlanningProjects(groups.flat());
     }).catch((caught) => {
@@ -482,7 +520,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     typeof createLocalProjectReadinessCoordinator<RepositoryReadiness>
   > | null>(null);
   readinessCoordinatorRef.current ??= createLocalProjectReadinessCoordinator({
-    loadConnectedTeamIds,
+    loadConnectedTeamIds: remote.loadConnectedTeamIds,
     loadReadiness: loadTeamRepositoryReadiness,
   });
   const readinessCoordinator = readinessCoordinatorRef.current;
@@ -508,6 +546,48 @@ export function useBriar(options: UseBriarOptions = {}) {
     promise: Promise<void>;
   } | null>(null);
   const dashboardRequestGeneration = useRef(0);
+  /**
+   * Last-known dashboard per project so switching back to a visited project
+   * renders instantly instead of blanking the whole UI. The delta cursor is not
+   * stored separately: it travels inside `DashboardPayload.cursor`, which is the
+   * same field `setDashboard` derives `dashboardCursor` from, so a cursor can
+   * never leak across projects.
+   */
+  const dashboardCache = useRef(new Map<string, DashboardPayload>());
+  /**
+   * Project whose dashboard is currently rendered from the cache. It forces the
+   * next fetch for that project to be a full snapshot instead of a delta, and
+   * drives the `dashboardStale` flag consumers can surface.
+   */
+  const staleDashboardProjectId = useRef<string | null>(null);
+  const [dashboardStale, setDashboardStale] = useState(false);
+
+  const rememberDashboard = useCallback((next: DashboardPayload | null) => {
+    if (!next) return;
+    const cache = dashboardCache.current;
+    // Re-inserting moves the entry to the end, so the Map doubles as LRU order.
+    cache.delete(next.team.id);
+    cache.set(next.team.id, next);
+    while (cache.size > DASHBOARD_CACHE_LIMIT) {
+      const oldest = cache.keys().next();
+      if (oldest.done) break;
+      cache.delete(oldest.value);
+    }
+  }, []);
+
+  /**
+   * Drops the "showing a cached payload" marker. Called whenever the dashboard
+   * is intentionally emptied or replaced by fresh data.
+   */
+  const clearDashboardStaleness = useCallback(() => {
+    staleDashboardProjectId.current = null;
+    setDashboardStale(false);
+  }, []);
+
+  const clearDashboardCache = useCallback(() => {
+    dashboardCache.current.clear();
+    clearDashboardStaleness();
+  }, [clearDashboardStaleness]);
 
   const setDashboard = useCallback((
     value: Parameters<typeof setDashboardState>[0],
@@ -515,15 +595,39 @@ export function useBriar(options: UseBriarOptions = {}) {
     dashboardRequestGeneration.current += 1;
     dashboardRequest.current?.abort.abort();
     dashboardRequest.current = null;
+    // Every intentional clear (logout, account deletion, organization change,
+    // a project with nothing cached) also drops the stale marker.
+    if (value === null) clearDashboardStaleness();
     setDashboardState((current) => {
       const next = typeof value === "function" ? value(current) : value;
       dashboardRef.current = next;
       dashboardCursor.current = next && Number.isSafeInteger(next.cursor)
         ? (next.cursor ?? null)
         : null;
+      rememberDashboard(next);
       return next;
     });
-  }, []);
+  }, [clearDashboardStaleness, rememberDashboard]);
+
+  /**
+   * Renders the cached dashboard for `projectId` so a project switch never
+   * blanks the UI. Returns false when nothing is cached, leaving the caller to
+   * fall back to the loading state.
+   */
+  const showCachedDashboard = useCallback((projectId: string) => {
+    const cached = dashboardCache.current.get(projectId);
+    // A cached payload always carries its own project, so consumers comparing
+    // `dashboard.team.id` with the active project keep working.
+    if (!cached || cached.team.id !== projectId) return false;
+    dashboardRef.current = cached;
+    setDashboard(cached);
+    dashboardCursor.current = Number.isSafeInteger(cached.cursor)
+      ? (cached.cursor ?? null)
+      : null;
+    staleDashboardProjectId.current = projectId;
+    setDashboardStale(true);
+    return true;
+  }, [setDashboard]);
 
   const setConnectedProjectInventory = useCallback((next: string[] | null) => {
     setConnectedProjectIds((current) => {
@@ -612,10 +716,34 @@ export function useBriar(options: UseBriarOptions = {}) {
     }
   }, [activeProjectId, token]);
 
+  // Cached dashboards are session scoped: a new (or cleared) token must never
+  // reuse the previous account's payloads.
+  useEffect(() => {
+    clearDashboardCache();
+  }, [clearDashboardCache, token]);
+
+  // …and organization scoped: leaving an organization drops every dashboard
+  // that belongs to it. The project selected together with the organization is
+  // restored from the cache before this effect runs, so it survives the prune.
+  useEffect(() => {
+    const cache = dashboardCache.current;
+    for (const [projectId, cached] of cache) {
+      if (cached.team.organizationId === activeOrganizationId) continue;
+      cache.delete(projectId);
+    }
+  }, [activeOrganizationId]);
+
   const refresh = useCallback(async (
     mode: "delta" | "snapshot" = "delta",
   ) => {
     if (demoMode || !token || !activeProjectId) return;
+    // While a cached (stale) dashboard is on screen the next fetch has to be a
+    // full snapshot: the cached cursor may be arbitrarily old, and the payload
+    // must be replaced rather than delta-patched.
+    const resolvedMode =
+      mode === "snapshot" || staleDashboardProjectId.current === activeProjectId
+        ? "snapshot"
+        : "delta";
     const currentRequest = dashboardRequest.current;
     if (currentRequest?.projectId === activeProjectId && mode === "delta") {
       return currentRequest.promise;
@@ -630,28 +758,28 @@ export function useBriar(options: UseBriarOptions = {}) {
           ? dashboardRef.current
           : null;
         let cursor = dashboardCursor.current;
-        if (mode === "snapshot" || !current || cursor === null) {
-          current = await loadDashboard(token, projectId, abort.signal);
+        if (resolvedMode === "snapshot" || !current || cursor === null) {
+          current = await remote.loadDashboard(token, projectId, abort.signal);
           cursor = current.cursor ?? null;
         } else {
           let pages = 0;
           while (true) {
             let delta;
             try {
-              delta = await loadDashboardDelta(
+              delta = await remote.loadDashboardDelta(
                 token,
                 projectId,
                 cursor,
                 abort.signal,
               );
               if (delta.reset) {
-                current = await loadDashboard(token, projectId, abort.signal);
+                current = await remote.loadDashboard(token, projectId, abort.signal);
                 cursor = current.cursor ?? null;
                 break;
               }
             } catch (caught) {
               if (!isApiErrorStatus(caught, 410)) throw caught;
-              current = await loadDashboard(token, projectId, abort.signal);
+              current = await remote.loadDashboard(token, projectId, abort.signal);
               cursor = current.cursor ?? null;
               break;
             }
@@ -661,7 +789,7 @@ export function useBriar(options: UseBriarOptions = {}) {
             pages += 1;
             if (!delta.hasMore) break;
             if (pages >= 20) {
-              current = await loadDashboard(token, projectId, abort.signal);
+              current = await remote.loadDashboard(token, projectId, abort.signal);
               cursor = current.cursor ?? null;
               break;
             }
@@ -669,12 +797,23 @@ export function useBriar(options: UseBriarOptions = {}) {
         }
         if (
           abort.signal.aborted ||
-          generation !== dashboardRequestGeneration.current
+          generation !== dashboardRequestGeneration.current ||
+          // A response that outlived its project must never be committed under
+          // another project's identity.
+          activeProjectIdRef.current !== projectId
         ) return;
         dashboardCursor.current = cursor;
         if (current !== dashboardRef.current) {
           dashboardRef.current = current;
           setDashboard(current);
+        } else {
+          // The delta advanced the cursor without changing any entity; keep the
+          // cache entry warm so a project switch still restores this payload.
+          rememberDashboard(current);
+        }
+        if (staleDashboardProjectId.current === projectId) {
+          staleDashboardProjectId.current = null;
+          setDashboardStale(false);
         }
         setError(null);
       } catch (caught) {
@@ -714,9 +853,9 @@ export function useBriar(options: UseBriarOptions = {}) {
               await clearSessionToken();
             }
           : clearSessionToken,
-        loadOrganizations,
-        loadTeams,
-        loadSession,
+        loadOrganizations: remote.loadOrganizations,
+        loadTeams: remote.loadTeams,
+        loadSession: remote.loadSession,
         readToken: webMode
           ? browserAuthClient.readSessionCredential
           : readSessionToken,
@@ -743,7 +882,7 @@ export function useBriar(options: UseBriarOptions = {}) {
               result.organizations,
               {
                 createOrganization: createRemoteOrganization,
-                loadOrganizations,
+                loadOrganizations: remote.loadOrganizations,
               },
             );
       } catch (caught) {
@@ -846,7 +985,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         execute: (run) =>
           executeScheduledTeamAgent(
             {
-              loadDashboard,
+              loadDashboard: remote.loadDashboard,
               dispatchRun: (
                 currentToken,
                 projectId,
@@ -977,7 +1116,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       projectIds,
       lastSyncedKeys: lastSyncedSharedWorkflowKeys.current,
       loadSharedWorkflow: async (projectId) =>
-        (await loadDashboard(token, projectId)).settings.workflow,
+        (await remote.loadDashboard(token, projectId)).settings.workflow,
       updateLocalWorkflow: updateLocalTeamWorkflow,
     }).then((results) => {
       if (cancelled) return;
@@ -1359,10 +1498,11 @@ export function useBriar(options: UseBriarOptions = {}) {
     setLocalProjectInventoryError(null);
     setActiveOrganizationId(null);
     setDashboard(null);
+    clearDashboardCache();
     setActiveProjectId(null);
     setProjectConnection(null);
     setIsCreatingProject(false);
-  }, [cancelLogin, token]);
+  }, [cancelLogin, clearDashboardCache, token]);
 
   const updateAccountProfile = useCallback(
     async (input: {
@@ -1402,11 +1542,12 @@ export function useBriar(options: UseBriarOptions = {}) {
       setLocalProjectInventoryError(null);
       setActiveOrganizationId(null);
       setDashboard(null);
+      clearDashboardCache();
       setActiveProjectId(null);
       setProjectConnection(null);
       setIsCreatingProject(false);
     },
-    [cancelLogin, projects, token],
+    [cancelLogin, clearDashboardCache, projects, token],
   );
 
   const startProjectCreation = useCallback(() => {
@@ -1445,7 +1586,8 @@ export function useBriar(options: UseBriarOptions = {}) {
       setActiveOrganizationId(project.organizationId);
       if (!demoMode) {
         if (!dashboardMatchesProject) {
-          setDashboard(null);
+          // Keep the last-known board on screen instead of blanking the UI.
+          if (!showCachedDashboard(projectId)) setDashboard(null);
         }
         setError(null);
         if (activeProjectId === projectId && !dashboardMatchesProject) {
@@ -1460,7 +1602,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       );
       setError(null);
     },
-    [activeProjectId, lockedProjectId, projects, refresh],
+    [activeProjectId, lockedProjectId, projects, refresh, showCachedDashboard],
   );
 
   const ensureProjectSelected = useCallback(
@@ -1471,7 +1613,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       let nextProjects = projects;
       let project = nextProjects.find((candidate) => candidate.id === projectId);
       if (!project && token && !demoMode) {
-        nextProjects = await loadTeams(token);
+        nextProjects = await remote.loadTeams(token);
         setProjects(nextProjects);
         project = nextProjects.find((candidate) => candidate.id === projectId);
       }
@@ -1490,7 +1632,8 @@ export function useBriar(options: UseBriarOptions = {}) {
       setActiveOrganizationId(project.organizationId);
       if (!demoMode) {
         if (!dashboardMatchesProject) {
-          setDashboard(null);
+          // Keep the last-known board on screen instead of blanking the UI.
+          if (!showCachedDashboard(project.id)) setDashboard(null);
         }
         setError(null);
         if (activeProjectId === project.id && !dashboardMatchesProject) {
@@ -1506,7 +1649,15 @@ export function useBriar(options: UseBriarOptions = {}) {
       setError(null);
       return project;
     },
-    [activeProjectId, demoMode, lockedProjectId, projects, refresh, token],
+    [
+      activeProjectId,
+      demoMode,
+      lockedProjectId,
+      projects,
+      refresh,
+      showCachedDashboard,
+      token,
+    ],
   );
 
   const selectOrganization = useCallback(
@@ -1549,7 +1700,10 @@ export function useBriar(options: UseBriarOptions = {}) {
             : emptyDashboard(project),
         );
       } else if (!dashboardMatchesProject) {
-        setDashboard(null);
+        // Keep the last-known board on screen instead of blanking the UI. The
+        // organization prune effect keeps this entry because the restored
+        // project belongs to the organization we are switching to.
+        if (!project || !showCachedDashboard(project.id)) setDashboard(null);
       }
       if (!dashboardMatchesProject) {
         setHealth(null);
@@ -1557,7 +1711,14 @@ export function useBriar(options: UseBriarOptions = {}) {
       }
       setError(null);
     },
-    [activeOrganizationId, activeProjectId, lockedProjectId, organizations, projects],
+    [
+      activeOrganizationId,
+      activeProjectId,
+      lockedProjectId,
+      organizations,
+      projects,
+      showCachedDashboard,
+    ],
   );
 
   const renameOrganization = useCallback(
@@ -4561,6 +4722,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       activeProjectId,
     ),
     dashboard,
+    dashboardStale,
     deleteAccount,
     deleteIssue: removeIssue,
     transferIssue: transferIssueToProject,
