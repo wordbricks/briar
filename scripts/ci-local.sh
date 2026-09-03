@@ -14,6 +14,8 @@ should_signoff=false
 ci_temp=""
 ci_temp_base="${TMPDIR:-/tmp}"
 ci_temp_base="${ci_temp_base%/}"
+timing_file=""
+ci_started_at=0
 
 usage() {
   cat <<'EOF'
@@ -29,7 +31,64 @@ fail() {
   exit 1
 }
 
+timing_init() {
+  timing_file="${BRIAR_CI_TIMING_FILE:-$ci_temp/timing.tsv}"
+  : >"$timing_file"
+}
+
+# Appends one row to the shared timing file. Safe from parallel subshells:
+# every row is a single short append.
+timing_record() {
+  local context="$1"
+  local label="$2"
+  local seconds="$3"
+  local status="$4"
+  echo "[local-ci] [timing] ${context} ${label} ${seconds}s ${status}" >&2
+  [[ -n "$timing_file" ]] || return 0
+  printf '%s\t%s\t%s\t%s\n' "$context" "$label" "$seconds" "$status" >>"$timing_file"
+}
+
+timed() {
+  local context="$1"
+  local label="$2"
+  shift 2
+  local started
+  local elapsed
+  started="$(date +%s)"
+  if "$@"; then
+    elapsed="$(($(date +%s) - started))"
+    timing_record "$context" "$label" "$elapsed" "ok"
+    return 0
+  fi
+  elapsed="$(($(date +%s) - started))"
+  timing_record "$context" "$label" "$elapsed" "fail"
+  return 1
+}
+
+timing_summary() {
+  [[ -n "$timing_file" && -s "$timing_file" ]] || return 0
+  echo
+  echo "[local-ci] === timing: steps (slowest first) ==="
+  awk -F'\t' \
+    '$2 != "context-total" && $2 != "run-total" {
+       printf "%6ds  %-16s %-44s %s\n", $3, $1, $2, $4
+     }' "$timing_file" | sort -rn
+  echo
+  echo "[local-ci] === timing: contexts and total ==="
+  awk -F'\t' \
+    '$2 == "context-total" || $2 == "run-total" {
+       printf "%6ds  %-16s %-44s %s\n", $3, $1, $2, $4
+     }' "$timing_file" | sort -rn
+  echo "[local-ci] timing file: ${timing_file}"
+}
+
 cleanup() {
+  local exit_code="$?"
+  if [[ "$ci_started_at" -gt 0 ]]; then
+    timing_record "run" "run-total" "$(($(date +%s) - ci_started_at))" \
+      "$([[ "$exit_code" -eq 0 ]] && echo ok || echo fail)"
+  fi
+  timing_summary
   if [[ -n "$ci_temp" ]]; then
     case "$ci_temp" in
       "$ci_temp_base"/briar-local-ci.*) rm -rf -- "$ci_temp" ;;
@@ -60,7 +119,7 @@ run_context() {
   shift
   echo
   echo "[local-ci] === ${context} ==="
-  "$@"
+  timed "$context" "context-total" "$@"
   echo "[local-ci] ✓ ${context}"
 }
 
@@ -69,11 +128,12 @@ run_app_worker() {
     find .github/workflows -type f -print -quit | grep -q .; then
     fail "GitHub Actions workflows are not allowed; use the local CI and release scripts."
   fi
-  bun run check
-  bun run managed-computer:image:check
-  bash scripts/qa-managed-computer-health.sh
-  bun run test
-  bash -n \
+  timed app-worker check bun run check
+  timed app-worker managed-computer-image-check bun run managed-computer:image:check
+  timed app-worker qa-managed-computer-health \
+    bash scripts/qa-managed-computer-health.sh
+  timed app-worker test bun run test
+  timed app-worker shell-syntax bash -n \
     scripts/import-apple-signing-assets.sh \
     scripts/ci-mobile.sh \
     scripts/ios-simulator.sh \
@@ -103,12 +163,12 @@ run_app_worker() {
     infrastructure/managed-computers/resolve-remote-desktop-packages \
     infrastructure/managed-computers/verify-managed-image \
     infrastructure/managed-computers/verify-remote-desktop
-  bun run ios:release:verify
-  bun run build
-  bun run build:release
-  bun run worker:check
-  bun run worker:build
-  bun run worker:startup
+  timed app-worker ios-release-verify bun run ios:release:verify
+  timed app-worker build bun run build
+  timed app-worker build-release bun run build:release
+  timed app-worker worker-check bun run worker:check
+  timed app-worker worker-build bun run worker:build
+  timed app-worker worker-startup bun run worker:startup
 }
 
 run_d1_migrations() {
@@ -116,25 +176,31 @@ run_d1_migrations() {
   d1_state_dir="$(mktemp -d "${TMPDIR:-/tmp}/briar-local-ci-d1.XXXXXX")"
   trap 'rm -rf "$d1_state_dir"' RETURN
 
-  bun run d1:migrate:local -- --persist-to "$d1_state_dir"
-  bun run test:d1:migrations
+  timed d1-migrations migrate-local \
+    bun run d1:migrate:local -- --persist-to "$d1_state_dir"
+  timed d1-migrations test-migrations bun run test:d1:migrations
 
   rm -rf "$d1_state_dir"
   trap - RETURN
 }
 
 run_rust() {
-  rustup toolchain install "$rust_toolchain" \
+  timed rust toolchain-install \
+    rustup toolchain install "$rust_toolchain" \
     --profile minimal \
     --component rustfmt,clippy
-  rustup run "$rust_toolchain" cargo fmt \
+  timed rust cargo-fmt \
+    rustup run "$rust_toolchain" cargo fmt \
     --manifest-path apps/briar/src-tauri/Cargo.toml --all --check
-  rustup run "$rust_toolchain" cargo clippy \
+  timed rust cargo-clippy \
+    rustup run "$rust_toolchain" cargo clippy \
     --manifest-path apps/briar/src-tauri/Cargo.toml \
     --all-targets \
     -- \
     -D warnings
-  rustup run "$rust_toolchain" cargo test --manifest-path apps/briar/src-tauri/Cargo.toml
+  timed rust cargo-test \
+    rustup run "$rust_toolchain" cargo test \
+    --manifest-path apps/briar/src-tauri/Cargo.toml
 }
 
 run_security() {
@@ -149,10 +215,10 @@ run_security() {
   [[ "$detected_gitleaks_version" == "$gitleaks_version" ]] ||
     fail "Expected gitleaks ${gitleaks_version}, found ${detected_gitleaks_version}."
 
-  bun run audit:dependencies
-  bun run audit:rust
-  bun run secrets:verify-encrypted
-  gitleaks git \
+  timed security audit-dependencies bun run audit:dependencies
+  timed security audit-rust bun run audit:rust
+  timed security secrets-verify-encrypted bun run secrets:verify-encrypted
+  timed security gitleaks gitleaks git \
     --config .gitleaks.toml \
     --redact \
     --no-banner \
@@ -174,9 +240,9 @@ prepare_parallel_inputs() {
   if includes_context rust; then
     echo
     echo "[local-ci] === shared build inputs ==="
-    bun run runtime:prepare
-    bun run cli:build
-    bun run agent:build
+    timed shared-inputs runtime-prepare bun run runtime:prepare
+    timed shared-inputs cli-build bun run cli:build
+    timed shared-inputs agent-build bun run agent:build
     echo "[local-ci] ✓ shared build inputs"
   fi
 }
@@ -212,7 +278,6 @@ run_selected_contexts() {
     return
   fi
 
-  ci_temp="$(mktemp -d "$ci_temp_base/briar-local-ci.XXXXXX")"
   echo
   echo "[local-ci] Running ${#contexts_to_run[@]} context(s) in parallel."
 
@@ -283,7 +348,11 @@ if $should_signoff; then
     fail "Install gh-signoff first: gh extension install basecamp/gh-signoff"
 fi
 
-bun install --frozen-lockfile
+ci_temp="$(mktemp -d "$ci_temp_base/briar-local-ci.XXXXXX")"
+timing_init
+ci_started_at="$(date +%s)"
+
+timed setup bun-install bun install --frozen-lockfile
 
 prepare_parallel_inputs
 run_selected_contexts
