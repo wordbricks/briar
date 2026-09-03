@@ -36,6 +36,21 @@ prepares shared build inputs once, and runs the four independent contexts in
 parallel before publishing any status. Do not precede it with a separate
 `bun run check`; that check is already part of `signoff/app-worker`.
 
+### Shared Cargo target directory
+
+The `rust` context builds into a shared Cargo target directory instead of
+`apps/briar/src-tauri/target`, so `cargo fmt`, `cargo clippy`, and `cargo test`
+stay incremental across git worktrees: a fresh Auto Hunt worktree reuses the
+artifacts of previous runs rather than rebuilding every crate. The default is
+`$(getconf DARWIN_USER_CACHE_DIR)/briar/ci/cargo-target` (falling back to
+`$TMPDIR` when that is unavailable). Override it with
+`BRIAR_CI_CARGO_TARGET_DIR`, which must be an absolute path ending in
+`/cargo-target`, or set `BRIAR_CI_CARGO_TARGET_DIR=local` to fall back to the
+per-worktree target directory when debugging a build. Unlike the release cache,
+the CI cache takes no exclusive lock: Cargo's own file lock serialises
+concurrent access, so several worktrees can run local CI at the same time and
+simply wait for each other.
+
 Mobile contract validation is separate from the required pull request
 signoffs. On a macOS worker with Xcode, JDK 17, and Android SDK 36, install the
 repository-pinned tools and explicitly provision the required iOS runtime and

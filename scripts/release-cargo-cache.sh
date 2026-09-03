@@ -1,22 +1,39 @@
 #!/bin/bash
 
-configure_release_cargo_cache() {
+# Resolves the shared Cargo target directory for a build channel ("release",
+# "ci", ...) and prints its physical path. Arguments:
+#   $1 channel name used in the default path
+#   $2 caller-supplied override (usually an environment variable's value)
+#   $3 name of that environment variable, used in the error message
+# The directory is created if missing; it does not take any lock.
+resolve_briar_cargo_target_dir() {
+  local channel="$1"
+  local override="${2:-}"
+  local override_name="${3:-BRIAR_CARGO_TARGET_DIR}"
   local cache_base
   local target_dir
   cache_base="$(getconf DARWIN_USER_CACHE_DIR 2>/dev/null || true)"
   if [[ -z "$cache_base" ]]; then
     cache_base="${TMPDIR:-/tmp}"
   fi
-  target_dir="${BRIAR_RELEASE_CARGO_TARGET_DIR:-${cache_base%/}/briar/release/cargo-target}"
+  target_dir="${override:-${cache_base%/}/briar/${channel}/cargo-target}"
   case "$target_dir" in
     /*/cargo-target) ;;
     *)
-      echo "BRIAR_RELEASE_CARGO_TARGET_DIR must be an absolute path ending in /cargo-target." >&2
+      echo "${override_name} must be an absolute path ending in /cargo-target." >&2
       return 1
       ;;
   esac
   mkdir -p "$target_dir"
-  target_dir="$(cd "$target_dir" && pwd -P)"
+  (cd "$target_dir" && pwd -P)
+}
+
+configure_release_cargo_cache() {
+  local target_dir
+  target_dir="$(resolve_briar_cargo_target_dir \
+    release \
+    "${BRIAR_RELEASE_CARGO_TARGET_DIR:-}" \
+    BRIAR_RELEASE_CARGO_TARGET_DIR)" || return 1
   BRIAR_RELEASE_CARGO_LOCK="$target_dir/.briar-release-lock"
   if ! mkdir "$BRIAR_RELEASE_CARGO_LOCK" 2>/dev/null; then
     echo "Another Briar release is using the shared Cargo cache: $target_dir" >&2

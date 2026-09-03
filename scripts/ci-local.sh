@@ -4,6 +4,9 @@ set -euo pipefail
 workspace_root="$(cd "$(dirname "$0")/.." && pwd -P)"
 cd "$workspace_root"
 
+# shellcheck source=scripts/release-cargo-cache.sh
+source "$workspace_root/scripts/release-cargo-cache.sh"
+
 readonly rust_toolchain="1.96.0"
 readonly cargo_audit_version="0.22.2"
 readonly gitleaks_version="8.30.1"
@@ -184,23 +187,47 @@ run_d1_migrations() {
   trap - RETURN
 }
 
+configure_ci_cargo_cache() {
+  local target_dir
+
+  if [[ "${BRIAR_CI_CARGO_TARGET_DIR:-}" == "local" ]]; then
+    echo "[local-ci] Using the per-worktree Cargo target directory."
+    return 0
+  fi
+
+  target_dir="$(resolve_briar_cargo_target_dir \
+    ci \
+    "${BRIAR_CI_CARGO_TARGET_DIR:-}" \
+    BRIAR_CI_CARGO_TARGET_DIR)" ||
+    fail "Could not resolve the shared CI Cargo target directory."
+
+  # No lock here on purpose: Cargo already serialises concurrent access to a
+  # target directory with its own file lock, and local CI runs in several
+  # worktrees at once must wait for each other rather than fail.
+  export CARGO_TARGET_DIR="$target_dir"
+  echo "[local-ci] Using shared CI Cargo target at $CARGO_TARGET_DIR"
+}
+
 run_rust() {
   timed rust toolchain-install \
     rustup toolchain install "$rust_toolchain" \
     --profile minimal \
     --component rustfmt,clippy
-  timed rust cargo-fmt \
-    rustup run "$rust_toolchain" cargo fmt \
-    --manifest-path apps/briar/src-tauri/Cargo.toml --all --check
-  timed rust cargo-clippy \
-    rustup run "$rust_toolchain" cargo clippy \
-    --manifest-path apps/briar/src-tauri/Cargo.toml \
-    --all-targets \
-    -- \
-    -D warnings
-  timed rust cargo-test \
-    rustup run "$rust_toolchain" cargo test \
-    --manifest-path apps/briar/src-tauri/Cargo.toml
+  (
+    configure_ci_cargo_cache
+    timed rust cargo-fmt \
+      rustup run "$rust_toolchain" cargo fmt \
+      --manifest-path apps/briar/src-tauri/Cargo.toml --all --check
+    timed rust cargo-clippy \
+      rustup run "$rust_toolchain" cargo clippy \
+      --manifest-path apps/briar/src-tauri/Cargo.toml \
+      --all-targets \
+      -- \
+      -D warnings
+    timed rust cargo-test \
+      rustup run "$rust_toolchain" cargo test \
+      --manifest-path apps/briar/src-tauri/Cargo.toml
+  )
 }
 
 run_security() {
