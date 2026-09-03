@@ -1,18 +1,21 @@
 # Security exceptions
 
-## Gitleaks public promotion campaign identifier
+## Gitleaks public campaign identifier
 
 - Recorded: 2026-09-03
 - Review by: 2026-10-03
-- Finding: `generic-api-key` on the public Jay slot 10 campaign identifier
-  in `apps/briar/worker/src/managed-computer-promotion-campaigns.test.ts`,
-  introduced by commit `1a74d6a8046ac296b40ba303c93765eb3962949a`.
-- This is the public campaign identifier stored in the migration. Promotion
-  credentials are separate values in `MANAGED_COMPUTER_PROMOTION_CODE`.
-- Scope: the allowlist requires both that exact test file and the exact
-  `code_key` line. Other identifiers, credentials, and files remain scanned.
-- Removal condition: remove the entry when Gitleaks no longer flags this
-  public identifier, or when the historical fixture is no longer scanned.
+- Finding: the generic API key rule flags the public campaign identifier
+  `getbriar-jay-10` in historical test fixtures and documentation. The full-ref
+  scan includes the fixture in commit `e42b197996880e704eac5343b8fb54c5fc29768d`
+  and the audit note in `6c0fd71727c263832b487117675de24cbd4c040c`.
+- This is a public database campaign identifier. Authentication credentials
+  and the separately configured promotion redemption code are distinct values.
+- Scope: only this exact identifier, only under the generic API key rule, and
+  only in `apps/briar/worker/src/managed-computer-promotion-campaigns.test.ts`
+  or this document. All three conditions must match.
+- Removal condition: remove the exception when the detector stops reporting
+  the identifier or the affected history is no longer scanned. Revoke it if
+  this public identifier is ever used as an authentication credential.
 
 ## GHSA-w3rx-r6r6-pgpr and GHSA-5p2g-fcmc-qvqq — temporary landing build exception
 

@@ -8,6 +8,7 @@ import {
   GetGitHubIntegrationResponseSchema,
   GetGitHubPullRequestResponseSchema,
   GetProjectGitHubRepositoryResponseSchema,
+  GetProjectMergeActivityResponseSchema,
   GitHubInstallationRepositorySchema,
   GitHubMergeResultSchema,
   GitHubPullRequestSchema,
@@ -21,6 +22,19 @@ import {
   GitHubPullRequestIdentitySchema,
 } from "@briar/contracts/gen/briar/types/v1/github_identity_pb";
 import { Code, ConnectError } from "@connectrpc/connect";
+import type { ProjectMergeActivity } from "../../src/lib/project-merge-activity";
+
+export const appProjectMergeActivity = (activity: ProjectMergeActivity) =>
+  create(GetProjectMergeActivityResponseSchema, {
+    repository: activity.repository,
+    generatedAt: timestampFromDate(new Date(activity.generatedAt)),
+    pullRequests: activity.pullRequests.map((pr) => ({
+      number: BigInt(pr.number),
+      title: pr.title,
+      url: pr.url,
+      mergedAt: timestampFromDate(new Date(pr.mergedAt)),
+    })),
+  });
 
 type IntegrationResult = Awaited<
   ReturnType<

@@ -300,6 +300,30 @@ describe("GitHub Connect services", () => {
     )).resolves.toBeNull();
   });
 
+  it("allows project viewers to read merge activity and rejects outsiders before contacting GitHub", async () => {
+    await db.prepare(`insert into briar_project_members (
+      project_id, organization_id, user_id, created_at, updated_at
+    ) values (?, ?, ?, ?, ?)`)
+      .bind(projectId, projectOrganizationId, viewerId, observedAt, observedAt).run();
+    const mergedAt = new Date(Date.now() - 60_000).toISOString();
+    const fetchMock = vi.fn(async (url: string) => url.includes("access_tokens")
+      ? Response.json({ token: "installation-token", expires_at: new Date(Date.now() + 3_600_000).toISOString() })
+      : Response.json([{ number: 12, title: "Fix navigation", merged_at: mergedAt, updated_at: mergedAt }]));
+    vi.stubGlobal("fetch", fetchMock);
+    const github = projectClient();
+    expect(await errorCode(github.getProjectMergeActivity({ projectId }, options(outsiderToken)))).toBe(Code.NotFound);
+    expect(fetchMock).not.toHaveBeenCalled();
+    let responseHeaders: Headers | undefined;
+    const result = await github.getProjectMergeActivity({ projectId }, {
+      ...options(viewerToken),
+      onHeader: (headers) => { responseHeaders = headers; },
+    });
+    expect(result.repository).toBe(repository);
+    expect(result.pullRequests).toMatchObject([{ number: 12n, title: "Fix navigation" }]);
+    expect(responseHeaders?.get("cache-control")).toBe("private, no-store");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it("serves one repository-scoped secret to session, worker, and agent principals", async () => {
     const fetchMock = vi.fn().mockImplementation(async () =>
       new Response(JSON.stringify({

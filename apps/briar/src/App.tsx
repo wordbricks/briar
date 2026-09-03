@@ -66,6 +66,7 @@ import { ProjectOnboarding } from "./components/ProjectOnboarding";
 import { PlanningProjectDialog } from "./components/PlanningProjectDialog";
 import { Projects } from "./components/Projects";
 import { ProjectLobby } from "./components/ProjectLobby";
+import { loadProjectMergeActivity } from "./lib/app-rpc/github";
 import { ProjectAgents } from "./components/ProjectAgents";
 import { ProjectIcon } from "./components/ProjectIcon";
 import { ProjectAgentSessionDetail } from "./components/ProjectAgentSessionDetail";
@@ -561,6 +562,13 @@ export function App({
       90,
     );
   }, [briar.activeOrganizationId, briar.token]);
+  const loadProjectHomeMerges = useCallback(
+    (projectId: string, signal: AbortSignal) => {
+      if (!briar.token) return Promise.reject(new Error("Sign in to load merge activity"));
+      return loadProjectMergeActivity(briar.token, projectId, signal);
+    },
+    [briar.token],
+  );
   const loadProjectHomeUsage = useMemo(
     () => createCachedProjectUsageSummaryLoader(async (projectId, period, range) => {
       if (!briar.token) return null;
@@ -4317,6 +4325,7 @@ export function App({
             dashboard={briar.dashboard}
             isSidebarOpen={isSidebarOpen}
             onLoadUsageSummary={loadProjectHomeUsage}
+            onLoadMergeActivity={loadProjectHomeMerges}
             onOpenAgents={() => {
               setRequestedSessionId(null);
               setAgentListRequestKey((key) => key + 1);
