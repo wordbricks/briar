@@ -653,7 +653,7 @@ describe("channel issue proposal approval route", () => {
             "connect-protocol-version": "1",
             "content-type": "application/json",
           },
-          body: JSON.stringify({ projectId: projectAId }),
+          body: JSON.stringify({ teamId: projectAId }),
         },
       ),
       env(),
