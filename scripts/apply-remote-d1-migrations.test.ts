@@ -55,7 +55,7 @@ describe("remote D1 migration imports", () => {
     );
     expect(runner).toHaveBeenCalledTimes(3);
     expect(beforeMigration).toHaveBeenCalledOnce();
-    expect(beforeMigration).toHaveBeenCalledWith("0002_second.sql");
+    expect(beforeMigration).toHaveBeenCalledWith("0002_second.sql", undefined);
   });
 
   it("recovers when the final import poll fails after D1 commits", async () => {

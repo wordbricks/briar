@@ -1,4 +1,6 @@
 interface Env {
+  /** HMAC key accepted only by the monotonic R2 release promotion endpoint. */
+  RELEASE_PROMOTION_SECRET?: string;
   /** Apple Developer team that owns the Companion bundle identifier. */
   APNS_TEAM_ID?: string;
   /** APNs token key identifier and unencrypted PKCS#8 key supplied as Worker secrets. */

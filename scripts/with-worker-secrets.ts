@@ -2,8 +2,11 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { applyRemoteD1Migrations } from "./apply-remote-d1-migrations";
+import { verifyProductionGitTarget } from "./production-git-target";
+import { withRemoteOperationLease } from "./remote-operation-lease";
 
 const REQUIRED_SECRETS = [
+  "RELEASE_PROMOTION_SECRET",
   "BETTER_AUTH_SECRET",
   "GOOGLE_CLIENT_ID",
   "GOOGLE_CLIENT_SECRET",
@@ -65,7 +68,7 @@ function serializeDotenv(secrets: Record<string, string>): string {
     .join("\n")}\n`;
 }
 
-async function runWrangler(args: string[]): Promise<number> {
+async function runWrangler(args: string[], signal?: AbortSignal): Promise<number> {
   const processHandle = Bun.spawn(["wrangler", ...args], {
     cwd: process.cwd(),
     env: process.env,
@@ -73,18 +76,28 @@ async function runWrangler(args: string[]): Promise<number> {
     stdout: "inherit",
     stderr: "inherit",
   });
-
-  return processHandle.exited;
+  const abortProcess = () => processHandle.kill();
+  if (signal?.aborted) abortProcess();
+  signal?.addEventListener("abort", abortProcess, { once: true });
+  try {
+    return await processHandle.exited;
+  } finally {
+    signal?.removeEventListener("abort", abortProcess);
+  }
 }
+
+const migrateRemoteD1 = (signal?: AbortSignal) =>
+  applyRemoteD1Migrations({ signal });
 
 export async function runWorkerDeploy(
   secretsPath: string,
-  runner: (args: string[]) => Promise<number> = runWrangler,
-  migrate: () => Promise<number> = applyRemoteD1Migrations,
+  runner: (args: string[], signal?: AbortSignal) => Promise<number> = runWrangler,
+  migrate: (signal?: AbortSignal) => Promise<number> = migrateRemoteD1,
+  signal?: AbortSignal,
 ): Promise<number> {
-  const migrationExitCode = await migrate();
+  const migrationExitCode = await migrate(signal);
   if (migrationExitCode !== 0) return migrationExitCode;
-  return runner(["deploy", "--keep-vars", "--secrets-file", secretsPath]);
+  return runner(["deploy", "--keep-vars", "--secrets-file", secretsPath], signal);
 }
 
 async function main(): Promise<void> {
@@ -130,7 +143,42 @@ async function main(): Promise<void> {
       }
     }
     const exitCode = mode === "deploy"
-      ? await runWorkerDeploy(secretsPath)
+      ? await (async () => {
+          const headSha = await verifyProductionGitTarget();
+          return withRemoteOperationLease({
+            headSha,
+            name: "worker-production",
+            runner: async (args, captureOutput = false, signal) => {
+              const processHandle = Bun.spawn(["wrangler", ...args], {
+                cwd: process.cwd(),
+                env: process.env,
+                stdin: "inherit",
+                stdout: captureOutput ? "pipe" : "inherit",
+                stderr: "inherit",
+              });
+              const abortProcess = () => processHandle.kill();
+              if (signal?.aborted) abortProcess();
+              signal?.addEventListener("abort", abortProcess, { once: true });
+              try {
+                if (!captureOutput) {
+                  return { exitCode: await processHandle.exited, stdout: "" };
+                }
+                const [stdout, exitCode] = await Promise.all([
+                  new Response(processHandle.stdout).text(),
+                  processHandle.exited,
+                ]);
+                return { exitCode, stdout };
+              } finally {
+                signal?.removeEventListener("abort", abortProcess);
+              }
+            },
+          }, (signal) => runWorkerDeploy(
+            secretsPath,
+            runWrangler,
+            migrateRemoteD1,
+            signal,
+          ));
+        })()
       : await runWrangler([
           "dev",
           "--env-file",

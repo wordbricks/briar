@@ -3,7 +3,10 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { verifySignoffReady } from "./verify-signoff-ready";
+import {
+  verifySignoffReady,
+  verifySignoffTargetUnchanged,
+} from "./verify-signoff-ready";
 
 const fixtureRoots: string[] = [];
 
@@ -29,6 +32,7 @@ function createPushedRepository(): string {
   git(repository, "add", "tracked.txt");
   git(repository, "commit", "-m", "initial");
   git(repository, "remote", "add", "origin", remote);
+  git(repository, "push", "origin", "HEAD:main");
   git(repository, "push", "--set-upstream", "origin", "signoff-test");
 
   return repository;
@@ -45,7 +49,9 @@ describe("signoff preflight", () => {
     const repository = createPushedRepository();
 
     expect(verifySignoffReady(repository)).toEqual({
+      baseSha: git(repository, "rev-parse", "HEAD"),
       head: git(repository, "rev-parse", "HEAD"),
+      pushBranch: "signoff-test",
       upstream: "origin/signoff-test",
     });
   });
@@ -71,5 +77,20 @@ describe("signoff preflight", () => {
     git(repository, "branch", "--unset-upstream");
 
     expect(() => verifySignoffReady(repository)).toThrow("not tracking a remote branch");
+  });
+
+  it("cancels a running signoff when origin/main moves", () => {
+    const repository = createPushedRepository();
+    const target = verifySignoffReady(repository);
+    git(repository, "checkout", "--detach");
+    writeFileSync(join(repository, "tracked.txt"), "new base\n");
+    git(repository, "add", "tracked.txt");
+    git(repository, "commit", "-m", "move base");
+    git(repository, "push", "origin", "HEAD:main");
+    git(repository, "checkout", "signoff-test");
+
+    expect(() => verifySignoffTargetUnchanged(target, repository)).toThrow(
+      "origin/main moved",
+    );
   });
 });

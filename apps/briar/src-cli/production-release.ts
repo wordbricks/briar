@@ -3,6 +3,10 @@ import { execFileSync } from "node:child_process";
 import { readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { verifyReleaseManifest } from "./release-manifest";
+import {
+  releasePromotionPayload,
+  signReleasePromotion,
+} from "../src/lib/release-promotion";
 
 const semverPattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/u;
 const updaterPublicKeyPattern = /^untrusted comment: minisign public key[^\n]*\n[A-Za-z0-9+/=]{40,}\s*$/u;
@@ -15,7 +19,10 @@ const requiredProductionSecrets = [
   "TAURI_SIGNING_PRIVATE_KEY_PASSWORD",
 ] as const;
 const requiredProductionConfig = ["APPLE_API_KEY", "APPLE_API_ISSUER"] as const;
-const requiredPublishingSecrets = ["CLOUDFLARE_API_TOKEN"] as const;
+const requiredPublishingSecrets = [
+  "CLOUDFLARE_API_TOKEN",
+  "RELEASE_PROMOTION_SECRET",
+] as const;
 const requiredPublishingConfig = ["CLOUDFLARE_ACCOUNT_ID"] as const;
 
 function requireSemver(version: string) {
@@ -91,6 +98,45 @@ export function productionUpdaterConfig(env: NodeJS.ProcessEnv) {
     bundle,
     plugins: { updater: { pubkey, endpoints: [endpoint] } },
   };
+}
+
+export async function promoteProductionRelease(input: {
+  readonly commitSha: string;
+  readonly endpoint: string;
+  readonly secret: string;
+  readonly version: string;
+}) {
+  requireSemver(input.version);
+  if (!/^[0-9a-f]{40}$/u.test(input.commitSha)) {
+    throw new Error("commitSha must be a full Git SHA.");
+  }
+  const endpoint = requireHttpsUrl(input.endpoint, "endpoint");
+  endpoint.pathname = "/releases/promote";
+  endpoint.search = "";
+  endpoint.hash = "";
+  const payload = releasePromotionPayload({
+    commitSha: input.commitSha,
+    version: input.version,
+  });
+  const signature = await signReleasePromotion(input.secret, payload);
+  const response = await fetch(endpoint, {
+    body: payload,
+    headers: {
+      Authorization: `Briar-HMAC ${signature}`,
+      "Content-Type": "application/json",
+    },
+    method: "POST",
+  });
+  if (!response.ok) {
+    const detail = (await response.text()).slice(0, 500);
+    throw new Error(
+      `Production release promotion failed (${response.status}): ${detail}`,
+    );
+  }
+  return response.json() as Promise<{
+    readonly currentVersion: string;
+    readonly promoted: boolean;
+  }>;
 }
 
 async function sha256(path: string) {
@@ -424,7 +470,21 @@ if (import.meta.main) {
       baseUrl: requiredArgument("--base-url"),
     });
     console.log(`Verified reusable Production artifacts for Briar v${version}.`);
+  } else if (command === "promote") {
+    const result = await promoteProductionRelease({
+      commitSha: requiredArgument("--commit-sha"),
+      endpoint: requiredArgument("--endpoint"),
+      secret: process.env.RELEASE_PROMOTION_SECRET ?? "",
+      version,
+    });
+    console.log(
+      result.promoted
+        ? `Promoted Briar v${result.currentVersion} atomically.`
+        : `Briar v${result.currentVersion} was already promoted.`,
+    );
   } else {
-    throw new Error("Expected preflight, config, metadata, or verify-artifacts command.");
+    throw new Error(
+      "Expected preflight, config, metadata, verify-artifacts, or promote command.",
+    );
   }
 }

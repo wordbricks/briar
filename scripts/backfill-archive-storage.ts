@@ -27,7 +27,9 @@ const decodeBackfillResponse = (input: unknown): BackfillResponse => {
   return { processed: input.processed, remaining: input.remaining };
 };
 
-export async function backfillRemoteArchiveStorage(): Promise<number> {
+export async function backfillRemoteArchiveStorage(
+  signal?: AbortSignal,
+): Promise<number> {
   const token = crypto.randomUUID();
   const port = 20_000 + Math.floor(Math.random() * 20_000);
   const origin = `http://127.0.0.1:${port}`;
@@ -52,6 +54,9 @@ export async function backfillRemoteArchiveStorage(): Promise<number> {
     stdout: "inherit",
     stderr: "inherit",
   });
+  const abortWorker = () => worker.kill();
+  if (signal?.aborted) abortWorker();
+  signal?.addEventListener("abort", abortWorker, { once: true });
 
   try {
     let ready = false;
@@ -63,7 +68,7 @@ export async function backfillRemoteArchiveStorage(): Promise<number> {
         throw new Error("Archive backfill Worker exited before becoming ready");
       }
       try {
-        const response = await fetch(`${origin}/health`);
+        const response = await fetch(`${origin}/health`, { signal });
         if (response.ok) {
           ready = true;
           break;
@@ -78,6 +83,7 @@ export async function backfillRemoteArchiveStorage(): Promise<number> {
     for (let batch = 0; batch < 10_000; batch += 1) {
       const response = await fetch(`${origin}/backfill`, {
         method: "POST",
+        signal,
         headers: { authorization: `Bearer ${token}` },
       });
       if (!response.ok) {
@@ -100,6 +106,7 @@ export async function backfillRemoteArchiveStorage(): Promise<number> {
     console.error(error instanceof Error ? error.message : String(error));
     return 1;
   } finally {
+    signal?.removeEventListener("abort", abortWorker);
     worker.kill();
     await worker.exited;
   }

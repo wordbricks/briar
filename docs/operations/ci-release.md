@@ -19,23 +19,22 @@ Run all checks locally:
 bun run ci:local
 ```
 
-After committing and pushing the exact revision that passed, publish all four
-statuses with `gh-signoff`:
-
-`gh-signoff` is a **Briar repository contributor/release tool**, not a runtime
-Worker or default Workflow dependency. Projects whose own validation scripts
-invoke `gh` must declare and provision that project-specific requirement; the
-Briar GitHub App flow itself never asks users to install or authenticate it.
+After committing and pushing the exact revision to an `origin` branch, run and
+publish all four statuses with the authenticated GitHub CLI:
 
 ```sh
 bun run ci:signoff
 ```
 
 The signoff command is self-contained: before any expensive setup or checks, it
-fails fast unless the worktree is clean and `HEAD` exactly matches its push
-branch. It then prepares shared build inputs once and runs the four independent
-contexts in parallel before publishing any status. Do not precede it with a
-separate `bun run check`; that check is already part of `signoff/app-worker`.
+fails fast unless the worktree is clean and `HEAD` exactly matches the live
+remote push branch. It records the current `origin/main`, immediately publishes
+all selected contexts as pending, and checks the local HEAD, push branch, and
+base branch every ten seconds. Moving any of them interrupts the remaining work
+and marks the target commit's contexts failed; rerun on the new base. Each
+context publishes its own final status as it finishes. Do not precede signoff
+with a separate `bun run check`; that check is already part of
+`signoff/app-worker`.
 
 `signoff/app-worker` builds the frontend twice, not three times: `build:release`
 is the authoritative desktop bundle (`apps/briar/dist`) and `web:build` is the
@@ -83,12 +82,19 @@ and idempotently creates the default iPhone and iPad destinations. Platform
 Support readiness is checked through an actual Xcode Simulator destination;
 the presence of a same-version runtime alone is insufficient because Xcode can
 reject prerelease or otherwise incompatible runtime builds.
-`bun run mobile:ci` then:
+`bun run mobile:ci` is an `effect/unstable/cli` command whose scope cleans up
+its isolated source/build copy and interrupts every spawned build on failure.
+XcodeGen runs once in that copy before the parallel jobs, so builds never race
+while replacing the checked-in project. It:
 
 - checks the canonical Buf descriptor and generated TypeScript/Swift Connect artifacts, and exercises representative generated client-to-Worker service boundaries;
 - builds and runs the independent SwiftUI App, Unit Test, and UI Test targets;
 - analyzes and builds the SwiftUI Production configuration without signing; and
 - builds the retained Tauri Android debug APK.
+
+The three independent iOS build/test jobs use bounded concurrency. The default
+is two; use `bun run mobile:ci -- --jobs 1` on a memory-constrained runner or
+`--jobs 3` on a dedicated host.
 
 Set `BRIAR_IOS_DESTINATION` and `BRIAR_IPAD_DESTINATION` to equivalent Xcode
 destinations when the worker uses differently named simulators. The command
@@ -112,13 +118,30 @@ Local CI uses an Effect runner with `effect/unstable/cli`. The typed CLI runs
 the selected contexts with scoped child processes and temporary directories.
 The first failed context interrupts its still-running siblings, so a known
 failure does not leave expensive builds or Miniflare pools running. Local CI
-assumes the repository dependencies have already been installed.
+assumes the repository dependencies have already been installed. An atomic
+lock in the linked worktree's Git metadata rejects a second local, signoff, or
+mobile CI run in the same worktree while still allowing different worktrees to
+validate in parallel. Stale locks left by a killed process are reclaimed.
+
+Command output is written to per-context temporary logs while one-line start,
+finish, and timing events stream to the terminal. Successful logs disappear
+with the Effect scope; on failure only the last 200 lines of the failed context
+are printed. Set `BRIAR_CI_TIMING_FILE` when a persistent TSV timing artifact is
+needed.
 
 All four contexts, `d1-migrations` included, run in parallel. The D1 migration
 suite pins itself to a single Vitest worker while `app-worker` runs so the
-combined Miniflare pool stays small; wrangler state for `d1:migrate:local` lives
-in a private temporary directory. Set `BRIAR_CI_SERIAL_CONTEXTS=true` to run the
-contexts one at a time on constrained machines.
+combined Miniflare pool stays small. Set `BRIAR_CI_SERIAL_CONTEXTS=true` to run
+the contexts one at a time on constrained machines.
+
+## Production Worker serialization
+
+Both `bun run worker:deploy` and direct `bun run d1:migrate:remote` require a
+clean checkout at the exact fetched `origin/main` commit. They acquire the same
+renewable `worker-production` lease in Production D1. The deploy command holds
+it across both migration and Worker publication, so separate terminals or
+hosts cannot interleave schema and code deployments. A process that loses its
+lease aborts; an abandoned lease expires after 20 minutes.
 
 ### The D1 schema snapshot
 
@@ -130,10 +153,9 @@ Vitest project loads it in one batch instead of replaying ~190 migrations into
 each test file's isolated database.
 
 The migrations remain the source of truth. `d1:migrate:local`, `d1:migrate:remote`
-and the migration regression suite (`test:d1:migrations`, which covers
-`worker/src/**/*.migration.test.ts`, `db.test.ts` and `workflow-v2.test.ts`)
-still replay the real files, so migration behaviour is never validated through
-the snapshot.
+and the migration regression suite still use the real files. CI relies on the
+suite's two full-history replays plus four domain-grouped cutover entries; it no
+longer pays for a third, redundant Wrangler replay on every signoff.
 
 After adding or editing a migration that changes the schema or seeds rows:
 
@@ -142,8 +164,8 @@ bun run d1:snapshot   # regenerate; takes ~45s
 ```
 
 Commit the regenerated `schema.sql` with the migration. The `d1-migrations` CI
-context runs `bun run d1:snapshot:check` right after `d1:migrate:local`; it
-compares the `migrations-digest` and `snapshot-digest` lines in the snapshot
+context runs `bun run d1:snapshot:check` before the migration regression suite;
+it compares the `migrations-digest` and `snapshot-digest` lines in the snapshot
 header against the migration files on disk and fails in under a second if either
 the migrations changed without a regeneration or the snapshot was hand-edited.
 `bun run d1:snapshot:check:full` regenerates into a temporary file and prints a

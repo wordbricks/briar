@@ -7,14 +7,14 @@ export default defineConfig(async () => ({
   test: {
     name: "worker-migrations",
     include: [
-      "worker/src/**/*.migration.test.ts",
+      "worker/src/migration-suites/*.migration.test.ts",
       "worker/src/db.test.ts",
       "worker/src/workflow-v2.test.ts",
     ],
     hookTimeout: 60_000,
-    // Capped: each worker boots its own workerd + isolated D1, so past ~8
-    // the process overhead outweighs the added parallelism.
-    maxWorkers: resolveMaxWorkers(8),
+    // Four domain entries amortize workerd startup across the cutover cases
+    // while retaining bounded parallelism for standalone migration runs.
+    maxWorkers: resolveMaxWorkers(4),
     testTimeout: 60_000,
   },
 }));
