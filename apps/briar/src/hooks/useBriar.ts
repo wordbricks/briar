@@ -7,62 +7,29 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AutoHuntSession } from "./useAutoHuntSessions";
 import {
   acceptOrganizationInvitation as acceptRemoteOrganizationInvitation,
-  acceptIssueActionProposal as acceptRemoteIssueActionProposal,
-  acceptIssueExecutionProposal as acceptRemoteIssueExecutionProposal,
-  acceptIssueSkillExecutionProposal as acceptRemoteIssueSkillExecutionProposal,
-  acceptIssueReworkProposal as acceptRemoteIssueReworkProposal,
-  addIssueDependency,
-  addRelatedIssue,
   beginDeviceAuthorization,
-  cancelHuntRun,
   claimProjectAgentScheduleRuns,
   completeProjectAgentScheduleRun,
-  completeIssueResultReview as completeRemoteIssueResultReview,
   connectLinearImport,
   createAgentToken,
   createProjectGithubCredential,
   createOrganization as createRemoteOrganization,
-  createIssue,
-  createIssueMessage,
   createTeam,
-  deleteIssue as deleteRemoteIssue,
-  deleteIssueMessage,
-  transferIssue as transferRemoteIssue,
   deleteTeam as deleteRemoteProject,
   dispatchHuntRun,
-  unassignHuntRun,
-  editIssueMessage,
   errorWithMessage,
   importLinearIssues,
-  isApiErrorStatus,
   loadDashboard,
   loadDashboardDelta,
   loadGithubIntegration,
-  loadIssueAttachment,
-  loadIssueMessages,
-  loadRunEvents,
-  loadRunEvidence,
-  loadRunEvidenceImage,
   loadLinearImportStates,
   loadOrganizations,
   loadTeams,
   loadTeamProjects,
   loadSession,
-  moveHuntRun,
-  moveIssueToPlanningProject as moveRemoteIssueToPlanningProject,
   pollDeviceToken,
   renewProjectAgentScheduleRun,
   retryHuntRun,
-  reworkPausedHuntRun,
-  resumeHuntRun,
-  removeIssueDependency,
-  removeIssueParent as removeRemoteIssueParent,
-  removeRelatedIssue,
-  setIssueParent as setRemoteIssueParent,
-  updateIssue,
-  updateIssueCheckpoints,
-  updateIssueExecutionPreferences,
-  updateIssueSubscription,
   updateTeamIcon as updateRemoteProjectIcon,
   updateTeamSettings,
   updateCheckpointPolicy,
@@ -70,7 +37,6 @@ import {
 } from "../lib/api";
 import {
   demoDashboard,
-  demoRunEvents,
   demoRepositoryReadiness,
 } from "../lib/demo-data";
 import {
@@ -142,9 +108,6 @@ import {
 import { browserCookieSessionCredential } from "../lib/session-credential";
 import {
   isRepositoryWorkflowPending,
-  progressForAutoHuntRun,
-  workflowWithAdditionalCheckpoints,
-  type AutoHuntWorkflowCheckpoint,
 } from "../lib/auto-hunt-contract";
 import { defaultIssueKeyPrefix } from "../lib/issue-key";
 import { canonicalizeIssueAttachmentReferences } from "../lib/issue-markdown";
@@ -157,35 +120,16 @@ import { executeScheduledTeamAgent } from "../lib/team-agent-schedule-execution"
 import { startTeamAgentSchedulePolling } from "../lib/team-agent-schedule-runner";
 import type {
   ClaimedProjectAgentScheduleRun,
-  AgentSkillExecutionApprovalInput,
-  AgentSkillExecutionProposal,
-  CreateIssueInput,
   DashboardPayload,
-  HuntEvent,
   HuntRun,
-  HuntRunPlacement,
-  IssueAttachment,
-  IssueMessage,
-  IssueMessageSendResult,
-  IssueProposedAction,
-  IssueExecutionApprovalInput,
-  IssueExecutionProposal,
-  IssueExecutionPreferences,
-  IssueResultReview,
   Organization,
-  PlanningProject,
   Project,
   ProjectSettings,
-  RunEvidence,
-  RunEvidenceImage,
-  UpdateIssueInput,
 } from "../types";
 import {
   demoOrganization,
   demoUser,
   emptyDashboard,
-  initialDemoIssueMessages,
-  initialDemoRunEvidence,
 } from "../state/demo-fixtures";
 import {
   companionMode,
@@ -194,7 +138,21 @@ import {
   remoteMode,
   webMode,
 } from "../state/platform";
+import { teamsByIdAtom } from "../state/entities/teams";
+import { upsertManyBy } from "../state/entities/upsert";
+import {
+  useIssueActions,
+  setIssueActionBridge,
+} from "../state/issues/actions";
+import {
+  deletingIssueIdAtom,
+  isCreatingIssueAtom,
+  recoveringRunIdAtom,
+  recoveryErrorAtom,
+  updatingIssueIdAtom,
+} from "../state/issues/atoms";
 import { useRegistry } from "../state/registry";
+import { useRunDetailActions } from "../state/run-detail/actions";
 import {
   useOrganizationActions,
   type OrganizationActionDeps,
@@ -390,21 +348,18 @@ export function useBriar(options: UseBriarOptions = {}) {
   >(null);
   const [projectConnection, setProjectConnection] = useAtom(teamConnectionAtom);
   const [isCreatingProject, setIsCreatingProject] = useAtom(isCreatingTeamAtom);
-  const [isCreatingIssue, setIsCreatingIssue] = useState(false);
-  const [updatingIssueId, setUpdatingIssueId] = useState<string | null>(null);
-  const [deletingIssueId, setDeletingIssueId] = useState<string | null>(null);
   const [deletingProjectId, setDeletingProjectId] = useAtom(deletingTeamIdAtom);
-  const [recoveringRunId, setRecoveringRunId] = useState<string | null>(null);
-  const issueMessagesByRun = useRef<Record<string, IssueMessage[]>>(
-    demoMode ? initialDemoIssueMessages : {},
-  );
-  const runEvidenceByRun = useRef<Record<string, RunEvidence[]>>(
-    demoMode ? initialDemoRunEvidence : {},
-  );
-  const runEventsByRun = useRef<Record<string, HuntEvent[]>>(
-    demoMode ? structuredClone(demoRunEvents) : {},
-  );
-  const [recoveryError, setRecoveryError] = useState<string | null>(null);
+  /*
+    The four issue mutation markers are one atom now, and the three run detail
+    caches are `Atom.family`s the run detail view subscribes to directly. The
+    facade only reads them back so `App.tsx` keeps its current props; Phase 2B's
+    view work removes these reads with the props.
+  */
+  const isCreatingIssue = useAtomValue(isCreatingIssueAtom);
+  const updatingIssueId = useAtomValue(updatingIssueIdAtom);
+  const deletingIssueId = useAtomValue(deletingIssueIdAtom);
+  const recoveringRunId = useAtomValue(recoveringRunIdAtom);
+  const recoveryError = useAtomValue(recoveryErrorAtom);
   const [velen, setVelen] = useState<VelenInspection | null>(null);
   const [health, setHealth] = useState<AutoHuntHealth | null>(null);
   const [healthError, setHealthError] = useState<string | null>(null);
@@ -438,40 +393,47 @@ export function useBriar(options: UseBriarOptions = {}) {
   const automaticWorkflowGenerations = useRef(
     new Map<string, Promise<ProjectSettings["workflow"]>>(),
   );
-  const resumeRequestIds = useRef(new Map<string, string>());
-  const reworkRequestIds = useRef(new Map<string, string>());
-  /**
-   * Commits a whole `DashboardPayload` for the call sites that still build one
-   * by hand. It keeps the two promises `setDashboard` always made — cancel
-   * whatever is in flight, then commit — but commits through `applySyncEvent`,
-   * so the store has exactly one writer. Phase 2B rewrites those call sites as
-   * optimistic entity updates and this shim goes with them.
-   */
-  const setDashboard = useCallback(
-    (
-      value:
-        | DashboardPayload
-        | null
-        | ((current: DashboardPayload | null) => DashboardPayload | null),
-    ) => {
-      const teamId = registry.get(activeTeamIdAtom);
-      const current =
-        teamId === null ? null : registry.get(dashboardViewAtom(teamId));
-      const next = typeof value === "function" ? value(current) : value;
+  /*
+    What is left of `setDashboard`, split into the two writes its remaining
+    callers actually perform. Both still cancel whatever is in flight before
+    committing — dropping that would let a response already on the wire put the
+    replaced value back — but neither rebuilds a whole payload, so a settings
+    edit no longer looks like a new dashboard to every subscriber.
+
+    The callers are the team connection, workflow and integration flows Phase 3
+    moves into `state/workspace`. The issue and run writes that made up the rest
+    of them now live in `state/issues/actions.ts`.
+  */
+
+  /** The selected team, when its payload is the one on screen. */
+  const renderedTeamId = useCallback(() => {
+    const teamId = registry.get(activeTeamIdAtom);
+    return teamId !== null && registry.get(dashboardViewAtom(teamId))
+      ? teamId
+      : null;
+  }, [registry]);
+
+  /** Commits a whole payload as the given team's snapshot. */
+  const commitTeamDashboard = useCallback(
+    (payload: DashboardPayload) => {
       loader.cancelAll();
-      if (!next) {
-        // Only ever reached for a team with nothing stored: the callers that
-        // blank the board check for stored data first.
-        if (teamId) applySyncEvent(registry, { kind: "team-cleared", teamId });
-        return;
-      }
       applySyncEvent(registry, {
         kind: "team-snapshot",
-        teamId: next.team.id,
-        payload: next,
+        teamId: payload.team.id,
+        payload,
       });
     },
     [loader, registry],
+  );
+
+  /** Rewrites the rendered team's settings, and nothing else. */
+  const commitTeamSettings = useCallback(
+    (teamId: string, settings: ProjectSettings) => {
+      loader.cancelAll();
+      if (renderedTeamId() !== teamId) return;
+      registry.set(teamSettingsAtom(teamId), settings);
+    },
+    [loader, registry, renderedTeamId],
   );
 
   const setConnectedProjectInventory = useCallback((next: string[] | null) => {
@@ -1281,14 +1243,21 @@ export function useBriar(options: UseBriarOptions = {}) {
         }
         return;
       }
-      setDashboard(
+      commitTeamDashboard(
         project.id === demoDashboard.team.id
           ? demoDashboard
           : emptyDashboard(project),
       );
       setError(null);
     },
-    [activeProjectId, lockedProjectId, projects, refresh, registry],
+    [
+      activeProjectId,
+      commitTeamDashboard,
+      lockedProjectId,
+      projects,
+      refresh,
+      registry,
+    ],
   );
 
   const ensureProjectSelected = useCallback(
@@ -1328,7 +1297,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         }
         return project;
       }
-      setDashboard(
+      commitTeamDashboard(
         project.id === demoDashboard.team.id
           ? demoDashboard
           : emptyDashboard(project),
@@ -1338,6 +1307,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     },
     [
       activeProjectId,
+      commitTeamDashboard,
       demoMode,
       lockedProjectId,
       projects,
@@ -1370,7 +1340,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         setProjects((current) => [...current, project]);
         setActiveOrganizationId(organization.id);
         setActiveProjectId(project.id);
-        setDashboard(emptyDashboard(project));
+        commitTeamDashboard(emptyDashboard(project));
         setError(null);
         setIsCreatingProject(false);
         return { project, agentToken: null };
@@ -1403,7 +1373,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         setLoading(false);
       }
     },
-    [activeOrganizationId, organizations, token],
+    [activeOrganizationId, commitTeamDashboard, organizations, token],
   );
 
   const removeProject = useCallback(
@@ -1453,21 +1423,31 @@ export function useBriar(options: UseBriarOptions = {}) {
           return next;
         });
         if (deletedActiveProject) {
-          setDashboard(
-            demoMode && nextActiveProject
-              ? nextActiveProject.id === demoDashboard.team.id
+          if (demoMode && nextActiveProject) {
+            commitTeamDashboard(
+              nextActiveProject.id === demoDashboard.team.id
                 ? demoDashboard
-                : emptyDashboard(nextActiveProject)
-              : null,
-          );
+                : emptyDashboard(nextActiveProject),
+            );
+          } else {
+            // The selection already moved on, so this drops whatever the team
+            // taking over had stored rather than the deleted team's payload —
+            // the behaviour the payload level setter had.
+            loader.cancelAll();
+            const clearedTeamId = registry.get(activeTeamIdAtom);
+            if (clearedTeamId) {
+              applySyncEvent(registry, {
+                kind: "team-cleared",
+                teamId: clearedTeamId,
+              });
+            }
+          }
           setHealth(null);
           setHealthError(null);
           if (!demoMode && token && nextActiveProject) {
-            try {
-              setDashboard(await loadDashboard(token, nextActiveProject.id));
-            } catch (caught) {
-              setError(caught instanceof Error ? caught.message : String(caught));
-            }
+            // The loader reports its own failures through the session error the
+            // hand written catch used to set.
+            await loader.refresh(nextActiveProject.id, "snapshot");
           }
         }
         if (localCleanupWarning) {
@@ -1481,7 +1461,16 @@ export function useBriar(options: UseBriarOptions = {}) {
         setDeletingProjectId(null);
       }
     },
-    [activeOrganizationId, activeProjectId, lockedProjectId, projects, token],
+    [
+      activeOrganizationId,
+      activeProjectId,
+      commitTeamDashboard,
+      loader,
+      lockedProjectId,
+      projects,
+      registry,
+      token,
+    ],
   );
 
   const selectProjectRepository = useCallback(async () => {
@@ -1525,11 +1514,14 @@ export function useBriar(options: UseBriarOptions = {}) {
         githubRepositoryId: credential.repository.id,
         githubRepository: credential.repository.fullName,
       };
-      setDashboard((current) =>
-        current?.team.id === projectId
-          ? { ...current, settings: connectedSettings }
-          : { ...projectDashboard, settings: connectedSettings }
-      );
+      if (renderedTeamId() === projectId) {
+        commitTeamSettings(projectId, connectedSettings);
+      } else {
+        commitTeamDashboard({
+          ...projectDashboard,
+          settings: connectedSettings,
+        });
+      }
       setProjectConnection((current) =>
         current?.project.id === projectId
           ? { ...current, workflow: connectedSettings.workflow }
@@ -1543,7 +1535,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [commitTeamDashboard, commitTeamSettings, renderedTeamId, token]);
 
   const resolveGithubProjectRepository = useCallback(async (
     githubRepository: string,
@@ -1698,14 +1690,17 @@ export function useBriar(options: UseBriarOptions = {}) {
       }
 
       if (shouldPersistTeamSettings) {
-        setDashboard((current) =>
-          current?.team.id === connection.project.id
-            ? { ...current, team: connectedProject, settings: savedSettings }
-            : {
-                ...emptyDashboard(connectedProject),
-                settings: savedSettings,
-              },
-        );
+        if (renderedTeamId() === connection.project.id) {
+          commitTeamSettings(connection.project.id, savedSettings);
+          registry.update(teamsByIdAtom, (teams) =>
+            upsertManyBy(teams, [connectedProject], () => connection.project.id),
+          );
+        } else {
+          commitTeamDashboard({
+            ...emptyDashboard(connectedProject),
+            settings: savedSettings,
+          });
+        }
       }
       if (connection.kind === "new" && token) {
         await configureLocalExecutionWorker(
@@ -1735,9 +1730,13 @@ export function useBriar(options: UseBriarOptions = {}) {
     }
   }, [
     applyLocalProjectInventoryObservation,
+    commitTeamDashboard,
+    commitTeamSettings,
     projectConnection,
     refreshProjectReadiness,
     readinessCoordinator,
+    registry,
+    renderedTeamId,
     token,
   ]);
 
@@ -1799,11 +1798,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       }
       if (!isCurrent()) return null;
       setProjectReadiness((current) => ({ ...current, [projectId]: readiness }));
-      setDashboard((current) =>
-        current?.team.id === projectId
-          ? { ...current, settings: connectedSettings }
-          : current
-      );
+      commitTeamSettings(projectId, connectedSettings);
       return { prepared, readiness };
     } catch (caught) {
       if (!isCurrent()) return null;
@@ -1815,6 +1810,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     }
   }, [
     applyLocalProjectInventoryObservation,
+    commitTeamSettings,
     dashboard,
     projects,
     readinessCoordinator,
@@ -1903,11 +1899,7 @@ export function useBriar(options: UseBriarOptions = {}) {
           ...dashboard.settings,
           workflow: nextWorkflow,
         });
-        setDashboard((current) =>
-          current?.team.id === projectId
-            ? { ...current, settings: result.settings }
-            : current,
-        );
+        commitTeamSettings(projectId, result.settings);
         await Promise.all([
           refreshProjectReadiness(projectId),
           refreshHealth(),
@@ -1928,7 +1920,13 @@ export function useBriar(options: UseBriarOptions = {}) {
       }
       return nextWorkflow;
     },
-    [dashboard, refreshHealth, refreshProjectReadiness, token],
+    [
+      commitTeamSettings,
+      dashboard,
+      refreshHealth,
+      refreshProjectReadiness,
+      token,
+    ],
   );
 
   const regenerateWorkflow = useCallback(
@@ -2026,18 +2024,13 @@ export function useBriar(options: UseBriarOptions = {}) {
         checkpoints,
         expectedRevision,
       });
-      setDashboard((current) => current?.team.id === projectId
-        ? {
-            ...current,
-            settings: {
-              ...current.settings,
-              checkpointPolicy: result.checkpointPolicy,
-            },
-          }
-        : current);
+      commitTeamSettings(projectId, {
+        ...dashboard.settings,
+        checkpointPolicy: result.checkpointPolicy,
+      });
       return result.checkpointPolicy;
     },
-    [dashboard, token],
+    [commitTeamSettings, dashboard, token],
   );
 
   useEffect(() => {
@@ -2210,23 +2203,16 @@ export function useBriar(options: UseBriarOptions = {}) {
       }
       const normalized = org?.trim() || null;
       if (demoMode) {
-        setDashboard((current) =>
-          current?.team.id === projectId
-            ? {
-                ...current,
-                settings: {
-                  ...current.settings,
-                  velenOrg: normalized,
-                  ...(normalized
-                    ? {}
-                    : {
-                        dataSource: null,
-                        linear: { enabled: false, source: null, teamKey: null },
-                      }),
-                },
-              }
-            : current,
-        );
+        commitTeamSettings(projectId, {
+          ...dashboard.settings,
+          velenOrg: normalized,
+          ...(normalized
+            ? {}
+            : {
+                dataSource: null,
+                linear: { enabled: false, source: null, teamKey: null },
+              }),
+        });
         return normalized;
       }
       if (!token) throw new Error("로그인이 필요합니다.");
@@ -2246,11 +2232,7 @@ export function useBriar(options: UseBriarOptions = {}) {
                 linear: { enabled: false, source: null, teamKey: null },
               }),
         });
-        setDashboard((current) =>
-          current?.team.id === projectId
-            ? { ...current, settings: result.settings }
-            : current,
-        );
+        commitTeamSettings(projectId, result.settings);
         return result.settings.velenOrg;
       } catch (caught) {
         if (!remoteMode) {
@@ -2269,1715 +2251,61 @@ export function useBriar(options: UseBriarOptions = {}) {
         throw caught;
       }
     },
-    [dashboard, token],
+    [commitTeamSettings, dashboard, token],
   );
 
-  const addIssue = useCallback(
-    async (projectId: string, input: CreateIssueInput) => {
-      const planningProject = planningProjects.find((candidate) => candidate.id === projectId);
-      const teamId = planningProject?.teamId ?? projectId;
-      const project = projects.find((candidate) => candidate.id === teamId);
-      if (!project || (!demoMode && !planningProject)) {
-        throw new Error("이슈를 추가할 프로젝트가 없습니다.");
-      }
-      setIsCreatingIssue(true);
-      setError(null);
-      try {
-        if (demoMode) {
-          const targetDashboard = dashboard?.team.id === teamId
-            ? dashboard
-            : emptyDashboard(project);
-          const occurredAt = new Date().toISOString();
-          const issueId = crypto.randomUUID();
-          const sourceKey = `briar-issue:${issueId}`;
-          const attachments: IssueAttachment[] = input.attachments.map((file) => ({
-            id: crypto.randomUUID(),
-            filename: file.name,
-            contentType: file.type,
-            byteSize: file.size,
-            url: URL.createObjectURL(file),
-          }));
-          const issueDescription = canonicalizeIssueAttachmentReferences(
-            input.description,
-            input.attachmentReferences ?? [],
-            attachments.map((attachment) => attachment.id),
-          );
-          const detail = input.status === "backlog"
-            ? "Briar 앱에서 생성된 이슈가 백로그에 추가되었습니다."
-            : "Briar 앱에서 생성된 이슈가 처리를 기다리고 있습니다.";
-          const initialEvent: HuntEvent = {
-            id: crypto.randomUUID(),
-            attempt: 1,
-            revision: 1,
-            status: input.status,
-            workflowStage: null,
-            detail,
-            actor: "briar-app",
-            qaStatus: null,
-            trackerState: null,
-            pullRequestUrls: [],
-            targetSha: null,
-            occurredAt,
-            recordedAt: occurredAt,
-          };
-          const baseWorkflow = targetDashboard.settings.checkpointPolicy
-            ? {
-                ...targetDashboard.settings.workflow,
-                execution: {
-                  checkpoints:
-                    targetDashboard.settings.checkpointPolicy.effective,
-                },
-              }
-            : targetDashboard.settings.workflow;
-          const run: HuntRun = {
-            id: crypto.randomUUID(),
-            workspaceId: project.organizationId ?? demoOrganization.id,
-            teamId,
-            projectId,
-            projectName: planningProject?.name ?? null,
-            runNumber:
-              Math.max(
-                0,
-                ...targetDashboard.runs.map((candidate) => candidate.runNumber),
-              ) + 1,
-            currentAttempt: 1,
-            currentRevision: 1,
-            source: "issue",
-            sourceKey,
-            title: input.title.trim(),
-            status: input.status,
-            workflowStage: null,
-            workflow: input.fullAuto
-              ? {
-                  ...baseWorkflow,
-                  execution: { checkpoints: [] },
-                }
-              : workflowWithAdditionalCheckpoints(
-                  baseWorkflow,
-                  input.checkpoints ?? [],
-                ),
-            issueCheckpoints: input.fullAuto ? [] : input.checkpoints ?? [],
-            fullAuto: input.fullAuto ?? false,
-            progress: input.status === "backlog" ? 0 : 5,
-            detail,
-            priority: input.priority,
-            difficulty: input.difficulty,
-            assigneeUserId: input.assigneeUserId === undefined
-              ? user?.id ?? null
-              : input.assigneeUserId,
-            subscribers: [{
-              userId: demoUser.id,
-              subscribedAt: occurredAt,
-            }],
-            preferredProvider: input.preferredProvider ?? null,
-            preferredModel: input.preferredModel ?? null,
-            preferredEffort: input.preferredEffort ?? null,
-            repository:
-              targetDashboard.settings.githubRepository ?? project.name,
-            branch: null,
-            commitSha: null,
-            tracker: null,
-            issueDescription,
-            attachments,
-            resultSummary: null,
-            structuredResult: null,
-            pullRequestUrls: [],
-            targetSha: null,
-            sourceCreatedAt: occurredAt,
-            stagingQaStatus: null,
-            productionQaStatus: null,
-            stagingQaDetail: null,
-            productionQaDetail: null,
-            context: {
-              origin: "briar-app",
-              issueId,
-              attachmentCount: attachments.length,
-              fullAuto: input.fullAuto ?? false,
-            },
-            claimedBy: null,
-            claimedAt: null,
-            leaseExpiresAt: null,
-            claimAttempts: 0,
-            startedAt: occurredAt,
-            updatedAt: occurredAt,
-            completedAt: null,
-            lastEventAt: occurredAt,
-            eventCount: 1,
-          };
-          runEventsByRun.current[run.id] = [initialEvent];
-          setActiveProjectId(teamId);
-          setActiveOrganizationId(project.organizationId);
-          setDashboard({
-            ...targetDashboard,
-            runs: [run, ...targetDashboard.runs],
-          });
-          return {
-            runId: run.id,
-            sourceKey,
-            stage: "queued" as const,
-            status: input.status,
-          };
-        }
-        if (!token) throw new Error("로그인이 필요합니다.");
-        if (!planningProject) {
-          throw new Error("이슈를 추가할 프로젝트가 없습니다.");
-        }
-        const result = await createIssue(token, {
-          teamId,
-          planningProjectId: planningProject.id,
-        }, input);
-        if (teamId === activeProjectId) {
-          await refresh("snapshot");
-        } else {
-          selectProject(teamId);
-        }
-        return result;
-      } catch (caught) {
-        const message = caught instanceof Error ? caught.message : String(caught);
-        setError(message);
-        throw caught;
-      } finally {
-        setIsCreatingIssue(false);
-      }
-    },
-    [
-      activeProjectId,
-      dashboard,
-      planningProjects,
-      projects,
-      refresh,
-      selectProject,
-      token,
-      user,
-    ],
-  );
+  /*
+    The issue, run and run detail writes. Both objects are identical for the
+    lifetime of the registry, so the callbacks below them no longer change every
+    polling tick — which is what the views start relying on when they subscribe
+    to the entity atoms directly instead of taking these as props.
+  */
+  const {
+    acceptConversationIssueAction,
+    acceptConversationIssueExecution,
+    acceptConversationSkillExecution,
+    addIssue,
+    changeIssueDependency,
+    changeIssueParent,
+    changeRelatedIssue,
+    completeResultReview,
+    editIssue,
+    editIssueCheckpoints,
+    editIssueExecutionPreferences,
+    editIssueSubscription,
+    moveIssueProject,
+    moveRun,
+    readIssueAttachment,
+    recoverRun,
+    removeIssue,
+    resumeRun,
+    reworkRun,
+    transferIssue: transferIssueToProject,
+    unassignRun,
+  } = useIssueActions();
+  const {
+    addIssueMessage,
+    readIssueMessages,
+    readRunEvents,
+    readRunEvidence,
+    readRunEvidenceImage,
+    removeIssueMessage,
+    updateIssueMessage,
+  } = useRunDetailActions();
 
-  const moveIssueProject = useCallback(
-    async (runId: string, sourceProjectId: string, targetProjectId: string) => {
-      if (!dashboard) throw new Error("이슈를 이동할 팀이 없습니다.");
-      const target = planningProjects.find((project) => project.id === targetProjectId);
-      if (!target || target.teamId !== dashboard.team.id) {
-        throw new Error("같은 팀의 프로젝트로만 이슈를 이동할 수 있습니다.");
-      }
-      setError(null);
-      try {
-        if (demoMode) {
-          setDashboard((current) => current ? {
-            ...current,
-            runs: current.runs.map((run) => run.id === runId
-              ? { ...run, projectId: target.id, projectName: target.name, updatedAt: new Date().toISOString() }
-              : run),
-          } : current);
-          return { outcome: "moved" as const };
-        }
-        if (!token) throw new Error("로그인이 필요합니다.");
-        const result = await moveRemoteIssueToPlanningProject(
-          token,
-          sourceProjectId,
-          runId,
-          targetProjectId,
-        );
-        await refresh("snapshot");
-        return result;
-      } catch (caught) {
-        setError(caught instanceof Error ? caught.message : String(caught));
-        throw caught;
-      }
-    },
-    [dashboard, planningProjects, refresh, token],
-  );
-
-  const readIssueAttachment = useCallback(
-    async (attachment: IssueAttachment) => {
-      if (!token && !attachment.url.startsWith("blob:")) {
-        throw new Error("첨부 파일을 열려면 로그인이 필요합니다.");
-      }
-      return loadIssueAttachment(token ?? "", attachment);
-    },
-    [token],
-  );
-
-  const editIssue = useCallback(
-    async (runId: string, input: UpdateIssueInput) => {
-      if (!activeProjectId || !dashboard) {
-        throw new Error("이슈를 수정할 프로젝트가 없습니다.");
-      }
-      setUpdatingIssueId(runId);
-      setError(null);
-      try {
-        if (demoMode) {
-          const updatedAt = new Date().toISOString();
-          const addedAttachments: IssueAttachment[] = input.attachments.map(
-            (file) => ({
-              id: crypto.randomUUID(),
-              filename: file.name,
-              contentType: file.type,
-              byteSize: file.size,
-              url: URL.createObjectURL(file),
-            }),
-          );
-          const canonicalDescription = canonicalizeIssueAttachmentReferences(
-            input.description,
-            input.attachmentReferences ?? [],
-            addedAttachments.map((attachment) => attachment.id),
-          );
-          setDashboard((current) =>
-            current
-              ? {
-                  ...current,
-                  runs: current.runs.map((run) =>
-                    run.id === runId
-                      ? {
-                          ...run,
-                          title: input.title.trim(),
-                          issueDescription: canonicalDescription,
-                          priority: input.priority,
-                          difficulty: input.difficulty,
-                          assigneeUserId:
-                            input.assigneeUserId === undefined
-                              ? run.assigneeUserId ?? null
-                              : input.assigneeUserId,
-                          attachments: [
-                            ...(input.keptAttachmentIds
-                              ? run.attachments.filter((attachment) =>
-                                  input.keptAttachmentIds?.includes(
-                                    attachment.id,
-                                  ),
-                                )
-                              : run.attachments),
-                            ...addedAttachments,
-                          ],
-                          updatedAt,
-                        }
-                      : run,
-                  ),
-                }
-              : current,
-          );
-          return {
-            runId,
-            title: input.title.trim(),
-            description: canonicalDescription,
-            priority: input.priority,
-            difficulty: input.difficulty,
-            assigneeUserId: input.assigneeUserId ?? null,
-            attachments: [
-              ...(input.keptAttachmentIds
-                ? (dashboard.runs.find((run) => run.id === runId)?.attachments ??
-                  []).filter((attachment) =>
-                    input.keptAttachmentIds?.includes(attachment.id),
-                  )
-                : dashboard.runs.find((run) => run.id === runId)?.attachments ??
-                  []),
-              ...addedAttachments,
-            ],
-          };
-        }
-        if (!token) throw new Error("로그인이 필요합니다.");
-        const result = await updateIssue(token, activeProjectId, runId, input);
-        await refresh("snapshot");
-        return result;
-      } catch (caught) {
-        const message = caught instanceof Error ? caught.message : String(caught);
-        setError(message);
-        throw caught;
-      } finally {
-        setUpdatingIssueId(null);
-      }
-    },
-    [activeProjectId, dashboard, demoMode, refresh, token],
-  );
-
-  const editIssueSubscription = useCallback(
-    async (runId: string, subscribed: boolean) => {
-      if (!activeProjectId || !dashboard || !user) {
-        throw new Error("이슈 구독을 변경할 수 없습니다.");
-      }
-      setError(null);
-      try {
-        if (demoMode) {
-          const run = dashboard.runs.find((candidate) => candidate.id === runId);
-          if (!subscribed && run?.assigneeUserId === user.id) {
-            throw new Error("담당자는 이슈 구독을 해제할 수 없습니다.");
-          }
-          const existing = run?.subscribers ?? [];
-          const subscribers = subscribed
-            ? existing.some((subscriber) => subscriber.userId === user.id)
-              ? existing
-              : [...existing, {
-                  userId: user.id,
-                  subscribedAt: new Date().toISOString(),
-                }]
-            : existing.filter((subscriber) => subscriber.userId !== user.id);
-          setDashboard((current) => current
-            ? {
-                ...current,
-                runs: current.runs.map((candidate) =>
-                  candidate.id === runId ? { ...candidate, subscribers } : candidate
-                ),
-              }
-            : current);
-          return { runId, subscribers };
-        }
-        if (!token) throw new Error("로그인이 필요합니다.");
-        const result = await updateIssueSubscription(
-          token,
-          activeProjectId,
-          runId,
-          subscribed,
-        );
-        setDashboard((current) => current
-          ? {
-              ...current,
-              runs: current.runs.map((run) =>
-                run.id === runId
-                  ? { ...run, subscribers: result.subscribers }
-                  : run
-              ),
-            }
-          : current);
-        return result;
-      } catch (caught) {
-        const message = caught instanceof Error ? caught.message : String(caught);
-        setError(message);
-        throw caught;
-      }
-    },
-    [activeProjectId, dashboard, demoMode, token, user],
-  );
-
-  const editIssueExecutionPreferences = useCallback(
-    async (runId: string, input: IssueExecutionPreferences) => {
-      if (!activeProjectId || !dashboard) {
-        throw new Error("이슈를 수정할 프로젝트가 없습니다.");
-      }
-      setUpdatingIssueId(runId);
-      setError(null);
-      try {
-        if (demoMode) {
-          setDashboard((current) =>
-            current
-              ? {
-                  ...current,
-                  runs: current.runs.map((run) =>
-                    run.id === runId
-                      ? {
-                          ...run,
-                          preferredProvider: input.provider,
-                          preferredModel: input.model,
-                          preferredEffort: input.effort,
-                          updatedAt: new Date().toISOString(),
-                        }
-                      : run,
-                  ),
-                }
-              : current,
-          );
-          return { runId, ...input };
-        }
-        if (!token) throw new Error("로그인이 필요합니다.");
-        const result = await updateIssueExecutionPreferences(
-          token,
-          activeProjectId,
-          runId,
-          input,
-        );
-        await refresh("snapshot");
-        return result;
-      } catch (caught) {
-        setError(caught instanceof Error ? caught.message : String(caught));
-        throw caught;
-      } finally {
-        setUpdatingIssueId(null);
-      }
-    },
-    [activeProjectId, dashboard, refresh, token],
-  );
-
-  const editIssueCheckpoints = useCallback(
-    async (runId: string, checkpoints: AutoHuntWorkflowCheckpoint[]) => {
-      if (!activeProjectId || !dashboard) {
-        throw new Error("이슈를 수정할 프로젝트가 없습니다.");
-      }
-      setUpdatingIssueId(runId);
-      setError(null);
-      try {
-        if (demoMode) {
-          const updatedAt = new Date().toISOString();
-          setDashboard((current) => current
-            ? {
-                ...current,
-                runs: current.runs.map((run) => {
-                  if (run.id !== runId) return run;
-                  const previousBoundaries = new Set(
-                    (run.issueCheckpoints ?? []).map(
-                      (checkpoint) => `${checkpoint.stage}:${checkpoint.position}`,
-                    ),
-                  );
-                  const baseWorkflow = {
-                    ...run.workflow,
-                    execution: {
-                      checkpoints: run.workflow.execution.checkpoints.filter(
-                        (checkpoint) => !previousBoundaries.has(
-                          `${checkpoint.stage}:${checkpoint.position}`,
-                        ),
-                      ),
-                    },
-                  };
-                  return {
-                    ...run,
-                    workflow: workflowWithAdditionalCheckpoints(
-                      baseWorkflow,
-                      checkpoints,
-                    ),
-                    issueCheckpoints: checkpoints,
-                    updatedAt,
-                  };
-                }),
-              }
-            : current);
-          return { runId, checkpoints };
-        }
-        if (!token) throw new Error("로그인이 필요합니다.");
-        const result = await updateIssueCheckpoints(
-          token,
-          activeProjectId,
-          runId,
-          checkpoints,
-        );
-        await refresh("snapshot");
-        return result;
-      } catch (caught) {
-        const message = caught instanceof Error ? caught.message : String(caught);
-        setError(message);
-        throw caught;
-      } finally {
-        setUpdatingIssueId(null);
-      }
-    },
-    [activeProjectId, dashboard, refresh, token],
-  );
-
-  const completeResultReview = useCallback(
-    async (runId: string): Promise<IssueResultReview> => {
-      if (!activeProjectId || !dashboard || !user) {
-        throw new Error("검수를 기록할 이슈 또는 로그인 정보가 없습니다.");
-      }
-      setError(null);
-      try {
-        const existing = dashboard.runs
-          .find((run) => run.id === runId)
-          ?.resultReviews?.find((review) => review.userId === user.id);
-        let review = existing;
-        if (!review) {
-          if (demoMode) {
-            review = {
-              userId: user.id,
-              name: user.name,
-              username: user.username ?? null,
-              image: user.image ?? null,
-              completedAt: new Date().toISOString(),
-            };
-          } else {
-            if (!token) throw new Error("로그인이 필요합니다.");
-            review = await completeRemoteIssueResultReview(
-              token,
-              activeProjectId,
-              runId,
-            );
-          }
-        }
-        setDashboard((current) =>
-          current
-            ? {
-                ...current,
-                runs: current.runs.map((run) =>
-                  run.id === runId &&
-                  !(run.resultReviews ?? []).some(
-                    (candidate) => candidate.userId === review.userId,
-                  )
-                    ? {
-                        ...run,
-                        resultReviews: [...(run.resultReviews ?? []), review],
-                      }
-                    : run,
-                ),
-              }
-            : current,
-        );
-        return review;
-      } catch (caught) {
-        setError(caught instanceof Error ? caught.message : String(caught));
-        throw caught;
-      }
-    },
-    [activeProjectId, dashboard, token, user],
-  );
-
-  const changeIssueDependency = useCallback(
-    async (
-      dependentRunId: string,
-      prerequisiteRunId: string,
-      action: "add" | "remove",
-    ) => {
-      if (!activeProjectId || !dashboard) {
-        throw new Error("의존성을 수정할 프로젝트가 없습니다.");
-      }
-      setUpdatingIssueId(dependentRunId);
-      setError(null);
-      try {
-        if (demoMode) {
-          setDashboard((current) => {
-            if (!current) return current;
-            const prerequisite = current.runs.find(
-              (run) => run.id === prerequisiteRunId,
-            );
-            const dependent = current.runs.find(
-              (run) => run.id === dependentRunId,
-            );
-            if (!prerequisite || !dependent) return current;
-            const prerequisiteReference = {
-              id: prerequisite.id,
-              runNumber: prerequisite.runNumber,
-              title: prerequisite.title,
-              status: prerequisite.status,
-            };
-            const dependentReference = {
-              id: dependent.id,
-              runNumber: dependent.runNumber,
-              title: dependent.title,
-              status: dependent.status,
-            };
-            return {
-              ...current,
-              runs: current.runs.map((run) => {
-                if (run.id === dependentRunId) {
-                  return {
-                    ...run,
-                    prerequisites:
-                      action === "add"
-                        ? [
-                            ...(run.prerequisites ?? []).filter(
-                              (candidate) => candidate.id !== prerequisiteRunId,
-                            ),
-                            prerequisiteReference,
-                          ]
-                        : (run.prerequisites ?? []).filter(
-                            (candidate) => candidate.id !== prerequisiteRunId,
-                          ),
-                  };
-                }
-                if (run.id === prerequisiteRunId) {
-                  return {
-                    ...run,
-                    dependents:
-                      action === "add"
-                        ? [
-                            ...(run.dependents ?? []).filter(
-                              (candidate) => candidate.id !== dependentRunId,
-                            ),
-                            dependentReference,
-                          ]
-                        : (run.dependents ?? []).filter(
-                            (candidate) => candidate.id !== dependentRunId,
-                          ),
-                  };
-                }
-                return run;
-              }),
-            };
-          });
-          return;
-        }
-        if (!token) throw new Error("로그인이 필요합니다.");
-        if (action === "add") {
-          await addIssueDependency(
-            token,
-            activeProjectId,
-            dependentRunId,
-            prerequisiteRunId,
-          );
-        } else {
-          await removeIssueDependency(
-            token,
-            activeProjectId,
-            dependentRunId,
-            prerequisiteRunId,
-          );
-        }
-        setDashboard(await loadDashboard(token, activeProjectId));
-      } catch (caught) {
-        setError(caught instanceof Error ? caught.message : String(caught));
-        throw caught;
-      } finally {
-        setUpdatingIssueId(null);
-      }
-    },
-    [activeProjectId, dashboard, token],
-  );
-
-  const changeIssueParent = useCallback(
-    async (childRunId: string, parentRunId: string | null) => {
-      if (!activeProjectId || !dashboard) {
-        throw new Error("계층을 수정할 프로젝트가 없습니다.");
-      }
-      setUpdatingIssueId(childRunId);
-      setError(null);
-      try {
-        if (!demoMode) {
-          if (!token) throw new Error("로그인이 필요합니다.");
-          if (parentRunId) {
-            await setRemoteIssueParent(
-              token,
-              activeProjectId,
-              childRunId,
-              parentRunId,
-            );
-          } else {
-            await removeRemoteIssueParent(token, activeProjectId, childRunId);
-          }
-          setDashboard(await loadDashboard(token, activeProjectId));
-          return;
-        }
-        setDashboard((current) => {
-          if (!current) return current;
-          const child = current.runs.find((run) => run.id === childRunId);
-          const parent = parentRunId
-            ? current.runs.find((run) => run.id === parentRunId)
-            : null;
-          if (!child || (parentRunId && !parent)) return current;
-          const reference = (run: typeof child) => ({
-            id: run.id,
-            runNumber: run.runNumber,
-            title: run.title,
-            status: run.status,
-          });
-          return {
-            ...current,
-            runs: current.runs.map((run) => {
-              if (run.id === childRunId) {
-                return { ...run, parent: parent ? reference(parent) : null };
-              }
-              const withoutChild = (run.subIssues ?? []).filter(
-                (candidate) => candidate.id !== childRunId,
-              );
-              return run.id === parentRunId
-                ? { ...run, subIssues: [...withoutChild, reference(child)] }
-                : { ...run, subIssues: withoutChild };
-            }),
-          };
-        });
-      } catch (caught) {
-        setError(caught instanceof Error ? caught.message : String(caught));
-        throw caught;
-      } finally {
-        setUpdatingIssueId(null);
-      }
-    },
-    [activeProjectId, dashboard, token],
-  );
-
-  const changeRelatedIssue = useCallback(
-    async (runId: string, relatedRunId: string, action: "add" | "remove") => {
-      if (!activeProjectId || !dashboard) {
-        throw new Error("관련 이슈를 수정할 프로젝트가 없습니다.");
-      }
-      setUpdatingIssueId(runId);
-      setError(null);
-      try {
-        if (!demoMode) {
-          if (!token) throw new Error("로그인이 필요합니다.");
-          if (action === "add") {
-            await addRelatedIssue(token, activeProjectId, runId, relatedRunId);
-          } else {
-            await removeRelatedIssue(token, activeProjectId, runId, relatedRunId);
-          }
-          setDashboard(await loadDashboard(token, activeProjectId));
-          return;
-        }
-        setDashboard((current) => {
-          if (!current) return current;
-          const left = current.runs.find((run) => run.id === runId);
-          const right = current.runs.find((run) => run.id === relatedRunId);
-          if (!left || !right) return current;
-          const reference = (run: typeof left) => ({
-            id: run.id,
-            runNumber: run.runNumber,
-            title: run.title,
-            status: run.status,
-          });
-          return {
-            ...current,
-            runs: current.runs.map((run) => {
-              const other = run.id === runId
-                ? right
-                : run.id === relatedRunId
-                  ? left
-                  : null;
-              if (!other) return run;
-              const remaining = (run.relatedIssues ?? []).filter(
-                (candidate) => candidate.id !== other.id,
-              );
-              return {
-                ...run,
-                relatedIssues: action === "add"
-                  ? [...remaining, reference(other)]
-                  : remaining,
-              };
-            }),
-          };
-        });
-      } catch (caught) {
-        setError(caught instanceof Error ? caught.message : String(caught));
-        throw caught;
-      } finally {
-        setUpdatingIssueId(null);
-      }
-    },
-    [activeProjectId, dashboard, token],
-  );
-
-  const removeIssue = useCallback(
-    async (runId: string) => {
-      if (!activeProjectId || !dashboard) {
-        throw new Error("이슈를 삭제할 프로젝트가 없습니다.");
-      }
-      setDeletingIssueId(runId);
-      setError(null);
-      try {
-        if (!demoMode) {
-          if (!token) throw new Error("로그인이 필요합니다.");
-          await deleteRemoteIssue(token, activeProjectId, runId);
-        }
-        setDashboard((current) =>
-          current
-            ? {
-                ...current,
-                runs: current.runs
-                  .filter((run) => run.id !== runId)
-                  .map((run) => ({
-                    ...run,
-                    prerequisites: (run.prerequisites ?? []).filter(
-                      (dependency) => dependency.id !== runId,
-                    ),
-                    dependents: (run.dependents ?? []).filter(
-                      (dependency) => dependency.id !== runId,
-                    ),
-                    parent: run.parent?.id === runId ? null : run.parent,
-                    subIssues: (run.subIssues ?? []).filter(
-                      (relation) => relation.id !== runId,
-                    ),
-                    relatedIssues: (run.relatedIssues ?? []).filter(
-                      (relation) => relation.id !== runId,
-                    ),
-                  })),
-              }
-            : current,
-        );
-        delete issueMessagesByRun.current[runId];
-        delete runEvidenceByRun.current[runId];
-        delete runEventsByRun.current[runId];
-      } catch (caught) {
-        const message = caught instanceof Error ? caught.message : String(caught);
-        setError(message);
-        throw caught;
-      } finally {
-        setDeletingIssueId(null);
-      }
-    },
-    [activeProjectId, dashboard, token],
-  );
-
-  const transferIssueToProject = useCallback(
-    async (runId: string, targetProjectId: string) => {
-      if (!activeProjectId || !dashboard) {
-        throw new Error("이슈를 옮길 프로젝트가 없습니다.");
-      }
-      if (targetProjectId === activeProjectId) {
-        throw new Error("같은 프로젝트로는 옮길 수 없습니다.");
-      }
-      setDeletingIssueId(runId);
-      setError(null);
-      try {
-        if (!demoMode) {
-          if (!token) throw new Error("로그인이 필요합니다.");
-          await transferRemoteIssue(
-            token,
-            activeProjectId,
-            runId,
-            targetProjectId,
-          );
-        }
-        setDashboard((current) =>
-          current
-            ? {
-                ...current,
-                runs: current.runs
-                  .filter((run) => run.id !== runId)
-                  .map((run) => ({
-                    ...run,
-                    prerequisites: (run.prerequisites ?? []).filter(
-                      (dependency) => dependency.id !== runId,
-                    ),
-                    dependents: (run.dependents ?? []).filter(
-                      (dependency) => dependency.id !== runId,
-                    ),
-                    parent: run.parent?.id === runId ? null : run.parent,
-                    subIssues: (run.subIssues ?? []).filter(
-                      (relation) => relation.id !== runId,
-                    ),
-                    relatedIssues: (run.relatedIssues ?? []).filter(
-                      (relation) => relation.id !== runId,
-                    ),
-                  })),
-              }
-            : current,
-        );
-        delete issueMessagesByRun.current[runId];
-        delete runEvidenceByRun.current[runId];
-        delete runEventsByRun.current[runId];
-      } catch (caught) {
-        const message = caught instanceof Error ? caught.message : String(caught);
-        setError(message);
-        throw caught;
-      } finally {
-        setDeletingIssueId(null);
-      }
-    },
-    [activeProjectId, dashboard, demoMode, token],
-  );
-
-  const readIssueMessages = useCallback(
-    async (runId: string) => {
-      if (!activeProjectId) throw new Error("메시지를 불러올 프로젝트가 없습니다.");
-      if (demoMode) return issueMessagesByRun.current[runId] ?? [];
-      if (!token) throw new Error("메시지를 불러오려면 로그인이 필요합니다.");
-      const messages = await loadIssueMessages(token, activeProjectId, runId);
-      const merged = mergeIssueMessages(
-        issueMessagesByRun.current[runId] ?? [],
-        messages,
-      );
-      issueMessagesByRun.current = {
-        ...issueMessagesByRun.current,
-        [runId]: merged,
-      };
-      return merged;
-    },
-    [activeProjectId, token],
-  );
-
-  const readRunEvidence = useCallback(
-    async (runId: string) => {
-      if (!activeProjectId) throw new Error("증빙을 불러올 프로젝트가 없습니다.");
-      if (demoMode) return runEvidenceByRun.current[runId] ?? [];
-      if (!token) throw new Error("증빙을 불러오려면 로그인이 필요합니다.");
-      const evidence = await loadRunEvidence(token, activeProjectId, runId);
-      runEvidenceByRun.current = {
-        ...runEvidenceByRun.current,
-        [runId]: evidence,
-      };
-      return evidence;
-    },
-    [activeProjectId, token],
-  );
-
-  const readRunEvents = useCallback(
-    async (runId: string) => {
-      if (!activeProjectId) throw new Error("이벤트를 불러올 프로젝트가 없습니다.");
-      if (demoMode) return runEventsByRun.current[runId] ?? [];
-      if (!token) throw new Error("이벤트를 불러오려면 로그인이 필요합니다.");
-      const events = await loadRunEvents(token, activeProjectId, runId);
-      runEventsByRun.current = {
-        ...runEventsByRun.current,
-        [runId]: events,
-      };
-      return events;
-    },
-    [activeProjectId, token],
-  );
-
-  const readRunEvidenceImage = useCallback(
-    async (image: RunEvidenceImage) => {
-      if (!token) throw new Error("증빙 이미지를 불러오려면 로그인이 필요합니다.");
-      return loadRunEvidenceImage(token, image);
-    },
-    [token],
-  );
-
-  const addIssueMessage = useCallback(
-    async (
-      runId: string,
-      input: {
-        body: string;
-        clientMessageId?: string;
-        parentMessageId: string | null;
-        mentionedUserIds?: string[];
-        mentionedAgentIds?: string[];
-        attachments?: File[];
-        attachmentReferences?: string[];
-      },
-    ): Promise<IssueMessageSendResult> => {
-      const body = input.body.trim();
-      if (!body && !input.attachments?.length) {
-        throw new Error("메시지나 이미지를 추가해 주세요.");
-      }
-      if (!activeProjectId) throw new Error("메시지를 보낼 프로젝트가 없습니다.");
-      const cacheMessage = (message: IssueMessage) => {
-        const currentMessages = issueMessagesByRun.current[runId] ?? [];
-        issueMessagesByRun.current = {
-          ...issueMessagesByRun.current,
-          [runId]: [
-            ...currentMessages.map((candidate) =>
-              candidate.id === message.parentMessageId
-                ? { ...candidate, replyCount: candidate.replyCount + 1 }
-                : candidate,
-            ),
-            message,
-          ],
-        };
-        return message;
-      };
-      if (demoMode) {
-        const createdAt = new Date().toISOString();
-        const message = cacheMessage({
-          id: input.clientMessageId ?? crypto.randomUUID(),
-          runId,
-          parentMessageId: input.parentMessageId,
-          body,
-          attachments: (input.attachments ?? []).map((file, index) => ({
-            id: input.attachmentReferences?.[index] ?? crypto.randomUUID(),
-            filename: file.name,
-            contentType: file.type,
-            byteSize: file.size,
-            url: URL.createObjectURL(file),
-          })),
-          author: {
-            id: demoUser.id,
-            name: demoUser.name,
-            image: demoUser.image ?? null,
-            provider: null,
-          },
-          replyCount: 0,
-          proposedAction: null,
-          executionProposal: null,
-          skillExecutionProposal: null,
-          createdAt,
-          updatedAt: createdAt,
-        });
-        return { message, agentReply: null };
-      }
-      if (!token) throw new Error("메시지를 보내려면 로그인이 필요합니다.");
-      const created = await createIssueMessage(
-        token,
-        activeProjectId,
-        runId,
-        {
-          body,
-          clientMessageId: input.clientMessageId,
-          parentMessageId: input.parentMessageId,
-          mentionedUserIds: input.mentionedUserIds,
-          mentionedAgentIds: input.mentionedAgentIds,
-          attachments: input.attachments,
-          attachmentReferences: input.attachmentReferences,
-        },
-      );
-      const message = cacheMessage(created.message);
-      return {
-        message,
-        agentReply: null,
-        agentReplyJob: created.agentReply,
-        agentReplyJobs: created.agentReplies ?? (
-          created.agentReply ? [created.agentReply] : []
-        ),
-      };
-    },
-    [activeProjectId, token],
-  );
-
-  const updateIssueMessage = useCallback(
-    async (
-      runId: string,
-      messageId: string,
-      input: {
-        body: string;
-        mentionedUserIds?: string[];
-      },
-    ): Promise<IssueMessage> => {
-      const body = input.body.trim();
-      if (!body) {
-        throw new Error("메시지 내용을 입력해 주세요.");
-      }
-      if (!activeProjectId) throw new Error("수정할 프로젝트가 없습니다.");
-      if (demoMode) {
-        const updatedAt = new Date().toISOString();
-        const message = {
-          ...(issueMessagesByRun.current[runId] ?? []).find(
-            (candidate) => candidate.id === messageId,
-          ),
-          body,
-          updatedAt,
-        } as IssueMessage;
-        issueMessagesByRun.current = {
-          ...issueMessagesByRun.current,
-          [runId]: (issueMessagesByRun.current[runId] ?? []).map((candidate) =>
-            candidate.id === messageId ? message : candidate,
-          ),
-        };
-        return message;
-      }
-      if (!token) throw new Error("메시지를 수정하려면 로그인이 필요합니다.");
-      const updated = await editIssueMessage(
-        token,
-        activeProjectId,
-        runId,
-        messageId,
-        {
-          body,
-          mentionedUserIds: input.mentionedUserIds,
-        },
-      );
-      issueMessagesByRun.current = {
-        ...issueMessagesByRun.current,
-        [runId]: (issueMessagesByRun.current[runId] ?? []).map((candidate) =>
-          candidate.id === messageId ? updated : candidate,
-        ),
-      };
-      return updated;
-    },
-    [activeProjectId, demoMode, token],
-  );
-
-  const removeIssueMessage = useCallback(
-    async (runId: string, messageId: string) => {
-      if (!activeProjectId) throw new Error("삭제할 프로젝트가 없습니다.");
-      if (demoMode) {
-        const deletedIds = new Set<string>([messageId]);
-        const currentMessages = issueMessagesByRun.current[runId] ?? [];
-        let changed = true;
-        while (changed) {
-          changed = false;
-          for (const candidate of currentMessages) {
-            if (
-              candidate.parentMessageId &&
-              deletedIds.has(candidate.parentMessageId) &&
-              !deletedIds.has(candidate.id)
-            ) {
-              deletedIds.add(candidate.id);
-              changed = true;
-            }
-          }
-        }
-        issueMessagesByRun.current = {
-          ...issueMessagesByRun.current,
-          [runId]: currentMessages.filter(
-            (candidate) => !deletedIds.has(candidate.id),
-          ),
-        };
-        return;
-      }
-      if (!token) throw new Error("메시지를 삭제하려면 로그인이 필요합니다.");
-      await deleteIssueMessage(token, activeProjectId, runId, messageId);
-      const deletedIds = new Set<string>([messageId]);
-      const currentMessages = issueMessagesByRun.current[runId] ?? [];
-      let changed = true;
-      while (changed) {
-        changed = false;
-        for (const candidate of currentMessages) {
-          if (
-            candidate.parentMessageId &&
-            deletedIds.has(candidate.parentMessageId) &&
-            !deletedIds.has(candidate.id)
-          ) {
-            deletedIds.add(candidate.id);
-            changed = true;
-          }
-        }
-      }
-      issueMessagesByRun.current = {
-        ...issueMessagesByRun.current,
-        [runId]: currentMessages.filter(
-          (candidate) => !deletedIds.has(candidate.id),
-        ),
-      };
-    },
-    [activeProjectId, demoMode, token],
-  );
-
-  const acceptConversationIssueAction = useCallback(
-    async (runId: string, proposal: IssueProposedAction) => {
-      if (!activeProjectId || !dashboard) {
-        throw new Error("변경할 이슈 처리 작업이 없습니다.");
-      }
-      if (demoMode) {
-        throw new Error("데모에서는 이슈 변경 제안을 수락할 수 없습니다.");
-      }
-      if (!token) throw new Error("로그인이 필요합니다.");
-      const result = proposal.type === "request_issue_rework"
-        ? await acceptRemoteIssueReworkProposal(
-            token,
-            activeProjectId,
-            runId,
-            proposal.id,
-          )
-        : await acceptRemoteIssueActionProposal(
-            token,
-            activeProjectId,
-            runId,
-            proposal.id,
-          );
-      const materializedExecutionProposal =
-        "executionProposal" in result ? result.executionProposal : null;
-      issueMessagesByRun.current = {
-        ...issueMessagesByRun.current,
-        [runId]: (issueMessagesByRun.current[runId] ?? []).map((message) =>
-          message.proposedAction?.id === proposal.id
-            ? {
-                ...message,
-                proposedAction: result.proposal,
-                executionProposal:
-                  materializedExecutionProposal ??
-                  message.executionProposal,
-              }
-            : message,
-        ),
-      };
-      await refresh("snapshot");
-      return result.proposal;
-    },
-    [activeProjectId, dashboard, demoMode, refresh, token],
-  );
-
-  const acceptConversationIssueExecution = useCallback(
-    async (
-      runId: string,
-      proposal: IssueExecutionProposal,
-      input: IssueExecutionApprovalInput,
-    ) => {
-      if (!activeProjectId || !dashboard) {
-        throw new Error("실행할 이슈 처리 작업이 없습니다.");
-      }
-      if (demoMode) {
-        throw new Error("데모에서는 이슈 실행을 승인할 수 없습니다.");
-      }
-      if (!token) throw new Error("로그인이 필요합니다.");
-      const result = await acceptRemoteIssueExecutionProposal(
-        token,
-        activeProjectId,
-        runId,
-        proposal.id,
-        input,
-      );
-      issueMessagesByRun.current = {
-        ...issueMessagesByRun.current,
-        [runId]: (issueMessagesByRun.current[runId] ?? []).map((message) =>
-          message.executionProposal?.id === proposal.id
-            ? { ...message, executionProposal: result.proposal }
-            : message,
-        ),
-      };
-      await refresh("snapshot");
-      return result.proposal;
-    },
-    [activeProjectId, dashboard, demoMode, refresh, token],
-  );
-
-  const acceptConversationSkillExecution = useCallback(
-    async (
-      runId: string,
-      proposal: AgentSkillExecutionProposal,
-      input: AgentSkillExecutionApprovalInput,
-    ) => {
-      if (!activeProjectId || !dashboard) {
-        throw new Error("실행할 프로젝트 Agent Skill이 없습니다.");
-      }
-      if (demoMode) {
-        throw new Error("데모에서는 Agent Skill 실행을 승인할 수 없습니다.");
-      }
-      if (!token) throw new Error("로그인이 필요합니다.");
-      const result = await acceptRemoteIssueSkillExecutionProposal(
-        token,
-        activeProjectId,
-        runId,
-        proposal,
-        input,
-      );
-      if (result.session) adoptRemoteAgentSession?.(result.session);
-      issueMessagesByRun.current = {
-        ...issueMessagesByRun.current,
-        [runId]: (issueMessagesByRun.current[runId] ?? []).map((message) =>
-          message.skillExecutionProposal?.id === proposal.id
-            ? { ...message, skillExecutionProposal: result.proposal }
-            : message,
-        ),
-      };
-      await refresh("snapshot");
-      return result.proposal;
-    },
-    [
-      activeProjectId,
+  /*
+    The two shell callbacks the issue actions reach back into: the team
+    selector, which a project window narrows to its own team, and the agent
+    session adopter `useAutoHuntSessions` owns. They are installed after each
+    render rather than passed as hook dependencies, so the action object above
+    keeps one identity while these keep tracking the latest closures.
+  */
+  useEffect(() => {
+    setIssueActionBridge(registry, {
       adoptRemoteAgentSession,
-      dashboard,
-      demoMode,
-      refresh,
-      token,
-    ],
-  );
-
-  const recoverRun = useCallback(
-    async (runId: string, action: "retry" | "cancel") => {
-      if (!activeProjectId || !dashboard) {
-        throw new Error("복구할 이슈 처리 작업이 없습니다.");
-      }
-      setRecoveringRunId(runId);
-      setRecoveryError(null);
-      try {
-        if (demoMode) {
-          const occurredAt = new Date().toISOString();
-          setDashboard((current) =>
-            current
-              ? {
-                  ...current,
-                  runs: current.runs.map((run) => {
-                    if (run.id !== runId) return run;
-                    const attempt =
-                      action === "retry"
-                        ? run.currentAttempt + 1
-                        : run.currentAttempt;
-                    const status = action === "retry" ? "queued" : "cancelled";
-                    const detail =
-                      action === "retry"
-                        ? `이슈 처리 ${attempt}차 시도를 요청했습니다.`
-                        : "사용자가 이슈 처리 작업을 취소했습니다.";
-                    const nextEvent: HuntEvent = {
-                      id: crypto.randomUUID(),
-                      attempt,
-                      revision: action === "retry" ? 1 : run.currentRevision,
-                      status,
-                      workflowStage: action === "retry" ? null : run.workflowStage,
-                      detail,
-                      actor: "briar-app",
-                      qaStatus: null,
-                      trackerState: run.tracker?.state ?? null,
-                      pullRequestUrls: [],
-                      targetSha: null,
-                      occurredAt,
-                      recordedAt: occurredAt,
-                    };
-                    runEventsByRun.current[run.id] = [
-                      nextEvent,
-                      ...(runEventsByRun.current[run.id] ?? []),
-                    ];
-                    return {
-                      ...run,
-                      currentAttempt: attempt,
-                      currentRevision:
-                        action === "retry" ? 1 : run.currentRevision,
-                      status,
-                      workflowStage:
-                        action === "retry" ? null : run.workflowStage,
-                      progress: action === "retry" ? 5 : run.progress,
-                      detail,
-                      branch: action === "retry" ? null : run.branch,
-                      commitSha: action === "retry" ? null : run.commitSha,
-                      claimedBy: null,
-                      claimedAt: null,
-                      leaseExpiresAt: null,
-                      completedAt: action === "cancel" ? occurredAt : null,
-                      updatedAt: occurredAt,
-                      lastEventAt: occurredAt,
-                      eventCount: run.eventCount + 1,
-                    };
-                  }),
-                }
-              : current,
-          );
-          return;
-        }
-        if (!token) throw new Error("로그인이 필요합니다.");
-        if (action === "retry") {
-          await retryHuntRun(token, activeProjectId, runId);
-        } else {
-          await cancelHuntRun(token, activeProjectId, runId);
-        }
-        await refresh("snapshot");
-      } catch (caught) {
-        const message = caught instanceof Error ? caught.message : String(caught);
-        setRecoveryError(message);
-        throw caught;
-      } finally {
-        setRecoveringRunId(null);
-      }
-    },
-    [activeProjectId, dashboard, refresh, token],
-  );
-
-  const resumeRun = useCallback(
-    async (runId: string) => {
-      if (!activeProjectId || !dashboard) {
-        throw new Error("재개할 이슈 처리 작업이 없습니다.");
-      }
-      setRecoveringRunId(runId);
-      setRecoveryError(null);
-      try {
-        if (demoMode) {
-          const occurredAt = new Date().toISOString();
-          setDashboard((current) =>
-            current
-              ? {
-                  ...current,
-                  runs: current.runs.map((run) => {
-                    if (run.id !== runId) return run;
-                    const currentIndex = run.workflow.stages.findIndex(
-                      (stage) => stage.id === run.workflowStage,
-                    );
-                    const workflowStage =
-                      run.workflow.stages[currentIndex + 1]?.id ??
-                      run.workflowStage;
-                    const status = "running";
-                    const nextEvent: HuntEvent = {
-                      id: crypto.randomUUID(),
-                      attempt: run.currentAttempt,
-                      revision: run.currentRevision,
-                      status,
-                      workflowStage,
-                      detail: "사용자가 일시정지된 워크플로우를 재개했습니다.",
-                      actor: "briar-app",
-                      qaStatus: null,
-                      trackerState: run.tracker?.state ?? null,
-                      pullRequestUrls: run.pullRequestUrls,
-                      targetSha: run.targetSha,
-                      occurredAt,
-                      recordedAt: occurredAt,
-                    };
-                    runEventsByRun.current[run.id] = [
-                      nextEvent,
-                      ...(runEventsByRun.current[run.id] ?? []),
-                    ];
-                    return {
-                      ...run,
-                      status,
-                      workflowStage,
-                      pausedAt: null,
-                      progress: progressForAutoHuntRun(
-                        status,
-                        workflowStage,
-                        run.workflow,
-                      ),
-                      detail: nextEvent.detail,
-                      claimedBy: null,
-                      claimedAt: null,
-                      leaseExpiresAt: null,
-                      completedAt: null,
-                      updatedAt: occurredAt,
-                      lastEventAt: occurredAt,
-                      eventCount: run.eventCount + 1,
-                    };
-                  }),
-                }
-              : current,
-          );
-          return;
-        }
-        if (!token) throw new Error("로그인이 필요합니다.");
-        const run = dashboard.runs.find((candidate) => candidate.id === runId);
-        const checkpoint = run?.checkpoint;
-        if (!checkpoint) {
-          throw new Error(
-            "이 앱 버전에서는 현재 대기 지점을 안전하게 확인할 수 없습니다. 새로고침하거나 앱을 업데이트해 주세요.",
-          );
-        }
-        const identity = `${runId}:${checkpoint.key}:${checkpoint.attempt}:${checkpoint.revision}`;
-        const requestId = resumeRequestIds.current.get(identity) ?? crypto.randomUUID();
-        resumeRequestIds.current.set(identity, requestId);
-        try {
-          await resumeHuntRun(
-            token,
-            activeProjectId,
-            runId,
-            {
-              key: checkpoint.key,
-              attempt: checkpoint.attempt,
-              revision: checkpoint.revision,
-            },
-            requestId,
-          );
-          resumeRequestIds.current.delete(identity);
-        } catch (caught) {
-          if (isApiErrorStatus(caught, 409)) {
-            resumeRequestIds.current.delete(identity);
-            await refresh("snapshot");
-            throw new Error(
-              "대기 지점이 이미 변경되었습니다. 최신 상태를 다시 불러왔습니다.",
-            );
-          }
-          throw caught;
-        }
-        await refresh("snapshot");
-      } catch (caught) {
-        const message = caught instanceof Error ? caught.message : String(caught);
-        setRecoveryError(message);
-        throw caught;
-      } finally {
-        setRecoveringRunId(null);
-      }
-    },
-    [activeProjectId, dashboard, demoMode, refresh, token],
-  );
-
-  const reworkRun = useCallback(
-    async (
-      runId: string,
-      input: { workflowStage: string; reason: string },
-    ) => {
-      if (!activeProjectId || !dashboard) {
-        throw new Error("재작업할 이슈 처리 작업이 없습니다.");
-      }
-      const reason = input.reason.trim();
-      if (!reason) throw new Error("수정할 내용을 입력해 주세요.");
-      setRecoveringRunId(runId);
-      setRecoveryError(null);
-      try {
-        const run = dashboard.runs.find((candidate) => candidate.id === runId);
-        const checkpoint = run?.checkpoint;
-        if (!run || !checkpoint) {
-          throw new Error(
-            "현재 대기 지점을 안전하게 확인할 수 없습니다. 새로고침한 뒤 다시 시도해 주세요.",
-          );
-        }
-        if (demoMode) {
-          const occurredAt = new Date().toISOString();
-          const nextRevision = run.currentRevision + 1;
-          const nextEvent: HuntEvent = {
-            id: crypto.randomUUID(),
-            attempt: run.currentAttempt,
-            revision: nextRevision,
-            status: "queued",
-            workflowStage: input.workflowStage,
-            detail: reason,
-            actor: "briar-app",
-            qaStatus: null,
-            trackerState: run.tracker?.state ?? null,
-            pullRequestUrls: run.pullRequestUrls,
-            targetSha: null,
-            occurredAt,
-            recordedAt: occurredAt,
-          };
-          runEventsByRun.current[run.id] = [
-            nextEvent,
-            ...(runEventsByRun.current[run.id] ?? []),
-          ];
-          setDashboard((current) =>
-            current
-              ? {
-                  ...current,
-                  runs: current.runs.map((candidate) =>
-                    candidate.id === run.id
-                      ? {
-                          ...candidate,
-                          status: "queued",
-                          workflowStage: input.workflowStage,
-                          currentRevision: nextRevision,
-                          pausedAt: null,
-                          waitingCheckpoint: null,
-                          checkpoint: null,
-                          progress: progressForAutoHuntRun(
-                            "queued",
-                            input.workflowStage,
-                            candidate.workflow,
-                          ),
-                          detail: reason,
-                          resultSummary: null,
-                          structuredResult: null,
-                          commitSha: null,
-                          targetSha: null,
-                          claimedBy: null,
-                          claimedAt: null,
-                          leaseExpiresAt: null,
-                          updatedAt: occurredAt,
-                          lastEventAt: occurredAt,
-                          eventCount: candidate.eventCount + 1,
-                        }
-                      : candidate,
-                  ),
-                }
-              : current,
-          );
-          return;
-        }
-        if (!token) throw new Error("로그인이 필요합니다.");
-        const identity = [
-          runId,
-          checkpoint.key,
-          checkpoint.attempt,
-          checkpoint.revision,
-          input.workflowStage,
-          reason,
-        ].join(":");
-        const requestId =
-          reworkRequestIds.current.get(identity) ?? crypto.randomUUID();
-        reworkRequestIds.current.set(identity, requestId);
-        try {
-          await reworkPausedHuntRun(
-            token,
-            activeProjectId,
-            runId,
-            {
-              workflowStage: input.workflowStage,
-              reason,
-              checkpoint: {
-                key: checkpoint.key,
-                attempt: checkpoint.attempt,
-                revision: checkpoint.revision,
-              },
-            },
-            requestId,
-          );
-          reworkRequestIds.current.delete(identity);
-        } catch (caught) {
-          if (isApiErrorStatus(caught, 409)) {
-            reworkRequestIds.current.delete(identity);
-            await refresh("snapshot");
-            throw new Error(
-              "대기 지점이 이미 변경되었습니다. 최신 상태를 다시 불러왔습니다.",
-            );
-          }
-          throw caught;
-        }
-        await refresh("snapshot");
-      } catch (caught) {
-        const message = caught instanceof Error ? caught.message : String(caught);
-        setRecoveryError(message);
-        throw caught;
-      } finally {
-        setRecoveringRunId(null);
-      }
-    },
-    [activeProjectId, dashboard, demoMode, refresh, token],
-  );
-
-  const moveRun = useCallback(
-    async (runId: string, placement: HuntRunPlacement) => {
-      if (!activeProjectId || !dashboard) {
-        throw new Error("이동할 이슈 처리 작업이 없습니다.");
-      }
-      setRecoveringRunId(runId);
-      setRecoveryError(null);
-      try {
-        if (demoMode) {
-          const occurredAt = new Date().toISOString();
-          setDashboard((current) =>
-            current
-              ? {
-                  ...current,
-                  runs: current.runs.map((run) => {
-                    if (run.id !== runId) return run;
-                    const workflowStage =
-                      placement.status === "backlog" ||
-                      placement.status === "queued"
-                        ? null
-                        : placement.status === "running"
-                          ? placement.workflowStage
-                          : run.workflowStage;
-                    const currentAttempt =
-                      placement.status === "queued"
-                        ? run.currentAttempt + 1
-                        : run.currentAttempt;
-                    const currentStageIndex = run.workflow.stages.findIndex(
-                      (stage) => stage.id === run.workflowStage,
-                    );
-                    const targetStageIndex = run.workflow.stages.findIndex(
-                      (stage) => stage.id === workflowStage,
-                    );
-                    const isRegression =
-                      placement.status === "running" &&
-                      currentStageIndex >= 0 &&
-                      targetStageIndex >= 0 &&
-                      targetStageIndex < currentStageIndex;
-                    const currentRevision =
-                      placement.status === "queued"
-                        ? 1
-                        : isRegression
-                          ? run.currentRevision + 1
-                          : run.currentRevision;
-                    const targetLabel =
-                      placement.status === "running"
-                        ? run.workflow.stages.find(
-                            (stage) => stage.id === workflowStage,
-                          )?.label
-                        : {
-                            backlog: "백로그",
-                            queued: "대기",
-                            blocked: "차단",
-                            failed: "실패",
-                            completed: "완료",
-                            cancelled: "취소",
-                          }[placement.status];
-                    const detail = `사용자가 작업을 ${targetLabel ?? placement.status} 상태로 이동했습니다.`;
-                    const nextEvent: HuntEvent = {
-                      id: crypto.randomUUID(),
-                      attempt: currentAttempt,
-                      revision: currentRevision,
-                      status: placement.status,
-                      workflowStage,
-                      detail,
-                      actor: "briar-app",
-                      qaStatus: null,
-                      trackerState: run.tracker?.state ?? null,
-                      pullRequestUrls: run.pullRequestUrls,
-                      targetSha: run.targetSha,
-                      occurredAt,
-                      recordedAt: occurredAt,
-                    };
-                    runEventsByRun.current[run.id] = [
-                      nextEvent,
-                      ...(runEventsByRun.current[run.id] ?? []),
-                    ];
-                    return {
-                      ...run,
-                      currentAttempt,
-                      currentRevision,
-                      status: placement.status,
-                      workflowStage,
-                      progress: progressForAutoHuntRun(
-                        placement.status,
-                        workflowStage,
-                        run.workflow,
-                      ),
-                      detail,
-                      commitSha: isRegression ? null : run.commitSha,
-                      targetSha: isRegression ? null : run.targetSha,
-                      resultSummary: isRegression ? null : run.resultSummary,
-                      claimedBy: null,
-                      claimedAt: null,
-                      leaseExpiresAt: null,
-                      completedAt: ["completed", "cancelled"].includes(
-                        placement.status,
-                      )
-                        ? occurredAt
-                        : null,
-                      updatedAt: occurredAt,
-                      lastEventAt: occurredAt,
-                      eventCount: run.eventCount + 1,
-                    };
-                  }),
-                }
-              : current,
-          );
-          return;
-        }
-        if (!token) throw new Error("로그인이 필요합니다.");
-        await moveHuntRun(token, activeProjectId, runId, placement);
-        await refresh("snapshot");
-      } catch (caught) {
-        const message = caught instanceof Error ? caught.message : String(caught);
-        setRecoveryError(message);
-        throw caught;
-      } finally {
-        setRecoveringRunId(null);
-      }
-    },
-    [activeProjectId, dashboard, refresh, token],
-  );
+      selectTeam: selectProject,
+    });
+  });
 
   return {
     acceptInvitation,
@@ -4097,10 +2425,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     repairHealth,
     retryRun: (runId: string) => recoverRun(runId, "retry"),
     cancelRun: (runId: string) => recoverRun(runId, "cancel"),
-    unassignRun: (projectId: string, runId: string) => {
-      if (!token) return Promise.reject(new Error("로그인이 필요합니다."));
-      return unassignHuntRun(token, projectId, runId).then(() => refresh());
-    },
+    unassignRun,
     moveRun,
     startProjectCreation: startTeamCreation,
     token,

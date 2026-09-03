@@ -105,6 +105,38 @@ Phase 2A를 구현하며 확인한, 이후 단계에 영향을 주는 사실:
   `applySyncEvent(team-snapshot)` 두 줄이며, 40여 개 낙관 갱신 호출부가 PR 묶음 B에서
   엔티티 갱신으로 재작성되면 사라진다.
 
+### 기준 갱신 (2026-09-04, Phase 2B-1 이후)
+
+액션과 런 상세를 옮기며 확인한 사실:
+
+- **`demoMode`는 테스트에서 항상 `false`다.** vitest 설정이 `VITE_BRIAR_API_URL`을
+  넣어 `isApiConfigured`가 참이 되므로 `state/platform.ts`의 상수는 꺼지지 않는다.
+  모듈 모킹이 금지된 상태에서 데모 분기를 덮으려면 액션 팩토리가 `deps.demoMode`로
+  플래그를 주입받아야 한다. `createIssueActions` / `createRunDetailActions`가 그
+  이음매를 갖는다. 이후 단계도 데모 분기를 테스트하려면 같은 방식을 쓴다.
+- **현재 코드에는 "낙관 갱신 후 커밋" 경로가 하나도 없었다.** 모든 액션이
+  서버 응답을 기다린 뒤(또는 데모에서만) 로컬을 고친다. 그래서
+  `state/sync/optimistic.ts`는 동기 패치(`applyRunPatch` / `applyRunPatches`)를
+  액션들이 쓰고, 롤백 규칙을 가진 `optimisticRunUpdate`는 헬퍼와 테스트로만
+  존재한다. 순서를 바꾸는 것은 눈에 보이는 동작 변화라 이 PR의 범위 밖이다.
+  생성 / 삭제용 낙관 헬퍼는 쓰는 액션이 없어 만들지 않았다.
+- **롤백 규칙.** 실패 시 (1) 런이 사라졌으면 복원하지 않고, (2) 저장소가 아직
+  낙관 값 인스턴스를 들고 있으면 복원하며, (3) 다른 값으로 바뀌었으면
+  `updatedAt`이 **더 새로울 때만** 복원을 건너뛴다. 같은 시각은 롤백이 이긴다.
+- **`pendingIssueMutationAtom`의 종료는 토큰 비교다.** 네 개의 독립 플래그를 하나의
+  판별 유니온으로 합치면 나중에 시작한 뮤테이션의 표시를 먼저 끝난 쪽이 지울 수
+  있다. `beginIssueMutation`이 돌려주는 종료 함수는 아직 자기 값일 때만 지운다.
+- **`setDashboard`가 하던 요청 취소는 남은 호출부에도 필요하다.** 팀 연결 / 워크플로
+  / Velen 흐름은 `commitTeamDashboard`와 `commitTeamSettings` 두 함수로 좁혔고,
+  둘 다 커밋 전에 `loader.cancelAll()`을 유지한다. Phase 3이 이 둘을
+  `state/workspace`로 가져가면 useBriar에서 대시보드 쓰기가 사라진다.
+- **액션이 셸 콜백을 필요로 한다.** `addIssue`의 팀 전환과 Agent Skill 승인의 세션
+  입양은 `useBriar`만 줄 수 있는데, 뷰가 훅보다 훨씬 아래에서 액션을 부른다.
+  레지스트리별 `WeakMap` 브리지(`setIssueActionBridge`)로 넘기며, 그래야
+  `useIssueActions()`가 레지스트리 수명 동안 같은 객체를 돌려준다.
+- **`useAutoHuntSessions`의 `AutoHuntSession` 타입을 `state/`가 import한다.** Phase 7이
+  훅을 정리할 때 타입을 `types.ts`로 옮기는 것이 낫다.
+
 ## 목표
 
 1. `apps/briar/src/hooks/useBriar.ts`(4,668줄)와 `apps/briar/src/App.tsx`(5,116줄)가
