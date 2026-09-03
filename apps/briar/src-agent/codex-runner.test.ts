@@ -147,10 +147,18 @@ async function runScenario(scenario: "invalid" | "optional" | "required") {
       child.once("error", reject);
       child.once("close", resolveExit);
     });
-    const payloads = await outputPromise;
-    if (exitCode !== 0 && payloads.length === 0) {
-      throw new Error(`Codex runner failed: ${stderr || `exit ${exitCode}`}`);
+    const diagnosticStderr = stderr
+      .split("\n")
+      .filter((line) =>
+        !line.includes("NO_COLOR") &&
+        !line.includes("trace-warnings") &&
+        line.trim().length > 0,
+      )
+      .join("\n");
+    if (exitCode !== 0 && diagnosticStderr) {
+      throw new Error(`Codex runner failed: ${diagnosticStderr}`);
     }
+    const payloads = await outputPromise;
     return { exitCode, payloads };
   } finally {
     clearTimeout(timeout);
