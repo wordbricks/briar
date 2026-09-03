@@ -849,7 +849,7 @@ function HuntDashboardContent({
         setSelectedRunMessageId(null);
         setSelectedRunInitialTab(null);
         setSelectedRunId(null);
-      } : undefined} transferProjects={transferDestinationProjects} onAddDependency={onAddIssueDependency ? prerequisiteRunId => onAddIssueDependency(selected.id, prerequisiteRunId) : undefined} onAddRelated={onAddRelatedIssue ? relatedRunId => onAddRelatedIssue(selected.id, relatedRunId) : undefined} onCreateSubIssue={() => openCreateSubIssueDialog(selected.id)} onLinkSubIssue={onSetIssueParent ? childRunId => onSetIssueParent(childRunId, selected.id) : undefined} onSetParent={onSetIssueParent ? parentRunId => onSetIssueParent(selected.id, parentRunId) : undefined} onUnlinkSubIssue={onSetIssueParent ? childRunId => onSetIssueParent(childRunId, null) : undefined} onAcceptIssueAction={onAcceptIssueAction ? proposal => onAcceptIssueAction(selected.id, proposal) : undefined} onAcceptIssueExecution={onAcceptIssueExecution ? (proposal, input) => onAcceptIssueExecution(selected.id, proposal, input) : undefined} onAcceptSkillExecution={onAcceptSkillExecution ? (proposal, input) => onAcceptSkillExecution(selected.id, proposal, input) : undefined} onRemoveDependency={onRemoveIssueDependency ? prerequisiteRunId => onRemoveIssueDependency(selected.id, prerequisiteRunId) : undefined} onRemoveRelated={onRemoveRelatedIssue ? relatedRunId => onRemoveRelatedIssue(selected.id, relatedRunId) : undefined} onRelatedMessageOpen={onRelatedMessageOpen} onDependencyOpen={runId => {
+      } : undefined} transferProjects={transferDestinationProjects} teams={projects} currentTeam={dashboard?.project ?? null} onAddDependency={onAddIssueDependency ? prerequisiteRunId => onAddIssueDependency(selected.id, prerequisiteRunId) : undefined} onAddRelated={onAddRelatedIssue ? relatedRunId => onAddRelatedIssue(selected.id, relatedRunId) : undefined} onCreateSubIssue={() => openCreateSubIssueDialog(selected.id)} onLinkSubIssue={onSetIssueParent ? childRunId => onSetIssueParent(childRunId, selected.id) : undefined} onSetParent={onSetIssueParent ? parentRunId => onSetIssueParent(selected.id, parentRunId) : undefined} onUnlinkSubIssue={onSetIssueParent ? childRunId => onSetIssueParent(childRunId, null) : undefined} onAcceptIssueAction={onAcceptIssueAction ? proposal => onAcceptIssueAction(selected.id, proposal) : undefined} onAcceptIssueExecution={onAcceptIssueExecution ? (proposal, input) => onAcceptIssueExecution(selected.id, proposal, input) : undefined} onAcceptSkillExecution={onAcceptSkillExecution ? (proposal, input) => onAcceptSkillExecution(selected.id, proposal, input) : undefined} onRemoveDependency={onRemoveIssueDependency ? prerequisiteRunId => onRemoveIssueDependency(selected.id, prerequisiteRunId) : undefined} onRemoveRelated={onRemoveRelatedIssue ? relatedRunId => onRemoveRelatedIssue(selected.id, relatedRunId) : undefined} onRelatedMessageOpen={onRelatedMessageOpen} onDependencyOpen={runId => {
         setSelectedRunMessageId(null);
         setSelectedRunInitialTab(null);
         setSelectedRunId(runId);
@@ -895,9 +895,21 @@ function HuntDashboardContent({
         onProcessNow={onProcessIssueNow}
         onTransfer={onTransferIssue ? run => {
           setContextTransferError(null);
-          setTransferTargetProjectId(transferDestinationProjects[0]?.id ?? "");
+          setTransferTargetProjectId("");
           setTransferringRunFromMenuId(run.id);
         } : undefined}
+        onTeamChange={onTransferIssue ? (run, teamId) => {
+          setContextTransferError(null);
+          setTransferTargetProjectId(`team:${teamId}`);
+          setTransferringRunFromMenuId(run.id);
+        } : undefined}
+        onProjectChange={onMoveIssueProject ? (run, targetProjectId) => {
+          if (!run.projectId || run.projectId === targetProjectId) return;
+          void onMoveIssueProject(run.id, run.projectId, targetProjectId).catch(() => undefined);
+        } : undefined}
+        teams={projects}
+        currentTeamId={dashboard?.project.id ?? null}
+        planningProjects={issueProjects}
         processingIssueIds={processingIssueIds}
         recoveringRunId={recoveringRunId}
         runs={runs}
@@ -962,9 +974,17 @@ function HuntDashboardContent({
         setDeletingRunFromMenuId(runId);
       }} onEdit={setEditingRunId} onTransfer={onTransferIssue ? runId => {
         setContextTransferError(null);
-        setTransferTargetProjectId(transferDestinationProjects[0]?.id ?? "");
+        setTransferTargetProjectId("");
         setTransferringRunFromMenuId(runId);
-      } : undefined} onMove={(run, placement) => onMoveRun(run.id, placement).catch(() => undefined)} onOpen={runId => {
+      } : undefined} onTeamChange={onTransferIssue ? (run, teamId) => {
+        setContextTransferError(null);
+        setTransferTargetProjectId(`team:${teamId}`);
+        const found = runs.find(candidate => candidate.id === run.id);
+        setTransferringRunFromMenuId((found ?? run).id);
+      } : undefined} onProjectChange={onMoveIssueProject ? (run, targetProjectId) => {
+        if (!run.projectId || run.projectId === targetProjectId) return;
+        void onMoveIssueProject(run.id, run.projectId, targetProjectId).catch(() => undefined);
+      } : undefined} teams={projects} currentTeamId={dashboard?.project.id ?? null} planningProjects={issueProjects} onMove={(run, placement) => onMoveRun(run.id, placement).catch(() => undefined)} onOpen={runId => {
         setSelectedRunMessageId(null);
         setSelectedRunInitialTab(null);
         setSelectedRunId(runId);
@@ -1017,9 +1037,16 @@ function HuntDashboardContent({
                       setDeletingRunFromMenuId(run.id);
                     }} onTransfer={onTransferIssue ? () => {
                       setContextTransferError(null);
-                      setTransferTargetProjectId(transferDestinationProjects[0]?.id ?? "");
+                      setTransferTargetProjectId("");
                       setTransferringRunFromMenuId(run.id);
-                    } : undefined} onPointerCancel={event => {
+                    } : undefined} onTeamChange={onTransferIssue ? teamId => {
+                      setContextTransferError(null);
+                      setTransferTargetProjectId(`team:${teamId}`);
+                      setTransferringRunFromMenuId(run.id);
+                    } : undefined} onProjectChange={onMoveIssueProject && run.projectId ? targetProjectId => {
+                      if (targetProjectId === run.projectId) return;
+                      void onMoveIssueProject(run.id, run.projectId!, targetProjectId).catch(() => undefined);
+                    } : undefined} teams={projects} currentTeamId={dashboard?.project.id ?? null} planningProjects={issueProjects.filter(project => !run.teamId || project.teamId === run.teamId)} onPointerCancel={event => {
                       if (pointerDragRef.current?.pointerId === event.pointerId) {
                         clearKanbanDragState();
                       }

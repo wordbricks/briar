@@ -42,6 +42,7 @@ import type {
   HuntRunPlacement,
   IssueExecutionPreferences,
   OrganizationMember,
+  PlanningProject,
   Project,
   ProjectAgent,
   ProjectSettings,
@@ -163,6 +164,11 @@ export function IssueCollection({
   onPriorityChange,
   onProcessNow,
   onTransfer,
+  onTeamChange,
+  onProjectChange,
+  teams = [],
+  currentTeamId = null,
+  planningProjects = [],
   processingIssueIds,
   projectForRun,
   readOnly = false,
@@ -209,6 +215,11 @@ export function IssueCollection({
   onPriorityChange?: (run: HuntRun, priority: number | null) => void;
   onProcessNow?: (run: HuntRun) => void;
   onTransfer?: (run: HuntRun) => void;
+  onTeamChange?: (run: HuntRun, teamId: string) => void;
+  onProjectChange?: (run: HuntRun, projectId: string) => void;
+  teams?: Array<Pick<Project, "id" | "name">>;
+  currentTeamId?: string | null;
+  planningProjects?: Array<Pick<PlanningProject, "id" | "name" | "teamId">>;
   processingIssueIds: ReadonlySet<string>;
   projectForRun?: (run: HuntRun) => Pick<Project, "icon" | "name"> | undefined;
   readOnly?: boolean;
@@ -625,6 +636,11 @@ export function IssueCollection({
               const run = runs.find((candidate) => candidate.id === runId);
               if (run) onTransfer(run);
             } : undefined}
+            onTeamChange={onTeamChange ? (run, teamId) => onTeamChange(run, teamId) : undefined}
+            onProjectChange={onProjectChange ? (run, projectId) => onProjectChange(run, projectId) : undefined}
+            teams={teams}
+            currentTeamId={currentTeamId}
+            planningProjects={planningProjects}
             processingIssueIds={processingIssueIds}
             projectForRun={projectForRun}
             readOnly={readOnly}
@@ -738,6 +754,14 @@ export function IssueCollection({
                                 onPriorityChange={(priority) => onPriorityChange?.(run, priority)}
                                 onProcessNow={onProcessNow ? () => onProcessNow(run) : undefined}
                                 onTransfer={onTransfer ? () => onTransfer(run) : undefined}
+                                onTeamChange={onTeamChange ? (teamId) => onTeamChange(run, teamId) : undefined}
+                                onProjectChange={onProjectChange ? (projectId) => onProjectChange(run, projectId) : undefined}
+                                teams={teams}
+                                currentTeamId={currentTeamId}
+                                planningProjects={(() => {
+                                  const teamIdForRun = run.teamId ?? currentTeamId;
+                                  return teamIdForRun ? planningProjects.filter((project) => project.teamId === teamIdForRun) : planningProjects;
+                                })()}
                                 project={projectForRun?.(run)}
                                 readOnly={readOnly}
                                 run={run}

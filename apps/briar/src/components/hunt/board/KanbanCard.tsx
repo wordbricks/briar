@@ -9,7 +9,7 @@ import { ProjectAgentAvatar } from "@/components/ProjectAgentAvatar";
 import { runMeta } from "@/lib/stages";
 import { type AutoHuntWorkflowCheckpoint } from "@/lib/auto-hunt-contract";
 import { formatIssueKey } from "@/lib/issue-key";
-import type { ExecutionWorker, HuntRun, HuntRunPlacement, IssueExecutionPreferences, OrganizationMember, Project, ProjectAgent } from "@/types";
+import type { ExecutionWorker, HuntRun, HuntRunPlacement, IssueExecutionPreferences, OrganizationMember, PlanningProject, Project, ProjectAgent } from "@/types";
 import { agentProviderLabels, type AgentProvider } from "@/lib/project-llm";
 import { useI18n } from "@/i18n";
 import type { MessageKey } from "@/i18n/messages";
@@ -38,6 +38,11 @@ export function KanbanCard({
   project,
   onDelete,
   onTransfer,
+  onTeamChange,
+  onProjectChange,
+  teams,
+  currentTeamId,
+  planningProjects,
   onPointerCancel,
   onPointerDown,
   onPointerMove,
@@ -71,6 +76,11 @@ export function KanbanCard({
   project?: Pick<Project, "icon" | "name">;
   onDelete: () => void;
   onTransfer?: () => void;
+  onTeamChange?: (teamId: string) => void;
+  onProjectChange?: (projectId: string) => void;
+  teams?: Array<Pick<Project, "id" | "name">>;
+  currentTeamId?: string | null;
+  planningProjects?: Array<Pick<PlanningProject, "id" | "name" | "teamId">>;
   onPointerCancel: (event: ReactPointerEvent<HTMLElement>) => void;
   onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void;
   onPointerMove: (event: ReactPointerEvent<HTMLElement>) => void;
@@ -97,7 +107,7 @@ export function KanbanCard({
   const assignedProvider = activeAgent || assignedWorker ? run.preferredProvider ?? run.requestedProvider ?? assignedWorker?.agentProvider ?? activeAgent?.provider ?? null : null;
   const showFullAutoBadge = Boolean(run.fullAuto);
   const assignmentBadgeCount = hideAssignmentBadges ? Number(showFullAutoBadge) : [activeAgent, assignedProvider, assignedWorker, showFullAutoBadge || null].filter(Boolean).length;
-  return <IssueContextMenu availableProviders={availableProviders} disabled={contextMenuDisabled || isMoving || isDragging || deletingIssueId === run.id || updatingIssueId === run.id} onDelete={onDelete} onTransfer={onTransfer} onEdit={onEdit} onMove={onMove} onOpen={onOpen} onProcessNow={onProcessNow} onPriorityChange={onPriorityChange} onPreferencesChange={onPreferencesChange} onCheckpointsChange={onCheckpointsChange} run={run} isProcessing={isProcessing}>
+  return <IssueContextMenu availableProviders={availableProviders} disabled={contextMenuDisabled || isMoving || isDragging || deletingIssueId === run.id || updatingIssueId === run.id} onDelete={onDelete} onTransfer={onTransfer} onTeamChange={onTeamChange} onProjectChange={onProjectChange} teams={teams} currentTeamId={currentTeamId} planningProjects={planningProjects} onEdit={onEdit} onMove={onMove} onOpen={onOpen} onProcessNow={onProcessNow} onPriorityChange={onPriorityChange} onPreferencesChange={onPreferencesChange} onCheckpointsChange={onCheckpointsChange} run={run} isProcessing={isProcessing}>
       <div aria-label={t("run.details", {
       title: run.title
     })} aria-disabled={isMoving} className={`kanban-card ${meta.tone}${run.status === "paused" ? " awaiting-review" : ""}${readOnly ? " read-only" : ""}${isMoving ? " moving" : ""}${isDragging ? " dragging" : ""}${assignmentBadgeCount > 0 ? " has-assignees" : ""}${assignmentBadgeCount > 1 ? " has-multiple-assignees" : ""}${assignmentBadgeCount > 2 ? " has-three-assignees" : ""}${assignmentBadgeCount > 3 ? " has-four-assignees" : ""}`} data-keyboard-list-current={isKeyboardCursor ? "" : undefined} data-keyboard-list-item="" data-run-id={run.id} draggable={false} onClick={onOpen} onFocus={onFocus} onKeyDown={event => {
