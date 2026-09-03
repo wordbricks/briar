@@ -3,7 +3,10 @@ import { describe, expect, it } from "vitest";
 import { demoDashboard } from "../../lib/demo-data";
 import type { Project } from "../../types";
 import { teamEntityAtom } from "../entities/teams";
+import { activeOrganizationIdAtom } from "../organization/atoms";
+import { lockedTeamIdAtom } from "../platform";
 import { createTestRegistry, type AtomRegistry } from "../registry";
+import { setSessionDataSources } from "../session/api";
 import { reconnectRequestGeneration } from "../workspace/api";
 import { sessionErrorAtom, tokenAtom } from "../session/atoms";
 import { applySyncEvent } from "../sync/apply";
@@ -13,7 +16,13 @@ import {
   type TeamActionApi,
   type TeamActions,
 } from "./actions";
-import { isCreatingTeamAtom, teamConnectionAtom, teamsAtom } from "./atoms";
+import {
+  activeTeamIdAtom,
+  isCreatingTeamAtom,
+  staleTeamIdAtom,
+  teamConnectionAtom,
+  teamsAtom,
+} from "./atoms";
 
 const teamOf = (id: string): Project => ({ ...demoDashboard.team, id, name: id });
 const teamA = teamOf("team-a");
@@ -197,5 +206,121 @@ describe("createTeamActions", () => {
     // Opening and cancelling invalidate reconnect attempts; finishing does not,
     // because the flow it completes already established the connection.
     expect(reconnectBumps()).toBe(3);
+  });
+});
+
+/*
+  Selecting a team.
+
+  These were `useBriar`'s `selectProject` and `ensureProjectSelected`. What they
+  guard is the moment a switch happens: the board on screen belongs to whichever
+  team the entity store last loaded, so the newly selected team's stored copy is
+  marked stale unless it is the one already rendered — otherwise the next delta
+  would patch a payload nobody refreshed.
+*/
+describe("selectTeam", () => {
+  it("selects a team the account has", () => {
+    const { actions, registry, reconnectBumps } = harness();
+    registry.set(activeTeamIdAtom, teamA.id);
+    registry.set(sessionErrorAtom, "이전 오류");
+
+    actions.selectTeam(teamB.id);
+
+    expect(registry.get(activeTeamIdAtom)).toBe(teamB.id);
+    expect(registry.get(activeOrganizationIdAtom)).toBe(teamB.organizationId);
+    expect(registry.get(sessionErrorAtom)).toBeNull();
+    expect(reconnectBumps()).toBe(1);
+    // Team B was never loaded, so there is no stored board to mark stale: the
+    // board renders empty and the fetch fills it in.
+    expect(registry.get(staleTeamIdAtom)).toBeNull();
+  });
+
+  it("marks a stored board stale when returning to it", () => {
+    const { actions, registry } = harness();
+    registry.set(activeTeamIdAtom, teamB.id);
+    applySyncEvent(registry, {
+      kind: "team-snapshot",
+      teamId: teamB.id,
+      payload: {
+        ...demoDashboard,
+        team: teamB,
+        runs: [],
+        generatedAt: "2026-09-01T00:00:00.000Z",
+      },
+    });
+
+    actions.selectTeam(teamA.id);
+
+    // Team A's stored payload is on screen at once, and marked stale so the
+    // next fetch replaces it wholesale instead of patching an old cursor.
+    expect(registry.get(activeTeamIdAtom)).toBe(teamA.id);
+    expect(registry.get(staleTeamIdAtom)).toBe(teamA.id);
+  });
+
+  it("leaves the loaded team alone when it is selected again", () => {
+    const { actions, registry, reconnectBumps } = harness();
+    registry.set(activeTeamIdAtom, teamA.id);
+
+    actions.selectTeam(teamA.id);
+
+    // The payload on screen is already this team's, so nothing is invalidated
+    // and no reconnect attempt is thrown away.
+    expect(registry.get(activeTeamIdAtom)).toBe(teamA.id);
+    expect(registry.get(staleTeamIdAtom)).toBeNull();
+    expect(reconnectBumps()).toBe(0);
+  });
+
+  it("ignores a team the account does not have", () => {
+    const { actions, registry } = harness();
+    registry.set(activeTeamIdAtom, teamA.id);
+
+    actions.selectTeam("team-gone");
+
+    expect(registry.get(activeTeamIdAtom)).toBe(teamA.id);
+  });
+
+  it("refuses any team but the pinned one in a project window", () => {
+    const { actions, registry } = harness();
+    registry.set(activeTeamIdAtom, teamA.id);
+    registry.set(lockedTeamIdAtom, teamA.id);
+
+    actions.selectTeam(teamB.id);
+
+    expect(registry.get(activeTeamIdAtom)).toBe(teamA.id);
+  });
+});
+
+describe("ensureTeamSelected", () => {
+  it("reloads the team list for a team the account has not seen yet", async () => {
+    const { actions, registry } = harness();
+    const teamC = teamOf("team-c");
+    registry.set(activeTeamIdAtom, teamA.id);
+    setSessionDataSources(registry, {
+      loadTeams: async () => [teamA, teamB, teamC],
+    });
+
+    const team = await actions.ensureTeamSelected(teamC.id);
+
+    expect(team.id).toBe(teamC.id);
+    expect(registry.get(teamsAtom)).toEqual([teamA, teamB, teamC]);
+    expect(registry.get(activeTeamIdAtom)).toBe(teamC.id);
+  });
+
+  it("throws when the team is nowhere to be found", async () => {
+    const { actions, registry } = harness();
+    setSessionDataSources(registry, { loadTeams: async () => [teamA, teamB] });
+
+    await expect(actions.ensureTeamSelected("team-gone")).rejects.toThrow(
+      "요청한 프로젝트를 찾을 수 없습니다.",
+    );
+  });
+
+  it("refuses to leave the team a project window is pinned to", async () => {
+    const { actions, registry } = harness();
+    registry.set(lockedTeamIdAtom, teamA.id);
+
+    await expect(actions.ensureTeamSelected(teamB.id)).rejects.toThrow(
+      "이 윈도우에서는 다른 프로젝트를 열 수 없습니다.",
+    );
   });
 });

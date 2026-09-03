@@ -21,7 +21,6 @@ import { teamSyncApiAtom } from "../sync/loader";
 import { activeTeamIdAtom, teamsAtom } from "../team/atoms";
 import {
   createIssueActions,
-  setIssueActionBridge,
   type IssueActionApi,
   type IssueActions,
 } from "./actions";
@@ -162,7 +161,6 @@ interface Harness {
   readonly actions: IssueActions;
   readonly registry: AtomRegistry;
   readonly server: IssueServer;
-  readonly selectedTeams: string[];
 }
 
 const harness = (
@@ -175,7 +173,6 @@ const harness = (
 ): Harness => {
   const registry = createTestRegistry();
   const server = new IssueServer();
-  const selectedTeams: string[] = [];
   registry.set(teamsAtom, [teamOf(teamId), teamOf(otherTeamId)]);
   registry.set(planningProjectsAtom, [
     planningProjectOf("plan-a", teamId),
@@ -197,14 +194,11 @@ const harness = (
       payload: snapshotOf(options.runs ?? []),
     });
   }
-  setIssueActionBridge(registry, {
-    selectTeam: (id) => selectedTeams.push(id),
-  });
   const actions = createIssueActions(registry, {
     api: server.api,
     demoMode: options.demoMode ?? false,
   });
-  return { actions, registry, server, selectedTeams };
+  return { actions, registry, server };
 };
 
 describe("guards", () => {
@@ -400,7 +394,7 @@ describe("resumeRun", () => {
 
 describe("addIssue", () => {
   it("refreshes in place when the issue belongs to the selected team", async () => {
-    const { actions, server, selectedTeams } = harness();
+    const { actions, registry, server } = harness();
     const result = await actions.addIssue("plan-a", {
       title: "새 이슈",
       description: "",
@@ -409,18 +403,18 @@ describe("addIssue", () => {
     } as unknown as CreateIssueInput);
     expect(result.runId).toBe("created-run");
     expect(server.calls[0]).toBe(`createIssue:${teamId}:plan-a`);
-    expect(selectedTeams).toEqual([]);
+    expect(registry.get(activeTeamIdAtom)).toBe(teamId);
   });
 
   it("switches teams when the issue belongs to another one", async () => {
-    const { actions, selectedTeams } = harness();
+    const { actions, registry } = harness();
     await actions.addIssue("plan-b", {
       title: "다른 팀",
       description: "",
       status: "queued",
       attachments: [],
     } as unknown as CreateIssueInput);
-    expect(selectedTeams).toEqual([otherTeamId]);
+    expect(registry.get(activeTeamIdAtom)).toBe(otherTeamId);
   });
 
   it("creates the run locally in demo mode", async () => {

@@ -117,14 +117,9 @@ const seedChannels = (registry: AtomRegistry, channels: ChannelSummary[]) => {
 };
 
 let actions: NavigationActions;
-const selectedTeams: string[] = [];
 
 function Harness() {
-  useNavigationReconciliation({
-    selectTeam: (teamId) => {
-      selectedTeams.push(teamId);
-    },
-  });
+  useNavigationReconciliation();
   return null;
 }
 
@@ -171,7 +166,6 @@ const mount = async (registry: AtomRegistry) => {
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   window.localStorage.setItem("briar.locale.v1", "en");
-  selectedTeams.length = 0;
 });
 
 describe("navigation reconciliation", () => {
@@ -197,7 +191,7 @@ describe("navigation reconciliation", () => {
     });
     await flush();
     expect(registry.get(navigationTeamIdAtom)).toBe(teamB.id);
-    expect(selectedTeams).toContain(teamB.id);
+    expect(registry.get(activeTeamIdAtom)).toBe(teamB.id);
     await view.cleanup();
   });
 

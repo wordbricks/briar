@@ -2,30 +2,35 @@ import { useStatusTray } from "../../hooks/useStatusTray";
 import { useChannelCatalogSync } from "../../state/channels/useChannelCatalogSync";
 import { useNavigationReconciliation } from "../../state/navigation/useNavigationReconciliation";
 import { useActiveOrganizationPersistence } from "../../state/organization/useActiveOrganizationPersistence";
+import { usePlanningProjectsSync } from "../../state/planning/usePlanningProjectsSync";
+import { useAuthReturnListener } from "../../state/session/useAuthReturnListener";
+import { useSessionBootstrap } from "../../state/session/useSessionBootstrap";
 import { useTeamSync } from "../../state/sync/useTeamSync";
 import { useWorkflowAutoGeneration } from "../../state/workflow/useWorkflowAutoGeneration";
 import { useWorkspaceSync } from "../../state/workspace/useWorkspaceSync";
 
-export interface AppEffectsProps {
-  /** Selecting a team, which the navigation reconciliation still delegates. */
-  readonly selectTeam: (teamId: string) => void;
-}
-
 /**
- * Mount point for the domain effect hooks that were `useEffect` blocks inside
- * `useBriar` and `App`. Rendering nothing keeps their re-render cost off the
- * app shell: a hook here subscribes to the atoms it needs, and only this
+ * Mount point for every domain effect: what used to be `useEffect` blocks
+ * inside `useBriar` and `App`. Rendering nothing keeps their re-render cost off
+ * the app shell — a hook here subscribes to the atoms it needs, and only this
  * component re-renders when they change.
+ *
+ * The order below is the order React runs them in, and it is the order they ran
+ * in before: the six that were already here, then the three the facade owned
+ * (whose effects ran after a child's), and the reconciliation last.
  */
-export function AppEffects({ selectTeam }: AppEffectsProps) {
+export function AppEffects() {
   useActiveOrganizationPersistence();
   useTeamSync();
   useChannelCatalogSync();
   useWorkspaceSync();
   useWorkflowAutoGeneration();
   useStatusTray();
+  usePlanningProjectsSync();
+  useAuthReturnListener();
+  useSessionBootstrap();
   // Last, because the reconciliation used to be one of `App`'s own effects and
   // therefore ran after every hook mounted here.
-  useNavigationReconciliation({ selectTeam });
+  useNavigationReconciliation();
   return null;
 }

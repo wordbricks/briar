@@ -1,5 +1,6 @@
 import { repositoryWorkflowBootstrap } from "../lib/auto-hunt-contract";
 import { demoDashboard } from "../lib/demo-data";
+import { demoMode, lockedTeamId } from "./platform";
 import type {
   DashboardPayload,
   IssueMessage,
@@ -9,6 +10,15 @@ import type {
   RunEvidence,
   SessionUser,
 } from "../types";
+
+/**
+ * Whether demo mode may preselect its own organization and team. A project
+ * window is pinned to one team, and preselecting a different one would open a
+ * board that window may not show — so a pinned window only takes the demo
+ * selection when it is pinned to the demo team itself.
+ */
+export const demoSelectionApplies =
+  demoMode && (!lockedTeamId || lockedTeamId === demoDashboard.team.id);
 
 /**
  * Seed data the app renders in demo mode. The two timestamps are anchored to
