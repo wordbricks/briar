@@ -1,5 +1,7 @@
 import {
   useCallback,
+  useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type KeyboardEventHandler,
@@ -9,6 +11,8 @@ import {
 import type { PersistedWidth } from "../lib/persisted-width";
 
 type HorizontalPaneResizeOptions = PersistedWidth & {
+  /** CSS custom property (e.g. "--inbox-detail-pane-width") the hook writes on the container. */
+  cssVariable: string;
   defaultWidth: number;
   keyboardStep?: number;
   max: number;
@@ -31,11 +35,20 @@ type HorizontalPaneResizeResult = {
 
 /**
  * Controls a right-hand pane whose width is expressed as a percentage of its
- * container. The caller owns the separator markup and CSS variable so its
- * accessible label and visual treatment remain specific to the screen.
+ * container. The caller owns the separator markup so its accessible label
+ * and visual treatment remain specific to the screen; the hook owns writing
+ * `cssVariable` onto the container so the caller never needs an inline style
+ * for it.
+ *
+ * While dragging, the width is written straight to the CSS custom property
+ * on `pointermove` (coalesced into one write per animation frame) instead of
+ * going through React state, so a drag no longer re-renders the surrounding
+ * tree on every pixel of movement. React state — and persistence via `save`
+ * — is committed exactly once, when the drag ends.
  */
 export function useHorizontalPaneResize({
   clamp,
+  cssVariable,
   defaultWidth,
   keyboardStep = 5,
   load,
@@ -48,22 +61,61 @@ export function useHorizontalPaneResize({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const widthRef = useRef<number | null>(width);
   const activePointerRef = useRef<number | null>(null);
-  widthRef.current = width;
+  const pendingClientXRef = useRef<number | null>(null);
+  const pendingFrameRef = useRef<number | null>(null);
 
   const effectiveWidth = width ?? defaultWidth;
 
+  // The container owns the live value of `cssVariable`. Keep it — and
+  // `widthRef` — in sync with committed width here, on real commits only
+  // (initial load, keyboard steps, drag end). Syncing `widthRef` from a
+  // plain render-body assignment would let an unrelated re-render mid-drag
+  // (e.g. a poll or socket update on the owning component) stomp the live
+  // value `applyPendingFrame` just wrote, so it must only happen when
+  // `width` actually changes.
+  useLayoutEffect(() => {
+    widthRef.current = width;
+    const container = containerRef.current;
+    if (!container) return;
+    if (width === null) {
+      container.style.removeProperty(cssVariable);
+    } else {
+      container.style.setProperty(cssVariable, `${width}%`);
+    }
+  }, [cssVariable, width]);
+
+  // Discard (without applying) any frame still queued when the hook unmounts.
+  useEffect(
+    () => () => {
+      if (pendingFrameRef.current !== null) {
+        window.cancelAnimationFrame(pendingFrameRef.current);
+        pendingFrameRef.current = null;
+      }
+    },
+    [],
+  );
+
+  const applyPendingFrame = useCallback(() => {
+    pendingFrameRef.current = null;
+    const clientX = pendingClientXRef.current;
+    if (clientX === null) return;
+    const container = containerRef.current;
+    if (!container) return;
+    const bounds = container.getBoundingClientRect();
+    const availableWidth = Math.max(1, bounds.width);
+    const paneRatio = Math.max(0, (bounds.right - clientX) / availableWidth);
+    const nextWidth = clamp(paneRatio * 100);
+    widthRef.current = nextWidth;
+    container.style.setProperty(cssVariable, `${nextWidth}%`);
+  }, [clamp, cssVariable]);
+
   const updateWidthFromPointer = useCallback(
     (clientX: number) => {
-      const container = containerRef.current;
-      if (!container) return;
-      const bounds = container.getBoundingClientRect();
-      const availableWidth = Math.max(1, bounds.width);
-      const paneRatio = Math.max(0, (bounds.right - clientX) / availableWidth);
-      const nextWidth = clamp(paneRatio * 100);
-      setWidth(nextWidth);
-      widthRef.current = nextWidth;
+      pendingClientXRef.current = clientX;
+      if (pendingFrameRef.current !== null) return;
+      pendingFrameRef.current = window.requestAnimationFrame(applyPendingFrame);
     },
-    [clamp],
+    [applyPendingFrame],
   );
 
   const onPointerDown = useCallback<PointerEventHandler<HTMLDivElement>>(
@@ -93,10 +145,25 @@ export function useHorizontalPaneResize({
         event.currentTarget.releasePointerCapture(event.pointerId);
       }
       activePointerRef.current = null;
+      // pointerup/pointercancel can arrive before the browser ever runs a
+      // queued frame (they aren't synchronized to animation frames), so
+      // apply it synchronously here first — otherwise the drag's last few
+      // pixels of movement would be silently dropped. Then drop the
+      // now-redundant scheduled frame.
+      if (pendingFrameRef.current !== null) {
+        window.cancelAnimationFrame(pendingFrameRef.current);
+        applyPendingFrame();
+      }
+      pendingClientXRef.current = null;
       setIsResizing(false);
-      if (widthRef.current !== null) save(widthRef.current);
+      // Commit the drag's final width to React state (and persist it) once,
+      // instead of on every pointermove.
+      if (widthRef.current !== null) {
+        setWidth(widthRef.current);
+        save(widthRef.current);
+      }
     },
-    [save],
+    [applyPendingFrame, save],
   );
 
   const onKeyDown = useCallback<KeyboardEventHandler<HTMLDivElement>>(

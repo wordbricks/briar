@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties } from "react";
 import { useAtomSet } from "@effect/atom-react";
 import {
   Activity,
@@ -798,6 +797,7 @@ export function App({
     separatorProps: inboxResizeProps,
   } = useHorizontalPaneResize({
     clamp: clampInboxPaneWidth,
+    cssVariable: "--inbox-detail-pane-width",
     defaultWidth: inboxPaneWidthDefault,
     load: loadInboxPaneWidth,
     max: inboxPaneWidthMax,
@@ -4180,11 +4180,6 @@ export function App({
               isResizingInbox && "is-resizing-inbox cursor-col-resize select-none",
             )}
             ref={inboxLayoutRef}
-            style={
-              {
-                "--inbox-detail-pane-width": `${inboxDetailPaneWidth}%`,
-              } as CSSProperties
-            }
           >
             <InboxWithSelection
               desktopEmbedded
