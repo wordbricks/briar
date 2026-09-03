@@ -1,0 +1,1072 @@
+import { useAtom, useAtomSet, useAtomValue } from "@effect/atom-react";
+import { lazy, Suspense, useMemo } from "react";
+import { Inbox as InboxIcon, MessageCircle } from "lucide-react";
+
+import { useI18n } from "../../i18n";
+import { AgentUsageStatusBar } from "../AgentUsageStatusBar";
+import { AppVersionStatus } from "../AppVersionStatus";
+import { InboxDetailPanel } from "../InboxDetailPanel";
+import {
+  InboxDetailTargetBoundary,
+  InboxWithSelection,
+} from "../InboxSelectionBoundary";
+import { EmptyState, MainContent, PageHeader } from "../layout";
+import { WindowNavigationControls } from "../WindowNavigationControls";
+import type { WindowNavigationHistoryItem } from "../WindowNavigationControls";
+import { AppSettingsSidebar } from "./AppSettingsSidebar";
+import {
+  ChannelsWithCatalog,
+  DirectMessagesWithCatalog,
+} from "./ChannelViews";
+import { HuntDashboardWithTeam } from "./HuntDashboardWithTeam";
+import { InboxDetailContent } from "./InboxDetailContent";
+import { SidebarWithSession } from "./SidebarWithSession";
+import {
+  TeamAgentsWithDashboard,
+  TeamLobbyWithDashboard,
+  TeamSettingsWithDashboard,
+} from "./TeamViewsWithDashboard";
+import {
+  AppSettingsWithWorkspace,
+  ConnectionHealthWithWorkspace,
+  TeamRepositorySetupDialogWithWorkspace,
+  WorkerStatusBarWithTeam,
+} from "./WorkspaceViews";
+import { useHorizontalPaneResize } from "../../hooks/useHorizontalPaneResize";
+import { useWorkerDispatch } from "../../hooks/useWorkerDispatch";
+import { inboxDetailLabel } from "../../lib/inbox-detail-label";
+import {
+  clampInboxPaneWidth,
+  inboxPaneWidthDefault,
+  inboxPaneWidthMax,
+  inboxPaneWidthMin,
+  loadInboxPaneWidth,
+  saveInboxPaneWidth,
+} from "../../lib/inbox-pane-width";
+import {
+  inboxNotificationTarget,
+  isInboxChannelTarget,
+} from "../../lib/inbox-notifications";
+import { isDesktopTauri } from "../../lib/platform";
+import { activeOrganizationTeams } from "../../lib/team-window-scope";
+import { cn } from "../../lib/utils";
+import {
+  projectNavigationLocation,
+  settingsNavigationLocation,
+} from "../../lib/app-navigation";
+import { useChannelActions } from "../../state/channels/actions";
+import {
+  activeChannelIdAtom,
+  organizationDirectMessagesAtom,
+  requestedChannelMessageAtom,
+  viewingIssueConversationRunIdAtom,
+} from "../../state/channels/atoms";
+import {
+  activePlanningProjectIdAtom,
+  createIssueTeamIdAtom,
+  isIssueDialogOpenAtom,
+  isNavigationHistoryOpenAtom,
+  isSidebarOpenAtom,
+  planningProjectEditIdAtom,
+  planningProjectTeamIdAtom,
+  quickProcessErrorAtom,
+} from "../../state/dialogs/atoms";
+import { inboxDetailTargetAtom } from "../../state/inbox-selection";
+import { useIssueActions } from "../../state/issues/actions";
+import {
+  agentListRequestKeyAtom,
+  issueListRequestKeyAtom,
+  pendingBriarLinkAtom,
+  requestedRunIdAtom,
+  requestedRunInitialTabAtom,
+  requestedRunMessageIdAtom,
+  requestedSessionIdAtom,
+  settingsTargetAtom,
+} from "../../state/navigation/atoms";
+import { useOrganizationActions } from "../../state/organization/actions";
+import {
+  activeOrganizationIdAtom,
+  organizationsAtom,
+} from "../../state/organization/atoms";
+import { demoMode, lockedTeamIdAtom } from "../../state/platform";
+import { useRunDetailActions } from "../../state/run-detail/actions";
+import {
+  sessionErrorAtom,
+  tokenAtom,
+  userAtom,
+} from "../../state/session/atoms";
+import { activeDashboardAtom } from "../../state/sync/view";
+import { useTeamActions } from "../../state/team/actions";
+import {
+  activeTeamIdAtom,
+  deletingTeamIdAtom,
+  teamsAtom,
+} from "../../state/team/atoms";
+import { useWorkspaceActions } from "../../state/workspace/actions";
+import { localInventoryErrorAtom } from "../../state/workspace/atoms";
+import type { AppNavigationLocation, ActivePage } from "../../lib/app-navigation";
+import type { ChannelNavigationPage } from "../../lib/app-navigation";
+import type { createCachedTeamUsageSummaryLoader } from "../../lib/team-usage-summary";
+import type { InboxMessageWithReadState } from "../../hooks/useInbox";
+import type { AgentAutoHuntOptions } from "../../hooks/useAgentDispatch";
+import type { AccountProfileInput } from "../../state/session/actions";
+import type { TeamMergeActivityLoader } from "../../lib/team-merge-activity";
+import type { InboxNotificationTarget } from "../../generated/tauri";
+import type {
+  AgentUsageReport,
+  AutoHuntSession,
+  DashboardPayload,
+  HuntRun,
+  Project,
+  ProjectAgent,
+  SessionUser,
+} from "../../types";
+
+/*
+  The desktop shell: window chrome, the sidebar, the page the history points at,
+  and the status bar.
+
+  It was the `else` branch of `App.tsx`'s gate chain, which is why the shell had
+  to hold every value any page might want. The pages read the store themselves
+  now, so what arrives here is what the app still owns: navigation, the inbox,
+  the auto hunt sessions, the agent list, and the few session calls that have no
+  store equivalent yet.
+
+  The lazy boundaries of the five pages only this shell renders come with it.
+*/
+
+const MyIssues = lazy(() =>
+  import("../MyIssues").then((m) => ({ default: m.MyIssues })),
+);
+const OrganizationCreate = lazy(() =>
+  import("../OrganizationCreate").then((m) => ({
+    default: m.OrganizationCreate,
+  })),
+);
+const OrganizationSettings = lazy(() =>
+  import("./OrganizationSettingsWithSession").then((m) => ({
+    default: m.OrganizationSettingsWithSession,
+  })),
+);
+const TeamSchedule = lazy(() =>
+  import("../TeamSchedule").then((m) => ({ default: m.TeamSchedule })),
+);
+const Teams = lazy(() =>
+  import("./TeamsWithPlanningProjects").then((m) => ({
+    default: m.TeamsWithPlanningProjects,
+  })),
+);
+
+/** Neutral placeholder that fills the slot a lazy view is about to occupy. */
+const lazyViewFallback = <div className="lazy-view-placeholder h-full w-full" />;
+
+/** Where the shell is, and every way it can move. Phase 6 owns this block. */
+export interface DesktopShellNavigation {
+  readonly activePage: ActivePage;
+  readonly selectedRunId: string | null;
+  readonly canGoBack: boolean;
+  readonly canGoForward: boolean;
+  readonly navigationHistoryIndex: number;
+  readonly navigationHistoryItems: WindowNavigationHistoryItem[];
+  readonly goBack: () => void;
+  readonly goForward: () => void;
+  readonly goToNavigationHistory: (index: number) => void;
+  readonly navigateToPage: (page: ActivePage, teamId?: string | null) => void;
+  readonly navigateToIssue: (runId: string, teamId?: string | null) => void;
+  readonly navigateToChannel: (
+    channelId: string,
+    page: ChannelNavigationPage,
+    organizationId?: string | null,
+    teamId?: string | null,
+  ) => void;
+  readonly navigateToLocation: (location: AppNavigationLocation) => void;
+  readonly replaceNavigationLocation: (location: AppNavigationLocation) => void;
+  readonly resetNavigation: (page: ActivePage) => void;
+  readonly closeSettings: () => void;
+  readonly handleDesktopChannelFallback: (
+    channelId: string | null,
+    page: ChannelNavigationPage,
+  ) => void;
+  /** The channel the desktop is looking at, resolved from the location. */
+  readonly desktopActiveChannelId: string | null;
+  /** The team the location names, which may differ from the selected one. */
+  readonly navigationProjectId: string | null;
+  /** The team whose tabs the page chain shows. */
+  readonly activeProjectForTabs: Project | undefined;
+  /** Records the team the navigation helpers default to. */
+  readonly setDefaultTeam: (teamId: string | null) => void;
+}
+
+/** The agent list, still `useIssueAgents`'s. */
+export interface DesktopShellAgents {
+  readonly all: ProjectAgent[];
+  readonly activeTeamAgents: ProjectAgent[];
+  readonly processingIssueIds: ReadonlySet<string>;
+  readonly rememberAgent: (agent: ProjectAgent) => void;
+}
+
+/** The inbox, still `useInbox`'s. */
+export interface DesktopShellInbox {
+  /** What this window may show, which a team window narrows. */
+  readonly messages: InboxMessageWithReadState[];
+  /** Everything the inbox knows, for resolving a notification's own title. */
+  readonly allMessages: InboxMessageWithReadState[];
+  readonly unreadCount: number;
+  readonly markAllRead: () => void;
+  readonly markRead: (messageId: string) => void;
+  readonly markUnread: (messageId: string) => void;
+  readonly markIssueRead: (runId: string) => void;
+}
+
+/** Auto hunt sessions, still `useAutoHuntSessions`'s. */
+export interface DesktopShellAutoHunt {
+  readonly sessions: AutoHuntSession[];
+  readonly adoptRemoteSession: (session: AutoHuntSession) => string;
+  readonly removeProjectSessions: (teamId: string) => void;
+  readonly settleTaskSession: (
+    sessionId: string,
+    input: {
+      status: "completed" | "failed" | "skipped";
+      conversationId: string | null;
+      workspaceRoot: string | null;
+      summary: string | null;
+      error: string | null;
+    },
+  ) => void;
+  readonly startTaskSession: (
+    teamId: string,
+    agentId: string,
+    session: {
+      sessionId?: string;
+      request: string;
+      agentName?: string | null;
+      startedAt: string;
+    },
+  ) => string;
+  readonly stopSession: (sessionId: string) => Promise<boolean>;
+}
+
+/** The session facade calls the shell has no store equivalent for yet. */
+export interface DesktopShellSession {
+  readonly deleteAccount: (confirmation: string) => Promise<void>;
+  readonly ensureTeamSelected: (teamId: string) => Promise<unknown>;
+  readonly logout: () => Promise<unknown>;
+  readonly refresh: (mode?: "delta" | "snapshot") => Promise<void>;
+  readonly selectTeam: (teamId: string) => void;
+  readonly updateAccountProfile: (
+    input: AccountProfileInput,
+  ) => Promise<SessionUser>;
+}
+
+/** Opening a team's repository, still `useRepositorySetup`'s. */
+export interface DesktopShellRepositorySetup {
+  readonly repositorySetupTeamId: string | null;
+  readonly closeRepositorySetup: () => void;
+  readonly beginTeamReconnect: (teamId: string) => void;
+  readonly openTeamRepository: (teamId: string) => void;
+}
+
+export interface DesktopShellProps {
+  /** The selected team, as the app resolved it for its hooks. */
+  readonly activeProject: Project | undefined;
+  readonly agents: DesktopShellAgents;
+  readonly autoHunt: DesktopShellAutoHunt;
+  readonly inbox: DesktopShellInbox;
+  readonly navigation: DesktopShellNavigation;
+  readonly repositorySetup: DesktopShellRepositorySetup;
+  readonly session: DesktopShellSession;
+  readonly channelInboxSyncSignal: string;
+  readonly conversationInboxSyncSignal: string;
+  readonly loadUsageReport: () => Promise<AgentUsageReport>;
+  readonly loadProjectHomeUsage: ReturnType<
+    typeof createCachedTeamUsageSummaryLoader
+  >;
+  readonly loadProjectHomeMerges: TeamMergeActivityLoader;
+  readonly loadOrganizationProjectDashboard: (
+    teamId: string,
+    signal: AbortSignal,
+  ) => Promise<DashboardPayload | null>;
+  readonly openOrganizationIssue: (teamId: string, runId: string) => void;
+  readonly openProjectInNewWindow: (teamId: string) => Promise<void>;
+  readonly openAppSettings: () => void;
+  readonly startAgentAutoHunt: (
+    agent: ProjectAgent,
+    runs: HuntRun[],
+    options?: AgentAutoHuntOptions,
+  ) => Promise<string>;
+  readonly startProjectAgentTask: (
+    agent: ProjectAgent,
+    input: { request: string; workerId: string; skillId: string },
+  ) => Promise<string>;
+}
+
+export function DesktopShell({
+  activeProject,
+  agents,
+  autoHunt,
+  channelInboxSyncSignal,
+  conversationInboxSyncSignal,
+  inbox,
+  loadOrganizationProjectDashboard,
+  loadProjectHomeMerges,
+  loadProjectHomeUsage,
+  loadUsageReport,
+  navigation,
+  openAppSettings,
+  openOrganizationIssue,
+  openProjectInNewWindow,
+  repositorySetup,
+  session,
+  startAgentAutoHunt,
+  startProjectAgentTask,
+}: DesktopShellProps) {
+  const { t } = useI18n();
+  const {
+    activePage,
+    activeProjectForTabs,
+    canGoBack,
+    canGoForward,
+    closeSettings,
+    desktopActiveChannelId,
+    goBack,
+    goForward,
+    goToNavigationHistory,
+    handleDesktopChannelFallback,
+    navigateToChannel,
+    navigateToIssue,
+    navigateToLocation,
+    navigateToPage,
+    navigationHistoryIndex,
+    navigationHistoryItems,
+    navigationProjectId,
+    replaceNavigationLocation,
+    resetNavigation,
+    selectedRunId,
+    setDefaultTeam,
+  } = navigation;
+  const {
+    activeTeamAgents: activeProjectAgents,
+    all: issueAgents,
+    processingIssueIds,
+    rememberAgent: rememberIssueAgent,
+  } = agents;
+  const {
+    beginTeamReconnect,
+    closeRepositorySetup,
+    openTeamRepository: openProjectRepository,
+    repositorySetupTeamId,
+  } = repositorySetup;
+  const {
+    markIssueRead: markInboxIssueRead,
+    messages: visibleInboxMessages,
+    unreadCount: visibleInboxUnreadCount,
+  } = inbox;
+
+  const runsOnDesktopTauri = isDesktopTauri();
+  const user = useAtomValue(userAtom);
+  const token = useAtomValue(tokenAtom);
+  const projects = useAtomValue(teamsAtom);
+  const organizations = useAtomValue(organizationsAtom);
+  const activeProjectId = useAtomValue(activeTeamIdAtom);
+  const activeOrganizationId = useAtomValue(activeOrganizationIdAtom);
+  const lockedTeamId = useAtomValue(lockedTeamIdAtom);
+  const deletingProjectId = useAtomValue(deletingTeamIdAtom);
+  const dashboard = useAtomValue(activeDashboardAtom);
+  const rawSessionError = useAtomValue(sessionErrorAtom);
+  const inventoryError = useAtomValue(localInventoryErrorAtom);
+  const error = rawSessionError ?? inventoryError;
+  const [isSidebarOpen, setIsSidebarOpen] = useAtom(isSidebarOpenAtom);
+  const [isNavigationHistoryOpen, setIsNavigationHistoryOpen] = useAtom(
+    isNavigationHistoryOpenAtom,
+  );
+  const [settingsTarget, setSettingsTarget] = useAtom(settingsTargetAtom);
+  const [requestedRunId, setRequestedRunId] = useAtom(requestedRunIdAtom);
+  const [requestedRunMessageId, setRequestedRunMessageId] = useAtom(
+    requestedRunMessageIdAtom,
+  );
+  const [requestedRunInitialTab, setRequestedRunInitialTab] = useAtom(
+    requestedRunInitialTabAtom,
+  );
+  const [requestedSessionId, setRequestedSessionId] = useAtom(
+    requestedSessionIdAtom,
+  );
+  const [issueListRequestKey, setIssueListRequestKey] = useAtom(
+    issueListRequestKeyAtom,
+  );
+  const [agentListRequestKey, setAgentListRequestKey] = useAtom(
+    agentListRequestKeyAtom,
+  );
+  const [isIssueDialogOpen, setIsIssueDialogOpen] = useAtom(
+    isIssueDialogOpenAtom,
+  );
+  const [createIssueProjectId, setCreateIssueProjectId] = useAtom(
+    createIssueTeamIdAtom,
+  );
+  const [activePlanningProjectId, setActivePlanningProjectId] = useAtom(
+    activePlanningProjectIdAtom,
+  );
+  const setPlanningProjectTeamId = useAtomSet(planningProjectTeamIdAtom);
+  const setPlanningProjectEditId = useAtomSet(planningProjectEditIdAtom);
+  const setInboxDetailTarget = useAtomSet(inboxDetailTargetAtom);
+  const setPendingBriarLink = useAtomSet(pendingBriarLinkAtom);
+  const setRequestedChannelMessage = useAtomSet(requestedChannelMessageAtom);
+  const setViewingIssueConversationRunId = useAtomSet(
+    viewingIssueConversationRunIdAtom,
+  );
+  const quickProcessError = useAtomValue(quickProcessErrorAtom);
+  const activeChannelId = useAtomValue(activeChannelIdAtom);
+  const organizationDirectMessages = useAtomValue(
+    organizationDirectMessagesAtom,
+  );
+  const {
+    createOrganizationChannel,
+    deleteOrganizationChannel,
+    markOrganizationChannelRead,
+    openOrganizationChannel,
+    openOrganizationChannelSettings,
+    selectChannel,
+  } = useChannelActions();
+  const { addOrganization, checkOrganizationHandle, selectOrganization } =
+    useOrganizationActions();
+  const {
+    changeTeamIcon,
+    changeTeamIssueKeyPrefix,
+    changeTeamScheduleTab,
+    startTeamCreation,
+  } = useTeamActions();
+  const { removeProject } = useWorkspaceActions();
+  const { removeIssue, transferIssue } = useIssueActions();
+  const { addIssueMessage } = useRunDetailActions();
+  const { processIssueNow } = useWorkerDispatch();
+  const {
+    containerRef: inboxLayoutRef,
+    effectiveWidth: inboxDetailPaneWidth,
+    isResizing: isResizingInbox,
+    separatorProps: inboxResizeProps,
+  } = useHorizontalPaneResize({
+    clamp: clampInboxPaneWidth,
+    cssVariable: "--inbox-detail-pane-width",
+    defaultWidth: inboxPaneWidthDefault,
+    load: loadInboxPaneWidth,
+    max: inboxPaneWidthMax,
+    min: inboxPaneWidthMin,
+    save: saveInboxPaneWidth,
+  });
+
+  const activeOrganization = organizations.find(
+    (organization) => organization.id === activeOrganizationId,
+  );
+  const settingsOrganization =
+    settingsTarget.scope === "organization"
+      ? organizations.find(
+          (organization) => organization.id === settingsTarget.organizationId,
+        )
+      : null;
+  const activeOrganizationProjects = useMemo(
+    () =>
+      activeOrganizationTeams(
+        projects,
+        lockedTeamId,
+        activeOrganizationId,
+        activeProjectId,
+      ),
+    [activeOrganizationId, activeProjectId, lockedTeamId, projects],
+  );
+
+  const settingsSidebar = (
+    <AppSettingsSidebar
+      onBack={closeSettings}
+      onNavigate={navigateToLocation}
+      onSelectOrganization={selectOrganization}
+      onSelectTeam={session.selectTeam}
+    />
+  );
+
+  const renderInboxDetailContent = (
+    inboxDetailTarget: InboxNotificationTarget,
+  ) => (
+    <InboxDetailContent
+      agents={issueAgents}
+      channelInboxSyncSignal={channelInboxSyncSignal}
+      conversationInboxSyncSignal={conversationInboxSyncSignal}
+      onEnsureTeamSelected={session.ensureTeamSelected}
+      onNavigateToIssue={navigateToIssue}
+      onNavigateToPage={navigateToPage}
+      onSkillSessionAccepted={autoHunt.adoptRemoteSession}
+      onStopSession={autoHunt.stopSession}
+      processingIssueIds={processingIssueIds}
+      sessions={autoHunt.sessions}
+      target={inboxDetailTarget}
+    />
+  );
+
+  return (
+    <div className="desktop-app-frame">
+      <div className="app-shell">
+        <WindowNavigationControls
+          canGoBack={canGoBack}
+          canGoForward={canGoForward}
+          historyIndex={navigationHistoryIndex}
+          historyItems={navigationHistoryItems}
+          isHistoryOpen={isNavigationHistoryOpen}
+          isSidebarOpen={isSidebarOpen}
+          onBack={goBack}
+          onForward={goForward}
+          onHistoryOpenChange={setIsNavigationHistoryOpen}
+          onHistorySelect={goToNavigationHistory}
+          onSidebarToggle={() => setIsSidebarOpen((open) => !open)}
+        />
+      {activePage !== "settings" ? (
+        <SidebarWithSession
+          activeChannelId={desktopActiveChannelId}
+          activePage={activePage}
+          agents={issueAgents}
+          onAddProject={startTeamCreation}
+          onAddPlanningProject={(teamId) => {
+            setPlanningProjectEditId(null);
+            setPlanningProjectTeamId(teamId);
+          }}
+          onPlanningProjectEdit={(projectId) => {
+            setPlanningProjectTeamId(null);
+            setPlanningProjectEditId(projectId);
+          }}
+          onPlanningProjectOpen={(planningProjectId, teamId) => {
+            setActivePlanningProjectId(planningProjectId);
+            setDefaultTeam(teamId);
+            session.selectTeam(teamId);
+            setRequestedRunId(null);
+            setIssueListRequestKey((key) => key + 1);
+            navigateToPage("issues");
+          }}
+          onAgentSessionOpen={(sessionId) => {
+            setRequestedRunId(null);
+            setRequestedSessionId(sessionId);
+            navigateToPage("agents");
+          }}
+          onAgentsOpen={() => {
+            setRequestedSessionId(null);
+            setAgentListRequestKey((key) => key + 1);
+            navigateToPage("agents");
+          }}
+          onLobbyOpen={() => navigateToPage("lobby")}
+          onScheduleOpen={() => navigateToPage("schedule")}
+          onInboxOpen={() => navigateToPage("inbox")}
+          onMyIssuesOpen={
+            activeOrganizationId
+              ? () => navigateToPage("my-issues")
+              : undefined
+          }
+          onDmsOpen={() => {
+            const directMessage = organizationDirectMessages.find(
+              (channel) => channel.id === activeChannelId,
+            ) ?? organizationDirectMessages[0];
+            if (directMessage) openOrganizationChannel(directMessage.id);
+            else navigateToPage("dms");
+          }}
+          onChannelCreate={
+            activeOrganizationId && token
+              ? createOrganizationChannel
+              : undefined
+          }
+          onChannelDelete={
+            activeOrganizationId && token
+              ? deleteOrganizationChannel
+              : undefined
+          }
+          onChannelOpen={activeOrganizationId ? openOrganizationChannel : undefined}
+          onChannelSettings={
+            activeOrganizationId
+              ? openOrganizationChannelSettings
+              : undefined
+          }
+          onIssuesOpen={() => {
+            setActivePlanningProjectId(null);
+            setRequestedRunId(null);
+            setIssueListRequestKey((key) => key + 1);
+            navigateToPage("issues");
+          }}
+          onCreateIssue={(projectId) => {
+            setCreateIssueProjectId(projectId);
+            navigateToPage("issues");
+            setIsIssueDialogOpen(true);
+          }}
+          onAddOrganization={() => navigateToPage("organization-create")}
+          onOrganizationChange={(organizationId) => {
+            const project = projects.find(
+              (candidate) => candidate.organizationId === organizationId,
+            );
+            setDefaultTeam(project?.id ?? null);
+            selectOrganization(organizationId);
+            setRequestedRunId(null);
+            setRequestedSessionId(null);
+            navigateToPage("lobby", project?.id ?? null);
+          }}
+          onProjectChange={(projectId) => {
+            setActivePlanningProjectId(null);
+            setDefaultTeam(projectId);
+            session.selectTeam(projectId);
+            setRequestedRunId(null);
+            setRequestedSessionId(null);
+          }}
+          onProjectOpenInNewWindow={
+            runsOnDesktopTauri && !lockedTeamId
+              ? openProjectInNewWindow
+              : undefined
+          }
+          onProjectRepositoryOpen={openProjectRepository}
+          onProjectSettings={(projectId) => {
+            session.selectTeam(projectId);
+            setSettingsTarget({
+              scope: "project",
+              projectId,
+              section: "general",
+            });
+            navigateToPage("settings");
+          }}
+          onSettings={openAppSettings}
+          onLogout={() => void session.logout()}
+          sessions={autoHunt.sessions}
+          unreadInboxCount={visibleInboxUnreadCount}
+        />
+      ) : null}
+      <div className="app-content-surface">
+      <Suspense fallback={null}>
+      <TeamRepositorySetupDialogWithWorkspace
+        onClose={closeRepositorySetup}
+        teamId={repositorySetupTeamId}
+      />
+      </Suspense>
+      <Suspense fallback={lazyViewFallback}>
+      {activePage === "organization-create" ? (
+        <OrganizationCreate
+          onBack={() =>
+            canGoBack ? goBack() : navigateToPage("issues")
+          }
+          onCheckHandle={checkOrganizationHandle}
+          onCreate={async (input) => {
+            await addOrganization(input);
+            resetNavigation("issues");
+          }}
+        />
+      ) : activePage === "settings" &&
+        settingsTarget.scope === "application" &&
+        user ? (
+        <AppSettingsWithWorkspace
+          initialSection={settingsTarget.section}
+          navigationSidebar={settingsSidebar}
+          onBack={closeSettings}
+          onAccountDelete={demoMode ? undefined : session.deleteAccount}
+          onAccountSave={session.updateAccountProfile}
+          onLoadUsageReport={loadUsageReport}
+          onSectionChange={(section) => {
+            const target = { scope: "application" as const, section };
+            setSettingsTarget(target);
+            navigateToLocation(settingsNavigationLocation(target));
+          }}
+        />
+      ) : activePage === "settings" &&
+      settingsTarget.scope === "organization" &&
+      settingsOrganization ? (
+        <OrganizationSettings
+          initialSection={settingsTarget.section}
+          key={settingsOrganization.id}
+          navigationSidebar={settingsSidebar}
+          onBack={closeSettings}
+          organization={settingsOrganization}
+        />
+      ) : activePage === "dms" &&
+        !lockedTeamId &&
+        activeOrganizationId &&
+        token ? (
+        <DirectMessagesWithCatalog
+          activeChannelId={desktopActiveChannelId}
+          channelInboxSyncSignal={channelInboxSyncSignal}
+          isSidebarOpen={isSidebarOpen}
+          key={`desktop-dms:${activeOrganizationId}`}
+          onChannelFallback={(channelId) =>
+            handleDesktopChannelFallback(channelId, "dms")
+          }
+          onChannelSelect={(channelId) => {
+            if (channelId) navigateToChannel(channelId, "dms");
+            else {
+              selectChannel(null);
+              navigateToPage("dms");
+            }
+          }}
+          onCreateAgent={() => {
+            setSettingsTarget({
+              scope: "organization",
+              organizationId: activeOrganizationId!,
+              section: "agents",
+            });
+            setIsSidebarOpen(true);
+            navigateToPage("settings");
+          }}
+          onIssueCreated={async (projectId, runId) => {
+            await session.ensureTeamSelected(projectId);
+            setRequestedRunId(runId);
+            navigateToIssue(runId, projectId);
+          }}
+          onSkillSessionAccepted={autoHunt.adoptRemoteSession}
+        />
+      ) : activePage === "dms" &&
+        !lockedTeamId &&
+        activeOrganizationId ? (
+        <MainContent id="dms">
+          <PageHeader title={t("sidebar.dms")} />
+          <EmptyState
+            description={t("dm.composeDescription")}
+            icon={<MessageCircle aria-hidden="true" size={20} />}
+            title={t("dm.empty")}
+          />
+        </MainContent>
+      ) : activePage === "projects" && activeProjectForTabs ? (
+        <Teams
+          isSidebarOpen={isSidebarOpen}
+          onCreate={() => {
+            setPlanningProjectEditId(null);
+            setPlanningProjectTeamId(activeProjectForTabs.id);
+          }}
+          onOpen={(planningProjectId, teamId) => {
+            setActivePlanningProjectId(planningProjectId);
+            setDefaultTeam(teamId);
+            session.selectTeam(teamId);
+            setRequestedRunId(null);
+            setIssueListRequestKey((key) => key + 1);
+            navigateToPage("issues", teamId);
+          }}
+          onSettings={(planningProjectId) => {
+            setPlanningProjectTeamId(null);
+            setPlanningProjectEditId(planningProjectId);
+          }}
+          teamId={activeProjectForTabs.id}
+          teamName={activeProjectForTabs.name}
+        />
+      ) : activePage === "my-issues" && activeOrganizationId ? (
+        <MyIssues
+          currentUserId={user?.id ?? null}
+          isSidebarOpen={isSidebarOpen}
+          loadProjectDashboard={loadOrganizationProjectDashboard}
+          onOpenIssue={openOrganizationIssue}
+          organizationId={activeOrganizationId}
+          organizationName={activeOrganization?.name}
+          projects={activeOrganizationProjects}
+        />
+      ) : activePage === "inbox" ? (
+        <main
+          aria-label={`${t("inbox.title")} · ${t("inbox.messages")}`}
+          className={cn(
+            "inbox-layout grid min-h-0 min-w-0 flex-1 grid-cols-[minmax(280px,1fr)_var(--inbox-resizer-width,6px)_minmax(320px,var(--inbox-detail-pane-width,50%))] grid-rows-[minmax(0,1fr)] bg-card",
+            isResizingInbox && "is-resizing-inbox cursor-col-resize select-none",
+          )}
+          ref={inboxLayoutRef}
+        >
+          <InboxWithSelection
+            desktopEmbedded
+            isSidebarOpen={isSidebarOpen}
+            messages={visibleInboxMessages}
+            onMarkAllRead={
+              lockedTeamId
+                ? () => {
+                    for (const message of visibleInboxMessages) {
+                      if (message.isUnread) inbox.markRead(message.id);
+                    }
+                  }
+                : inbox.markAllRead
+            }
+            onMarkRead={inbox.markRead}
+            onMarkUnread={inbox.markUnread}
+            onOpen={(message) => {
+              const target = inboxNotificationTarget(message);
+              inbox.markRead(message.id);
+              if (target.projectId !== activeProjectId) {
+                session.selectTeam(target.projectId);
+              }
+              if (isInboxChannelTarget(target)) {
+                setRequestedRunId(null);
+                setRequestedSessionId(null);
+                setRequestedChannelMessage({
+                  channelId: target.targetId,
+                  messageId: target.channelMessageId,
+                  rootMessageId: target.rootMessageId,
+                });
+                selectChannel(target.targetId);
+                markOrganizationChannelRead(target.targetId);
+              } else {
+                setRequestedChannelMessage(null);
+              }
+              setInboxDetailTarget(target);
+            }}
+            projects={activeOrganizationProjects}
+            unreadCount={visibleInboxUnreadCount}
+          />
+          <div
+            aria-label={t("inbox.resizeDetailPane")}
+            aria-orientation="vertical"
+            aria-valuemax={inboxPaneWidthMax}
+            aria-valuemin={inboxPaneWidthMin}
+            aria-valuenow={inboxDetailPaneWidth}
+            className={cn(
+              "inbox-pane-resizer relative z-[1] h-full min-h-0 min-w-0 cursor-col-resize touch-none bg-transparent outline-none before:absolute before:bottom-0 before:left-1/2 before:top-0 before:w-px before:-translate-x-1/2 before:bg-border before:opacity-0 before:shadow-none before:transition-[opacity,background-color,box-shadow] before:duration-150 after:absolute after:left-1/2 after:top-1/2 after:h-[34px] after:w-[5px] after:-translate-x-1/2 after:-translate-y-1/2 after:rounded-full after:border after:border-border after:bg-card after:opacity-0 after:transition-[opacity,border-color,background-color] after:duration-150 motion-reduce:before:transition-none motion-reduce:after:transition-none hover:before:bg-primary/60 hover:before:opacity-100 hover:before:shadow-[0_0_0_1px_color-mix(in_srgb,var(--primary)_8%,transparent)] hover:after:border-primary/60 hover:after:bg-accent hover:after:opacity-100 focus-visible:before:bg-primary/60 focus-visible:before:opacity-100 focus-visible:before:shadow-[0_0_0_1px_color-mix(in_srgb,var(--primary)_8%,transparent)] focus-visible:after:border-primary/60 focus-visible:after:bg-accent focus-visible:after:opacity-100",
+              isResizingInbox &&
+                "before:bg-primary/60 before:opacity-100 before:shadow-[0_0_0_1px_color-mix(in_srgb,var(--primary)_8%,transparent)] after:border-primary/60 after:bg-accent after:opacity-100",
+            )}
+            role="separator"
+            tabIndex={0}
+            {...inboxResizeProps}
+          />
+          <InboxDetailTargetBoundary>
+            {(target) => (
+              <InboxDetailPanel
+                label={
+                  target
+                    ? inboxDetailLabel({
+                        fallback: t("inbox.messages"),
+                        messages: inbox.allMessages,
+                        runs: dashboard?.runs,
+                        target,
+                      })
+                    : t("inbox.noNotificationSelected")
+                }
+              >
+                {target ? renderInboxDetailContent(target) : (
+                  <div
+                    className="inbox-detail-empty flex h-full w-full flex-col items-center justify-center gap-[18px] bg-card text-center text-muted-foreground [&>svg]:text-muted-foreground/60 [&>p]:m-0 [&>p]:text-sm"
+                    role="status"
+                  >
+                    <InboxIcon aria-hidden="true" size={56} strokeWidth={1.2} />
+                    <p>{t("inbox.noNotificationSelected")}</p>
+                  </div>
+                )}
+              </InboxDetailPanel>
+            )}
+          </InboxDetailTargetBoundary>
+        </main>
+      ) : activePage === "settings" &&
+        settingsTarget.scope === "project" &&
+        activeProject ? (
+        <TeamSettingsWithDashboard
+          isDeleting={deletingProjectId === activeProjectId}
+          isSidebarOpen={isSidebarOpen}
+          initialSection={settingsTarget.section}
+          key={activeProject.id}
+          navigationSidebar={settingsSidebar}
+          onBack={closeSettings}
+          onDelete={async () => {
+            const fallbackProject = projects.find(
+              (project) => project.id !== activeProject.id,
+            );
+            await removeProject(activeProject.id);
+            autoHunt.removeProjectSessions(activeProject.id);
+            replaceNavigationLocation(
+              fallbackProject
+                ? projectNavigationLocation("issues", fallbackProject.id)
+                : "lobby",
+            );
+          }}
+          onIconChange={changeTeamIcon}
+          onIssueKeyPrefixChange={changeTeamIssueKeyPrefix}
+          onScheduleTabChange={changeTeamScheduleTab}
+          project={activeProject}
+          sessionToken={token}
+        />
+      ) : activePage === "lobby" && activeProject ? (
+        <TeamLobbyWithDashboard
+          isSidebarOpen={isSidebarOpen}
+          onLoadUsageSummary={loadProjectHomeUsage}
+          onLoadMergeActivity={loadProjectHomeMerges}
+          onOpenAgents={() => {
+            setRequestedSessionId(null);
+            setAgentListRequestKey((key) => key + 1);
+            navigateToPage("agents");
+          }}
+          onOpenIssue={(runId) => {
+            setRequestedSessionId(null);
+            setRequestedRunId(runId);
+            navigateToIssue(runId);
+          }}
+          onOpenIssues={() => {
+            setRequestedRunId(null);
+            navigateToPage("issues");
+          }}
+          onOpenRepository={() => openProjectRepository(activeProject.id)}
+          onOpenSettings={() => {
+            setSettingsTarget({
+              scope: "project",
+              projectId: activeProject.id,
+              section: "general",
+            });
+            navigateToPage("settings");
+          }}
+          project={activeProject}
+        />
+      ) : activePage === "agents" && activeProject ? (
+        <TeamAgentsWithDashboard
+          agentListRequestKey={agentListRequestKey}
+          error={error}
+          isSidebarOpen={isSidebarOpen}
+          onIssueOpen={(runId) => {
+            setRequestedSessionId(null);
+            setRequestedRunId(runId);
+            navigateToIssue(runId);
+          }}
+          onRequestedSessionOpen={() => setRequestedSessionId(null)}
+          onSettleTaskSession={(sessionId, settlement) =>
+            autoHunt.settleTaskSession(sessionId, settlement)}
+          onStopSession={(sessionId) => autoHunt.stopSession(sessionId)}
+          onStart={startAgentAutoHunt}
+          onStartRemoteTask={token ? startProjectAgentTask : undefined}
+          onStartTaskSession={(agent, session) => {
+            rememberIssueAgent(agent);
+            autoHunt.startTaskSession(activeProject.id, agent.id, {
+              ...session,
+              agentName: agent.name,
+            });
+          }}
+          project={activeProject}
+          requestedSessionId={requestedSessionId}
+          sessions={autoHunt.sessions}
+          token={token}
+        />
+      ) : activePage === "schedule" && activeProject ? (
+        <TeamSchedule
+          isSidebarOpen={isSidebarOpen}
+          project={activeProject}
+          token={token}
+        />
+      ) : activePage === "channels" &&
+        activeOrganizationId &&
+        token ? (
+        <ChannelsWithCatalog
+          activeChannelId={desktopActiveChannelId}
+          channelInboxSyncSignal={channelInboxSyncSignal}
+          key={`desktop-channels:${activeOrganizationId}`}
+          onChannelFallback={(channelId) =>
+            handleDesktopChannelFallback(channelId, "channels")
+          }
+          onChannelSelect={(channelId) => {
+            if (channelId) navigateToChannel(channelId, "channels");
+            else {
+              selectChannel(null);
+              navigateToPage("channels");
+            }
+          }}
+          onSkillSessionAccepted={autoHunt.adoptRemoteSession}
+          onCreateAgent={() => {
+            setSettingsTarget({
+              scope: "organization",
+              organizationId: activeOrganizationId!,
+              section: "agents",
+            });
+            setIsSidebarOpen(true);
+            navigateToPage("settings");
+          }}
+          onIssueCreated={async (projectId, runId) => {
+            await session.ensureTeamSelected(projectId);
+            setRequestedRunId(runId);
+            navigateToIssue(runId, projectId);
+          }}
+        />
+
+      ) : (
+        <HuntDashboardWithTeam
+          agents={activeProjectAgents}
+          conversationInboxSyncSignal={conversationInboxSyncSignal}
+          error={quickProcessError ?? error}
+          isIssueDialogOpen={isIssueDialogOpen}
+          createIssueDefaultProjectId={createIssueProjectId}
+          noProject={!activeProject}
+          requestedRunId={requestedRunId}
+          requestedRunMessageId={requestedRunMessageId}
+          requestedRunInitialTab={requestedRunInitialTab}
+          selectedRunId={selectedRunId}
+          issueListRequestKey={issueListRequestKey}
+          isSidebarOpen={isSidebarOpen}
+          onAddProject={startTeamCreation}
+          onIssueDialogOpenChange={(isOpen) => {
+            if (!isOpen) setCreateIssueProjectId(null);
+            setIsIssueDialogOpen(isOpen);
+          }}
+          onIssueViewed={markInboxIssueRead}
+          onViewingIssueConversationChange={setViewingIssueConversationRunId}
+          onSelectedRunChange={(runId) => {
+            if (runId) navigateToIssue(runId);
+            else navigateToPage("issues");
+          }}
+          onDeleteIssue={async (runId) => {
+            await removeIssue(runId);
+            if (runId === selectedRunId && navigationProjectId) {
+              replaceNavigationLocation(
+                projectNavigationLocation("issues", navigationProjectId),
+              );
+            }
+          }}
+          onTransferIssue={async (runId, targetProjectId) => {
+            await transferIssue(runId, targetProjectId);
+            if (runId === selectedRunId && navigationProjectId) {
+              replaceNavigationLocation(
+                projectNavigationLocation("issues", navigationProjectId),
+              );
+            }
+          }}
+          onRelatedMessageOpen={(relatedMessage) => {
+            setPendingBriarLink({ kind: "channel", ...relatedMessage });
+          }}
+          onProcessIssueNow={processIssueNow}
+          onRequestedRunOpen={() => {
+            setRequestedRunId(null);
+            setRequestedRunMessageId(null);
+            setRequestedRunInitialTab(null);
+          }}
+          onSendIssueMessage={addIssueMessage}
+          processingIssueIds={processingIssueIds}
+          projects={activeOrganizationProjects}
+          activeIssueProjectId={activePlanningProjectId}
+          sessions={autoHunt.sessions}
+        />
+        )}
+      </Suspense>
+      </div>
+      </div>
+      <div className="app-status-bar">
+        <AgentUsageStatusBar
+          onManageAccounts={() => {
+            setSettingsTarget({
+              scope: "application",
+              section: "providers",
+            });
+            navigateToPage("settings");
+          }}
+          onOpenUsageDetails={() => {
+            setSettingsTarget({
+              scope: "application",
+              section: "usage",
+            });
+            navigateToPage("settings");
+          }}
+        />
+        <WorkerStatusBarWithTeam
+          onOpenSettings={() => {
+            if (!activeOrganizationId) return;
+            setSettingsTarget({
+              scope: "organization",
+              organizationId: activeOrganizationId,
+              section: "workers",
+            });
+            setIsSidebarOpen(true);
+            navigateToPage("settings");
+          }}
+          onRefresh={() => session.refresh("snapshot")}
+        />
+        <AppVersionStatus />
+        <ConnectionHealthWithWorkspace
+          onReconnect={() => {
+            if (activeProjectId) {
+              beginTeamReconnect(activeProjectId);
+            }
+          }}
+        />
+      </div>
+    </div>
+  );
+}
