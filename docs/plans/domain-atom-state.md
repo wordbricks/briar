@@ -885,7 +885,7 @@ Phase 2 이후 언제든 착수 가능하며 Phase 3–7과 병행할 수 있다
 | 2A | #1584, #1585 | 머지됨 | #1584: `state/entities`(runs / teams / workers / members / providers / channels / upsert / retention), `state/team`의 팀별 family, `state/sync`의 `events` / `apply` / `view`. #1585: `sync/loader`, `sync/useTeamSync`, `useBriar` 파사드를 `dashboardViewAtom` 위로 옮기고 `dashboardRef` / `dashboardCursor` / `dashboardRequest` / `dashboardRequestGeneration` / `dashboardCache` 제거. Phase 1의 대시보드 주입 콜백 8개 삭제. |
 | 2B | #1586, #1587 | 머지됨 | #1586: `sync/optimistic`, `state/issues`(atoms / actions), `state/run-detail`(atoms / actions), `useBriar`의 `setDashboard` 제거. #1587: `components/app`의 `HuntDashboardWithTeam` / `RunPageWithRun` / `TeamViewsWithDashboard`, App.tsx의 삼중 이슈·런 프롭 블록 삭제와 렌더 카운트 테스트. 보드 목록의 id 전용 렌더는 후속. |
 | 3 | #1588, #1589 | 머지됨 | #1588: `state/workspace`(atoms / api / health / readiness / actions / `useWorkspaceSync`), `state/workflow`(actions / `useWorkflowAutoGeneration`), `state/integrations`(atoms / actions), `sync/events`의 `team-settings-changed`와 `sync/commit`. `useBriar`의 workspace `useState` 7개·ref 5개와 `commitTeamDashboard` / `commitTeamSettings` 제거, Phase 1 주입 콜백 3개(`bumpReconnectRequest`, `clearWorkspaceViews`, `resetTeamHealth`) 삭제. `AutoHuntSession` 계열 타입을 `types.ts`로. #1589: `components/app/WorkspaceViews`의 연결 래퍼 4종과 `TeamSettingsWithDashboard` 확장, App.tsx 프롭 블록 삭제, 파사드에서 25개 키 제거. |
-| 4 | | 예정 | |
+| 4 | #1590 | 진행 중 | #1590: `entities/channels` 연결(저장 인덱스), `sync`의 채널 카탈로그 이벤트 4종, `state/channels`(atoms / api / actions / `useChannelCatalogSync`), `components/app`의 `ChannelViews` 3종과 `CommandPaletteWithContext`, `lockedTeamIdAtom`을 `state/platform.ts`로 통합. |
 | 5 | | 예정 | |
 | 6 | | 예정 | |
 | 7 | | 예정 | |
