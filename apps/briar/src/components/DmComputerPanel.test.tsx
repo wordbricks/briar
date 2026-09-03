@@ -1,6 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
+import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { I18nProvider } from "../i18n";
@@ -23,7 +24,7 @@ type FakeRfb = {
   scaleViewport: boolean;
   target: Element;
   viewOnly: boolean;
-  emit: (type: string) => void;
+  emit: (type: string, text?: string) => void;
 };
 
 const noVncState = {
@@ -39,25 +40,30 @@ class FakeRfbClient {
   scaleViewport = false;
   viewOnly = false;
   readonly target: Element;
-  private readonly listeners = new Map<string, Set<() => void>>();
+  private readonly listeners = new Map<string, Set<(event: Event) => void>>();
 
   constructor(target: HTMLElement) {
     this.target = target;
     noVncState.instances.push(this);
   }
 
-  addEventListener(type: string, listener: () => void) {
+  addEventListener(type: string, listener: (event: Event) => void) {
     const listeners = this.listeners.get(type) ?? new Set();
     listeners.add(listener);
     this.listeners.set(type, listeners);
+  }
+
+  removeEventListener(type: string, listener: (event: Event) => void) {
+    this.listeners.get(type)?.delete(listener);
   }
 
   disconnect() {}
   focus() {}
   sendCtrlAltDel() {}
 
-  emit(type: string) {
-    for (const listener of this.listeners.get(type) ?? []) listener();
+  emit(type: string, text?: string) {
+    const event = new CustomEvent(type, { detail: { text } });
+    for (const listener of this.listeners.get(type) ?? []) listener(event);
   }
 }
 
@@ -153,6 +159,7 @@ const loadProjectAgents = vi.fn<
   DmComputerPanelServices["loadProjectAgents"]
 >();
 const loadWorkers = vi.fn<DmComputerPanelServices["loadWorkers"]>();
+const nativeClipboardWrite = vi.fn().mockResolvedValue(undefined);
 const services: DmComputerPanelServices = {
   createRemoteSession,
   endRemoteSession,
@@ -166,10 +173,8 @@ const services: DmComputerPanelServices = {
 describe("DmComputerPanel", () => {
   beforeEach(() => {
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
-    Object.defineProperty(window, "__TAURI_INTERNALS__", {
-      configurable: true,
-      value: {},
-    });
+    nativeClipboardWrite.mockReset().mockResolvedValue(undefined);
+    mockIPC(nativeClipboardWrite);
     window.localStorage.setItem("briar.locale.v1", "en");
     window.sessionStorage.clear();
     noVncState.instances.length = 0;
@@ -189,6 +194,7 @@ describe("DmComputerPanel", () => {
   });
 
   afterEach(() => {
+    clearMocks();
     delete (window as Window & { __TAURI_INTERNALS__?: unknown })
       .__TAURI_INTERNALS__;
   });
@@ -234,6 +240,8 @@ describe("DmComputerPanel", () => {
     expect(rfb.resizeSession).toBe(false);
 
     await act(async () => rfb.emit("connect"));
+    await act(async () => rfb.emit("clipboard", "preview text"));
+    expect(nativeClipboardWrite).not.toHaveBeenCalled();
     const openButton = container.querySelector<HTMLButtonElement>(
       'button[aria-label="Open full screen"]',
     );
@@ -244,14 +252,39 @@ describe("DmComputerPanel", () => {
     expect(rfb.viewOnly).toBe(false);
     expect(noVncState.instances).toHaveLength(1);
 
+    await act(async () => rfb.emit("clipboard", "한글\nremote copy"));
+    await vi.waitFor(() => expect(nativeClipboardWrite).toHaveBeenCalledWith(
+      "plugin:clipboard-manager|write_text",
+      { text: "한글\nremote copy" },
+    ));
+    expect(container.textContent).toContain("Copied to local");
+
+    nativeClipboardWrite.mockRejectedValueOnce(new Error("Clipboard unavailable"));
+    await act(async () => rfb.emit("clipboard", "retry copy"));
+    await vi.waitFor(() => expect(container.textContent).toContain("Automatic copy failed"));
+    const copyButton = [...container.querySelectorAll("button")].find(
+      (button) => button.textContent === "Copy to local",
+    );
+    expect(copyButton).toBeDefined();
+    await act(async () => copyButton?.click());
+    await vi.waitFor(() => expect(container.textContent).toContain("Copied to local"));
+    expect(nativeClipboardWrite).toHaveBeenLastCalledWith(
+      "plugin:clipboard-manager|write_text",
+      { text: "retry copy" },
+    );
+
     await act(async () => {
       window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     });
     expect(container.querySelector('[role="dialog"]')).toBeNull();
     expect(container.querySelector('[role="complementary"]')).not.toBeNull();
     expect(rfb.viewOnly).toBe(true);
+    await act(async () => rfb.emit("clipboard", "collapsed copy"));
+    expect(nativeClipboardWrite).toHaveBeenCalledTimes(3);
 
     await cleanup();
+    rfb.emit("clipboard", "after closing");
+    expect(nativeClipboardWrite).toHaveBeenCalledTimes(3);
     expect(endRemoteSession).toHaveBeenCalledWith(
       "session-token",
       "organization-1",
