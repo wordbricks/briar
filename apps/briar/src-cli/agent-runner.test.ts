@@ -12,6 +12,7 @@ import {
   sidecarProviderEvent,
   sidecarRunBlocked,
 } from "../src-agent/sidecar-protocol";
+import { IssueAgentReplyProviderOutputSchema } from "../src/lib/agent-reply-contract";
 import { ChannelAgentReplyProviderOutputSchema } from "../src/lib/channel-agent-reply-contract";
 import {
   createDetachedTranscriptSequencer,
@@ -339,6 +340,89 @@ describe("detached Agent runner", () => {
         expect(launch.request.instructions).toContain(skill.name);
         expect(launch.request.instructions).toContain(skill.body);
       }
+    }
+  });
+
+  it("keeps every prompt reply example decodable by its reply contract", () => {
+    // A prompt example the reply contract rejects fails every retry of the
+    // reply that follows it, so the shapes shown to the provider and the
+    // schemas that decode its answer must never drift apart.
+    const organizationId = "11111111-1111-4111-8111-111111111111";
+    const projectId = "22222222-2222-4222-8222-222222222222";
+    const projectAgent = {
+      ...agent,
+      scope: { kind: "project" as const, organizationId, projectId },
+    };
+    const organizationAgent = {
+      ...agent,
+      scope: { kind: "organization" as const, organizationId },
+    };
+    const replyExamples = (prompt: string, prefix: string) =>
+      prompt.split("\n").filter((line) =>
+        line.startsWith(prefix) && line.endsWith("}")
+      );
+    // Examples document placeholder identifiers in prose; only their shape is
+    // under test.
+    const decodable = (example: string) =>
+      example.replace(/"[^"]*UUID"/g, `"${projectId}"`);
+
+    const channelExamples = [
+      detachedChannelReplyPrompt({
+        agent: projectAgent,
+        snapshot: { messages: [] },
+        workspaceAvailable: true,
+        memoryLearningAvailable: true,
+      }),
+      detachedChannelReplyPrompt({
+        agent: organizationAgent,
+        snapshot: { messages: [] },
+        workspaceAvailable: false,
+        organizationContextAvailable: true,
+        delegationTargets: [{
+          agentId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          agentName: "Repository Guide",
+          projectId,
+          projectName: "Briar",
+          responsibility: "Answer questions about the Briar repository.",
+          skills: [],
+        }],
+      }),
+    ].flatMap((prompt) => replyExamples(prompt, '{"body":'));
+    const issueExamples = replyExamples(
+      detachedIssueReplyPrompt({
+        agent: projectAgent,
+        snapshot: { messages: [] },
+        userMessage: "Record this as an issue.",
+        workspaceAvailable: true,
+      }),
+      '{"reply":',
+    );
+    expect(channelExamples.length).toBeGreaterThanOrEqual(10);
+    expect(issueExamples.length).toBeGreaterThanOrEqual(6);
+    expect(
+      channelExamples.some((example) => example.includes('"issueProposal":{')),
+    ).toBe(true);
+    expect(
+      issueExamples.some((example) =>
+        example.includes('"type":"request_issue_create"')
+      ),
+    ).toBe(true);
+
+    const channelContract = providerStructuredOutputContract(
+      "codex",
+      ChannelAgentReplyProviderOutputSchema,
+    );
+    for (const example of channelExamples) {
+      expect(() => channelContract.decodeJson(decodable(example)), example)
+        .not.toThrow();
+    }
+    const issueContract = providerStructuredOutputContract(
+      "codex",
+      IssueAgentReplyProviderOutputSchema,
+    );
+    for (const example of issueExamples) {
+      expect(() => issueContract.decodeJson(decodable(example)), example)
+        .not.toThrow();
     }
   });
 
