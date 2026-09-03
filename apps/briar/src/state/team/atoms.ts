@@ -1,7 +1,14 @@
 import * as Atom from "effect/unstable/reactivity/Atom";
 
 import { demoDashboard } from "../../lib/demo-data";
-import type { Project, ProjectConnection } from "../../types";
+import type {
+  ChannelConversationNotification,
+  IssueConversationNotification,
+  Project,
+  ProjectConnection,
+  TeamExecutionWorkerPolicy,
+  TeamSettings,
+} from "../../types";
 import { demoMode } from "../platform";
 
 /*
@@ -56,3 +63,132 @@ export const activeTeamAtom = Atom.make((get) => {
   if (!activeTeamId) return null;
   return get(teamsAtom).find((team) => team.id === activeTeamId) ?? null;
 }).pipe(Atom.keepAlive, Atom.withLabel("team/active"));
+
+/*
+  Per-team state that is team scoped but not an entity: the settings, policy,
+  notification and sync cursor projections a `DashboardPayload` carries. Each is
+  an `Atom.family` keyed by team id, so switching teams changes which value the
+  views read instead of tearing anything down.
+
+  `null` means "this team's payload did not carry the field", which the
+  reassembled dashboard turns back into an absent optional property. That
+  distinction is load bearing: the delta merge leaves an absent projection
+  untouched, and treating it as an empty list would fabricate changes.
+*/
+
+const demoTeamId = demoMode ? demoDashboard.team.id : null;
+
+/** A team's settings, or `null` before its first payload. */
+export const teamSettingsAtom = Atom.family((teamId: string) =>
+  Atom.make<TeamSettings | null>(
+    teamId === demoTeamId ? demoDashboard.settings : null,
+  ).pipe(Atom.keepAlive, Atom.withLabel(`team/${teamId}/settings`)),
+);
+
+/** A team's execution worker policy, or `null` when the payload omitted it. */
+export const teamExecutionPolicyAtom = Atom.family((teamId: string) =>
+  Atom.make<TeamExecutionWorkerPolicy | null>(
+    teamId === demoTeamId ? (demoDashboard.executionPolicy ?? null) : null,
+  ).pipe(Atom.keepAlive, Atom.withLabel(`team/${teamId}/executionPolicy`)),
+);
+
+/**
+ * The conversation and channel notification feeds a team's payload carries.
+ * They live in one atom because they always arrive together; the two arrays
+ * keep their own references, so a change to one does not disturb the other.
+ */
+export type TeamNotifications = {
+  readonly conversation: IssueConversationNotification[] | null;
+  readonly channel: ChannelConversationNotification[] | null;
+};
+
+const emptyTeamNotifications: TeamNotifications = {
+  conversation: null,
+  channel: null,
+};
+
+const sameTeamNotifications = (
+  left: TeamNotifications,
+  right: TeamNotifications,
+) => left.conversation === right.conversation && left.channel === right.channel;
+
+/** A team's notification feeds. */
+export const teamNotificationsAtom = Atom.family((teamId: string) =>
+  Atom.make<TeamNotifications>(
+    teamId === demoTeamId
+      ? {
+          conversation: demoDashboard.conversationNotifications ?? null,
+          channel: demoDashboard.channelNotifications ?? null,
+        }
+      : emptyTeamNotifications,
+  ).pipe(
+    Atom.keepAlive,
+    Atom.withEquality(sameTeamNotifications),
+    Atom.withLabel(`team/${teamId}/notifications`),
+  ),
+);
+
+const demoCursor = Number.isSafeInteger(demoDashboard.cursor)
+  ? (demoDashboard.cursor ?? null)
+  : null;
+
+/**
+ * The delta cursor `state/sync/loader.ts` resumes from. It advances on every
+ * delta page, including the ones that changed nothing, which is why it is not
+ * the cursor the reassembled payload reports.
+ */
+export const teamCursorAtom = Atom.family((teamId: string) =>
+  Atom.make<number | null>(teamId === demoTeamId ? demoCursor : null).pipe(
+    Atom.keepAlive,
+    Atom.withLabel(`team/${teamId}/cursor`),
+  ),
+);
+
+/**
+ * `generatedAt` of the payload currently rendered for the team, and `null`
+ * before the team was ever loaded — half of the "does this team have a
+ * dashboard" check {@link teamLoadedAtom} exposes.
+ */
+export const teamGeneratedAtAtom = Atom.family((teamId: string) =>
+  Atom.make<string | null>(
+    teamId === demoTeamId ? demoDashboard.generatedAt : null,
+  ).pipe(Atom.keepAlive, Atom.withLabel(`team/${teamId}/generatedAt`)),
+);
+
+/**
+ * `cursor` of the payload currently rendered. It moves with
+ * {@link teamGeneratedAtAtom}, so a delta that changed no entity leaves the
+ * rendered payload identical instead of producing a new object every polling
+ * tick.
+ */
+export const teamPayloadCursorAtom = Atom.family((teamId: string) =>
+  Atom.make<number | null>(teamId === demoTeamId ? demoCursor : null).pipe(
+    Atom.keepAlive,
+    Atom.withLabel(`team/${teamId}/payloadCursor`),
+  ),
+);
+
+/** The team has a payload on hand, so switching to it renders immediately. */
+export const teamLoadedAtom = Atom.family((teamId: string) =>
+  Atom.make(
+    (get) =>
+      get(teamGeneratedAtAtom(teamId)) !== null &&
+      get(teamSettingsAtom(teamId)) !== null,
+  ).pipe(Atom.keepAlive, Atom.withLabel(`team/${teamId}/loaded`)),
+);
+
+/**
+ * The team whose stored payload is on screen waiting to be replaced by fresh
+ * data, or `null`. It forces the next fetch for that team to be a snapshot
+ * rather than a delta from a possibly ancient cursor.
+ */
+export const staleTeamIdAtom = Atom.make<string | null>(null).pipe(
+  Atom.keepAlive,
+  Atom.withLabel("team/staleId"),
+);
+
+/** A previously loaded team's payload is on screen, waiting for fresh data. */
+export const dashboardStaleAtom = Atom.map(
+  staleTeamIdAtom,
+  (teamId) => teamId !== null,
+).pipe(Atom.keepAlive, Atom.withLabel("team/dashboardStale"));
