@@ -14,6 +14,8 @@ import { teamsByIdAtom } from "../entities/teams";
 import { upsertManyBy } from "../entities/upsert";
 import { demoMode } from "../platform";
 import { useRegistry, type AtomRegistry } from "../registry";
+import { bumpReconnectRequest } from "../workspace/api";
+import { resetHealth } from "../workspace/atoms";
 import { sessionErrorAtom, tokenAtom } from "../session/atoms";
 import { applySyncEvent, markTeamStale } from "../sync/apply";
 import { loadedDashboardTeamIdAtom } from "../sync/view";
@@ -42,10 +44,6 @@ export const liveOrganizationActionApi: OrganizationActionApi = {
  */
 export interface OrganizationActionDeps {
   readonly api?: Partial<OrganizationActionApi> | undefined;
-  /** Invalidates in-flight reconnect attempts. */
-  readonly bumpReconnectRequest: () => void;
-  /** Blanks the health probe when the switch lands on a different team. */
-  readonly resetTeamHealth: () => void;
   /**
    * The team a project window is pinned to, if any. Such a window may only ever
    * select that team's organization.
@@ -93,7 +91,7 @@ export function createOrganizationActions(
 
   return {
     async addOrganization(input) {
-      deps.bumpReconnectRequest();
+      bumpReconnectRequest(registry);
       let organization: Organization;
       if (demoMode) {
         if (
@@ -128,7 +126,7 @@ export function createOrganizationActions(
         registry.set(activeTeamIdAtom, null);
         registry.set(sessionErrorAtom, null);
       });
-      deps.resetTeamHealth();
+      resetHealth(registry);
       return organization;
     },
 
@@ -207,7 +205,7 @@ export function createOrganizationActions(
       if (deps.lockedTeamId) {
         const lockedTeam = teams.find((team) => team.id === deps.lockedTeamId);
         if (lockedTeam?.organizationId !== organizationId) return;
-        deps.bumpReconnectRequest();
+        bumpReconnectRequest(registry);
         Atom.batch(() => {
           registry.set(activeOrganizationIdAtom, organizationId);
           registry.set(activeTeamIdAtom, lockedTeam.id);
@@ -236,7 +234,7 @@ export function createOrganizationActions(
         registry.set(sessionErrorAtom, null);
         return;
       }
-      deps.bumpReconnectRequest();
+      bumpReconnectRequest(registry);
       Atom.batch(() => {
         registry.set(activeOrganizationIdAtom, organizationId);
         registry.set(activeTeamIdAtom, teamId);
@@ -256,7 +254,7 @@ export function createOrganizationActions(
         // board never blanks; it only needs the marker that forces a snapshot.
         markTeamStale(registry, teamId);
       }
-      if (!dashboardMatchesTeam) deps.resetTeamHealth();
+      if (!dashboardMatchesTeam) resetHealth(registry);
     },
   };
 }
@@ -265,15 +263,9 @@ export function useOrganizationActions(
   deps: OrganizationActionDeps,
 ): OrganizationActions {
   const registry = useRegistry();
-  const { api, bumpReconnectRequest, lockedTeamId, resetTeamHealth } = deps;
+  const { api, lockedTeamId } = deps;
   return useMemo(
-    () =>
-      createOrganizationActions(registry, {
-        api,
-        bumpReconnectRequest,
-        lockedTeamId,
-        resetTeamHealth,
-      }),
-    [api, bumpReconnectRequest, lockedTeamId, registry, resetTeamHealth],
+    () => createOrganizationActions(registry, { api, lockedTeamId }),
+    [api, lockedTeamId, registry],
   );
 }

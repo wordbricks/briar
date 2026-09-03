@@ -20,84 +20,29 @@ import {
   type TeamRealtimeTarget,
 } from "../lib/team-realtime-refresh";
 import type { HuntRun, ProjectAgent } from "../types";
+/*
+  The session types live in `types.ts` because `state/issues/actions.ts` needs
+  `AutoHuntSession` and must not import a React hook to get it. They are
+  re-exported here so the many views that import them from this module keep
+  working.
+*/
+export type {
+  AutoHuntSession,
+  AutoHuntSessionEvent,
+  AutoHuntSessionEventType,
+  AutoHuntSessionFollowUp,
+  AutoHuntSessionIssue,
+  AutoHuntSessionIssueOutcome,
+  AutoHuntSessionStatus,
+} from "../types";
+import type {
+  AutoHuntSession,
+  AutoHuntSessionEventType,
+  AutoHuntSessionIssueOutcome,
+} from "../types";
 
 const storageKey = "briar.auto-hunt-sessions.v1";
 const PROJECT_SESSION_REALTIME_FALLBACK_MS = 5 * 60_000;
-
-export type AutoHuntSessionStatus =
-  | "running"
-  | "completed"
-  | "failed"
-  | "skipped"
-  | "interrupted";
-export type AutoHuntSessionIssueOutcome =
-  | "pending"
-  | "completed"
-  | "blocked"
-  | "failed"
-  | "skipped";
-export type AutoHuntSessionEventType =
-  | "started"
-  | "completed"
-  | "failed"
-  | "skipped"
-  | "interrupted"
-  | "stopped";
-
-export type AutoHuntSessionIssue = {
-  runId: string;
-  runNumber: number;
-  sourceKey: string;
-  title: string;
-  outcome: AutoHuntSessionIssueOutcome;
-  summary: string | null;
-};
-
-export type AutoHuntSessionEvent = {
-  id: string;
-  type: AutoHuntSessionEventType;
-  occurredAt: string;
-};
-
-export type AutoHuntSessionFollowUp = {
-  id: string;
-  message: string;
-  sentAt: string;
-};
-
-export type AutoHuntSession = {
-  id: string;
-  dispatchGroupId: string;
-  projectId: string;
-  agentId?: string;
-  agentName?: string | null;
-  skillId?: string | null;
-  sessionType: "task" | "dispatch";
-  trigger?: "manual" | "scheduled";
-  scheduleId?: string;
-  scheduleRunId?: string;
-  parentSessionId?: string;
-  request?: string;
-  followUps?: AutoHuntSessionFollowUp[];
-  status: AutoHuntSessionStatus;
-  issues: AutoHuntSessionIssue[];
-  startedAt: string;
-  completedAt: string | null;
-  conversationId: string | null;
-  workspaceRoot: string | null;
-  requestedWorkerId?: string | null;
-  workerId?: string | null;
-  requestedByUserId?: string | null;
-  summary: string | null;
-  error: string | null;
-  events: AutoHuntSessionEvent[];
-  dispatchEvents: AutoHuntDispatchEvent[];
-  workers: AutoHuntWorkerResult[];
-  updatedAt: string;
-  localOwner?: boolean;
-  archived?: boolean;
-  detailLoaded?: boolean;
-};
 
 export function collapseLinkedAutoHuntSessions(
   sessions: readonly AutoHuntSession[],

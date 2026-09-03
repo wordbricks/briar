@@ -1,5 +1,7 @@
 import { useActiveOrganizationPersistence } from "../../state/organization/useActiveOrganizationPersistence";
 import { useTeamSync } from "../../state/sync/useTeamSync";
+import { useWorkflowAutoGeneration } from "../../state/workflow/useWorkflowAutoGeneration";
+import { useWorkspaceSync } from "../../state/workspace/useWorkspaceSync";
 
 /**
  * Mount point for the domain effect hooks that were `useEffect` blocks inside
@@ -10,5 +12,7 @@ import { useTeamSync } from "../../state/sync/useTeamSync";
 export function AppEffects() {
   useActiveOrganizationPersistence();
   useTeamSync();
+  useWorkspaceSync();
+  useWorkflowAutoGeneration();
   return null;
 }

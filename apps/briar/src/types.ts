@@ -7,12 +7,14 @@ import {
   type AutoHuntWorkflowStageId,
 } from "./lib/auto-hunt-contract";
 import type { StructuredAgentResult } from "./lib/agent-result";
+import type { AutoHuntWorkerResult } from "./lib/auto-hunt-agent";
 import type { AgentExecutionCostRecord } from "./lib/agent-execution-cost";
 import type { AgentUsagePricing } from "./lib/agent-usage-pricing";
 import type {
   AgentExecutionMetrics,
   AgentExecutionUsageRecord,
 } from "./lib/agent-execution-metrics";
+import type { AutoHuntDispatchEvent } from "./generated/tauri";
 import type { ProjectAgentCodexPet } from "./lib/codex-pets";
 import type { AgentSkillExecutionProposal } from "./lib/channels-contract";
 import type {
@@ -1131,4 +1133,87 @@ export type SessionUser = {
   name: string;
   email: string;
   image?: string | null;
+};
+
+/*
+  One Auto Hunt agent session: a dispatch group or a single task, the issues it
+  touched and how it ended.
+
+  It belongs here rather than in the hook that stores it because
+  `state/issues/actions.ts` adopts a remote session and would otherwise have to
+  import a React hook for a type.
+*/
+export type AutoHuntSessionStatus =
+  | "running"
+  | "completed"
+  | "failed"
+  | "skipped"
+  | "interrupted";
+export type AutoHuntSessionIssueOutcome =
+  | "pending"
+  | "completed"
+  | "blocked"
+  | "failed"
+  | "skipped";
+export type AutoHuntSessionEventType =
+  | "started"
+  | "completed"
+  | "failed"
+  | "skipped"
+  | "interrupted"
+  | "stopped";
+
+export type AutoHuntSessionIssue = {
+  runId: string;
+  runNumber: number;
+  sourceKey: string;
+  title: string;
+  outcome: AutoHuntSessionIssueOutcome;
+  summary: string | null;
+};
+
+export type AutoHuntSessionEvent = {
+  id: string;
+  type: AutoHuntSessionEventType;
+  occurredAt: string;
+};
+
+export type AutoHuntSessionFollowUp = {
+  id: string;
+  message: string;
+  sentAt: string;
+};
+
+export type AutoHuntSession = {
+  id: string;
+  dispatchGroupId: string;
+  projectId: string;
+  agentId?: string;
+  agentName?: string | null;
+  skillId?: string | null;
+  sessionType: "task" | "dispatch";
+  trigger?: "manual" | "scheduled";
+  scheduleId?: string;
+  scheduleRunId?: string;
+  parentSessionId?: string;
+  request?: string;
+  followUps?: AutoHuntSessionFollowUp[];
+  status: AutoHuntSessionStatus;
+  issues: AutoHuntSessionIssue[];
+  startedAt: string;
+  completedAt: string | null;
+  conversationId: string | null;
+  workspaceRoot: string | null;
+  requestedWorkerId?: string | null;
+  workerId?: string | null;
+  requestedByUserId?: string | null;
+  summary: string | null;
+  error: string | null;
+  events: AutoHuntSessionEvent[];
+  dispatchEvents: AutoHuntDispatchEvent[];
+  workers: AutoHuntWorkerResult[];
+  updatedAt: string;
+  localOwner?: boolean;
+  archived?: boolean;
+  detailLoaded?: boolean;
 };

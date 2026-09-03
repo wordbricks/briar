@@ -4,6 +4,7 @@ import { demoDashboard } from "../../lib/demo-data";
 import type { Project } from "../../types";
 import { teamEntityAtom } from "../entities/teams";
 import { createTestRegistry, type AtomRegistry } from "../registry";
+import { reconnectRequestGeneration } from "../workspace/api";
 import { sessionErrorAtom, tokenAtom } from "../session/atoms";
 import { applySyncEvent } from "../sync/apply";
 import { dashboardViewAtom } from "../sync/view";
@@ -82,16 +83,12 @@ const harness = (): Harness => {
       generatedAt: "2026-09-01T00:00:00.000Z",
     },
   });
-  let reconnectBumps = 0;
-  const actions = createTeamActions(registry, {
-    api: server.api,
-    bumpReconnectRequest: () => {
-      reconnectBumps += 1;
-    },
-  });
+  const baseReconnectGeneration = reconnectRequestGeneration(registry);
+  const actions = createTeamActions(registry, { api: server.api });
   return {
     actions,
-    reconnectBumps: () => reconnectBumps,
+    reconnectBumps: () =>
+      reconnectRequestGeneration(registry) - baseReconnectGeneration,
     registry,
     server,
   };

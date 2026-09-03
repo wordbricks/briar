@@ -3,6 +3,7 @@ import type {
   DashboardDeltaPayload,
   DashboardPayload,
   HuntRun,
+  TeamSettings,
 } from "../../types";
 
 /*
@@ -35,6 +36,17 @@ export type SyncEvent =
   | { readonly kind: "run-deleted"; readonly teamId: string; readonly runId: string }
   /** One channel summary was created or changed. */
   | { readonly kind: "channel-changed"; readonly channel: ChannelSummary }
+  /**
+   * A confirmed settings write for one team. Applied only to the team whose
+   * payload is the one on screen: a write for any other team would otherwise
+   * install settings next to entities nobody refreshed, and the next snapshot
+   * for it replaces them anyway.
+   */
+  | {
+      readonly kind: "team-settings-changed";
+      readonly teamId: string;
+      readonly settings: TeamSettings;
+    }
   /** The team's entities and per-team state are dropped. */
   | { readonly kind: "team-cleared"; readonly teamId: string }
   /**
