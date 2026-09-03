@@ -26,7 +26,7 @@ import {
   useState,
   type RefObject,
 } from "react";
-import type { ProjectConnection } from "../hooks/useBriar";
+import type { ProjectConnection } from "../types";
 import { ApiError, apiErrorIssueMessages } from "../lib/api";
 import {
   preflightThenCreateTeam,

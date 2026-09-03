@@ -4,7 +4,7 @@ import type { ComponentProps, ReactNode } from "react";
 import {
   inboxDetailTargetAtom,
   selectedInboxMessageIdAtom,
-} from "../lib/inbox-selection";
+} from "../state/inbox-selection";
 import type { InboxNotificationTarget } from "../generated/tauri";
 import { Inbox } from "./Inbox";
 

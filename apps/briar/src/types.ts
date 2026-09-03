@@ -736,6 +736,17 @@ export type Team = {
 /** @deprecated Use {@link Team} instead. */
 export type Project = Team;
 
+/**
+ * A team the onboarding flow just connected, either for the first time
+ * (`"new"`) or again after it was disconnected (`"reconnect"`).
+ */
+export type ProjectConnection = {
+  kind: "new" | "reconnect";
+  project: Team;
+  agentToken: string | null;
+  workflow?: TeamSettings["workflow"];
+};
+
 export type PlanningProjectStatus =
   | "planned"
   | "active"
