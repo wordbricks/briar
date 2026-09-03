@@ -15,6 +15,7 @@ import {
   useState,
 } from "react";
 
+import { useRemoteDesktopClipboard } from "../hooks/useRemoteDesktopClipboard";
 import { useI18n } from "../i18n";
 import {
   createManagedComputerRemoteSession,
@@ -38,6 +39,7 @@ import {
 import { cn } from "../lib/utils";
 import { managedComputerRemoteErrorMessage } from
   "./ManagedComputerRemoteDesktop";
+import { RemoteDesktopClipboardButton } from "./RemoteDesktopClipboardButton";
 import { Button } from "./ui/button";
 import { Spinner } from "./ui/spinner";
 
@@ -143,6 +145,8 @@ function DmComputerScreen({
   const expandedRef = useRef(false);
   const fitScreenRef = useRef(true);
   const wasExpandedRef = useRef(false);
+  const { controller: clipboardController, state: clipboardState } =
+    useRemoteDesktopClipboard();
   const [connectionState, setConnectionState] =
     useState<ConnectionState>("connecting");
   const [error, setError] = useState<string | null>(null);
@@ -158,11 +162,12 @@ function DmComputerScreen({
   const screenLabel = t("dm.computer.screen", { name: target.agentName });
 
   const destroyRfb = useCallback(() => {
+    clipboardController.reset();
     pasteController.reset();
     const rfb = rfbRef.current;
     rfbRef.current = null;
     rfb?.disconnect();
-  }, [pasteController]);
+  }, [clipboardController, pasteController]);
 
   const connect = useCallback(async (reconnect: boolean) => {
     const generation = ++generationRef.current;
@@ -224,6 +229,7 @@ function DmComputerScreen({
         setError(t("managedComputer.remote.error.relay"));
       });
       rfbRef.current = rfb;
+      clipboardController.bind(rfb);
     } catch (caught) {
       if (generation !== generationRef.current) return;
       const messageKey = managedComputerRemoteErrorMessage(caught);
@@ -237,6 +243,7 @@ function DmComputerScreen({
       );
     }
   }, [
+    clipboardController,
     destroyRfb,
     organizationId,
     services,
@@ -371,6 +378,10 @@ function DmComputerScreen({
         </div>
         {expanded ? (
           <div className="flex shrink-0 items-center gap-2">
+            <RemoteDesktopClipboardButton
+              onCopy={clipboardController.copyToLocal}
+              state={clipboardState}
+            />
             <Button
               className="border-white/15 bg-white/5 text-white hover:bg-white/10"
               onClick={() => setFitScreen((current) => !current)}
