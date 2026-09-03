@@ -11,10 +11,7 @@ import {
   resolveIssueHierarchyLocation,
 } from "./hierarchy-repository";
 import { transferIssue } from "./issue-transfer-repository";
-import {
-  applyD1Migrations,
-  executeD1Sql,
-} from "./test-helpers/d1";
+import { executeD1Sql } from "./test-helpers/d1";
 
 describe("Workspace Team Project Issue hierarchy", () => {
   const db = env.DB;
@@ -28,7 +25,7 @@ describe("Workspace Team Project Issue hierarchy", () => {
   const now = "2026-08-31T00:00:00.000Z";
 
   beforeAll(async () => {
-    await applyD1Migrations(db);
+    // The worker-d1 setup file already loads the full schema snapshot.
     await executeD1Sql(db, `
       insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
       values
