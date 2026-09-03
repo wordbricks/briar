@@ -18,6 +18,9 @@ const deviceCodeErrorCodes =
   exhaustiveLiterals<OfficialDeviceCodeErrorCode>()([
     "invalid_request",
     "invalid_client",
+    "invalid_scope",
+    "server_error",
+    "unauthorized_client",
   ]);
 
 const deviceTokenErrorCodes =
