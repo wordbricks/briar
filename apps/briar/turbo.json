@@ -35,12 +35,13 @@
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/.env*",
         "$TURBO_ROOT$/config/release.env",
+        "$TURBO_ROOT$/package.json",
         "$TURBO_ROOT$/scripts/with-release-env.sh",
         "$TURBO_ROOT$/third-party/agency-agents-LICENSE.md",
         "$TURBO_ROOT$/third-party/ponytail-LICENSE.md"
       ],
       "env": ["VITE_BRIAR_*"],
-      "outputs": ["dist/**"],
+      "outputs": ["dist-web/**"],
       "cache": true
     },
     "build:release": {
@@ -55,6 +56,7 @@
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/.env*",
         "$TURBO_ROOT$/config/release.env",
+        "$TURBO_ROOT$/package.json",
         "$TURBO_ROOT$/scripts/verify-release-config.sh",
         "$TURBO_ROOT$/scripts/with-release-env.sh",
         "$TURBO_ROOT$/third-party/agency-agents-LICENSE.md",
@@ -62,11 +64,21 @@
       ],
       "env": ["VITE_BRIAR_*"],
       "outputs": ["dist/**"],
-      "cache": false
+      "cache": true
     },
     "typecheck": {
       "dependsOn": ["transit", "worker:check"],
       "outputs": []
+    },
+    "test": {
+      "dependsOn": ["transit"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/package.json",
+        "$TURBO_ROOT$/bun.lock"
+      ],
+      "outputs": [],
+      "cache": true
     },
     "skills:check": {
       "inputs": [

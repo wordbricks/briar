@@ -70,7 +70,13 @@
     },
     "test": {
       "dependsOn": ["transit"],
-      "cache": false
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/package.json",
+        "$TURBO_ROOT$/bun.lock"
+      ],
+      "outputs": [],
+      "cache": true
     },
     "skills:check": {
       "outputs": []
