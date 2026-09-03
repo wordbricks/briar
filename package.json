@@ -106,6 +106,7 @@
     "@effect/platform-bun": "4.0.0-rc.112",
     "@effect/eslint-plugin": "catalog:",
     "@effect/tsgo": "catalog:",
+    "@effect/vitest": "4.0.0-rc.112",
     "@oxlint/plugins": "catalog:",
     "@types/bun": "catalog:",
     "@types/node": "catalog:",

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "@effect/vitest";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -12,40 +12,39 @@ import {
 } from "./ci-local";
 
 describe("Effect local CI runner", () => {
-  it("propagates an intermediate command failure and skips later work", async () => {
-    const executed: string[] = [];
-    const executor = CiCommandExecutor.of({
-      execute: (command) => Effect.sync(() => {
-        const name = command.argv.join(" ");
-        executed.push(name);
-        return {
-          exitCode: name === "fail now" ? 17 : 0,
-          output: "",
-        };
-      }),
-    });
-    const error = await Effect.runPromise(
-      runCommandSequence("test-context", [
+  it.effect("propagates an intermediate command failure and skips later work", () =>
+    Effect.gen(function* commandFailureEffect() {
+      const executed: string[] = [];
+      const executor = CiCommandExecutor.of({
+        execute: (command) => Effect.sync(() => {
+          const name = command.argv.join(" ");
+          executed.push(name);
+          return {
+            exitCode: name === "fail now" ? 17 : 0,
+            output: "",
+          };
+        }),
+      });
+      const error = yield* runCommandSequence("test-context", [
         { label: "first", command: { argv: ["pass"] } },
         { label: "middle", command: { argv: ["fail", "now"] } },
         { label: "last", command: { argv: ["must-not-run"] } },
       ]).pipe(
         Effect.provide(Layer.succeed(CiCommandExecutor, executor)),
         Effect.flip,
-      ),
-    );
+      );
 
-    expect(error).toMatchObject({
-      _tag: "CiCommandFailed",
-      context: "test-context",
-      exitCode: 17,
-      label: "middle",
-    });
-    expect(executed).toEqual(["pass", "fail now"]);
-  });
+      expect(error).toMatchObject({
+        _tag: "CiCommandFailed",
+        context: "test-context",
+        exitCode: 17,
+        label: "middle",
+      });
+      expect(executed).toEqual(["pass", "fail now"]);
+    }));
 
-  it("interrupts sibling contexts after a parallel failure", async () => {
-    const result = await Effect.runPromise(Effect.gen(function* parallelFailureEffect() {
+  it.effect("interrupts sibling contexts after a parallel failure", () =>
+    Effect.gen(function* parallelFailureEffect() {
       const started = yield* Deferred.make<void>();
       const interrupted = yield* Ref.make(false);
       const sibling = Deferred.succeed(started, undefined).pipe(
@@ -56,10 +55,9 @@ describe("Effect local CI runner", () => {
         Effect.andThen(Effect.fail("context failed")),
       );
       const exit = yield* Effect.exit(runPrograms([sibling, failure], false));
-      return { exit, interrupted: yield* Ref.get(interrupted) };
-    }));
+      const wasInterrupted = yield* Ref.get(interrupted);
 
-    expect(Exit.isFailure(result.exit)).toBe(true);
-    expect(result.interrupted).toBe(true);
-  });
+      expect(Exit.isFailure(exit)).toBe(true);
+      expect(wasInterrupted).toBe(true);
+    }));
 });
