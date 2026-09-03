@@ -1,12 +1,10 @@
 import {
-  ArrowUpRight,
   Building2,
   Check,
   Cpu,
   FolderKanban,
   Github,
   LogOut,
-  Mail,
   ShieldCheck,
 } from "lucide-react";
 import { Spinner } from "./ui/spinner";
@@ -20,7 +18,10 @@ import { useI18n } from "../i18n";
 import { ApiError, loadOrganizationInvitation } from "../lib/api";
 import type { DeviceLoginMethod } from "../lib/api";
 import type { OrganizationInvitationPreview, SessionUser } from "../types";
-import { GoogleIcon } from "./LoginScreen";
+import {
+  LoginActions,
+  type LoginEmailHandlers,
+} from "./LoginScreen";
 import { Logo } from "./Logo";
 
 type Translate = ReturnType<typeof useI18n>["t"];
@@ -51,10 +52,13 @@ export function InvitationOnboarding({
   onCancelLogin,
   onLeave,
   onLogin,
+  onSendEmailCode,
   onSwitchAccount,
+  onVerifyEmailCode,
   token,
   user,
-}: {
+  webMode = false,
+}: LoginEmailHandlers & {
   accepting: boolean;
   error: string | null;
   loading: boolean;
@@ -67,6 +71,7 @@ export function InvitationOnboarding({
   onSwitchAccount: () => Promise<void>;
   token: string;
   user: SessionUser | null;
+  webMode?: boolean;
 }) {
   const { t } = useI18n();
   const [invitation, setInvitation] =
@@ -278,42 +283,16 @@ export function InvitationOnboarding({
                 </Button>
               </div>
             ) : (
-              <div className="mt-5 grid gap-3">
-                <Button
-                  className="grid h-11 w-full grid-cols-[20px_minmax(0,1fr)_16px] place-items-center rounded-[13px] px-3.5 text-xs font-semibold shadow-[0_5px_16px_rgba(38,42,32,0.05)] [&>svg:first-child]:size-[18px] [&>svg:last-child]:size-4"
-                  disabled={loginLoading}
-                  onClick={() => onLogin("email")}
-                  type="button"
-                >
-                  {loginLoading ? (
-                    <Spinner size={18} />
-                  ) : (
-                    <Mail size={18} />
-                  )}
-                  <span className="col-start-2 text-center">
-                    {t("invitation.signIn")}
-                  </span>
-                  <ArrowUpRight size={16} />
-                </Button>
-                <div
-                  className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2.5 text-[var(--text-2xs)] text-muted-foreground before:h-px before:bg-border before:content-[''] after:h-px after:bg-border after:content-['']"
-                  role="separator"
-                >
-                  <span>{t("login.or")}</span>
-                </div>
-                <Button
-                  className="grid h-[46px] w-full grid-cols-[20px_minmax(0,1fr)_16px] place-items-center rounded-[13px] border border-border bg-card px-3.5 text-xs font-semibold text-foreground shadow-[0_5px_16px_rgba(38,42,32,0.05)] hover:bg-secondary [&>svg:first-child]:size-[18px] [&>svg:last-child]:size-4"
-                  disabled={loginLoading}
-                  onClick={() => onLogin("google")}
-                  type="button"
-                  variant="outline"
-                >
-                  <GoogleIcon />
-                  <span className="col-start-2 text-center">
-                    {t("invitation.signInGoogle")}
-                  </span>
-                  <ArrowUpRight size={16} />
-                </Button>
+              <div className="mt-5">
+                <LoginActions
+                  emailButtonLabel={t("invitation.signIn")}
+                  loading={loginLoading}
+                  onLogin={onLogin}
+                  onReset={onCancelLogin}
+                  onSendEmailCode={onSendEmailCode}
+                  onVerifyEmailCode={onVerifyEmailCode}
+                  webMode={webMode}
+                />
               </div>
             )}
           </>

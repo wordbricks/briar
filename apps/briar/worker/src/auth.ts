@@ -11,8 +11,15 @@ import {
   type AuthEmailSender,
 } from "./auth-email";
 
-const mobileClientIdSchema = Schema.Literals(["briar-mobile", "briar-android"]);
-const isMobileClientId = Schema.is(mobileClientIdSchema);
+const deviceAuthorizationClientIdSchema = Schema.Literals([
+  "briar-mobile",
+  "briar-android",
+  "briar-desktop",
+  "briar-cli",
+]);
+const isDeviceAuthorizationClient = Schema.is(
+  deviceAuthorizationClientIdSchema,
+);
 
 type AuthExecutionContext = Pick<ExecutionContext, "waitUntil">;
 
@@ -104,10 +111,7 @@ export function createAuth(
       deviceAuthorization({
         verificationUri: `${apiOrigin}/device`,
         validateClient: async (clientId) =>
-          isMobileClientId(clientId) ||
-          clientId === "briar-desktop" ||
-          clientId === "briar-web" ||
-          clientId === "briar-cli",
+          isDeviceAuthorizationClient(clientId),
       }),
     ],
   });

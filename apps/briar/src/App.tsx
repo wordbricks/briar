@@ -3763,12 +3763,16 @@ export function App({
           window.location.reload();
         }}
         onLogin={(method) => void briar.login({ method, locale })}
+        onSendEmailCode={(email) => briar.sendLoginEmailCode(email, locale)}
         onSwitchAccount={async () => {
           await briar.logout();
           await briar.login({ locale, switchAccount: true });
         }}
+        onVerifyEmailCode={(email, code) =>
+          briar.verifyLoginEmailCode(email, code, locale)}
         token={invitationToken}
         user={briar.user}
+        webMode={briar.webMode}
       />
     );
   } else if (shouldShowInitialOnboarding) {
@@ -3784,6 +3788,10 @@ export function App({
           setHasCompletedOnboarding(true);
         }}
         onLogin={(method) => void briar.login({ method, locale })}
+        onSendEmailCode={(email) => briar.sendLoginEmailCode(email, locale)}
+        onVerifyEmailCode={(email, code) =>
+          briar.verifyLoginEmailCode(email, code, locale)}
+        webMode={briar.webMode}
       />
     );
   } else if (!briar.user) {
@@ -3795,6 +3803,9 @@ export function App({
         loginCode={briar.loginCode}
         onCancel={briar.cancelLogin}
         onLogin={(method) => void briar.login({ method, locale })}
+        onSendEmailCode={(email) => briar.sendLoginEmailCode(email, locale)}
+        onVerifyEmailCode={(email, code) =>
+          briar.verifyLoginEmailCode(email, code, locale)}
         webMode={briar.webMode}
       />
     );

@@ -42,6 +42,7 @@ import {
   safeNumber,
 } from "../app-rpc/mappers";
 import { ApiError } from "./errors";
+import { withSessionCredential } from "../session-credential";
 
 const client = appTransport
   ? createClient(DmMemoryService, appTransport)
@@ -429,10 +430,10 @@ export async function retryDmMemoryLearning(
 }
 
 export async function exportDmMemory(scope: DmMemoryApiScope, spaceId: string) {
-  const response = await fetch(`${briarApiUrl}${base(scope.organizationId, scope.channelId)}/export?memorySpaceId=${encodeURIComponent(spaceId)}`, {
-    headers: { Authorization: `Bearer ${scope.token}` },
-    cache: "no-store",
-  });
+  const response = await fetch(
+    `${briarApiUrl}${base(scope.organizationId, scope.channelId)}/export?memorySpaceId=${encodeURIComponent(spaceId)}`,
+    withSessionCredential(scope.token, { cache: "no-store" }),
+  );
   if (!response.ok) throw new ApiError(response.status, "Memory export failed");
   return response.blob();
 }

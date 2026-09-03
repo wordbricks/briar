@@ -6,7 +6,12 @@ export const briarWebAppOrigin =
     ? window.location.origin
     : "";
 
-export const briarApiUrl = (configuredApiUrl || briarWebAppOrigin).replace(/\/$/u, "");
+// Keep browser API calls first-party so Better Auth's HttpOnly session cookie
+// authenticates the app without exposing a bearer token to JavaScript storage.
+// The Worker removes this route prefix before dispatching the API request.
+export const briarApiUrl = (
+  briarWebAppOrigin ? `${briarWebAppOrigin}/app-api` : configuredApiUrl || ""
+).replace(/\/$/u, "");
 
 // Browser authentication uses cookies, so keep it on the web app origin.
 // Bearer-authenticated Connect clients continue to use the configured API origin.
