@@ -4,6 +4,7 @@ import type {
   DashboardPayload,
   IssueMessage,
   Organization,
+  PlanningProject,
   Project,
   RunEvidence,
   SessionUser,
@@ -26,6 +27,31 @@ export const demoOrganization: Organization = {
   logo: null,
   role: demoDashboard.team.role,
   createdAt: demoDashboard.team.createdAt,
+};
+/**
+ * The single planning project demo mode starts with: every team has a default
+ * project, and the demo team's is the one its sample issues belong to.
+ */
+export const demoPlanningProject: PlanningProject = {
+  id: demoDashboard.team.id,
+  workspaceId: demoOrganization.id,
+  workspaceName: demoOrganization.name,
+  teamId: demoDashboard.team.id,
+  teamName: demoDashboard.team.name,
+  name: "General",
+  description: "",
+  status: "active",
+  leadUserId: null,
+  leadName: null,
+  startDate: null,
+  targetDate: null,
+  icon: null,
+  color: null,
+  sortOrder: 0,
+  isDefault: true,
+  role: "owner",
+  createdAt: demoDashboard.team.createdAt,
+  updatedAt: demoDashboard.team.createdAt,
 };
 export const demoMessageTime = new Date(Date.now() - 18 * 60_000).toISOString();
 export const demoReplyTime = new Date(Date.now() - 8 * 60_000).toISOString();

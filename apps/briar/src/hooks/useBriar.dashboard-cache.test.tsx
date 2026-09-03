@@ -1,9 +1,11 @@
 /** @vitest-environment jsdom */
 
+import { RegistryContext } from "@effect/atom-react";
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createReactTestRoot, type ReactTestRoot } from "../test/react";
 import { demoDashboard } from "../lib/demo-data";
+import { createTestRegistry } from "../state/registry";
 import type {
   DashboardDeltaPayload,
   DashboardPayload,
@@ -151,7 +153,13 @@ const mount = async (
 ) => {
   server = new DashboardServer(projects, organizations);
   view = createReactTestRoot();
-  await view.render(<Harness lockedProjectId={lockedProjectId} />);
+  // `useBriar` reads its root state from atoms, which are module singletons: a
+  // registry per test is what keeps one test's session out of the next one.
+  await view.render(
+    <RegistryContext.Provider value={createTestRegistry()}>
+      <Harness lockedProjectId={lockedProjectId} />
+    </RegistryContext.Provider>,
+  );
   await flush();
 };
 
