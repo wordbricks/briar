@@ -1,10 +1,10 @@
-import { Activity, Bot, BrainCircuit, Check, ChevronRight, Clock3, FolderInput, Pencil, Signal, Trash2, Waypoints } from "lucide-react";
+import { Activity, Bot, BrainCircuit, Check, ChevronRight, Clock3, Folder, FolderInput, Pencil, Signal, Trash2, Users, Waypoints } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import { type ReactElement } from "react";
 import { AgentProviderIcon } from "@/components/AgentIcons";
 import { type AutoHuntWorkflowCheckpoint } from "@/lib/auto-hunt-contract";
-import type { HuntRun, HuntRunPlacement, IssueExecutionPreferences } from "@/types";
+import type { HuntRun, HuntRunPlacement, IssueExecutionPreferences, PlanningProject, Project } from "@/types";
 import { agentEffortOptions, agentModelDisplayName, agentModelOptions, agentProviderLabels, type AgentProvider } from "@/lib/project-llm";
 import { useAgentProviderModels } from "@/hooks/useAgentProviderModels";
 import { useI18n } from "@/i18n";
@@ -25,6 +25,11 @@ export function IssueContextMenu({
   onPriorityChange,
   onPreferencesChange,
   onCheckpointsChange,
+  onTeamChange,
+  onProjectChange,
+  teams = [],
+  currentTeamId = null,
+  planningProjects = [],
   run,
   isProcessing
 }: {
@@ -40,6 +45,11 @@ export function IssueContextMenu({
   onPriorityChange: (priority: number | null) => void;
   onPreferencesChange: (preferences: IssueExecutionPreferences) => void;
   onCheckpointsChange: (checkpoints: AutoHuntWorkflowCheckpoint[]) => void;
+  onTeamChange?: (teamId: string) => void;
+  onProjectChange?: (projectId: string) => void;
+  teams?: Array<Pick<Project, "id" | "name">>;
+  currentTeamId?: string | null;
+  planningProjects?: Array<Pick<PlanningProject, "id" | "name" | "teamId">>;
   run: HuntRun;
   isProcessing: boolean;
 }) {
@@ -308,6 +318,54 @@ export function IssueContextMenu({
               </ContextMenu.Portal> : null}
           </ContextMenu.Sub>
 
+          {onTeamChange && teams.length > 0 ? <ContextMenu.Sub>
+              <ContextMenu.SubTrigger className="issue-context-item">
+                <Users aria-hidden="true" size={17} />
+                <span>{t("issue.team")}</span>
+                <small>{teams.find(team => team.id === (run.teamId ?? currentTeamId))?.name ?? t("run.notSet")}</small>
+                <ChevronRight aria-hidden="true" size={14} />
+              </ContextMenu.SubTrigger>
+              <ContextMenu.Portal>
+                <ContextMenu.SubContent className="issue-context-menu issue-context-submenu" collisionPadding={10} sideOffset={7}>
+                  <ContextMenu.RadioGroup value={run.teamId ?? currentTeamId ?? ""}>
+                    {teams.map(team => <ContextMenu.RadioItem className="issue-context-item issue-context-choice" key={team.id} onSelect={() => {
+                  if ((run.teamId ?? currentTeamId) === team.id) return;
+                  onTeamChange(team.id);
+                }} value={team.id}>
+                        <ContextMenu.ItemIndicator className="issue-context-check" forceMount>
+                          {(run.teamId ?? currentTeamId) === team.id ? <Check aria-hidden="true" size={14} /> : null}
+                        </ContextMenu.ItemIndicator>
+                        <span>{team.name}</span>
+                      </ContextMenu.RadioItem>)}
+                  </ContextMenu.RadioGroup>
+                </ContextMenu.SubContent>
+              </ContextMenu.Portal>
+            </ContextMenu.Sub> : null}
+
+          {onProjectChange && planningProjects.length > 0 ? <ContextMenu.Sub>
+              <ContextMenu.SubTrigger className="issue-context-item">
+                <Folder aria-hidden="true" size={17} />
+                <span>{t("issue.project")}</span>
+                <small>{planningProjects.find(project => project.id === run.projectId)?.name ?? run.projectName ?? t("run.notSet")}</small>
+                <ChevronRight aria-hidden="true" size={14} />
+              </ContextMenu.SubTrigger>
+              <ContextMenu.Portal>
+                <ContextMenu.SubContent className="issue-context-menu issue-context-submenu" collisionPadding={10} sideOffset={7}>
+                  <ContextMenu.RadioGroup value={run.projectId ?? ""}>
+                    {planningProjects.map(project => <ContextMenu.RadioItem className="issue-context-item issue-context-choice" key={project.id} onSelect={() => {
+                  if (run.projectId === project.id) return;
+                  onProjectChange(project.id);
+                }} value={project.id}>
+                        <ContextMenu.ItemIndicator className="issue-context-check" forceMount>
+                          {run.projectId === project.id ? <Check aria-hidden="true" size={14} /> : null}
+                        </ContextMenu.ItemIndicator>
+                        <span>{project.name}</span>
+                      </ContextMenu.RadioItem>)}
+                  </ContextMenu.RadioGroup>
+                </ContextMenu.SubContent>
+              </ContextMenu.Portal>
+            </ContextMenu.Sub> : null}
+
           <ContextMenu.Separator className="issue-context-separator" />
 
           <ContextMenu.Item className="issue-context-item" onSelect={onOpen}>
@@ -318,7 +376,7 @@ export function IssueContextMenu({
             <Pencil aria-hidden="true" size={17} />
             <span>{t("issue.edit")}</span>
           </ContextMenu.Item>
-          {onTransfer ? <ContextMenu.Item className="issue-context-item" onSelect={onTransfer}>
+          {onTransfer && !onTeamChange && !onProjectChange ? <ContextMenu.Item className="issue-context-item" onSelect={onTransfer}>
               <FolderInput aria-hidden="true" size={17} />
               <span>{t("issue.transfer")}</span>
             </ContextMenu.Item> : null}

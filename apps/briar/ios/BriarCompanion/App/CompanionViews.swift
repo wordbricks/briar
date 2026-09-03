@@ -1899,7 +1899,13 @@ struct RunDetailView: View {
                     mutations.isActive("preferences-\(run.id)")
             )
             .accessibilityIdentifier("execution-effort-picker")
-        }
+            Picker(L10n.text("팀", locale: locale), selection: teamSelection) {
+                ForEach(projects, id: \.id) { project in
+                    Text(project.name).tag(project.id)
+                }
+            }
+            .disabled(projects.isEmpty || mutations.isActive("transfer-\(run.id)"))
+            .accessibilityIdentifier("issue-team-picker")
 
         if localStatus == .backlog || localStatus == .queued {
             dependenciesControl
@@ -3463,6 +3469,18 @@ struct RunDetailView: View {
                 )
                 preferences = next
                 Task { await savePreferences(next) }
+            }
+        )
+    }
+
+    /// Team change transfers the issue immediately, like other property pickers.
+    private var teamSelection: Binding<UUID> {
+        Binding(
+            get: { run.teamId ?? projectID },
+            set: { newTeamID in
+                guard newTeamID != (run.teamId ?? projectID) else { return }
+                transferTargetProjectID = newTeamID
+                Task { await transferIssue(to: newTeamID) }
             }
         )
     }
