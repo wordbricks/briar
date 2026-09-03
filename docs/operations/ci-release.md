@@ -120,6 +120,35 @@ combined Miniflare pool stays small; wrangler state for `d1:migrate:local` lives
 in a private temporary directory. Set `BRIAR_CI_SERIAL_CONTEXTS=true` to run the
 contexts one at a time on constrained machines.
 
+### The D1 schema snapshot
+
+`apps/briar/migrations-snapshot/schema.sql` is a generated dump of the fully
+migrated D1 database: every migration except
+`0142_restore_cvs_slack_history.sql` (6 MB of restored customer messages, no
+schema change), plus the rows that data-only migrations seed. The `worker-d1`
+Vitest project loads it in one batch instead of replaying ~190 migrations into
+each test file's isolated database.
+
+The migrations remain the source of truth. `d1:migrate:local`, `d1:migrate:remote`
+and the migration regression suite (`test:d1:migrations`, which covers
+`worker/src/**/*.migration.test.ts`, `db.test.ts` and `workflow-v2.test.ts`)
+still replay the real files, so migration behaviour is never validated through
+the snapshot.
+
+After adding or editing a migration that changes the schema or seeds rows:
+
+```sh
+bun run d1:snapshot   # regenerate; takes ~45s
+```
+
+Commit the regenerated `schema.sql` with the migration. The `d1-migrations` CI
+context runs `bun run d1:snapshot:check` right after `d1:migrate:local`; it
+compares the `migrations-digest` and `snapshot-digest` lines in the snapshot
+header against the migration files on disk and fails in under a second if either
+the migrations changed without a regeneration or the snapshot was hand-edited.
+`bun run d1:snapshot:check:full` regenerates into a temporary file and prints a
+diff — use it when the fast check disagrees with what you expect.
+
 Any audit exception must be narrow, dated, and recorded in
 [`security-exceptions.md`](security-exceptions.md) with a removal condition.
 

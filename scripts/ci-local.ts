@@ -413,6 +413,13 @@ const runD1Migrations = Effect.fn("runD1MigrationsCi")(
       timings,
       "d1-migrations",
       logPath,
+      "snapshot-check",
+      { argv: ["bun", "run", "d1:snapshot:check"] },
+    );
+    yield* runTimedCommand(
+      timings,
+      "d1-migrations",
+      logPath,
       "test-migrations",
       {
         argv: ["bun", "run", "test:d1:migrations"],
