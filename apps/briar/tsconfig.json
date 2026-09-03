@@ -23,7 +23,10 @@
     "src-cli",
     "vite.config.ts",
     "vitest.worker.shared.ts",
+    "vitest.worker.test-files.ts",
+    "vitest.worker-projects.config.ts",
     "vitest.worker.config.ts",
+    "vitest.worker-d1.config.ts",
     "vitest.worker-migrations.config.ts"
   ]
 }

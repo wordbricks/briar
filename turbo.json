@@ -40,6 +40,8 @@
         "config/ios-release.json",
         "scripts/verify-encrypted-env.ts",
         "scripts/verify-encrypted-env.test.ts",
+        "scripts/verify-signoff-ready.ts",
+        "scripts/verify-signoff-ready.test.ts",
         "package.json",
         "bun.lock"
       ],

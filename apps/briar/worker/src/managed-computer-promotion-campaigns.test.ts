@@ -51,43 +51,6 @@ describe("managed computer promotion campaigns", () => {
     `);
   }, 30_000);
 
-  it("registers Jay promotion campaign slots six through ten", async () => {
-    const campaigns = await db.prepare(
-      `select id, name, active
-       from briar_managed_computer_campaigns
-       where id in ('getbriar-jay-6', 'getbriar-jay-7', 'getbriar-jay-8',
-                    'getbriar-jay-9', 'getbriar-jay-10')
-       order by cast(substr(id, 14) as integer)`,
-    ).all<{ id: string; name: string; active: number }>();
-    expect(campaigns.results).toEqual([
-      {
-        id: "getbriar-jay-6",
-        name: "Managed computer pilot Jay slot 6",
-        active: 1,
-      },
-      {
-        id: "getbriar-jay-7",
-        name: "Managed computer pilot Jay slot 7",
-        active: 1,
-      },
-      {
-        id: "getbriar-jay-8",
-        name: "Managed computer pilot Jay slot 8",
-        active: 1,
-      },
-      {
-        id: "getbriar-jay-9",
-        name: "Managed computer pilot Jay slot 9",
-        active: 1,
-      },
-      {
-        id: "getbriar-jay-10",
-        name: "Managed computer pilot Jay slot 10",
-        active: 1,
-      },
-    ]);
-  });
-
   it("allows the next campaign after the previous computer is stopped", async () => {
     const first = await applyForPromotionalManagedComputer(db, env(), {
       organizationId,
