@@ -47,6 +47,7 @@ import {
   requestExecutionWorkerUpdateApplication,
   retireManagedComputerApplication,
   retryManagedComputerApplication,
+  terminateManagedComputerApplication,
   unbindProjectExecutionWorkerApplication,
   updateExecutionWorkerApplication,
   validateManagedComputerPromotionApplication,
@@ -177,6 +178,12 @@ const throwFleetError = (error: unknown): never => {
         409,
         error.message,
         "MANAGED_COMPUTER_RETIRE_UNAVAILABLE",
+      );
+    case "managed_computer_terminate_unavailable":
+      throw new HttpError(
+        409,
+        error.message,
+        "MANAGED_COMPUTER_TERMINATE_UNAVAILABLE",
       );
   }
 };
@@ -452,6 +459,22 @@ export const createAppFleetService = (
       if (context) context.waitUntil(result.reconciliation);
       else await result.reconciliation;
     }
+    return {
+      computer: appManagedComputer(result.computer),
+      duplicate: result.duplicate,
+    };
+  },
+
+  terminateManagedComputer: async (input) => {
+    const session = await requireSession(auth, request);
+    const result = await withFleetErrors(terminateManagedComputerApplication({
+      db,
+      env,
+      organizationId: decodeUuid(input.organizationId),
+      managedComputerId: decodeUuid(input.managedComputerId),
+      userId: session.user.id,
+      observedAt: new Date().toISOString(),
+    }));
     return {
       computer: appManagedComputer(result.computer),
       duplicate: result.duplicate,

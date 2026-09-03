@@ -1461,6 +1461,43 @@ public nonisolated struct BriarAPI_RetireManagedComputerResponse: Sendable {
   fileprivate var _computer: BriarAPI_ManagedComputer? = nil
 }
 
+public nonisolated struct BriarAPI_TerminateManagedComputerRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var organizationID: String = String()
+
+  public var managedComputerID: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_TerminateManagedComputerResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var computer: BriarAPI_ManagedComputer {
+    get {_computer ?? BriarAPI_ManagedComputer()}
+    set {_computer = newValue}
+  }
+  /// Returns true if `computer` has been explicitly set.
+  public var hasComputer: Bool {self._computer != nil}
+  /// Clears the value of `computer`. Subsequent reads from it will return its default value.
+  public mutating func clearComputer() {self._computer = nil}
+
+  public var duplicate: Bool = false
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _computer: BriarAPI_ManagedComputer? = nil
+}
+
 public nonisolated struct BriarAPI_ManagedComputerRemoteSession: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -3704,6 +3741,80 @@ nonisolated extension BriarAPI_RetireManagedComputerResponse: SwiftProtobuf.Mess
   }
 
   public static func ==(lhs: BriarAPI_RetireManagedComputerResponse, rhs: BriarAPI_RetireManagedComputerResponse) -> Bool {
+    if lhs._computer != rhs._computer {return false}
+    if lhs.duplicate != rhs.duplicate {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_TerminateManagedComputerRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".TerminateManagedComputerRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}managed_computer_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.managedComputerID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.organizationID.isEmpty {
+      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    }
+    if !self.managedComputerID.isEmpty {
+      try visitor.visitSingularStringField(value: self.managedComputerID, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_TerminateManagedComputerRequest, rhs: BriarAPI_TerminateManagedComputerRequest) -> Bool {
+    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.managedComputerID != rhs.managedComputerID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_TerminateManagedComputerResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".TerminateManagedComputerResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}computer\0\u{1}duplicate\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._computer) }()
+      case 2: try { try decoder.decodeSingularBoolField(value: &self.duplicate) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._computer {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    if self.duplicate != false {
+      try visitor.visitSingularBoolField(value: self.duplicate, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_TerminateManagedComputerResponse, rhs: BriarAPI_TerminateManagedComputerResponse) -> Bool {
     if lhs._computer != rhs._computer {return false}
     if lhs.duplicate != rhs.duplicate {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}

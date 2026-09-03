@@ -69,7 +69,7 @@ export async function listOrganizationManagedComputers(
 ) {
   const result = await db.prepare(
     `select * from briar_managed_computers
-     where organization_id = ?
+     where organization_id = ? and state != 'terminated'
      order by created_at desc, id`,
   ).bind(organizationId).all<ManagedComputerRow>();
   return result.results ?? [];
@@ -1124,32 +1124,31 @@ export async function markManagedComputerTerminated(
   managedComputerId: string,
   observedAt: string,
 ) {
-  const computer = await db.prepare(
-    `update briar_managed_computers
-     set state = 'terminated', state_updated_at = ?, terminated_at = ?, updated_at = ?
-     where id = ? and state in ('stopped', 'failed')
-     returning *`,
-  ).bind(observedAt, observedAt, observedAt, managedComputerId)
-    .first<ManagedComputerRow>();
-  if (computer?.briar_device_id) {
-    await db.batch([
-      db.prepare(
-        `update briar_execution_worker_devices
-         set state = 'disabled', updated_at = ? where id = ?`,
-      ).bind(observedAt, computer.briar_device_id),
-      db.prepare(
-        `update briar_execution_workers
-         set state = 'disabled', accepting_work = 0, updated_at = ?
-         where device_id = ?`,
-      ).bind(observedAt, computer.briar_device_id),
-      db.prepare(
-        `update briar_execution_worker_credentials
-         set revoked_at = coalesce(revoked_at, ?)
-         where device_id = ?`,
-      ).bind(observedAt, computer.briar_device_id),
-    ]);
-  }
-  return computer;
+  const deviceQuery = `select briar_device_id from briar_managed_computers
+    where id = ? and state = 'terminated'`;
+  const [result] = await db.batch<ManagedComputerRow>([
+    db.prepare(
+      `update briar_managed_computers
+       set state = 'terminated', state_updated_at = ?, terminated_at = ?, updated_at = ?
+       where id = ? and state in ('stopped', 'failed')
+       returning *`,
+    ).bind(observedAt, observedAt, observedAt, managedComputerId),
+    db.prepare(
+      `update briar_execution_worker_devices
+       set state = 'disabled', updated_at = ? where id in (${deviceQuery})`,
+    ).bind(observedAt, managedComputerId),
+    db.prepare(
+      `update briar_execution_workers
+       set state = 'disabled', accepting_work = 0, updated_at = ?
+       where device_id in (${deviceQuery})`,
+    ).bind(observedAt, managedComputerId),
+    db.prepare(
+      `update briar_execution_worker_credentials
+       set revoked_at = coalesce(revoked_at, ?)
+       where device_id in (${deviceQuery})`,
+    ).bind(observedAt, managedComputerId),
+  ]);
+  return result?.results[0] ?? null;
 }
 
 export async function markManagedComputerReconciliationFailure(

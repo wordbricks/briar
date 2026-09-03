@@ -109753,6 +109753,325 @@ pub const __RETIRE_MANAGED_COMPUTER_RESPONSE_JSON_ANY: ::buffa::type_registry::J
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
+pub struct TerminateManagedComputerRequest {
+    /// Field 1: `organization_id`
+    #[serde(
+        rename = "organizationId",
+        alias = "organization_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub organization_id: ::buffa::alloc::string::String,
+    /// Field 2: `managed_computer_id`
+    #[serde(
+        rename = "managedComputerId",
+        alias = "managed_computer_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub managed_computer_id: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for TerminateManagedComputerRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("TerminateManagedComputerRequest")
+            .field("organization_id", &self.organization_id)
+            .field("managed_computer_id", &self.managed_computer_id)
+            .finish()
+    }
+}
+impl TerminateManagedComputerRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.TerminateManagedComputerRequest";
+}
+::buffa::impl_default_instance!(TerminateManagedComputerRequest);
+impl ::buffa::MessageName for TerminateManagedComputerRequest {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "TerminateManagedComputerRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.TerminateManagedComputerRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.TerminateManagedComputerRequest";
+}
+impl ::buffa::Message for TerminateManagedComputerRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.organization_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        }
+        if !self.managed_computer_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.managed_computer_id)
+                        as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.organization_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        }
+        if !self.managed_computer_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.managed_computer_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.managed_computer_id, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.organization_id.clear();
+        self.managed_computer_id.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for TerminateManagedComputerRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.TerminateManagedComputerRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for TerminateManagedComputerRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __TERMINATE_MANAGED_COMPUTER_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.TerminateManagedComputerRequest",
+    to_json: ::buffa::type_registry::any_to_json::<TerminateManagedComputerRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<TerminateManagedComputerRequest>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct TerminateManagedComputerResponse {
+    /// Field 1: `computer`
+    #[serde(
+        rename = "computer",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub computer: ::buffa::MessageField<
+        ManagedComputer,
+        ::buffa::Inline<ManagedComputer>,
+    >,
+    /// Field 2: `duplicate`
+    #[serde(
+        rename = "duplicate",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub duplicate: bool,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for TerminateManagedComputerResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("TerminateManagedComputerResponse")
+            .field("computer", &self.computer)
+            .field("duplicate", &self.duplicate)
+            .finish()
+    }
+}
+impl TerminateManagedComputerResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.TerminateManagedComputerResponse";
+}
+::buffa::impl_default_instance!(TerminateManagedComputerResponse);
+impl ::buffa::MessageName for TerminateManagedComputerResponse {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "TerminateManagedComputerResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.TerminateManagedComputerResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.TerminateManagedComputerResponse";
+}
+impl ::buffa::Message for TerminateManagedComputerResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.computer.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.computer.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if self.duplicate {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.computer.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.computer.write_to(__cache, buf);
+        }
+        if self.duplicate {
+            ::buffa::types::put_bool_field(2u32, self.duplicate, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.computer.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.duplicate = ::buffa::types::decode_bool(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.computer = ::buffa::MessageField::none();
+        self.duplicate = false;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for TerminateManagedComputerResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.TerminateManagedComputerResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for TerminateManagedComputerResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __TERMINATE_MANAGED_COMPUTER_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.TerminateManagedComputerResponse",
+    to_json: ::buffa::type_registry::any_to_json::<TerminateManagedComputerResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<TerminateManagedComputerResponse>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
 pub struct ManagedComputerRemoteSession {
     /// Field 1: `id`
     #[serde(
@@ -302573,6 +302892,659 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
+        pub struct TerminateManagedComputerRequestView<'a> {
+            /// Field 1: `organization_id`
+            pub organization_id: &'a str,
+            /// Field 2: `managed_computer_id`
+            pub managed_computer_id: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for TerminateManagedComputerRequestView<'a> {
+            type Owned = super::super::TerminateManagedComputerRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.managed_computer_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::TerminateManagedComputerRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::TerminateManagedComputerRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::TerminateManagedComputerRequest {
+                    organization_id: self.organization_id.to_string(),
+                    managed_computer_id: self.managed_computer_id.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for TerminateManagedComputerRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.organization_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                                as u64;
+                }
+                if !self.managed_computer_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(
+                                &self.managed_computer_id,
+                            ) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.organization_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                }
+                if !self.managed_computer_id.is_empty() {
+                    ::buffa::types::put_string_field(
+                        2u32,
+                        &self.managed_computer_id,
+                        buf,
+                    );
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for TerminateManagedComputerRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
+                    __map.serialize_entry("organizationId", self.organization_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(
+                    self.managed_computer_id,
+                ) {
+                    __map
+                        .serialize_entry("managedComputerId", self.managed_computer_id)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for TerminateManagedComputerRequestView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "TerminateManagedComputerRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.TerminateManagedComputerRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.TerminateManagedComputerRequest";
+        }
+        ::buffa::impl_default_view_instance!(TerminateManagedComputerRequestView);
+        ::buffa::impl_view_reborrow!(TerminateManagedComputerRequestView);
+        /** Self-contained, `'static` owned view of a `TerminateManagedComputerRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`TerminateManagedComputerRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`TerminateManagedComputerRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct TerminateManagedComputerRequestOwnedView(
+            ::buffa::OwnedView<TerminateManagedComputerRequestView<'static>>,
+        );
+        impl TerminateManagedComputerRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TerminateManagedComputerRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TerminateManagedComputerRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::TerminateManagedComputerRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TerminateManagedComputerRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`TerminateManagedComputerRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &TerminateManagedComputerRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::TerminateManagedComputerRequest {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `organization_id`
+            #[must_use]
+            pub fn organization_id(&self) -> &'_ str {
+                self.0.reborrow().organization_id
+            }
+            /// Field 2: `managed_computer_id`
+            #[must_use]
+            pub fn managed_computer_id(&self) -> &'_ str {
+                self.0.reborrow().managed_computer_id
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<TerminateManagedComputerRequestView<'static>>,
+        > for TerminateManagedComputerRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<TerminateManagedComputerRequestView<'static>>,
+            ) -> Self {
+                TerminateManagedComputerRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<TerminateManagedComputerRequestOwnedView>
+        for ::buffa::OwnedView<TerminateManagedComputerRequestView<'static>> {
+            fn from(wrapper: TerminateManagedComputerRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<TerminateManagedComputerRequestView<'static>>,
+        > for TerminateManagedComputerRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<TerminateManagedComputerRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::TerminateManagedComputerRequest {
+            type View<'a> = TerminateManagedComputerRequestView<'a>;
+            type ViewHandle = TerminateManagedComputerRequestOwnedView;
+        }
+        impl ::serde::Serialize for TerminateManagedComputerRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct TerminateManagedComputerResponseView<'a> {
+            /// Field 1: `computer`
+            pub computer: ::buffa::MessageFieldView<
+                super::super::__buffa::view::ManagedComputerView<'a>,
+            >,
+            /// Field 2: `duplicate`
+            pub duplicate: bool,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for TerminateManagedComputerResponseView<'a> {
+            type Owned = super::super::TerminateManagedComputerResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.computer.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.computer = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::ManagedComputerView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.duplicate = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::TerminateManagedComputerResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::TerminateManagedComputerResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::TerminateManagedComputerResponse {
+                    computer: match self.computer.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::ManagedComputer,
+                                ::buffa::Inline<super::super::ManagedComputer>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    duplicate: self.duplicate,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for TerminateManagedComputerResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if self.computer.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.computer.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                if self.duplicate {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.computer.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.computer.write_to(__cache, buf);
+                }
+                if self.duplicate {
+                    ::buffa::types::put_bool_field(2u32, self.duplicate, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for TerminateManagedComputerResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self.computer.as_option()
+                    {
+                        __map.serialize_entry("computer", __v)?;
+                    }
+                }
+                if self.duplicate {
+                    __map.serialize_entry("duplicate", &self.duplicate)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for TerminateManagedComputerResponseView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "TerminateManagedComputerResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.TerminateManagedComputerResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.TerminateManagedComputerResponse";
+        }
+        ::buffa::impl_default_view_instance!(TerminateManagedComputerResponseView);
+        ::buffa::impl_view_reborrow!(TerminateManagedComputerResponseView);
+        /** Self-contained, `'static` owned view of a `TerminateManagedComputerResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`TerminateManagedComputerResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`TerminateManagedComputerResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct TerminateManagedComputerResponseOwnedView(
+            ::buffa::OwnedView<TerminateManagedComputerResponseView<'static>>,
+        );
+        impl TerminateManagedComputerResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TerminateManagedComputerResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TerminateManagedComputerResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::TerminateManagedComputerResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TerminateManagedComputerResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`TerminateManagedComputerResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &TerminateManagedComputerResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::TerminateManagedComputerResponse {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `computer`
+            #[must_use]
+            pub fn computer(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::ManagedComputerView<'_>,
+            > {
+                &self.0.reborrow().computer
+            }
+            /// Field 2: `duplicate`
+            #[must_use]
+            pub fn duplicate(&self) -> bool {
+                self.0.reborrow().duplicate
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<TerminateManagedComputerResponseView<'static>>,
+        > for TerminateManagedComputerResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<TerminateManagedComputerResponseView<'static>>,
+            ) -> Self {
+                TerminateManagedComputerResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<TerminateManagedComputerResponseOwnedView>
+        for ::buffa::OwnedView<TerminateManagedComputerResponseView<'static>> {
+            fn from(wrapper: TerminateManagedComputerResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<TerminateManagedComputerResponseView<'static>>,
+        > for TerminateManagedComputerResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<TerminateManagedComputerResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::TerminateManagedComputerResponse {
+            type View<'a> = TerminateManagedComputerResponseView<'a>;
+            type ViewHandle = TerminateManagedComputerResponseOwnedView;
+        }
+        impl ::serde::Serialize for TerminateManagedComputerResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
         pub struct ManagedComputerRemoteSessionView<'a> {
             /// Field 1: `id`
             pub id: &'a str,
@@ -357861,6 +358833,8 @@ pub mod __buffa {
         reg.register_json_any(super::__RETRY_MANAGED_COMPUTER_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__RETIRE_MANAGED_COMPUTER_REQUEST_JSON_ANY);
         reg.register_json_any(super::__RETIRE_MANAGED_COMPUTER_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__TERMINATE_MANAGED_COMPUTER_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__TERMINATE_MANAGED_COMPUTER_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__MANAGED_COMPUTER_REMOTE_SESSION_JSON_ANY);
         reg.register_json_any(super::__MANAGED_COMPUTER_SOCKET_TICKET_JSON_ANY);
         reg.register_json_any(
@@ -359498,6 +360472,14 @@ pub use self::__buffa::view::RetireManagedComputerRequestOwnedView;
 pub use self::__buffa::view::RetireManagedComputerResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::RetireManagedComputerResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::TerminateManagedComputerRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::TerminateManagedComputerRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::TerminateManagedComputerResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::TerminateManagedComputerResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ManagedComputerRemoteSessionView;
 #[doc(inline)]

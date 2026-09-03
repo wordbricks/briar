@@ -122,6 +122,19 @@ export async function retireManagedComputer(
   );
 }
 
+export async function terminateManagedComputer(
+  token: string,
+  organizationId: string,
+  managedComputerId: string,
+) {
+  return managedComputerMutationResponseFromProto(
+    await requireFleetClient().terminateManagedComputer(
+      { organizationId, managedComputerId },
+      appCallOptions(token),
+    ),
+  );
+}
+
 export async function createManagedComputerRemoteSession(
   token: string,
   organizationId: string,
