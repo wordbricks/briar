@@ -316,6 +316,41 @@ workspace / workflow / integrations를 옮기며 확인한, 이후 단계에 영
   `visibleTeams` / `visibleOrganizations` / `activeOrganizationTeams`가 셸이 세
   번 반복하던 삼항 사슬이다.
 
+### 기준 갱신 (2026-09-04, Phase 6 이후)
+
+내비게이션을 옮기며 확인한, Phase 7·8에 영향을 주는 사실:
+
+- **렌더 단계 ref 두 개는 서로 다른 결말을 맞았다.** `navigationUserIdRef`는
+  파생 atom이 읽어야 해서 `navigationHistoryUserIdAtom` +
+  `navigationUserBoundaryChangedAtom` 한 쌍이 되었다(`undefined`가 "아직 아무도
+  이 스택을 갖지 않았다"는 뜻이므로 `null`과 구분해야 한다).
+  `navigationActiveProjectIdRef`는 **사라졌다**: 렌더마다 `activeTeamId`로 다시
+  덮어써졌고 `setDefaultTeam` 호출부 다섯 곳이 모두 같은 동기 스텝에서 같은 팀을
+  선택하므로, 액션이 호출 시점에 `activeTeamIdAtom`을 읽는 것과 결과가 같다.
+  같은 형태의 "렌더 단계 미러 ref"를 만나면 먼저 이 질문을 한다.
+- **파생 atom은 effect 재실행 횟수를 줄인다.** `settingsTargetFromNavigationLocation`은
+  렌더마다 새 객체였고, 그것을 의존성으로 둔 설정 동기화 effect는 **매 렌더** 돌고
+  있었다. `Atom.map`으로 만들면 위치가 바뀔 때만 새 값이 되어 effect가 훨씬 덜
+  돈다. 그 effect들이 멱등이어야 안전한데(설정 타깃 쓰기는 같은 값이면 `current`를
+  돌려주므로 멱등이다), 옮길 때마다 확인해야 한다.
+- **조정 effect의 마운트 지점을 옮기면 순서가 바뀐다.** 자식의 effect가 부모보다
+  먼저 돌므로, App의 훅이던 것을 `AppEffects`로 내리면 `useDeepLinks`(여전히 App)
+  보다 **먼저** 돈다 — 이전과 같다. 대신 `AppEffects` 안의 다른 훅들보다는 나중에
+  돌아야 이전 순서가 유지되므로 목록의 **마지막**에 둔다.
+- **`lazy()` 경계가 fallback으로 떨어지면 이전 DOM은 언마운트되지 않는다.**
+  React가 숨기기만 하므로 `textContent`에는 옛 화면이 그대로 남는다. 페이지 전환
+  테스트는 새 페이지의 문자열을 기다려야 하고, `beforeEach`에서 그 페이지 모듈을
+  미리 `import()` 해야 `act` 플러시 안에서 해소된다.
+- **테스트 레지스트리에 위치를 심을 때 `resetNavigation`과 `navigateToPage`는 다르다.**
+  후자는 방문을 남겨 `canGoBack`이 참이 된다. "뒤로 갈 곳이 없다"를 검사하는
+  테스트는 `resetNavigation`으로 심어야 한다.
+- **팀이 사라졌는데 선택은 남으면 무한 루프다.** 팀 백필(3)이 선택된 팀을 위치에
+  써 넣고 팀 존재 폴백(4)이 그 팀이 없다며 지우기를 반복한다. 실제 앱에서는 팀
+  목록과 선택이 함께 비므로 도달하지 않지만, 테스트에서 `teamsAtom`만 비우면
+  걸린다.
+- **App에 남은 `briar.` 키 28개는 전부 세션·로그인·팀 선택이다.** 내비게이션이
+  나가면서 더 줄일 것이 없어졌고, 다음에 줄어드는 시점은 Phase 7의 파사드 제거다.
+
 ## 목표
 
 1. `apps/briar/src/hooks/useBriar.ts`(4,668줄)와 `apps/briar/src/App.tsx`(5,116줄)가
@@ -870,15 +905,24 @@ PR 묶음 B. 액션과 뷰:
 - 결과: App.tsx 3,053줄 → 783줄, `briar.` 키 42개 → 28개. Phase 6이 가져갈
   내비게이션 블록은 `hooks/useAppNavigation.ts`로 그대로 옮겨 두었다.
 
-### Phase 6. 내비게이션 (M, 결합도 최고)
+### Phase 6. 내비게이션 (M, 결합도 최고) — 완료
 
-- 조정 effect 6개의 `useAppNavigation()` 추출은 Phase 5-4가 순서 계약을 지켜
-  **그대로** 끝냈다(`hooks/useAppNavigation.ts`). 남은 일은
-  `useNavigationHistory` 내부 상태를 `state/navigation` atom으로 전환하고
-  `activePage`, `activeRunId` 등을 파생 atom으로 노출하는 것이다. 그러면
-  `DesktopShellNavigation` 프롭 묶음이 사라진다.
-- 완료 조건: 내비게이션 관련 기존 테스트(`useNavigationHistory.test.ts`, 키보드
-  커맨드 테스트) 통과. `Sidebar`와 `CompanionHeader`가 `activePageAtom`만 구독.
+- 방문 스택을 `state/navigation/atoms.ts`의 `navigationHistoryAtom` 하나로 옮기고,
+  `activePage` / `activeRunId` / 위치가 가리키는 팀·조직·채널 id / 뒤·앞 가능
+  여부를 파생 atom으로 노출했다. 리듀서는 `state/navigation/history.ts`에 그대로
+  남아 있다.
+- 이동 콜백은 `state/navigation/actions.ts`의 레지스트리 바인딩 액션이 되었고,
+  조정 effect 6개는 순서 계약을 문서화한 채
+  `state/navigation/useNavigationReconciliation.ts`로 나가 `AppEffects`가
+  마운트한다. `hooks/useAppNavigation.ts`와 `DesktopShellNavigation` 프롭 묶음은
+  사라졌다.
+- 데스크톱 셸은 창 크롬 / 사이드바 / **페이지 슬롯**(`DesktopPages`) / 상태
+  표시줄로 갈라졌다. 페이지 슬롯과 사이드바만 위치를 구독하므로 이동 한 번이
+  크롬과 상태 표시줄을 건드리지 않는다.
+- 완료 조건 달성: 내비게이션 관련 기존 테스트(리듀서 테스트는
+  `state/navigation/history.test.ts`로 이동, 키보드 커맨드 테스트) 통과.
+  `Sidebar`(`SidebarWithSession`)와 `CompanionHeader`
+  (`CompanionHeaderWithSession`)가 페이지 atom을 직접 구독.
 
 ### Phase 7. 파사드 제거와 구독형 effect (S–M)
 
@@ -969,6 +1013,6 @@ Phase 2 이후 언제든 착수 가능하며 Phase 3–7과 병행할 수 있다
 | 3 | #1588, #1589 | 머지됨 | #1588: `state/workspace`(atoms / api / health / readiness / actions / `useWorkspaceSync`), `state/workflow`(actions / `useWorkflowAutoGeneration`), `state/integrations`(atoms / actions), `sync/events`의 `team-settings-changed`와 `sync/commit`. `useBriar`의 workspace `useState` 7개·ref 5개와 `commitTeamDashboard` / `commitTeamSettings` 제거, Phase 1 주입 콜백 3개(`bumpReconnectRequest`, `clearWorkspaceViews`, `resetTeamHealth`) 삭제. `AutoHuntSession` 계열 타입을 `types.ts`로. #1589: `components/app/WorkspaceViews`의 연결 래퍼 4종과 `TeamSettingsWithDashboard` 확장, App.tsx 프롭 블록 삭제, 파사드에서 25개 키 제거. |
 | 4 | #1590, #1591 | 머지됨 | #1590: `entities/channels` 연결(저장 인덱스), `sync`의 채널 카탈로그 이벤트 4종, `state/channels`(atoms / api / actions / `useChannelCatalogSync`), `components/app`의 `ChannelViews` 3종과 `CommandPaletteWithContext`, `lockedTeamIdAtom`을 `state/platform.ts`로 통합. #1591: `state/dialogs`와 `state/navigation` atom, `hooks`의 `useStatusTray` / `useDeepLinks` / `useCommandPaletteItems` / `useAppShortcuts` / `useWorkerDispatch`, `lib/navigation-history-items`, `AppDialogViews`와 `AppSettingsWithWorkspace` 래퍼, `Sidebar` / `OrganizationSettings` / `TeamLobby` 래퍼 확장. App.tsx 4,947줄 → 3,053줄, `briar.` 키 55개 → 42개. |
 | 5 | #1592, #1593, #1594, #1595 | 머지됨 | #1592: `hooks`의 `useRepositorySetup` / `useIssueAgents` / `useAgentDispatch` / `useInvitationFlow` / `useLaunchIntro`, `components/app`의 `InboxDetailContent` / `AppSettingsSidebar`, `lib`의 `inbox-detail-label` / `team-window-scope`. #1593: `AuthGate` / `AppDialogs` / `CompanionShell`, `AppEffects` 단일 마운트, `WorkerDispatchDialog` 이중 렌더 제거, 5-1이 남긴 죽은 import 정리. #1594: `DesktopShell`과 트리가 나가며 드러난 죽은 로컬 40여 개 제거. #1595: 내비게이션 블록을 `hooks/useAppNavigation.ts`로 그대로 이동(Phase 6의 첫 항목을 미리 끝냄). App.tsx 3,053줄 → 783줄, `briar.` 키 42개 → 28개. |
-| 6 | | 예정 | |
+| 6 | #1596, #1597, #1598 | 머지됨 | #1596: `state/navigation`의 `history` / `atoms`(방문 스택 + 파생 12종) / `actions` / `useNavigationReconciliation`, `hooks/useAppNavigation`을 호환 훅으로 축소, `setDefaultTeam` 제거. #1597: 조정 effect를 `AppEffects`로, `useAppNavigation` 삭제, `WindowNavigationControlsWithHistory` / `CompanionHeaderWithSession` 래퍼, `SidebarWithSession`의 페이지 구독, `useAppShortcuts`(11→4) / `useCommandPaletteItems`(16→5) / `useDeepLinks` / `useRepositorySetup` / `AppDialogs` / `CommandPaletteWithContext`의 내비게이션 프롭 제거. #1598: `DesktopPages` 페이지 슬롯 분리와 렌더 카운트 테스트. App.tsx 783줄 → 661줄, `briar.` 키 28개 유지(전부 세션·로그인). |
 | 7 | | 예정 | |
 | 8 | | 예정 | |
