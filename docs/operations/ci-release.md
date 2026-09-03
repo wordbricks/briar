@@ -117,14 +117,24 @@ The `rust` context builds into a shared Cargo target directory instead of
 `apps/briar/src-tauri/target`, so `cargo fmt`, `cargo clippy`, and `cargo test`
 stay incremental across git worktrees: a fresh Auto Hunt worktree reuses the
 artifacts of previous runs rather than rebuilding every crate. The default is
-`$(getconf DARWIN_USER_CACHE_DIR)/briar/ci/cargo-target` (falling back to
-`$TMPDIR` when that is unavailable). Override it with
-`BRIAR_CI_CARGO_TARGET_DIR`, which must be an absolute path ending in
-`/cargo-target`, or set `BRIAR_CI_CARGO_TARGET_DIR=local` to fall back to the
-per-worktree target directory when debugging a build. Unlike the release cache,
-the CI cache takes no exclusive lock: Cargo's own file lock serialises
-concurrent access, so several worktrees can run local CI at the same time and
-simply wait for each other.
+`${XDG_CACHE_HOME:-~/.cache}/briar/cargo-target`, and the release scripts use
+the same directory (Cargo keeps the `debug` and `release` profiles apart), so
+CI runs and release builds warm each other's dependencies. The directory is
+deliberately not under `DARWIN_USER_CACHE_DIR`: macOS treats that location as
+purgeable, and each eviction turned a ~20s incremental Rust check into a
+~10 minute cold build. Override it with `BRIAR_CI_CARGO_TARGET_DIR`, which must
+be an absolute path ending in `/cargo-target`, or set
+`BRIAR_CI_CARGO_TARGET_DIR=local` to fall back to the per-worktree target
+directory when debugging a build. Unlike the release cache, the CI cache takes
+no exclusive lock: Cargo's own file lock serialises concurrent access, so
+several worktrees can run local CI at the same time and simply wait for each
+other.
+
+To relocate an existing cache without a cold rebuild, `mv` the directory to the
+new path (or set the override to the old one). The per-worktree
+`apps/briar/src-tauri/target` directories are not used by local CI and can be
+deleted to reclaim disk; only `bun run tauri dev` and similar development
+builds write there.
 
 Mobile contract validation is separate from the required pull request
 signoffs. On a macOS worker with Xcode, JDK 17, and Android SDK 36, install the

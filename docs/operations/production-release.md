@@ -137,11 +137,12 @@ override.
 
 ## Shared Cargo build cache
 
-Candidate and Production builds set `CARGO_TARGET_DIR` to a per-user release
-cache outside the worktree. This preserves compiled Rust dependencies between
-Auto Hunt worktrees while the bundle output is cleared before each build. A
-lock prevents two release commands from writing to the shared target at the
-same time.
+Candidate and Production builds set `CARGO_TARGET_DIR` to the per-user Cargo
+cache outside the worktree (`${XDG_CACHE_HOME:-~/.cache}/briar/cargo-target`,
+shared with local CI; see `ci-release.md`). This preserves compiled Rust
+dependencies between Auto Hunt worktrees while the bundle output is cleared
+before each build. A lock prevents two release commands from writing to the
+shared target at the same time.
 
 The command prints the resolved cache path. Set
 `BRIAR_RELEASE_CARGO_TARGET_DIR` to an absolute path ending in `/cargo-target`

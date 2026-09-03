@@ -460,18 +460,15 @@ const resolveCargoTargetDirectory = Effect.fn("resolveCargoTargetDirectory")(
       return undefined;
     }
 
-    let cacheBase = "";
-    if (!override) {
-      const executor = yield* CiCommandExecutor;
-      const result = yield* executor.execute({
-        argv: ["getconf", "DARWIN_USER_CACHE_DIR"],
-        output: { _tag: "capture" },
-      });
-      if (result.exitCode === 0) cacheBase = result.output.trim();
-    }
+    // Shared with the release scripts (see scripts/release-cargo-cache.sh).
+    // Deliberately under the XDG cache rather than DARWIN_USER_CACHE_DIR: macOS
+    // treats the latter as purgeable, and every eviction turned a ~20s
+    // incremental Rust check into a ~10 minute cold build.
+    const cacheBase = process.env.XDG_CACHE_HOME?.trim() ||
+      join(process.env.HOME ?? process.env.TMPDIR ?? "/tmp", ".cache");
     const targetDirectory = override || join(
-      (cacheBase || process.env.TMPDIR || "/tmp").replace(/\/$/u, ""),
-      "briar/ci/cargo-target",
+      cacheBase.replace(/\/$/u, ""),
+      "briar/cargo-target",
     );
     if (!targetDirectory.startsWith("/") || !targetDirectory.endsWith("/cargo-target")) {
       return yield* new CiInvariantError({

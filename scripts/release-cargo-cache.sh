@@ -1,22 +1,22 @@
 #!/bin/bash
 
-# Resolves the shared Cargo target directory for a build channel ("release",
-# "ci", ...) and prints its physical path. Arguments:
-#   $1 channel name used in the default path
-#   $2 caller-supplied override (usually an environment variable's value)
-#   $3 name of that environment variable, used in the error message
+# Resolves the shared Cargo target directory and prints its physical path.
+# Local CI and the release scripts share one directory: Cargo keeps the
+# `debug` and `release` profiles apart, so CI runs and release builds warm each
+# other's dependency artifacts. The default lives under the user's XDG cache
+# (`~/.cache/briar/cargo-target`), deliberately not under
+# `DARWIN_USER_CACHE_DIR`: macOS treats that directory as purgeable, and every
+# eviction turned a ~20s incremental Rust check into a ~10 minute cold build.
+# Arguments:
+#   $1 caller-supplied override (usually an environment variable's value)
+#   $2 name of that environment variable, used in the error message
 # The directory is created if missing; it does not take any lock.
 resolve_briar_cargo_target_dir() {
-  local channel="$1"
-  local override="${2:-}"
-  local override_name="${3:-BRIAR_CARGO_TARGET_DIR}"
-  local cache_base
+  local override="${1:-}"
+  local override_name="${2:-BRIAR_CARGO_TARGET_DIR}"
+  local cache_base="${XDG_CACHE_HOME:-$HOME/.cache}"
   local target_dir
-  cache_base="$(getconf DARWIN_USER_CACHE_DIR 2>/dev/null || true)"
-  if [[ -z "$cache_base" ]]; then
-    cache_base="${TMPDIR:-/tmp}"
-  fi
-  target_dir="${override:-${cache_base%/}/briar/${channel}/cargo-target}"
+  target_dir="${override:-${cache_base%/}/briar/cargo-target}"
   case "$target_dir" in
     /*/cargo-target) ;;
     *)
@@ -31,7 +31,6 @@ resolve_briar_cargo_target_dir() {
 configure_release_cargo_cache() {
   local target_dir
   target_dir="$(resolve_briar_cargo_target_dir \
-    release \
     "${BRIAR_RELEASE_CARGO_TARGET_DIR:-}" \
     BRIAR_RELEASE_CARGO_TARGET_DIR)" || return 1
   BRIAR_RELEASE_CARGO_LOCK="$target_dir/.briar-release-lock"
