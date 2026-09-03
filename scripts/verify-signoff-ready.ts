@@ -7,16 +7,24 @@ export interface SignoffTarget {
   upstream: string;
 }
 
-function git(args: readonly string[], cwd: string): string {
+export type SignoffGitRunner = (
+  args: readonly string[],
+  cwd: string,
+) => string;
+
+const runGit: SignoffGitRunner = (args, cwd) => {
   return execFileSync("git", args, {
     cwd,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
     timeout: 15_000,
   }).trim();
-}
+};
 
-export function verifySignoffReady(cwd = process.cwd()): SignoffTarget {
+export function verifySignoffReady(
+  cwd = process.cwd(),
+  git: SignoffGitRunner = runGit,
+): SignoffTarget {
   if (git(["status", "--porcelain"], cwd) !== "") {
     throw new Error("repository has uncommitted changes; commit them before signoff");
   }
@@ -66,8 +74,9 @@ export function verifySignoffReady(cwd = process.cwd()): SignoffTarget {
 export function verifySignoffTargetUnchanged(
   expected: SignoffTarget,
   cwd = process.cwd(),
+  git: SignoffGitRunner = runGit,
 ): SignoffTarget {
-  const current = verifySignoffReady(cwd);
+  const current = verifySignoffReady(cwd, git);
   if (current.head !== expected.head) {
     throw new Error(`signoff HEAD moved from ${expected.head} to ${current.head}`);
   }
