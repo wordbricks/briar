@@ -35,7 +35,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
   type Dispatch,
   type ReactNode,
   type RefObject,
@@ -383,9 +382,9 @@ export function Channels({
     effectiveWidth: effectiveThreadWidth,
     isResizing: isResizingThread,
     separatorProps: threadResizeProps,
-    width: threadWidth,
   } = useHorizontalPaneResize({
     clamp: clampChannelThreadWidth,
+    cssVariable: "--channel-thread-width",
     defaultWidth: channelThreadWidthDefault,
     load: loadChannelThreadWidth,
     max: channelThreadWidthMax,
@@ -1223,13 +1222,6 @@ export function Channels({
         showRequestedThreadOnly ? " channels-inbox-thread-only" : ""
       }`}
       ref={channelsRef}
-      style={
-        threadWidth === null
-          ? undefined
-          : ({
-              "--channel-thread-width": `${threadWidth}%`,
-            } as CSSProperties)
-      }
     >
       {!showRequestedThreadOnly ? (
         <div

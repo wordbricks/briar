@@ -259,10 +259,10 @@ export function RunPage({
     containerRef: runPageLayoutRef,
     effectiveWidth: effectiveConversationPaneWidth,
     isResizing: isResizingConversation,
-    separatorProps: conversationResizeProps,
-    width: conversationPaneWidth
+    separatorProps: conversationResizeProps
   } = useHorizontalPaneResize({
     clamp: clampConversationPaneWidth,
+    cssVariable: "--run-conversation-pane-width",
     defaultWidth: conversationPaneWidthDefault,
     load: loadConversationPaneWidth,
     max: conversationPaneWidthMax,
@@ -1097,9 +1097,7 @@ export function RunPage({
               </div>
             </header> : null}
           <div className="run-page-body">
-            <div className={`run-page-layout${usesConversationTab ? " is-conversation-tabbed" : ""}${isResizingConversation ? " is-resizing-conversation" : ""}`} ref={runPageLayoutRef} style={conversationPaneWidth === null || usesConversationTab ? undefined : {
-            "--run-conversation-pane-width": `${conversationPaneWidth}%`
-          } as React.CSSProperties}>
+            <div className={`run-page-layout${usesConversationTab ? " is-conversation-tabbed" : ""}${isResizingConversation ? " is-resizing-conversation" : ""}`} ref={runPageLayoutRef}>
               <div className="run-page-main">
                 <div aria-label={t("run.detailTabs")} className="issue-detail-tabs" role="tablist">
                   <button aria-controls={`${detailTabsId}-description-panel`} aria-selected={activeDetailTab === "description"} id={`${detailTabsId}-description-tab`} onClick={() => selectDetailTab("description")} role="tab" type="button">
