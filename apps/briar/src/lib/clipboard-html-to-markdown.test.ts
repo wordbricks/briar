@@ -31,6 +31,12 @@ describe("htmlToMarkdown", () => {
     expect(markdown).toContain("indent\ttab");
   });
 
+  it("keeps separate paragraphs inside a list item", () => {
+    expect(
+      htmlToMarkdown("<ul><li><p>first</p><p>second</p></li></ul>"),
+    ).toMatch(/^-\s+first\n\tsecond$/);
+  });
+
   it("does not treat the Google Docs wrapper as bold", () => {
     const markdown = htmlToMarkdown(`
       <b style="font-weight:normal;" id="docs-internal-guid-abc">
@@ -67,5 +73,8 @@ describe("htmlToMarkdown", () => {
 
   it("keeps line breaks from br tags", () => {
     expect(htmlToMarkdown("<p>first<br>second</p>")).toBe("first  \nsecond");
+    expect(htmlToMarkdown("<p>before <span>first<br>second</span> after</p>")).toBe(
+      "before first  \nsecond after",
+    );
   });
 });

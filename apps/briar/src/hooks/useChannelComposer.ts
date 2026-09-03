@@ -373,7 +373,7 @@ export function useChannelComposer<T extends ComposerInput>({
         (event.nativeEvent as { shiftKey?: boolean } | undefined)?.shiftKey,
       );
     plainPaste.current = false;
-    const html = event.clipboardData?.getData("text/html") ?? "";
+    const html = event.clipboardData?.getData?.("text/html") ?? "";
     const markdown = plainOnly ? null : markdownFromClipboardHtml(html);
     if (markdown) {
       event.preventDefault();
@@ -384,7 +384,7 @@ export function useChannelComposer<T extends ComposerInput>({
       file.type.startsWith("image/") || file.type === "application/pdf",
     );
     if (pasted.length === 0) return;
-    const plainText = event.clipboardData?.getData("text/plain") ?? "";
+    const plainText = event.clipboardData?.getData?.("text/plain") ?? "";
     if (plainOnly && plainText.trim()) return;
     event.preventDefault();
     addImages(pasted);

@@ -258,8 +258,13 @@ function convertListItem(
     }
     inlineParent.appendChild(child.cloneNode(true));
   }
-  const content = convertInlines(inlineParent, marks).trim() ||
-    convertBlocks(inlineParent, indent + 1, marks).trim();
+  const hasBlockChild = Array.from(inlineParent.childNodes).some((child) =>
+    child instanceof Element &&
+    (blockTags.has(child.tagName.toLowerCase()) || containsBlock(child)),
+  );
+  const content = hasBlockChild
+    ? convertBlocks(inlineParent, 0, marks).trim()
+    : convertInlines(inlineParent, marks).trim();
   const head = formatListItem(ordered, indent, index, content);
   return nested.length > 0 ? `${head}\n${nested.join("\n")}` : head;
 }
@@ -274,6 +279,7 @@ function formatListItem(
   const pad = "\t".repeat(indent);
   const [first, ...rest] = content.split("\n");
   const continuation = rest
+    .filter((line) => line.length > 0)
     .map((line) => `${pad}\t${line}`)
     .join("\n");
   return continuation
@@ -339,7 +345,7 @@ function containsBlock(element: Element): boolean {
   for (const child of Array.from(element.childNodes)) {
     if (!(child instanceof Element)) continue;
     const tag = child.tagName.toLowerCase();
-    if (blockTags.has(tag) || tag === "br") return true;
+    if (blockTags.has(tag)) return true;
     if (containsBlock(child)) return true;
   }
   return false;
