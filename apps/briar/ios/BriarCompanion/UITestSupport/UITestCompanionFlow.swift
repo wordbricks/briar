@@ -308,7 +308,7 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
         self.scenario = scenario
         services = AuthenticatedMobileServices(
             account: BriarAPI_AccountServiceClientMock(),
-            project: BriarAPI_ProjectServiceClientMock(),
+            team: BriarAPI_TeamServiceClientMock(),
             dashboard: BriarAPI_DashboardServiceClientMock(),
             inbox: BriarAPI_InboxServiceClientMock(),
             issue: IssueServiceMock(scenario: scenario),

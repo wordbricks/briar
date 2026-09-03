@@ -1,10 +1,10 @@
 import {
-  projectAgentAvatarAccept,
-  projectAgentAvatarFromFile,
-} from "./project-agent-avatar";
+  teamAgentAvatarAccept,
+  teamAgentAvatarFromFile,
+} from "./team-agent-avatar";
 
-export const workerLogoAccept = projectAgentAvatarAccept;
-export const workerLogoFromFile = projectAgentAvatarFromFile;
+export const workerLogoAccept = teamAgentAvatarAccept;
+export const workerLogoFromFile = teamAgentAvatarFromFile;
 
 export {
   isWorkerEmoji,

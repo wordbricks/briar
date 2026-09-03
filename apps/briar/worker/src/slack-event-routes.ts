@@ -6,13 +6,13 @@ import {
   claimSlackEvent,
   completeSlackEvent,
   getHuntRunForProject,
-  getProjectSettings,
+  getTeamSettings,
   getSlackInstallation,
   recordHuntEvent,
   releaseSlackEvent,
 } from "./db";
 import { HttpError, json } from "./http-response";
-import { listOrganizationProjects } from "./project-repository";
+import { listOrganizationTeams } from "./team-repository";
 import { flushOrganizationInboxRealtimeOutbox } from "./realtime-scheduling";
 import {
   buildSlackIssueCreatedMessage,
@@ -161,12 +161,12 @@ async function processSlackAppMention(env: Env, payload: SlackEventCallback) {
       return;
     }
 
-    const settings = await getProjectSettings(
+    const settings = await getTeamSettings(
       env.DB,
       installation.default_project_id,
     );
     const project = (
-      await listOrganizationProjects(env.DB, installation.organization_id)
+      await listOrganizationTeams(env.DB, installation.organization_id)
     ).find((candidate) => candidate.id === installation.default_project_id);
     if (!project) {
       throw new Error("Slack default project is unavailable");

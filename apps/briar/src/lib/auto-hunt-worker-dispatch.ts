@@ -1,5 +1,5 @@
 import type { HuntRun, ProjectAgent } from "../types";
-import type { ModelEffort } from "./project-llm";
+import type { ModelEffort } from "./team-llm";
 import type { AgentProviderCapabilityCatalog } from "./agent-provider-contract";
 import {
   recommendIssueExecution,

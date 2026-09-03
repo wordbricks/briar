@@ -18469,81 +18469,75 @@ where
     }
 }
 
-///Shorthand for `OwnedView<ListProjectsRequestView<'static>>`.
-pub type OwnedListProjectsRequestView = ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::ListProjectsRequestView<'static>,
+///Shorthand for `OwnedView<ListTeamsRequestView<'static>>`.
+pub type OwnedListTeamsRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ListTeamsRequestView<'static>,
 >;
-///Shorthand for `OwnedView<ListProjectsResponseView<'static>>`.
-pub type OwnedListProjectsResponseView = ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::ListProjectsResponseView<'static>,
+///Shorthand for `OwnedView<ListTeamsResponseView<'static>>`.
+pub type OwnedListTeamsResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ListTeamsResponseView<'static>,
 >;
-///Shorthand for `OwnedView<CreateProjectRequestView<'static>>`.
-pub type OwnedCreateProjectRequestView = ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::CreateProjectRequestView<'static>,
+///Shorthand for `OwnedView<CreateTeamRequestView<'static>>`.
+pub type OwnedCreateTeamRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CreateTeamRequestView<'static>,
 >;
-///Shorthand for `OwnedView<CreateProjectResponseView<'static>>`.
-pub type OwnedCreateProjectResponseView = ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::CreateProjectResponseView<'static>,
+///Shorthand for `OwnedView<CreateTeamResponseView<'static>>`.
+pub type OwnedCreateTeamResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CreateTeamResponseView<'static>,
 >;
-///Shorthand for `OwnedView<DeleteProjectRequestView<'static>>`.
-pub type OwnedDeleteProjectRequestView = ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::DeleteProjectRequestView<'static>,
+///Shorthand for `OwnedView<DeleteTeamRequestView<'static>>`.
+pub type OwnedDeleteTeamRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::DeleteTeamRequestView<'static>,
 >;
-///Shorthand for `OwnedView<DeleteProjectResponseView<'static>>`.
-pub type OwnedDeleteProjectResponseView = ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::DeleteProjectResponseView<'static>,
+///Shorthand for `OwnedView<DeleteTeamResponseView<'static>>`.
+pub type OwnedDeleteTeamResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::DeleteTeamResponseView<'static>,
 >;
-///Shorthand for `OwnedView<UpdateProjectIconRequestView<'static>>`.
-pub type OwnedUpdateProjectIconRequestView = ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::UpdateProjectIconRequestView<'static>,
+///Shorthand for `OwnedView<UpdateTeamIconRequestView<'static>>`.
+pub type OwnedUpdateTeamIconRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateTeamIconRequestView<'static>,
 >;
-///Shorthand for `OwnedView<UpdateProjectIconResponseView<'static>>`.
-pub type OwnedUpdateProjectIconResponseView = ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::UpdateProjectIconResponseView<'static>,
+///Shorthand for `OwnedView<UpdateTeamIconResponseView<'static>>`.
+pub type OwnedUpdateTeamIconResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateTeamIconResponseView<'static>,
 >;
-///Shorthand for `OwnedView<UpdateProjectIssueKeyPrefixRequestView<'static>>`.
-pub type OwnedUpdateProjectIssueKeyPrefixRequestView = ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::UpdateProjectIssueKeyPrefixRequestView<
+///Shorthand for `OwnedView<UpdateTeamIssueKeyPrefixRequestView<'static>>`.
+pub type OwnedUpdateTeamIssueKeyPrefixRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateTeamIssueKeyPrefixRequestView<
         'static,
     >,
 >;
-///Shorthand for `OwnedView<UpdateProjectIssueKeyPrefixResponseView<'static>>`.
-pub type OwnedUpdateProjectIssueKeyPrefixResponseView = ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::UpdateProjectIssueKeyPrefixResponseView<
+///Shorthand for `OwnedView<UpdateTeamIssueKeyPrefixResponseView<'static>>`.
+pub type OwnedUpdateTeamIssueKeyPrefixResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateTeamIssueKeyPrefixResponseView<
         'static,
     >,
 >;
-///Shorthand for `OwnedView<UpdateProjectTabsRequestView<'static>>`.
-pub type OwnedUpdateProjectTabsRequestView = ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::UpdateProjectTabsRequestView<'static>,
+///Shorthand for `OwnedView<UpdateTeamTabsRequestView<'static>>`.
+pub type OwnedUpdateTeamTabsRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateTeamTabsRequestView<'static>,
 >;
-///Shorthand for `OwnedView<UpdateProjectTabsResponseView<'static>>`.
-pub type OwnedUpdateProjectTabsResponseView = ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::UpdateProjectTabsResponseView<'static>,
+///Shorthand for `OwnedView<UpdateTeamTabsResponseView<'static>>`.
+pub type OwnedUpdateTeamTabsResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateTeamTabsResponseView<'static>,
 >;
-///Shorthand for `OwnedView<CreateProjectAgentTokenRequestView<'static>>`.
-pub type OwnedCreateProjectAgentTokenRequestView = ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::CreateProjectAgentTokenRequestView<
+///Shorthand for `OwnedView<CreateTeamAgentTokenRequestView<'static>>`.
+pub type OwnedCreateTeamAgentTokenRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CreateTeamAgentTokenRequestView<'static>,
+>;
+///Shorthand for `OwnedView<CreateTeamAgentTokenResponseView<'static>>`.
+pub type OwnedCreateTeamAgentTokenResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CreateTeamAgentTokenResponseView<
         'static,
     >,
 >;
-///Shorthand for `OwnedView<CreateProjectAgentTokenResponseView<'static>>`.
-pub type OwnedCreateProjectAgentTokenResponseView = ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::CreateProjectAgentTokenResponseView<
-        'static,
-    >,
+///Shorthand for `OwnedView<UpdateTeamSettingsRequestView<'static>>`.
+pub type OwnedUpdateTeamSettingsRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateTeamSettingsRequestView<'static>,
 >;
-///Shorthand for `OwnedView<UpdateProjectSettingsRequestView<'static>>`.
-pub type OwnedUpdateProjectSettingsRequestView = ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::UpdateProjectSettingsRequestView<
-        'static,
-    >,
->;
-///Shorthand for `OwnedView<UpdateProjectSettingsResponseView<'static>>`.
-pub type OwnedUpdateProjectSettingsResponseView = ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::UpdateProjectSettingsResponseView<
-        'static,
-    >,
+///Shorthand for `OwnedView<UpdateTeamSettingsResponseView<'static>>`.
+pub type OwnedUpdateTeamSettingsResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateTeamSettingsResponseView<'static>,
 >;
 ///Shorthand for `OwnedView<UpdateCheckpointPolicyRequestView<'static>>`.
 pub type OwnedUpdateCheckpointPolicyRequestView = ::buffa::view::OwnedView<
@@ -18557,27 +18551,27 @@ pub type OwnedUpdateCheckpointPolicyResponseView = ::buffa::view::OwnedView<
         'static,
     >,
 >;
-///Shorthand for `OwnedView<GetProjectExecutionWorkerPolicyRequestView<'static>>`.
-pub type OwnedGetProjectExecutionWorkerPolicyRequestView = ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::GetProjectExecutionWorkerPolicyRequestView<
+///Shorthand for `OwnedView<GetTeamExecutionWorkerPolicyRequestView<'static>>`.
+pub type OwnedGetTeamExecutionWorkerPolicyRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::GetTeamExecutionWorkerPolicyRequestView<
         'static,
     >,
 >;
-///Shorthand for `OwnedView<GetProjectExecutionWorkerPolicyResponseView<'static>>`.
-pub type OwnedGetProjectExecutionWorkerPolicyResponseView = ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::GetProjectExecutionWorkerPolicyResponseView<
+///Shorthand for `OwnedView<GetTeamExecutionWorkerPolicyResponseView<'static>>`.
+pub type OwnedGetTeamExecutionWorkerPolicyResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::GetTeamExecutionWorkerPolicyResponseView<
         'static,
     >,
 >;
-///Shorthand for `OwnedView<UpdateProjectExecutionWorkerPolicyRequestView<'static>>`.
-pub type OwnedUpdateProjectExecutionWorkerPolicyRequestView = ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::UpdateProjectExecutionWorkerPolicyRequestView<
+///Shorthand for `OwnedView<UpdateTeamExecutionWorkerPolicyRequestView<'static>>`.
+pub type OwnedUpdateTeamExecutionWorkerPolicyRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateTeamExecutionWorkerPolicyRequestView<
         'static,
     >,
 >;
-///Shorthand for `OwnedView<UpdateProjectExecutionWorkerPolicyResponseView<'static>>`.
-pub type OwnedUpdateProjectExecutionWorkerPolicyResponseView = ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::UpdateProjectExecutionWorkerPolicyResponseView<
+///Shorthand for `OwnedView<UpdateTeamExecutionWorkerPolicyResponseView<'static>>`.
+pub type OwnedUpdateTeamExecutionWorkerPolicyResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateTeamExecutionWorkerPolicyResponseView<
         'static,
     >,
 >;
@@ -18653,8 +18647,8 @@ pub type OwnedResolveIssueHierarchyLocationResponseView = ::buffa::view::OwnedVi
         'static,
     >,
 >;
-impl ::connectrpc::Encodable<crate::proto::briar::app::v1::ListProjectsResponse>
-for crate::proto::briar::app::v1::__buffa::view::ListProjectsResponseView<'_> {
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::ListTeamsResponse>
+for crate::proto::briar::app::v1::__buffa::view::ListTeamsResponseView<'_> {
     fn encode(
         &self,
         codec: ::connectrpc::CodecFormat,
@@ -18662,9 +18656,9 @@ for crate::proto::briar::app::v1::__buffa::view::ListProjectsResponseView<'_> {
         ::connectrpc::__codegen::encode_view_body(self, codec)
     }
 }
-impl ::connectrpc::Encodable<crate::proto::briar::app::v1::ListProjectsResponse>
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::ListTeamsResponse>
 for ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::ListProjectsResponseView<'static>,
+    crate::proto::briar::app::v1::__buffa::view::ListTeamsResponseView<'static>,
 > {
     fn encode(
         &self,
@@ -18687,8 +18681,8 @@ for ::buffa::view::OwnedView<
         )
     }
 }
-impl ::connectrpc::Encodable<crate::proto::briar::app::v1::CreateProjectResponse>
-for crate::proto::briar::app::v1::__buffa::view::CreateProjectResponseView<'_> {
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::CreateTeamResponse>
+for crate::proto::briar::app::v1::__buffa::view::CreateTeamResponseView<'_> {
     fn encode(
         &self,
         codec: ::connectrpc::CodecFormat,
@@ -18696,9 +18690,9 @@ for crate::proto::briar::app::v1::__buffa::view::CreateProjectResponseView<'_> {
         ::connectrpc::__codegen::encode_view_body(self, codec)
     }
 }
-impl ::connectrpc::Encodable<crate::proto::briar::app::v1::CreateProjectResponse>
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::CreateTeamResponse>
 for ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::CreateProjectResponseView<'static>,
+    crate::proto::briar::app::v1::__buffa::view::CreateTeamResponseView<'static>,
 > {
     fn encode(
         &self,
@@ -18721,8 +18715,8 @@ for ::buffa::view::OwnedView<
         )
     }
 }
-impl ::connectrpc::Encodable<crate::proto::briar::app::v1::DeleteProjectResponse>
-for crate::proto::briar::app::v1::__buffa::view::DeleteProjectResponseView<'_> {
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::DeleteTeamResponse>
+for crate::proto::briar::app::v1::__buffa::view::DeleteTeamResponseView<'_> {
     fn encode(
         &self,
         codec: ::connectrpc::CodecFormat,
@@ -18730,9 +18724,9 @@ for crate::proto::briar::app::v1::__buffa::view::DeleteProjectResponseView<'_> {
         ::connectrpc::__codegen::encode_view_body(self, codec)
     }
 }
-impl ::connectrpc::Encodable<crate::proto::briar::app::v1::DeleteProjectResponse>
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::DeleteTeamResponse>
 for ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::DeleteProjectResponseView<'static>,
+    crate::proto::briar::app::v1::__buffa::view::DeleteTeamResponseView<'static>,
 > {
     fn encode(
         &self,
@@ -18755,8 +18749,8 @@ for ::buffa::view::OwnedView<
         )
     }
 }
-impl ::connectrpc::Encodable<crate::proto::briar::app::v1::UpdateProjectIconResponse>
-for crate::proto::briar::app::v1::__buffa::view::UpdateProjectIconResponseView<'_> {
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::UpdateTeamIconResponse>
+for crate::proto::briar::app::v1::__buffa::view::UpdateTeamIconResponseView<'_> {
     fn encode(
         &self,
         codec: ::connectrpc::CodecFormat,
@@ -18764,9 +18758,9 @@ for crate::proto::briar::app::v1::__buffa::view::UpdateProjectIconResponseView<'
         ::connectrpc::__codegen::encode_view_body(self, codec)
     }
 }
-impl ::connectrpc::Encodable<crate::proto::briar::app::v1::UpdateProjectIconResponse>
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::UpdateTeamIconResponse>
 for ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::UpdateProjectIconResponseView<'static>,
+    crate::proto::briar::app::v1::__buffa::view::UpdateTeamIconResponseView<'static>,
 > {
     fn encode(
         &self,
@@ -18790,9 +18784,9 @@ for ::buffa::view::OwnedView<
     }
 }
 impl ::connectrpc::Encodable<
-    crate::proto::briar::app::v1::UpdateProjectIssueKeyPrefixResponse,
+    crate::proto::briar::app::v1::UpdateTeamIssueKeyPrefixResponse,
 >
-for crate::proto::briar::app::v1::__buffa::view::UpdateProjectIssueKeyPrefixResponseView<
+for crate::proto::briar::app::v1::__buffa::view::UpdateTeamIssueKeyPrefixResponseView<
     '_,
 > {
     fn encode(
@@ -18803,10 +18797,10 @@ for crate::proto::briar::app::v1::__buffa::view::UpdateProjectIssueKeyPrefixResp
     }
 }
 impl ::connectrpc::Encodable<
-    crate::proto::briar::app::v1::UpdateProjectIssueKeyPrefixResponse,
+    crate::proto::briar::app::v1::UpdateTeamIssueKeyPrefixResponse,
 >
 for ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::UpdateProjectIssueKeyPrefixResponseView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateTeamIssueKeyPrefixResponseView<
         'static,
     >,
 > {
@@ -18831,8 +18825,8 @@ for ::buffa::view::OwnedView<
         )
     }
 }
-impl ::connectrpc::Encodable<crate::proto::briar::app::v1::UpdateProjectTabsResponse>
-for crate::proto::briar::app::v1::__buffa::view::UpdateProjectTabsResponseView<'_> {
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::UpdateTeamTabsResponse>
+for crate::proto::briar::app::v1::__buffa::view::UpdateTeamTabsResponseView<'_> {
     fn encode(
         &self,
         codec: ::connectrpc::CodecFormat,
@@ -18840,9 +18834,9 @@ for crate::proto::briar::app::v1::__buffa::view::UpdateProjectTabsResponseView<'
         ::connectrpc::__codegen::encode_view_body(self, codec)
     }
 }
-impl ::connectrpc::Encodable<crate::proto::briar::app::v1::UpdateProjectTabsResponse>
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::UpdateTeamTabsResponse>
 for ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::UpdateProjectTabsResponseView<'static>,
+    crate::proto::briar::app::v1::__buffa::view::UpdateTeamTabsResponseView<'static>,
 > {
     fn encode(
         &self,
@@ -18865,12 +18859,8 @@ for ::buffa::view::OwnedView<
         )
     }
 }
-impl ::connectrpc::Encodable<
-    crate::proto::briar::app::v1::CreateProjectAgentTokenResponse,
->
-for crate::proto::briar::app::v1::__buffa::view::CreateProjectAgentTokenResponseView<
-    '_,
-> {
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::CreateTeamAgentTokenResponse>
+for crate::proto::briar::app::v1::__buffa::view::CreateTeamAgentTokenResponseView<'_> {
     fn encode(
         &self,
         codec: ::connectrpc::CodecFormat,
@@ -18878,11 +18868,9 @@ for crate::proto::briar::app::v1::__buffa::view::CreateProjectAgentTokenResponse
         ::connectrpc::__codegen::encode_view_body(self, codec)
     }
 }
-impl ::connectrpc::Encodable<
-    crate::proto::briar::app::v1::CreateProjectAgentTokenResponse,
->
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::CreateTeamAgentTokenResponse>
 for ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::CreateProjectAgentTokenResponseView<
+    crate::proto::briar::app::v1::__buffa::view::CreateTeamAgentTokenResponseView<
         'static,
     >,
 > {
@@ -18907,8 +18895,8 @@ for ::buffa::view::OwnedView<
         )
     }
 }
-impl ::connectrpc::Encodable<crate::proto::briar::app::v1::UpdateProjectSettingsResponse>
-for crate::proto::briar::app::v1::__buffa::view::UpdateProjectSettingsResponseView<'_> {
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::UpdateTeamSettingsResponse>
+for crate::proto::briar::app::v1::__buffa::view::UpdateTeamSettingsResponseView<'_> {
     fn encode(
         &self,
         codec: ::connectrpc::CodecFormat,
@@ -18916,11 +18904,9 @@ for crate::proto::briar::app::v1::__buffa::view::UpdateProjectSettingsResponseVi
         ::connectrpc::__codegen::encode_view_body(self, codec)
     }
 }
-impl ::connectrpc::Encodable<crate::proto::briar::app::v1::UpdateProjectSettingsResponse>
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::UpdateTeamSettingsResponse>
 for ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::UpdateProjectSettingsResponseView<
-        'static,
-    >,
+    crate::proto::briar::app::v1::__buffa::view::UpdateTeamSettingsResponseView<'static>,
 > {
     fn encode(
         &self,
@@ -18984,9 +18970,9 @@ for ::buffa::view::OwnedView<
     }
 }
 impl ::connectrpc::Encodable<
-    crate::proto::briar::app::v1::GetProjectExecutionWorkerPolicyResponse,
+    crate::proto::briar::app::v1::GetTeamExecutionWorkerPolicyResponse,
 >
-for crate::proto::briar::app::v1::__buffa::view::GetProjectExecutionWorkerPolicyResponseView<
+for crate::proto::briar::app::v1::__buffa::view::GetTeamExecutionWorkerPolicyResponseView<
     '_,
 > {
     fn encode(
@@ -18997,10 +18983,10 @@ for crate::proto::briar::app::v1::__buffa::view::GetProjectExecutionWorkerPolicy
     }
 }
 impl ::connectrpc::Encodable<
-    crate::proto::briar::app::v1::GetProjectExecutionWorkerPolicyResponse,
+    crate::proto::briar::app::v1::GetTeamExecutionWorkerPolicyResponse,
 >
 for ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::GetProjectExecutionWorkerPolicyResponseView<
+    crate::proto::briar::app::v1::__buffa::view::GetTeamExecutionWorkerPolicyResponseView<
         'static,
     >,
 > {
@@ -19026,9 +19012,9 @@ for ::buffa::view::OwnedView<
     }
 }
 impl ::connectrpc::Encodable<
-    crate::proto::briar::app::v1::UpdateProjectExecutionWorkerPolicyResponse,
+    crate::proto::briar::app::v1::UpdateTeamExecutionWorkerPolicyResponse,
 >
-for crate::proto::briar::app::v1::__buffa::view::UpdateProjectExecutionWorkerPolicyResponseView<
+for crate::proto::briar::app::v1::__buffa::view::UpdateTeamExecutionWorkerPolicyResponseView<
     '_,
 > {
     fn encode(
@@ -19039,10 +19025,10 @@ for crate::proto::briar::app::v1::__buffa::view::UpdateProjectExecutionWorkerPol
     }
 }
 impl ::connectrpc::Encodable<
-    crate::proto::briar::app::v1::UpdateProjectExecutionWorkerPolicyResponse,
+    crate::proto::briar::app::v1::UpdateTeamExecutionWorkerPolicyResponse,
 >
 for ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::UpdateProjectExecutionWorkerPolicyResponseView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateTeamExecutionWorkerPolicyResponseView<
         'static,
     >,
 > {
@@ -19302,110 +19288,110 @@ for ::buffa::view::OwnedView<
     }
 }
 /// Full service name for this service.
-pub const PROJECT_SERVICE_SERVICE_NAME: &str = "briar.app.v1.ProjectService";
-/// Static [`Spec`](::connectrpc::Spec) for the `ListProjects` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const PROJECT_SERVICE_LIST_PROJECTS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/briar.app.v1.ProjectService/ListProjects",
+pub const TEAM_SERVICE_SERVICE_NAME: &str = "briar.app.v1.TeamService";
+/// Static [`Spec`](::connectrpc::Spec) for the `ListTeams` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const TEAM_SERVICE_LIST_TEAMS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.TeamService/ListTeams",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the `CreateProject` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const PROJECT_SERVICE_CREATE_PROJECT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/briar.app.v1.ProjectService/CreateProject",
+/// Static [`Spec`](::connectrpc::Spec) for the `CreateTeam` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const TEAM_SERVICE_CREATE_TEAM_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.TeamService/CreateTeam",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the `DeleteProject` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const PROJECT_SERVICE_DELETE_PROJECT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/briar.app.v1.ProjectService/DeleteProject",
+/// Static [`Spec`](::connectrpc::Spec) for the `DeleteTeam` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const TEAM_SERVICE_DELETE_TEAM_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.TeamService/DeleteTeam",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the `UpdateProjectIcon` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const PROJECT_SERVICE_UPDATE_PROJECT_ICON_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/briar.app.v1.ProjectService/UpdateProjectIcon",
+/// Static [`Spec`](::connectrpc::Spec) for the `UpdateTeamIcon` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const TEAM_SERVICE_UPDATE_TEAM_ICON_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.TeamService/UpdateTeamIcon",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the `UpdateProjectIssueKeyPrefix` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const PROJECT_SERVICE_UPDATE_PROJECT_ISSUE_KEY_PREFIX_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/briar.app.v1.ProjectService/UpdateProjectIssueKeyPrefix",
+/// Static [`Spec`](::connectrpc::Spec) for the `UpdateTeamIssueKeyPrefix` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const TEAM_SERVICE_UPDATE_TEAM_ISSUE_KEY_PREFIX_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.TeamService/UpdateTeamIssueKeyPrefix",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the `UpdateProjectTabs` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const PROJECT_SERVICE_UPDATE_PROJECT_TABS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/briar.app.v1.ProjectService/UpdateProjectTabs",
+/// Static [`Spec`](::connectrpc::Spec) for the `UpdateTeamTabs` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const TEAM_SERVICE_UPDATE_TEAM_TABS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.TeamService/UpdateTeamTabs",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the `CreateProjectAgentToken` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const PROJECT_SERVICE_CREATE_PROJECT_AGENT_TOKEN_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/briar.app.v1.ProjectService/CreateProjectAgentToken",
+/// Static [`Spec`](::connectrpc::Spec) for the `CreateTeamAgentToken` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const TEAM_SERVICE_CREATE_TEAM_AGENT_TOKEN_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.TeamService/CreateTeamAgentToken",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the `UpdateProjectSettings` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const PROJECT_SERVICE_UPDATE_PROJECT_SETTINGS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/briar.app.v1.ProjectService/UpdateProjectSettings",
+/// Static [`Spec`](::connectrpc::Spec) for the `UpdateTeamSettings` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const TEAM_SERVICE_UPDATE_TEAM_SETTINGS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.TeamService/UpdateTeamSettings",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Static [`Spec`](::connectrpc::Spec) for the `UpdateCheckpointPolicy` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const PROJECT_SERVICE_UPDATE_CHECKPOINT_POLICY_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/briar.app.v1.ProjectService/UpdateCheckpointPolicy",
+pub const TEAM_SERVICE_UPDATE_CHECKPOINT_POLICY_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.TeamService/UpdateCheckpointPolicy",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the `GetProjectExecutionWorkerPolicy` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const PROJECT_SERVICE_GET_PROJECT_EXECUTION_WORKER_POLICY_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/briar.app.v1.ProjectService/GetProjectExecutionWorkerPolicy",
+/// Static [`Spec`](::connectrpc::Spec) for the `GetTeamExecutionWorkerPolicy` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const TEAM_SERVICE_GET_TEAM_EXECUTION_WORKER_POLICY_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.TeamService/GetTeamExecutionWorkerPolicy",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the `UpdateProjectExecutionWorkerPolicy` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const PROJECT_SERVICE_UPDATE_PROJECT_EXECUTION_WORKER_POLICY_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/briar.app.v1.ProjectService/UpdateProjectExecutionWorkerPolicy",
+/// Static [`Spec`](::connectrpc::Spec) for the `UpdateTeamExecutionWorkerPolicy` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const TEAM_SERVICE_UPDATE_TEAM_EXECUTION_WORKER_POLICY_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.TeamService/UpdateTeamExecutionWorkerPolicy",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Static [`Spec`](::connectrpc::Spec) for the `ListTeamPlanningProjects` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const PROJECT_SERVICE_LIST_TEAM_PLANNING_PROJECTS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/briar.app.v1.ProjectService/ListTeamPlanningProjects",
+pub const TEAM_SERVICE_LIST_TEAM_PLANNING_PROJECTS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.TeamService/ListTeamPlanningProjects",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Static [`Spec`](::connectrpc::Spec) for the `CreatePlanningProject` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const PROJECT_SERVICE_CREATE_PLANNING_PROJECT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/briar.app.v1.ProjectService/CreatePlanningProject",
+pub const TEAM_SERVICE_CREATE_PLANNING_PROJECT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.TeamService/CreatePlanningProject",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Static [`Spec`](::connectrpc::Spec) for the `UpdatePlanningProject` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const PROJECT_SERVICE_UPDATE_PLANNING_PROJECT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/briar.app.v1.ProjectService/UpdatePlanningProject",
+pub const TEAM_SERVICE_UPDATE_PLANNING_PROJECT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.TeamService/UpdatePlanningProject",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Static [`Spec`](::connectrpc::Spec) for the `DeletePlanningProject` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const PROJECT_SERVICE_DELETE_PLANNING_PROJECT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/briar.app.v1.ProjectService/DeletePlanningProject",
+pub const TEAM_SERVICE_DELETE_PLANNING_PROJECT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.TeamService/DeletePlanningProject",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Static [`Spec`](::connectrpc::Spec) for the `MoveIssueToPlanningProject` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const PROJECT_SERVICE_MOVE_ISSUE_TO_PLANNING_PROJECT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/briar.app.v1.ProjectService/MoveIssueToPlanningProject",
+pub const TEAM_SERVICE_MOVE_ISSUE_TO_PLANNING_PROJECT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.TeamService/MoveIssueToPlanningProject",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Static [`Spec`](::connectrpc::Spec) for the `ResolveIssueHierarchyLocation` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const PROJECT_SERVICE_RESOLVE_ISSUE_HIERARCHY_LOCATION_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/briar.app.v1.ProjectService/ResolveIssueHierarchyLocation",
+pub const TEAM_SERVICE_RESOLVE_ISSUE_HIERARCHY_LOCATION_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.TeamService/ResolveIssueHierarchyLocation",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Server trait for ProjectService.
+/// Server trait for TeamService.
 ///
 /// # Implementing handlers
 ///
@@ -19455,8 +19441,8 @@ pub const PROJECT_SERVICE_RESOLVE_ISSUE_HIERARCHY_LOCATION_SPEC: ::connectrpc::S
 /// [`PreEncoded`](::connectrpc::PreEncoded) — see its `# Streaming
 /// example` doc.
 #[allow(clippy::type_complexity)]
-pub trait ProjectService: Send + Sync + 'static {
-    /// Handle the ListProjects RPC.
+pub trait TeamService: Send + Sync + 'static {
+    /// Handle the ListTeams RPC.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -19465,21 +19451,21 @@ pub trait ProjectService: Send + Sync + 'static {
     /// (zero-copy). The response cannot borrow from `request` — use
     /// `.to_owned_message()` (or copy the specific fields) for anything
     /// returned, stored, or moved into `tokio::spawn`.
-    fn list_projects<'a>(
+    fn list_teams<'a>(
         &'a self,
         ctx: ::connectrpc::RequestContext,
         request: ::connectrpc::ServiceRequest<
             '_,
-            crate::proto::briar::app::v1::ListProjectsRequest,
+            crate::proto::briar::app::v1::ListTeamsRequest,
         >,
     ) -> impl ::std::future::Future<
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
-                crate::proto::briar::app::v1::ListProjectsResponse,
+                crate::proto::briar::app::v1::ListTeamsResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Handle the CreateProject RPC.
+    /// Handle the CreateTeam RPC.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -19488,21 +19474,21 @@ pub trait ProjectService: Send + Sync + 'static {
     /// (zero-copy). The response cannot borrow from `request` — use
     /// `.to_owned_message()` (or copy the specific fields) for anything
     /// returned, stored, or moved into `tokio::spawn`.
-    fn create_project<'a>(
+    fn create_team<'a>(
         &'a self,
         ctx: ::connectrpc::RequestContext,
         request: ::connectrpc::ServiceRequest<
             '_,
-            crate::proto::briar::app::v1::CreateProjectRequest,
+            crate::proto::briar::app::v1::CreateTeamRequest,
         >,
     ) -> impl ::std::future::Future<
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
-                crate::proto::briar::app::v1::CreateProjectResponse,
+                crate::proto::briar::app::v1::CreateTeamResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Handle the DeleteProject RPC.
+    /// Handle the DeleteTeam RPC.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -19511,21 +19497,21 @@ pub trait ProjectService: Send + Sync + 'static {
     /// (zero-copy). The response cannot borrow from `request` — use
     /// `.to_owned_message()` (or copy the specific fields) for anything
     /// returned, stored, or moved into `tokio::spawn`.
-    fn delete_project<'a>(
+    fn delete_team<'a>(
         &'a self,
         ctx: ::connectrpc::RequestContext,
         request: ::connectrpc::ServiceRequest<
             '_,
-            crate::proto::briar::app::v1::DeleteProjectRequest,
+            crate::proto::briar::app::v1::DeleteTeamRequest,
         >,
     ) -> impl ::std::future::Future<
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
-                crate::proto::briar::app::v1::DeleteProjectResponse,
+                crate::proto::briar::app::v1::DeleteTeamResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Handle the UpdateProjectIcon RPC.
+    /// Handle the UpdateTeamIcon RPC.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -19534,21 +19520,21 @@ pub trait ProjectService: Send + Sync + 'static {
     /// (zero-copy). The response cannot borrow from `request` — use
     /// `.to_owned_message()` (or copy the specific fields) for anything
     /// returned, stored, or moved into `tokio::spawn`.
-    fn update_project_icon<'a>(
+    fn update_team_icon<'a>(
         &'a self,
         ctx: ::connectrpc::RequestContext,
         request: ::connectrpc::ServiceRequest<
             '_,
-            crate::proto::briar::app::v1::UpdateProjectIconRequest,
+            crate::proto::briar::app::v1::UpdateTeamIconRequest,
         >,
     ) -> impl ::std::future::Future<
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
-                crate::proto::briar::app::v1::UpdateProjectIconResponse,
+                crate::proto::briar::app::v1::UpdateTeamIconResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Handle the UpdateProjectIssueKeyPrefix RPC.
+    /// Handle the UpdateTeamIssueKeyPrefix RPC.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -19557,21 +19543,21 @@ pub trait ProjectService: Send + Sync + 'static {
     /// (zero-copy). The response cannot borrow from `request` — use
     /// `.to_owned_message()` (or copy the specific fields) for anything
     /// returned, stored, or moved into `tokio::spawn`.
-    fn update_project_issue_key_prefix<'a>(
+    fn update_team_issue_key_prefix<'a>(
         &'a self,
         ctx: ::connectrpc::RequestContext,
         request: ::connectrpc::ServiceRequest<
             '_,
-            crate::proto::briar::app::v1::UpdateProjectIssueKeyPrefixRequest,
+            crate::proto::briar::app::v1::UpdateTeamIssueKeyPrefixRequest,
         >,
     ) -> impl ::std::future::Future<
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
-                crate::proto::briar::app::v1::UpdateProjectIssueKeyPrefixResponse,
+                crate::proto::briar::app::v1::UpdateTeamIssueKeyPrefixResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Handle the UpdateProjectTabs RPC.
+    /// Handle the UpdateTeamTabs RPC.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -19580,21 +19566,21 @@ pub trait ProjectService: Send + Sync + 'static {
     /// (zero-copy). The response cannot borrow from `request` — use
     /// `.to_owned_message()` (or copy the specific fields) for anything
     /// returned, stored, or moved into `tokio::spawn`.
-    fn update_project_tabs<'a>(
+    fn update_team_tabs<'a>(
         &'a self,
         ctx: ::connectrpc::RequestContext,
         request: ::connectrpc::ServiceRequest<
             '_,
-            crate::proto::briar::app::v1::UpdateProjectTabsRequest,
+            crate::proto::briar::app::v1::UpdateTeamTabsRequest,
         >,
     ) -> impl ::std::future::Future<
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
-                crate::proto::briar::app::v1::UpdateProjectTabsResponse,
+                crate::proto::briar::app::v1::UpdateTeamTabsResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Handle the CreateProjectAgentToken RPC.
+    /// Handle the CreateTeamAgentToken RPC.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -19603,21 +19589,21 @@ pub trait ProjectService: Send + Sync + 'static {
     /// (zero-copy). The response cannot borrow from `request` — use
     /// `.to_owned_message()` (or copy the specific fields) for anything
     /// returned, stored, or moved into `tokio::spawn`.
-    fn create_project_agent_token<'a>(
+    fn create_team_agent_token<'a>(
         &'a self,
         ctx: ::connectrpc::RequestContext,
         request: ::connectrpc::ServiceRequest<
             '_,
-            crate::proto::briar::app::v1::CreateProjectAgentTokenRequest,
+            crate::proto::briar::app::v1::CreateTeamAgentTokenRequest,
         >,
     ) -> impl ::std::future::Future<
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
-                crate::proto::briar::app::v1::CreateProjectAgentTokenResponse,
+                crate::proto::briar::app::v1::CreateTeamAgentTokenResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Handle the UpdateProjectSettings RPC.
+    /// Handle the UpdateTeamSettings RPC.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -19626,17 +19612,17 @@ pub trait ProjectService: Send + Sync + 'static {
     /// (zero-copy). The response cannot borrow from `request` — use
     /// `.to_owned_message()` (or copy the specific fields) for anything
     /// returned, stored, or moved into `tokio::spawn`.
-    fn update_project_settings<'a>(
+    fn update_team_settings<'a>(
         &'a self,
         ctx: ::connectrpc::RequestContext,
         request: ::connectrpc::ServiceRequest<
             '_,
-            crate::proto::briar::app::v1::UpdateProjectSettingsRequest,
+            crate::proto::briar::app::v1::UpdateTeamSettingsRequest,
         >,
     ) -> impl ::std::future::Future<
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
-                crate::proto::briar::app::v1::UpdateProjectSettingsResponse,
+                crate::proto::briar::app::v1::UpdateTeamSettingsResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -19663,7 +19649,7 @@ pub trait ProjectService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Handle the GetProjectExecutionWorkerPolicy RPC.
+    /// Handle the GetTeamExecutionWorkerPolicy RPC.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -19672,21 +19658,21 @@ pub trait ProjectService: Send + Sync + 'static {
     /// (zero-copy). The response cannot borrow from `request` — use
     /// `.to_owned_message()` (or copy the specific fields) for anything
     /// returned, stored, or moved into `tokio::spawn`.
-    fn get_project_execution_worker_policy<'a>(
+    fn get_team_execution_worker_policy<'a>(
         &'a self,
         ctx: ::connectrpc::RequestContext,
         request: ::connectrpc::ServiceRequest<
             '_,
-            crate::proto::briar::app::v1::GetProjectExecutionWorkerPolicyRequest,
+            crate::proto::briar::app::v1::GetTeamExecutionWorkerPolicyRequest,
         >,
     ) -> impl ::std::future::Future<
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
-                crate::proto::briar::app::v1::GetProjectExecutionWorkerPolicyResponse,
+                crate::proto::briar::app::v1::GetTeamExecutionWorkerPolicyResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Handle the UpdateProjectExecutionWorkerPolicy RPC.
+    /// Handle the UpdateTeamExecutionWorkerPolicy RPC.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -19695,17 +19681,17 @@ pub trait ProjectService: Send + Sync + 'static {
     /// (zero-copy). The response cannot borrow from `request` — use
     /// `.to_owned_message()` (or copy the specific fields) for anything
     /// returned, stored, or moved into `tokio::spawn`.
-    fn update_project_execution_worker_policy<'a>(
+    fn update_team_execution_worker_policy<'a>(
         &'a self,
         ctx: ::connectrpc::RequestContext,
         request: ::connectrpc::ServiceRequest<
             '_,
-            crate::proto::briar::app::v1::UpdateProjectExecutionWorkerPolicyRequest,
+            crate::proto::briar::app::v1::UpdateTeamExecutionWorkerPolicyRequest,
         >,
     ) -> impl ::std::future::Future<
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
-                crate::proto::briar::app::v1::UpdateProjectExecutionWorkerPolicyResponse,
+                crate::proto::briar::app::v1::UpdateTeamExecutionWorkerPolicyResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -19863,7 +19849,7 @@ pub trait ProjectService: Send + Sync + 'static {
 /// let service = Arc::new(MyServiceImpl);
 /// let router = service.register(Router::new());
 /// ```
-pub trait ProjectServiceExt: ProjectService {
+pub trait TeamServiceExt: TeamService {
     /// Register this service implementation with a Router.
     ///
     /// Takes ownership of the `Arc<Self>` and returns a new Router with
@@ -19873,21 +19859,21 @@ pub trait ProjectServiceExt: ProjectService {
         router: ::connectrpc::Router,
     ) -> ::connectrpc::Router;
 }
-impl<S: ProjectService> ProjectServiceExt for S {
+impl<S: TeamService> TeamServiceExt for S {
     fn register(
         self: ::std::sync::Arc<Self>,
         router: ::connectrpc::Router,
     ) -> ::connectrpc::Router {
         router
             .route_view(
-                PROJECT_SERVICE_SERVICE_NAME,
-                "ListProjects",
+                TEAM_SERVICE_SERVICE_NAME,
+                "ListTeams",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
                     ::connectrpc::view_handler_fn(move |
                         ctx,
                         req: ::buffa::view::OwnedView<
-                            crate::proto::briar::app::v1::__buffa::view::ListProjectsRequestView<
+                            crate::proto::briar::app::v1::__buffa::view::ListTeamsRequestView<
                                 'static,
                             >,
                         >,
@@ -19896,27 +19882,27 @@ impl<S: ProjectService> ProjectServiceExt for S {
                         let svc = ::std::sync::Arc::clone(&svc);
                         async move {
                             let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::briar::app::v1::ListProjectsRequest,
+                                crate::proto::briar::app::v1::ListTeamsRequest,
                             >::from_parts(req.reborrow(), req.bytes());
-                            svc.list_projects(ctx, sreq)
+                            svc.list_teams(ctx, sreq)
                                 .await?
                                 .encode::<
-                                    crate::proto::briar::app::v1::ListProjectsResponse,
+                                    crate::proto::briar::app::v1::ListTeamsResponse,
                                 >(format)
                         }
                     })
                 },
             )
-            .with_spec(PROJECT_SERVICE_LIST_PROJECTS_SPEC)
+            .with_spec(TEAM_SERVICE_LIST_TEAMS_SPEC)
             .route_view(
-                PROJECT_SERVICE_SERVICE_NAME,
-                "CreateProject",
+                TEAM_SERVICE_SERVICE_NAME,
+                "CreateTeam",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
                     ::connectrpc::view_handler_fn(move |
                         ctx,
                         req: ::buffa::view::OwnedView<
-                            crate::proto::briar::app::v1::__buffa::view::CreateProjectRequestView<
+                            crate::proto::briar::app::v1::__buffa::view::CreateTeamRequestView<
                                 'static,
                             >,
                         >,
@@ -19925,27 +19911,27 @@ impl<S: ProjectService> ProjectServiceExt for S {
                         let svc = ::std::sync::Arc::clone(&svc);
                         async move {
                             let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::briar::app::v1::CreateProjectRequest,
+                                crate::proto::briar::app::v1::CreateTeamRequest,
                             >::from_parts(req.reborrow(), req.bytes());
-                            svc.create_project(ctx, sreq)
+                            svc.create_team(ctx, sreq)
                                 .await?
                                 .encode::<
-                                    crate::proto::briar::app::v1::CreateProjectResponse,
+                                    crate::proto::briar::app::v1::CreateTeamResponse,
                                 >(format)
                         }
                     })
                 },
             )
-            .with_spec(PROJECT_SERVICE_CREATE_PROJECT_SPEC)
+            .with_spec(TEAM_SERVICE_CREATE_TEAM_SPEC)
             .route_view(
-                PROJECT_SERVICE_SERVICE_NAME,
-                "DeleteProject",
+                TEAM_SERVICE_SERVICE_NAME,
+                "DeleteTeam",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
                     ::connectrpc::view_handler_fn(move |
                         ctx,
                         req: ::buffa::view::OwnedView<
-                            crate::proto::briar::app::v1::__buffa::view::DeleteProjectRequestView<
+                            crate::proto::briar::app::v1::__buffa::view::DeleteTeamRequestView<
                                 'static,
                             >,
                         >,
@@ -19954,27 +19940,27 @@ impl<S: ProjectService> ProjectServiceExt for S {
                         let svc = ::std::sync::Arc::clone(&svc);
                         async move {
                             let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::briar::app::v1::DeleteProjectRequest,
+                                crate::proto::briar::app::v1::DeleteTeamRequest,
                             >::from_parts(req.reborrow(), req.bytes());
-                            svc.delete_project(ctx, sreq)
+                            svc.delete_team(ctx, sreq)
                                 .await?
                                 .encode::<
-                                    crate::proto::briar::app::v1::DeleteProjectResponse,
+                                    crate::proto::briar::app::v1::DeleteTeamResponse,
                                 >(format)
                         }
                     })
                 },
             )
-            .with_spec(PROJECT_SERVICE_DELETE_PROJECT_SPEC)
+            .with_spec(TEAM_SERVICE_DELETE_TEAM_SPEC)
             .route_view(
-                PROJECT_SERVICE_SERVICE_NAME,
-                "UpdateProjectIcon",
+                TEAM_SERVICE_SERVICE_NAME,
+                "UpdateTeamIcon",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
                     ::connectrpc::view_handler_fn(move |
                         ctx,
                         req: ::buffa::view::OwnedView<
-                            crate::proto::briar::app::v1::__buffa::view::UpdateProjectIconRequestView<
+                            crate::proto::briar::app::v1::__buffa::view::UpdateTeamIconRequestView<
                                 'static,
                             >,
                         >,
@@ -19983,27 +19969,27 @@ impl<S: ProjectService> ProjectServiceExt for S {
                         let svc = ::std::sync::Arc::clone(&svc);
                         async move {
                             let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::briar::app::v1::UpdateProjectIconRequest,
+                                crate::proto::briar::app::v1::UpdateTeamIconRequest,
                             >::from_parts(req.reborrow(), req.bytes());
-                            svc.update_project_icon(ctx, sreq)
+                            svc.update_team_icon(ctx, sreq)
                                 .await?
                                 .encode::<
-                                    crate::proto::briar::app::v1::UpdateProjectIconResponse,
+                                    crate::proto::briar::app::v1::UpdateTeamIconResponse,
                                 >(format)
                         }
                     })
                 },
             )
-            .with_spec(PROJECT_SERVICE_UPDATE_PROJECT_ICON_SPEC)
+            .with_spec(TEAM_SERVICE_UPDATE_TEAM_ICON_SPEC)
             .route_view(
-                PROJECT_SERVICE_SERVICE_NAME,
-                "UpdateProjectIssueKeyPrefix",
+                TEAM_SERVICE_SERVICE_NAME,
+                "UpdateTeamIssueKeyPrefix",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
                     ::connectrpc::view_handler_fn(move |
                         ctx,
                         req: ::buffa::view::OwnedView<
-                            crate::proto::briar::app::v1::__buffa::view::UpdateProjectIssueKeyPrefixRequestView<
+                            crate::proto::briar::app::v1::__buffa::view::UpdateTeamIssueKeyPrefixRequestView<
                                 'static,
                             >,
                         >,
@@ -20012,27 +19998,27 @@ impl<S: ProjectService> ProjectServiceExt for S {
                         let svc = ::std::sync::Arc::clone(&svc);
                         async move {
                             let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::briar::app::v1::UpdateProjectIssueKeyPrefixRequest,
+                                crate::proto::briar::app::v1::UpdateTeamIssueKeyPrefixRequest,
                             >::from_parts(req.reborrow(), req.bytes());
-                            svc.update_project_issue_key_prefix(ctx, sreq)
+                            svc.update_team_issue_key_prefix(ctx, sreq)
                                 .await?
                                 .encode::<
-                                    crate::proto::briar::app::v1::UpdateProjectIssueKeyPrefixResponse,
+                                    crate::proto::briar::app::v1::UpdateTeamIssueKeyPrefixResponse,
                                 >(format)
                         }
                     })
                 },
             )
-            .with_spec(PROJECT_SERVICE_UPDATE_PROJECT_ISSUE_KEY_PREFIX_SPEC)
+            .with_spec(TEAM_SERVICE_UPDATE_TEAM_ISSUE_KEY_PREFIX_SPEC)
             .route_view(
-                PROJECT_SERVICE_SERVICE_NAME,
-                "UpdateProjectTabs",
+                TEAM_SERVICE_SERVICE_NAME,
+                "UpdateTeamTabs",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
                     ::connectrpc::view_handler_fn(move |
                         ctx,
                         req: ::buffa::view::OwnedView<
-                            crate::proto::briar::app::v1::__buffa::view::UpdateProjectTabsRequestView<
+                            crate::proto::briar::app::v1::__buffa::view::UpdateTeamTabsRequestView<
                                 'static,
                             >,
                         >,
@@ -20041,27 +20027,27 @@ impl<S: ProjectService> ProjectServiceExt for S {
                         let svc = ::std::sync::Arc::clone(&svc);
                         async move {
                             let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::briar::app::v1::UpdateProjectTabsRequest,
+                                crate::proto::briar::app::v1::UpdateTeamTabsRequest,
                             >::from_parts(req.reborrow(), req.bytes());
-                            svc.update_project_tabs(ctx, sreq)
+                            svc.update_team_tabs(ctx, sreq)
                                 .await?
                                 .encode::<
-                                    crate::proto::briar::app::v1::UpdateProjectTabsResponse,
+                                    crate::proto::briar::app::v1::UpdateTeamTabsResponse,
                                 >(format)
                         }
                     })
                 },
             )
-            .with_spec(PROJECT_SERVICE_UPDATE_PROJECT_TABS_SPEC)
+            .with_spec(TEAM_SERVICE_UPDATE_TEAM_TABS_SPEC)
             .route_view(
-                PROJECT_SERVICE_SERVICE_NAME,
-                "CreateProjectAgentToken",
+                TEAM_SERVICE_SERVICE_NAME,
+                "CreateTeamAgentToken",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
                     ::connectrpc::view_handler_fn(move |
                         ctx,
                         req: ::buffa::view::OwnedView<
-                            crate::proto::briar::app::v1::__buffa::view::CreateProjectAgentTokenRequestView<
+                            crate::proto::briar::app::v1::__buffa::view::CreateTeamAgentTokenRequestView<
                                 'static,
                             >,
                         >,
@@ -20070,27 +20056,27 @@ impl<S: ProjectService> ProjectServiceExt for S {
                         let svc = ::std::sync::Arc::clone(&svc);
                         async move {
                             let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::briar::app::v1::CreateProjectAgentTokenRequest,
+                                crate::proto::briar::app::v1::CreateTeamAgentTokenRequest,
                             >::from_parts(req.reborrow(), req.bytes());
-                            svc.create_project_agent_token(ctx, sreq)
+                            svc.create_team_agent_token(ctx, sreq)
                                 .await?
                                 .encode::<
-                                    crate::proto::briar::app::v1::CreateProjectAgentTokenResponse,
+                                    crate::proto::briar::app::v1::CreateTeamAgentTokenResponse,
                                 >(format)
                         }
                     })
                 },
             )
-            .with_spec(PROJECT_SERVICE_CREATE_PROJECT_AGENT_TOKEN_SPEC)
+            .with_spec(TEAM_SERVICE_CREATE_TEAM_AGENT_TOKEN_SPEC)
             .route_view(
-                PROJECT_SERVICE_SERVICE_NAME,
-                "UpdateProjectSettings",
+                TEAM_SERVICE_SERVICE_NAME,
+                "UpdateTeamSettings",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
                     ::connectrpc::view_handler_fn(move |
                         ctx,
                         req: ::buffa::view::OwnedView<
-                            crate::proto::briar::app::v1::__buffa::view::UpdateProjectSettingsRequestView<
+                            crate::proto::briar::app::v1::__buffa::view::UpdateTeamSettingsRequestView<
                                 'static,
                             >,
                         >,
@@ -20099,20 +20085,20 @@ impl<S: ProjectService> ProjectServiceExt for S {
                         let svc = ::std::sync::Arc::clone(&svc);
                         async move {
                             let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::briar::app::v1::UpdateProjectSettingsRequest,
+                                crate::proto::briar::app::v1::UpdateTeamSettingsRequest,
                             >::from_parts(req.reborrow(), req.bytes());
-                            svc.update_project_settings(ctx, sreq)
+                            svc.update_team_settings(ctx, sreq)
                                 .await?
                                 .encode::<
-                                    crate::proto::briar::app::v1::UpdateProjectSettingsResponse,
+                                    crate::proto::briar::app::v1::UpdateTeamSettingsResponse,
                                 >(format)
                         }
                     })
                 },
             )
-            .with_spec(PROJECT_SERVICE_UPDATE_PROJECT_SETTINGS_SPEC)
+            .with_spec(TEAM_SERVICE_UPDATE_TEAM_SETTINGS_SPEC)
             .route_view(
-                PROJECT_SERVICE_SERVICE_NAME,
+                TEAM_SERVICE_SERVICE_NAME,
                 "UpdateCheckpointPolicy",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
@@ -20139,16 +20125,16 @@ impl<S: ProjectService> ProjectServiceExt for S {
                     })
                 },
             )
-            .with_spec(PROJECT_SERVICE_UPDATE_CHECKPOINT_POLICY_SPEC)
+            .with_spec(TEAM_SERVICE_UPDATE_CHECKPOINT_POLICY_SPEC)
             .route_view(
-                PROJECT_SERVICE_SERVICE_NAME,
-                "GetProjectExecutionWorkerPolicy",
+                TEAM_SERVICE_SERVICE_NAME,
+                "GetTeamExecutionWorkerPolicy",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
                     ::connectrpc::view_handler_fn(move |
                         ctx,
                         req: ::buffa::view::OwnedView<
-                            crate::proto::briar::app::v1::__buffa::view::GetProjectExecutionWorkerPolicyRequestView<
+                            crate::proto::briar::app::v1::__buffa::view::GetTeamExecutionWorkerPolicyRequestView<
                                 'static,
                             >,
                         >,
@@ -20157,27 +20143,27 @@ impl<S: ProjectService> ProjectServiceExt for S {
                         let svc = ::std::sync::Arc::clone(&svc);
                         async move {
                             let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::briar::app::v1::GetProjectExecutionWorkerPolicyRequest,
+                                crate::proto::briar::app::v1::GetTeamExecutionWorkerPolicyRequest,
                             >::from_parts(req.reborrow(), req.bytes());
-                            svc.get_project_execution_worker_policy(ctx, sreq)
+                            svc.get_team_execution_worker_policy(ctx, sreq)
                                 .await?
                                 .encode::<
-                                    crate::proto::briar::app::v1::GetProjectExecutionWorkerPolicyResponse,
+                                    crate::proto::briar::app::v1::GetTeamExecutionWorkerPolicyResponse,
                                 >(format)
                         }
                     })
                 },
             )
-            .with_spec(PROJECT_SERVICE_GET_PROJECT_EXECUTION_WORKER_POLICY_SPEC)
+            .with_spec(TEAM_SERVICE_GET_TEAM_EXECUTION_WORKER_POLICY_SPEC)
             .route_view(
-                PROJECT_SERVICE_SERVICE_NAME,
-                "UpdateProjectExecutionWorkerPolicy",
+                TEAM_SERVICE_SERVICE_NAME,
+                "UpdateTeamExecutionWorkerPolicy",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
                     ::connectrpc::view_handler_fn(move |
                         ctx,
                         req: ::buffa::view::OwnedView<
-                            crate::proto::briar::app::v1::__buffa::view::UpdateProjectExecutionWorkerPolicyRequestView<
+                            crate::proto::briar::app::v1::__buffa::view::UpdateTeamExecutionWorkerPolicyRequestView<
                                 'static,
                             >,
                         >,
@@ -20186,20 +20172,20 @@ impl<S: ProjectService> ProjectServiceExt for S {
                         let svc = ::std::sync::Arc::clone(&svc);
                         async move {
                             let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::briar::app::v1::UpdateProjectExecutionWorkerPolicyRequest,
+                                crate::proto::briar::app::v1::UpdateTeamExecutionWorkerPolicyRequest,
                             >::from_parts(req.reborrow(), req.bytes());
-                            svc.update_project_execution_worker_policy(ctx, sreq)
+                            svc.update_team_execution_worker_policy(ctx, sreq)
                                 .await?
                                 .encode::<
-                                    crate::proto::briar::app::v1::UpdateProjectExecutionWorkerPolicyResponse,
+                                    crate::proto::briar::app::v1::UpdateTeamExecutionWorkerPolicyResponse,
                                 >(format)
                         }
                     })
                 },
             )
-            .with_spec(PROJECT_SERVICE_UPDATE_PROJECT_EXECUTION_WORKER_POLICY_SPEC)
+            .with_spec(TEAM_SERVICE_UPDATE_TEAM_EXECUTION_WORKER_POLICY_SPEC)
             .route_view(
-                PROJECT_SERVICE_SERVICE_NAME,
+                TEAM_SERVICE_SERVICE_NAME,
                 "ListTeamPlanningProjects",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
@@ -20226,9 +20212,9 @@ impl<S: ProjectService> ProjectServiceExt for S {
                     })
                 },
             )
-            .with_spec(PROJECT_SERVICE_LIST_TEAM_PLANNING_PROJECTS_SPEC)
+            .with_spec(TEAM_SERVICE_LIST_TEAM_PLANNING_PROJECTS_SPEC)
             .route_view(
-                PROJECT_SERVICE_SERVICE_NAME,
+                TEAM_SERVICE_SERVICE_NAME,
                 "CreatePlanningProject",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
@@ -20255,9 +20241,9 @@ impl<S: ProjectService> ProjectServiceExt for S {
                     })
                 },
             )
-            .with_spec(PROJECT_SERVICE_CREATE_PLANNING_PROJECT_SPEC)
+            .with_spec(TEAM_SERVICE_CREATE_PLANNING_PROJECT_SPEC)
             .route_view(
-                PROJECT_SERVICE_SERVICE_NAME,
+                TEAM_SERVICE_SERVICE_NAME,
                 "UpdatePlanningProject",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
@@ -20284,9 +20270,9 @@ impl<S: ProjectService> ProjectServiceExt for S {
                     })
                 },
             )
-            .with_spec(PROJECT_SERVICE_UPDATE_PLANNING_PROJECT_SPEC)
+            .with_spec(TEAM_SERVICE_UPDATE_PLANNING_PROJECT_SPEC)
             .route_view(
-                PROJECT_SERVICE_SERVICE_NAME,
+                TEAM_SERVICE_SERVICE_NAME,
                 "DeletePlanningProject",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
@@ -20313,9 +20299,9 @@ impl<S: ProjectService> ProjectServiceExt for S {
                     })
                 },
             )
-            .with_spec(PROJECT_SERVICE_DELETE_PLANNING_PROJECT_SPEC)
+            .with_spec(TEAM_SERVICE_DELETE_PLANNING_PROJECT_SPEC)
             .route_view(
-                PROJECT_SERVICE_SERVICE_NAME,
+                TEAM_SERVICE_SERVICE_NAME,
                 "MoveIssueToPlanningProject",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
@@ -20342,9 +20328,9 @@ impl<S: ProjectService> ProjectServiceExt for S {
                     })
                 },
             )
-            .with_spec(PROJECT_SERVICE_MOVE_ISSUE_TO_PLANNING_PROJECT_SPEC)
+            .with_spec(TEAM_SERVICE_MOVE_ISSUE_TO_PLANNING_PROJECT_SPEC)
             .route_view(
-                PROJECT_SERVICE_SERVICE_NAME,
+                TEAM_SERVICE_SERVICE_NAME,
                 "ResolveIssueHierarchyLocation",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
@@ -20371,19 +20357,19 @@ impl<S: ProjectService> ProjectServiceExt for S {
                     })
                 },
             )
-            .with_spec(PROJECT_SERVICE_RESOLVE_ISSUE_HIERARCHY_LOCATION_SPEC)
+            .with_spec(TEAM_SERVICE_RESOLVE_ISSUE_HIERARCHY_LOCATION_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
 #[doc(hidden)]
-pub struct ProjectServiceRegisterMarker;
-impl<S: ProjectService> ::connectrpc::ServiceRegister<ProjectServiceRegisterMarker>
+pub struct TeamServiceRegisterMarker;
+impl<S: TeamService> ::connectrpc::ServiceRegister<TeamServiceRegisterMarker>
 for ::std::sync::Arc<S> {
     fn register_service(self, router: ::connectrpc::Router) -> ::connectrpc::Router {
-        <S as ProjectServiceExt>::register(self, router)
+        <S as TeamServiceExt>::register(self, router)
     }
 }
-/// Monomorphic dispatcher for `ProjectService`.
+/// Monomorphic dispatcher for `TeamService`.
 ///
 /// Unlike `.register(Router)` which type-erases each method into an `Arc<dyn ErasedHandler>` stored in a `HashMap`, this struct dispatches via a compile-time `match` on method name: no vtable, no hash lookup.
 ///
@@ -20392,14 +20378,14 @@ for ::std::sync::Arc<S> {
 /// ```rust,ignore
 /// use connectrpc::ConnectRpcService;
 ///
-/// let server = ProjectServiceServer::new(MyImpl);
+/// let server = TeamServiceServer::new(MyImpl);
 /// let service = ConnectRpcService::new(server);
 /// // hand `service` to axum/hyper as a fallback_service
 /// ```
-pub struct ProjectServiceServer<T> {
+pub struct TeamServiceServer<T> {
     inner: ::std::sync::Arc<T>,
 }
-impl<T: ProjectService> ProjectServiceServer<T> {
+impl<T: TeamService> TeamServiceServer<T> {
     /// Wrap a service implementation in a monomorphic dispatcher.
     pub fn new(service: T) -> Self {
         Self {
@@ -20411,125 +20397,121 @@ impl<T: ProjectService> ProjectServiceServer<T> {
         Self { inner }
     }
 }
-impl<T> Clone for ProjectServiceServer<T> {
+impl<T> Clone for TeamServiceServer<T> {
     fn clone(&self) -> Self {
         Self {
             inner: ::std::sync::Arc::clone(&self.inner),
         }
     }
 }
-impl<T: ProjectService> ::connectrpc::Dispatcher for ProjectServiceServer<T> {
+impl<T: TeamService> ::connectrpc::Dispatcher for TeamServiceServer<T> {
     #[inline]
     fn lookup(
         &self,
         path: &str,
     ) -> Option<::connectrpc::dispatcher::codegen::MethodDescriptor> {
-        let method = path.strip_prefix("briar.app.v1.ProjectService/")?;
+        let method = path.strip_prefix("briar.app.v1.TeamService/")?;
         match method {
-            "ListProjects" => {
+            "ListTeams" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(PROJECT_SERVICE_LIST_PROJECTS_SPEC),
+                        .with_spec(TEAM_SERVICE_LIST_TEAMS_SPEC),
                 )
             }
-            "CreateProject" => {
+            "CreateTeam" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(PROJECT_SERVICE_CREATE_PROJECT_SPEC),
+                        .with_spec(TEAM_SERVICE_CREATE_TEAM_SPEC),
                 )
             }
-            "DeleteProject" => {
+            "DeleteTeam" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(PROJECT_SERVICE_DELETE_PROJECT_SPEC),
+                        .with_spec(TEAM_SERVICE_DELETE_TEAM_SPEC),
                 )
             }
-            "UpdateProjectIcon" => {
+            "UpdateTeamIcon" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(PROJECT_SERVICE_UPDATE_PROJECT_ICON_SPEC),
+                        .with_spec(TEAM_SERVICE_UPDATE_TEAM_ICON_SPEC),
                 )
             }
-            "UpdateProjectIssueKeyPrefix" => {
+            "UpdateTeamIssueKeyPrefix" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(PROJECT_SERVICE_UPDATE_PROJECT_ISSUE_KEY_PREFIX_SPEC),
+                        .with_spec(TEAM_SERVICE_UPDATE_TEAM_ISSUE_KEY_PREFIX_SPEC),
                 )
             }
-            "UpdateProjectTabs" => {
+            "UpdateTeamTabs" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(PROJECT_SERVICE_UPDATE_PROJECT_TABS_SPEC),
+                        .with_spec(TEAM_SERVICE_UPDATE_TEAM_TABS_SPEC),
                 )
             }
-            "CreateProjectAgentToken" => {
+            "CreateTeamAgentToken" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(PROJECT_SERVICE_CREATE_PROJECT_AGENT_TOKEN_SPEC),
+                        .with_spec(TEAM_SERVICE_CREATE_TEAM_AGENT_TOKEN_SPEC),
                 )
             }
-            "UpdateProjectSettings" => {
+            "UpdateTeamSettings" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(PROJECT_SERVICE_UPDATE_PROJECT_SETTINGS_SPEC),
+                        .with_spec(TEAM_SERVICE_UPDATE_TEAM_SETTINGS_SPEC),
                 )
             }
             "UpdateCheckpointPolicy" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(PROJECT_SERVICE_UPDATE_CHECKPOINT_POLICY_SPEC),
+                        .with_spec(TEAM_SERVICE_UPDATE_CHECKPOINT_POLICY_SPEC),
                 )
             }
-            "GetProjectExecutionWorkerPolicy" => {
+            "GetTeamExecutionWorkerPolicy" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(
-                            PROJECT_SERVICE_GET_PROJECT_EXECUTION_WORKER_POLICY_SPEC,
-                        ),
+                        .with_spec(TEAM_SERVICE_GET_TEAM_EXECUTION_WORKER_POLICY_SPEC),
                 )
             }
-            "UpdateProjectExecutionWorkerPolicy" => {
+            "UpdateTeamExecutionWorkerPolicy" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(
-                            PROJECT_SERVICE_UPDATE_PROJECT_EXECUTION_WORKER_POLICY_SPEC,
-                        ),
+                        .with_spec(TEAM_SERVICE_UPDATE_TEAM_EXECUTION_WORKER_POLICY_SPEC),
                 )
             }
             "ListTeamPlanningProjects" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(PROJECT_SERVICE_LIST_TEAM_PLANNING_PROJECTS_SPEC),
+                        .with_spec(TEAM_SERVICE_LIST_TEAM_PLANNING_PROJECTS_SPEC),
                 )
             }
             "CreatePlanningProject" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(PROJECT_SERVICE_CREATE_PLANNING_PROJECT_SPEC),
+                        .with_spec(TEAM_SERVICE_CREATE_PLANNING_PROJECT_SPEC),
                 )
             }
             "UpdatePlanningProject" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(PROJECT_SERVICE_UPDATE_PLANNING_PROJECT_SPEC),
+                        .with_spec(TEAM_SERVICE_UPDATE_PLANNING_PROJECT_SPEC),
                 )
             }
             "DeletePlanningProject" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(PROJECT_SERVICE_DELETE_PLANNING_PROJECT_SPEC),
+                        .with_spec(TEAM_SERVICE_DELETE_PLANNING_PROJECT_SPEC),
                 )
             }
             "MoveIssueToPlanningProject" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(PROJECT_SERVICE_MOVE_ISSUE_TO_PLANNING_PROJECT_SPEC),
+                        .with_spec(TEAM_SERVICE_MOVE_ISSUE_TO_PLANNING_PROJECT_SPEC),
                 )
             }
             "ResolveIssueHierarchyLocation" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(PROJECT_SERVICE_RESOLVE_ISSUE_HIERARCHY_LOCATION_SPEC),
+                        .with_spec(TEAM_SERVICE_RESOLVE_ISSUE_HIERARCHY_LOCATION_SPEC),
                 )
             }
             _ => None,
@@ -20542,184 +20524,184 @@ impl<T: ProjectService> ::connectrpc::Dispatcher for ProjectServiceServer<T> {
         request: ::connectrpc::Payload,
         format: ::connectrpc::CodecFormat,
     ) -> ::connectrpc::dispatcher::codegen::UnaryResult {
-        let Some(method) = path.strip_prefix("briar.app.v1.ProjectService/") else {
+        let Some(method) = path.strip_prefix("briar.app.v1.TeamService/") else {
             return ::connectrpc::dispatcher::codegen::unimplemented_unary(path);
         };
         let _ = (&ctx, &request, &format);
         match method {
-            "ListProjects" => {
+            "ListTeams" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
                     let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::briar::app::v1::ListProjectsRequest,
+                        crate::proto::briar::app::v1::ListTeamsRequest,
                     >(request.encoded()?, format)?;
-                    let req: crate::proto::briar::app::v1::__buffa::view::ListProjectsRequestView<
+                    let req: crate::proto::briar::app::v1::__buffa::view::ListTeamsRequestView<
                         '_,
                     > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
                         &body,
                         ctx.decode_options(),
                     )?;
                     let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::briar::app::v1::ListProjectsRequest,
+                        crate::proto::briar::app::v1::ListTeamsRequest,
                     >::from_parts(&req, &body);
-                    svc.list_projects(ctx, req)
+                    svc.list_teams(ctx, req)
                         .await?
                         .encode::<
-                            crate::proto::briar::app::v1::ListProjectsResponse,
+                            crate::proto::briar::app::v1::ListTeamsResponse,
                         >(format)
                 })
             }
-            "CreateProject" => {
+            "CreateTeam" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
                     let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::briar::app::v1::CreateProjectRequest,
+                        crate::proto::briar::app::v1::CreateTeamRequest,
                     >(request.encoded()?, format)?;
-                    let req: crate::proto::briar::app::v1::__buffa::view::CreateProjectRequestView<
+                    let req: crate::proto::briar::app::v1::__buffa::view::CreateTeamRequestView<
                         '_,
                     > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
                         &body,
                         ctx.decode_options(),
                     )?;
                     let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::briar::app::v1::CreateProjectRequest,
+                        crate::proto::briar::app::v1::CreateTeamRequest,
                     >::from_parts(&req, &body);
-                    svc.create_project(ctx, req)
+                    svc.create_team(ctx, req)
                         .await?
                         .encode::<
-                            crate::proto::briar::app::v1::CreateProjectResponse,
+                            crate::proto::briar::app::v1::CreateTeamResponse,
                         >(format)
                 })
             }
-            "DeleteProject" => {
+            "DeleteTeam" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
                     let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::briar::app::v1::DeleteProjectRequest,
+                        crate::proto::briar::app::v1::DeleteTeamRequest,
                     >(request.encoded()?, format)?;
-                    let req: crate::proto::briar::app::v1::__buffa::view::DeleteProjectRequestView<
+                    let req: crate::proto::briar::app::v1::__buffa::view::DeleteTeamRequestView<
                         '_,
                     > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
                         &body,
                         ctx.decode_options(),
                     )?;
                     let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::briar::app::v1::DeleteProjectRequest,
+                        crate::proto::briar::app::v1::DeleteTeamRequest,
                     >::from_parts(&req, &body);
-                    svc.delete_project(ctx, req)
+                    svc.delete_team(ctx, req)
                         .await?
                         .encode::<
-                            crate::proto::briar::app::v1::DeleteProjectResponse,
+                            crate::proto::briar::app::v1::DeleteTeamResponse,
                         >(format)
                 })
             }
-            "UpdateProjectIcon" => {
+            "UpdateTeamIcon" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
                     let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::briar::app::v1::UpdateProjectIconRequest,
+                        crate::proto::briar::app::v1::UpdateTeamIconRequest,
                     >(request.encoded()?, format)?;
-                    let req: crate::proto::briar::app::v1::__buffa::view::UpdateProjectIconRequestView<
+                    let req: crate::proto::briar::app::v1::__buffa::view::UpdateTeamIconRequestView<
                         '_,
                     > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
                         &body,
                         ctx.decode_options(),
                     )?;
                     let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::briar::app::v1::UpdateProjectIconRequest,
+                        crate::proto::briar::app::v1::UpdateTeamIconRequest,
                     >::from_parts(&req, &body);
-                    svc.update_project_icon(ctx, req)
+                    svc.update_team_icon(ctx, req)
                         .await?
                         .encode::<
-                            crate::proto::briar::app::v1::UpdateProjectIconResponse,
+                            crate::proto::briar::app::v1::UpdateTeamIconResponse,
                         >(format)
                 })
             }
-            "UpdateProjectIssueKeyPrefix" => {
+            "UpdateTeamIssueKeyPrefix" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
                     let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::briar::app::v1::UpdateProjectIssueKeyPrefixRequest,
+                        crate::proto::briar::app::v1::UpdateTeamIssueKeyPrefixRequest,
                     >(request.encoded()?, format)?;
-                    let req: crate::proto::briar::app::v1::__buffa::view::UpdateProjectIssueKeyPrefixRequestView<
+                    let req: crate::proto::briar::app::v1::__buffa::view::UpdateTeamIssueKeyPrefixRequestView<
                         '_,
                     > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
                         &body,
                         ctx.decode_options(),
                     )?;
                     let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::briar::app::v1::UpdateProjectIssueKeyPrefixRequest,
+                        crate::proto::briar::app::v1::UpdateTeamIssueKeyPrefixRequest,
                     >::from_parts(&req, &body);
-                    svc.update_project_issue_key_prefix(ctx, req)
+                    svc.update_team_issue_key_prefix(ctx, req)
                         .await?
                         .encode::<
-                            crate::proto::briar::app::v1::UpdateProjectIssueKeyPrefixResponse,
+                            crate::proto::briar::app::v1::UpdateTeamIssueKeyPrefixResponse,
                         >(format)
                 })
             }
-            "UpdateProjectTabs" => {
+            "UpdateTeamTabs" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
                     let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::briar::app::v1::UpdateProjectTabsRequest,
+                        crate::proto::briar::app::v1::UpdateTeamTabsRequest,
                     >(request.encoded()?, format)?;
-                    let req: crate::proto::briar::app::v1::__buffa::view::UpdateProjectTabsRequestView<
+                    let req: crate::proto::briar::app::v1::__buffa::view::UpdateTeamTabsRequestView<
                         '_,
                     > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
                         &body,
                         ctx.decode_options(),
                     )?;
                     let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::briar::app::v1::UpdateProjectTabsRequest,
+                        crate::proto::briar::app::v1::UpdateTeamTabsRequest,
                     >::from_parts(&req, &body);
-                    svc.update_project_tabs(ctx, req)
+                    svc.update_team_tabs(ctx, req)
                         .await?
                         .encode::<
-                            crate::proto::briar::app::v1::UpdateProjectTabsResponse,
+                            crate::proto::briar::app::v1::UpdateTeamTabsResponse,
                         >(format)
                 })
             }
-            "CreateProjectAgentToken" => {
+            "CreateTeamAgentToken" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
                     let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::briar::app::v1::CreateProjectAgentTokenRequest,
+                        crate::proto::briar::app::v1::CreateTeamAgentTokenRequest,
                     >(request.encoded()?, format)?;
-                    let req: crate::proto::briar::app::v1::__buffa::view::CreateProjectAgentTokenRequestView<
+                    let req: crate::proto::briar::app::v1::__buffa::view::CreateTeamAgentTokenRequestView<
                         '_,
                     > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
                         &body,
                         ctx.decode_options(),
                     )?;
                     let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::briar::app::v1::CreateProjectAgentTokenRequest,
+                        crate::proto::briar::app::v1::CreateTeamAgentTokenRequest,
                     >::from_parts(&req, &body);
-                    svc.create_project_agent_token(ctx, req)
+                    svc.create_team_agent_token(ctx, req)
                         .await?
                         .encode::<
-                            crate::proto::briar::app::v1::CreateProjectAgentTokenResponse,
+                            crate::proto::briar::app::v1::CreateTeamAgentTokenResponse,
                         >(format)
                 })
             }
-            "UpdateProjectSettings" => {
+            "UpdateTeamSettings" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
                     let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::briar::app::v1::UpdateProjectSettingsRequest,
+                        crate::proto::briar::app::v1::UpdateTeamSettingsRequest,
                     >(request.encoded()?, format)?;
-                    let req: crate::proto::briar::app::v1::__buffa::view::UpdateProjectSettingsRequestView<
+                    let req: crate::proto::briar::app::v1::__buffa::view::UpdateTeamSettingsRequestView<
                         '_,
                     > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
                         &body,
                         ctx.decode_options(),
                     )?;
                     let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::briar::app::v1::UpdateProjectSettingsRequest,
+                        crate::proto::briar::app::v1::UpdateTeamSettingsRequest,
                     >::from_parts(&req, &body);
-                    svc.update_project_settings(ctx, req)
+                    svc.update_team_settings(ctx, req)
                         .await?
                         .encode::<
-                            crate::proto::briar::app::v1::UpdateProjectSettingsResponse,
+                            crate::proto::briar::app::v1::UpdateTeamSettingsResponse,
                         >(format)
                 })
             }
@@ -20745,47 +20727,47 @@ impl<T: ProjectService> ::connectrpc::Dispatcher for ProjectServiceServer<T> {
                         >(format)
                 })
             }
-            "GetProjectExecutionWorkerPolicy" => {
+            "GetTeamExecutionWorkerPolicy" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
                     let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::briar::app::v1::GetProjectExecutionWorkerPolicyRequest,
+                        crate::proto::briar::app::v1::GetTeamExecutionWorkerPolicyRequest,
                     >(request.encoded()?, format)?;
-                    let req: crate::proto::briar::app::v1::__buffa::view::GetProjectExecutionWorkerPolicyRequestView<
+                    let req: crate::proto::briar::app::v1::__buffa::view::GetTeamExecutionWorkerPolicyRequestView<
                         '_,
                     > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
                         &body,
                         ctx.decode_options(),
                     )?;
                     let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::briar::app::v1::GetProjectExecutionWorkerPolicyRequest,
+                        crate::proto::briar::app::v1::GetTeamExecutionWorkerPolicyRequest,
                     >::from_parts(&req, &body);
-                    svc.get_project_execution_worker_policy(ctx, req)
+                    svc.get_team_execution_worker_policy(ctx, req)
                         .await?
                         .encode::<
-                            crate::proto::briar::app::v1::GetProjectExecutionWorkerPolicyResponse,
+                            crate::proto::briar::app::v1::GetTeamExecutionWorkerPolicyResponse,
                         >(format)
                 })
             }
-            "UpdateProjectExecutionWorkerPolicy" => {
+            "UpdateTeamExecutionWorkerPolicy" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
                     let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::briar::app::v1::UpdateProjectExecutionWorkerPolicyRequest,
+                        crate::proto::briar::app::v1::UpdateTeamExecutionWorkerPolicyRequest,
                     >(request.encoded()?, format)?;
-                    let req: crate::proto::briar::app::v1::__buffa::view::UpdateProjectExecutionWorkerPolicyRequestView<
+                    let req: crate::proto::briar::app::v1::__buffa::view::UpdateTeamExecutionWorkerPolicyRequestView<
                         '_,
                     > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
                         &body,
                         ctx.decode_options(),
                     )?;
                     let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::briar::app::v1::UpdateProjectExecutionWorkerPolicyRequest,
+                        crate::proto::briar::app::v1::UpdateTeamExecutionWorkerPolicyRequest,
                     >::from_parts(&req, &body);
-                    svc.update_project_execution_worker_policy(ctx, req)
+                    svc.update_team_execution_worker_policy(ctx, req)
                         .await?
                         .encode::<
-                            crate::proto::briar::app::v1::UpdateProjectExecutionWorkerPolicyResponse,
+                            crate::proto::briar::app::v1::UpdateTeamExecutionWorkerPolicyResponse,
                         >(format)
                 })
             }
@@ -20931,7 +20913,7 @@ impl<T: ProjectService> ::connectrpc::Dispatcher for ProjectServiceServer<T> {
         request: ::buffa::bytes::Bytes,
         format: ::connectrpc::CodecFormat,
     ) -> ::connectrpc::dispatcher::codegen::StreamingResult {
-        let Some(method) = path.strip_prefix("briar.app.v1.ProjectService/") else {
+        let Some(method) = path.strip_prefix("briar.app.v1.TeamService/") else {
             return ::connectrpc::dispatcher::codegen::unimplemented_streaming(path);
         };
         let _ = (&ctx, &request, &format);
@@ -20946,7 +20928,7 @@ impl<T: ProjectService> ::connectrpc::Dispatcher for ProjectServiceServer<T> {
         requests: ::connectrpc::dispatcher::codegen::RequestStream,
         format: ::connectrpc::CodecFormat,
     ) -> ::connectrpc::dispatcher::codegen::UnaryResult {
-        let Some(method) = path.strip_prefix("briar.app.v1.ProjectService/") else {
+        let Some(method) = path.strip_prefix("briar.app.v1.TeamService/") else {
             return ::connectrpc::dispatcher::codegen::unimplemented_unary(path);
         };
         let _ = (&ctx, &requests, &format);
@@ -20961,7 +20943,7 @@ impl<T: ProjectService> ::connectrpc::Dispatcher for ProjectServiceServer<T> {
         requests: ::connectrpc::dispatcher::codegen::RequestStream,
         format: ::connectrpc::CodecFormat,
     ) -> ::connectrpc::dispatcher::codegen::StreamingResult {
-        let Some(method) = path.strip_prefix("briar.app.v1.ProjectService/") else {
+        let Some(method) = path.strip_prefix("briar.app.v1.TeamService/") else {
             return ::connectrpc::dispatcher::codegen::unimplemented_streaming(path);
         };
         let _ = (&ctx, &requests, &format);
@@ -20987,8 +20969,8 @@ impl<T: ProjectService> ::connectrpc::Dispatcher for ProjectServiceServer<T> {
 /// let conn = Http2Connection::connect_plaintext(uri.clone()).await?.shared(1024);
 /// let config = ClientConfig::new(uri).with_protocol(Protocol::Grpc);
 ///
-/// let client = ProjectServiceClient::new(conn, config);
-/// let response = client.list_projects(request).await?;
+/// let client = TeamServiceClient::new(conn, config);
+/// let response = client.list_teams(request).await?;
 /// ```
 ///
 /// # Example (Connect / HTTP/1.1 or ALPN)
@@ -20999,8 +20981,8 @@ impl<T: ProjectService> ::connectrpc::Dispatcher for ProjectServiceServer<T> {
 /// let http = HttpClient::plaintext();  // cleartext http:// only
 /// let config = ClientConfig::new("http://localhost:8080".parse()?);
 ///
-/// let client = ProjectServiceClient::new(http, config);
-/// let response = client.list_projects(request).await?;
+/// let client = TeamServiceClient::new(http, config);
+/// let response = client.list_teams(request).await?;
 /// ```
 ///
 /// # Working with the response
@@ -21010,7 +20992,7 @@ impl<T: ProjectService> ::connectrpc::Dispatcher for ProjectServiceServer<T> {
 /// message, so field access is zero-copy:
 ///
 /// ```rust,ignore
-/// let resp = client.list_projects(request).await?;
+/// let resp = client.list_teams(request).await?;
 /// let name: &str = resp.view().name;  // borrow into the response buffer
 /// ```
 ///
@@ -21018,7 +21000,7 @@ impl<T: ProjectService> ::connectrpc::Dispatcher for ProjectServiceServer<T> {
 /// [`into_owned()`](::connectrpc::client::UnaryResponse::into_owned):
 ///
 /// ```rust,ignore
-/// let owned = client.list_projects(request).await?.into_owned();
+/// let owned = client.list_teams(request).await?.into_owned();
 /// ```
 ///
 /// [`into_view()`](::connectrpc::client::UnaryResponse::into_view) keeps the
@@ -21029,12 +21011,12 @@ impl<T: ProjectService> ::connectrpc::Dispatcher for ProjectServiceServer<T> {
 /// methods (`msg.name()`) or `.view()`, or convert with `.to_owned_message()`.
 #[cfg(feature = "client")]
 #[derive(Clone)]
-pub struct ProjectServiceClient<T> {
+pub struct TeamServiceClient<T> {
     transport: T,
     config: ::connectrpc::client::ClientConfig,
 }
 #[cfg(feature = "client")]
-impl<T> ProjectServiceClient<T>
+impl<T> TeamServiceClient<T>
 where
     T: ::connectrpc::client::ClientTransport,
     <T::ResponseBody as ::connectrpc::http_body::Body>::Error: ::std::fmt::Display,
@@ -21051,35 +21033,35 @@ where
     pub fn config_mut(&mut self) -> &mut ::connectrpc::client::ClientConfig {
         &mut self.config
     }
-    /// Call the ListProjects RPC. Sends a request to /briar.app.v1.ProjectService/ListProjects.
-    pub async fn list_projects(
+    /// Call the ListTeams RPC. Sends a request to /briar.app.v1.TeamService/ListTeams.
+    pub async fn list_teams(
         &self,
-        request: crate::proto::briar::app::v1::ListProjectsRequest,
+        request: crate::proto::briar::app::v1::ListTeamsRequest,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::app::v1::__buffa::view::ListProjectsResponseView<
+                crate::proto::briar::app::v1::__buffa::view::ListTeamsResponseView<
                     'static,
                 >,
             >,
         >,
         ::connectrpc::ConnectError,
     > {
-        self.list_projects_with_options(
+        self.list_teams_with_options(
                 request,
                 ::connectrpc::client::CallOptions::default(),
             )
             .await
     }
-    /// Call the ListProjects RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn list_projects_with_options(
+    /// Call the ListTeams RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_teams_with_options(
         &self,
-        request: crate::proto::briar::app::v1::ListProjectsRequest,
+        request: crate::proto::briar::app::v1::ListTeamsRequest,
         options: ::connectrpc::client::CallOptions,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::app::v1::__buffa::view::ListProjectsResponseView<
+                crate::proto::briar::app::v1::__buffa::view::ListTeamsResponseView<
                     'static,
                 >,
             >,
@@ -21089,42 +21071,42 @@ where
         ::connectrpc::client::call_unary(
                 &self.transport,
                 &self.config,
-                PROJECT_SERVICE_LIST_PROJECTS_SPEC
+                TEAM_SERVICE_LIST_TEAMS_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
             )
             .await
     }
-    /// Call the CreateProject RPC. Sends a request to /briar.app.v1.ProjectService/CreateProject.
-    pub async fn create_project(
+    /// Call the CreateTeam RPC. Sends a request to /briar.app.v1.TeamService/CreateTeam.
+    pub async fn create_team(
         &self,
-        request: crate::proto::briar::app::v1::CreateProjectRequest,
+        request: crate::proto::briar::app::v1::CreateTeamRequest,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::app::v1::__buffa::view::CreateProjectResponseView<
+                crate::proto::briar::app::v1::__buffa::view::CreateTeamResponseView<
                     'static,
                 >,
             >,
         >,
         ::connectrpc::ConnectError,
     > {
-        self.create_project_with_options(
+        self.create_team_with_options(
                 request,
                 ::connectrpc::client::CallOptions::default(),
             )
             .await
     }
-    /// Call the CreateProject RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn create_project_with_options(
+    /// Call the CreateTeam RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn create_team_with_options(
         &self,
-        request: crate::proto::briar::app::v1::CreateProjectRequest,
+        request: crate::proto::briar::app::v1::CreateTeamRequest,
         options: ::connectrpc::client::CallOptions,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::app::v1::__buffa::view::CreateProjectResponseView<
+                crate::proto::briar::app::v1::__buffa::view::CreateTeamResponseView<
                     'static,
                 >,
             >,
@@ -21134,42 +21116,42 @@ where
         ::connectrpc::client::call_unary(
                 &self.transport,
                 &self.config,
-                PROJECT_SERVICE_CREATE_PROJECT_SPEC
+                TEAM_SERVICE_CREATE_TEAM_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
             )
             .await
     }
-    /// Call the DeleteProject RPC. Sends a request to /briar.app.v1.ProjectService/DeleteProject.
-    pub async fn delete_project(
+    /// Call the DeleteTeam RPC. Sends a request to /briar.app.v1.TeamService/DeleteTeam.
+    pub async fn delete_team(
         &self,
-        request: crate::proto::briar::app::v1::DeleteProjectRequest,
+        request: crate::proto::briar::app::v1::DeleteTeamRequest,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::app::v1::__buffa::view::DeleteProjectResponseView<
+                crate::proto::briar::app::v1::__buffa::view::DeleteTeamResponseView<
                     'static,
                 >,
             >,
         >,
         ::connectrpc::ConnectError,
     > {
-        self.delete_project_with_options(
+        self.delete_team_with_options(
                 request,
                 ::connectrpc::client::CallOptions::default(),
             )
             .await
     }
-    /// Call the DeleteProject RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn delete_project_with_options(
+    /// Call the DeleteTeam RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn delete_team_with_options(
         &self,
-        request: crate::proto::briar::app::v1::DeleteProjectRequest,
+        request: crate::proto::briar::app::v1::DeleteTeamRequest,
         options: ::connectrpc::client::CallOptions,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::app::v1::__buffa::view::DeleteProjectResponseView<
+                crate::proto::briar::app::v1::__buffa::view::DeleteTeamResponseView<
                     'static,
                 >,
             >,
@@ -21179,42 +21161,42 @@ where
         ::connectrpc::client::call_unary(
                 &self.transport,
                 &self.config,
-                PROJECT_SERVICE_DELETE_PROJECT_SPEC
+                TEAM_SERVICE_DELETE_TEAM_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
             )
             .await
     }
-    /// Call the UpdateProjectIcon RPC. Sends a request to /briar.app.v1.ProjectService/UpdateProjectIcon.
-    pub async fn update_project_icon(
+    /// Call the UpdateTeamIcon RPC. Sends a request to /briar.app.v1.TeamService/UpdateTeamIcon.
+    pub async fn update_team_icon(
         &self,
-        request: crate::proto::briar::app::v1::UpdateProjectIconRequest,
+        request: crate::proto::briar::app::v1::UpdateTeamIconRequest,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::app::v1::__buffa::view::UpdateProjectIconResponseView<
+                crate::proto::briar::app::v1::__buffa::view::UpdateTeamIconResponseView<
                     'static,
                 >,
             >,
         >,
         ::connectrpc::ConnectError,
     > {
-        self.update_project_icon_with_options(
+        self.update_team_icon_with_options(
                 request,
                 ::connectrpc::client::CallOptions::default(),
             )
             .await
     }
-    /// Call the UpdateProjectIcon RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn update_project_icon_with_options(
+    /// Call the UpdateTeamIcon RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn update_team_icon_with_options(
         &self,
-        request: crate::proto::briar::app::v1::UpdateProjectIconRequest,
+        request: crate::proto::briar::app::v1::UpdateTeamIconRequest,
         options: ::connectrpc::client::CallOptions,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::app::v1::__buffa::view::UpdateProjectIconResponseView<
+                crate::proto::briar::app::v1::__buffa::view::UpdateTeamIconResponseView<
                     'static,
                 >,
             >,
@@ -21224,42 +21206,42 @@ where
         ::connectrpc::client::call_unary(
                 &self.transport,
                 &self.config,
-                PROJECT_SERVICE_UPDATE_PROJECT_ICON_SPEC
+                TEAM_SERVICE_UPDATE_TEAM_ICON_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
             )
             .await
     }
-    /// Call the UpdateProjectIssueKeyPrefix RPC. Sends a request to /briar.app.v1.ProjectService/UpdateProjectIssueKeyPrefix.
-    pub async fn update_project_issue_key_prefix(
+    /// Call the UpdateTeamIssueKeyPrefix RPC. Sends a request to /briar.app.v1.TeamService/UpdateTeamIssueKeyPrefix.
+    pub async fn update_team_issue_key_prefix(
         &self,
-        request: crate::proto::briar::app::v1::UpdateProjectIssueKeyPrefixRequest,
+        request: crate::proto::briar::app::v1::UpdateTeamIssueKeyPrefixRequest,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::app::v1::__buffa::view::UpdateProjectIssueKeyPrefixResponseView<
+                crate::proto::briar::app::v1::__buffa::view::UpdateTeamIssueKeyPrefixResponseView<
                     'static,
                 >,
             >,
         >,
         ::connectrpc::ConnectError,
     > {
-        self.update_project_issue_key_prefix_with_options(
+        self.update_team_issue_key_prefix_with_options(
                 request,
                 ::connectrpc::client::CallOptions::default(),
             )
             .await
     }
-    /// Call the UpdateProjectIssueKeyPrefix RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn update_project_issue_key_prefix_with_options(
+    /// Call the UpdateTeamIssueKeyPrefix RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn update_team_issue_key_prefix_with_options(
         &self,
-        request: crate::proto::briar::app::v1::UpdateProjectIssueKeyPrefixRequest,
+        request: crate::proto::briar::app::v1::UpdateTeamIssueKeyPrefixRequest,
         options: ::connectrpc::client::CallOptions,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::app::v1::__buffa::view::UpdateProjectIssueKeyPrefixResponseView<
+                crate::proto::briar::app::v1::__buffa::view::UpdateTeamIssueKeyPrefixResponseView<
                     'static,
                 >,
             >,
@@ -21269,42 +21251,42 @@ where
         ::connectrpc::client::call_unary(
                 &self.transport,
                 &self.config,
-                PROJECT_SERVICE_UPDATE_PROJECT_ISSUE_KEY_PREFIX_SPEC
+                TEAM_SERVICE_UPDATE_TEAM_ISSUE_KEY_PREFIX_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
             )
             .await
     }
-    /// Call the UpdateProjectTabs RPC. Sends a request to /briar.app.v1.ProjectService/UpdateProjectTabs.
-    pub async fn update_project_tabs(
+    /// Call the UpdateTeamTabs RPC. Sends a request to /briar.app.v1.TeamService/UpdateTeamTabs.
+    pub async fn update_team_tabs(
         &self,
-        request: crate::proto::briar::app::v1::UpdateProjectTabsRequest,
+        request: crate::proto::briar::app::v1::UpdateTeamTabsRequest,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::app::v1::__buffa::view::UpdateProjectTabsResponseView<
+                crate::proto::briar::app::v1::__buffa::view::UpdateTeamTabsResponseView<
                     'static,
                 >,
             >,
         >,
         ::connectrpc::ConnectError,
     > {
-        self.update_project_tabs_with_options(
+        self.update_team_tabs_with_options(
                 request,
                 ::connectrpc::client::CallOptions::default(),
             )
             .await
     }
-    /// Call the UpdateProjectTabs RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn update_project_tabs_with_options(
+    /// Call the UpdateTeamTabs RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn update_team_tabs_with_options(
         &self,
-        request: crate::proto::briar::app::v1::UpdateProjectTabsRequest,
+        request: crate::proto::briar::app::v1::UpdateTeamTabsRequest,
         options: ::connectrpc::client::CallOptions,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::app::v1::__buffa::view::UpdateProjectTabsResponseView<
+                crate::proto::briar::app::v1::__buffa::view::UpdateTeamTabsResponseView<
                     'static,
                 >,
             >,
@@ -21314,42 +21296,42 @@ where
         ::connectrpc::client::call_unary(
                 &self.transport,
                 &self.config,
-                PROJECT_SERVICE_UPDATE_PROJECT_TABS_SPEC
+                TEAM_SERVICE_UPDATE_TEAM_TABS_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
             )
             .await
     }
-    /// Call the CreateProjectAgentToken RPC. Sends a request to /briar.app.v1.ProjectService/CreateProjectAgentToken.
-    pub async fn create_project_agent_token(
+    /// Call the CreateTeamAgentToken RPC. Sends a request to /briar.app.v1.TeamService/CreateTeamAgentToken.
+    pub async fn create_team_agent_token(
         &self,
-        request: crate::proto::briar::app::v1::CreateProjectAgentTokenRequest,
+        request: crate::proto::briar::app::v1::CreateTeamAgentTokenRequest,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::app::v1::__buffa::view::CreateProjectAgentTokenResponseView<
+                crate::proto::briar::app::v1::__buffa::view::CreateTeamAgentTokenResponseView<
                     'static,
                 >,
             >,
         >,
         ::connectrpc::ConnectError,
     > {
-        self.create_project_agent_token_with_options(
+        self.create_team_agent_token_with_options(
                 request,
                 ::connectrpc::client::CallOptions::default(),
             )
             .await
     }
-    /// Call the CreateProjectAgentToken RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn create_project_agent_token_with_options(
+    /// Call the CreateTeamAgentToken RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn create_team_agent_token_with_options(
         &self,
-        request: crate::proto::briar::app::v1::CreateProjectAgentTokenRequest,
+        request: crate::proto::briar::app::v1::CreateTeamAgentTokenRequest,
         options: ::connectrpc::client::CallOptions,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::app::v1::__buffa::view::CreateProjectAgentTokenResponseView<
+                crate::proto::briar::app::v1::__buffa::view::CreateTeamAgentTokenResponseView<
                     'static,
                 >,
             >,
@@ -21359,42 +21341,42 @@ where
         ::connectrpc::client::call_unary(
                 &self.transport,
                 &self.config,
-                PROJECT_SERVICE_CREATE_PROJECT_AGENT_TOKEN_SPEC
+                TEAM_SERVICE_CREATE_TEAM_AGENT_TOKEN_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
             )
             .await
     }
-    /// Call the UpdateProjectSettings RPC. Sends a request to /briar.app.v1.ProjectService/UpdateProjectSettings.
-    pub async fn update_project_settings(
+    /// Call the UpdateTeamSettings RPC. Sends a request to /briar.app.v1.TeamService/UpdateTeamSettings.
+    pub async fn update_team_settings(
         &self,
-        request: crate::proto::briar::app::v1::UpdateProjectSettingsRequest,
+        request: crate::proto::briar::app::v1::UpdateTeamSettingsRequest,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::app::v1::__buffa::view::UpdateProjectSettingsResponseView<
+                crate::proto::briar::app::v1::__buffa::view::UpdateTeamSettingsResponseView<
                     'static,
                 >,
             >,
         >,
         ::connectrpc::ConnectError,
     > {
-        self.update_project_settings_with_options(
+        self.update_team_settings_with_options(
                 request,
                 ::connectrpc::client::CallOptions::default(),
             )
             .await
     }
-    /// Call the UpdateProjectSettings RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn update_project_settings_with_options(
+    /// Call the UpdateTeamSettings RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn update_team_settings_with_options(
         &self,
-        request: crate::proto::briar::app::v1::UpdateProjectSettingsRequest,
+        request: crate::proto::briar::app::v1::UpdateTeamSettingsRequest,
         options: ::connectrpc::client::CallOptions,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::app::v1::__buffa::view::UpdateProjectSettingsResponseView<
+                crate::proto::briar::app::v1::__buffa::view::UpdateTeamSettingsResponseView<
                     'static,
                 >,
             >,
@@ -21404,14 +21386,14 @@ where
         ::connectrpc::client::call_unary(
                 &self.transport,
                 &self.config,
-                PROJECT_SERVICE_UPDATE_PROJECT_SETTINGS_SPEC
+                TEAM_SERVICE_UPDATE_TEAM_SETTINGS_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
             )
             .await
     }
-    /// Call the UpdateCheckpointPolicy RPC. Sends a request to /briar.app.v1.ProjectService/UpdateCheckpointPolicy.
+    /// Call the UpdateCheckpointPolicy RPC. Sends a request to /briar.app.v1.TeamService/UpdateCheckpointPolicy.
     pub async fn update_checkpoint_policy(
         &self,
         request: crate::proto::briar::app::v1::UpdateCheckpointPolicyRequest,
@@ -21449,42 +21431,42 @@ where
         ::connectrpc::client::call_unary(
                 &self.transport,
                 &self.config,
-                PROJECT_SERVICE_UPDATE_CHECKPOINT_POLICY_SPEC
+                TEAM_SERVICE_UPDATE_CHECKPOINT_POLICY_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
             )
             .await
     }
-    /// Call the GetProjectExecutionWorkerPolicy RPC. Sends a request to /briar.app.v1.ProjectService/GetProjectExecutionWorkerPolicy.
-    pub async fn get_project_execution_worker_policy(
+    /// Call the GetTeamExecutionWorkerPolicy RPC. Sends a request to /briar.app.v1.TeamService/GetTeamExecutionWorkerPolicy.
+    pub async fn get_team_execution_worker_policy(
         &self,
-        request: crate::proto::briar::app::v1::GetProjectExecutionWorkerPolicyRequest,
+        request: crate::proto::briar::app::v1::GetTeamExecutionWorkerPolicyRequest,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::app::v1::__buffa::view::GetProjectExecutionWorkerPolicyResponseView<
+                crate::proto::briar::app::v1::__buffa::view::GetTeamExecutionWorkerPolicyResponseView<
                     'static,
                 >,
             >,
         >,
         ::connectrpc::ConnectError,
     > {
-        self.get_project_execution_worker_policy_with_options(
+        self.get_team_execution_worker_policy_with_options(
                 request,
                 ::connectrpc::client::CallOptions::default(),
             )
             .await
     }
-    /// Call the GetProjectExecutionWorkerPolicy RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn get_project_execution_worker_policy_with_options(
+    /// Call the GetTeamExecutionWorkerPolicy RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_team_execution_worker_policy_with_options(
         &self,
-        request: crate::proto::briar::app::v1::GetProjectExecutionWorkerPolicyRequest,
+        request: crate::proto::briar::app::v1::GetTeamExecutionWorkerPolicyRequest,
         options: ::connectrpc::client::CallOptions,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::app::v1::__buffa::view::GetProjectExecutionWorkerPolicyResponseView<
+                crate::proto::briar::app::v1::__buffa::view::GetTeamExecutionWorkerPolicyResponseView<
                     'static,
                 >,
             >,
@@ -21494,42 +21476,42 @@ where
         ::connectrpc::client::call_unary(
                 &self.transport,
                 &self.config,
-                PROJECT_SERVICE_GET_PROJECT_EXECUTION_WORKER_POLICY_SPEC
+                TEAM_SERVICE_GET_TEAM_EXECUTION_WORKER_POLICY_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
             )
             .await
     }
-    /// Call the UpdateProjectExecutionWorkerPolicy RPC. Sends a request to /briar.app.v1.ProjectService/UpdateProjectExecutionWorkerPolicy.
-    pub async fn update_project_execution_worker_policy(
+    /// Call the UpdateTeamExecutionWorkerPolicy RPC. Sends a request to /briar.app.v1.TeamService/UpdateTeamExecutionWorkerPolicy.
+    pub async fn update_team_execution_worker_policy(
         &self,
-        request: crate::proto::briar::app::v1::UpdateProjectExecutionWorkerPolicyRequest,
+        request: crate::proto::briar::app::v1::UpdateTeamExecutionWorkerPolicyRequest,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::app::v1::__buffa::view::UpdateProjectExecutionWorkerPolicyResponseView<
+                crate::proto::briar::app::v1::__buffa::view::UpdateTeamExecutionWorkerPolicyResponseView<
                     'static,
                 >,
             >,
         >,
         ::connectrpc::ConnectError,
     > {
-        self.update_project_execution_worker_policy_with_options(
+        self.update_team_execution_worker_policy_with_options(
                 request,
                 ::connectrpc::client::CallOptions::default(),
             )
             .await
     }
-    /// Call the UpdateProjectExecutionWorkerPolicy RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn update_project_execution_worker_policy_with_options(
+    /// Call the UpdateTeamExecutionWorkerPolicy RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn update_team_execution_worker_policy_with_options(
         &self,
-        request: crate::proto::briar::app::v1::UpdateProjectExecutionWorkerPolicyRequest,
+        request: crate::proto::briar::app::v1::UpdateTeamExecutionWorkerPolicyRequest,
         options: ::connectrpc::client::CallOptions,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::app::v1::__buffa::view::UpdateProjectExecutionWorkerPolicyResponseView<
+                crate::proto::briar::app::v1::__buffa::view::UpdateTeamExecutionWorkerPolicyResponseView<
                     'static,
                 >,
             >,
@@ -21539,14 +21521,14 @@ where
         ::connectrpc::client::call_unary(
                 &self.transport,
                 &self.config,
-                PROJECT_SERVICE_UPDATE_PROJECT_EXECUTION_WORKER_POLICY_SPEC
+                TEAM_SERVICE_UPDATE_TEAM_EXECUTION_WORKER_POLICY_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
             )
             .await
     }
-    /// Call the ListTeamPlanningProjects RPC. Sends a request to /briar.app.v1.ProjectService/ListTeamPlanningProjects.
+    /// Call the ListTeamPlanningProjects RPC. Sends a request to /briar.app.v1.TeamService/ListTeamPlanningProjects.
     pub async fn list_team_planning_projects(
         &self,
         request: crate::proto::briar::app::v1::ListTeamPlanningProjectsRequest,
@@ -21584,14 +21566,14 @@ where
         ::connectrpc::client::call_unary(
                 &self.transport,
                 &self.config,
-                PROJECT_SERVICE_LIST_TEAM_PLANNING_PROJECTS_SPEC
+                TEAM_SERVICE_LIST_TEAM_PLANNING_PROJECTS_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
             )
             .await
     }
-    /// Call the CreatePlanningProject RPC. Sends a request to /briar.app.v1.ProjectService/CreatePlanningProject.
+    /// Call the CreatePlanningProject RPC. Sends a request to /briar.app.v1.TeamService/CreatePlanningProject.
     pub async fn create_planning_project(
         &self,
         request: crate::proto::briar::app::v1::CreatePlanningProjectRequest,
@@ -21629,14 +21611,14 @@ where
         ::connectrpc::client::call_unary(
                 &self.transport,
                 &self.config,
-                PROJECT_SERVICE_CREATE_PLANNING_PROJECT_SPEC
+                TEAM_SERVICE_CREATE_PLANNING_PROJECT_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
             )
             .await
     }
-    /// Call the UpdatePlanningProject RPC. Sends a request to /briar.app.v1.ProjectService/UpdatePlanningProject.
+    /// Call the UpdatePlanningProject RPC. Sends a request to /briar.app.v1.TeamService/UpdatePlanningProject.
     pub async fn update_planning_project(
         &self,
         request: crate::proto::briar::app::v1::UpdatePlanningProjectRequest,
@@ -21674,14 +21656,14 @@ where
         ::connectrpc::client::call_unary(
                 &self.transport,
                 &self.config,
-                PROJECT_SERVICE_UPDATE_PLANNING_PROJECT_SPEC
+                TEAM_SERVICE_UPDATE_PLANNING_PROJECT_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
             )
             .await
     }
-    /// Call the DeletePlanningProject RPC. Sends a request to /briar.app.v1.ProjectService/DeletePlanningProject.
+    /// Call the DeletePlanningProject RPC. Sends a request to /briar.app.v1.TeamService/DeletePlanningProject.
     pub async fn delete_planning_project(
         &self,
         request: crate::proto::briar::app::v1::DeletePlanningProjectRequest,
@@ -21719,14 +21701,14 @@ where
         ::connectrpc::client::call_unary(
                 &self.transport,
                 &self.config,
-                PROJECT_SERVICE_DELETE_PLANNING_PROJECT_SPEC
+                TEAM_SERVICE_DELETE_PLANNING_PROJECT_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
             )
             .await
     }
-    /// Call the MoveIssueToPlanningProject RPC. Sends a request to /briar.app.v1.ProjectService/MoveIssueToPlanningProject.
+    /// Call the MoveIssueToPlanningProject RPC. Sends a request to /briar.app.v1.TeamService/MoveIssueToPlanningProject.
     pub async fn move_issue_to_planning_project(
         &self,
         request: crate::proto::briar::app::v1::MoveIssueToPlanningProjectRequest,
@@ -21764,14 +21746,14 @@ where
         ::connectrpc::client::call_unary(
                 &self.transport,
                 &self.config,
-                PROJECT_SERVICE_MOVE_ISSUE_TO_PLANNING_PROJECT_SPEC
+                TEAM_SERVICE_MOVE_ISSUE_TO_PLANNING_PROJECT_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
             )
             .await
     }
-    /// Call the ResolveIssueHierarchyLocation RPC. Sends a request to /briar.app.v1.ProjectService/ResolveIssueHierarchyLocation.
+    /// Call the ResolveIssueHierarchyLocation RPC. Sends a request to /briar.app.v1.TeamService/ResolveIssueHierarchyLocation.
     pub async fn resolve_issue_hierarchy_location(
         &self,
         request: crate::proto::briar::app::v1::ResolveIssueHierarchyLocationRequest,
@@ -21809,7 +21791,7 @@ where
         ::connectrpc::client::call_unary(
                 &self.transport,
                 &self.config,
-                PROJECT_SERVICE_RESOLVE_ISSUE_HIERARCHY_LOCATION_SPEC
+                TEAM_SERVICE_RESOLVE_ISSUE_HIERARCHY_LOCATION_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,

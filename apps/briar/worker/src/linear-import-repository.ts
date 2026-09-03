@@ -12,7 +12,7 @@ import {
 import { parseWorkflow, stableJson } from "./hunt-run-codec";
 import { HuntTransitionError } from "./hunt-run-errors";
 import { dashboardStageFor } from "./hunt-run-model";
-import { getProjectSettings } from "./project-settings-repository";
+import { getTeamSettings } from "./team-settings-repository";
 import { digestRunId } from "./run-identity";
 
 export type LinearImportRelationInput = {
@@ -76,7 +76,7 @@ export async function importLinearHuntRuns(
   repository: string,
   inputs: LinearImportRunInput[],
 ): Promise<LinearImportResult> {
-  const settings = await getProjectSettings(db, projectId);
+  const settings = await getTeamSettings(db, projectId);
   const workflowSnapshot = parseWorkflow(settings?.workflow_json);
   if (isRepositoryWorkflowPending(workflowSnapshot)) {
     throw new HuntTransitionError(

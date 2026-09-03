@@ -1,7 +1,7 @@
 import { getArchivedEvidenceImage, listArchivedRunEvidence } from "./archive";
 import type { BriarAuth } from "./auth";
 import {
-  getProject,
+  getTeam,
   getRunEvidenceImage,
   listRunEvidence,
   listRunEvidenceImages,
@@ -37,7 +37,7 @@ export async function listProjectRunEvidence(input: {
   runId: string;
   userId: string;
 }) {
-  const project = await getProject(input.db, input.projectId, input.userId);
+  const project = await getTeam(input.db, input.projectId, input.userId);
   if (!project) throw new HttpError(404, "Project not found");
   return listRunEvidenceForProject({
     db: input.db,

@@ -36,8 +36,8 @@ import {
   type SettingsSection,
 } from "./app-settings-navigation";
 import type { OrganizationSettingsSection } from "./OrganizationSettings";
-import type { ProjectSettingsSection } from "./ProjectSettings";
-import { ProjectIcon } from "./ProjectIcon";
+import type { TeamSettingsSection } from "./TeamSettings";
+import { TeamIcon } from "./TeamIcon";
 
 export type UnifiedSettingsTarget =
   | { scope: "application"; section: SettingsSection }
@@ -49,7 +49,7 @@ export type UnifiedSettingsTarget =
   | {
       scope: "project";
       projectId: string;
-      section: ProjectSettingsSection;
+      section: TeamSettingsSection;
     };
 
 type NavigationItem<Section extends string> = {
@@ -243,7 +243,7 @@ export function UnifiedSettingsSidebar({
     ],
     [t],
   );
-  const projectItems = useMemo<NavigationItem<ProjectSettingsSection>[]>(
+  const projectItems = useMemo<NavigationItem<TeamSettingsSection>[]>(
     () => [
       {
         id: "general",
@@ -369,7 +369,7 @@ export function UnifiedSettingsSidebar({
           onExpandedIdChange={setExpandedProjectId}
           onNavigate={onNavigate}
           renderEntityIcon={(project) => (
-            <ProjectIcon className="size-4" project={project} />
+            <TeamIcon className="size-4" project={project} />
           )}
           scope="project"
           targetFor={(project, section) => ({

@@ -446,7 +446,7 @@ export function IssueConversation({
         description: agent.description ?? null,
         responsibility: agent.responsibility,
         skills: agent.skills,
-        projectId: agent.projectId,
+        projectId: agent.teamId,
         createdAt: agent.createdAt
       });
     }

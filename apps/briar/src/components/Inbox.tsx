@@ -30,7 +30,7 @@ import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
 import { autoHuntWorkflowStageCatalog } from "../lib/auto-hunt-contract";
 import type { Project } from "../types";
-import { ProjectIcon } from "./ProjectIcon";
+import { TeamIcon } from "./TeamIcon";
 import {
   classifyInboxMessage,
   type InboxCategory,
@@ -654,7 +654,7 @@ function InboxMessageRow({
               )}
               data-project-id={project.id}
             >
-              <ProjectIcon
+              <TeamIcon
                 className="inbox-message-project-icon-image"
                 project={project}
               />

@@ -24,26 +24,26 @@ export {
   updateAccountProfile,
 } from "./api/account";
 import { decodeInboxReadVersions } from "./api/inbox-contract";
-import { listProjects } from "./app-rpc/project";
+import { listTeams } from "./app-rpc/team";
 export {
   createAgentToken,
   createPlanningProject,
-  createProject,
+  createTeam,
   deletePlanningProject,
-  deleteProject,
-  loadProjectExecutionWorkerPolicy,
+  deleteTeam,
+  loadTeamExecutionWorkerPolicy,
   loadTeamProjects,
   moveIssueToPlanningProject,
   resolveIssueHierarchyLocation,
   updateCheckpointPolicy,
-  updateProjectIcon,
-  type ProjectIconUpdate,
-  updateProjectExecutionWorkerPolicy,
-  updateProjectIssueKeyPrefix,
-  updateProjectSettings,
-  updateProjectTabs,
+  updateTeamIcon,
+  type TeamIconUpdate,
+  updateTeamExecutionWorkerPolicy,
+  updateTeamIssueKeyPrefix,
+  updateTeamSettings,
+  updateTeamTabs,
   updatePlanningProject,
-} from "./app-rpc/project";
+} from "./app-rpc/team";
 export {
   acceptOrganizationInvitation,
   createOrganization,
@@ -347,8 +347,8 @@ export async function deleteInboxReadState(
   return decodeInboxReadVersions(await deleteInboxReadStateRpc(token, messageId));
 }
 
-export async function loadProjects(token: string): Promise<Project[]> {
-  return listProjects(token);
+export async function loadTeams(token: string): Promise<Project[]> {
+  return listTeams(token);
 }
 
 const normalizeDashboardRuns = (runs: DashboardPayload["runs"]) =>
@@ -396,7 +396,7 @@ export async function loadRunEvents(
   return listRunEventsRpc(token, projectId, runId);
 }
 
-export async function loadProjectAgentSpriteSheet(
+export async function loadTeamAgentSpriteSheet(
   token: string,
   projectId: string,
   agentId: string,

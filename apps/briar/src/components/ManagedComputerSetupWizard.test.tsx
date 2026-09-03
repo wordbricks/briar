@@ -130,7 +130,7 @@ describe("ManagedComputerSetupWizard", () => {
         id: "44444444-4444-4444-8444-444444444444",
         managedComputerId: computer.id,
         organizationId: computer.organizationId,
-        projectId: "33333333-3333-4333-8333-333333333333",
+        teamId: "33333333-3333-4333-8333-333333333333",
         status: "pending" as const,
         expiresAt: "2099-01-01T00:00:00.000Z",
       },
@@ -211,7 +211,7 @@ describe("ManagedComputerSetupWizard", () => {
         payload: {
           case: "complete",
           value: create(ManagedComputerSetupCompleteSchema, {
-            projectId: "33333333-3333-4333-8333-333333333333",
+            teamId: "33333333-3333-4333-8333-333333333333",
             provider: AgentProvider.CODEX,
             workerId: "worker-1",
           }),

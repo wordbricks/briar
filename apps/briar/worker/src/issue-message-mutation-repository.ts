@@ -1,4 +1,4 @@
-import type { ProjectAgentProvider } from "./project-agent-model";
+import type { TeamAgentProvider } from "./team-agent-model";
 import {
   issueAttachmentUploadAvailabilityGuard,
   issueAttachmentUploadConsumeStatements,
@@ -18,7 +18,7 @@ export type IssueMessageReplyPlan = {
   agentName: string;
   agentResponsibility: string;
   preferredWorkerId: string | null;
-  preferredProvider: ProjectAgentProvider;
+  preferredProvider: TeamAgentProvider;
   requiresPreferredWorker: boolean;
 };
 
@@ -91,7 +91,7 @@ export async function commitIssueMessageMutation(
     userId: string;
     messageId: string;
     parentMessageId: string | null;
-    authorAgentProvider: ProjectAgentProvider | null;
+    authorAgentProvider: TeamAgentProvider | null;
     body: string;
     mentionedUserIds: readonly string[];
     targetAgentIds: readonly string[];

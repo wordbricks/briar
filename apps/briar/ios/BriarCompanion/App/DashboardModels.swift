@@ -361,7 +361,7 @@ struct DashboardWorker: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
-struct ProjectExecutionWorkerPolicy: Codable, Equatable, Sendable {
+struct TeamExecutionWorkerPolicy: Codable, Equatable, Sendable {
     enum SelectionMode: String, Codable, Sendable {
         case any
         case allowlist
@@ -410,7 +410,7 @@ struct OrganizationMember: Codable, Equatable, Identifiable, Sendable {
     var id: String { userId }
 }
 
-struct ProjectSettings: Equatable, Sendable {
+struct TeamSettings: Equatable, Sendable {
     struct Linear: Equatable, Sendable {
         let enabled: Bool
         let source: String?
@@ -459,11 +459,11 @@ struct ProjectSettings: Equatable, Sendable {
 
 struct DashboardSnapshot: Equatable, Sendable {
     var project: Project
-    var settings: ProjectSettings
+    var settings: TeamSettings
     var runs: [DashboardRun]
     var workers: [DashboardWorker]?
     var organizationProviders: [AgentProvider]?
-    var executionPolicy: ProjectExecutionWorkerPolicy?
+    var executionPolicy: TeamExecutionWorkerPolicy?
     var members: [OrganizationMember]?
     var conversationNotifications: [ConversationNotification]?
     var channelNotifications: [ChannelNotification]?
@@ -472,11 +472,11 @@ struct DashboardSnapshot: Equatable, Sendable {
 
     init(
         project: Project,
-        settings: ProjectSettings = .empty,
+        settings: TeamSettings = .empty,
         runs: [DashboardRun],
         workers: [DashboardWorker]? = nil,
         organizationProviders: [AgentProvider]? = nil,
-        executionPolicy: ProjectExecutionWorkerPolicy? = nil,
+        executionPolicy: TeamExecutionWorkerPolicy? = nil,
         members: [OrganizationMember]? = nil,
         conversationNotifications: [ConversationNotification]? = nil,
         channelNotifications: [ChannelNotification]? = nil,
@@ -504,10 +504,10 @@ struct DashboardDelta: Equatable, Sendable {
     let runs: [DashboardRun]
     let deletedRunIds: [UUID]
     let project: Project?
-    let settings: ProjectSettings?
+    let settings: TeamSettings?
     let workers: [DashboardWorker]?
     let organizationProviders: [AgentProvider]?
-    let executionPolicy: ProjectExecutionWorkerPolicy?
+    let executionPolicy: TeamExecutionWorkerPolicy?
     let members: [OrganizationMember]?
     let conversationNotifications: [ConversationNotification]?
     let channelNotifications: [ChannelNotification]?
@@ -520,10 +520,10 @@ struct DashboardDelta: Equatable, Sendable {
         runs: [DashboardRun],
         deletedRunIds: [UUID],
         project: Project?,
-        settings: ProjectSettings? = nil,
+        settings: TeamSettings? = nil,
         workers: [DashboardWorker]? = nil,
         organizationProviders: [AgentProvider]? = nil,
-        executionPolicy: ProjectExecutionWorkerPolicy? = nil,
+        executionPolicy: TeamExecutionWorkerPolicy? = nil,
         members: [OrganizationMember]? = nil,
         conversationNotifications: [ConversationNotification]? = nil,
         channelNotifications: [ChannelNotification]? = nil,

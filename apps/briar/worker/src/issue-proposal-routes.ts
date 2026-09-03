@@ -12,7 +12,7 @@ import {
   getIssueAgentSkillExecutionProposal,
   getIssueExecutionProposal,
   getIssueReworkProposal,
-  getProject,
+  getTeam,
   HuntTransitionError,
   listIssueExecutionProposals,
   reserveIssueCreateProposalApproval,
@@ -55,7 +55,7 @@ async function requireIssueProposalProject(
   capability: "issues:execute" | "issues:write",
   deniedMessage: string,
 ) {
-  const project = await getProject(input.db, input.projectId, input.userId);
+  const project = await getTeam(input.db, input.projectId, input.userId);
   if (!project) throw new HttpError(404, "Project not found");
   if (!hasOrganizationCapability(project.member_role, capability)) {
     throw new HttpError(403, deniedMessage);

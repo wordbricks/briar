@@ -5,7 +5,7 @@ import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   defaultAgentProviderModelCatalog,
-} from "../lib/project-llm";
+} from "../lib/team-llm";
 import type { AgentProviderCapabilityCatalog } from "../lib/agent-provider-contract";
 import type { ExecutionWorker } from "../types";
 import { WorkerDispatchDialog } from "./WorkerDispatchDialog";

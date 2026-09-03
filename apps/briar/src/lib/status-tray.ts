@@ -39,11 +39,11 @@ export function buildStatusTrayItems(
       );
     })
     .map((run) => ({
-      projectId: run.projectId,
+      projectId: run.teamId,
       runId: run.id,
       title: run.title?.trim() || untitledTitle,
       statusLabel: statusLabelForRun(run, options?.localizeStatus),
-      projectName: run.projectName,
+      projectName: run.teamName,
     }));
 }
 

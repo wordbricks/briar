@@ -109,7 +109,7 @@ const organizationWorker: OrganizationExecutionWorker = {
 
 const projectAgent: ProjectAgent = {
   id: "agent-1",
-  projectId: "project-1",
+  teamId: "project-1",
   name: "QA Engineer",
   avatar: null,
   codexPet: null,

@@ -29,7 +29,7 @@ import { isReservedProposalIssueSourceKey } from "./proposal-issue-source";
 import { dashboardStageForProgress } from "./request-readers";
 import { decodeRequestSync } from "./request-schema";
 import { assertRunEventIdentityNotOverridden } from "./run-event-identity";
-import type { AuthenticatedWorkerProject } from "./worker-route-auth";
+import type { AuthenticatedWorkerTeam } from "./worker-route-auth";
 import { auditExecutionEvent } from "./workers";
 
 export type IssueWorkIdentity = {
@@ -42,7 +42,7 @@ export type WorkerRunExecutionPrincipal =
   | { readonly kind: "agent" }
   | {
       readonly kind: "worker";
-      readonly worker: AuthenticatedWorkerProject;
+      readonly worker: AuthenticatedWorkerTeam;
     };
 
 export type WorkerRunEventTarget =

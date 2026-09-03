@@ -1,0 +1,311 @@
+syntax = "proto3";
+
+package briar.app.v1;
+
+import "briar/app/v1/common.proto";
+import "briar/types/v1/workflow.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+option swift_prefix = "BriarAPI_";
+
+service TeamService {
+  rpc ListTeams(ListTeamsRequest) returns (ListTeamsResponse);
+  rpc CreateTeam(CreateTeamRequest) returns (CreateTeamResponse);
+  rpc DeleteTeam(DeleteTeamRequest) returns (DeleteTeamResponse);
+  rpc UpdateTeamIcon(UpdateTeamIconRequest) returns (UpdateTeamIconResponse);
+  rpc UpdateTeamIssueKeyPrefix(UpdateTeamIssueKeyPrefixRequest) returns (UpdateTeamIssueKeyPrefixResponse);
+  rpc UpdateTeamTabs(UpdateTeamTabsRequest) returns (UpdateTeamTabsResponse);
+  rpc CreateTeamAgentToken(CreateTeamAgentTokenRequest) returns (CreateTeamAgentTokenResponse);
+  rpc UpdateTeamSettings(UpdateTeamSettingsRequest) returns (UpdateTeamSettingsResponse);
+  rpc UpdateCheckpointPolicy(UpdateCheckpointPolicyRequest) returns (UpdateCheckpointPolicyResponse);
+  rpc GetTeamExecutionWorkerPolicy(GetTeamExecutionWorkerPolicyRequest) returns (GetTeamExecutionWorkerPolicyResponse);
+  rpc UpdateTeamExecutionWorkerPolicy(UpdateTeamExecutionWorkerPolicyRequest) returns (UpdateTeamExecutionWorkerPolicyResponse);
+  rpc ListTeamPlanningProjects(ListTeamPlanningProjectsRequest) returns (ListTeamPlanningProjectsResponse);
+  rpc CreatePlanningProject(CreatePlanningProjectRequest) returns (CreatePlanningProjectResponse);
+  rpc UpdatePlanningProject(UpdatePlanningProjectRequest) returns (UpdatePlanningProjectResponse);
+  rpc DeletePlanningProject(DeletePlanningProjectRequest) returns (DeletePlanningProjectResponse);
+  rpc MoveIssueToPlanningProject(MoveIssueToPlanningProjectRequest) returns (MoveIssueToPlanningProjectResponse);
+  rpc ResolveIssueHierarchyLocation(ResolveIssueHierarchyLocationRequest) returns (ResolveIssueHierarchyLocationResponse);
+}
+
+message ListTeamsRequest {}
+
+message ListTeamsResponse {
+  repeated Team teams = 1;
+}
+
+message CreateTeamRequest {
+  string name = 1;
+  optional string organization_id = 2;
+}
+
+message CreateTeamResponse {
+  Team team = 1;
+  string agent_token = 2;
+}
+
+message DeleteTeamRequest {
+  string team_id = 1;
+}
+
+message DeleteTeamResponse {
+  bool deleted = 1;
+}
+
+message UpdateTeamIconRequest {
+  string team_id = 1;
+
+  oneof icon_update {
+    string icon = 2;
+    google.protobuf.Empty clear_icon = 3;
+    NamedIcon named_icon = 4;
+  }
+}
+
+message NamedIcon {
+  string name = 1;
+  optional string color = 2;
+}
+
+message UpdateTeamIconResponse {
+  Team team = 1;
+}
+
+message UpdateTeamIssueKeyPrefixRequest {
+  string team_id = 1;
+  string issue_key_prefix = 2;
+}
+
+message UpdateTeamIssueKeyPrefixResponse {
+  Team team = 1;
+}
+
+message UpdateTeamTabsRequest {
+  string team_id = 1;
+  bool schedule = 2;
+}
+
+message UpdateTeamTabsResponse {
+  Team team = 1;
+}
+
+message CreateTeamAgentTokenRequest {
+  string team_id = 1;
+}
+
+message CreateTeamAgentTokenResponse {
+  string agent_token = 1;
+}
+
+message LinearSettings {
+  bool enabled = 1;
+  optional string source = 2;
+  optional string team_key = 3;
+}
+
+message TeamSettings {
+  optional string velen_org = 1;
+  optional string data_source = 2;
+  LinearSettings linear = 3;
+  optional int64 github_repository_id = 4;
+  optional string github_repository = 5;
+  briar.types.v1.AutoHuntWorkflow workflow = 6;
+  optional briar.types.v1.CheckpointPolicy checkpoint_policy = 7;
+}
+
+message UpdateTeamSettingsRequest {
+  string team_id = 1;
+  optional string velen_org = 2;
+  optional string data_source = 3;
+  LinearSettings linear = 4;
+  optional string github_repository = 5;
+  briar.types.v1.AutoHuntWorkflow workflow = 6;
+}
+
+message UpdateTeamSettingsResponse {
+  TeamSettings settings = 1;
+}
+
+message UpdateCheckpointPolicyRequest {
+  enum Scope {
+    SCOPE_UNSPECIFIED = 0;
+    SCOPE_TEAM = 1;
+    SCOPE_USER = 2;
+  }
+
+  string team_id = 1;
+  Scope scope = 2;
+  repeated briar.types.v1.WorkflowCheckpointSpec checkpoints = 3;
+  uint64 expected_revision = 4;
+}
+
+message UpdateCheckpointPolicyResponse {
+  briar.types.v1.CheckpointPolicy checkpoint_policy = 1;
+}
+
+message TeamExecutionWorkerPolicy {
+  enum SelectionMode {
+    SELECTION_MODE_UNSPECIFIED = 0;
+    SELECTION_MODE_ANY = 1;
+    SELECTION_MODE_ALLOWLIST = 2;
+  }
+
+  SelectionMode selection_mode = 1;
+  optional string default_worker_id = 2;
+  repeated string allowed_worker_ids = 3;
+  optional google.protobuf.Timestamp updated_at = 4;
+}
+
+message GetTeamExecutionWorkerPolicyRequest {
+  string team_id = 1;
+}
+
+message GetTeamExecutionWorkerPolicyResponse {
+  TeamExecutionWorkerPolicy policy = 1;
+}
+
+message UpdateTeamExecutionWorkerPolicyRequest {
+  string team_id = 1;
+  TeamExecutionWorkerPolicy.SelectionMode selection_mode = 2;
+  optional string default_worker_id = 3;
+  repeated string allowed_worker_ids = 4;
+}
+
+message UpdateTeamExecutionWorkerPolicyResponse {
+  TeamExecutionWorkerPolicy policy = 1;
+}
+
+message Team {
+  string id = 1;
+  string name = 2;
+  string issue_key_prefix = 3;
+  bool schedule_tab_enabled = 4;
+  optional string icon = 5;
+  string organization_id = 6;
+  string organization_name = 7;
+  ProjectRole role = 8;
+  google.protobuf.Timestamp created_at = 9;
+  optional string icon_name = 10;
+  optional string icon_color = 11;
+}
+
+enum PlanningProjectStatus {
+  PLANNING_PROJECT_STATUS_UNSPECIFIED = 0;
+  PLANNING_PROJECT_STATUS_PLANNED = 1;
+  PLANNING_PROJECT_STATUS_ACTIVE = 2;
+  PLANNING_PROJECT_STATUS_COMPLETED = 3;
+  PLANNING_PROJECT_STATUS_CANCELLED = 4;
+}
+
+message PlanningProject {
+  string id = 1;
+  string workspace_id = 2;
+  string workspace_name = 3;
+  string team_id = 4;
+  string team_name = 5;
+  string name = 6;
+  string description = 7;
+  PlanningProjectStatus status = 8;
+  optional string lead_user_id = 9;
+  optional string lead_name = 10;
+  optional string start_date = 11;
+  optional string target_date = 12;
+  optional string icon = 13;
+  optional string color = 14;
+  int32 sort_order = 15;
+  bool is_default = 16;
+  ProjectRole role = 17;
+  google.protobuf.Timestamp created_at = 18;
+  google.protobuf.Timestamp updated_at = 19;
+}
+
+message ListTeamPlanningProjectsRequest {
+  string team_id = 1;
+}
+
+message ListTeamPlanningProjectsResponse {
+  repeated PlanningProject projects = 1;
+}
+
+message CreatePlanningProjectRequest {
+  string team_id = 1;
+  string name = 2;
+  optional string description = 3;
+  optional PlanningProjectStatus status = 4;
+  optional string lead_user_id = 5;
+  optional string start_date = 6;
+  optional string target_date = 7;
+  optional string icon = 8;
+  optional string color = 9;
+  optional int32 sort_order = 10;
+}
+
+message NullableStringUpdate {
+  oneof update {
+    string value = 1;
+    google.protobuf.Empty clear = 2;
+  }
+}
+
+message UpdatePlanningProjectRequest {
+  string project_id = 1;
+  optional string name = 2;
+  optional string description = 3;
+  optional PlanningProjectStatus status = 4;
+  NullableStringUpdate lead_user_id = 5;
+  NullableStringUpdate start_date = 6;
+  NullableStringUpdate target_date = 7;
+  NullableStringUpdate icon = 8;
+  NullableStringUpdate color = 9;
+  optional int32 sort_order = 10;
+}
+
+message CreatePlanningProjectResponse {
+  PlanningProject project = 1;
+}
+
+message UpdatePlanningProjectResponse {
+  PlanningProject project = 1;
+}
+
+message DeletePlanningProjectRequest {
+  string project_id = 1;
+}
+
+message DeletePlanningProjectResponse {
+  bool deleted = 1;
+  int32 moved_issue_count = 2;
+}
+
+message MoveIssueToPlanningProjectRequest {
+  string source_project_id = 1;
+  string run_id = 2;
+  string target_project_id = 3;
+}
+
+message MoveIssueToPlanningProjectResponse {
+  enum Outcome {
+    OUTCOME_UNSPECIFIED = 0;
+    OUTCOME_MOVED = 1;
+    OUTCOME_SAME_PROJECT = 2;
+  }
+  Outcome outcome = 1;
+  string issue_id = 2;
+  string workspace_id = 3;
+  string team_id = 4;
+  string project_id = 5;
+}
+
+message ResolveIssueHierarchyLocationRequest {
+  string source_team_id = 1;
+  string run_id = 2;
+}
+
+message ResolveIssueHierarchyLocationResponse {
+  string run_id = 1;
+  string workspace_id = 2;
+  string team_id = 3;
+  string project_id = 4;
+  string project_name = 5;
+}

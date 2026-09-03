@@ -13,7 +13,7 @@ import { handleChannelMessageRoute } from "./channel-message-routes";
 import { handleDmMemoryRoute } from "./dm-memory-routes";
 import { handleChannelReplyResultRoute } from "./channel-reply-result-routes";
 import { handleManagedComputerRoute } from "./managed-computer-routes";
-import { handleProjectAgentRoute } from "./project-agent-routes";
+import { handleTeamAgentRoute } from "./team-agent-routes";
 import { handlePublicRoute } from "./public-routes";
 import { handleIncomingChannelWebhookRoute } from "./incoming-channel-webhook";
 import { handleRealtimeRoute } from "./realtime-routes";
@@ -25,7 +25,7 @@ import {
 import { handleRunEvidenceRoute } from "./run-evidence-routes";
 import { handleGithubPublicRoute } from "./github-integration-routes";
 import {
-  getProject,
+  getTeam,
 } from "./db";
 import { WorkerConflictError } from "./workers";
 import { WorkerLifecycleConflictError } from "./worker-lifecycle-repository";
@@ -107,7 +107,7 @@ async function requireProjectAccess(
     return;
   }
   const session = await requireSession(auth, request);
-  if (!(await getProject(db, projectId, session.user.id))) {
+  if (!(await getTeam(db, projectId, session.user.id))) {
     throw new HttpError(404, "Attachment not found");
   }
 }
@@ -173,7 +173,7 @@ async function route(
   });
   if (channelMessageResponse !== undefined) return channelMessageResponse;
 
-  const projectAgentResponse = await handleProjectAgentRoute({
+  const projectAgentResponse = await handleTeamAgentRoute({
     request,
     url,
     auth,

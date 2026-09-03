@@ -11,7 +11,7 @@ import {
 import {
   agentProviderLabels,
   type AgentProvider,
-} from "../lib/project-llm";
+} from "../lib/team-llm";
 
 export function AgentWorkLog({
   activity,

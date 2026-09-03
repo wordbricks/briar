@@ -26,12 +26,12 @@ import {
   inspectWorkerProviderHealth,
 } from "./provider-health";
 import {
-  configWithRemoteProjectSettings,
-  type FetchRemoteProjectSettings,
-  fetchRemoteProjectSettings,
+  configWithRemoteTeamSettings,
+  type FetchRemoteTeamSettings,
+  fetchRemoteTeamSettings,
   projectWithRemoteSettings,
   remoteWorkflowState,
-} from "./project-settings-sync";
+} from "./team-settings-sync";
 import {
   createManagedComputerSetupSession,
   fetchCurrentUser,
@@ -97,7 +97,7 @@ export type ManagedComputerSyncDependencies = {
   resolveProjectId: (
     config: Awaited<ReturnType<typeof loadConfig>>,
   ) => Promise<string>;
-  fetchProjectSettings: FetchRemoteProjectSettings;
+  fetchTeamSettings: FetchRemoteTeamSettings;
   persistConfig: typeof saveConfig;
   writeOutput: (output: string) => void;
 };
@@ -108,7 +108,7 @@ const defaultManagedComputerSyncDependencies: ManagedComputerSyncDependencies = 
   loadAuthentication: configForManagedComputer,
   resolveProjectId: async (config) =>
     value("--project")?.trim() || (await currentProject(config)).id,
-  fetchProjectSettings: fetchRemoteProjectSettings,
+  fetchTeamSettings: fetchRemoteTeamSettings,
   persistConfig: saveConfig,
   writeOutput: console.log,
 };
@@ -131,12 +131,12 @@ export async function managedComputerSyncCommand(
       `Briar project ${projectId} is not configured on this managed computer`,
     );
   }
-  const settings = await resolved.fetchProjectSettings(
+  const settings = await resolved.fetchTeamSettings(
     credential.apiOrigin,
     projectId,
     userToken,
   );
-  const nextConfig = configWithRemoteProjectSettings(
+  const nextConfig = configWithRemoteTeamSettings(
     config,
     projectId,
     settings,
@@ -196,7 +196,7 @@ export async function managedComputerSetupCommand() {
     throw new Error("This managed computer enrollment does not match the API");
   }
 
-  const authoritativeSettings = await fetchRemoteProjectSettings(
+  const authoritativeSettings = await fetchRemoteTeamSettings(
     credential.apiOrigin,
     projectId,
     userToken,
@@ -259,7 +259,7 @@ export async function managedComputerSetupCommand() {
   if (
     binding.managedComputerId !== credential.managedComputerId ||
     binding.organizationId !== credential.organizationId ||
-    binding.projectId !== projectId ||
+    binding.teamId !== projectId ||
     binding.deviceId !== credential.deviceId
   ) {
     throw new Error("Managed computer setup response did not match this device");

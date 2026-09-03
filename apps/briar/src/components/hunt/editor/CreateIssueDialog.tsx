@@ -13,7 +13,7 @@ import { clearCreateIssueDraft, loadCreateIssueDraft, saveCreateIssueDraft } fro
 import { removeIssueAttachmentMarkdown } from "@/lib/issue-markdown";
 import { type IssueDifficulty } from "@/lib/issue-difficulty";
 import type { CreateIssueInput, OrganizationMember } from "@/types";
-import { agentEffortOptions, agentProviders, type AgentProvider, type ModelEffort } from "@/lib/project-llm";
+import { agentEffortOptions, agentProviders, type AgentProvider, type ModelEffort } from "@/lib/team-llm";
 import { useAgentProviderModels } from "@/hooks/useAgentProviderModels";
 import { useAgentProviderModelPreferences } from "@/hooks/useAgentProviderModelPreferences";
 import { useI18n } from "@/i18n";

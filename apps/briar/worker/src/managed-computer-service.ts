@@ -39,8 +39,8 @@ import {
 import { decodeInstanceIdentityDocument } from "./managed-computer-request-contract";
 import { workerJson } from "./worker-json";
 import type { WorkerRuntimeMetadata } from "./worker-runtime-mappers";
-import { getProjectSettings } from "./project-settings-repository";
-import { settingsJson } from "./project-settings-json";
+import { getTeamSettings } from "./team-settings-repository";
+import { settingsJson } from "./team-settings-json";
 
 export class ManagedComputerServiceError extends Error {
   constructor(
@@ -753,7 +753,7 @@ export async function managedComputerSetupContext(
       expiresAt: session.expires_at,
     },
     project,
-    settings: settingsJson(await getProjectSettings(db, project.id)),
+    settings: settingsJson(await getTeamSettings(db, project.id)),
   };
 }
 

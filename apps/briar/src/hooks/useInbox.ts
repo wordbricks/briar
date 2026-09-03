@@ -222,7 +222,7 @@ export function buildCurrentInboxMessages(
   const messages: InboxMessage[] = [];
 
   if (dashboard) {
-    const issueKeyPrefix = dashboard.project.issueKeyPrefix;
+    const issueKeyPrefix = dashboard.team.issueKeyPrefix;
     for (const run of dashboard.runs) {
       if (!inboxIssueNotifyingStatuses.has(run.status)) continue;
       if (currentUserId !== undefined) {
@@ -237,8 +237,8 @@ export function buildCurrentInboxMessages(
       messages.push({
         id: `issue:${run.id}`,
         kind: "issue",
-        projectId: dashboard.project.id,
-        projectName: dashboard.project.name,
+        projectId: dashboard.team.id,
+        projectName: dashboard.team.name,
         targetId: run.id,
         title: run.title,
         occurredAt: run.lastEventAt,
@@ -282,8 +282,8 @@ export function buildCurrentInboxMessages(
       messages.push({
         id: `conversation:${notification.id}`,
         kind: "conversation",
-        projectId: dashboard.project.id,
-        projectName: dashboard.project.name,
+        projectId: dashboard.team.id,
+        projectName: dashboard.team.name,
         targetId: notification.runId,
         messageId: notification.id,
         rootMessageId: notification.rootMessageId,
@@ -309,8 +309,8 @@ export function buildCurrentInboxMessages(
         // Dashboard loading already scopes this projection to the active
         // project's organization. Retaining the active project keeps the
         // existing persisted Inbox/project filtering contract compatible.
-        projectId: dashboard.project.id,
-        projectName: dashboard.project.name,
+        projectId: dashboard.team.id,
+        projectName: dashboard.team.name,
         targetId: notification.channelId,
         channelId: notification.channelId,
         channelName: notification.channelName,
@@ -710,8 +710,8 @@ export function useInbox(
     [
       dashboard?.conversationNotifications,
       dashboard?.channelNotifications,
-      dashboard?.project.id,
-      dashboard?.project.name,
+      dashboard?.team.id,
+      dashboard?.team.name,
       dashboard?.runs,
       projects,
       sessions,

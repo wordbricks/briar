@@ -13,11 +13,11 @@ import {
   registerAppAgentService,
   type AppConnectAgentServices,
 } from "./app-connect-agent";
-import { encodeStoredProjectAgentSessionSummary } from "./project-request-contract";
+import { encodeStoredTeamAgentSessionSummary } from "./team-request-contract";
 import { requireConnectHandler } from "./test-helpers/connect";
 
 const repositoryMocks = {
-  getProject: vi.fn<AppConnectAgentServices["getProject"]>(),
+  getTeam: vi.fn<AppConnectAgentServices["getTeam"]>(),
   getCursor: vi.fn<AppConnectAgentServices["getSessionCursor"]>(),
   getTranscript: vi.fn<AppConnectAgentServices["getTranscript"]>(),
   listSummaries: vi.fn<AppConnectAgentServices["listSessionSummaries"]>(),
@@ -65,7 +65,7 @@ describe("app Agent Connect adapter", () => {
         updatedAt: new Date("2026-08-30T00:00:00.000Z"),
       },
     });
-    repositoryMocks.getProject.mockResolvedValue({
+    repositoryMocks.getTeam.mockResolvedValue({
       id: projectId,
       name: "Briar",
       issue_key_prefix: "BR",
@@ -84,7 +84,7 @@ describe("app Agent Connect adapter", () => {
       session_id: sessionId,
       archived: 0,
       updated_at: "2026-08-30T02:03:04.000Z",
-      summary_json: encodeStoredProjectAgentSessionSummary({
+      summary_json: encodeStoredTeamAgentSessionSummary({
         dispatchGroupId: sessionId,
         agentId,
         agentName: "Planner",
@@ -159,7 +159,7 @@ describe("app Agent Connect adapter", () => {
       },
       {
         requireSession: repositoryMocks.requireSession,
-        getProject: repositoryMocks.getProject,
+        getTeam: repositoryMocks.getTeam,
         getSessionCursor: repositoryMocks.getCursor,
         getTranscript: repositoryMocks.getTranscript,
         listSessionSummaries: repositoryMocks.listSummaries,

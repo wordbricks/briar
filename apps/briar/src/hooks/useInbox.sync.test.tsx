@@ -72,10 +72,10 @@ function Harness({
   userId: string;
 }) {
   const sessions = useMemo(() => [], []);
-  const projects = useMemo(() => [dashboard.project], [dashboard.project]);
+  const projects = useMemo(() => [dashboard.team], [dashboard.team]);
   inbox = useInbox(
     userId,
-    dashboard.project.organizationId,
+    dashboard.team.organizationId,
     dashboard,
     sessions,
     projects,

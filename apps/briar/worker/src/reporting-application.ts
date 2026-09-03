@@ -9,7 +9,7 @@ import { normalizeAutoHuntWorkflow } from "../../src/lib/auto-hunt-contract";
 import { parseExecutionMetrics } from "./agent-result-json";
 import {
   getHuntRunForProject,
-  getProject,
+  getTeam,
   listOrganizationStatusTrayRuns,
   listOrganizationUsageCostRecords,
   listOrganizationUsageExecutionAttempts,
@@ -241,7 +241,7 @@ export async function getProjectUsageSummaryApplication(input: {
   readonly range?: ProjectUsageDateRange;
   readonly generatedAt?: number;
 }) {
-  const project = await getProject(input.db, input.projectId, input.userId);
+  const project = await getTeam(input.db, input.projectId, input.userId);
   if (!project) {
     throw new ReportingApplicationError("project_not_found", "Project not found");
   }
@@ -306,7 +306,7 @@ export async function getRunCostEstimateApplication(
   },
   services: ReportingApplicationServices = reportingApplicationServices,
 ) {
-  const project = await getProject(input.db, input.projectId, input.userId);
+  const project = await getTeam(input.db, input.projectId, input.userId);
   if (!project) {
     throw new ReportingApplicationError("project_not_found", "Project not found");
   }

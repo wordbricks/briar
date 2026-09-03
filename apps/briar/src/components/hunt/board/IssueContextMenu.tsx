@@ -5,7 +5,7 @@ import { type ReactElement } from "react";
 import { AgentProviderIcon } from "@/components/AgentIcons";
 import { type AutoHuntWorkflowCheckpoint } from "@/lib/auto-hunt-contract";
 import type { HuntRun, HuntRunPlacement, IssueExecutionPreferences, PlanningProject, Project } from "@/types";
-import { agentEffortOptions, agentModelDisplayName, agentModelOptions, agentProviderLabels, type AgentProvider } from "@/lib/project-llm";
+import { agentEffortOptions, agentModelDisplayName, agentModelOptions, agentProviderLabels, type AgentProvider } from "@/lib/team-llm";
 import { useAgentProviderModels } from "@/hooks/useAgentProviderModels";
 import { useI18n } from "@/i18n";
 import type { MessageKey } from "@/i18n/messages";

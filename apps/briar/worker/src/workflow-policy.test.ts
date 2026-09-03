@@ -3,10 +3,10 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { normalizeAutoHuntWorkflow } from "../../src/lib/auto-hunt-contract";
 import {
   createOrganization,
-  createProject,
+  createTeam,
   recordHuntEvent,
   updateIssueCheckpoints,
-  updateProjectMandatoryCheckpoints,
+  updateTeamMandatoryCheckpoints,
   updateUserWorkflowCheckpointDefaults,
   type HuntEventInput,
 } from "./db";
@@ -69,7 +69,7 @@ describe("workflow checkpoint policy persistence", () => {
       handle: "policy-org",
       ownerUserId: "policy-user",
     });
-    const project = await createProject(db, {
+    const project = await createTeam(db, {
       ownerUserId: "policy-user",
       organizationId: organization.id,
       name: "Policy Project",
@@ -134,8 +134,8 @@ describe("workflow checkpoint policy persistence", () => {
       .bind(projectId)
       .first<{ revision: number }>();
     expect(initial?.revision).toBe(1);
-    expect(await updateProjectMandatoryCheckpoints(db, projectId, mandatory, 1)).toBe(true);
-    expect(await updateProjectMandatoryCheckpoints(db, projectId, [], 1)).toBe(false);
+    expect(await updateTeamMandatoryCheckpoints(db, projectId, mandatory, 1)).toBe(true);
+    expect(await updateTeamMandatoryCheckpoints(db, projectId, [], 1)).toBe(false);
     expect(
       await updateUserWorkflowCheckpointDefaults(
         db,
@@ -202,7 +202,7 @@ describe("workflow checkpoint policy persistence", () => {
       completion: { requiredStages: ["pr_open", "production_qa"] },
     })).rejects.toThrow("unknown stage 'implementing'");
 
-    expect(await updateProjectMandatoryCheckpoints(db, projectId, [], 2)).toBe(true);
+    expect(await updateTeamMandatoryCheckpoints(db, projectId, [], 2)).toBe(true);
     expect(
       await updateUserWorkflowCheckpointDefaults(
         db,

@@ -36,7 +36,7 @@ import {
   updateOrganizationExecutionWorkerIcon,
 } from "../lib/api";
 import { isDesktopTauri } from "../lib/platform";
-import { configureLocalExecutionWorker } from "../lib/project-connection";
+import { configureLocalExecutionWorker } from "../lib/team-connection";
 import { loadExecutionWorkerSettings } from "../lib/organization-worker-settings";
 import {
   compareSemanticVersions,
@@ -75,13 +75,13 @@ const workerStateTone = (state: OrganizationExecutionWorker["state"]) =>
   state === "online" ? "success" : state === "stale" ? "warning" : "outline";
 
 export function OrganizationWorkersSettings({
-  connectedProjectIds,
+  connectedTeamIds,
   organization,
   projects,
   token,
   userId,
 }: {
-  connectedProjectIds: string[] | null;
+  connectedTeamIds: string[] | null;
   organization: Organization;
   projects: Project[];
   token: string;
@@ -97,9 +97,9 @@ export function OrganizationWorkersSettings({
   const connectedOrganizationProjects = useMemo(
     () =>
       organizationProjects.filter((project) =>
-        connectedProjectIds?.includes(project.id),
+        connectedTeamIds?.includes(project.id),
       ),
-    [connectedProjectIds, organizationProjects],
+    [connectedTeamIds, organizationProjects],
   );
   const [workers, setWorkers] = useState<OrganizationExecutionWorker[]>([]);
   const [localStatuses, setLocalStatuses] = useState<
@@ -347,7 +347,7 @@ export function OrganizationWorkersSettings({
           ) : (
             organizationProjects.map((project) => {
               const connected = Boolean(
-                connectedProjectIds?.includes(project.id),
+                connectedTeamIds?.includes(project.id),
               );
               const status = statusByProjectId.get(project.id);
               const enabled = status?.registered === true;

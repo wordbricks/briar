@@ -3,7 +3,7 @@ import { agentProviders } from "../../src/lib/agent-provider";
 import type {
   HuntEventRow,
   IssueMessageRow,
-  ProjectAgentSessionRow,
+  TeamAgentSessionRow,
   RunEvidenceImageRow,
   RunEvidenceRow,
 } from "./db";
@@ -13,8 +13,8 @@ import type {
   AgentWorkLogEntryRow,
 } from "./agent-worklog";
 import {
-  decodeStoredProjectAgentSessionPayload,
-} from "./project-request-contract";
+  decodeStoredTeamAgentSessionPayload,
+} from "./team-request-contract";
 import {
   PositiveSafeInteger,
   strictSchemaOptions,
@@ -281,9 +281,9 @@ export const decodeArchivedProjectAgentSessionRow = decodeArchiveSync(
 );
 export const decodeArchivedProjectAgentSession = (
   input: unknown,
-): ProjectAgentSessionRow => {
+): TeamAgentSessionRow => {
   const row = decodeArchivedProjectAgentSessionRow(input);
-  decodeStoredProjectAgentSessionPayload(row.payload_json);
+  decodeStoredTeamAgentSessionPayload(row.payload_json);
   return row;
 };
 export const decodeArchivedTranscriptSession:

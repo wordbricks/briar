@@ -289,7 +289,7 @@ final class IssueMutationTests: XCTestCase {
         return IssueMutationStore(
             preparedUploadClient: uploads,
             issueService: issue,
-            projectService: BriarAPI_ProjectServiceClientMock(),
+            teamService: BriarAPI_TeamServiceClientMock(),
             projectID: Self.projectID,
             attachmentReference: { "generated-local-reference" }
         )

@@ -21,7 +21,7 @@ import {
   ProjectAgentScheduleNotificationLevel
     as ProtoProjectAgentScheduleNotificationLevel,
   ProjectAgentScheduleRecurrence as ProtoProjectAgentScheduleRecurrence,
-  ProjectAgentScheduleRunStatus as ProtoProjectAgentScheduleRunStatus,
+  TeamAgentScheduleRunStatus as ProtoProjectAgentScheduleRunStatus,
   type ProjectAgentScheduleWrite,
   type ProjectAgentSession,
   ProjectAgentSessionEventType,
@@ -73,53 +73,53 @@ import {
 } from "./organization-agents";
 import { appOrganizationAgent } from "./app-connect-agent-mappers";
 import {
-  createProjectAgentApplication,
-  deleteProjectAgentApplication,
-  ProjectAgentApplicationError,
-  updateProjectAgentApplication,
-} from "./project-agent-application";
-import { projectAgentJson } from "./project-agent-json";
-import { getProjectAgent, listProjectAgents } from "./project-agent-repository";
+  createTeamAgentApplication,
+  deleteTeamAgentApplication,
+  TeamAgentApplicationError,
+  updateTeamAgentApplication,
+} from "./team-agent-application";
+import { teamAgentJson } from "./team-agent-json";
+import { getTeamAgent, listTeamAgents } from "./team-agent-repository";
 import {
-  getProjectAgentSession,
-  getProjectAgentSessionSyncCursor,
-  listProjectAgentSessionChanges,
-  listProjectAgentSessions,
-  listProjectAgentSessionSummaries,
-  projectAgentSessionIsApprovalOwned,
-  upsertProjectAgentSession,
-} from "./project-agent-session-repository";
-import { getProjectAgentScheduleCreatorId } from "./project-agent-schedule-repository";
+  getTeamAgentSession,
+  getTeamAgentSessionSyncCursor,
+  listTeamAgentSessionChanges,
+  listTeamAgentSessions,
+  listTeamAgentSessionSummaries,
+  teamAgentSessionIsApprovalOwned,
+  upsertTeamAgentSession,
+} from "./team-agent-session-repository";
+import { getTeamAgentScheduleCreatorId } from "./team-agent-schedule-repository";
 import {
-  claimProjectAgentScheduleRunApplication,
-  completeProjectAgentScheduleRunApplication,
-  createProjectAgentScheduleApplication,
-  deleteProjectAgentScheduleApplication,
-  listProjectAgentScheduleRunsApplication,
-  listProjectAgentSchedulesApplication,
-  ProjectAgentScheduleApplicationError,
-  renewProjectAgentScheduleRunApplication,
-  updateProjectAgentScheduleApplication,
-} from "./project-agent-schedule-application";
+  claimTeamAgentScheduleRunApplication,
+  completeTeamAgentScheduleRunApplication,
+  createTeamAgentScheduleApplication,
+  deleteTeamAgentScheduleApplication,
+  listTeamAgentScheduleRunsApplication,
+  listTeamAgentSchedulesApplication,
+  TeamAgentScheduleApplicationError,
+  renewTeamAgentScheduleRunApplication,
+  updateTeamAgentScheduleApplication,
+} from "./team-agent-schedule-application";
 import {
-  projectAgentScheduleJson,
-  projectAgentScheduleRunJson,
-} from "./project-agent-schedule-json";
-import { projectAgentTaskSessionEvent } from "./project-agent-task-session";
+  teamAgentScheduleJson,
+  teamAgentScheduleRunJson,
+} from "./team-agent-schedule-json";
+import { teamAgentTaskSessionEvent } from "./team-agent-task-session";
 import {
-  createProjectAgentTaskJob,
-  getProjectAgentTaskJobByRequest,
-} from "./project-agent-task-repository";
-import { getProject } from "./project-command-repository";
+  createTeamAgentTaskJob,
+  getTeamAgentTaskJobByRequest,
+} from "./team-agent-task-repository";
+import { getTeam } from "./team-command-repository";
 import {
   decodeOrganizationAgentWrite,
-  decodeProjectAgentInput,
-  decodeProjectAgentScheduleInput,
-  decodeProjectAgentSessionInput,
-  decodeStoredProjectAgentSessionPayload,
-  decodeStoredProjectAgentSessionSummary,
-  decodeProjectAgentTaskInput,
-} from "./project-request-contract";
+  decodeTeamAgentInput,
+  decodeTeamAgentScheduleInput,
+  decodeTeamAgentSessionInput,
+  decodeStoredTeamAgentSessionPayload,
+  decodeStoredTeamAgentSessionSummary,
+  decodeTeamAgentTaskInput,
+} from "./team-request-contract";
 import { decodeRequestSync } from "./request-schema";
 import {
   scheduleProjectAgentSessionRealtimePublish,
@@ -147,17 +147,17 @@ export type AppConnectAgentInput = {
 
 export type AppConnectAgentServices = {
   readonly requireSession: typeof requireSession;
-  readonly getProject: typeof getProject;
-  readonly getSessionCursor: typeof getProjectAgentSessionSyncCursor;
-  readonly listSessionSummaries: typeof listProjectAgentSessionSummaries;
+  readonly getTeam: typeof getTeam;
+  readonly getSessionCursor: typeof getTeamAgentSessionSyncCursor;
+  readonly listSessionSummaries: typeof listTeamAgentSessionSummaries;
   readonly getTranscript: typeof getProjectAgentTranscriptApplication;
 };
 
 const appConnectAgentServices: AppConnectAgentServices = {
   requireSession,
-  getProject,
-  getSessionCursor: getProjectAgentSessionSyncCursor,
-  listSessionSummaries: listProjectAgentSessionSummaries,
+  getTeam,
+  getSessionCursor: getTeamAgentSessionSyncCursor,
+  listSessionSummaries: listTeamAgentSessionSummaries,
   getTranscript: getProjectAgentTranscriptApplication,
 };
 
@@ -418,7 +418,7 @@ const domainScheduleWrite = (write: ProjectAgentScheduleWrite | undefined) => {
   if (!write) {
     throw new ConnectError("schedule is required", Code.InvalidArgument);
   }
-  return decodeProjectAgentScheduleInput({
+  return decodeTeamAgentScheduleInput({
     agentId: write.agentId,
     name: write.name,
     recurrence: domainScheduleRecurrence(write.recurrence),
@@ -646,7 +646,7 @@ const domainSessionEventType = (
 };
 
 const toSkill = (
-  skill: ReturnType<typeof projectAgentJson>["skills"][number],
+  skill: ReturnType<typeof teamAgentJson>["skills"][number],
 ) => ({
   id: skill.id,
   agentId: skill.agentId,
@@ -664,8 +664,8 @@ const toSkill = (
   updatedAt: requiredTimestamp(skill.updatedAt, "Agent Skill update"),
 });
 
-const toProjectAgent = (row: Parameters<typeof projectAgentJson>[0]) => {
-  const agent = projectAgentJson(row);
+const toProjectAgent = (row: Parameters<typeof teamAgentJson>[0]) => {
+  const agent = teamAgentJson(row);
   return {
     id: agent.id,
     projectId: agent.projectId,
@@ -725,9 +725,9 @@ const scheduleRunStatus = {
 } as const;
 
 const toProjectAgentSchedule = (
-  row: Awaited<ReturnType<typeof listProjectAgentSchedulesApplication>>[number],
+  row: Awaited<ReturnType<typeof listTeamAgentSchedulesApplication>>[number],
 ) => {
-  const schedule = projectAgentScheduleJson(row);
+  const schedule = teamAgentScheduleJson(row);
   return {
     id: schedule.id,
     projectId: schedule.projectId,
@@ -751,10 +751,10 @@ const toProjectAgentSchedule = (
 
 const toProjectAgentScheduleRun = (
   row: Awaited<
-    ReturnType<typeof listProjectAgentScheduleRunsApplication>
+    ReturnType<typeof listTeamAgentScheduleRunsApplication>
   >[number],
 ) => {
-  const scheduleRun = projectAgentScheduleRunJson(row);
+  const scheduleRun = teamAgentScheduleRunJson(row);
   return {
     id: scheduleRun.id,
     projectId: scheduleRun.projectId,
@@ -804,7 +804,7 @@ const toProjectAgentScheduleRun = (
 };
 
 const projectWrite = (input: CreateProjectAgentRequest) =>
-  decodeProjectAgentInput({
+  decodeTeamAgentInput({
     name: input.name ?? null,
     avatar: input.avatar ?? null,
     provider: domainAgentProvider(input.provider),
@@ -819,7 +819,7 @@ const projectWrite = (input: CreateProjectAgentRequest) =>
   });
 
 const updateProjectWrite = (input: UpdateProjectAgentRequest) =>
-  decodeProjectAgentInput({
+  decodeTeamAgentInput({
     name: input.name ?? null,
     avatar: input.avatarUpdate.case === "avatar"
       ? input.avatarUpdate.value
@@ -866,7 +866,7 @@ const organizationWrite = (
   });
 
 const throwProjectAgentApplicationError = (error: unknown): never => {
-  if (!(error instanceof ProjectAgentApplicationError)) throw error;
+  if (!(error instanceof TeamAgentApplicationError)) throw error;
   switch (error.reason) {
     case "agent_not_found":
       throw new HttpError(404, error.message);
@@ -881,7 +881,7 @@ const throwProjectAgentApplicationError = (error: unknown): never => {
 };
 
 const throwScheduleApplicationError = (error: unknown): never => {
-  if (!(error instanceof ProjectAgentScheduleApplicationError)) throw error;
+  if (!(error instanceof TeamAgentScheduleApplicationError)) throw error;
   switch (error.reason) {
     case "agent_not_found":
     case "schedule_not_found":
@@ -908,7 +908,7 @@ const withScheduleApplicationErrors = async <A>(promise: Promise<A>) => {
   }
 };
 
-type DecodedSession = ReturnType<typeof decodeProjectAgentSessionInput>;
+type DecodedSession = ReturnType<typeof decodeTeamAgentSessionInput>;
 
 const toProjectAgentSession = (input: {
   id: string;
@@ -940,7 +940,7 @@ const toProjectAgentSession = (input: {
   })),
   status: sessionStatus[input.payload.status],
   issues: input.payload.issues.map((issue) => ({
-    $typeName: "briar.app.v1.ProjectAgentSessionIssue",
+    $typeName: "briar.app.v1.TeamAgentSessionIssue",
     runId: issue.runId,
     runNumber: issue.runNumber,
     sourceKey: issue.sourceKey,
@@ -959,7 +959,7 @@ const toProjectAgentSession = (input: {
   summary: input.payload.summary ?? undefined,
   error: input.payload.error ?? undefined,
   events: input.payload.events.map((event) => ({
-    $typeName: "briar.app.v1.ProjectAgentSessionEvent",
+    $typeName: "briar.app.v1.TeamAgentSessionEvent",
     id: event.id,
     type: sessionEventType[event.type],
     occurredAt: requiredTimestamp(event.occurredAt, "Agent session event"),
@@ -969,7 +969,7 @@ const toProjectAgentSession = (input: {
 });
 
 const rowToProjectAgentSession = (
-  row: Awaited<ReturnType<typeof getProjectAgentSession>> extends infer R
+  row: Awaited<ReturnType<typeof getTeamAgentSession>> extends infer R
     ? Exclude<R, null>
     : never,
   options: { archived?: boolean } = {},
@@ -978,16 +978,16 @@ const rowToProjectAgentSession = (
     id: row.id,
     projectId: row.project_id,
     requestedByUserId: row.requested_by_user_id,
-    payload: decodeStoredProjectAgentSessionPayload(row.payload_json),
+    payload: decodeStoredTeamAgentSessionPayload(row.payload_json),
     archived: options.archived,
   });
 
 const summaryToProjectAgentSession = (
-  row: Awaited<ReturnType<typeof listProjectAgentSessionSummaries>>[number],
+  row: Awaited<ReturnType<typeof listTeamAgentSessionSummaries>>[number],
 ) => {
   const { requestedByUserId, ...stored } =
-    decodeStoredProjectAgentSessionSummary(row.summary_json);
-  const payload = decodeProjectAgentSessionInput({
+    decodeStoredTeamAgentSessionSummary(row.summary_json);
+  const payload = decodeTeamAgentSessionInput({
     ...stored,
     followUps: [],
     conversationId: null,
@@ -1006,7 +1006,7 @@ const requireProject = async (
   db: D1Database,
   projectId: string,
   userId: string,
-  loadProject: typeof getProject,
+  loadProject: typeof getTeam,
 ) => {
   const project = await loadProject(
     db,
@@ -1142,13 +1142,13 @@ export const createAppAgentService = (
     };
   },
 
-  createProjectAgent: async (input) => {
+  createTeamAgent: async (input) => {
     const session = await services.requireSession(auth, request);
     const project = await requireProject(
       db,
       input.projectId,
       session.user.id,
-      services.getProject,
+      services.getTeam,
     );
     if (
       !hasOrganizationCapability(project.member_role, "development:manage")
@@ -1156,7 +1156,7 @@ export const createAppAgentService = (
       throw new HttpError(403, "Development management permission required");
     }
     const agent = await withProjectAgentApplicationErrors(
-      createProjectAgentApplication({
+      createTeamAgentApplication({
         db,
         project,
         write: projectWrite(input),
@@ -1166,13 +1166,13 @@ export const createAppAgentService = (
     return { agent: toProjectAgent(agent) };
   },
 
-  updateProjectAgent: async (input) => {
+  updateTeamAgent: async (input) => {
     const session = await services.requireSession(auth, request);
     const project = await requireProject(
       db,
       input.projectId,
       session.user.id,
-      services.getProject,
+      services.getTeam,
     );
     if (
       !hasOrganizationCapability(project.member_role, "development:manage")
@@ -1180,7 +1180,7 @@ export const createAppAgentService = (
       throw new HttpError(403, "Development management permission required");
     }
     const agent = await withProjectAgentApplicationErrors(
-      updateProjectAgentApplication({
+      updateTeamAgentApplication({
         db,
         attachmentsBucket: env.ATTACHMENTS,
         project,
@@ -1192,13 +1192,13 @@ export const createAppAgentService = (
     return { agent: toProjectAgent(agent) };
   },
 
-  deleteProjectAgent: async (input) => {
+  deleteTeamAgent: async (input) => {
     const session = await services.requireSession(auth, request);
     const project = await requireProject(
       db,
       input.projectId,
       session.user.id,
-      services.getProject,
+      services.getTeam,
     );
     if (
       !hasOrganizationCapability(project.member_role, "development:manage")
@@ -1206,7 +1206,7 @@ export const createAppAgentService = (
       throw new HttpError(403, "Development management permission required");
     }
     await withProjectAgentApplicationErrors(
-      deleteProjectAgentApplication({
+      deleteTeamAgentApplication({
         db,
         attachmentsBucket: env.ATTACHMENTS,
         projectId: project.id,
@@ -1217,42 +1217,42 @@ export const createAppAgentService = (
     return { deleted: true };
   },
 
-  listProjectAgents: async (input) => {
+  listTeamAgents: async (input) => {
     const session = await services.requireSession(auth, request);
     const project = await requireProject(
       db,
       input.projectId,
       session.user.id,
-      services.getProject,
+      services.getTeam,
     );
     return {
-      agents: (await listProjectAgents(db, project.id)).map(toProjectAgent),
+      agents: (await listTeamAgents(db, project.id)).map(toProjectAgent),
     };
   },
 
-  listProjectAgentSchedules: async (input) => {
+  listTeamAgentSchedules: async (input) => {
     const session = await services.requireSession(auth, request);
     const project = await requireProject(
       db,
       input.projectId,
       session.user.id,
-      services.getProject,
+      services.getTeam,
     );
     return {
-      schedules: (await listProjectAgentSchedulesApplication(db, project.id))
+      schedules: (await listTeamAgentSchedulesApplication(db, project.id))
         .map(
           toProjectAgentSchedule,
         ),
     };
   },
 
-  createProjectAgentSchedule: async (input) => {
+  createTeamAgentSchedule: async (input) => {
     const session = await services.requireSession(auth, request);
     const project = await requireProject(
       db,
       input.projectId,
       session.user.id,
-      services.getProject,
+      services.getTeam,
     );
     if (
       !hasOrganizationCapability(project.member_role, "development:manage")
@@ -1260,7 +1260,7 @@ export const createAppAgentService = (
       throw new HttpError(403, "Development management permission required");
     }
     const schedule = await withScheduleApplicationErrors(
-      createProjectAgentScheduleApplication({
+      createTeamAgentScheduleApplication({
         db,
         projectId: project.id,
         userId: session.user.id,
@@ -1271,13 +1271,13 @@ export const createAppAgentService = (
     return { schedule: toProjectAgentSchedule(schedule) };
   },
 
-  updateProjectAgentSchedule: async (input) => {
+  updateTeamAgentSchedule: async (input) => {
     const session = await services.requireSession(auth, request);
     const project = await requireProject(
       db,
       input.projectId,
       session.user.id,
-      services.getProject,
+      services.getTeam,
     );
     if (
       !hasOrganizationCapability(project.member_role, "development:manage")
@@ -1285,7 +1285,7 @@ export const createAppAgentService = (
       throw new HttpError(403, "Development management permission required");
     }
     const schedule = await withScheduleApplicationErrors(
-      updateProjectAgentScheduleApplication({
+      updateTeamAgentScheduleApplication({
         db,
         projectId: project.id,
         scheduleId: decodeUuid(input.scheduleId),
@@ -1296,13 +1296,13 @@ export const createAppAgentService = (
     return { schedule: toProjectAgentSchedule(schedule) };
   },
 
-  deleteProjectAgentSchedule: async (input) => {
+  deleteTeamAgentSchedule: async (input) => {
     const session = await services.requireSession(auth, request);
     const project = await requireProject(
       db,
       input.projectId,
       session.user.id,
-      services.getProject,
+      services.getTeam,
     );
     if (
       !hasOrganizationCapability(project.member_role, "development:manage")
@@ -1310,7 +1310,7 @@ export const createAppAgentService = (
       throw new HttpError(403, "Development management permission required");
     }
     const deleted = await withScheduleApplicationErrors(
-      deleteProjectAgentScheduleApplication({
+      deleteTeamAgentScheduleApplication({
         db,
         projectId: project.id,
         scheduleId: decodeUuid(input.scheduleId),
@@ -1320,16 +1320,16 @@ export const createAppAgentService = (
     return { deleted };
   },
 
-  listProjectAgentScheduleRuns: async (input) => {
+  listTeamAgentScheduleRuns: async (input) => {
     const session = await services.requireSession(auth, request);
     const project = await requireProject(
       db,
       input.projectId,
       session.user.id,
-      services.getProject,
+      services.getTeam,
     );
     return {
-      runs: (await listProjectAgentScheduleRunsApplication(db, project.id))
+      runs: (await listTeamAgentScheduleRunsApplication(db, project.id))
         .map(
           toProjectAgentScheduleRun,
         ),
@@ -1339,7 +1339,7 @@ export const createAppAgentService = (
   claimProjectAgentScheduleRun: async (input) => {
     const session = await services.requireSession(auth, request);
     const projectIds = decodeScheduleClaimProjectIds(input.projectIds);
-    const claimed = await claimProjectAgentScheduleRunApplication({
+    const claimed = await claimTeamAgentScheduleRunApplication({
       db,
       userId: session.user.id,
       projectIds,
@@ -1362,13 +1362,13 @@ export const createAppAgentService = (
     };
   },
 
-  completeProjectAgentScheduleRun: async (input) => {
+  completeTeamAgentScheduleRun: async (input) => {
     const session = await services.requireSession(auth, request);
     const project = await requireProject(
       db,
       input.projectId,
       session.user.id,
-      services.getProject,
+      services.getTeam,
     );
     if (
       !hasOrganizationCapability(project.member_role, "development:manage")
@@ -1399,7 +1399,7 @@ export const createAppAgentService = (
         throw new ConnectError("outcome is required", Code.InvalidArgument);
       })();
     const scheduleRun = await withScheduleApplicationErrors(
-      completeProjectAgentScheduleRunApplication({
+      completeTeamAgentScheduleRunApplication({
         db,
         projectId: project.id,
         runId: decodeUuid(input.runId),
@@ -1416,7 +1416,7 @@ export const createAppAgentService = (
       db,
       input.projectId,
       session.user.id,
-      services.getProject,
+      services.getTeam,
     );
     if (
       !hasOrganizationCapability(project.member_role, "development:manage")
@@ -1427,7 +1427,7 @@ export const createAppAgentService = (
       claimToken: input.claimToken,
     });
     const scheduleRun = await withScheduleApplicationErrors(
-      renewProjectAgentScheduleRunApplication({
+      renewTeamAgentScheduleRunApplication({
         db,
         projectId: project.id,
         runId: decodeUuid(input.runId),
@@ -1443,16 +1443,16 @@ export const createAppAgentService = (
     };
   },
 
-  listProjectAgentSessions: async (input) => {
+  listTeamAgentSessions: async (input) => {
     const session = await services.requireSession(auth, request);
     const project = await requireProject(
       db,
       input.projectId,
       session.user.id,
-      services.getProject,
+      services.getTeam,
     );
     const [hotSessions, archivedSessions] = await Promise.all([
-      listProjectAgentSessions(db, project.id),
+      listTeamAgentSessions(db, project.id),
       listArchivedProjectAgentSessions(db, env.ARCHIVES, project.id),
     ]);
     const sessions = [
@@ -1479,7 +1479,7 @@ export const createAppAgentService = (
       db,
       input.projectId,
       session.user.id,
-      services.getProject,
+      services.getTeam,
     );
     if (input.cursor === undefined) {
       const [cursor, summaries] = await Promise.all([
@@ -1495,7 +1495,7 @@ export const createAppAgentService = (
       };
     }
 
-    const page = await listProjectAgentSessionChanges(
+    const page = await listTeamAgentSessionChanges(
       db,
       project.id,
       safeCursor(input.cursor),
@@ -1528,16 +1528,16 @@ export const createAppAgentService = (
     };
   },
 
-  getProjectAgentSession: async (input) => {
+  getTeamAgentSession: async (input) => {
     const sessionId = decodeSessionId(input.sessionId);
     const session = await services.requireSession(auth, request);
     const project = await requireProject(
       db,
       input.projectId,
       session.user.id,
-      services.getProject,
+      services.getTeam,
     );
-    const hot = await getProjectAgentSession(db, project.id, sessionId);
+    const hot = await getTeamAgentSession(db, project.id, sessionId);
     if (hot) return { session: rowToProjectAgentSession(hot) };
     const archived = await getArchivedProjectAgentSession(
       db,
@@ -1557,7 +1557,7 @@ export const createAppAgentService = (
       db,
       input.projectId,
       session.user.id,
-      services.getProject,
+      services.getTeam,
     );
     const selector = input.selector.case === "sessionId"
       ? { sessionId: decodeSessionId(input.selector.value) }
@@ -1601,14 +1601,14 @@ export const createAppAgentService = (
       db,
       input.projectId,
       session.user.id,
-      services.getProject,
+      services.getTeam,
     );
     if (
       !hasOrganizationCapability(project.member_role, "development:manage")
     ) {
       throw new HttpError(403, "Development management permission required");
     }
-    if (await projectAgentSessionIsApprovalOwned(db, project.id, sessionId)) {
+    if (await teamAgentSessionIsApprovalOwned(db, project.id, sessionId)) {
       throw new HttpError(
         409,
         "Approved Agent Skill execution sessions are updated by their assigned Worker",
@@ -1616,7 +1616,7 @@ export const createAppAgentService = (
       );
     }
 
-    const payload = decodeProjectAgentSessionInput({
+    const payload = decodeTeamAgentSessionInput({
       dispatchGroupId: input.dispatchGroupId,
       agentId: input.agentId ?? null,
       agentName: input.agentName ?? null,
@@ -1660,7 +1660,7 @@ export const createAppAgentService = (
     });
     const observedAt = new Date().toISOString();
     const existing =
-      (await getProjectAgentSession(db, project.id, sessionId)) ??
+      (await getTeamAgentSession(db, project.id, sessionId)) ??
         (await getArchivedProjectAgentSession(
           db,
           env.ARCHIVES,
@@ -1671,7 +1671,7 @@ export const createAppAgentService = (
     if (existing) {
       requestedByUserId = existing.requested_by_user_id;
     } else if (payload.parentSessionId) {
-      const parent = (await getProjectAgentSession(
+      const parent = (await getTeamAgentSession(
         db,
         project.id,
         payload.parentSessionId,
@@ -1684,7 +1684,7 @@ export const createAppAgentService = (
         ));
       requestedByUserId = parent?.requested_by_user_id ?? null;
     } else if (payload.trigger === "scheduled" && payload.scheduleId) {
-      requestedByUserId = await getProjectAgentScheduleCreatorId(
+      requestedByUserId = await getTeamAgentScheduleCreatorId(
         db,
         project.id,
         payload.scheduleId,
@@ -1692,7 +1692,7 @@ export const createAppAgentService = (
     } else {
       requestedByUserId = session.user.id;
     }
-    const row = await upsertProjectAgentSession(
+    const row = await upsertTeamAgentSession(
       db,
       {
         projectId: project.id,
@@ -1715,27 +1715,27 @@ export const createAppAgentService = (
       db,
       rawInput.projectId,
       session.user.id,
-      services.getProject,
+      services.getTeam,
     );
     if (
       !hasOrganizationCapability(project.member_role, "development:manage")
     ) {
       throw new HttpError(403, "Development management permission required");
     }
-    const input = decodeProjectAgentTaskInput({
+    const input = decodeTeamAgentTaskInput({
       agentId: rawInput.agentId,
       skillId: rawInput.skillId || null,
       request: rawInput.request,
       workerId: rawInput.workerId,
       requestId: rawInput.requestId,
     });
-    const existingJob = await getProjectAgentTaskJobByRequest(
+    const existingJob = await getTeamAgentTaskJobByRequest(
       db,
       project.id,
       input.requestId,
     );
     if (existingJob) {
-      const existingSession = await getProjectAgentSession(
+      const existingSession = await getTeamAgentSession(
         db,
         project.id,
         existingJob.id,
@@ -1746,7 +1746,7 @@ export const createAppAgentService = (
       return { session: rowToProjectAgentSession(existingSession) };
     }
 
-    const agent = await getProjectAgent(db, project.id, input.agentId);
+    const agent = await getTeamAgent(db, project.id, input.agentId);
     if (!agent) {
       throw new HttpError(404, "Agent not found for this project");
     }
@@ -1825,7 +1825,7 @@ export const createAppAgentService = (
     const taskId = crypto.randomUUID();
     let job;
     try {
-      job = await createProjectAgentTaskJob(db, {
+      job = await createTeamAgentTaskJob(db, {
         id: taskId,
         projectId: project.id,
         agentId: agent.id,
@@ -1840,14 +1840,14 @@ export const createAppAgentService = (
         ? error.message.toLowerCase()
         : "";
       if (!message.includes("unique")) throw error;
-      job = await getProjectAgentTaskJobByRequest(
+      job = await getTeamAgentTaskJobByRequest(
         db,
         project.id,
         input.requestId,
       );
     }
     if (!job) throw new HttpError(409, "Agent task could not be queued");
-    const payload = decodeProjectAgentSessionInput({
+    const payload = decodeTeamAgentSessionInput({
       dispatchGroupId: taskId,
       agentId: agent.id,
       agentName: agent.name,
@@ -1868,10 +1868,10 @@ export const createAppAgentService = (
       workerId: worker.id,
       summary: null,
       error: null,
-      events: [projectAgentTaskSessionEvent("started", observedAt)],
+      events: [teamAgentTaskSessionEvent("started", observedAt)],
       updatedAt: observedAt,
     });
-    const createdSession = await upsertProjectAgentSession(
+    const createdSession = await upsertTeamAgentSession(
       db,
       {
         projectId: project.id,

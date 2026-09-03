@@ -36,7 +36,7 @@ import {
   agentEffortOptions,
   agentModelOptions,
   type ModelEffort,
-} from "../lib/project-llm";
+} from "../lib/team-llm";
 import { useAgentProviderModels } from "../hooks/useAgentProviderModels";
 import {
   agentProviderLabels,
@@ -46,11 +46,11 @@ import { AgentProviderIcon } from "./AgentIcons";
 import { NativeSelect } from "./NativeSelect";
 import { ProviderSelect } from "./ProviderSelect";
 import {
-  ProjectAgentSkillsEditor,
-  projectAgentSkillInputs,
-  projectAgentSkillsValid,
-} from "./ProjectAgentSkillsEditor";
-import type { ProjectAgentSkillInput } from "../types";
+  TeamAgentSkillsEditor,
+  teamAgentSkillInputs,
+  teamAgentSkillsValid,
+} from "./TeamAgentSkillsEditor";
+import type { TeamAgentSkillInput } from "../types";
 import { ComputerUsePolicySwitch } from "./ComputerUsePolicySwitch";
 
 const providers: readonly ChannelAgentProvider[] = agentProviders;
@@ -74,7 +74,7 @@ export function OrganizationAgentsSettings({
   const [editingAgent, setEditingAgent] =
     useState<ChannelAgentSummary | null>(null);
   const [editingSkills, setEditingSkills] =
-    useState<ProjectAgentSkillInput[]>([]);
+    useState<TeamAgentSkillInput[]>([]);
   const [editingComputerUsePolicy, setEditingComputerUsePolicy] = useState<
     "disabled" | "unattended"
   >("disabled");
@@ -146,7 +146,7 @@ export function OrganizationAgentsSettings({
     setEditingAgent(agent);
     setEditingComputerUsePolicy(agent.computerUsePolicy ?? "disabled");
     setEditingSkills(
-      projectAgentSkillInputs(
+      teamAgentSkillInputs(
         agent.skills.map((skill) => ({
           id: skill.id,
           name: skill.name,
@@ -168,7 +168,7 @@ export function OrganizationAgentsSettings({
     if (
       !editingAgent ||
       isSavingSkills ||
-      !projectAgentSkillsValid(editingSkills)
+      !teamAgentSkillsValid(editingSkills)
     ) return;
     setIsSavingSkills(true);
     setSkillSaveError(null);
@@ -186,7 +186,7 @@ export function OrganizationAgentsSettings({
           description: editingAgent.description ?? "",
           responsibility: editingAgent.responsibility,
           computerUsePolicy: editingComputerUsePolicy,
-          skills: projectAgentSkillInputs(editingSkills),
+          skills: teamAgentSkillInputs(editingSkills),
         },
       );
       setAgents((current) =>
@@ -377,7 +377,7 @@ export function OrganizationAgentsSettings({
                 policy={editingComputerUsePolicy}
                 provider={editingAgent.provider}
               />
-              <ProjectAgentSkillsEditor
+              <TeamAgentSkillsEditor
                 defaultEffort={editingAgent.effort}
                 defaultModel={editingAgent.model}
                 defaultProvider={editingAgent.provider}
@@ -403,7 +403,7 @@ export function OrganizationAgentsSettings({
             </Button>
             <Button
               disabled={
-                isSavingSkills || !projectAgentSkillsValid(editingSkills)
+                isSavingSkills || !teamAgentSkillsValid(editingSkills)
               }
               onClick={() => void saveSkills()}
               type="button"

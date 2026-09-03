@@ -87,7 +87,7 @@ import {
   IssueUpdateProposalAction,
   issueUpdateChangeFields,
 } from "./issue-request-contract";
-import { ProjectAgentSessionInput } from "./project-request-contract";
+import { TeamAgentSessionInput } from "./team-request-contract";
 import { strictSchema } from "./schema-codecs";
 
 type CreateIssueResult = Awaited<
@@ -1005,7 +1005,7 @@ const TrustedProjectAgentSession = Schema.Struct({
   id: Schema.String,
   projectId: Schema.String,
   requestedByUserId: Schema.NullOr(Schema.String),
-  ...ProjectAgentSessionInput.fields,
+  ...TeamAgentSessionInput.fields,
 });
 const decodeTrustedProjectAgentSession = Schema.decodeUnknownSync(
   TrustedProjectAgentSession,

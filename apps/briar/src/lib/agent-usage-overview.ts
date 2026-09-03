@@ -8,7 +8,7 @@ import type {
 import {
   agentProviders,
   type AgentProvider,
-} from "./project-llm";
+} from "./team-llm";
 
 export type UsageRangeDays = 7 | 30 | 90;
 

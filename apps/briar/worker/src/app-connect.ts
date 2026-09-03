@@ -19,10 +19,10 @@ import { registerAppOrganizationService } from "./app-connect-organization";
 import { registerAppReportingService } from "./app-connect-reporting";
 import { registerAppRealtimeService } from "./app-connect-realtime";
 import {
-  appConnectProjectServices,
-  type AppConnectProjectServices,
-  registerAppProjectService,
-} from "./app-connect-project";
+  appConnectTeamServices,
+  type AppConnectTeamServices,
+  registerAppTeamService,
+} from "./app-connect-team";
 import { registerWorkerExecutionService } from "./worker-connect-execution";
 import { registerWorkerControlService } from "./worker-connect-control";
 import {
@@ -41,14 +41,14 @@ export type AppConnectRouteInput = {
   readonly requireRunExecutionProject: (runId: string) => Promise<string>;
 };
 
-export type AppConnectServices = AppConnectProjectServices;
+export type AppConnectServices = AppConnectTeamServices;
 
 export const appConnectReadMaxBytes = 2 * 1_024 * 1_024;
 
 /** Serve a generated Connect RPC when the request targets a registered method. */
 export async function handleAppConnectRequest(
   input: AppConnectRouteInput,
-  services: AppConnectServices = appConnectProjectServices,
+  services: AppConnectServices = appConnectTeamServices,
 ): Promise<Response | undefined> {
   const router = createConnectRouter({
     connect: true,
@@ -57,7 +57,7 @@ export async function handleAppConnectRequest(
     readMaxBytes: appConnectReadMaxBytes,
     interceptors: [connectErrorInterceptor],
   });
-  registerAppProjectService(router, {
+  registerAppTeamService(router, {
     request: input.request,
     auth: input.auth,
     db: input.env.DB,

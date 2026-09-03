@@ -8,7 +8,7 @@ import { dashboardEventJson, dashboardRunJson } from "./dashboard-json";
 import {
   claimNextIssueAgentReply,
   getHuntRunForProject,
-  getProjectAgent,
+  getTeamAgent,
   listHuntRunEvents,
   listIssueAttachments,
   listRunEvidence,
@@ -21,7 +21,7 @@ import {
   issueActivityCredential,
   scheduleProjectRealtimePublish,
 } from "./realtime-scheduling";
-import { type AuthenticatedWorkerProject } from "./worker-route-auth";
+import { type AuthenticatedWorkerTeam } from "./worker-route-auth";
 import { latestExecutionWorkerUpdateHandoff } from "./worker-update-repository";
 import {
   executionWorkerRuntime,
@@ -35,7 +35,7 @@ export async function claimNextIssueReplyWork(input: {
   db: D1Database;
   env: Env;
   context?: ExecutionContext;
-  authenticatedWorker: AuthenticatedWorkerProject;
+  authenticatedWorker: AuthenticatedWorkerTeam;
 }) {
   const {
     db,
@@ -104,9 +104,9 @@ export async function claimNextIssueReplyWork(input: {
       throw new HttpError(409, "Reply job lost its issue context");
     }
     const liveAgent = job.agent_id
-      ? await getProjectAgent(db, input.projectId, job.agent_id)
+      ? await getTeamAgent(db, input.projectId, job.agent_id)
       : run.agent_id
-        ? await getProjectAgent(db, input.projectId, run.agent_id)
+        ? await getTeamAgent(db, input.projectId, run.agent_id)
         : null;
     if (job.agent_id && !liveAgent) {
       throw new HttpError(409, "Reply job lost its Project Agent");

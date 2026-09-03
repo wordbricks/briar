@@ -47,7 +47,7 @@ import {
   hasAvailableChannelReplyWorker,
 } from "./workers";
 import type { WorkerRuntimeMetadata } from "./worker-runtime-mappers";
-import { encodeApprovedProjectAgentTaskSession } from "./project-agent-session-materialization";
+import { encodeApprovedTeamAgentTaskSession } from "./team-agent-session-materialization";
 import {
   consumeReplyAttachmentStatements,
   replyAttachmentAvailabilityGuard,
@@ -4347,7 +4347,7 @@ export async function completeChannelReply(
       consentTaskPolicy.requested_by_user_id && job.claimed_worker_id &&
       job.selected_agent_name_snapshot && job.skill_id &&
       job.skill_execution_request_snapshot
-    ? encodeApprovedProjectAgentTaskSession({
+    ? encodeApprovedTeamAgentTaskSession({
       sessionId: consentTaskSessionId,
       agentId: job.agent_id,
       agentName: job.selected_agent_name_snapshot,

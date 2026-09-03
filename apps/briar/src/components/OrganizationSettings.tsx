@@ -88,7 +88,7 @@ export function OrganizationSettings({
   isSidebarOpen = true,
   initialSection,
   navigationSidebar,
-  connectedProjectIds = null,
+  connectedTeamIds = null,
   projects = [],
   userId = "",
 }: {
@@ -103,7 +103,7 @@ export function OrganizationSettings({
   isSidebarOpen?: boolean;
   initialSection?: OrganizationSettingsSection;
   navigationSidebar?: ReactNode;
-  connectedProjectIds?: string[] | null;
+  connectedTeamIds?: string[] | null;
   projects?: Project[];
   userId?: string;
 }) {
@@ -944,7 +944,7 @@ export function OrganizationSettings({
               />
             ) : activeSection === "workers" ? (
               <OrganizationWorkersSettings
-                connectedProjectIds={connectedProjectIds}
+                connectedTeamIds={connectedTeamIds}
                 organization={organization}
                 projects={projects}
                 token={token}

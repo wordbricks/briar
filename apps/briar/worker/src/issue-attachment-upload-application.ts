@@ -12,12 +12,12 @@ import {
   type IssueAttachmentUploadPurpose,
 } from "./issue-attachment-upload-repository";
 import { hasOrganizationCapability } from "./organization-access";
-import { getProject } from "./project-command-repository";
+import { getTeam } from "./team-command-repository";
 import { createUploadCapability, UPLOAD_CAPABILITY_MAX_TTL_MS } from "./upload-capability";
 import type { UploadMetadata } from "./upload-repository";
 
 export type IssueAttachmentUploadApplicationServices = {
-  readonly getProject: typeof getProject;
+  readonly getTeam: typeof getTeam;
   readonly getHuntRunForProject: typeof getHuntRunForProject;
   readonly prepareIssueAttachmentUploadRows:
     typeof prepareIssueAttachmentUploadRows;
@@ -25,7 +25,7 @@ export type IssueAttachmentUploadApplicationServices = {
 };
 
 const applicationServices: IssueAttachmentUploadApplicationServices = {
-  getProject,
+  getTeam,
   getHuntRunForProject,
   prepareIssueAttachmentUploadRows,
   createUploadCapability,
@@ -125,7 +125,7 @@ async function prepareIssueAttachmentsApplication(
   overrides: Partial<IssueAttachmentUploadApplicationServices>,
 ) {
   const services = { ...applicationServices, ...overrides };
-  const project = await services.getProject(input.db, input.projectId, input.userId);
+  const project = await services.getTeam(input.db, input.projectId, input.userId);
   const capability = purpose === "issue_message" ? "conversations:write" : "issues:write";
   if (!project) throw new HttpError(404, "Project not found");
   if (!hasOrganizationCapability(project.member_role, capability)) {

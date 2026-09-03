@@ -36,12 +36,12 @@ import {
   workerStateAt,
 } from "./workers";
 import { latestExecutionWorkerUpdateHandoff } from "./worker-update-repository";
-import type { AuthenticatedWorkerProject } from "./worker-route-auth";
+import type { AuthenticatedWorkerTeam } from "./worker-route-auth";
 
 const DM_REPLY_CONTEXT_MESSAGE_LIMIT = 10;
 const DM_REPLY_CONTEXT_MAX_AGE_MS = 5 * 24 * 60 * 60 * 1_000;
 
-export type AuthenticatedChannelWorkerProject = AuthenticatedWorkerProject;
+export type AuthenticatedChannelWorkerProject = AuthenticatedWorkerTeam;
 
 export type ClaimNextChannelReplyWorkInput = {
   input: { organizationId: string; workerId: string };

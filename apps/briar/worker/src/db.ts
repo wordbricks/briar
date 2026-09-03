@@ -267,85 +267,85 @@ export {
 export type { OrganizationInboxRealtimeOutboxRow } from "./organization-inbox-outbox-repository";
 
 export type {
-  ProjectAgentRow,
-  ProjectAgentSessionRow,
-  ProjectAgentSessionSummaryRow,
-  ProjectAgentSessionChangeRow,
-  ProjectAgentSessionChangesPage,
-  ProjectAgentTaskJobRow,
-  ProjectAgentTaskCompletionReceiptRow,
-  ProjectAgentTaskCompletionResult,
-  ClaimedProjectAgentTaskRow,
-  ProjectAgentScheduleRow,
-  ProjectAgentScheduleRunStatus,
-  ProjectAgentScheduleRunRow,
-} from "./project-agent-model";
+  TeamAgentRow,
+  TeamAgentSessionRow,
+  TeamAgentSessionSummaryRow,
+  TeamAgentSessionChangeRow,
+  TeamAgentSessionChangesPage,
+  TeamAgentTaskJobRow,
+  TeamAgentTaskCompletionReceiptRow,
+  TeamAgentTaskCompletionResult,
+  ClaimedTeamAgentTaskRow,
+  TeamAgentScheduleRow,
+  TeamAgentScheduleRunStatus,
+  TeamAgentScheduleRunRow,
+} from "./team-agent-model";
 
 export {
-  listProjectAgents,
-  getProjectAgent,
-  createProjectAgent,
-  deleteProjectAgent,
-  updateProjectAgent,
-} from "./project-agent-repository";
+  listTeamAgents,
+  getTeamAgent,
+  createTeamAgent,
+  deleteTeamAgent,
+  updateTeamAgent,
+} from "./team-agent-repository";
 
 export {
-  listProjectAgentSchedules,
-  getProjectAgentScheduleCreatorId,
-  createProjectAgentSchedule,
-  updateProjectAgentSchedule,
-  deleteProjectAgentSchedule,
-  listProjectAgentScheduleRuns,
+  listTeamAgentSchedules,
+  getTeamAgentScheduleCreatorId,
+  createTeamAgentSchedule,
+  updateTeamAgentSchedule,
+  deleteTeamAgentSchedule,
+  listTeamAgentScheduleRuns,
   PROJECT_AGENT_SCHEDULE_LEASE_MS,
-  listClaimableProjectAgentScheduleProjectIds,
-  claimDueProjectAgentScheduleRun,
-  completeProjectAgentScheduleRun,
-  renewProjectAgentScheduleRunLease,
-} from "./project-agent-schedule-repository";
+  listClaimableTeamAgentScheduleTeamIds,
+  claimDueTeamAgentScheduleRun,
+  completeTeamAgentScheduleRun,
+  renewTeamAgentScheduleRunLease,
+} from "./team-agent-schedule-repository";
 
 export {
-  upsertProjectAgentSessionSummary,
-  listProjectAgentSessionSummaries,
-  getProjectAgentSessionSyncCursor,
-  listProjectAgentSessionChanges,
-  listProjectAgentSessions,
-  getProjectAgentSession,
-  projectAgentSessionIsApprovalOwned,
-  upsertProjectAgentSession,
-} from "./project-agent-session-repository";
+  upsertTeamAgentSessionSummary,
+  listTeamAgentSessionSummaries,
+  getTeamAgentSessionSyncCursor,
+  listTeamAgentSessionChanges,
+  listTeamAgentSessions,
+  getTeamAgentSession,
+  teamAgentSessionIsApprovalOwned,
+  upsertTeamAgentSession,
+} from "./team-agent-session-repository";
 
 export {
-  createProjectAgentTaskJob,
-  getProjectAgentTaskJob,
-  getProjectAgentTaskJobByRequest,
-  reapProjectAgentTaskJobs,
-  claimNextProjectAgentTask,
-  getClaimedProjectAgentTask,
-  renewProjectAgentTaskLease,
-  completeProjectAgentTaskWithReceipt,
-  completeProjectAgentTask,
-} from "./project-agent-task-repository";
+  createTeamAgentTaskJob,
+  getTeamAgentTaskJob,
+  getTeamAgentTaskJobByRequest,
+  reapTeamAgentTaskJobs,
+  claimNextTeamAgentTask,
+  getClaimedTeamAgentTask,
+  renewTeamAgentTaskLease,
+  completeTeamAgentTaskWithReceipt,
+  completeTeamAgentTask,
+} from "./team-agent-task-repository";
 
 export {
-  createProject,
-  getProject,
-  updateProjectIcon,
-  updateProjectIssueKeyPrefix,
-  updateProjectScheduleTabEnabled,
-  deleteProject,
-  getProjectRunChildMismatch,
-} from "./project-command-repository";
+  createTeam,
+  getTeam,
+  updateTeamIcon,
+  updateTeamIssueKeyPrefix,
+  updateTeamScheduleTabEnabled,
+  deleteTeam,
+  getTeamRunChildMismatch,
+} from "./team-command-repository";
 
 export {
-  getProjectSettings,
-  updateProjectMandatoryCheckpoints,
+  getTeamSettings,
+  updateTeamMandatoryCheckpoints,
   updateUserWorkflowCheckpointDefaults,
-  updateProjectSettings,
-} from "./project-settings-repository";
+  updateTeamSettings,
+} from "./team-settings-repository";
 export type {
-  ProjectSettingsRow,
-  ProjectSettingsInput,
-} from "./project-settings-repository";
+  TeamSettingsRow,
+  TeamSettingsInput,
+} from "./team-settings-repository";
 
 export {
   recordRunEvidence,

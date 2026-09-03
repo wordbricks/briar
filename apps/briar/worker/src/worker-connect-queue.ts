@@ -63,7 +63,7 @@ import {
 import { sha256 } from "./crypto-digest";
 import {
   renewIssueAgentReplyLease,
-  renewProjectAgentTaskLease,
+  renewTeamAgentTaskLease,
 } from "./db";
 import { HttpError } from "./http-response";
 import { claimNextIssueReplyWork } from "./issue-reply-worker-routes";
@@ -81,13 +81,13 @@ import {
   recordMergeBatchValidationWork,
 } from "./merge-batch-worker";
 import {
-  claimNextProjectAgentTaskWork,
-  completeProjectAgentTaskWork,
-} from "./project-agent-task-worker";
+  claimNextTeamAgentTaskWork,
+  completeTeamAgentTaskWork,
+} from "./team-agent-task-worker";
 import {
-  decodeProjectAgentTaskFailure,
-  decodeProjectAgentTaskSuccess,
-} from "./project-request-contract";
+  decodeTeamAgentTaskFailure,
+  decodeTeamAgentTaskSuccess,
+} from "./team-request-contract";
 import { claimNextQueueWork } from "./queue-claim-routes";
 import {
   claimDmLearningJob,
@@ -123,7 +123,7 @@ import {
   type WorkerConflictError,
 } from "./workers";
 import {
-  type AuthenticatedWorkerProject,
+  type AuthenticatedWorkerTeam,
   requireWorkerProjectBinding,
 } from "./worker-route-auth";
 import { decodeWorkerClaimInput } from "./worker-request-contract";
@@ -157,14 +157,14 @@ export type WorkerQueueServices = {
   readonly requireWorkerProjectBinding: typeof requireWorkerProjectBinding;
   readonly claimNextMergeBatchWork: typeof claimNextMergeBatchWork;
   readonly claimNextIssueReplyWork: typeof claimNextIssueReplyWork;
-  readonly claimNextProjectAgentTaskWork: typeof claimNextProjectAgentTaskWork;
-  readonly completeProjectAgentTaskWork: typeof completeProjectAgentTaskWork;
+  readonly claimNextTeamAgentTaskWork: typeof claimNextTeamAgentTaskWork;
+  readonly completeTeamAgentTaskWork: typeof completeTeamAgentTaskWork;
   readonly claimNextChannelReplyWork: typeof claimNextChannelReplyWork;
   readonly claimNextQueueWork: typeof claimNextQueueWork;
   readonly claimDmLearningJob: typeof claimDmLearningJob;
   readonly sha256: typeof sha256;
   readonly renewHuntRunLease: typeof renewHuntRunLease;
-  readonly renewProjectAgentTaskLease: typeof renewProjectAgentTaskLease;
+  readonly renewTeamAgentTaskLease: typeof renewTeamAgentTaskLease;
   readonly renewIssueAgentReplyLease: typeof renewIssueAgentReplyLease;
   readonly renewChannelReplyLease: typeof renewChannelReplyLease;
   readonly getClaimedChannelReply: typeof getClaimedChannelReply;
@@ -203,14 +203,14 @@ const workerQueueServices: WorkerQueueServices = {
   requireWorkerProjectBinding,
   claimNextMergeBatchWork,
   claimNextIssueReplyWork,
-  claimNextProjectAgentTaskWork,
-  completeProjectAgentTaskWork,
+  claimNextTeamAgentTaskWork,
+  completeTeamAgentTaskWork,
   claimNextChannelReplyWork,
   claimNextQueueWork,
   claimDmLearningJob,
   sha256,
   renewHuntRunLease,
-  renewProjectAgentTaskLease,
+  renewTeamAgentTaskLease,
   renewIssueAgentReplyLease,
   renewChannelReplyLease,
   getClaimedChannelReply,
@@ -363,7 +363,7 @@ async function claimWork(
   if (issueReply) return { work: workerClaimMessage(issueReply) };
 
   if (!request.repliesOnly) {
-    const agentTask = await services.claimNextProjectAgentTaskWork({
+    const agentTask = await services.claimNextTeamAgentTaskWork({
       projectId: claimInput.projectId,
       db: input.db,
       env: input.env,
@@ -417,7 +417,7 @@ async function claimWork(
 
 async function renewIssueLease(
   input: WorkerConnectQueueInput,
-  worker: AuthenticatedWorkerProject,
+  worker: AuthenticatedWorkerTeam,
   projectId: string,
   identity: WorkClaimIdentity,
   services: WorkerQueueServices,
@@ -479,7 +479,7 @@ async function renewWorkLease(
     case "issue":
       return renewIssueLease(input, worker, request.projectId, identity, services);
     case "projectAgentTask": {
-      const renewed = await services.renewProjectAgentTaskLease(
+      const renewed = await services.renewTeamAgentTaskLease(
         input.db,
         request.projectId,
         identity.workId,
@@ -833,7 +833,7 @@ async function checkpointChannelReplySessionRpc(
   });
 }
 
-async function completeProjectAgentTask(
+async function completeTeamAgentTask(
   input: WorkerConnectQueueInput,
   request: CompleteProjectAgentTaskRequest,
   services: WorkerQueueServices,
@@ -853,11 +853,11 @@ async function completeProjectAgentTask(
   );
   const result = request.result;
   if (result.case === "success") {
-    const success = decodeProjectAgentTaskSuccess({
+    const success = decodeTeamAgentTaskSuccess({
       summary: result.value.summary,
       conversationId: result.value.conversationId,
     });
-    return services.completeProjectAgentTaskWork({
+    return services.completeTeamAgentTaskWork({
       db: input.db,
       env: input.env,
       context: input.context,
@@ -873,10 +873,10 @@ async function completeProjectAgentTask(
     });
   }
   if (result.case === "failure") {
-    const failure = decodeProjectAgentTaskFailure({
+    const failure = decodeTeamAgentTaskFailure({
       error: result.value.error,
     });
-    return services.completeProjectAgentTaskWork({
+    return services.completeTeamAgentTaskWork({
       db: input.db,
       env: input.env,
       context: input.context,
@@ -1458,7 +1458,7 @@ export function createWorkerQueueService(
     renewWorkLease: (request) => renewWorkLease(input, request, services),
     checkpointChannelReplySession: (request) => checkpointChannelReplySessionRpc(input, request, services),
     handoffWork: (request) => handoffWork(input, request, services),
-    completeProjectAgentTask: (request) => completeProjectAgentTask(input, request, services),
+    completeTeamAgentTask: (request) => completeTeamAgentTask(input, request, services),
     recordMergeBatchCandidateEnqueued: (request) => recordMergeBatchCandidateEnqueuedRpc(input, request, services),
     recordMergeBatchAuthority: (request) => recordMergeBatchAuthorityRpc(input, request, services),
     recordMergeBatchValidation: (request) => recordMergeBatchValidationRpc(input, request, services),

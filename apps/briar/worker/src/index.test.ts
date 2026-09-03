@@ -30,9 +30,9 @@ import {
   decodeIssueUpdateInput,
 } from "./issue-request-contract";
 import {
-  decodeProjectAgentScheduleInput,
-  decodeProjectAgentSessionInput,
-} from "./project-request-contract";
+  decodeTeamAgentScheduleInput,
+  decodeTeamAgentSessionInput,
+} from "./team-request-contract";
 import {
   decodePausedRunReworkInput,
 } from "./run-request-contract";
@@ -663,18 +663,18 @@ describe("Worker HTTP contract", () => {
         }],
         updatedAt: "2026-07-30T00:00:00.000Z",
       };
-    expect(decodeProjectAgentSessionInput(snapshot)).toMatchObject({
+    expect(decodeTeamAgentSessionInput(snapshot)).toMatchObject({
       agentName: "Inbox Agent",
       status: "running",
     });
     expect(() =>
-      decodeProjectAgentSessionInput({
+      decodeTeamAgentSessionInput({
         ...snapshot,
         dispatchGroupId: "",
       })
     ).toThrow();
     expect(
-      decodeProjectAgentSessionInput({
+      decodeTeamAgentSessionInput({
         ...snapshot,
         status: "skipped",
         completedAt: "2026-07-30T00:01:00.000Z",
@@ -733,7 +733,7 @@ describe("Worker HTTP contract", () => {
 
   it("normalizes recurring agent schedule input", () => {
     expect(
-      decodeProjectAgentScheduleInput({
+      decodeTeamAgentScheduleInput({
         agentId: "11111111-1111-4111-8111-111111111111",
         name: "  Weekly audit  ",
         recurrence: "weekly",
@@ -754,7 +754,7 @@ describe("Worker HTTP contract", () => {
       timeZone: "Asia/Seoul",
     });
     expect(
-      decodeProjectAgentScheduleInput({
+      decodeTeamAgentScheduleInput({
         agentId: "11111111-1111-4111-8111-111111111111",
         name: "Daily audit",
         recurrence: "daily",
@@ -764,7 +764,7 @@ describe("Worker HTTP contract", () => {
       }).dayOfWeek,
     ).toBeNull();
     expect(() =>
-      decodeProjectAgentScheduleInput({
+      decodeTeamAgentScheduleInput({
         agentId: "11111111-1111-4111-8111-111111111111",
         name: "Invalid zone",
         recurrence: "daily",
@@ -776,7 +776,7 @@ describe("Worker HTTP contract", () => {
 
   it("normalizes custom schedule days and requires a weekly selection", () => {
     expect(
-      decodeProjectAgentScheduleInput({
+      decodeTeamAgentScheduleInput({
         agentId: "11111111-1111-4111-8111-111111111111",
         name: "Alternating review",
         recurrence: "custom",
@@ -795,7 +795,7 @@ describe("Worker HTTP contract", () => {
       notificationLevel: "none",
     });
     expect(() =>
-      decodeProjectAgentScheduleInput({
+      decodeTeamAgentScheduleInput({
         agentId: "11111111-1111-4111-8111-111111111111",
         name: "Missing weekdays",
         recurrence: "custom",

@@ -24,7 +24,7 @@ import { acceptProjectIssueActionProposal } from "./issue-proposal-routes";
 import { createOrganizationAgent } from "./organization-agents";
 import {
   claimNextQueuedHuntRun,
-  createProjectAgent,
+  createTeamAgent,
   createIssueActionProposal,
   createIssueAttachments,
   moveHuntRun,
@@ -244,7 +244,7 @@ describe("channel issue proposal approval route", () => {
       effort: null,
       createdAt: now,
     });
-    const projectAgent = await createProjectAgent(db, projectAId, {
+    const projectAgent = await createTeamAgent(db, projectAId, {
       name: "Builder",
       provider: "codex",
       model: "gpt-5.6-sol",

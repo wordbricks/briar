@@ -175,7 +175,7 @@ export const isManagedComputerSetupToController = (
         (payload.value.provider === undefined ||
           isSetupProvider(payload.value.provider));
     case "complete":
-      return Option.isSome(decodeSessionId(payload.value.projectId)) &&
+      return Option.isSome(decodeSessionId(payload.value.teamId)) &&
         isSetupProvider(payload.value.provider) &&
         Option.isSome(decodeWorkerId(payload.value.workerId));
     case "error":

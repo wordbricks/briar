@@ -16,7 +16,7 @@ import { getDashboardSyncCursor } from "./dashboard-change-repository";
 import {
   acknowledgeAgentSkillExecutionRealtimeOutbox,
   acknowledgeOrganizationInboxRealtimeOutbox,
-  getProjectAgentSessionSyncCursor,
+  getTeamAgentSessionSyncCursor,
   listAgentSkillExecutionRealtimeOutbox,
   listOrganizationInboxRealtimeOutbox,
   type IssueAgentReplyJobRow,
@@ -491,7 +491,7 @@ export function scheduleProjectAgentSessionRealtimePublish(
     db.prepare(
       `select organization_id from briar_teams where id = ?`,
     ).bind(projectId).first<{ organization_id: string }>(),
-    getProjectAgentSessionSyncCursor(db, projectId),
+    getTeamAgentSessionSyncCursor(db, projectId),
   ]).then(([project, version]) => {
     if (!project) return;
     return publishProjectAgentSessionRealtime(

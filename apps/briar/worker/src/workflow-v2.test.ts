@@ -11,7 +11,7 @@ import {
   completeWorkflowStageLifecycle,
   completeWorkflowStage,
   createOrganization,
-  createProject,
+  createTeam,
   getHuntRunForProject,
   getWorkflowProgress,
   initializeWorkflowProgress,
@@ -142,7 +142,7 @@ describe("workflow v2 D1 persistence and transitions", () => {
       handle: "workflow-org",
       ownerUserId: "workflow-owner",
     });
-    const project = await createProject(db, {
+    const project = await createTeam(db, {
       ownerUserId: "workflow-owner",
       organizationId: organization.id,
       name: "Workflow Project",

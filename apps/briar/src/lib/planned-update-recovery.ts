@@ -1,4 +1,4 @@
-import type { ProjectAgentRunInput } from "./project-llm";
+import type { TeamAgentRunInput } from "./team-llm";
 import {
   commands,
   type PlannedUpdateAgentRecovery,
@@ -32,7 +32,7 @@ export function plannedUpdateContinuationMessage(originalRequest: string) {
 
 export function recoveryAgent(
   recovery: PlannedUpdateAgentRecovery,
-): ProjectAgentRunInput["agent"] {
+): TeamAgentRunInput["agent"] {
   return {
     id: recovery.request.agentId,
     name: recovery.request.agentName,

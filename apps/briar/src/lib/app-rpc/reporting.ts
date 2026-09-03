@@ -4,9 +4,9 @@ import {
 } from "@briar/contracts/gen/briar/app/v1/reporting_pb";
 import type { UsageRangeDays } from "../agent-usage-overview";
 import type {
-  ProjectUsageDateRange,
-  ProjectUsagePeriod,
-} from "../project-usage-summary";
+  TeamUsageDateRange,
+  TeamUsagePeriod,
+} from "../team-usage-summary";
 import { appCallOptions, appTransport } from "./core";
 import {
   organizationUsageRangeToProto,
@@ -45,8 +45,8 @@ export async function loadAgentUsageReport(
 export async function loadProjectUsageSummary(
   token: string,
   projectId: string,
-  period: ProjectUsagePeriod = "day",
-  range?: ProjectUsageDateRange,
+  period: TeamUsagePeriod = "day",
+  range?: TeamUsageDateRange,
   signal?: AbortSignal,
 ) {
   return projectUsageSummaryFromProto(

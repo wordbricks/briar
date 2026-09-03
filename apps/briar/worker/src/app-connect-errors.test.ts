@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { Code, createClient, ConnectError } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
-import { ProjectService } from "@briar/contracts/gen/briar/app/v1/project_pb";
+import { TeamService } from "@briar/contracts/gen/briar/app/v1/team_pb";
 import {
   ValidationErrorDetailSchema,
 } from "@briar/contracts/gen/briar/types/v1/error_pb";
@@ -11,12 +11,12 @@ import {
   handleAppConnectRequest,
   type AppConnectServices,
 } from "./app-connect";
-import { appConnectProjectServices } from "./app-connect-project";
+import { appConnectTeamServices } from "./app-connect-team";
 
 describe("App Connect errors", () => {
   it("preserves validation details across the HTTP boundary", async () => {
     const services: AppConnectServices = {
-      ...appConnectProjectServices,
+      ...appConnectTeamServices,
       requireSession: vi.fn(async () => ({
         user: { id: "user-1" },
       }) as never),
@@ -38,10 +38,10 @@ describe("App Connect errors", () => {
         return response ?? new Response(null, { status: 404 });
       },
     });
-    const client = createClient(ProjectService, transport);
+    const client = createClient(TeamService, transport);
 
-    const connectError = await client.updateProjectTabs({
-      projectId: "not-a-uuid",
+    const connectError = await client.updateTeamTabs({
+      teamId: "not-a-uuid",
       schedule: true,
     }).catch((error: unknown) => error);
 

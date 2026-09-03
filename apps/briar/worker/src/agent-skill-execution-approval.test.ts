@@ -17,16 +17,16 @@ import {
 import {
   acceptAgentSkillExecutionProposal,
   claimNextIssueAgentReply,
-  claimNextProjectAgentTask,
+  claimNextTeamAgentTask,
   completeIssueAgentReplyOutput,
-  completeProjectAgentTask,
-  completeProjectAgentTaskWithReceipt,
+  completeTeamAgentTask,
+  completeTeamAgentTaskWithReceipt,
   createIssueMessage,
-  createProjectAgent,
+  createTeamAgent,
   enqueueIssueAgentReply,
-  getProjectAgentSession,
+  getTeamAgentSession,
   listIssueAgentSkillExecutionProposals,
-  reapProjectAgentTaskJobs,
+  reapTeamAgentTaskJobs,
   recordHuntEvent,
   type AgentSkillExecutionProposalRow,
   type HuntEventInput,
@@ -48,8 +48,8 @@ import {
   registerExecutionWorker,
   updateProjectExecutionWorkerPolicy,
 } from "./workers";
-import { encodeApprovedProjectAgentTaskSession } from "./project-agent-session-materialization";
-import { decodeStoredProjectAgentSessionPayload } from "./project-request-contract";
+import { encodeApprovedTeamAgentTaskSession } from "./team-agent-session-materialization";
+import { decodeStoredTeamAgentSessionPayload } from "./team-request-contract";
 
 const organizationId = "91000000-0000-4000-8000-000000000001";
 const projectId = "92000000-0000-4000-8000-000000000001";
@@ -160,7 +160,7 @@ const materializedSessionPayloadJson = (input: {
   userId: string;
   sessionId: string;
   acceptedAt: string;
-}) => encodeApprovedProjectAgentTaskSession({
+}) => encodeApprovedTeamAgentTaskSession({
   sessionId: input.sessionId,
   agentId: input.proposal.agent_id,
   agentName: input.proposal.agent_name,
@@ -385,7 +385,7 @@ describe("conversational Agent Skill execution approval", () => {
       model: "gpt-5.6-sol",
       effort: "high",
     },
-  ) => createProjectAgent(db, projectId, {
+  ) => createTeamAgent(db, projectId, {
     name: `Release Agent ${sequence + 1}`,
     provider: "codex",
     model: "gpt-5.6-sol",
@@ -718,7 +718,7 @@ describe("conversational Agent Skill execution approval", () => {
     await expect(transientSessionPayload(seeded.proposal.id))
       .resolves.toBeNull();
     await expect(
-      agentClient.getProjectAgentSession(
+      agentClient.getTeamAgentSession(
         {
           projectId,
           sessionId: acceptedBody.proposal.resultSessionId,
@@ -749,7 +749,7 @@ describe("conversational Agent Skill execution approval", () => {
       otherWorkerId,
     )).status).toBe(400);
 
-    const wrongWorkerClaim = await claimNextProjectAgentTask(db, projectId, {
+    const wrongWorkerClaim = await claimNextTeamAgentTask(db, projectId, {
       workerId: otherWorkerId,
       claimTokenHash: sha256("wrong-worker-claim"),
       claimedAt: new Date().toISOString(),
@@ -771,7 +771,7 @@ describe("conversational Agent Skill execution approval", () => {
 
     const claimToken = "briar_agent_task_claim_approved_task";
     const claimHash = sha256(claimToken);
-    const claimed = await claimNextProjectAgentTask(db, projectId, {
+    const claimed = await claimNextTeamAgentTask(db, projectId, {
       workerId,
       claimTokenHash: claimHash,
       claimedAt: new Date().toISOString(),
@@ -795,12 +795,12 @@ describe("conversational Agent Skill execution approval", () => {
     );
     expect(completedResponse.status).toBe(200);
     const completedBody = await completedResponse.json();
-    const session = await getProjectAgentSession(db, projectId, claimed!.id);
+    const session = await getTeamAgentSession(db, projectId, claimed!.id);
     expect(session).toMatchObject({
       status: "completed",
       requested_by_user_id: ownerId,
     });
-    expect(decodeStoredProjectAgentSessionPayload(session!.payload_json))
+    expect(decodeStoredTeamAgentSessionPayload(session!.payload_json))
       .toMatchObject({
         status: "completed",
         summary: "Release workflow completed.",
@@ -869,7 +869,7 @@ describe("conversational Agent Skill execution approval", () => {
     );
     expect(archive.failures).toEqual([]);
     expect(archive.completedObjects).toBeGreaterThan(0);
-    expect(await getProjectAgentSession(db, projectId, claimed!.id)).toBeNull();
+    expect(await getTeamAgentSession(db, projectId, claimed!.id)).toBeNull();
     const archivedCompletionReplay = await completeTask(
       claimed!.id,
       claimToken,
@@ -979,7 +979,7 @@ describe("conversational Agent Skill execution approval", () => {
     });
     const taskClaimToken = "briar_agent_task_claim_channel_approved_task";
     const taskClaimHash = sha256(taskClaimToken);
-    const task = await claimNextProjectAgentTask(db, projectId, {
+    const task = await claimNextTeamAgentTask(db, projectId, {
       workerId,
       claimTokenHash: taskClaimHash,
       claimedAt: new Date().toISOString(),
@@ -1018,7 +1018,7 @@ describe("conversational Agent Skill execution approval", () => {
     expect(await tableCount("briar_project_agent_task_jobs"))
       .toBe(taskCountBefore + 1);
     const claimToken = "briar_agent_task_claim_invoke_is_consent";
-    expect(await claimNextProjectAgentTask(db, projectId, {
+    expect(await claimNextTeamAgentTask(db, projectId, {
       workerId,
       claimTokenHash: sha256(claimToken),
       claimedAt: new Date().toISOString(),
@@ -1278,7 +1278,7 @@ describe("conversational Agent Skill execution approval", () => {
     };
     const taskId = body.proposal.resultSessionId;
     const claimToken = "briar_agent_task_claim_retryable_receipt";
-    expect(await claimNextProjectAgentTask(db, projectId, {
+    expect(await claimNextTeamAgentTask(db, projectId, {
       workerId,
       claimTokenHash: sha256(claimToken),
       claimedAt: new Date().toISOString(),
@@ -1290,7 +1290,7 @@ describe("conversational Agent Skill execution approval", () => {
     expect(first.status).toBe(200);
     const firstBody = await first.json();
     expect(firstBody).toEqual({});
-    expect(await getProjectAgentSession(db, projectId, taskId))
+    expect(await getTeamAgentSession(db, projectId, taskId))
       .toMatchObject({ id: taskId, status: "running" });
     const replay = await completeTask(taskId, claimToken, payload);
     expect(replay.status).toBe(200);
@@ -1311,7 +1311,7 @@ describe("conversational Agent Skill execution approval", () => {
     });
 
     const successToken = "briar_agent_task_claim_retryable_receipt_success";
-    expect(await claimNextProjectAgentTask(db, projectId, {
+    expect(await claimNextTeamAgentTask(db, projectId, {
       workerId,
       claimTokenHash: sha256(successToken),
       claimedAt: new Date().toISOString(),
@@ -1418,7 +1418,7 @@ describe("conversational Agent Skill execution approval", () => {
       conversationId: "direct-conversation",
     };
 
-    const committed = await completeProjectAgentTaskWithReceipt(
+    const committed = await completeTeamAgentTaskWithReceipt(
       db,
       projectId,
       taskId,
@@ -1435,13 +1435,13 @@ describe("conversational Agent Skill execution approval", () => {
       job: { id: taskId, status: "completed" },
       receipt: { outcome_status: "completed", summary: payload.summary },
     });
-    expect((await getProjectAgentSession(db, projectId, taskId))?.status)
+    expect((await getTeamAgentSession(db, projectId, taskId))?.status)
       .toBe("running");
 
     const reconciled = await completeTask(taskId, work.claimToken, payload);
     expect(reconciled.status).toBe(200);
     expect(await reconciled.json()).toEqual({ replayed: true });
-    expect((await getProjectAgentSession(db, projectId, taskId))?.status)
+    expect((await getTeamAgentSession(db, projectId, taskId))?.status)
       .toBe("completed");
     expect((await completeTask(taskId, work.claimToken, {
       ...payload,
@@ -1588,14 +1588,14 @@ describe("conversational Agent Skill execution approval", () => {
     for (let attempt = 1; attempt <= 3; attempt += 1) {
       const claimToken = `briar_agent_task_claim_retry_claim_${attempt}`;
       const claimHash = sha256(claimToken);
-      const claimed = await claimNextProjectAgentTask(db, projectId, {
+      const claimed = await claimNextTeamAgentTask(db, projectId, {
         workerId,
         claimTokenHash: claimHash,
         claimedAt: new Date().toISOString(),
         leaseExpiresAt: new Date(Date.now() + 300_000).toISOString(),
       });
       expect(claimed?.id).toBe(body.proposal.resultSessionId);
-      const completed = await completeProjectAgentTask(
+      const completed = await completeTeamAgentTask(
         db,
         projectId,
         claimed!.id,
@@ -1607,7 +1607,7 @@ describe("conversational Agent Skill execution approval", () => {
         },
       );
       expect(completed?.status).toBe(attempt < 3 ? "queued" : "failed");
-      const session = await getProjectAgentSession(db, projectId, claimed!.id);
+      const session = await getTeamAgentSession(db, projectId, claimed!.id);
       expect(session?.status).toBe(attempt < 3 ? "running" : "failed");
     }
     const terminalFailureReplay = await completeTask(
@@ -1641,7 +1641,7 @@ describe("conversational Agent Skill execution approval", () => {
       proposal: { resultSessionId: string };
     };
     const reapHash = sha256("reap-claim");
-    expect(await claimNextProjectAgentTask(db, projectId, {
+    expect(await claimNextTeamAgentTask(db, projectId, {
       workerId,
       claimTokenHash: reapHash,
       claimedAt: new Date(Date.now() - 120_000).toISOString(),
@@ -1651,14 +1651,14 @@ describe("conversational Agent Skill execution approval", () => {
       `update briar_project_agent_task_jobs set attempts = 3
        where id = ?`,
     ).bind(reapedBody.proposal.resultSessionId).run();
-    const reaped = await reapProjectAgentTaskJobs(db, projectId, {
+    const reaped = await reapTeamAgentTaskJobs(db, projectId, {
       observedAt: new Date().toISOString(),
       error: "Worker lease expired after repeated attempts.",
     });
     expect(reaped.map((job) => job.id)).toContain(
       reapedBody.proposal.resultSessionId,
     );
-    expect((await getProjectAgentSession(
+    expect((await getTeamAgentSession(
       db,
       projectId,
       reapedBody.proposal.resultSessionId,
@@ -1690,7 +1690,7 @@ describe("conversational Agent Skill execution approval", () => {
        set responsibility = 'Revoked responsibility', updated_at = ?
        where id = ?`,
     ).bind(new Date().toISOString(), agentSeed.agent.id).run();
-    expect((await getProjectAgentSession(db, projectId, agentSessionId))?.status)
+    expect((await getTeamAgentSession(db, projectId, agentSessionId))?.status)
       .toBe("failed");
 
     const skillSeed = await seedIssueProposal();
@@ -1706,7 +1706,7 @@ describe("conversational Agent Skill execution approval", () => {
     expect(await db.prepare(
       `select 1 from briar_project_agent_task_jobs where id = ?`,
     ).bind(skillSessionId).first()).toBeNull();
-    expect((await getProjectAgentSession(db, projectId, skillSessionId))?.status)
+    expect((await getTeamAgentSession(db, projectId, skillSessionId))?.status)
       .toBe("failed");
 
     const policySeed = await seedIssueProposal();
@@ -1724,7 +1724,7 @@ describe("conversational Agent Skill execution approval", () => {
       updatedByUserId: ownerId,
       observedAt: new Date().toISOString(),
     });
-    expect((await getProjectAgentSession(db, projectId, policySessionId))?.status)
+    expect((await getTeamAgentSession(db, projectId, policySessionId))?.status)
       .toBe("failed");
 
     await updateProjectExecutionWorkerPolicy(db, projectId, {
@@ -1743,7 +1743,7 @@ describe("conversational Agent Skill execution approval", () => {
       proposal: { resultSessionId: string };
     }).proposal.resultSessionId;
     await disableExecutionWorker(db, workerDeviceId, new Date().toISOString());
-    expect((await getProjectAgentSession(db, projectId, workerSessionId))?.status)
+    expect((await getTeamAgentSession(db, projectId, workerSessionId))?.status)
       .toBe("failed");
 
     // Migration 0074's existing channel-delete sync trigger reinserts a row

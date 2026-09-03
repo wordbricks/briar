@@ -14,9 +14,9 @@ import {
   organizationAgentContextMaxEncodedPageBytes,
 } from "./organization-agent-context";
 import {
-  decodeProjectAgentSessionInput,
-  encodeStoredProjectAgentSessionPayload,
-} from "./project-request-contract";
+  decodeTeamAgentSessionInput,
+  encodeStoredTeamAgentSessionPayload,
+} from "./team-request-contract";
 
 const organizationId = "10000000-0000-4000-8000-000000000001";
 const otherOrganizationId = "10000000-0000-4000-8000-000000000002";
@@ -86,7 +86,7 @@ const insertSession = async (input: {
   startedAt: string;
   visibleAt?: string;
 }) => {
-  const payload = decodeProjectAgentSessionInput({
+  const payload = decodeTeamAgentSessionInput({
     dispatchGroupId: input.id,
     agentId,
     skillId: null,
@@ -119,7 +119,7 @@ const insertSession = async (input: {
     input.id,
     agentId,
     input.status,
-    encodeStoredProjectAgentSessionPayload(payload),
+    encodeStoredTeamAgentSessionPayload(payload),
     input.startedAt,
     input.status === "completed" ? input.startedAt : null,
     input.startedAt,

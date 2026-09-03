@@ -61,7 +61,7 @@ export type AuthenticatedWorkerPrincipal = Awaited<
   ReturnType<typeof requireWorkerCredential>
 >;
 
-export type AuthenticatedWorkerProject = {
+export type AuthenticatedWorkerTeam = {
   principal: AuthenticatedWorkerPrincipal;
   binding: NonNullable<
     Awaited<ReturnType<typeof executionWorkerBindingById>>
@@ -73,8 +73,8 @@ export async function requireWorkerProjectBinding(
   request: Request,
   projectId: string,
   workerId?: string,
-  preauthenticated?: AuthenticatedWorkerProject,
-): Promise<AuthenticatedWorkerProject> {
+  preauthenticated?: AuthenticatedWorkerTeam,
+): Promise<AuthenticatedWorkerTeam> {
   if (preauthenticated) {
     if (
       preauthenticated.binding.project_id !== projectId ||

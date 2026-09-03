@@ -4,7 +4,7 @@ import { parseJsonObject } from "./agent-result-json";
 import { sha256 } from "./crypto-digest";
 import {
   claimNextQueuedHuntRun,
-  getProjectAgent,
+  getTeamAgent,
   listIssueAttachments,
 } from "./db";
 import { issueClaimExecutionConfig } from "./agent-execution-config";
@@ -12,7 +12,7 @@ import { HttpError } from "./http-response";
 import { issueAttachmentJson } from "./issue-conversation-json";
 import { claimConversationJson } from "./issue-conversation-json";
 import { listIssueMessagesWithArchive } from "./issue-conversation-service";
-import type { AuthenticatedWorkerProject } from "./worker-route-auth";
+import type { AuthenticatedWorkerTeam } from "./worker-route-auth";
 import { latestExecutionWorkerUpdateHandoff } from "./worker-update-repository";
 import { claimWorkflowContext } from "./workflow-resume";
 import {
@@ -29,7 +29,7 @@ export async function claimNextQueueWork(input: {
   projectId: string;
   claimedBy: string;
   runId?: string;
-  authenticatedWorker?: AuthenticatedWorkerProject;
+  authenticatedWorker?: AuthenticatedWorkerTeam;
 }) {
   const {
     db,
@@ -107,7 +107,7 @@ export async function claimNextQueueWork(input: {
       });
     }
     const agent =
-      run?.agent_id ? await getProjectAgent(db, projectId, run.agent_id) : null;
+      run?.agent_id ? await getTeamAgent(db, projectId, run.agent_id) : null;
     const activeSkill = agent
       ? issueProcessingAgentSkillRow(agent.skills)
       : null;

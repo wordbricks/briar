@@ -48,22 +48,22 @@ type BeginInstallationResult = Awaited<
 >;
 type CredentialResult = Awaited<
   ReturnType<
-    typeof import("./project-github-application").createProjectGithubCredentialApplication
+    typeof import("./team-github-application").createTeamGithubCredentialApplication
   >
 >;
 type RepositoryResult = Awaited<
   ReturnType<
-    typeof import("./project-github-application").getProjectGithubRepositoryApplication
+    typeof import("./team-github-application").getTeamGithubRepositoryApplication
   >
 >;
 type PullRequestResult = Awaited<
   ReturnType<
-    typeof import("./project-github-application").getProjectGithubPullRequestApplication
+    typeof import("./team-github-application").getTeamGithubPullRequestApplication
   >
 >;
 type MergeResult = Awaited<
   ReturnType<
-    typeof import("./project-github-application").mergeProjectGithubPullRequestApplication
+    typeof import("./team-github-application").mergeTeamGithubPullRequestApplication
   >
 >;
 

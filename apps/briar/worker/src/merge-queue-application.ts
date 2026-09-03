@@ -11,9 +11,9 @@ import {
 import { configureMergeQueueProfile, getMergeQueueProfile } from "./merge-queue-profile";
 import { getMergeQueueStatus } from "./merge-queue-status";
 import { hasOrganizationCapability } from "./organization-access";
-import { getProject } from "./project-command-repository";
-import { validationCommandsFromStage } from "./project-configuration-application";
-import { getProjectSettings } from "./project-settings-repository";
+import { getTeam } from "./team-command-repository";
+import { validationCommandsFromStage } from "./team-configuration-application";
+import { getTeamSettings } from "./team-settings-repository";
 
 const DEFAULT_MERGE_QUEUE_QUIET_WINDOW_MS = 300_000;
 const DEFAULT_MERGE_QUEUE_MAX_BATCH_SIZE = 5;
@@ -46,8 +46,8 @@ export type MergeQueueApplicationServices = {
   readonly getGithubConnectionForOrganization: typeof getGithubConnectionForOrganization;
   readonly getMergeQueueProfile: typeof getMergeQueueProfile;
   readonly getMergeQueueStatus: typeof getMergeQueueStatus;
-  readonly getProject: typeof getProject;
-  readonly getProjectSettings: typeof getProjectSettings;
+  readonly getTeam: typeof getTeam;
+  readonly getTeamSettings: typeof getTeamSettings;
   readonly listGithubConnectionRepositories: typeof listGithubConnectionRepositories;
 };
 
@@ -56,8 +56,8 @@ export const mergeQueueApplicationServices: MergeQueueApplicationServices = {
   getGithubConnectionForOrganization,
   getMergeQueueProfile,
   getMergeQueueStatus,
-  getProject,
-  getProjectSettings,
+  getTeam,
+  getTeamSettings,
   listGithubConnectionRepositories,
 };
 
@@ -67,7 +67,7 @@ const requireProject = async (
   userId: string,
   services: MergeQueueApplicationServices,
 ) => {
-  const project = await services.getProject(db, projectId, userId);
+  const project = await services.getTeam(db, projectId, userId);
   if (!project) {
     throw new MergeQueueApplicationError("project_not_found", "Project not found");
   }
@@ -126,7 +126,7 @@ export async function updateMergeQueueProfileApplication(
   }
 
   const current = await services.getMergeQueueProfile(input.db, project.id);
-  const settings = await services.getProjectSettings(input.db, project.id);
+  const settings = await services.getTeamSettings(input.db, project.id);
   const readinessStageId = input.command.readinessStageId ?? current?.readiness_stage_id;
   if (!readinessStageId) {
     throw new MergeQueueApplicationError(

@@ -7,7 +7,7 @@ import {
 import { RunStatus } from "@briar/contracts/gen/briar/app/v1/common_pb";
 import { describe, expect, it } from "vitest";
 import { dashboardRunFromProto } from "./dashboard";
-import { workflowToProto } from "./project-configuration-mappers";
+import { workflowToProto } from "./team-configuration-mappers";
 
 describe("Dashboard Connect DTO mapping", () => {
   it("keeps Team and planning Project identity on dashboard runs", () => {

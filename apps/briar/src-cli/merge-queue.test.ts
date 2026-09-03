@@ -437,7 +437,7 @@ describe("local provider-independent merge-queue worker", () => {
 
   it("checks repository identity without inspecting or requiring rulesets", () => {
     const profile = {
-      projectId,
+      teamId: projectId,
       repositoryId: 701,
       repository: "wordbricks/briar",
       baseBranch: "main" as const,

@@ -24,9 +24,9 @@ import type {
   AgentUsagePricing,
 } from "../agent-usage-pricing";
 import type {
-  ProjectUsagePeriod,
-  ProjectUsageSummary,
-} from "../project-usage-summary";
+  TeamUsagePeriod,
+  TeamUsageSummary,
+} from "../team-usage-summary";
 import type {
   AgentUsageReport,
   AgentUsageRun,
@@ -58,7 +58,7 @@ export const organizationUsageRangeToProto = (
 };
 
 export const projectUsagePeriodToProto = (
-  period: ProjectUsagePeriod,
+  period: TeamUsagePeriod,
 ): ProtoProjectUsagePeriod => {
   switch (period) {
     case "day":
@@ -72,7 +72,7 @@ export const projectUsagePeriodToProto = (
 
 const projectUsagePeriodFromProto = (
   period: ProtoProjectUsagePeriod,
-): ProjectUsagePeriod => {
+): TeamUsagePeriod => {
   switch (period) {
     case ProtoProjectUsagePeriod.DAY:
       return "day";
@@ -139,7 +139,7 @@ const executionAttemptFromProto = (
   attempt: AgentUsageExecutionAttemptMessage,
 ) => ({
   executionId: attempt.executionId,
-  projectId: attempt.projectId,
+  teamId: attempt.projectId,
   runAttempt: attempt.runAttempt,
   claimAttempt: attempt.claimAttempt,
   workerId: attempt.workerId ?? null,
@@ -156,7 +156,7 @@ const executionAttemptFromProto = (
 
 const usageRecordFromProto = (record: AgentUsageRecordMessage) => ({
   executionId: record.executionId,
-  projectId: record.projectId,
+  teamId: record.projectId,
   runAttempt: record.runAttempt,
   claimAttempt: record.claimAttempt,
   workerId: record.workerId ?? null,
@@ -201,7 +201,7 @@ const usageRecordFromProto = (record: AgentUsageRecordMessage) => ({
 
 const costRecordFromProto = (record: AgentUsageCostRecordMessage) => ({
   executionId: record.executionId,
-  projectId: record.projectId,
+  teamId: record.projectId,
   runAttempt: record.runAttempt,
   claimAttempt: record.claimAttempt,
   workerId: record.workerId ?? null,
@@ -230,7 +230,7 @@ const estimatedCostRecordFromProto = (
   record: AgentUsageEstimatedCostRecordMessage,
 ) => ({
   executionId: record.executionId,
-  projectId: record.projectId,
+  teamId: record.projectId,
   runAttempt: record.runAttempt,
   claimAttempt: record.claimAttempt,
   workerId: record.workerId ?? null,
@@ -262,7 +262,7 @@ const estimatedCostRecordFromProto = (
 
 const usageRunFromProto = (run: AgentUsageRunMessage): AgentUsageRun => ({
   id: run.id,
-  projectId: run.projectId,
+  teamId: run.projectId,
   status: runStatusFromProto(run.status),
   executionMetrics: agentExecutionMetricsFromProto(run.executionMetrics),
   claimedBy: run.claimedBy ?? null,
@@ -299,7 +299,7 @@ export const organizationUsageReportFromProto = (
 
 export const projectUsageSummaryFromProto = (
   response: GetProjectUsageSummaryResponse,
-): ProjectUsageSummary => ({
+): TeamUsageSummary => ({
   period: projectUsagePeriodFromProto(response.period),
   rangeStart: requiredTimestamp(
     response.rangeStart,
@@ -347,8 +347,8 @@ export const statusTrayRunsFromProto = (
       throw new Error(`Status tray run must be running, received: ${status}`);
     }
     return {
-      projectId: run.projectId,
-      projectName: run.projectName,
+      teamId: run.projectId,
+      teamName: run.projectName,
       id: run.id,
       title: run.title,
       status,

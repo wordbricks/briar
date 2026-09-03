@@ -161,7 +161,7 @@ func planningProjectStatusMessage(
 }
 
 extension Project {
-    init(connectMessage message: BriarAPI_Project) throws {
+    init(connectMessage message: BriarAPI_Team) throws {
         guard
             let id = UUID(uuidString: message.id),
             let organizationID = UUID(uuidString: message.organizationID),

@@ -6,7 +6,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import type { HuntEventInput } from "./db";
 import {
   createIssueMessage,
-  createProjectAgent,
+  createTeamAgent,
   recordHuntEvent,
 } from "./db";
 import { resolveIssueAttachmentUploads } from "./issue-attachment-upload-repository";
@@ -112,7 +112,7 @@ describe("issue message mutation", () => {
     runId = await recordHuntEvent(db, projectId, huntEvent("message-run"));
     agentIds = await Promise.all(
       ["Alpha", "Beta"].map(async (name, index) =>
-        (await createProjectAgent(db, projectId, {
+        (await createTeamAgent(db, projectId, {
           name,
           provider: index === 0 ? "codex" : "claude",
           model: null,

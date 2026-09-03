@@ -1,12 +1,12 @@
 import {
-  getProject,
+  getTeam,
   HuntTransitionError,
   moveHuntRun,
   transferIssue,
 } from "./db";
 import { HttpError } from "./http-response";
 import { hasOrganizationCapability } from "./organization-access";
-import { decodeProjectTransferInput } from "./project-request-contract";
+import { decodeTeamTransferInput } from "./team-request-contract";
 import {
   decodeMoveRunInput,
   decodePausedRunReworkInput,
@@ -38,7 +38,7 @@ async function requireIssueExecutionProject(
   capability: "issues:execute" | "issues:write",
   deniedMessage: string,
 ) {
-  const project = await getProject(input.db, input.projectId, input.userId);
+  const project = await getTeam(input.db, input.projectId, input.userId);
   if (!project) throw new HttpError(404, "Project not found");
   if (!hasOrganizationCapability(project.member_role, capability)) {
     throw new HttpError(403, deniedMessage);
@@ -54,11 +54,11 @@ export async function transferProjectIssue(
     "issues:write",
     "Issue editing permission required",
   );
-  const request = decodeProjectTransferInput(input.request);
+  const request = decodeTeamTransferInput(input.request);
   if (request.targetProjectId === sourceProject.id) {
     throw new HttpError(400, "Target project must be different");
   }
-  const targetProject = await getProject(
+  const targetProject = await getTeam(
     input.db,
     request.targetProjectId,
     input.userId,

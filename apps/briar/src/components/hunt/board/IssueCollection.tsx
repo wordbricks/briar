@@ -47,7 +47,7 @@ import type {
   ProjectAgent,
   ProjectSettings,
 } from "@/types";
-import type { AgentProvider } from "@/lib/project-llm";
+import type { AgentProvider } from "@/lib/team-llm";
 import { PageHeader } from "../../layout";
 import { IssueList } from "./IssueList";
 import { IssuePropertyFilterMenu } from "./IssuePropertyFilterMenu";

@@ -29,7 +29,7 @@ import { loadRunCostEstimate } from "@/lib/api";
 import { copyIssueId, copyIssueShareLink, shareIssueLink } from "@/lib/issue-links";
 import { formatIssueKey } from "@/lib/issue-key";
 import type { AgentSkillExecutionApprovalInput, AgentSkillExecutionProposal, AgentExecutionCostEstimate, ExecutionWorker, HuntEvent, HuntRun, HuntRunPlacement, IssueAttachment, IssueMessage, IssueMessageSendResult, IssueProposedAction, IssueExecutionApprovalInput, IssueExecutionProposal, IssueExecutionPreferences, OrganizationMember, PlanningProject, Project, ProjectAgent, ProjectExecutionWorkerPolicy, RelatedMessageReference, RunEvidence, RunEvidenceImage, UpdateIssueInput } from "@/types";
-import { agentEffortOptions, agentModelDisplayName, agentModelOptions, agentProviderLabels, type AgentProvider, type ModelEffort } from "@/lib/project-llm";
+import { agentEffortOptions, agentModelDisplayName, agentModelOptions, agentProviderLabels, type AgentProvider, type ModelEffort } from "@/lib/team-llm";
 import { useAgentProviderModels } from "@/hooks/useAgentProviderModels";
 import { useI18n } from "@/i18n";
 import type { MessageKey } from "@/i18n/messages";
@@ -46,7 +46,7 @@ import { IssueDifficultyIcon } from "../IssueDifficultyIcon";
 import { IssueStatusHistoryPanel } from "./IssueStatusHistoryPanel";
 import { IssueWorkflowProgress } from "./IssueWorkflowProgress";
 import { RunStatusPill } from "./RunStatusPill";
-import { ProjectIcon } from "../../ProjectIcon";
+import { TeamIcon } from "../../TeamIcon";
 import { DraftIssueDescriptionEditor } from "../editor/DraftIssueDescriptionEditor";
 import { formatDate, formatExecutionUsdTicks, formatRatePerMillion, localizeEvent, localizeStatus, localizeWorkflowStage, relativeTime } from "../model/formatters";
 import { placementForId, placementIdForRun, placementMatchesRun } from "../model/kanban";
@@ -634,13 +634,13 @@ export function RunPage({
     .map(project => ({
       label: project.name,
       value: project.id,
-      leading: <ProjectIcon project={project} className="run-project-option-icon" />
+      leading: <TeamIcon project={project} className="run-project-option-icon" />
     }));
   if (currentProject && !projectOptions.some(option => option.value === currentProject.id)) {
     projectOptions.unshift({
       label: currentProject.name,
       value: currentProject.id,
-      leading: <ProjectIcon project={currentProject} className="run-project-option-icon" />
+      leading: <TeamIcon project={currentProject} className="run-project-option-icon" />
     });
   }
   const projectValue = currentProject?.id ?? "";
@@ -653,13 +653,13 @@ export function RunPage({
   const teamOptions = [...teamOptionsMap.values()].map((team) => ({
     label: team.name,
     value: team.id,
-    leading: <ProjectIcon project={team} className="run-project-option-icon" />,
+    leading: <TeamIcon project={team} className="run-project-option-icon" />,
   }));
   if (currentTeamId && !teamOptions.some((option) => option.value === currentTeamId)) {
     teamOptions.unshift({
       label: currentTeamName ?? t("run.notSet"),
       value: currentTeamId,
-      leading: <ProjectIcon project={currentTeam ?? { name: currentTeamName ?? t("run.notSet"), icon: null }} className="run-project-option-icon" />,
+      leading: <TeamIcon project={currentTeam ?? { name: currentTeamName ?? t("run.notSet"), icon: null }} className="run-project-option-icon" />,
     });
   }
   const teamValue = currentTeamId ?? "";
@@ -1533,12 +1533,12 @@ export function RunPage({
                       <span className="run-property-copy"><strong>{teamLabel}</strong></span>
                     </div>}
                   {canEditProject ? <label aria-label={`${t("issue.project")}: ${projectLabel}`} className="run-property run-property-editable" title={t("issue.project")}>
-                      <span className="run-property-icon project"><ProjectIcon className="run-project-option-icon" project={currentProject ?? { name: projectLabel, icon: null }} /></span>
+                      <span className="run-property-icon project"><TeamIcon className="run-project-option-icon" project={currentProject ?? { name: projectLabel, icon: null }} /></span>
                       <span className="run-property-copy">
                         <SelectMenu align="end" className="run-project-select" disabled={isUpdatingIssue} label={t("issue.project")} onValueChange={updateIssueProject} options={projectOptions} searchEmptyMessage={t("organization.noResults")} searchPlaceholder={t("organization.search")} searchable={projectOptions.length > 8} size="small" value={projectValue} />
                       </span>
                     </label> : <div aria-label={`${t("issue.project")}: ${projectLabel}`} className="run-property" title={t("issue.project")}>
-                      <span className="run-property-icon project"><ProjectIcon className="run-project-option-icon" project={currentProject ?? { name: projectLabel, icon: null }} /></span>
+                      <span className="run-property-icon project"><TeamIcon className="run-project-option-icon" project={currentProject ?? { name: projectLabel, icon: null }} /></span>
                       <span className="run-property-copy"><strong>{projectLabel}</strong></span>
                     </div>}
                   {run.fullAuto ? <div aria-label={`${t("issue.fullAuto")}: ${t("issue.fullAutoDescription")}`} className="run-property" title={t("issue.fullAutoDescription")}>

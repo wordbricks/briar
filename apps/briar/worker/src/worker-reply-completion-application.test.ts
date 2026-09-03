@@ -17,7 +17,7 @@ import type { HuntEventInput } from "./db";
 import {
   claimNextIssueAgentReply,
   createIssueMessage,
-  createProjectAgent,
+  createTeamAgent,
   enqueueIssueAgentReply,
   recordHuntEvent,
 } from "./db";
@@ -176,7 +176,7 @@ describe("reply completion application", () => {
         deviceId,
       ),
     ]);
-    agentId = (await createProjectAgent(db, projectId, {
+    agentId = (await createTeamAgent(db, projectId, {
       name: "Reply Agent",
       provider: "codex",
       model: null,
