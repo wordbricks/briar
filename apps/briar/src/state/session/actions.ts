@@ -17,6 +17,7 @@ import {
 } from "../organization/atoms";
 import { demoMode, webMode } from "../platform";
 import { useRegistry, type AtomRegistry } from "../registry";
+import { applySyncEvent } from "../sync/apply";
 import {
   activeTeamIdAtom,
   isCreatingTeamAtom,
@@ -45,9 +46,9 @@ export const liveSessionActionApi: SessionActionApi = {
 };
 
 /**
- * The parts of a sign-out Phase 1 does not own yet. `useBriar` still holds the
- * login poll timers, the workspace inventory and the dashboard cache, so it
- * supplies them here instead of these actions reaching back into React.
+ * The parts of a sign-out these actions do not own yet. `useBriar` still holds
+ * the login poll timers and the workspace inventory, so it supplies them here
+ * instead of these actions reaching back into React.
  */
 export interface SessionActionDeps {
   readonly api?: Partial<SessionActionApi> | undefined;
@@ -56,10 +57,11 @@ export interface SessionActionDeps {
   /** Stops device-authorization polling and clears its transient state. */
   readonly cancelLogin: () => void;
   /**
-   * Clears the state a signed-out app must not keep but Phase 1 does not own:
-   * the connected team inventory and its error, the dashboard and its cache.
+   * Clears the workspace state a signed-out app must not keep: the connected
+   * team inventory and its error. Phase 3 moves it into a workspace module and
+   * this last injection point goes with it.
    */
-  readonly clearSignedOutViews: () => void;
+  readonly clearWorkspaceViews: () => void;
 }
 
 export interface AccountProfileInput {
@@ -101,6 +103,9 @@ export function createSessionActions(
       registry.set(activeTeamIdAtom, null);
       registry.set(teamConnectionAtom, null);
       registry.set(isCreatingTeamAtom, false);
+      // The entity store is session scoped: nothing the previous account
+      // loaded may outlive its token.
+      applySyncEvent(registry, { kind: "session-cleared" });
     });
   };
 
@@ -118,7 +123,7 @@ export function createSessionActions(
         await api.signOutBrowserSession().catch(() => undefined);
       }
       await api.clearSessionToken();
-      deps.clearSignedOutViews();
+      deps.clearWorkspaceViews();
       clearSessionState();
     },
 
@@ -133,7 +138,7 @@ export function createSessionActions(
         await api.signOutBrowserSession();
       }
       await api.clearSessionToken();
-      deps.clearSignedOutViews();
+      deps.clearWorkspaceViews();
       clearSessionState();
     },
 
@@ -153,15 +158,15 @@ export function createSessionActions(
 
 export function useSessionActions(deps: SessionActionDeps): SessionActions {
   const registry = useRegistry();
-  const { api, bumpReconnectRequest, cancelLogin, clearSignedOutViews } = deps;
+  const { api, bumpReconnectRequest, cancelLogin, clearWorkspaceViews } = deps;
   return useMemo(
     () =>
       createSessionActions(registry, {
         api,
         bumpReconnectRequest,
         cancelLogin,
-        clearSignedOutViews,
+        clearWorkspaceViews,
       }),
-    [api, bumpReconnectRequest, cancelLogin, clearSignedOutViews, registry],
+    [api, bumpReconnectRequest, cancelLogin, clearWorkspaceViews, registry],
   );
 }

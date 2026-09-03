@@ -7,10 +7,16 @@ import {
   updateOrganization as updateRemoteOrganization,
   updateOrganizationLogo as updateRemoteOrganizationLogo,
 } from "../../lib/api";
-import type { Organization, Project } from "../../types";
+import { demoDashboard } from "../../lib/demo-data";
+import type { Organization } from "../../types";
+import { emptyDashboard } from "../demo-fixtures";
+import { teamsByIdAtom } from "../entities/teams";
+import { upsertManyBy } from "../entities/upsert";
 import { demoMode } from "../platform";
 import { useRegistry, type AtomRegistry } from "../registry";
 import { sessionErrorAtom, tokenAtom } from "../session/atoms";
+import { applySyncEvent, markTeamStale } from "../sync/apply";
+import { loadedDashboardTeamIdAtom } from "../sync/view";
 import { activeTeamIdAtom, teamsAtom } from "../team/atoms";
 import { activeOrganizationIdAtom, organizationsAtom } from "./atoms";
 
@@ -30,35 +36,16 @@ export const liveOrganizationActionApi: OrganizationActionApi = {
 };
 
 /**
- * The dashboard-shaped state Phase 1 does not own yet. `useBriar` keeps the
- * dashboard, its per-team cache and the health probe, so an organization switch
- * hands those transitions back to it rather than duplicating them here.
+ * The health probe is the only piece of an organization switch these actions do
+ * not own: it still lives in `useBriar` until Phase 3 moves it. The dashboard
+ * half is read and written here, through the entity store.
  */
 export interface OrganizationActionDeps {
   readonly api?: Partial<OrganizationActionApi> | undefined;
-  /**
-   * Applies the dashboard and health half of an organization switch: keep, warm
-   * from the cache, or blank the board for `team`.
-   */
-  readonly applyOrganizationSwitch: (
-    team: Project | null,
-    dashboardMatchesTeam: boolean,
-  ) => void;
   /** Invalidates in-flight reconnect attempts. */
   readonly bumpReconnectRequest: () => void;
-  /** Mirrors a renamed organization into the rendered dashboard. */
-  readonly renameDashboardOrganization: (
-    organizationId: string,
-    organizationName: string,
-  ) => void;
-  /**
-   * The team the rendered dashboard belongs to, or `null` when no dashboard is
-   * on screen. Compared against the team an organization resolves to, so a
-   * no-op switch stays a no-op.
-   */
-  readonly readDashboardTeamId: () => string | null;
-  /** Blanks the dashboard and health for a freshly created organization. */
-  readonly resetTeamViews: () => void;
+  /** Blanks the health probe when the switch lands on a different team. */
+  readonly resetTeamHealth: () => void;
   /**
    * The team a project window is pinned to, if any. Such a window may only ever
    * select that team's organization.
@@ -136,10 +123,12 @@ export function createOrganizationActions(
           organization,
         ]);
         registry.set(activeOrganizationIdAtom, organization.id);
+        // No team is selected in a brand new organization, so the dashboard
+        // view resolves to `null` without anything having to blank it.
         registry.set(activeTeamIdAtom, null);
         registry.set(sessionErrorAtom, null);
       });
-      deps.resetTeamViews();
+      deps.resetTeamHealth();
       return organization;
     },
 
@@ -195,8 +184,21 @@ export function createOrganizationActions(
               : team,
           ),
         );
+        // The stored team entities carry their own copy of the organization
+        // name, so the rendered dashboard has to be renamed with them.
+        registry.update(teamsByIdAtom, (teams) => {
+          let next = teams;
+          for (const [teamId, team] of teams) {
+            if (team.organizationId !== organizationId) continue;
+            next = upsertManyBy(
+              next,
+              [{ ...team, organizationName: organization.name }],
+              () => teamId,
+            );
+          }
+          return next;
+        });
       });
-      deps.renameDashboardOrganization(organizationId, organization.name);
       return organization;
     },
 
@@ -224,7 +226,8 @@ export function createOrganizationActions(
         teams.find((candidate) => candidate.organizationId === organizationId) ??
         null;
       const teamId = team?.id ?? null;
-      const dashboardMatchesTeam = deps.readDashboardTeamId() === teamId;
+      const dashboardMatchesTeam =
+        registry.get(loadedDashboardTeamIdAtom) === teamId;
       if (
         registry.get(activeOrganizationIdAtom) === organizationId &&
         registry.get(activeTeamIdAtom) === teamId &&
@@ -239,7 +242,21 @@ export function createOrganizationActions(
         registry.set(activeTeamIdAtom, teamId);
         registry.set(sessionErrorAtom, null);
       });
-      deps.applyOrganizationSwitch(team, dashboardMatchesTeam);
+      if (demoMode && team) {
+        applySyncEvent(registry, {
+          kind: "team-snapshot",
+          teamId: team.id,
+          payload:
+            team.id === demoDashboard.team.id
+              ? demoDashboard
+              : emptyDashboard(team),
+        });
+      } else if (!dashboardMatchesTeam) {
+        // The store keeps the team's last payload across the switch, so the
+        // board never blanks; it only needs the marker that forces a snapshot.
+        markTeamStale(registry, teamId);
+      }
+      if (!dashboardMatchesTeam) deps.resetTeamHealth();
     },
   };
 }
@@ -248,35 +265,15 @@ export function useOrganizationActions(
   deps: OrganizationActionDeps,
 ): OrganizationActions {
   const registry = useRegistry();
-  const {
-    api,
-    applyOrganizationSwitch,
-    bumpReconnectRequest,
-    lockedTeamId,
-    readDashboardTeamId,
-    renameDashboardOrganization,
-    resetTeamViews,
-  } = deps;
+  const { api, bumpReconnectRequest, lockedTeamId, resetTeamHealth } = deps;
   return useMemo(
     () =>
       createOrganizationActions(registry, {
         api,
-        applyOrganizationSwitch,
         bumpReconnectRequest,
         lockedTeamId,
-        readDashboardTeamId,
-        renameDashboardOrganization,
-        resetTeamViews,
+        resetTeamHealth,
       }),
-    [
-      api,
-      applyOrganizationSwitch,
-      bumpReconnectRequest,
-      lockedTeamId,
-      readDashboardTeamId,
-      registry,
-      renameDashboardOrganization,
-      resetTeamViews,
-    ],
+    [api, bumpReconnectRequest, lockedTeamId, registry, resetTeamHealth],
   );
 }

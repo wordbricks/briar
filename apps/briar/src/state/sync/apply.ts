@@ -52,7 +52,7 @@ import type { SyncEvent } from "./events";
   families. Every event is applied inside a single `Atom.batch`, so a subscriber
   is notified once no matter how many atoms the event touched.
 
-  The merge rules are the ones `lib/dashboard-sync.ts` applied to a whole
+  The merge rules are the ones the payload-level dashboard merge applied to a whole
   `DashboardPayload`, kept intact: an unchanged projection keeps its reference,
   and a delta that moves nothing leaves even the rendered `cursor` and
   `generatedAt` alone. That is what makes a quiet polling tick free.

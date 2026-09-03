@@ -60,6 +60,51 @@ Phase 1을 구현하며 확인한, 이후 단계에 영향을 주는 사실:
 - `briar.error`는 세션 오류와 `localProjectInventoryError`(workspace, Phase 3)의
   합이다. Phase 3이 workspace atom을 만들 때까지 파사드가 이 합을 유지한다.
 
+### 기준 갱신 (2026-09-04, Phase 2A `#1584` / `#1585` 이후)
+
+Phase 2A를 구현하며 확인한, 이후 단계에 영향을 주는 사실:
+
+- **`AppEffects`는 데스크톱·웹 셸에만 마운트되어 있었다.** 컴패니언 분기가
+  `<AppEffects />`가 있는 return 위에서 먼저 반환하므로, Phase 1이 옮긴
+  `useActiveOrganizationPersistence`는 컴패니언 모드에서 돌지 않았다. 2A가
+  컴패니언 셸에도 `<AppEffects />`를 넣었다. Phase 5가 셸을 분리해 마운트 지점을
+  하나로 합치기 전까지, effect hook을 추가할 때 두 곳을 모두 확인한다.
+- **`HuntRun.teamId`는 옵셔널이다.** 런 맵만으로는 팀 소속을 복원할 수 없어
+  `teamRunIdsAtom`은 파생이 아니라 **저장**한다(계획 스케치와 다르다). 정렬 규칙도
+  경로마다 다르다: 스냅샷은 서버 순서 그대로·상한 없음, 델타만 재정렬하고 팀당
+  200개로 자른다. 기존 `setDashboard(snapshot)`이 `payload.runs`를 손대지 않던
+  동작을 유지하려면 이 구분이 필요하다.
+- **`AgentProvider`는 문자열 유니온이다.** `entities/providers.ts`에는 의미 있는
+  `Map<id, T>`가 없어 팀별 목록 atom만 둔다.
+- **`OrganizationMember`의 키는 `userId`다.** `upsertMany`는
+  `upsertManyBy(map, incoming, identify, deletedIds?)` 위에 얹은 얇은 래퍼다.
+- **멤버는 여러 팀 인덱스가 공유한다.** 조직 단위 엔티티이므로, 팀 인덱스에서 빠진
+  id를 공유 맵에서 지우기 전에 다른 잔류 팀이 참조하는지 확인해야 한다.
+- **옵셔널 projection의 `undefined`와 `[]`는 다르다.** 델타 병합이 "서버가 안 보낸"
+  projection을 건드리지 않는 규칙이 여기에 걸려 있어, 팀 family는 부재를 `null`로
+  저장하고 뷰에서 다시 `undefined`로 되돌린다.
+- **커서는 둘로 나뉜다.** `mergeDashboardDelta`는 `changed: false`일 때 렌더되는
+  payload의 `cursor` / `generatedAt`도 올리지 않았다. 재개용 `teamCursorAtom`은 매
+  델타 페이지마다 전진하고, 렌더용 `teamPayloadCursorAtom` / `teamGeneratedAtAtom`은
+  엔티티가 실제로 바뀔 때만 움직인다. 이 분리가 "무변경 폴링 틱 리렌더 0회"를
+  지탱한다.
+- **`Atom.withEquality`에는 타입 인자를 명시해야 한다.** 제네릭 비교 함수를 그냥
+  넘기면 `A`가 `unknown`으로 추론되어 컴파일이 깨진다
+  (`Atom.withEquality<HuntRun[] | null>(shallowArrayEqual)`).
+  비교가 `true`면 레지스트리는 **이전 값 인스턴스를 유지**하므로, 파생 배열 atom의
+  아이덴티티 보존이 여기에 기댄다.
+- **`Atom.family`는 인자별 초기값을 만들 수 있다.** 데모 시드는 팀 family 안에서
+  `teamId === demoDashboard.team.id`로 분기해 모듈 스코프에 둔다.
+- **로더는 레지스트리당 하나여야 한다.** `useBriar`와 `useTeamSync`가 다른
+  컴포넌트에 있어 in-flight 맵을 공유해야 하므로, 레지스트리 키 `WeakMap`으로
+  싱글턴을 만들고 데이터 소스는 `teamSyncApiAtom`으로 주입한다.
+- **남은 주입 콜백은 4개.** `bumpReconnectRequest`, `cancelLogin`(로그인 타이머),
+  `clearWorkspaceViews`, `resetTeamHealth` — 전부 Phase 3(workspace / health)과
+  로그인 폴링 소유권 문제이며 대시보드와 무관하다.
+- **`setDashboard`는 파사드 내부 shim으로 남았다.** 로더 취소 +
+  `applySyncEvent(team-snapshot)` 두 줄이며, 40여 개 낙관 갱신 호출부가 PR 묶음 B에서
+  엔티티 갱신으로 재작성되면 사라진다.
+
 ## 목표
 
 1. `apps/briar/src/hooks/useBriar.ts`(4,668줄)와 `apps/briar/src/App.tsx`(5,116줄)가
@@ -702,7 +747,7 @@ Phase 2 이후 언제든 착수 가능하며 Phase 3–7과 병행할 수 있다
 |---|---|---|---|
 | 0 | #1581 | 머지됨 | `state/registry.ts`, `state/platform.ts`, `state/demo-fixtures.ts`, `state/inbox-selection.ts`, `test/render-count.tsx`. `ProjectConnection`은 `types.ts`로. |
 | 1 | #1583 | 머지됨 | `state/session|organization|team|planning`의 atoms/actions, `useActiveOrganizationPersistence`, `components/app/`의 연결 래퍼 4종과 `AppEffects`. `activeProjectIdRef` 제거. |
-| 2A | | 예정 | |
+| 2A | #1584, #1585 | 머지됨 | #1584: `state/entities`(runs / teams / workers / members / providers / channels / upsert / retention), `state/team`의 팀별 family, `state/sync`의 `events` / `apply` / `view`. #1585: `sync/loader`, `sync/useTeamSync`, `useBriar` 파사드를 `dashboardViewAtom` 위로 옮기고 `dashboardRef` / `dashboardCursor` / `dashboardRequest` / `dashboardRequestGeneration` / `dashboardCache` 제거. Phase 1의 대시보드 주입 콜백 8개 삭제. |
 | 2B | | 예정 | |
 | 3 | | 예정 | |
 | 4 | | 예정 | |

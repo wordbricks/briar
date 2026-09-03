@@ -4725,6 +4725,11 @@ export function App({
       <div
         className={`app-shell companion-shell platform-${mobilePlatform}`}
       >
+        {/*
+          The companion shell returns before the desktop tree below, so it needs
+          its own mount for the domain effects — dashboard sync among them.
+        */}
+        <AppEffects />
         <CompanionHeader
           activeOrganizationId={briar.activeOrganizationId}
           activeProjectId={briar.activeProjectId}

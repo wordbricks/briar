@@ -6,7 +6,10 @@ import {
   activeOrganizationIdAtom,
   organizationsAtom,
 } from "../organization/atoms";
+import { runsByIdAtom } from "../entities/runs";
 import { createTestRegistry, type AtomRegistry } from "../registry";
+import { applySyncEvent } from "../sync/apply";
+import { dashboardViewAtom } from "../sync/view";
 import {
   activeTeamIdAtom,
   isCreatingTeamAtom,
@@ -90,6 +93,18 @@ const harness = (): Harness => {
     [activeTeamIdAtom, teamA.id],
     [isCreatingTeamAtom, true],
   ]);
+  // A signed-in account has its team's board in the entity store; signing out
+  // has to take that with it.
+  applySyncEvent(registry, {
+    kind: "team-snapshot",
+    teamId: teamA.id,
+    payload: {
+      ...demoDashboard,
+      team: teamA,
+      runs: [],
+      generatedAt: "2026-09-01T00:00:00.000Z",
+    },
+  });
   const server = new AccountServer();
   let cancelledLogins = 0;
   let clearedViews = 0;
@@ -102,7 +117,7 @@ const harness = (): Harness => {
     cancelLogin: () => {
       cancelledLogins += 1;
     },
-    clearSignedOutViews: () => {
+    clearWorkspaceViews: () => {
       clearedViews += 1;
     },
   });
@@ -125,6 +140,9 @@ const expectSignedOut = (registry: AtomRegistry) => {
   expect(registry.get(activeTeamIdAtom)).toBeNull();
   expect(registry.get(teamConnectionAtom)).toBeNull();
   expect(registry.get(isCreatingTeamAtom)).toBe(false);
+  // Nothing the previous account loaded may outlive its token.
+  expect(registry.get(dashboardViewAtom(teamA.id))).toBeNull();
+  expect(registry.get(runsByIdAtom).size).toBe(0);
 };
 
 describe("createSessionActions", () => {

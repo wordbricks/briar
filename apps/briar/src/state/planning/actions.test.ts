@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import { demoDashboard } from "../../lib/demo-data";
 import type { PlanningProject, Project } from "../../types";
+import { teamRunsAtom } from "../entities/runs";
 import { createTestRegistry, type AtomRegistry } from "../registry";
 import { tokenAtom } from "../session/atoms";
-import { teamsAtom } from "../team/atoms";
+import { applySyncEvent } from "../sync/apply";
+import { activeTeamIdAtom, teamsAtom } from "../team/atoms";
 import {
   createPlanningActions,
   type PlanningActionApi,
@@ -79,7 +81,6 @@ class PlanningServer {
 
 interface Harness {
   readonly actions: PlanningActions;
-  readonly moves: [string, string, string][];
   readonly registry: AtomRegistry;
   readonly server: PlanningServer;
 }
@@ -91,18 +92,39 @@ const harness = (
     [teamsAtom, [teamA, teamB]],
     [planningProjectsAtom, planningProjects],
     [tokenAtom, "token-1"],
+    [activeTeamIdAtom, teamA.id],
   ]);
   const server = new PlanningServer();
-  const moves: [string, string, string][] = [];
-  const actions = createPlanningActions(registry, {
-    api: server.api,
-    countDashboardIssues: () => 0,
-    movePlanningProjectIssues: (teamId, from, to) => {
-      moves.push([teamId, from, to.id]);
+  const actions = createPlanningActions(registry, { api: server.api });
+  return { actions, registry, server };
+};
+
+/** Loads team A's board with one issue filed under `featureA`. */
+const loadTeamAWithIssue = (registry: AtomRegistry) => {
+  const run = {
+    ...demoDashboard.runs[0]!,
+    id: "run-1",
+    projectId: featureA.id,
+    projectName: featureA.name,
+  };
+  applySyncEvent(registry, {
+    kind: "team-snapshot",
+    teamId: teamA.id,
+    payload: {
+      ...demoDashboard,
+      team: teamA,
+      runs: [run],
+      generatedAt: "2026-09-01T00:00:00.000Z",
     },
   });
-  return { actions, moves, registry, server };
+  return run;
 };
+
+const issueProjects = (registry: AtomRegistry) =>
+  (registry.get(teamRunsAtom(teamA.id)) ?? []).map((run) => [
+    run.projectId,
+    run.projectName,
+  ]);
 
 describe("createPlanningActions", () => {
   it("appends a created project in server order", async () => {
@@ -164,7 +186,8 @@ describe("createPlanningActions", () => {
   });
 
   it("removes a project and moves its issues to the team default", async () => {
-    const { actions, moves, registry, server } = harness();
+    const { actions, registry, server } = harness();
+    loadTeamAWithIssue(registry);
     server.movedIssueCount = 3;
 
     const result = await actions.removePlanningProject(featureA.id);
@@ -172,15 +195,17 @@ describe("createPlanningActions", () => {
     expect(result).toEqual({ movedIssueCount: 3 });
     expect(server.deleted).toEqual([featureA.id]);
     expect(registry.get(planningProjectsAtom)).toEqual([defaultA, defaultB]);
-    expect(moves).toEqual([[teamA.id, featureA.id, defaultA.id]]);
+    // The issues the server re-filed are re-pointed in the store too.
+    expect(issueProjects(registry)).toEqual([[defaultA.id, defaultA.name]]);
   });
 
-  it("leaves the dashboard alone when nothing moved", async () => {
-    const { actions, moves } = harness();
+  it("leaves the board alone when nothing moved", async () => {
+    const { actions, registry } = harness();
+    const run = loadTeamAWithIssue(registry);
 
     await actions.removePlanningProject(featureA.id);
 
-    expect(moves).toEqual([]);
+    expect(registry.get(teamRunsAtom(teamA.id))).toEqual([run]);
   });
 
   it("refuses to remove a team's default project", async () => {

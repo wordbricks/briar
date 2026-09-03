@@ -7,9 +7,12 @@ import {
 } from "../../lib/api";
 import type { PlanningProject, PlanningProjectStatus } from "../../types";
 import { demoOrganization } from "../demo-fixtures";
+import { runsByIdAtom, teamRunsAtom } from "../entities/runs";
+import { upsertMany } from "../entities/upsert";
 import { demoMode } from "../platform";
 import { useRegistry, type AtomRegistry } from "../registry";
 import { tokenAtom } from "../session/atoms";
+import { loadedDashboardTeamIdAtom } from "../sync/view";
 import { teamsAtom } from "../team/atoms";
 import { planningProjectsAtom } from "./atoms";
 
@@ -26,20 +29,8 @@ export const livePlanningActionApi: PlanningActionApi = {
   updatePlanningProject: updateRemotePlanningProject,
 };
 
-/**
- * Deleting a planning project moves its issues to the team's default project.
- * Issues live in the dashboard, which `useBriar` still owns, so both halves of
- * that move are injected.
- */
 export interface PlanningActionDeps {
   readonly api?: Partial<PlanningActionApi> | undefined;
-  /** Demo mode has no server to report a moved-issue count, so it is counted here. */
-  readonly countDashboardIssues: (planningProjectId: string) => number;
-  readonly movePlanningProjectIssues: (
-    teamId: string,
-    fromPlanningProjectId: string,
-    toPlanningProject: PlanningProject,
-  ) => void;
 }
 
 export interface CreatePlanningProjectInput {
@@ -79,9 +70,37 @@ const byTeamThenSortOrder = (left: PlanningProject, right: PlanningProject) =>
 
 export function createPlanningActions(
   registry: AtomRegistry,
-  deps: PlanningActionDeps,
+  deps: PlanningActionDeps = {},
 ): PlanningActions {
   const api: PlanningActionApi = { ...livePlanningActionApi, ...deps.api };
+
+  /** Demo mode has no server to report a moved-issue count, so it counts here. */
+  const countTeamIssues = (planningProjectId: string) => {
+    const teamId = registry.get(loadedDashboardTeamIdAtom);
+    if (!teamId) return 0;
+    return (registry.get(teamRunsAtom(teamId)) ?? []).filter(
+      (run) => run.projectId === planningProjectId,
+    ).length;
+  };
+
+  /** Re-points a deleted planning project's issues at the default one. */
+  const moveTeamIssues = (
+    teamId: string,
+    fromPlanningProjectId: string,
+    toPlanningProject: PlanningProject,
+  ) => {
+    const runs = registry.get(teamRunsAtom(teamId));
+    if (!runs) return;
+    const moved = runs
+      .filter((run) => run.projectId === fromPlanningProjectId)
+      .map((run) => ({
+        ...run,
+        projectId: toPlanningProject.id,
+        projectName: toPlanningProject.name,
+      }));
+    if (moved.length === 0) return;
+    registry.update(runsByIdAtom, (current) => upsertMany(current, moved));
+  };
 
   return {
     async addPlanningProject(teamId, input) {
@@ -180,7 +199,7 @@ export function createPlanningActions(
         throw new Error("이슈를 옮길 기본 프로젝트를 찾을 수 없습니다.");
       }
       const result = demoMode
-        ? { movedIssueCount: deps.countDashboardIssues(planningProjectId) }
+        ? { movedIssueCount: countTeamIssues(planningProjectId) }
         : await (async () => {
             const token = registry.get(tokenAtom);
             if (!token) throw new Error("로그인이 필요합니다.");
@@ -190,27 +209,20 @@ export function createPlanningActions(
         current.filter((candidate) => candidate.id !== planningProjectId),
       );
       if (result.movedIssueCount > 0) {
-        deps.movePlanningProjectIssues(
-          project.teamId,
-          planningProjectId,
-          defaultProject,
-        );
+        moveTeamIssues(project.teamId, planningProjectId, defaultProject);
       }
       return result;
     },
   };
 }
 
-export function usePlanningActions(deps: PlanningActionDeps): PlanningActions {
+export function usePlanningActions(
+  deps: PlanningActionDeps = {},
+): PlanningActions {
   const registry = useRegistry();
-  const { api, countDashboardIssues, movePlanningProjectIssues } = deps;
+  const { api } = deps;
   return useMemo(
-    () =>
-      createPlanningActions(registry, {
-        api,
-        countDashboardIssues,
-        movePlanningProjectIssues,
-      }),
-    [api, countDashboardIssues, movePlanningProjectIssues, registry],
+    () => createPlanningActions(registry, { api }),
+    [api, registry],
   );
 }

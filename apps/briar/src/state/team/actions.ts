@@ -8,6 +8,8 @@ import {
   type TeamIconUpdate,
 } from "../../lib/api";
 import type { Project } from "../../types";
+import { teamsByIdAtom } from "../entities/teams";
+import { upsertManyBy } from "../entities/upsert";
 import { demoMode } from "../platform";
 import { useRegistry, type AtomRegistry } from "../registry";
 import { sessionErrorAtom, tokenAtom } from "../session/atoms";
@@ -30,11 +32,6 @@ export interface TeamActionDeps {
   readonly api?: Partial<TeamActionApi> | undefined;
   /** Invalidates in-flight reconnect attempts. */
   readonly bumpReconnectRequest: () => void;
-  /**
-   * Mirrors an edited team into the rendered dashboard, which still lives in
-   * `useBriar` and carries its own copy of the team record.
-   */
-  readonly applyTeamToDashboard: (team: Project) => void;
 }
 
 export interface TeamActions {
@@ -71,7 +68,9 @@ export function createTeamActions(
 
   /**
    * Writes an edited team everywhere it is duplicated: the team list, the
-   * in-progress connection flow, and (through `useBriar`) the dashboard.
+   * in-progress connection flow, and the entity the dashboard renders. The
+   * entity is only touched when the store already holds that team, matching the
+   * "mirror it into the rendered dashboard" rule this replaced.
    */
   const commitTeam = (team: Project) => {
     Atom.batch(() => {
@@ -81,8 +80,12 @@ export function createTeamActions(
       registry.update(teamConnectionAtom, (current) =>
         current?.project.id === team.id ? { ...current, project: team } : current,
       );
+      registry.update(teamsByIdAtom, (teams) =>
+        teams.has(team.id)
+          ? upsertManyBy(teams, [team], () => team.id)
+          : teams,
+      );
     });
-    deps.applyTeamToDashboard(team);
     return team;
   };
 
@@ -159,14 +162,9 @@ export function createTeamActions(
 
 export function useTeamActions(deps: TeamActionDeps): TeamActions {
   const registry = useRegistry();
-  const { api, applyTeamToDashboard, bumpReconnectRequest } = deps;
+  const { api, bumpReconnectRequest } = deps;
   return useMemo(
-    () =>
-      createTeamActions(registry, {
-        api,
-        applyTeamToDashboard,
-        bumpReconnectRequest,
-      }),
-    [api, applyTeamToDashboard, bumpReconnectRequest, registry],
+    () => createTeamActions(registry, { api, bumpReconnectRequest }),
+    [api, bumpReconnectRequest, registry],
   );
 }
