@@ -720,6 +720,8 @@ export type Project = {
   issueKeyPrefix: string;
   scheduleTabEnabled: boolean;
   icon: string | null;
+  iconName: string | null;
+  iconColor: string | null;
   organizationId: string;
   organizationName: string;
   role: OrganizationRole;

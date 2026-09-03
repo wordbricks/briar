@@ -296,6 +296,8 @@ const throwApplicationError = (error: unknown): never => {
   switch (error.reason) {
     case "project_not_found":
       throw new HttpError(404, error.message);
+    case "invalid_project_icon":
+      throw new HttpError(400, error.message);
     case "development_management_required":
     case "project_management_required":
     case "repository_connection_permission_denied":
@@ -506,19 +508,26 @@ export const createAppProjectService = (
 
   updateProjectIcon: async (input) => {
     const session = await services.requireSession(auth, request);
-    const icon = input.iconUpdate.case === "icon"
-      ? input.iconUpdate.value
-      : input.iconUpdate.case === "clearIcon"
-      ? null
-      : (() => {
-        throw new ConnectError("icon update is required", Code.InvalidArgument);
-      })();
+    const iconUpdate =
+      input.iconUpdate.case === "icon"
+        ? { type: "image" as const, dataUrl: input.iconUpdate.value }
+        : input.iconUpdate.case === "clearIcon"
+        ? { type: "clear" as const }
+        : input.iconUpdate.case === "namedIcon"
+        ? {
+            type: "named" as const,
+            name: input.iconUpdate.value.name,
+            color: input.iconUpdate.value.color ?? null,
+          }
+        : (() => {
+          throw new ConnectError("icon update is required", Code.InvalidArgument);
+        })();
     const project = await withApplicationErrors(
       services.updateIcon({
         db,
         projectId: decodeUuid(input.projectId),
         userId: session.user.id,
-        icon,
+        iconUpdate,
       }),
     );
     scheduleProjectRealtimePublish(env, db, project.id, context);

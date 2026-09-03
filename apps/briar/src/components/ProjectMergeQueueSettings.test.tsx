@@ -18,6 +18,8 @@ const project: Project = {
   issueKeyPrefix: "BR",
   scheduleTabEnabled: true,
   icon: null,
+  iconName: null,
+  iconColor: null,
   organizationId: "organization-1",
   organizationName: "Briar",
   role: "owner",

@@ -37,6 +37,7 @@ export {
   resolveIssueHierarchyLocation,
   updateCheckpointPolicy,
   updateProjectIcon,
+  type ProjectIconUpdate,
   updateProjectExecutionWorkerPolicy,
   updateProjectIssueKeyPrefix,
   updateProjectSettings,

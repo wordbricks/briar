@@ -183,15 +183,47 @@ public nonisolated struct BriarAPI_UpdateProjectIconRequest: Sendable {
     set {iconUpdate = .clearIcon_p(newValue)}
   }
 
+  public var namedIcon: BriarAPI_NamedIcon {
+    get {
+      if case .namedIcon(let v)? = iconUpdate {return v}
+      return BriarAPI_NamedIcon()
+    }
+    set {iconUpdate = .namedIcon(newValue)}
+  }
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public nonisolated enum OneOf_IconUpdate: Equatable, Sendable {
     case icon(String)
     case clearIcon_p(SwiftProtobuf.Google_Protobuf_Empty)
+    case namedIcon(BriarAPI_NamedIcon)
 
   }
 
   public init() {}
+}
+
+public nonisolated struct BriarAPI_NamedIcon: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var name: String = String()
+
+  public var color: String {
+    get {_color ?? String()}
+    set {_color = newValue}
+  }
+  /// Returns true if `color` has been explicitly set.
+  public var hasColor: Bool {self._color != nil}
+  /// Clears the value of `color`. Subsequent reads from it will return its default value.
+  public mutating func clearColor() {self._color = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _color: String? = nil
 }
 
 public nonisolated struct BriarAPI_UpdateProjectIconResponse: Sendable {
@@ -769,12 +801,32 @@ public nonisolated struct BriarAPI_Project: Sendable {
   /// Clears the value of `createdAt`. Subsequent reads from it will return its default value.
   public mutating func clearCreatedAt() {self._createdAt = nil}
 
+  public var iconName: String {
+    get {_iconName ?? String()}
+    set {_iconName = newValue}
+  }
+  /// Returns true if `iconName` has been explicitly set.
+  public var hasIconName: Bool {self._iconName != nil}
+  /// Clears the value of `iconName`. Subsequent reads from it will return its default value.
+  public mutating func clearIconName() {self._iconName = nil}
+
+  public var iconColor: String {
+    get {_iconColor ?? String()}
+    set {_iconColor = newValue}
+  }
+  /// Returns true if `iconColor` has been explicitly set.
+  public var hasIconColor: Bool {self._iconColor != nil}
+  /// Clears the value of `iconColor`. Subsequent reads from it will return its default value.
+  public mutating func clearIconColor() {self._iconColor = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _icon: String? = nil
   fileprivate var _createdAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+  fileprivate var _iconName: String? = nil
+  fileprivate var _iconColor: String? = nil
 }
 
 public nonisolated struct BriarAPI_PlanningProject: @unchecked Sendable {
@@ -1545,7 +1597,7 @@ nonisolated extension BriarAPI_DeleteProjectResponse: SwiftProtobuf.Message, Swi
 
 nonisolated extension BriarAPI_UpdateProjectIconRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".UpdateProjectIconRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{1}icon\0\u{3}clear_icon\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{1}icon\0\u{3}clear_icon\0\u{3}named_icon\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1575,6 +1627,19 @@ nonisolated extension BriarAPI_UpdateProjectIconRequest: SwiftProtobuf.Message, 
           self.iconUpdate = .clearIcon_p(v)
         }
       }()
+      case 4: try {
+        var v: BriarAPI_NamedIcon?
+        var hadOneofValue = false
+        if let current = self.iconUpdate {
+          hadOneofValue = true
+          if case .namedIcon(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.iconUpdate = .namedIcon(v)
+        }
+      }()
       default: break
       }
     }
@@ -1597,6 +1662,10 @@ nonisolated extension BriarAPI_UpdateProjectIconRequest: SwiftProtobuf.Message, 
       guard case .clearIcon_p(let v)? = self.iconUpdate else { preconditionFailure() }
       try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
     }()
+    case .namedIcon?: try {
+      guard case .namedIcon(let v)? = self.iconUpdate else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
+    }()
     case nil: break
     }
     try unknownFields.traverse(visitor: &visitor)
@@ -1605,6 +1674,45 @@ nonisolated extension BriarAPI_UpdateProjectIconRequest: SwiftProtobuf.Message, 
   public static func ==(lhs: BriarAPI_UpdateProjectIconRequest, rhs: BriarAPI_UpdateProjectIconRequest) -> Bool {
     if lhs.projectID != rhs.projectID {return false}
     if lhs.iconUpdate != rhs.iconUpdate {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_NamedIcon: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".NamedIcon"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{1}color\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.name) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self._color) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.name.isEmpty {
+      try visitor.visitSingularStringField(value: self.name, fieldNumber: 1)
+    }
+    try { if let v = self._color {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_NamedIcon, rhs: BriarAPI_NamedIcon) -> Bool {
+    if lhs.name != rhs.name {return false}
+    if lhs._color != rhs._color {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -2376,7 +2484,7 @@ nonisolated extension BriarAPI_UpdateProjectExecutionWorkerPolicyResponse: Swift
 
 nonisolated extension BriarAPI_Project: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".Project"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{3}issue_key_prefix\0\u{3}schedule_tab_enabled\0\u{1}icon\0\u{3}organization_id\0\u{3}organization_name\0\u{1}role\0\u{3}created_at\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{3}issue_key_prefix\0\u{3}schedule_tab_enabled\0\u{1}icon\0\u{3}organization_id\0\u{3}organization_name\0\u{1}role\0\u{3}created_at\0\u{3}icon_name\0\u{3}icon_color\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2393,6 +2501,8 @@ nonisolated extension BriarAPI_Project: SwiftProtobuf.Message, SwiftProtobuf._Me
       case 7: try { try decoder.decodeSingularStringField(value: &self.organizationName) }()
       case 8: try { try decoder.decodeSingularEnumField(value: &self.role) }()
       case 9: try { try decoder.decodeSingularMessageField(value: &self._createdAt) }()
+      case 10: try { try decoder.decodeSingularStringField(value: &self._iconName) }()
+      case 11: try { try decoder.decodeSingularStringField(value: &self._iconColor) }()
       default: break
       }
     }
@@ -2430,6 +2540,12 @@ nonisolated extension BriarAPI_Project: SwiftProtobuf.Message, SwiftProtobuf._Me
     try { if let v = self._createdAt {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
     } }()
+    try { if let v = self._iconName {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 10)
+    } }()
+    try { if let v = self._iconColor {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 11)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -2443,6 +2559,8 @@ nonisolated extension BriarAPI_Project: SwiftProtobuf.Message, SwiftProtobuf._Me
     if lhs.organizationName != rhs.organizationName {return false}
     if lhs.role != rhs.role {return false}
     if lhs._createdAt != rhs._createdAt {return false}
+    if lhs._iconName != rhs._iconName {return false}
+    if lhs._iconColor != rhs._iconColor {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

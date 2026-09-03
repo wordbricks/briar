@@ -15,6 +15,7 @@ import type {
   ProjectSettings,
 } from "../../types";
 import { isProjectIconDataUrl } from "../project-icon";
+import { isProjectIconColor, isProjectIconName } from "../project-icon-library";
 import { appCallOptions, appTransport } from "./core";
 import {
   projectRoleFromProto,
@@ -47,6 +48,14 @@ export const projectFromMessage = (project: ProjectMessage): Project => ({
   icon:
     project.icon !== undefined && isProjectIconDataUrl(project.icon)
       ? project.icon
+      : null,
+  iconName:
+    project.iconName !== undefined && isProjectIconName(project.iconName)
+      ? project.iconName
+      : null,
+  iconColor:
+    project.iconColor !== undefined && isProjectIconColor(project.iconColor)
+      ? project.iconColor
       : null,
   organizationId: project.organizationId,
   organizationName: project.organizationName,
@@ -243,18 +252,29 @@ export async function deleteProject(token: string, projectId: string) {
   if (!response.deleted) throw new Error("Project was not deleted");
 }
 
+export type ProjectIconUpdate =
+  | { readonly type: "image"; readonly dataUrl: string }
+  | { readonly type: "named"; readonly name: string; readonly color: string | null }
+  | { readonly type: "clear" };
+
 export async function updateProjectIcon(
   token: string,
   projectId: string,
-  icon: string | null,
+  update: ProjectIconUpdate,
 ): Promise<{ project: Project }> {
   const client = requireProjectClient();
   const response = await client.updateProjectIcon(
     {
       projectId,
-      iconUpdate: icon === null
-        ? { case: "clearIcon", value: {} }
-        : { case: "icon", value: icon },
+      iconUpdate:
+        update.type === "image"
+          ? { case: "icon", value: update.dataUrl }
+          : update.type === "clear"
+          ? { case: "clearIcon", value: {} }
+          : {
+              case: "namedIcon",
+              value: { name: update.name, color: update.color ?? undefined },
+            },
     },
     appCallOptions(token),
   );

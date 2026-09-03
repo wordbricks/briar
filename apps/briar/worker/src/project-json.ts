@@ -9,6 +9,8 @@ export function projectJson(row: ProjectRow) {
     issueKeyPrefix: row.issue_key_prefix,
     scheduleTabEnabled: row.schedule_tab_enabled !== 0,
     icon: row.icon,
+    iconName: row.icon_name,
+    iconColor: row.icon_color,
     organizationId: row.organization_id,
     organizationName: row.organization_name,
     role: row.member_role,
