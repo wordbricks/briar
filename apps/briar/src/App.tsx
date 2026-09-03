@@ -3704,6 +3704,7 @@ export function App({
         organizationName={activeOrganization?.name}
         projects={activeOrganizationProjects}
         requestedMessage={requestedChannelMessage}
+        onRequestedMessageOpen={clearRequestedChannelMessage}
         token={briar.token}
       />
     ) : isInboxDetailLoading ? (

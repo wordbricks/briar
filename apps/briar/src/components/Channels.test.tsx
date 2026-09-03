@@ -400,6 +400,7 @@ describe("Channels", () => {
 
   it("keeps an Inbox thread reply centered and links its channel", async () => {
     const openChannel = vi.fn();
+    const onRequestedMessageOpen = vi.fn();
     const rootMessage: ChannelMessage = {
       id: "channel-root-1",
       channelId: selectedChannel.id,
@@ -478,6 +479,7 @@ describe("Channels", () => {
           onChannelsChange={() => undefined}
           onInboxChannelOpen={openChannel}
           onInboxDetailClose={() => undefined}
+          onRequestedMessageOpen={onRequestedMessageOpen}
           organizationId="org-1"
           requestedMessage={{
             channelId: selectedChannel.id,
@@ -496,6 +498,7 @@ describe("Channels", () => {
     expect(highlighted?.dataset.channelMessageId).toBe(replyMessage.id);
     expect(container.querySelector(".channel-thread")).not.toBeNull();
     expect(document.activeElement).toBe(highlighted);
+    expect(onRequestedMessageOpen).toHaveBeenCalledTimes(1);
     const channelLink = container.querySelector<HTMLButtonElement>(
       '[aria-label="Open #General"]',
     );
