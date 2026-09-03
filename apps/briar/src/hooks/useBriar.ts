@@ -62,8 +62,6 @@ import {
   recoveryErrorAtom,
   updatingIssueIdAtom,
 } from "../state/issues/atoms";
-import { useIntegrationActions } from "../state/integrations/actions";
-import { velenAtom } from "../state/integrations/atoms";
 import { useRegistry } from "../state/registry";
 import { useRunDetailActions } from "../state/run-detail/actions";
 import {
@@ -108,7 +106,6 @@ import {
   activeDashboardAtom,
   loadedDashboardTeamIdAtom,
 } from "../state/sync/view";
-import { useWorkflowActions } from "../state/workflow/actions";
 import { useWorkspaceActions } from "../state/workspace/actions";
 import {
   bumpReconnectRequest,
@@ -120,7 +117,6 @@ import {
   activeTeamConnectionStateAtom,
   applyInventoryObservation,
   connectedTeamIdsAtom,
-  healthAtom,
   localInventoryErrorAtom,
   lockedTeamIdAtom,
   readinessLoadingTeamIdsAtom,
@@ -278,13 +274,11 @@ export function useBriar(options: UseBriarOptions = {}) {
   const activeProjectConnectionState = useAtomValue(
     activeTeamConnectionStateAtom,
   );
-  const health = useAtomValue(healthAtom);
   const projectReadiness = useAtomValue(teamReadinessRecordAtom);
   const projectReadinessError = useAtomValue(teamReadinessErrorRecordAtom);
   const projectReadinessLoadingProjects = useAtomValue(
     readinessLoadingTeamIdsAtom,
   );
-  const velen = useAtomValue(velenAtom);
   /*
     The dashboard is no longer state this hook owns. It is reassembled from the
     normalized entity store for whichever team is selected, so a team switch
@@ -813,36 +807,8 @@ export function useBriar(options: UseBriarOptions = {}) {
     lifetime of the registry and the views can take them straight from the hooks
     instead of through the shell.
   */
-  const {
-    addProject,
-    connectProject,
-    createProjectRepository,
-    inspectLovableProject,
-    inspectProjectRepository,
-    preflightProjectConnection,
-    prepareGithubProjectRepository,
-    reconnectProject,
-    refreshHealth,
-    refreshProjectReadiness,
-    removeProject,
-    repairHealth,
-    resolveGithubProjectRepository,
-    selectProjectRepository,
-    startWorkingOnProject,
-  } = useWorkspaceActions();
-  const {
-    analyzeWorkflowRequirements,
-    regenerateWorkflow,
-    reviseWorkflow,
-    saveCheckpointPolicy,
-  } = useWorkflowActions();
-  const {
-    connectLinearForImport,
-    loadLinearStatesForImport,
-    refreshVelen,
-    runLinearIssueImport,
-    saveVelenIntegration,
-  } = useIntegrationActions();
+  const { reconnectProject, refreshProjectReadiness, removeProject } =
+    useWorkspaceActions();
 
   /*
     The shell callbacks the domain actions reach back into: the team selector,
@@ -872,7 +838,6 @@ export function useBriar(options: UseBriarOptions = {}) {
     addIssue,
     addPlanningProject,
     moveIssueProject,
-    addProject,
     cancelProjectCreation: cancelTeamCreation,
     cancelLogin,
     changeOrganizationLogo,
@@ -880,7 +845,6 @@ export function useBriar(options: UseBriarOptions = {}) {
     changeProjectIssueKeyPrefix: changeTeamIssueKeyPrefix,
     changeProjectScheduleTab: changeTeamScheduleTab,
     checkOrganizationHandle,
-    connectProject,
     connectedTeamIds,
     activeProjectConnectionState,
     dashboard,
@@ -897,9 +861,6 @@ export function useBriar(options: UseBriarOptions = {}) {
     remoteMode,
     webMode,
     error: error ?? localProjectInventoryError,
-    health: health.value,
-    healthError: health.error,
-    healthLoading: health.status === "loading",
     finishProjectCreation: finishTeamCreation,
     isCreatingProject,
     isCreatingIssue,
@@ -920,24 +881,14 @@ export function useBriar(options: UseBriarOptions = {}) {
     projectReadinessLoadingProjects,
     reconnectProject,
     renameOrganization,
-    analyzeWorkflowRequirements,
-    regenerateWorkflow,
     reworkRun,
-    reviseWorkflow,
     resumeRun,
-    saveCheckpointPolicy,
     updateAccountProfile,
-    saveVelenIntegration,
-    connectLinearForImport,
-    loadLinearStatesForImport,
-    runLinearIssueImport,
     recoveringRunId,
     recoveryError,
     restoringSession,
     refresh,
-    refreshHealth,
     refreshProjectReadiness,
-    refreshVelen,
     readIssueAttachment,
     editIssue,
     editIssueSubscription,
@@ -968,15 +919,6 @@ export function useBriar(options: UseBriarOptions = {}) {
     setActiveOrganizationId: selectOrganization,
     setActiveProjectId: selectProject,
     ensureProjectSelected,
-    selectProjectRepository,
-    createProjectRepository,
-    inspectProjectRepository,
-    inspectLovableProject,
-    preflightProjectConnection,
-    prepareGithubProjectRepository,
-    resolveGithubProjectRepository,
-    startWorkingOnProject,
-    repairHealth,
     retryRun: (runId: string) => recoverRun(runId, "retry"),
     cancelRun: (runId: string) => recoverRun(runId, "cancel"),
     unassignRun,
@@ -984,6 +926,5 @@ export function useBriar(options: UseBriarOptions = {}) {
     startProjectCreation: startTeamCreation,
     token,
     user,
-    velen,
   };
 }

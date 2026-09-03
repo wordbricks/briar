@@ -164,6 +164,42 @@ Phase 2A를 구현하며 확인한, 이후 단계에 영향을 주는 사실:
   (`inboxDetailRun` 조회), 워크플로 자동 생성 effect가 설정을 본다. Phase 3/4가
   가져간다.
 
+### 기준 갱신 (2026-09-04, Phase 3 `#1588` / `#1589` 이후)
+
+workspace / workflow / integrations를 옮기며 확인한, 이후 단계에 영향을 주는 사실:
+
+- **effect 훅에도 데이터 소스 이음매가 필요하다.** 액션은 `deps.api`로 받으면 되지만
+  훅과 액션이 같은 coordinator를 공유하면 서로에게 부분 API를 건넬 수 없다.
+  `workspaceApiAtom`(Partial 오버라이드)과 `workspaceModesAtom`(`demoMode` /
+  `remoteMode`)을 레지스트리에 두고 `resolveWorkspaceApi(registry, overrides)`가
+  호출 시점에 합친다. 이후 단계도 훅이 있는 도메인은 이 형태를 쓴다.
+- **`Atom.family`의 팀별 값은 전역 레코드로 되돌릴 수 있다.** 파사드가 남긴
+  `projectReadiness` 3종은 `teamsAtom` 위 파생 atom + `withEquality`로 만들었다.
+  family는 열거할 수 없으므로 이런 레코드는 항상 "무엇을 순회할지"를 정해 줘야 한다.
+- **`renderCounter.track`으로는 구독형 리렌더를 셀 수 없다**(Phase 2B-2 기록의 확인).
+  Phase 3의 렌더 카운트 테스트는 "셸 카운터 0 + 해당 뷰의 DOM 변화"로 검증한다.
+  래퍼가 `lazy()`를 들고 있어 첫 페인트가 모듈 로드를 기다리므로 고정 tick이 아니라
+  조건 대기 헬퍼가 필요하다.
+- **`useAtomValue`로 만든 파생은 effect 재시작 단위가 된다.** 스케줄 러너처럼
+  재시작이 곧 부작용(재claim)인 effect는 배열 아이덴티티를 보존하는 writer
+  (`setConnectedTeamIds`)와 `useMemo`가 함께 있어야 한다. 셸 콜백은 의존성이 아니라
+  레지스트리 브리지(`setWorkspaceScheduleBridge`)로 넘긴다.
+- **부팅 검사는 자기 결과로 다시 돌 수 있다.** 준비 상태 검사가 연결 목록을 채우고
+  그 목록이 같은 effect의 의존성이므로, 팀별로 "어느 인벤토리에 답했는지"를 ref에
+  기록해 중복 왕복을 막았다. 같은 형태의 effect를 추가할 때 확인한다.
+- **`useBriar`에 남은 것은 세션·로그인·팀 선택뿐이다.** 상태는 `user` / `token` /
+  `projects` / `planningProjects` / `organizations` / `activeOrganizationId` /
+  `activeProjectId` / `loading` / `restoringSession` / `loginCode` / `error` /
+  `projectConnection` / `isCreatingProject` / `deletingProjectId`와 ref 3개
+  (`pollTimer`, `pollLoginNow`, `loginAttempt`). effect는 세션 복원, 플래닝
+  프로젝트 로드, 컴패니언 인증 복귀, 액션 브리지 설치 4개. 액션은 `login` /
+  `completeLogin` / `sendLoginEmailCode` / `verifyLoginEmailCode` / `cancelLogin` /
+  `acceptInvitation` / `selectProject` / `ensureProjectSelected` / `refresh`.
+  Phase 4 이후는 이 목록만 남기면 된다.
+- **App은 아직 `briar.projectReadiness` 3종과 `connectedTeamIds`를 읽는다.**
+  `Sidebar`, `AppSettings`, `TeamLobby`, `OrganizationSettings`가 프롭으로 받기
+  때문이며, 그 뷰들을 옮기는 단계에서 파사드의 마지막 레코드 파생이 사라진다.
+
 ## 목표
 
 1. `apps/briar/src/hooks/useBriar.ts`(4,668줄)와 `apps/briar/src/App.tsx`(5,116줄)가
@@ -808,7 +844,7 @@ Phase 2 이후 언제든 착수 가능하며 Phase 3–7과 병행할 수 있다
 | 1 | #1583 | 머지됨 | `state/session|organization|team|planning`의 atoms/actions, `useActiveOrganizationPersistence`, `components/app/`의 연결 래퍼 4종과 `AppEffects`. `activeProjectIdRef` 제거. |
 | 2A | #1584, #1585 | 머지됨 | #1584: `state/entities`(runs / teams / workers / members / providers / channels / upsert / retention), `state/team`의 팀별 family, `state/sync`의 `events` / `apply` / `view`. #1585: `sync/loader`, `sync/useTeamSync`, `useBriar` 파사드를 `dashboardViewAtom` 위로 옮기고 `dashboardRef` / `dashboardCursor` / `dashboardRequest` / `dashboardRequestGeneration` / `dashboardCache` 제거. Phase 1의 대시보드 주입 콜백 8개 삭제. |
 | 2B | #1586, #1587 | 머지됨 | #1586: `sync/optimistic`, `state/issues`(atoms / actions), `state/run-detail`(atoms / actions), `useBriar`의 `setDashboard` 제거. #1587: `components/app`의 `HuntDashboardWithTeam` / `RunPageWithRun` / `TeamViewsWithDashboard`, App.tsx의 삼중 이슈·런 프롭 블록 삭제와 렌더 카운트 테스트. 보드 목록의 id 전용 렌더는 후속. |
-| 3 | | 예정 | |
+| 3 | #1588, #1589 | 머지됨 | #1588: `state/workspace`(atoms / api / health / readiness / actions / `useWorkspaceSync`), `state/workflow`(actions / `useWorkflowAutoGeneration`), `state/integrations`(atoms / actions), `sync/events`의 `team-settings-changed`와 `sync/commit`. `useBriar`의 workspace `useState` 7개·ref 5개와 `commitTeamDashboard` / `commitTeamSettings` 제거, Phase 1 주입 콜백 3개(`bumpReconnectRequest`, `clearWorkspaceViews`, `resetTeamHealth`) 삭제. `AutoHuntSession` 계열 타입을 `types.ts`로. #1589: `components/app/WorkspaceViews`의 연결 래퍼 4종과 `TeamSettingsWithDashboard` 확장, App.tsx 프롭 블록 삭제, 파사드에서 25개 키 제거. |
 | 4 | | 예정 | |
 | 5 | | 예정 | |
 | 6 | | 예정 | |

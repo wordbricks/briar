@@ -29,14 +29,12 @@ import {
   Settings,
 } from "lucide-react";
 import { AgentUsageStatusBar } from "./components/AgentUsageStatusBar";
-import { WorkerStatusBar } from "./components/WorkerStatusBar";
 import { AppVersionStatus } from "./components/AppVersionStatus";
 import {
   CompanionBottomNavigation,
   type CompanionStatusFilter,
 } from "./components/CompanionBottomNavigation";
 import { CompanionEmptyState, CompanionHeader } from "./components/CompanionHeader";
-import { ConnectionHealth } from "./components/ConnectionHealth";
 import { Inbox } from "./components/Inbox";
 import { HuntDashboardWithTeam } from "./components/app/HuntDashboardWithTeam";
 import { RunPageWithRun } from "./components/app/RunPageWithRun";
@@ -46,6 +44,12 @@ import {
   TeamSettingsWithDashboard,
   WorkerDispatchDialogWithTeam,
 } from "./components/app/TeamViewsWithDashboard";
+import {
+  ConnectionHealthWithWorkspace,
+  TeamOnboardingWithWorkspace,
+  TeamRepositorySetupDialogWithWorkspace,
+  WorkerStatusBarWithTeam,
+} from "./components/app/WorkspaceViews";
 import { InboxDetailPanel } from "./components/InboxDetailPanel";
 import {
   InboxDetailTargetBoundary,
@@ -164,10 +168,8 @@ import {
 } from "./lib/issue-links";
 import { listenForClickedIssueLinks } from "./lib/external-links";
 import { navigateToIssueLink } from "./lib/issue-link-navigation";
-import { isRepositoryConnectedForImport } from "./lib/linear-import";
 import {
   localTeamConnectionState,
-  localTeamReadiness,
   teamRepositoryDestination,
 } from "./lib/local-team-connection";
 import type { IssueDetailTab } from "./lib/issue-detail-tab";
@@ -327,16 +329,6 @@ const PlanningProjectDialog = lazy(() =>
 const TeamAgentSessionDetail = lazy(() =>
   import("./components/TeamAgentSessionDetail").then((m) => ({
     default: m.TeamAgentSessionDetail,
-  })),
-);
-const TeamOnboarding = lazy(() =>
-  import("./components/TeamOnboarding").then((m) => ({
-    default: m.TeamOnboarding,
-  })),
-);
-const TeamRepositorySetupDialog = lazy(() =>
-  import("./components/TeamRepositorySetupDialog").then((m) => ({
-    default: m.TeamRepositorySetupDialog,
   })),
 );
 const TeamSchedule = lazy(() =>
@@ -3998,38 +3990,13 @@ export function App({
         ) : null}
         <div className="app-content-surface">
         <Suspense fallback={null}>
-        {repositorySetupProjectId ? (
-          <TeamRepositorySetupDialog
-            connectionState={localTeamConnectionState(
-              briar.connectedTeamIds,
-              repositorySetupProjectId,
-            )}
-            error={briar.projectReadinessError[repositorySetupProjectId] ?? null}
-            loading={
-              briar.projectReadinessLoadingProjects.has(
-                repositorySetupProjectId,
-              )
-            }
-            onClose={() => {
-              setRepositorySetupProjectId(null);
-              restoreRepositorySetupTrigger();
-            }}
-            onStartWorking={async () => {
-              await briar.startWorkingOnProject(repositorySetupProjectId);
-            }}
-            onRefresh={() =>
-              briar.refreshProjectReadiness(repositorySetupProjectId)
-            }
-            projectName={
-              briar.projects.find(
-                (project) => project.id === repositorySetupProjectId,
-              )?.name ?? ""
-            }
-            readiness={
-              briar.projectReadiness[repositorySetupProjectId] ?? null
-            }
-          />
-        ) : null}
+        <TeamRepositorySetupDialogWithWorkspace
+          onClose={() => {
+            setRepositorySetupProjectId(null);
+            restoreRepositorySetupTrigger();
+          }}
+          teamId={repositorySetupProjectId}
+        />
         </Suspense>
         <Suspense fallback={lazyViewFallback}>
         {activePage === "organization-create" ? (
@@ -4283,15 +4250,6 @@ export function App({
           settingsTarget.scope === "project" &&
           activeProject ? (
           <TeamSettingsWithDashboard
-            githubRepository={
-              briar.dashboard?.settings.githubRepository ??
-              localTeamReadiness(
-                briar.activeProjectConnectionState,
-                briar.projectReadiness[activeProject.id] ?? null,
-              )?.githubRepository ??
-              null
-            }
-            health={briar.health}
             isDeleting={briar.deletingProjectId === briar.activeProjectId}
             isSidebarOpen={isSidebarOpen}
             initialSection={settingsTarget.section}
@@ -4310,47 +4268,11 @@ export function App({
                   : "lobby",
               );
             }}
-            onRegenerateWorkflow={() => briar.regenerateWorkflow(activeProject.id)}
-            onAnalyzeWorkflowRequirements={() =>
-              briar.analyzeWorkflowRequirements(activeProject.id)
-            }
-            onReviseWorkflow={(requestedChange) =>
-              briar.reviseWorkflow(activeProject.id, requestedChange)
-            }
-            onSaveCheckpointPolicy={(scope, checkpoints, expectedRevision) =>
-              briar.saveCheckpointPolicy(
-                activeProject.id,
-                scope,
-                checkpoints,
-                expectedRevision,
-              )
-            }
-            onUpdateVelenOrg={(org) =>
-              briar.saveVelenIntegration(activeProject.id, org)
-            }
-            onConnectLinearImport={(apiKey) =>
-              briar.connectLinearForImport(activeProject.id, apiKey)
-            }
-            onLoadLinearImportStates={(input) =>
-              briar.loadLinearStatesForImport(activeProject.id, input)
-            }
-            onImportLinearIssues={(input) =>
-              briar.runLinearIssueImport(activeProject.id, input)
-            }
             onIconChange={briar.changeProjectIcon}
             onIssueKeyPrefixChange={briar.changeProjectIssueKeyPrefix}
             onScheduleTabChange={briar.changeProjectScheduleTab}
-            onRefreshVelen={briar.refreshVelen}
-            onRefreshHealth={briar.refreshHealth}
             project={activeProject}
-            repositoryConnected={isRepositoryConnectedForImport({
-              projectId: activeProject.id,
-              connectedTeamIds: briar.connectedTeamIds,
-              githubRepository: briar.dashboard?.settings.githubRepository,
-              repositoryPath: briar.health?.repositoryPath,
-            })}
             sessionToken={briar.token}
-            velen={briar.velen}
           />
         ) : activePage === "lobby" && activeProject ? (
           <TeamLobbyWithDashboard
@@ -4549,7 +4471,7 @@ export function App({
               navigateToPage("settings");
             }}
           />
-          <WorkerStatusBar
+          <WorkerStatusBarWithTeam
             onOpenSettings={() => {
               if (!briar.activeOrganizationId) return;
               setSettingsTarget({
@@ -4561,23 +4483,14 @@ export function App({
               navigateToPage("settings");
             }}
             onRefresh={() => briar.refresh("snapshot")}
-            organizationId={briar.activeOrganizationId}
-            token={briar.token}
-            userId={briar.user?.id ?? null}
-            workers={briar.dashboard?.workers ?? []}
           />
           <AppVersionStatus />
-          <ConnectionHealth
-            error={briar.healthError}
-            health={briar.health}
-            loading={briar.healthLoading}
+          <ConnectionHealthWithWorkspace
             onReconnect={() => {
               if (briar.activeProjectId) {
                 beginProjectReconnect(briar.activeProjectId);
               }
             }}
-            onRefresh={() => void briar.refreshHealth()}
-            onRepair={() => void briar.repairHealth()}
           />
         </div>
       </div>
@@ -4947,68 +4860,38 @@ export function App({
           prefix={pendingShortcutPrefix.join(" ").toUpperCase()}
         />
       ) : null}
-      {!briar.remoteMode &&
-      briar.user &&
-      (briar.isCreatingProject || briar.projectConnection) ? (
-        <TeamOnboarding
-          canCancel={briar.organizations.length > 0}
-          connection={briar.projectConnection}
-          error={briar.error}
-          includeDeveloperTools={developerToolsProjectSetupRequested}
-          loading={briar.loading}
-          onCancel={() => {
-            if (invitationProgress?.nextStep === "developer") {
-              clearOrganizationInvitationProgress();
-              setInvitationProgress(null);
-              invitationDeveloperSetupRequestRef.current = null;
-            }
-            setDeveloperToolsProjectSetupRequested(false);
-            briar.cancelProjectCreation();
-            restoreRepositorySetupTrigger();
-          }}
-          onAnalyzeRequirements={async (projectId, onProgress) => {
-            const workflow = await briar.analyzeWorkflowRequirements(
-              projectId,
-              onProgress,
-            );
-            const health = await briar.refreshHealth();
-            return {
-              workflow,
-              requirements: health?.requirements ?? [],
-            };
-          }}
-          onConnect={briar.connectProject}
-          onCreate={briar.addProject}
-          onFinish={() => {
-            if (invitationProgress?.nextStep === "developer") {
-              clearOrganizationInvitationProgress();
-              setInvitationProgress(null);
-              invitationDeveloperSetupRequestRef.current = null;
-            }
-            repositorySetupTriggerRef.current = null;
-            setDeveloperToolsProjectSetupRequested(false);
-            briar.finishProjectCreation();
-            setRequestedRunId(null);
-            setRequestedSessionId(null);
-            resetNavigation("lobby");
-          }}
-          onInspectLovableRepository={briar.inspectLovableProject}
-          onPreflight={briar.preflightProjectConnection}
-          onPrepareGithubRepository={briar.prepareGithubProjectRepository}
-          onReviseWorkflow={briar.reviseWorkflow}
-          onRepositorySelect={briar.selectProjectRepository}
-          onRepositoryInspect={briar.inspectProjectRepository}
-          onResolveGithubRepository={briar.resolveGithubProjectRepository}
-          requireDeveloperAgent={
-            invitationProgress?.nextStep === "developer"
+      <TeamOnboardingWithWorkspace
+        includeDeveloperTools={developerToolsProjectSetupRequested}
+        onCancel={() => {
+          if (invitationProgress?.nextStep === "developer") {
+            clearOrganizationInvitationProgress();
+            setInvitationProgress(null);
+            invitationDeveloperSetupRequestRef.current = null;
           }
-          startWithDeveloperTools={Boolean(
-            invitationProgress?.nextStep === "developer" &&
-              invitationProgress.initialProjectId ===
-                briar.projectConnection?.project.id,
-          )}
-        />
-      ) : null}
+          setDeveloperToolsProjectSetupRequested(false);
+          briar.cancelProjectCreation();
+          restoreRepositorySetupTrigger();
+        }}
+        onFinish={() => {
+          if (invitationProgress?.nextStep === "developer") {
+            clearOrganizationInvitationProgress();
+            setInvitationProgress(null);
+            invitationDeveloperSetupRequestRef.current = null;
+          }
+          repositorySetupTriggerRef.current = null;
+          setDeveloperToolsProjectSetupRequested(false);
+          briar.finishProjectCreation();
+          setRequestedRunId(null);
+          setRequestedSessionId(null);
+          resetNavigation("lobby");
+        }}
+        requireDeveloperAgent={invitationProgress?.nextStep === "developer"}
+        startWithDeveloperTools={Boolean(
+          invitationProgress?.nextStep === "developer" &&
+            invitationProgress.initialProjectId ===
+              briar.projectConnection?.project.id,
+        )}
+      />
       <WorkerDispatchDialogWithTeam
         didDispatchSuccessfully={completedDispatchRunId === dispatchRun?.id}
         error={quickProcessError}
