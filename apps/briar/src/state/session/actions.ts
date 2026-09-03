@@ -45,6 +45,8 @@ import {
   clearWorkspaceInventory,
   resetHealth,
 } from "../workspace/atoms";
+import { clearSnapshotAccount } from "../persistence/account";
+import { clearSnapshotsSafely } from "../persistence/store";
 import { applySyncEvent } from "../sync/apply";
 import {
   activeTeamIdAtom,
@@ -224,6 +226,14 @@ export function createSessionActions(
       // loaded may outlive its token.
       applySyncEvent(registry, { kind: "session-cleared" });
     });
+    /*
+      …and so is the stored snapshot. This is the one place a sign-out and an
+      account deletion agree on, so it is where the persisted copy of what was
+      just cleared is dropped too: the next cold start on this device must not
+      re-render the account that signed out.
+    */
+    clearSnapshotAccount();
+    void clearSnapshotsSafely(registry);
   };
 
   const clearLoginTimer = () => {

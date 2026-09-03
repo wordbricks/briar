@@ -2,6 +2,7 @@ import { useStatusTray } from "../../hooks/useStatusTray";
 import { useChannelCatalogSync } from "../../state/channels/useChannelCatalogSync";
 import { useNavigationReconciliation } from "../../state/navigation/useNavigationReconciliation";
 import { useActiveOrganizationPersistence } from "../../state/organization/useActiveOrganizationPersistence";
+import { useSnapshotWriter } from "../../state/persistence/useSnapshotWriter";
 import { usePlanningProjectsSync } from "../../state/planning/usePlanningProjectsSync";
 import { useAuthReturnListener } from "../../state/session/useAuthReturnListener";
 import { useSessionBootstrap } from "../../state/session/useSessionBootstrap";
@@ -29,6 +30,10 @@ export function AppEffects() {
   usePlanningProjectsSync();
   useAuthReturnListener();
   useSessionBootstrap();
+  // Only observes, so its position among the writers above does not matter; it
+  // sits after the bootstrap because the first record of a boot is the account
+  // the bootstrap just committed.
+  useSnapshotWriter();
   // Last, because the reconciliation used to be one of `App`'s own effects and
   // therefore ran after every hook mounted here.
   useNavigationReconciliation();
