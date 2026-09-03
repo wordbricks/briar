@@ -19,11 +19,15 @@ import {
   writeInboxNotificationPreferences,
 } from "../lib/inbox-notifications";
 import type { InboxNotificationPermissionStatus } from "../generated/tauri";
-import { LoginScreen, type LoginMethod } from "./LoginScreen";
+import {
+  LoginScreen,
+  type LoginEmailHandlers,
+  type LoginMethod,
+} from "./LoginScreen";
 
 type Step = "welcome" | "login" | "notifications";
 
-type InitialOnboardingProps = {
+type InitialOnboardingProps = LoginEmailHandlers & {
   authenticated: boolean;
   error: string | null;
   loading: boolean;
@@ -34,6 +38,7 @@ type InitialOnboardingProps = {
   openSystemSettings?: typeof openInboxNotificationSystemSettings;
   readPermissionStatus?: typeof readInboxNotificationPermissionStatus;
   requestPermission?: typeof requestInboxNotificationPermission;
+  webMode?: boolean;
 };
 
 export function InitialOnboarding({
@@ -44,9 +49,12 @@ export function InitialOnboarding({
   onCancelLogin,
   onComplete,
   onLogin,
+  onSendEmailCode,
+  onVerifyEmailCode,
   openSystemSettings = openInboxNotificationSystemSettings,
   readPermissionStatus = readInboxNotificationPermissionStatus,
   requestPermission = requestInboxNotificationPermission,
+  webMode = false,
 }: InitialOnboardingProps) {
   const { t } = useI18n();
   const [step, setStep] = useState<Step>(
@@ -236,6 +244,9 @@ export function InitialOnboarding({
               loginCode={loginCode}
               onCancel={onCancelLogin}
               onLogin={onLogin}
+              onSendEmailCode={onSendEmailCode}
+              onVerifyEmailCode={onVerifyEmailCode}
+              webMode={webMode}
             />
             <Button
               className="absolute bottom-6 left-7 z-[9] h-[42px] rounded-xl bg-secondary px-4 text-xs font-semibold text-muted-foreground shadow-none transition-[transform,background-color] duration-150 hover:bg-secondary/80 active:scale-[.97]"

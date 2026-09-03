@@ -14,6 +14,7 @@ import {
 } from "@briar/contracts/gen/briar/types/v1/error_pb";
 import { briarApiUrl } from "../api-config";
 import { ApiError } from "../api/errors";
+import { isBrowserCookieSessionCredential } from "../session-credential";
 
 const statusForConnectCode = (code: Code): number => {
   switch (code) {
@@ -68,7 +69,9 @@ const bearerTokenContextKey = createContextKey<string | undefined>(undefined, {
 
 const appClientInterceptor: Interceptor = (next) => async (request) => {
   const token = request.contextValues.get(bearerTokenContextKey);
-  if (token) request.header.set("authorization", `Bearer ${token}`);
+  if (token && !isBrowserCookieSessionCredential(token)) {
+    request.header.set("authorization", `Bearer ${token}`);
+  }
 
   try {
     return await next(request);

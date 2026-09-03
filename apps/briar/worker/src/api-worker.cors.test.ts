@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import worker from "./api-worker";
+import worker, { normalizeWebAppApiRequest } from "./api-worker";
 
 const preflight = (origin: string) => worker.fetch(
   new Request(
@@ -36,5 +36,28 @@ describe("credentialed auth CORS", () => {
     expect(response.headers.has("access-control-allow-credentials")).toBe(
       false,
     );
+  });
+});
+
+describe("web app API proxy", () => {
+  test("strips only the first-party API prefix before routing", async () => {
+    const request = new Request(
+      "https://briar.wordbricks.ai/app-api/briar.app.v1.AccountService/GetCurrentUser?view=full",
+      { method: "POST", body: "{}" },
+    );
+
+    const normalized = normalizeWebAppApiRequest(request);
+
+    expect(normalized.url).toBe(
+      "https://briar.wordbricks.ai/briar.app.v1.AccountService/GetCurrentUser?view=full",
+    );
+    expect(normalized.method).toBe("POST");
+    await expect(normalized.text()).resolves.toBe("{}");
+  });
+
+  test("leaves non-proxy routes unchanged", () => {
+    const request = new Request("https://briar.wordbricks.ai/api/auth/get-session");
+
+    expect(normalizeWebAppApiRequest(request)).toBe(request);
   });
 });

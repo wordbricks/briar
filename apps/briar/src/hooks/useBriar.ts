@@ -146,6 +146,11 @@ import {
   isAuthorizationCancelled,
   openAuthorization,
 } from "../lib/auth-session";
+import {
+  browserAuthClient,
+  type BrowserAuthLocale,
+} from "../lib/browser-auth-client";
+import { browserCookieSessionCredential } from "../lib/session-credential";
 import { startDashboardPolling } from "../lib/dashboard-polling";
 import { mergeDashboardDelta } from "../lib/dashboard-sync";
 import {
@@ -704,11 +709,18 @@ export function useBriar(options: UseBriarOptions = {}) {
 
     const restore = async () => {
       const result = await restoreStoredSession({
-        clearToken: clearSessionToken,
+        clearToken: webMode
+          ? async () => {
+              await browserAuthClient.signOut();
+              await clearSessionToken();
+            }
+          : clearSessionToken,
         loadOrganizations,
         loadProjects,
         loadSession,
-        readToken: readSessionToken,
+        readToken: webMode
+          ? browserAuthClient.readSessionCredential
+          : readSessionToken,
       });
       if (cancelled) return;
       if (result.status === "missing" || result.status === "unauthorized") {
@@ -1124,6 +1136,68 @@ export function useBriar(options: UseBriarOptions = {}) {
     setProjectReadinessLoading,
   ]);
 
+  const completeLogin = useCallback(async (
+    nextToken: string,
+    attempt: number,
+  ) => {
+    const [nextUser, nextProjects, loadedOrganizations] = await Promise.all([
+      loadSession(nextToken),
+      loadProjects(nextToken),
+      loadOrganizations(nextToken),
+    ]);
+    const nextOrganizations = deferDefaultOrganization
+      ? loadedOrganizations
+      : await ensureDefaultOrganization(
+          nextToken,
+          nextUser,
+          loadedOrganizations,
+          {
+            createOrganization: createRemoteOrganization,
+            loadOrganizations,
+          },
+        );
+    const inventoryObservation: LocalProjectInventoryObservation = remoteMode
+      ? { status: "loaded", connectedProjectIds: null, error: null }
+      : await readinessCoordinator.inspectInventory();
+    if (attempt !== loginAttempt.current) return;
+    if (nextToken === browserCookieSessionCredential) {
+      await clearSessionToken();
+    } else {
+      await writeSessionToken(nextToken);
+    }
+    if (attempt !== loginAttempt.current) {
+      if (nextToken === browserCookieSessionCredential) {
+        await browserAuthClient.signOut();
+      } else {
+        await clearSessionToken();
+      }
+      return;
+    }
+    setToken(nextToken);
+    setUser(nextUser);
+    setProjects(nextProjects);
+    setOrganizations(nextOrganizations);
+    applyLocalProjectInventoryObservation(inventoryObservation);
+    const selection = resolveActiveAccountSelection(
+      nextUser.id,
+      nextOrganizations,
+      nextProjects,
+      lockedProjectId,
+    );
+    setActiveOrganizationId(selection.activeOrganizationId);
+    setActiveProjectId(selection.activeProjectId);
+    setProjectConnection(null);
+    setError(null);
+    setLoginCode(null);
+    setLoading(false);
+    pollLoginNow.current = null;
+  }, [
+    applyLocalProjectInventoryObservation,
+    deferDefaultOrganization,
+    lockedProjectId,
+    readinessCoordinator,
+  ]);
+
   const login = useCallback(async (
     options: {
       method?: DeviceLoginMethod;
@@ -1136,6 +1210,17 @@ export function useBriar(options: UseBriarOptions = {}) {
     setLoading(true);
     setError(null);
     try {
+      if (webMode) {
+        if (options.method === "google") {
+          await browserAuthClient.signInWithGoogle({
+            callbackURL: window.location.href,
+            locale: options.locale ?? "en",
+          });
+          return;
+        }
+        setLoading(false);
+        return;
+      }
       const authorization = await beginDeviceAuthorization(
         deviceClientId,
         options,
@@ -1155,52 +1240,7 @@ export function useBriar(options: UseBriarOptions = {}) {
           );
           if (attempt !== loginAttempt.current) return;
           if (result.access_token) {
-            const nextToken = result.access_token;
-            const [nextUser, nextProjects, loadedOrganizations] =
-              await Promise.all([
-                loadSession(nextToken),
-                loadProjects(nextToken),
-                loadOrganizations(nextToken),
-              ]);
-            const nextOrganizations = deferDefaultOrganization
-              ? loadedOrganizations
-              : await ensureDefaultOrganization(
-                  nextToken,
-                  nextUser,
-                  loadedOrganizations,
-                  {
-                    createOrganization: createRemoteOrganization,
-                    loadOrganizations,
-                  },
-                );
-            const inventoryObservation: LocalProjectInventoryObservation =
-              remoteMode
-                ? { status: "loaded", connectedProjectIds: null, error: null }
-                : await readinessCoordinator.inspectInventory();
-            if (attempt !== loginAttempt.current) return;
-            await writeSessionToken(nextToken);
-            if (attempt !== loginAttempt.current) {
-              await clearSessionToken();
-              return;
-            }
-            setToken(nextToken);
-            setUser(nextUser);
-            setProjects(nextProjects);
-            setOrganizations(nextOrganizations);
-            applyLocalProjectInventoryObservation(inventoryObservation);
-            const selection = resolveActiveAccountSelection(
-              nextUser.id,
-              nextOrganizations,
-              nextProjects,
-              lockedProjectId,
-            );
-            setActiveOrganizationId(selection.activeOrganizationId);
-            setActiveProjectId(selection.activeProjectId);
-            setProjectConnection(null);
-            setError(null);
-            setLoginCode(null);
-            setLoading(false);
-            pollLoginNow.current = null;
+            await completeLogin(result.access_token, attempt);
             return;
           }
           if (result.error === "slow_down") delay += 5_000;
@@ -1231,7 +1271,47 @@ export function useBriar(options: UseBriarOptions = {}) {
       setLoading(false);
       pollLoginNow.current = null;
     }
-  }, [clearLoginTimer, deferDefaultOrganization, lockedProjectId]);
+  }, [clearLoginTimer, completeLogin]);
+
+  const sendLoginEmailCode = useCallback(async (
+    email: string,
+    locale: BrowserAuthLocale,
+  ) => {
+    setLoading(true);
+    setError(null);
+    try {
+      await browserAuthClient.sendEmailOTP(email, locale);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+      throw caught;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const verifyLoginEmailCode = useCallback(async (
+    email: string,
+    otp: string,
+    locale: BrowserAuthLocale,
+  ) => {
+    const attempt = ++loginAttempt.current;
+    clearLoginTimer();
+    setLoading(true);
+    setError(null);
+    try {
+      await browserAuthClient.signInWithEmailOTP({ email, locale, otp });
+      if (attempt !== loginAttempt.current) {
+        await browserAuthClient.signOut();
+        return;
+      }
+      await completeLogin(browserCookieSessionCredential, attempt);
+    } catch (caught) {
+      if (attempt !== loginAttempt.current) return;
+      setError(caught instanceof Error ? caught.message : String(caught));
+      setLoading(false);
+      throw caught;
+    }
+  }, [clearLoginTimer, completeLogin]);
 
   const acceptInvitation = useCallback(
     async (invitationToken: string) => {
@@ -1271,6 +1351,9 @@ export function useBriar(options: UseBriarOptions = {}) {
     cancelLogin();
     if (token) {
       await deleteAndroidPushRegistration(token).catch(() => false);
+    }
+    if (webMode && token === browserCookieSessionCredential) {
+      await browserAuthClient.signOut();
     }
     await clearSessionToken();
     setToken(null);
@@ -1312,6 +1395,9 @@ export function useBriar(options: UseBriarOptions = {}) {
         projects.map((project) => disconnectLocalProject(project.id)),
       );
       cancelLogin();
+      if (webMode && token === browserCookieSessionCredential) {
+        await browserAuthClient.signOut().catch(() => undefined);
+      }
       await clearSessionToken();
       setToken(null);
       setUser(null);
@@ -4453,6 +4539,8 @@ export function useBriar(options: UseBriarOptions = {}) {
     loading,
     login,
     loginCode,
+    sendLoginEmailCode,
+    verifyLoginEmailCode,
     logout,
     organizations,
     planningProjects,

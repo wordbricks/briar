@@ -1,4 +1,5 @@
 import { ArrowUpRight, Mail, X } from "lucide-react";
+import { useState, type FormEvent } from "react";
 import { Spinner } from "./ui/spinner";
 
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,173 @@ import { Logo } from "./Logo";
 
 export type LoginMethod = "email" | "google";
 
+export type LoginEmailHandlers = {
+  onSendEmailCode?: (email: string) => Promise<void>;
+  onVerifyEmailCode?: (email: string, code: string) => Promise<void>;
+};
+
+export function LoginActions({
+  emailButtonLabel,
+  loading,
+  onLogin,
+  onReset,
+  onSendEmailCode,
+  onVerifyEmailCode,
+  webMode = false,
+}: LoginEmailHandlers & {
+  emailButtonLabel?: string;
+  loading: boolean;
+  onLogin: (method: LoginMethod) => void;
+  onReset?: () => void;
+  webMode?: boolean;
+}) {
+  const { t } = useI18n();
+  const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
+  const [codeSent, setCodeSent] = useState(false);
+  const directEmail = webMode && onSendEmailCode && onVerifyEmailCode;
+
+  const sendCode = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!directEmail) return;
+    await onSendEmailCode(email.trim().toLowerCase());
+    setCode("");
+    setCodeSent(true);
+  };
+
+  const verifyCode = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!directEmail) return;
+    await onVerifyEmailCode(email.trim().toLowerCase(), code);
+  };
+
+  if (directEmail && codeSent) {
+    return (
+      <form
+        className="grid gap-3"
+        onSubmit={(event) => void verifyCode(event).catch(() => undefined)}
+      >
+        <Typography className="text-center" tone="muted" variant="caption">
+          {t("login.codeSent")}
+        </Typography>
+        <label className="sr-only" htmlFor="login-email-code">
+          {t("login.signInCode")}
+        </label>
+        <input
+          autoComplete="one-time-code"
+          autoFocus
+          className="h-11 w-full rounded-[13px] border border-border bg-card px-3.5 text-center font-mono text-lg font-semibold tracking-[0.22em] text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
+          disabled={loading}
+          id="login-email-code"
+          inputMode="numeric"
+          maxLength={6}
+          onChange={(event) =>
+            setCode(event.target.value.replace(/\D/gu, "").slice(0, 6))}
+          pattern="[0-9]{6}"
+          placeholder="123456"
+          required
+          type="text"
+          value={code}
+        />
+        <Button disabled={loading || code.length !== 6} type="submit">
+          {loading ? <Spinner size={18} /> : null}
+          {t("login.verifyCode")}
+        </Button>
+        <div className="grid grid-cols-2 gap-2">
+          <Button
+            disabled={loading}
+            onClick={() =>
+              void onSendEmailCode(email).catch(() => undefined)}
+            type="button"
+            variant="secondary"
+          >
+            {t("login.resend")}
+          </Button>
+          <Button
+            disabled={loading}
+            onClick={() => {
+              setCodeSent(false);
+              setCode("");
+              onReset?.();
+            }}
+            type="button"
+            variant="ghost"
+          >
+            {t("login.editEmail")}
+          </Button>
+        </div>
+      </form>
+    );
+  }
+
+  return (
+    <div className="grid gap-3">
+      {directEmail ? (
+        <form
+          className="grid gap-2"
+          onSubmit={(event) => void sendCode(event).catch(() => undefined)}
+        >
+          <label className="sr-only" htmlFor="login-email">
+            {t("login.email")}
+          </label>
+          <input
+            autoComplete="email"
+            className="h-11 w-full rounded-[13px] border border-border bg-card px-3.5 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/15"
+            disabled={loading}
+            id="login-email"
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="name@example.com"
+            required
+            type="email"
+            value={email}
+          />
+          <Button
+            className="grid h-11 w-full grid-cols-[20px_minmax(0,1fr)_16px] place-items-center rounded-[13px] px-3.5 text-xs font-semibold shadow-[0_5px_16px_rgba(38,42,32,0.05)] [&>svg:first-child]:size-[18px] [&>svg:last-child]:size-4"
+            disabled={loading}
+            type="submit"
+          >
+            {loading ? <Spinner size={18} /> : <Mail size={18} />}
+            <span className="col-start-2 text-center">
+              {emailButtonLabel ?? t("login.continueEmail")}
+            </span>
+            <ArrowUpRight size={16} />
+          </Button>
+        </form>
+      ) : (
+        <Button
+          className="grid h-11 w-full grid-cols-[20px_minmax(0,1fr)_16px] place-items-center rounded-[13px] px-3.5 text-xs font-semibold shadow-[0_5px_16px_rgba(38,42,32,0.05)] [&>svg:first-child]:size-[18px] [&>svg:last-child]:size-4"
+          disabled={loading}
+          onClick={() => onLogin("email")}
+          type="button"
+        >
+          {loading ? <Spinner size={18} /> : <Mail size={18} />}
+          <span className="col-start-2 text-center">
+            {emailButtonLabel ?? t("login.continueEmail")}
+          </span>
+          <ArrowUpRight size={16} />
+        </Button>
+      )}
+      <div
+        className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2.5 text-[var(--text-2xs)] text-muted-foreground before:h-px before:bg-border before:content-[''] after:h-px after:bg-border after:content-['']"
+        role="separator"
+      >
+        <span>{t("login.or")}</span>
+      </div>
+      <Button
+        className="grid h-[46px] w-full grid-cols-[20px_minmax(0,1fr)_16px] place-items-center rounded-[13px] border border-border bg-card px-3.5 text-xs font-semibold text-foreground shadow-[0_5px_16px_rgba(38,42,32,0.05)] hover:bg-secondary [&>svg:first-child]:size-[18px] [&>svg:last-child]:size-4"
+        disabled={loading}
+        onClick={() => onLogin("google")}
+        type="button"
+        variant="outline"
+      >
+        <GoogleIcon />
+        <span className="col-start-2 text-center">{t("login.continueGoogle")}</span>
+        <ArrowUpRight size={16} />
+      </Button>
+    </div>
+  );
+}
+
 export function LoginScreen({
   companionMode = false,
   embedded = false,
@@ -18,8 +186,10 @@ export function LoginScreen({
   loginCode,
   onCancel,
   onLogin,
+  onSendEmailCode,
+  onVerifyEmailCode,
   webMode = false,
-}: {
+}: LoginEmailHandlers & {
   companionMode?: boolean;
   embedded?: boolean;
   error: string | null;
@@ -132,47 +302,19 @@ export function LoginScreen({
             </Typography>
           </div>
         ) : (
-          <div className="grid gap-3">
-            <Button
-              className={cn(
-                "grid h-11 w-full grid-cols-[20px_minmax(0,1fr)_16px] place-items-center rounded-[13px] px-3.5 text-xs font-semibold shadow-[0_5px_16px_rgba(38,42,32,0.05)] [&>svg:first-child]:size-[18px] [&>svg:last-child]:size-4",
-                companionMode && "mx-auto max-w-[480px]",
-              )}
-              disabled={loading}
-              onClick={() => onLogin("email")}
-              type="button"
-            >
-              {loading ? (
-                <Spinner size={18} />
-              ) : (
-                <Mail size={18} />
-              )}
-              <span className="col-start-2 text-center">{t("login.continueEmail")}</span>
-              <ArrowUpRight size={16} />
-            </Button>
-            <div
-              className={cn(
-                "grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2.5 text-[var(--text-2xs)] text-muted-foreground before:h-px before:bg-border before:content-[''] after:h-px after:bg-border after:content-['']",
-                companionMode && "mx-auto w-full max-w-[480px]",
-              )}
-              role="separator"
-            >
-              <span>{t("login.or")}</span>
-            </div>
-            <Button
-              className={cn(
-                "grid h-[46px] w-full grid-cols-[20px_minmax(0,1fr)_16px] place-items-center rounded-[13px] border border-border bg-card px-3.5 text-xs font-semibold text-foreground shadow-[0_5px_16px_rgba(38,42,32,0.05)] hover:bg-secondary [&>svg:first-child]:size-[18px] [&>svg:last-child]:size-4",
-                companionMode && "mx-auto max-w-[480px]",
-              )}
-              disabled={loading}
-              onClick={() => onLogin("google")}
-              type="button"
-              variant="outline"
-            >
-              <GoogleIcon />
-              <span className="col-start-2 text-center">{t("login.continueGoogle")}</span>
-              <ArrowUpRight size={16} />
-            </Button>
+          <div
+            className={cn(
+              companionMode && "mx-auto w-full max-w-[480px] min-w-0",
+            )}
+          >
+            <LoginActions
+              loading={loading}
+              onLogin={onLogin}
+              onReset={onCancel}
+              onSendEmailCode={onSendEmailCode}
+              onVerifyEmailCode={onVerifyEmailCode}
+              webMode={webMode}
+            />
           </div>
         )}
         {error ? (
