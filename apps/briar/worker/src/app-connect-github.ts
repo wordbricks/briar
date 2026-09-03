@@ -22,6 +22,7 @@ import {
   appMergeGithubPullRequest,
   appProjectGithubCredential,
   appProjectGithubRepository,
+  appProjectMergeActivity,
   appUpdateGithubPullRequest,
 } from "./app-connect-github-mappers";
 import {
@@ -35,6 +36,7 @@ import {
   createProjectGithubPullRequestApplication,
   getProjectGithubPullRequestApplication,
   getProjectGithubRepositoryApplication,
+  getProjectMergeActivityApplication,
   mergeProjectGithubPullRequestApplication,
   requireProjectGithubAccess,
   updateProjectGithubPullRequestApplication,
@@ -65,6 +67,7 @@ export type AppConnectGithubServices = {
   readonly getIntegration: typeof getGithubIntegrationApplication;
   readonly getPullRequest: typeof getProjectGithubPullRequestApplication;
   readonly getRepository: typeof getProjectGithubRepositoryApplication;
+  readonly getMergeActivity: typeof getProjectMergeActivityApplication;
   readonly mergePullRequest: typeof mergeProjectGithubPullRequestApplication;
   readonly requireProjectAccess: typeof requireProjectGithubAccess;
   readonly requireSession: typeof requireSession;
@@ -80,6 +83,7 @@ export const appConnectGithubServices: AppConnectGithubServices = {
   getIntegration: getGithubIntegrationApplication,
   getPullRequest: getProjectGithubPullRequestApplication,
   getRepository: getProjectGithubRepositoryApplication,
+  getMergeActivity: getProjectMergeActivityApplication,
   mergePullRequest: mergeProjectGithubPullRequestApplication,
   requireProjectAccess: requireProjectGithubAccess,
   requireSession,
@@ -246,6 +250,18 @@ export const createAppProjectGithubService = (
   input: AppConnectGithubInput,
   services: AppConnectGithubServices = appConnectGithubServices,
 ): ServiceImpl<typeof ProjectGitHubService> => ({
+  getProjectMergeActivity: async (request, context) => {
+    preventAuthenticatedResponseCaching(context.responseHeader);
+    const session = await services.requireSession(input.auth, input.request);
+    return appProjectMergeActivity(await withGithubProviderErrors(
+      services.getMergeActivity({
+        db: input.db,
+        env: input.env,
+        projectId: decodeUuid(request.projectId),
+        userId: session.user.id,
+      }),
+    ));
+  },
   createProjectGitHubCredential: async (request, context) => {
     preventAuthenticatedResponseCaching(context.responseHeader);
     const { project } = await projectAccess(input, services, request.projectId);

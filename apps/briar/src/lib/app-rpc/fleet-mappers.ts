@@ -33,6 +33,7 @@ import {
   type RequestExecutionWorkerUpdateResponse,
   type RetryManagedComputerResponse,
   type RetireManagedComputerResponse,
+  type TerminateManagedComputerResponse,
   type UpdateExecutionWorkerResponse,
   type UpdateExecutionWorkerRequest,
   type ValidateManagedComputerPromotionResponse,
@@ -656,7 +657,10 @@ export const managedComputerSetupStatusFromProto = (
 });
 
 export const managedComputerMutationResponseFromProto = (
-  response: RetryManagedComputerResponse | RetireManagedComputerResponse,
+  response:
+    | RetryManagedComputerResponse
+    | RetireManagedComputerResponse
+    | TerminateManagedComputerResponse,
 ) => ({
   computer: managedComputerFromProto(
     requiredMessage(response.computer, "managedComputerMutation.computer"),

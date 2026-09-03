@@ -28,7 +28,7 @@ struct AgentsHomeView<ToolbarContentType: ToolbarContent>: View {
                     ContentUnavailableView(
                         L10n.text("표시할 Agent 없음"),
                         systemImage: "cpu",
-                        description: Text(L10n.text("프로젝트에 연결된 Agent가 여기에 표시됩니다."))
+                        description: Text(L10n.text("팀에 연결된 Agent가 여기에 표시됩니다."))
                     )
                 } else {
                     ForEach(agents.agents) { agent in

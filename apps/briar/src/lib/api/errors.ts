@@ -34,8 +34,22 @@ export class ApiResponseDecodeError extends Data.TaggedError(
   }
 }
 
+function findApiError(error: unknown): ApiError | undefined {
+  const visited = new Set<object>();
+  let current = error;
+
+  while (Predicate.isObject(current) && !visited.has(current)) {
+    if (current instanceof ApiError) return current;
+    visited.add(current);
+    if (!Predicate.hasProperty(current, "cause")) return undefined;
+    current = current.cause;
+  }
+
+  return undefined;
+}
+
 export function isApiErrorStatus(error: unknown, status: number) {
-  return error instanceof ApiError && error.status === status;
+  return findApiError(error)?.status === status;
 }
 
 export function errorWithMessage(error: unknown, message: string) {

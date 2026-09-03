@@ -25,10 +25,14 @@ import type {
   ChannelMember,
 } from "../lib/channels-contract";
 import {
+  isChannelAttachmentTypeSupported,
+  normalizeChannelAttachmentFile,
+  validateChannelAttachments,
+} from "../lib/channel-attachments";
+import { markdownFromClipboardHtml } from "../lib/clipboard-html-to-markdown";
+import {
   dataTransferHasFiles,
   filesFromDataTransfer,
-  normalizeIssueAttachmentFile,
-  validateIssueAttachments,
 } from "../lib/issue-attachments";
 
 type ComposerInput = HTMLInputElement | HTMLTextAreaElement;
@@ -88,6 +92,7 @@ export function useChannelComposer<T extends ComposerInput>({
   const inputRef = useRef<T | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const pendingCaret = useRef<number | null>(null);
+  const plainPaste = useRef(false);
   const mentionListId = useId();
   const skillListId = useId();
 
@@ -223,16 +228,16 @@ export function useChannelComposer<T extends ComposerInput>({
   };
 
   const addImages = (files: readonly File[]) => {
-    const normalized = files.map(normalizeIssueAttachmentFile);
+    const normalized = files.map(normalizeChannelAttachmentFile);
     if (
       normalized.length === 0 ||
-      normalized.some((file) => !file.type.startsWith("image/"))
+      normalized.some((file) => !isChannelAttachmentTypeSupported(file.type))
     ) {
-      setAttachmentError(t("channel.imageOnly"));
+      setAttachmentError(t("channel.attachmentTypeUnsupported"));
       return;
     }
     const next = [...images, ...normalized.map(draftChannelImage)];
-    const validationError = validateIssueAttachments(
+    const validationError = validateChannelAttachments(
       next.map((image) => image.file),
     );
     if (validationError) {
@@ -296,6 +301,20 @@ export function useChannelComposer<T extends ComposerInput>({
     event: KeyboardEvent<T> | MouseEvent<T>,
   ) => setCaret(event.currentTarget.selectionStart ?? 0);
   const handleKeyDown = (event: KeyboardEvent<T>) => {
+    const isPlainPasteShortcut =
+      (event.metaKey || event.ctrlKey) &&
+      event.shiftKey &&
+      !event.altKey &&
+      event.key.toLowerCase() === "v";
+    if (isPlainPasteShortcut) {
+      plainPaste.current = true;
+    } else if (
+      event.key !== "Meta" &&
+      event.key !== "Control" &&
+      event.key !== "Shift"
+    ) {
+      plainPaste.current = false;
+    }
     if (showsSkillSuggestions) {
       if (event.key === "ArrowDown" || event.key === "ArrowUp") {
         event.preventDefault();
@@ -348,10 +367,25 @@ export function useChannelComposer<T extends ComposerInput>({
     }
   };
   const handlePaste = (event: ClipboardEvent<T>) => {
+    const plainOnly =
+      plainPaste.current ||
+      Boolean(
+        (event.nativeEvent as { shiftKey?: boolean } | undefined)?.shiftKey,
+      );
+    plainPaste.current = false;
+    const html = event.clipboardData?.getData?.("text/html") ?? "";
+    const markdown = plainOnly ? null : markdownFromClipboardHtml(html);
+    if (markdown) {
+      event.preventDefault();
+      insertAtCaret(markdown);
+      return;
+    }
     const pasted = filesFromDataTransfer(event.clipboardData).filter((file) =>
-      file.type.startsWith("image/"),
+      file.type.startsWith("image/") || file.type === "application/pdf",
     );
     if (pasted.length === 0) return;
+    const plainText = event.clipboardData?.getData?.("text/plain") ?? "";
+    if (plainOnly && plainText.trim()) return;
     event.preventDefault();
     addImages(pasted);
   };

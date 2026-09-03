@@ -18,6 +18,7 @@ service GitHubIntegrationService {
 // ProjectGitHubService owns typed project-scoped GitHub App operations used by
 // the app and CLI.
 service ProjectGitHubService {
+  rpc GetProjectMergeActivity(GetProjectMergeActivityRequest) returns (GetProjectMergeActivityResponse);
   rpc CreateProjectGitHubCredential(CreateProjectGitHubCredentialRequest) returns (CreateProjectGitHubCredentialResponse);
   rpc GetProjectGitHubRepository(GetProjectGitHubRepositoryRequest) returns (GetProjectGitHubRepositoryResponse);
   rpc CreateGitHubPullRequest(CreateGitHubPullRequestRequest) returns (CreateGitHubPullRequestResponse);
@@ -25,6 +26,24 @@ service ProjectGitHubService {
   rpc UpdateGitHubPullRequest(UpdateGitHubPullRequestRequest) returns (UpdateGitHubPullRequestResponse);
   rpc MergeGitHubPullRequest(MergeGitHubPullRequestRequest) returns (MergeGitHubPullRequestResponse);
   rpc CreateGitHubCommitStatus(CreateGitHubCommitStatusRequest) returns (CreateGitHubCommitStatusResponse);
+}
+
+message GetProjectMergeActivityRequest {
+  string project_id = 1;
+}
+
+message MergedPullRequest {
+  uint64 number = 1;
+  string title = 2;
+  string url = 3;
+  google.protobuf.Timestamp merged_at = 4;
+}
+
+// Complete merged PR history for the 16 days ending at generated_at.
+message GetProjectMergeActivityResponse {
+  string repository = 1;
+  google.protobuf.Timestamp generated_at = 2;
+  repeated MergedPullRequest pull_requests = 3;
 }
 
 message GitHubInstallationRepository {

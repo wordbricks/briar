@@ -58,7 +58,7 @@ describe("PlanningProjectDialog deletion", () => {
     );
 
     expect(document.body.textContent).toContain(
-      "이슈는 같은 팀의 General 프로젝트로 옮겨집니다",
+      "이슈는 같은 팀의 기본 프로젝트로 옮겨집니다",
     );
     await act(async () => findButton("프로젝트 삭제")?.click());
     expect(onDelete).not.toHaveBeenCalled();
@@ -94,7 +94,7 @@ describe("PlanningProjectDialog deletion", () => {
     );
 
     expect(document.body.textContent).toContain(
-      "기본 General 프로젝트는 삭제할 수 없습니다",
+      "기본 프로젝트는 삭제할 수 없습니다",
     );
     expect(findButton("프로젝트 삭제")).toBeUndefined();
     expect(onDelete).not.toHaveBeenCalled();

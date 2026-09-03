@@ -13,6 +13,8 @@ import {
 import { useMemo, useState, type ReactNode } from "react";
 
 import { Input } from "./ui/input";
+import { Typography } from "./ui/typography";
+import { PageHeader } from "./layout";
 import { ProjectIcon } from "./ProjectIcon";
 import { PullRequestIconLink } from "./hunt/board/PullRequestIconLink";
 import { relativeTime, localizeStatus } from "./hunt/model/formatters";
@@ -159,12 +161,26 @@ export function MyIssuesList({
       className={`my-issues-reference${sidebarClosed ? " sidebar-closed" : ""}`}
       id="my-issues-reference"
     >
-      <header className="my-issues-reference-header" data-tauri-drag-region="deep">
-        <h1>{title}</h1>
-        <span className="visually-hidden" aria-live="polite">
-          {t("myIssues.count", { count: runs.length })}
-        </span>
-      </header>
+      <PageHeader
+        className={`app-page-header${sidebarClosed ? " sidebar-closed" : ""}`}
+        data-tauri-drag-region="deep"
+        title={
+          <span className="queue-heading-copy">
+            <span>{title}</span>
+            <Typography
+              as="span"
+              className="queue-task-count"
+              tone="muted"
+              variant="caption"
+            >
+              {t("myIssues.count", { count: runs.length })}
+            </Typography>
+          </span>
+        }
+      />
+      <span className="visually-hidden" aria-live="polite">
+        {t("myIssues.count", { count: runs.length })}
+      </span>
       <div className="my-issues-reference-scroll">
         <div className="my-issues-reference-toolbar">
           <nav aria-label={t("myIssues.scopeLabel")} className="my-issues-scope-tabs">

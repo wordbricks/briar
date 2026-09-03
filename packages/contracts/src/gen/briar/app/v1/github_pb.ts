@@ -14,7 +14,85 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file briar/app/v1/github.proto.
  */
 export const file_briar_app_v1_github: GenFile = /*@__PURE__*/
-  fileDesc("Chlicmlhci9hcHAvdjEvZ2l0aHViLnByb3RvEgxicmlhci5hcHAudjEiWgocR2l0SHViSW5zdGFsbGF0aW9uUmVwb3NpdG9yeRIKCgJpZBgBIAEoBBINCgVvd25lchgCIAEoCRIMCgRuYW1lGAMgASgJEhEKCWZ1bGxfbmFtZRgEIAEoCSI2ChtHZXRHaXRIdWJJbnRlZ3JhdGlvblJlcXVlc3QSFwoPb3JnYW5pemF0aW9uX2lkGAEgASgJIvsCChxHZXRHaXRIdWJJbnRlZ3JhdGlvblJlc3BvbnNlEhIKCmNvbmZpZ3VyZWQYASABKAgSEgoKY2FuX21hbmFnZRgCIAEoCBIRCgljb25uZWN0ZWQYAyABKAgSHAoPaW5zdGFsbGF0aW9uX2lkGAQgASgESACIAQESGgoNYWNjb3VudF9sb2dpbhgFIAEoCUgBiAEBEh8KEmFjY291bnRfYXZhdGFyX3VybBgGIAEoCUgCiAEBEkAKDHJlcG9zaXRvcmllcxgHIAMoCzIqLmJyaWFyLmFwcC52MS5HaXRIdWJJbnN0YWxsYXRpb25SZXBvc2l0b3J5EjUKDGNvbm5lY3RlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBIA4gBAUISChBfaW5zdGFsbGF0aW9uX2lkQhAKDl9hY2NvdW50X2xvZ2luQhUKE19hY2NvdW50X2F2YXRhcl91cmxCDwoNX2Nvbm5lY3RlZF9hdCI5Ch5CZWdpbkdpdEh1Ykluc3RhbGxhdGlvblJlcXVlc3QSFwoPb3JnYW5pemF0aW9uX2lkGAEgASgJIjYKH0JlZ2luR2l0SHViSW5zdGFsbGF0aW9uUmVzcG9uc2USEwoLaW5zdGFsbF91cmwYASABKAki2AEKF1Byb2plY3RHaXRIdWJDcmVkZW50aWFsEhIKCnByb2plY3RfaWQYASABKAkSFwoPb3JnYW5pemF0aW9uX2lkGAIgASgJEhUKDXJlcG9zaXRvcnlfaWQYAyABKAQSEgoKcmVwb3NpdG9yeRgEIAEoCRIRCgljbG9uZV91cmwYBSABKAkSEAoIdXNlcm5hbWUYBiABKAkSEAoIcGFzc3dvcmQYByABKAkSLgoKZXhwaXJlc19hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiOgokQ3JlYXRlUHJvamVjdEdpdEh1YkNyZWRlbnRpYWxSZXF1ZXN0EhIKCnByb2plY3RfaWQYASABKAkiYgolQ3JlYXRlUHJvamVjdEdpdEh1YkNyZWRlbnRpYWxSZXNwb25zZRI5CgpjcmVkZW50aWFsGAEgASgLMiUuYnJpYXIuYXBwLnYxLlByb2plY3RHaXRIdWJDcmVkZW50aWFsIqQBChdQcm9qZWN0R2l0SHViUmVwb3NpdG9yeRIKCgJpZBgBIAEoBBIRCglmdWxsX25hbWUYAiABKAkSFgoOZGVmYXVsdF9icmFuY2gYAyABKAkSGgoSYWxsb3dfc3F1YXNoX21lcmdlGAQgASgIEhoKEmFsbG93X3JlYmFzZV9tZXJnZRgFIAEoCBIaChJhbGxvd19tZXJnZV9jb21taXQYBiABKAgiNwohR2V0UHJvamVjdEdpdEh1YlJlcG9zaXRvcnlSZXF1ZXN0EhIKCnByb2plY3RfaWQYASABKAkiXwoiR2V0UHJvamVjdEdpdEh1YlJlcG9zaXRvcnlSZXNwb25zZRI5CgpyZXBvc2l0b3J5GAEgASgLMiUuYnJpYXIuYXBwLnYxLlByb2plY3RHaXRIdWJSZXBvc2l0b3J5IpsCChFHaXRIdWJQdWxsUmVxdWVzdBI7CghpZGVudGl0eRgBIAEoCzIpLmJyaWFyLnR5cGVzLnYxLkdpdEh1YlB1bGxSZXF1ZXN0SWRlbnRpdHkSEgoKcmVwb3NpdG9yeRgCIAEoCRILCgN1cmwYAyABKAkSMwoFc3RhdGUYBCABKA4yJC5icmlhci5hcHAudjEuR2l0SHViUHVsbFJlcXVlc3RTdGF0ZRINCgVkcmFmdBgFIAEoCBIOCgZtZXJnZWQYBiABKAgSDAoEYm9keRgHIAEoCRIQCghoZWFkX3NoYRgIIAEoCRIQCghoZWFkX3JlZhgJIAEoCRIQCghiYXNlX3NoYRgKIAEoCRIQCghiYXNlX3JlZhgLIAEoCSJ8Ch5DcmVhdGVHaXRIdWJQdWxsUmVxdWVzdFJlcXVlc3QSEgoKcHJvamVjdF9pZBgBIAEoCRINCgV0aXRsZRgCIAEoCRIMCgRoZWFkGAMgASgJEgwKBGJhc2UYBCABKAkSDAoEYm9keRgFIAEoCRINCgVkcmFmdBgGIAEoCCJYCh9DcmVhdGVHaXRIdWJQdWxsUmVxdWVzdFJlc3BvbnNlEjUKDHB1bGxfcmVxdWVzdBgBIAEoCzIfLmJyaWFyLmFwcC52MS5HaXRIdWJQdWxsUmVxdWVzdCJOChtHZXRHaXRIdWJQdWxsUmVxdWVzdFJlcXVlc3QSEgoKcHJvamVjdF9pZBgBIAEoCRIbChNwdWxsX3JlcXVlc3RfbnVtYmVyGAIgASgEIlUKHEdldEdpdEh1YlB1bGxSZXF1ZXN0UmVzcG9uc2USNQoMcHVsbF9yZXF1ZXN0GAEgASgLMh8uYnJpYXIuYXBwLnYxLkdpdEh1YlB1bGxSZXF1ZXN0IusBCh5VcGRhdGVHaXRIdWJQdWxsUmVxdWVzdFJlcXVlc3QSEgoKcHJvamVjdF9pZBgBIAEoCRIbChNwdWxsX3JlcXVlc3RfbnVtYmVyGAIgASgEEhIKBXRpdGxlGAMgASgJSACIAQESEQoEYm9keRgEIAEoCUgBiAEBEhEKBGJhc2UYBSABKAlIAogBARI4CgVzdGF0ZRgGIAEoDjIkLmJyaWFyLmFwcC52MS5HaXRIdWJQdWxsUmVxdWVzdFN0YXRlSAOIAQFCCAoGX3RpdGxlQgcKBV9ib2R5QgcKBV9iYXNlQggKBl9zdGF0ZSJYCh9VcGRhdGVHaXRIdWJQdWxsUmVxdWVzdFJlc3BvbnNlEjUKDHB1bGxfcmVxdWVzdBgBIAEoCzIfLmJyaWFyLmFwcC52MS5HaXRIdWJQdWxsUmVxdWVzdCK9AQodTWVyZ2VHaXRIdWJQdWxsUmVxdWVzdFJlcXVlc3QSEgoKcHJvamVjdF9pZBgBIAEoCRIbChNwdWxsX3JlcXVlc3RfbnVtYmVyGAIgASgEEjUKDG1lcmdlX21ldGhvZBgDIAEoDjIfLmJyaWFyLmFwcC52MS5HaXRIdWJNZXJnZU1ldGhvZBIeChFleHBlY3RlZF9oZWFkX3NoYRgEIAEoCUgAiAEBQhQKEl9leHBlY3RlZF9oZWFkX3NoYSJBChFHaXRIdWJNZXJnZVJlc3VsdBILCgNzaGEYASABKAkSDgoGbWVyZ2VkGAIgASgIEg8KB21lc3NhZ2UYAyABKAkiUAoeTWVyZ2VHaXRIdWJQdWxsUmVxdWVzdFJlc3BvbnNlEi4KBW1lcmdlGAEgASgLMh8uYnJpYXIuYXBwLnYxLkdpdEh1Yk1lcmdlUmVzdWx0ItsBCh9DcmVhdGVHaXRIdWJDb21taXRTdGF0dXNSZXF1ZXN0EhIKCnByb2plY3RfaWQYASABKAkSCwoDc2hhGAIgASgJEjQKBXN0YXRlGAMgASgOMiUuYnJpYXIuYXBwLnYxLkdpdEh1YkNvbW1pdFN0YXR1c1N0YXRlEg8KB2NvbnRleHQYBCABKAkSGAoLZGVzY3JpcHRpb24YBSABKAlIAIgBARIXCgp0YXJnZXRfdXJsGAYgASgJSAGIAQFCDgoMX2Rlc2NyaXB0aW9uQg0KC190YXJnZXRfdXJsIiIKIENyZWF0ZUdpdEh1YkNvbW1pdFN0YXR1c1Jlc3BvbnNlKrcBChZHaXRIdWJQdWxsUmVxdWVzdFN0YXRlEioKJkdJVF9IVUJfUFVMTF9SRVFVRVNUX1NUQVRFX1VOU1BFQ0lGSUVEEAASIwofR0lUX0hVQl9QVUxMX1JFUVVFU1RfU1RBVEVfT1BFThABEiUKIUdJVF9IVUJfUFVMTF9SRVFVRVNUX1NUQVRFX0NMT1NFRBACEiUKIUdJVF9IVUJfUFVMTF9SRVFVRVNUX1NUQVRFX01FUkdFRBADKpsBChFHaXRIdWJNZXJnZU1ldGhvZBIkCiBHSVRfSFVCX01FUkdFX01FVEhPRF9VTlNQRUNJRklFRBAAEh4KGkdJVF9IVUJfTUVSR0VfTUVUSE9EX01FUkdFEAESHwobR0lUX0hVQl9NRVJHRV9NRVRIT0RfU1FVQVNIEAISHwobR0lUX0hVQl9NRVJHRV9NRVRIT0RfUkVCQVNFEAMq6AEKF0dpdEh1YkNvbW1pdFN0YXR1c1N0YXRlEisKJ0dJVF9IVUJfQ09NTUlUX1NUQVRVU19TVEFURV9VTlNQRUNJRklFRBAAEiUKIUdJVF9IVUJfQ09NTUlUX1NUQVRVU19TVEFURV9FUlJPUhABEicKI0dJVF9IVUJfQ09NTUlUX1NUQVRVU19TVEFURV9GQUlMVVJFEAISJwojR0lUX0hVQl9DT01NSVRfU1RBVFVTX1NUQVRFX1BFTkRJTkcQAxInCiNHSVRfSFVCX0NPTU1JVF9TVEFUVVNfU1RBVEVfU1VDQ0VTUxAEMoECChhHaXRIdWJJbnRlZ3JhdGlvblNlcnZpY2USbQoUR2V0R2l0SHViSW50ZWdyYXRpb24SKS5icmlhci5hcHAudjEuR2V0R2l0SHViSW50ZWdyYXRpb25SZXF1ZXN0GiouYnJpYXIuYXBwLnYxLkdldEdpdEh1YkludGVncmF0aW9uUmVzcG9uc2USdgoXQmVnaW5HaXRIdWJJbnN0YWxsYXRpb24SLC5icmlhci5hcHAudjEuQmVnaW5HaXRIdWJJbnN0YWxsYXRpb25SZXF1ZXN0Gi0uYnJpYXIuYXBwLnYxLkJlZ2luR2l0SHViSW5zdGFsbGF0aW9uUmVzcG9uc2Uy8QYKFFByb2plY3RHaXRIdWJTZXJ2aWNlEogBCh1DcmVhdGVQcm9qZWN0R2l0SHViQ3JlZGVudGlhbBIyLmJyaWFyLmFwcC52MS5DcmVhdGVQcm9qZWN0R2l0SHViQ3JlZGVudGlhbFJlcXVlc3QaMy5icmlhci5hcHAudjEuQ3JlYXRlUHJvamVjdEdpdEh1YkNyZWRlbnRpYWxSZXNwb25zZRJ/ChpHZXRQcm9qZWN0R2l0SHViUmVwb3NpdG9yeRIvLmJyaWFyLmFwcC52MS5HZXRQcm9qZWN0R2l0SHViUmVwb3NpdG9yeVJlcXVlc3QaMC5icmlhci5hcHAudjEuR2V0UHJvamVjdEdpdEh1YlJlcG9zaXRvcnlSZXNwb25zZRJ2ChdDcmVhdGVHaXRIdWJQdWxsUmVxdWVzdBIsLmJyaWFyLmFwcC52MS5DcmVhdGVHaXRIdWJQdWxsUmVxdWVzdFJlcXVlc3QaLS5icmlhci5hcHAudjEuQ3JlYXRlR2l0SHViUHVsbFJlcXVlc3RSZXNwb25zZRJtChRHZXRHaXRIdWJQdWxsUmVxdWVzdBIpLmJyaWFyLmFwcC52MS5HZXRHaXRIdWJQdWxsUmVxdWVzdFJlcXVlc3QaKi5icmlhci5hcHAudjEuR2V0R2l0SHViUHVsbFJlcXVlc3RSZXNwb25zZRJ2ChdVcGRhdGVHaXRIdWJQdWxsUmVxdWVzdBIsLmJyaWFyLmFwcC52MS5VcGRhdGVHaXRIdWJQdWxsUmVxdWVzdFJlcXVlc3QaLS5icmlhci5hcHAudjEuVXBkYXRlR2l0SHViUHVsbFJlcXVlc3RSZXNwb25zZRJzChZNZXJnZUdpdEh1YlB1bGxSZXF1ZXN0EisuYnJpYXIuYXBwLnYxLk1lcmdlR2l0SHViUHVsbFJlcXVlc3RSZXF1ZXN0GiwuYnJpYXIuYXBwLnYxLk1lcmdlR2l0SHViUHVsbFJlcXVlc3RSZXNwb25zZRJ5ChhDcmVhdGVHaXRIdWJDb21taXRTdGF0dXMSLS5icmlhci5hcHAudjEuQ3JlYXRlR2l0SHViQ29tbWl0U3RhdHVzUmVxdWVzdBouLmJyaWFyLmFwcC52MS5DcmVhdGVHaXRIdWJDb21taXRTdGF0dXNSZXNwb25zZUIMugIJQnJpYXJBUElfYgZwcm90bzM", [file_briar_types_v1_github_identity, file_google_protobuf_timestamp]);
+  fileDesc("Chlicmlhci9hcHAvdjEvZ2l0aHViLnByb3RvEgxicmlhci5hcHAudjEiNAoeR2V0UHJvamVjdE1lcmdlQWN0aXZpdHlSZXF1ZXN0EhIKCnByb2plY3RfaWQYASABKAkibgoRTWVyZ2VkUHVsbFJlcXVlc3QSDgoGbnVtYmVyGAEgASgEEg0KBXRpdGxlGAIgASgJEgsKA3VybBgDIAEoCRItCgltZXJnZWRfYXQYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIp8BCh9HZXRQcm9qZWN0TWVyZ2VBY3Rpdml0eVJlc3BvbnNlEhIKCnJlcG9zaXRvcnkYASABKAkSMAoMZ2VuZXJhdGVkX2F0GAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBI2Cg1wdWxsX3JlcXVlc3RzGAMgAygLMh8uYnJpYXIuYXBwLnYxLk1lcmdlZFB1bGxSZXF1ZXN0IloKHEdpdEh1Ykluc3RhbGxhdGlvblJlcG9zaXRvcnkSCgoCaWQYASABKAQSDQoFb3duZXIYAiABKAkSDAoEbmFtZRgDIAEoCRIRCglmdWxsX25hbWUYBCABKAkiNgobR2V0R2l0SHViSW50ZWdyYXRpb25SZXF1ZXN0EhcKD29yZ2FuaXphdGlvbl9pZBgBIAEoCSL7AgocR2V0R2l0SHViSW50ZWdyYXRpb25SZXNwb25zZRISCgpjb25maWd1cmVkGAEgASgIEhIKCmNhbl9tYW5hZ2UYAiABKAgSEQoJY29ubmVjdGVkGAMgASgIEhwKD2luc3RhbGxhdGlvbl9pZBgEIAEoBEgAiAEBEhoKDWFjY291bnRfbG9naW4YBSABKAlIAYgBARIfChJhY2NvdW50X2F2YXRhcl91cmwYBiABKAlIAogBARJACgxyZXBvc2l0b3JpZXMYByADKAsyKi5icmlhci5hcHAudjEuR2l0SHViSW5zdGFsbGF0aW9uUmVwb3NpdG9yeRI1Cgxjb25uZWN0ZWRfYXQYCCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wSAOIAQFCEgoQX2luc3RhbGxhdGlvbl9pZEIQCg5fYWNjb3VudF9sb2dpbkIVChNfYWNjb3VudF9hdmF0YXJfdXJsQg8KDV9jb25uZWN0ZWRfYXQiOQoeQmVnaW5HaXRIdWJJbnN0YWxsYXRpb25SZXF1ZXN0EhcKD29yZ2FuaXphdGlvbl9pZBgBIAEoCSI2Ch9CZWdpbkdpdEh1Ykluc3RhbGxhdGlvblJlc3BvbnNlEhMKC2luc3RhbGxfdXJsGAEgASgJItgBChdQcm9qZWN0R2l0SHViQ3JlZGVudGlhbBISCgpwcm9qZWN0X2lkGAEgASgJEhcKD29yZ2FuaXphdGlvbl9pZBgCIAEoCRIVCg1yZXBvc2l0b3J5X2lkGAMgASgEEhIKCnJlcG9zaXRvcnkYBCABKAkSEQoJY2xvbmVfdXJsGAUgASgJEhAKCHVzZXJuYW1lGAYgASgJEhAKCHBhc3N3b3JkGAcgASgJEi4KCmV4cGlyZXNfYXQYCCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIjoKJENyZWF0ZVByb2plY3RHaXRIdWJDcmVkZW50aWFsUmVxdWVzdBISCgpwcm9qZWN0X2lkGAEgASgJImIKJUNyZWF0ZVByb2plY3RHaXRIdWJDcmVkZW50aWFsUmVzcG9uc2USOQoKY3JlZGVudGlhbBgBIAEoCzIlLmJyaWFyLmFwcC52MS5Qcm9qZWN0R2l0SHViQ3JlZGVudGlhbCKkAQoXUHJvamVjdEdpdEh1YlJlcG9zaXRvcnkSCgoCaWQYASABKAQSEQoJZnVsbF9uYW1lGAIgASgJEhYKDmRlZmF1bHRfYnJhbmNoGAMgASgJEhoKEmFsbG93X3NxdWFzaF9tZXJnZRgEIAEoCBIaChJhbGxvd19yZWJhc2VfbWVyZ2UYBSABKAgSGgoSYWxsb3dfbWVyZ2VfY29tbWl0GAYgASgIIjcKIUdldFByb2plY3RHaXRIdWJSZXBvc2l0b3J5UmVxdWVzdBISCgpwcm9qZWN0X2lkGAEgASgJIl8KIkdldFByb2plY3RHaXRIdWJSZXBvc2l0b3J5UmVzcG9uc2USOQoKcmVwb3NpdG9yeRgBIAEoCzIlLmJyaWFyLmFwcC52MS5Qcm9qZWN0R2l0SHViUmVwb3NpdG9yeSKbAgoRR2l0SHViUHVsbFJlcXVlc3QSOwoIaWRlbnRpdHkYASABKAsyKS5icmlhci50eXBlcy52MS5HaXRIdWJQdWxsUmVxdWVzdElkZW50aXR5EhIKCnJlcG9zaXRvcnkYAiABKAkSCwoDdXJsGAMgASgJEjMKBXN0YXRlGAQgASgOMiQuYnJpYXIuYXBwLnYxLkdpdEh1YlB1bGxSZXF1ZXN0U3RhdGUSDQoFZHJhZnQYBSABKAgSDgoGbWVyZ2VkGAYgASgIEgwKBGJvZHkYByABKAkSEAoIaGVhZF9zaGEYCCABKAkSEAoIaGVhZF9yZWYYCSABKAkSEAoIYmFzZV9zaGEYCiABKAkSEAoIYmFzZV9yZWYYCyABKAkifAoeQ3JlYXRlR2l0SHViUHVsbFJlcXVlc3RSZXF1ZXN0EhIKCnByb2plY3RfaWQYASABKAkSDQoFdGl0bGUYAiABKAkSDAoEaGVhZBgDIAEoCRIMCgRiYXNlGAQgASgJEgwKBGJvZHkYBSABKAkSDQoFZHJhZnQYBiABKAgiWAofQ3JlYXRlR2l0SHViUHVsbFJlcXVlc3RSZXNwb25zZRI1CgxwdWxsX3JlcXVlc3QYASABKAsyHy5icmlhci5hcHAudjEuR2l0SHViUHVsbFJlcXVlc3QiTgobR2V0R2l0SHViUHVsbFJlcXVlc3RSZXF1ZXN0EhIKCnByb2plY3RfaWQYASABKAkSGwoTcHVsbF9yZXF1ZXN0X251bWJlchgCIAEoBCJVChxHZXRHaXRIdWJQdWxsUmVxdWVzdFJlc3BvbnNlEjUKDHB1bGxfcmVxdWVzdBgBIAEoCzIfLmJyaWFyLmFwcC52MS5HaXRIdWJQdWxsUmVxdWVzdCLrAQoeVXBkYXRlR2l0SHViUHVsbFJlcXVlc3RSZXF1ZXN0EhIKCnByb2plY3RfaWQYASABKAkSGwoTcHVsbF9yZXF1ZXN0X251bWJlchgCIAEoBBISCgV0aXRsZRgDIAEoCUgAiAEBEhEKBGJvZHkYBCABKAlIAYgBARIRCgRiYXNlGAUgASgJSAKIAQESOAoFc3RhdGUYBiABKA4yJC5icmlhci5hcHAudjEuR2l0SHViUHVsbFJlcXVlc3RTdGF0ZUgDiAEBQggKBl90aXRsZUIHCgVfYm9keUIHCgVfYmFzZUIICgZfc3RhdGUiWAofVXBkYXRlR2l0SHViUHVsbFJlcXVlc3RSZXNwb25zZRI1CgxwdWxsX3JlcXVlc3QYASABKAsyHy5icmlhci5hcHAudjEuR2l0SHViUHVsbFJlcXVlc3QivQEKHU1lcmdlR2l0SHViUHVsbFJlcXVlc3RSZXF1ZXN0EhIKCnByb2plY3RfaWQYASABKAkSGwoTcHVsbF9yZXF1ZXN0X251bWJlchgCIAEoBBI1CgxtZXJnZV9tZXRob2QYAyABKA4yHy5icmlhci5hcHAudjEuR2l0SHViTWVyZ2VNZXRob2QSHgoRZXhwZWN0ZWRfaGVhZF9zaGEYBCABKAlIAIgBAUIUChJfZXhwZWN0ZWRfaGVhZF9zaGEiQQoRR2l0SHViTWVyZ2VSZXN1bHQSCwoDc2hhGAEgASgJEg4KBm1lcmdlZBgCIAEoCBIPCgdtZXNzYWdlGAMgASgJIlAKHk1lcmdlR2l0SHViUHVsbFJlcXVlc3RSZXNwb25zZRIuCgVtZXJnZRgBIAEoCzIfLmJyaWFyLmFwcC52MS5HaXRIdWJNZXJnZVJlc3VsdCLbAQofQ3JlYXRlR2l0SHViQ29tbWl0U3RhdHVzUmVxdWVzdBISCgpwcm9qZWN0X2lkGAEgASgJEgsKA3NoYRgCIAEoCRI0CgVzdGF0ZRgDIAEoDjIlLmJyaWFyLmFwcC52MS5HaXRIdWJDb21taXRTdGF0dXNTdGF0ZRIPCgdjb250ZXh0GAQgASgJEhgKC2Rlc2NyaXB0aW9uGAUgASgJSACIAQESFwoKdGFyZ2V0X3VybBgGIAEoCUgBiAEBQg4KDF9kZXNjcmlwdGlvbkINCgtfdGFyZ2V0X3VybCIiCiBDcmVhdGVHaXRIdWJDb21taXRTdGF0dXNSZXNwb25zZSq3AQoWR2l0SHViUHVsbFJlcXVlc3RTdGF0ZRIqCiZHSVRfSFVCX1BVTExfUkVRVUVTVF9TVEFURV9VTlNQRUNJRklFRBAAEiMKH0dJVF9IVUJfUFVMTF9SRVFVRVNUX1NUQVRFX09QRU4QARIlCiFHSVRfSFVCX1BVTExfUkVRVUVTVF9TVEFURV9DTE9TRUQQAhIlCiFHSVRfSFVCX1BVTExfUkVRVUVTVF9TVEFURV9NRVJHRUQQAyqbAQoRR2l0SHViTWVyZ2VNZXRob2QSJAogR0lUX0hVQl9NRVJHRV9NRVRIT0RfVU5TUEVDSUZJRUQQABIeChpHSVRfSFVCX01FUkdFX01FVEhPRF9NRVJHRRABEh8KG0dJVF9IVUJfTUVSR0VfTUVUSE9EX1NRVUFTSBACEh8KG0dJVF9IVUJfTUVSR0VfTUVUSE9EX1JFQkFTRRADKugBChdHaXRIdWJDb21taXRTdGF0dXNTdGF0ZRIrCidHSVRfSFVCX0NPTU1JVF9TVEFUVVNfU1RBVEVfVU5TUEVDSUZJRUQQABIlCiFHSVRfSFVCX0NPTU1JVF9TVEFUVVNfU1RBVEVfRVJST1IQARInCiNHSVRfSFVCX0NPTU1JVF9TVEFUVVNfU1RBVEVfRkFJTFVSRRACEicKI0dJVF9IVUJfQ09NTUlUX1NUQVRVU19TVEFURV9QRU5ESU5HEAMSJwojR0lUX0hVQl9DT01NSVRfU1RBVFVTX1NUQVRFX1NVQ0NFU1MQBDKBAgoYR2l0SHViSW50ZWdyYXRpb25TZXJ2aWNlEm0KFEdldEdpdEh1YkludGVncmF0aW9uEikuYnJpYXIuYXBwLnYxLkdldEdpdEh1YkludGVncmF0aW9uUmVxdWVzdBoqLmJyaWFyLmFwcC52MS5HZXRHaXRIdWJJbnRlZ3JhdGlvblJlc3BvbnNlEnYKF0JlZ2luR2l0SHViSW5zdGFsbGF0aW9uEiwuYnJpYXIuYXBwLnYxLkJlZ2luR2l0SHViSW5zdGFsbGF0aW9uUmVxdWVzdBotLmJyaWFyLmFwcC52MS5CZWdpbkdpdEh1Ykluc3RhbGxhdGlvblJlc3BvbnNlMukHChRQcm9qZWN0R2l0SHViU2VydmljZRJ2ChdHZXRQcm9qZWN0TWVyZ2VBY3Rpdml0eRIsLmJyaWFyLmFwcC52MS5HZXRQcm9qZWN0TWVyZ2VBY3Rpdml0eVJlcXVlc3QaLS5icmlhci5hcHAudjEuR2V0UHJvamVjdE1lcmdlQWN0aXZpdHlSZXNwb25zZRKIAQodQ3JlYXRlUHJvamVjdEdpdEh1YkNyZWRlbnRpYWwSMi5icmlhci5hcHAudjEuQ3JlYXRlUHJvamVjdEdpdEh1YkNyZWRlbnRpYWxSZXF1ZXN0GjMuYnJpYXIuYXBwLnYxLkNyZWF0ZVByb2plY3RHaXRIdWJDcmVkZW50aWFsUmVzcG9uc2USfwoaR2V0UHJvamVjdEdpdEh1YlJlcG9zaXRvcnkSLy5icmlhci5hcHAudjEuR2V0UHJvamVjdEdpdEh1YlJlcG9zaXRvcnlSZXF1ZXN0GjAuYnJpYXIuYXBwLnYxLkdldFByb2plY3RHaXRIdWJSZXBvc2l0b3J5UmVzcG9uc2USdgoXQ3JlYXRlR2l0SHViUHVsbFJlcXVlc3QSLC5icmlhci5hcHAudjEuQ3JlYXRlR2l0SHViUHVsbFJlcXVlc3RSZXF1ZXN0Gi0uYnJpYXIuYXBwLnYxLkNyZWF0ZUdpdEh1YlB1bGxSZXF1ZXN0UmVzcG9uc2USbQoUR2V0R2l0SHViUHVsbFJlcXVlc3QSKS5icmlhci5hcHAudjEuR2V0R2l0SHViUHVsbFJlcXVlc3RSZXF1ZXN0GiouYnJpYXIuYXBwLnYxLkdldEdpdEh1YlB1bGxSZXF1ZXN0UmVzcG9uc2USdgoXVXBkYXRlR2l0SHViUHVsbFJlcXVlc3QSLC5icmlhci5hcHAudjEuVXBkYXRlR2l0SHViUHVsbFJlcXVlc3RSZXF1ZXN0Gi0uYnJpYXIuYXBwLnYxLlVwZGF0ZUdpdEh1YlB1bGxSZXF1ZXN0UmVzcG9uc2UScwoWTWVyZ2VHaXRIdWJQdWxsUmVxdWVzdBIrLmJyaWFyLmFwcC52MS5NZXJnZUdpdEh1YlB1bGxSZXF1ZXN0UmVxdWVzdBosLmJyaWFyLmFwcC52MS5NZXJnZUdpdEh1YlB1bGxSZXF1ZXN0UmVzcG9uc2USeQoYQ3JlYXRlR2l0SHViQ29tbWl0U3RhdHVzEi0uYnJpYXIuYXBwLnYxLkNyZWF0ZUdpdEh1YkNvbW1pdFN0YXR1c1JlcXVlc3QaLi5icmlhci5hcHAudjEuQ3JlYXRlR2l0SHViQ29tbWl0U3RhdHVzUmVzcG9uc2VCDLoCCUJyaWFyQVBJX2IGcHJvdG8z", [file_briar_types_v1_github_identity, file_google_protobuf_timestamp]);
+
+/**
+ * @generated from message briar.app.v1.GetProjectMergeActivityRequest
+ */
+export type GetProjectMergeActivityRequest = Message<"briar.app.v1.GetProjectMergeActivityRequest"> & {
+  /**
+   * @generated from field: string project_id = 1;
+   */
+  projectId: string;
+};
+
+/**
+ * Describes the message briar.app.v1.GetProjectMergeActivityRequest.
+ * Use `create(GetProjectMergeActivityRequestSchema)` to create a new message.
+ */
+export const GetProjectMergeActivityRequestSchema: GenMessage<GetProjectMergeActivityRequest> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_github, 0);
+
+/**
+ * @generated from message briar.app.v1.MergedPullRequest
+ */
+export type MergedPullRequest = Message<"briar.app.v1.MergedPullRequest"> & {
+  /**
+   * @generated from field: uint64 number = 1;
+   */
+  number: bigint;
+
+  /**
+   * @generated from field: string title = 2;
+   */
+  title: string;
+
+  /**
+   * @generated from field: string url = 3;
+   */
+  url: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp merged_at = 4;
+   */
+  mergedAt?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message briar.app.v1.MergedPullRequest.
+ * Use `create(MergedPullRequestSchema)` to create a new message.
+ */
+export const MergedPullRequestSchema: GenMessage<MergedPullRequest> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_github, 1);
+
+/**
+ * Complete merged PR history for the 16 days ending at generated_at.
+ *
+ * @generated from message briar.app.v1.GetProjectMergeActivityResponse
+ */
+export type GetProjectMergeActivityResponse = Message<"briar.app.v1.GetProjectMergeActivityResponse"> & {
+  /**
+   * @generated from field: string repository = 1;
+   */
+  repository: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp generated_at = 2;
+   */
+  generatedAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: repeated briar.app.v1.MergedPullRequest pull_requests = 3;
+   */
+  pullRequests: MergedPullRequest[];
+};
+
+/**
+ * Describes the message briar.app.v1.GetProjectMergeActivityResponse.
+ * Use `create(GetProjectMergeActivityResponseSchema)` to create a new message.
+ */
+export const GetProjectMergeActivityResponseSchema: GenMessage<GetProjectMergeActivityResponse> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_github, 2);
 
 /**
  * @generated from message briar.app.v1.GitHubInstallationRepository
@@ -46,7 +124,7 @@ export type GitHubInstallationRepository = Message<"briar.app.v1.GitHubInstallat
  * Use `create(GitHubInstallationRepositorySchema)` to create a new message.
  */
 export const GitHubInstallationRepositorySchema: GenMessage<GitHubInstallationRepository> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_github, 0);
+  messageDesc(file_briar_app_v1_github, 3);
 
 /**
  * @generated from message briar.app.v1.GetGitHubIntegrationRequest
@@ -63,7 +141,7 @@ export type GetGitHubIntegrationRequest = Message<"briar.app.v1.GetGitHubIntegra
  * Use `create(GetGitHubIntegrationRequestSchema)` to create a new message.
  */
 export const GetGitHubIntegrationRequestSchema: GenMessage<GetGitHubIntegrationRequest> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_github, 1);
+  messageDesc(file_briar_app_v1_github, 4);
 
 /**
  * @generated from message briar.app.v1.GetGitHubIntegrationResponse
@@ -115,7 +193,7 @@ export type GetGitHubIntegrationResponse = Message<"briar.app.v1.GetGitHubIntegr
  * Use `create(GetGitHubIntegrationResponseSchema)` to create a new message.
  */
 export const GetGitHubIntegrationResponseSchema: GenMessage<GetGitHubIntegrationResponse> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_github, 2);
+  messageDesc(file_briar_app_v1_github, 5);
 
 /**
  * @generated from message briar.app.v1.BeginGitHubInstallationRequest
@@ -132,7 +210,7 @@ export type BeginGitHubInstallationRequest = Message<"briar.app.v1.BeginGitHubIn
  * Use `create(BeginGitHubInstallationRequestSchema)` to create a new message.
  */
 export const BeginGitHubInstallationRequestSchema: GenMessage<BeginGitHubInstallationRequest> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_github, 3);
+  messageDesc(file_briar_app_v1_github, 6);
 
 /**
  * @generated from message briar.app.v1.BeginGitHubInstallationResponse
@@ -149,7 +227,7 @@ export type BeginGitHubInstallationResponse = Message<"briar.app.v1.BeginGitHubI
  * Use `create(BeginGitHubInstallationResponseSchema)` to create a new message.
  */
 export const BeginGitHubInstallationResponseSchema: GenMessage<BeginGitHubInstallationResponse> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_github, 4);
+  messageDesc(file_briar_app_v1_github, 7);
 
 /**
  * @generated from message briar.app.v1.ProjectGitHubCredential
@@ -201,7 +279,7 @@ export type ProjectGitHubCredential = Message<"briar.app.v1.ProjectGitHubCredent
  * Use `create(ProjectGitHubCredentialSchema)` to create a new message.
  */
 export const ProjectGitHubCredentialSchema: GenMessage<ProjectGitHubCredential> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_github, 5);
+  messageDesc(file_briar_app_v1_github, 8);
 
 /**
  * @generated from message briar.app.v1.CreateProjectGitHubCredentialRequest
@@ -218,7 +296,7 @@ export type CreateProjectGitHubCredentialRequest = Message<"briar.app.v1.CreateP
  * Use `create(CreateProjectGitHubCredentialRequestSchema)` to create a new message.
  */
 export const CreateProjectGitHubCredentialRequestSchema: GenMessage<CreateProjectGitHubCredentialRequest> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_github, 6);
+  messageDesc(file_briar_app_v1_github, 9);
 
 /**
  * @generated from message briar.app.v1.CreateProjectGitHubCredentialResponse
@@ -235,7 +313,7 @@ export type CreateProjectGitHubCredentialResponse = Message<"briar.app.v1.Create
  * Use `create(CreateProjectGitHubCredentialResponseSchema)` to create a new message.
  */
 export const CreateProjectGitHubCredentialResponseSchema: GenMessage<CreateProjectGitHubCredentialResponse> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_github, 7);
+  messageDesc(file_briar_app_v1_github, 10);
 
 /**
  * @generated from message briar.app.v1.ProjectGitHubRepository
@@ -277,7 +355,7 @@ export type ProjectGitHubRepository = Message<"briar.app.v1.ProjectGitHubReposit
  * Use `create(ProjectGitHubRepositorySchema)` to create a new message.
  */
 export const ProjectGitHubRepositorySchema: GenMessage<ProjectGitHubRepository> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_github, 8);
+  messageDesc(file_briar_app_v1_github, 11);
 
 /**
  * @generated from message briar.app.v1.GetProjectGitHubRepositoryRequest
@@ -294,7 +372,7 @@ export type GetProjectGitHubRepositoryRequest = Message<"briar.app.v1.GetProject
  * Use `create(GetProjectGitHubRepositoryRequestSchema)` to create a new message.
  */
 export const GetProjectGitHubRepositoryRequestSchema: GenMessage<GetProjectGitHubRepositoryRequest> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_github, 9);
+  messageDesc(file_briar_app_v1_github, 12);
 
 /**
  * @generated from message briar.app.v1.GetProjectGitHubRepositoryResponse
@@ -311,7 +389,7 @@ export type GetProjectGitHubRepositoryResponse = Message<"briar.app.v1.GetProjec
  * Use `create(GetProjectGitHubRepositoryResponseSchema)` to create a new message.
  */
 export const GetProjectGitHubRepositoryResponseSchema: GenMessage<GetProjectGitHubRepositoryResponse> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_github, 10);
+  messageDesc(file_briar_app_v1_github, 13);
 
 /**
  * @generated from message briar.app.v1.GitHubPullRequest
@@ -378,7 +456,7 @@ export type GitHubPullRequest = Message<"briar.app.v1.GitHubPullRequest"> & {
  * Use `create(GitHubPullRequestSchema)` to create a new message.
  */
 export const GitHubPullRequestSchema: GenMessage<GitHubPullRequest> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_github, 11);
+  messageDesc(file_briar_app_v1_github, 14);
 
 /**
  * @generated from message briar.app.v1.CreateGitHubPullRequestRequest
@@ -420,7 +498,7 @@ export type CreateGitHubPullRequestRequest = Message<"briar.app.v1.CreateGitHubP
  * Use `create(CreateGitHubPullRequestRequestSchema)` to create a new message.
  */
 export const CreateGitHubPullRequestRequestSchema: GenMessage<CreateGitHubPullRequestRequest> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_github, 12);
+  messageDesc(file_briar_app_v1_github, 15);
 
 /**
  * @generated from message briar.app.v1.CreateGitHubPullRequestResponse
@@ -437,7 +515,7 @@ export type CreateGitHubPullRequestResponse = Message<"briar.app.v1.CreateGitHub
  * Use `create(CreateGitHubPullRequestResponseSchema)` to create a new message.
  */
 export const CreateGitHubPullRequestResponseSchema: GenMessage<CreateGitHubPullRequestResponse> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_github, 13);
+  messageDesc(file_briar_app_v1_github, 16);
 
 /**
  * @generated from message briar.app.v1.GetGitHubPullRequestRequest
@@ -459,7 +537,7 @@ export type GetGitHubPullRequestRequest = Message<"briar.app.v1.GetGitHubPullReq
  * Use `create(GetGitHubPullRequestRequestSchema)` to create a new message.
  */
 export const GetGitHubPullRequestRequestSchema: GenMessage<GetGitHubPullRequestRequest> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_github, 14);
+  messageDesc(file_briar_app_v1_github, 17);
 
 /**
  * @generated from message briar.app.v1.GetGitHubPullRequestResponse
@@ -476,7 +554,7 @@ export type GetGitHubPullRequestResponse = Message<"briar.app.v1.GetGitHubPullRe
  * Use `create(GetGitHubPullRequestResponseSchema)` to create a new message.
  */
 export const GetGitHubPullRequestResponseSchema: GenMessage<GetGitHubPullRequestResponse> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_github, 15);
+  messageDesc(file_briar_app_v1_github, 18);
 
 /**
  * @generated from message briar.app.v1.UpdateGitHubPullRequestRequest
@@ -518,7 +596,7 @@ export type UpdateGitHubPullRequestRequest = Message<"briar.app.v1.UpdateGitHubP
  * Use `create(UpdateGitHubPullRequestRequestSchema)` to create a new message.
  */
 export const UpdateGitHubPullRequestRequestSchema: GenMessage<UpdateGitHubPullRequestRequest> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_github, 16);
+  messageDesc(file_briar_app_v1_github, 19);
 
 /**
  * @generated from message briar.app.v1.UpdateGitHubPullRequestResponse
@@ -535,7 +613,7 @@ export type UpdateGitHubPullRequestResponse = Message<"briar.app.v1.UpdateGitHub
  * Use `create(UpdateGitHubPullRequestResponseSchema)` to create a new message.
  */
 export const UpdateGitHubPullRequestResponseSchema: GenMessage<UpdateGitHubPullRequestResponse> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_github, 17);
+  messageDesc(file_briar_app_v1_github, 20);
 
 /**
  * @generated from message briar.app.v1.MergeGitHubPullRequestRequest
@@ -567,7 +645,7 @@ export type MergeGitHubPullRequestRequest = Message<"briar.app.v1.MergeGitHubPul
  * Use `create(MergeGitHubPullRequestRequestSchema)` to create a new message.
  */
 export const MergeGitHubPullRequestRequestSchema: GenMessage<MergeGitHubPullRequestRequest> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_github, 18);
+  messageDesc(file_briar_app_v1_github, 21);
 
 /**
  * @generated from message briar.app.v1.GitHubMergeResult
@@ -594,7 +672,7 @@ export type GitHubMergeResult = Message<"briar.app.v1.GitHubMergeResult"> & {
  * Use `create(GitHubMergeResultSchema)` to create a new message.
  */
 export const GitHubMergeResultSchema: GenMessage<GitHubMergeResult> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_github, 19);
+  messageDesc(file_briar_app_v1_github, 22);
 
 /**
  * @generated from message briar.app.v1.MergeGitHubPullRequestResponse
@@ -611,7 +689,7 @@ export type MergeGitHubPullRequestResponse = Message<"briar.app.v1.MergeGitHubPu
  * Use `create(MergeGitHubPullRequestResponseSchema)` to create a new message.
  */
 export const MergeGitHubPullRequestResponseSchema: GenMessage<MergeGitHubPullRequestResponse> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_github, 20);
+  messageDesc(file_briar_app_v1_github, 23);
 
 /**
  * @generated from message briar.app.v1.CreateGitHubCommitStatusRequest
@@ -653,7 +731,7 @@ export type CreateGitHubCommitStatusRequest = Message<"briar.app.v1.CreateGitHub
  * Use `create(CreateGitHubCommitStatusRequestSchema)` to create a new message.
  */
 export const CreateGitHubCommitStatusRequestSchema: GenMessage<CreateGitHubCommitStatusRequest> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_github, 21);
+  messageDesc(file_briar_app_v1_github, 24);
 
 /**
  * @generated from message briar.app.v1.CreateGitHubCommitStatusResponse
@@ -666,7 +744,7 @@ export type CreateGitHubCommitStatusResponse = Message<"briar.app.v1.CreateGitHu
  * Use `create(CreateGitHubCommitStatusResponseSchema)` to create a new message.
  */
 export const CreateGitHubCommitStatusResponseSchema: GenMessage<CreateGitHubCommitStatusResponse> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_github, 22);
+  messageDesc(file_briar_app_v1_github, 25);
 
 /**
  * @generated from enum briar.app.v1.GitHubPullRequestState
@@ -800,6 +878,14 @@ export const GitHubIntegrationService: GenService<{
  * @generated from service briar.app.v1.ProjectGitHubService
  */
 export const ProjectGitHubService: GenService<{
+  /**
+   * @generated from rpc briar.app.v1.ProjectGitHubService.GetProjectMergeActivity
+   */
+  getProjectMergeActivity: {
+    methodKind: "unary";
+    input: typeof GetProjectMergeActivityRequestSchema;
+    output: typeof GetProjectMergeActivityResponseSchema;
+  },
   /**
    * @generated from rpc briar.app.v1.ProjectGitHubService.CreateProjectGitHubCredential
    */

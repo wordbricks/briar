@@ -30,6 +30,38 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.186",
+        date: "2026년 9월 3일",
+        title: "채널·DM에서 PDF를 공유하고 관리형 컴퓨터·프로젝트 관리를 다듬습니다",
+        summary:
+          "채널과 DM에서 PDF 첨부를 지원하고, 관리형 컴퓨터 클립보드 동기화와 프로젝트 PR 병합 현황을 추가했습니다.",
+        items: [
+          "채널과 DM에서 PDF 첨부 파일을 보내고 미리보기와 다운로드로 확인할 수 있습니다.",
+          "전체 화면 원격 데스크톱에서 관리형 컴퓨터의 클립보드 내용을 붙여넣을 수 있도록 클립보드를 동기화합니다.",
+          "프로젝트 로비에 풀 리퀘스트 병합 활동 개요를 추가해 PR이 어떻게 병합되는지 한눈에 볼 수 있습니다.",
+          "중지된 관리형 컴퓨터를 긴 정리 주기를 기다리지 않고 바로 종료할 수 있습니다.",
+          "관리형 컴퓨터 파일럿 프로모션 코드를 GETBRIARJAY6부터 GETBRIARJAY10까지 추가했습니다.",
+          "채널과 DM의 전송 오류를 배너 대신 토스트로 표시합니다.",
+          "사이드바 Projects 목록을 Channels 아코디언과 같은 스타일로 정리합니다.",
+          "팀을 다시 선택해도 Issues 보드가 사라지지 않고 복원됩니다.",
+          "DM·채널 입력창에서 서식이 포함된 붙여넣기가 한 줄로 합쳐지지 않도록 고칩니다.",
+          "Team/Project 명칭 정리 후 남아있던 오래된 문구를 수정합니다.",
+          "내 이슈 목록 화면을 공통 PageHeader와 디자인 토큰에 맞춰 정렬합니다.",
+        ],
+      },
+      {
+        version: "1.2.185",
+        date: "2026년 9월 2일",
+        title: "로그인 세션 복구와 관리형 컴퓨터 실행 환경을 고칩니다",
+        summary:
+          "만료된 웹 세션이 로그인 화면에 멈추지 않게 하고, 새 관리형 컴퓨터가 최신 실행 설정을 사용하도록 갱신했습니다.",
+        items: [
+          "Connect 오류 안에 감싸진 401 응답도 찾아 저장된 세션 토큰을 지우고 로그인 화면으로 돌아갑니다.",
+          "관리형 컴퓨터가 새 AMI를 가리키는 Launch Template 13을 사용하도록 Worker 설정을 갱신했습니다.",
+          "관리형 컴퓨터의 실행 서비스에 GH_BROWSER 경로를 지정해 에이전트가 브라우저를 올바르게 열도록 했습니다.",
+        ],
+      },
+      {
         version: "1.2.184",
         date: "2026년 9월 2일",
         title: "DM에서 관리형 컴퓨터 화면을 확인하고 조작합니다",
@@ -1464,6 +1496,38 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.186",
+        date: "September 3, 2026",
+        title: "Share PDFs in channels and DMs, and refine managed computer and project management",
+        summary:
+          "Support PDF attachments in channels and direct messages, sync the managed computer clipboard, and add a project PR merge activity overview.",
+        items: [
+          "Support PDF attachments in channels and direct messages with inline preview and download.",
+          "Copy the managed computer clipboard so a full-screen remote desktop can paste its contents.",
+          "Add a project PR merge activity overview to the project lobby.",
+          "Allow immediate termination of stopped managed computers without waiting for a longer cleanup cycle.",
+          "Add GETBRIARJAY6 through GETBRIARJAY10 managed-computer pilot promotion slots.",
+          "Show channel and DM send errors as toasts instead of a banner.",
+          "Restyle the sidebar Projects list to match the Channels accordion.",
+          "Restore the Issues board after reselecting a Team.",
+          "Fix loss of formatted paste in DM and channel composers.",
+          "Fix leftover Team/Project copy after the hierarchy rename.",
+          "Align the My issues list view with the shared PageHeader and design tokens.",
+        ],
+      },
+      {
+        version: "1.2.185",
+        date: "September 2, 2026",
+        title: "Recover expired sessions and refresh managed computer launch settings",
+        summary:
+          "Recover from expired web sessions when Connect wraps an unauthorized response, and point new managed computers at the refreshed launch configuration.",
+        items: [
+          "Find a 401 response even when Connect wraps it in another error, clear the stored session token, and return to sign-in.",
+          "Point managed computers at Launch Template 13, which contains the refreshed machine image and runtime setup.",
+          "Set GH_BROWSER for the managed computer executor so agents open the browser through the expected launcher.",
+        ],
+      },
       {
         version: "1.2.184",
         date: "September 2, 2026",
@@ -2990,7 +3054,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-184">
+          <a href="#v1-2-186">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -3012,7 +3076,11 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.184"
+                      entry.version === "1.2.186"
+                        ? "2026-09-03"
+                        : entry.version === "1.2.185"
+                        ? "2026-09-02"
+                        : entry.version === "1.2.184"
                         ? "2026-09-02"
                         : entry.version === "1.2.183"
                         ? "2026-09-02"

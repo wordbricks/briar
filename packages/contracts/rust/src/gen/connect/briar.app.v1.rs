@@ -22781,6 +22781,18 @@ pub type OwnedRetireManagedComputerResponseView = ::buffa::view::OwnedView<
         'static,
     >,
 >;
+///Shorthand for `OwnedView<TerminateManagedComputerRequestView<'static>>`.
+pub type OwnedTerminateManagedComputerRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::TerminateManagedComputerRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<TerminateManagedComputerResponseView<'static>>`.
+pub type OwnedTerminateManagedComputerResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::TerminateManagedComputerResponseView<
+        'static,
+    >,
+>;
 ///Shorthand for `OwnedView<CreateManagedComputerRemoteSessionRequestView<'static>>`.
 pub type OwnedCreateManagedComputerRemoteSessionRequestView = ::buffa::view::OwnedView<
     crate::proto::briar::app::v1::__buffa::view::CreateManagedComputerRemoteSessionRequestView<
@@ -23374,6 +23386,48 @@ for ::buffa::view::OwnedView<
     }
 }
 impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::TerminateManagedComputerResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::TerminateManagedComputerResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::TerminateManagedComputerResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::TerminateManagedComputerResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
     crate::proto::briar::app::v1::CreateManagedComputerRemoteSessionResponse,
 >
 for crate::proto::briar::app::v1::__buffa::view::CreateManagedComputerRemoteSessionResponseView<
@@ -23624,6 +23678,12 @@ pub const FLEET_SERVICE_RETRY_MANAGED_COMPUTER_SPEC: ::connectrpc::Spec = ::conn
 /// Static [`Spec`](::connectrpc::Spec) for the `RetireManagedComputer` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const FLEET_SERVICE_RETIRE_MANAGED_COMPUTER_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/briar.app.v1.FleetService/RetireManagedComputer",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `TerminateManagedComputer` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const FLEET_SERVICE_TERMINATE_MANAGED_COMPUTER_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.FleetService/TerminateManagedComputer",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -24023,6 +24083,29 @@ pub trait FleetService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::briar::app::v1::RetireManagedComputerResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the TerminateManagedComputer RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn terminate_managed_computer<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::TerminateManagedComputerRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::TerminateManagedComputerResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -24558,6 +24641,35 @@ impl<S: FleetService> FleetServiceExt for S {
             .with_spec(FLEET_SERVICE_RETIRE_MANAGED_COMPUTER_SPEC)
             .route_view(
                 FLEET_SERVICE_SERVICE_NAME,
+                "TerminateManagedComputer",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::TerminateManagedComputerRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::TerminateManagedComputerRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.terminate_managed_computer(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::TerminateManagedComputerResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(FLEET_SERVICE_TERMINATE_MANAGED_COMPUTER_SPEC)
+            .route_view(
+                FLEET_SERVICE_SERVICE_NAME,
                 "CreateManagedComputerRemoteSession",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
@@ -24810,6 +24922,12 @@ impl<T: FleetService> ::connectrpc::Dispatcher for FleetServiceServer<T> {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
                         .with_spec(FLEET_SERVICE_RETIRE_MANAGED_COMPUTER_SPEC),
+                )
+            }
+            "TerminateManagedComputer" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(FLEET_SERVICE_TERMINATE_MANAGED_COMPUTER_SPEC),
                 )
             }
             "CreateManagedComputerRemoteSession" => {
@@ -25162,6 +25280,28 @@ impl<T: FleetService> ::connectrpc::Dispatcher for FleetServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::briar::app::v1::RetireManagedComputerResponse,
+                        >(format)
+                })
+            }
+            "TerminateManagedComputer" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::TerminateManagedComputerRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::TerminateManagedComputerRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::TerminateManagedComputerRequest,
+                    >::from_parts(&req, &body);
+                    svc.terminate_managed_computer(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::TerminateManagedComputerResponse,
                         >(format)
                 })
             }
@@ -26013,6 +26153,51 @@ where
             )
             .await
     }
+    /// Call the TerminateManagedComputer RPC. Sends a request to /briar.app.v1.FleetService/TerminateManagedComputer.
+    pub async fn terminate_managed_computer(
+        &self,
+        request: crate::proto::briar::app::v1::TerminateManagedComputerRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::TerminateManagedComputerResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.terminate_managed_computer_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the TerminateManagedComputer RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn terminate_managed_computer_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::TerminateManagedComputerRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::TerminateManagedComputerResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                FLEET_SERVICE_TERMINATE_MANAGED_COMPUTER_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
     /// Call the CreateManagedComputerRemoteSession RPC. Sends a request to /briar.app.v1.FleetService/CreateManagedComputerRemoteSession.
     pub async fn create_managed_computer_remote_session(
         &self,
@@ -26217,6 +26402,18 @@ pub type OwnedBeginGitHubInstallationResponseView = ::buffa::view::OwnedView<
         'static,
     >,
 >;
+///Shorthand for `OwnedView<GetProjectMergeActivityRequestView<'static>>`.
+pub type OwnedGetProjectMergeActivityRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::GetProjectMergeActivityRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<GetProjectMergeActivityResponseView<'static>>`.
+pub type OwnedGetProjectMergeActivityResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::GetProjectMergeActivityResponseView<
+        'static,
+    >,
+>;
 ///Shorthand for `OwnedView<CreateProjectGitHubCredentialRequestView<'static>>`.
 pub type OwnedCreateProjectGitHubCredentialRequestView = ::buffa::view::OwnedView<
     crate::proto::briar::app::v1::__buffa::view::CreateProjectGitHubCredentialRequestView<
@@ -26353,6 +26550,48 @@ impl ::connectrpc::Encodable<
 >
 for ::buffa::view::OwnedView<
     crate::proto::briar::app::v1::__buffa::view::BeginGitHubInstallationResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::GetProjectMergeActivityResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::GetProjectMergeActivityResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::GetProjectMergeActivityResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::GetProjectMergeActivityResponseView<
         'static,
     >,
 > {
@@ -27225,6 +27464,12 @@ where
 }
 /// Full service name for this service.
 pub const PROJECT_GIT_HUB_SERVICE_SERVICE_NAME: &str = "briar.app.v1.ProjectGitHubService";
+/// Static [`Spec`](::connectrpc::Spec) for the `GetProjectMergeActivity` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const PROJECT_GIT_HUB_SERVICE_GET_PROJECT_MERGE_ACTIVITY_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.ProjectGitHubService/GetProjectMergeActivity",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Static [`Spec`](::connectrpc::Spec) for the `CreateProjectGitHubCredential` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const PROJECT_GIT_HUB_SERVICE_CREATE_PROJECT_GIT_HUB_CREDENTIAL_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/briar.app.v1.ProjectGitHubService/CreateProjectGitHubCredential",
@@ -27319,6 +27564,29 @@ pub const PROJECT_GIT_HUB_SERVICE_CREATE_GIT_HUB_COMMIT_STATUS_SPEC: ::connectrp
 /// example` doc.
 #[allow(clippy::type_complexity)]
 pub trait ProjectGitHubService: Send + Sync + 'static {
+    /// Handle the GetProjectMergeActivity RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn get_project_merge_activity<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::GetProjectMergeActivityRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::GetProjectMergeActivityResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
     /// Handle the CreateProjectGitHubCredential RPC.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
@@ -27512,6 +27780,35 @@ impl<S: ProjectGitHubService> ProjectGitHubServiceExt for S {
         router: ::connectrpc::Router,
     ) -> ::connectrpc::Router {
         router
+            .route_view(
+                PROJECT_GIT_HUB_SERVICE_SERVICE_NAME,
+                "GetProjectMergeActivity",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::GetProjectMergeActivityRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::GetProjectMergeActivityRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.get_project_merge_activity(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::GetProjectMergeActivityResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(PROJECT_GIT_HUB_SERVICE_GET_PROJECT_MERGE_ACTIVITY_SPEC)
             .route_view(
                 PROJECT_GIT_HUB_SERVICE_SERVICE_NAME,
                 "CreateProjectGitHubCredential",
@@ -27772,6 +28069,14 @@ for ProjectGitHubServiceServer<T> {
     ) -> Option<::connectrpc::dispatcher::codegen::MethodDescriptor> {
         let method = path.strip_prefix("briar.app.v1.ProjectGitHubService/")?;
         match method {
+            "GetProjectMergeActivity" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(
+                            PROJECT_GIT_HUB_SERVICE_GET_PROJECT_MERGE_ACTIVITY_SPEC,
+                        ),
+                )
+            }
             "CreateProjectGitHubCredential" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
@@ -27841,6 +28146,28 @@ for ProjectGitHubServiceServer<T> {
         };
         let _ = (&ctx, &request, &format);
         match method {
+            "GetProjectMergeActivity" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::GetProjectMergeActivityRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::GetProjectMergeActivityRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::GetProjectMergeActivityRequest,
+                    >::from_parts(&req, &body);
+                    svc.get_project_merge_activity(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::GetProjectMergeActivityResponse,
+                        >(format)
+                })
+            }
             "CreateProjectGitHubCredential" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
@@ -28062,7 +28389,7 @@ for ProjectGitHubServiceServer<T> {
 /// let config = ClientConfig::new(uri).with_protocol(Protocol::Grpc);
 ///
 /// let client = ProjectGitHubServiceClient::new(conn, config);
-/// let response = client.create_project_git_hub_credential(request).await?;
+/// let response = client.get_project_merge_activity(request).await?;
 /// ```
 ///
 /// # Example (Connect / HTTP/1.1 or ALPN)
@@ -28074,7 +28401,7 @@ for ProjectGitHubServiceServer<T> {
 /// let config = ClientConfig::new("http://localhost:8080".parse()?);
 ///
 /// let client = ProjectGitHubServiceClient::new(http, config);
-/// let response = client.create_project_git_hub_credential(request).await?;
+/// let response = client.get_project_merge_activity(request).await?;
 /// ```
 ///
 /// # Working with the response
@@ -28084,7 +28411,7 @@ for ProjectGitHubServiceServer<T> {
 /// message, so field access is zero-copy:
 ///
 /// ```rust,ignore
-/// let resp = client.create_project_git_hub_credential(request).await?;
+/// let resp = client.get_project_merge_activity(request).await?;
 /// let name: &str = resp.view().name;  // borrow into the response buffer
 /// ```
 ///
@@ -28092,7 +28419,7 @@ for ProjectGitHubServiceServer<T> {
 /// [`into_owned()`](::connectrpc::client::UnaryResponse::into_owned):
 ///
 /// ```rust,ignore
-/// let owned = client.create_project_git_hub_credential(request).await?.into_owned();
+/// let owned = client.get_project_merge_activity(request).await?.into_owned();
 /// ```
 ///
 /// [`into_view()`](::connectrpc::client::UnaryResponse::into_view) keeps the
@@ -28124,6 +28451,51 @@ where
     /// Get a mutable reference to the client configuration.
     pub fn config_mut(&mut self) -> &mut ::connectrpc::client::ClientConfig {
         &mut self.config
+    }
+    /// Call the GetProjectMergeActivity RPC. Sends a request to /briar.app.v1.ProjectGitHubService/GetProjectMergeActivity.
+    pub async fn get_project_merge_activity(
+        &self,
+        request: crate::proto::briar::app::v1::GetProjectMergeActivityRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::GetProjectMergeActivityResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.get_project_merge_activity_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the GetProjectMergeActivity RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_project_merge_activity_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::GetProjectMergeActivityRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::GetProjectMergeActivityResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                PROJECT_GIT_HUB_SERVICE_GET_PROJECT_MERGE_ACTIVITY_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
     }
     /// Call the CreateProjectGitHubCredential RPC. Sends a request to /briar.app.v1.ProjectGitHubService/CreateProjectGitHubCredential.
     pub async fn create_project_git_hub_credential(

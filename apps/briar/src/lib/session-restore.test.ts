@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { Code, ConnectError } from "@connectrpc/connect";
 import type { Organization, Project, SessionUser } from "../types";
 import { ApiError } from "./api";
 import { restoreStoredSession } from "./session-restore";
@@ -60,6 +61,26 @@ describe("restoreStoredSession", () => {
     const dependencies = createDependencies();
     dependencies.loadSession.mockRejectedValue(
       new ApiError(401, "Unauthorized"),
+    );
+
+    await expect(restoreStoredSession(dependencies)).resolves.toEqual({
+      status: "unauthorized",
+    });
+    expect(dependencies.clearToken).toHaveBeenCalledOnce();
+    expect(dependencies.loadProjects).not.toHaveBeenCalled();
+    expect(dependencies.loadOrganizations).not.toHaveBeenCalled();
+  });
+
+  it("clears the stored token when Connect wraps the 401 error", async () => {
+    const dependencies = createDependencies();
+    dependencies.loadSession.mockRejectedValue(
+      new ConnectError(
+        "Unauthorized",
+        Code.Unknown,
+        undefined,
+        undefined,
+        new ApiError(401, "Unauthorized"),
+      ),
     );
 
     await expect(restoreStoredSession(dependencies)).resolves.toEqual({

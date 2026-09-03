@@ -1,4 +1,5 @@
 import { compareSemanticVersions, isSemanticVersion } from "../../src/lib/semantic-version";
+import { terminateManagedInstance } from "./aws-managed-computer";
 import { managedComputerConfig } from "./managed-computer-model";
 import { reconcileDrainingManagedComputer } from "./managed-computer-reconciliation";
 import {
@@ -6,6 +7,7 @@ import {
   listOrganizationManagedComputers,
   managedComputerByDeviceId,
   managedComputerById,
+  markManagedComputerTerminated,
   organizationManagedComputer,
   recordManagedComputerAuditEvent,
   refreshManagedComputerReadiness,
@@ -57,6 +59,7 @@ export type FleetApplicationErrorReason =
   | "managed_computer_remote_forbidden"
   | "managed_computer_setup_forbidden"
   | "managed_computer_retire_unavailable"
+  | "managed_computer_terminate_unavailable"
   | "organization_not_found"
   | "project_not_found"
   | "remote_session_not_found"
@@ -666,6 +669,71 @@ export async function retireManagedComputerApplication(input: {
     })
     : null;
   return { computer, duplicate: !transitioned, reconciliation };
+}
+
+export async function terminateManagedComputerApplication(input: {
+  db: D1Database;
+  env: Env;
+  organizationId: string;
+  managedComputerId: string;
+  userId: string;
+  observedAt: string;
+}) {
+  const role = await organizationRole(input.db, input.organizationId, input.userId);
+  requireDevelopmentManagement(role);
+  const existing = await organizationManagedComputer(
+    input.db,
+    input.organizationId,
+    input.managedComputerId,
+  );
+  if (!existing) {
+    return applicationError("managed_computer_not_found", "Managed computer not found");
+  }
+  if (existing.state !== "stopped" && existing.state !== "terminated") {
+    return applicationError(
+      "managed_computer_terminate_unavailable",
+      "Only stopped managed computers can be permanently terminated",
+    );
+  }
+  if (existing.state === "stopped" && existing.aws_instance_id) {
+    await terminateManagedInstance(
+      managedComputerConfig(input.env),
+      existing.aws_region,
+      existing.aws_instance_id,
+    );
+  }
+  const transitioned = await markManagedComputerTerminated(
+    input.db,
+    input.managedComputerId,
+    input.observedAt,
+  );
+  const computer = transitioned ?? await organizationManagedComputer(
+    input.db,
+    input.organizationId,
+    input.managedComputerId,
+  );
+  if (!computer || computer.state !== "terminated") {
+    return applicationError(
+      "managed_computer_terminate_unavailable",
+      "Managed computer cannot be terminated from its current state",
+    );
+  }
+  await endManagedComputerRemoteSessionsAndDisconnect(input.db, input.env, {
+    managedComputerId: computer.id,
+    reason: "computer_terminated",
+    observedAt: input.observedAt,
+  });
+  if (transitioned) {
+    await recordManagedComputerAuditEvent(input.db, {
+      organizationId: input.organizationId,
+      managedComputerId: computer.id,
+      actorUserId: input.userId,
+      action: "terminated",
+      detail: { reason: "user_terminated" },
+      occurredAt: input.observedAt,
+    });
+  }
+  return { computer, duplicate: !transitioned };
 }
 
 const managedComputerControlAccess = async (input: {

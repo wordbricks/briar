@@ -111,7 +111,6 @@ describe("Sidebar", () => {
 
   it("keeps each Projects accordion and its rows inside the owning Team", async () => {
     const onAddPlanningProject = vi.fn();
-    const onProjectsOpen = vi.fn();
     const onPlanningProjectOpen = vi.fn();
     const onPlanningProjectEdit = vi.fn();
     const { cleanup, container, root } = createReactTestRoot({
@@ -125,7 +124,6 @@ describe("Sidebar", () => {
         onAddPlanningProject={onAddPlanningProject}
         onPlanningProjectEdit={onPlanningProjectEdit}
         onPlanningProjectOpen={onPlanningProjectOpen}
-        onProjectsOpen={onProjectsOpen}
         planningProjects={[
           {
             id: "planning-1",
@@ -197,9 +195,14 @@ describe("Sidebar", () => {
     expect(consoleGroup.textContent).not.toContain("Desktop navigation");
 
     const toggle = briarGroup.querySelector<HTMLButtonElement>(
-      ".sidebar-planning-projects-toggle",
+      ".sidebar-planning-projects .sidebar-channels-toggle",
     )!;
+    expect(toggle.classList.contains("sidebar-project-channels-toggle")).toBe(true);
     expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(toggle.querySelector(".sidebar-channels-chevron")).not.toBeNull();
+    expect(
+      briarGroup.querySelector(".sidebar-planning-projects-heading"),
+    ).toBeNull();
     expect(container.querySelector("#planning-project-list-project-1")?.textContent)
       .toContain("Desktop navigation");
 
@@ -209,11 +212,7 @@ describe("Sidebar", () => {
     expect(container.querySelector("#planning-project-list-project-2")).not.toBeNull();
 
     await act(async () => toggle.click());
-    const title = briarGroup.querySelector<HTMLButtonElement>(
-      ".sidebar-planning-projects-link",
-    )!;
-    await act(async () => title.click());
-    expect(onProjectsOpen).toHaveBeenCalledWith("project-1");
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
 
     const row = briarGroup.querySelector<HTMLButtonElement>(
       ".sidebar-planning-project-row > button:first-child",
@@ -230,10 +229,22 @@ describe("Sidebar", () => {
     await act(async () => settings.click());
     expect(onPlanningProjectEdit).toHaveBeenCalledWith("planning-1");
 
-    const add = briarGroup.querySelector<HTMLButtonElement>(
-      '.sidebar-planning-projects-heading > button:last-child',
-    )!;
-    await act(async () => add.click());
+    await act(async () => {
+      toggle.dispatchEvent(
+        new MouseEvent("contextmenu", {
+          bubbles: true,
+          button: 2,
+          cancelable: true,
+          clientX: 120,
+          clientY: 90,
+        }),
+      );
+    });
+    const addItem = [...document.body.querySelectorAll<HTMLElement>(
+      ".sidebar-channel-context-menu-item",
+    )].find((item) => item.textContent?.includes("프로젝트 추가"));
+    expect(addItem).toBeTruthy();
+    await act(async () => addItem?.click());
     expect(onAddPlanningProject).toHaveBeenCalledWith("project-1");
 
     await cleanup();
@@ -653,17 +664,17 @@ describe("Sidebar", () => {
     ).toBe(6);
 
     const collapseBriar = container.querySelector<HTMLButtonElement>(
-      '[aria-label="Briar 프로젝트 접기"]',
+      '[aria-label="Briar 팀 접기"]',
     );
     await act(async () => collapseBriar?.click());
 
     expect(container.querySelector("#project-views-project-1")).toBeNull();
     expect(container.querySelector("#project-views-project-2")).not.toBeNull();
     expect(
-      container.querySelector('[aria-label="Briar 프로젝트 펼치기"]'),
+      container.querySelector('[aria-label="Briar 팀 펼치기"]'),
     ).not.toBeNull();
     expect(
-      container.querySelector('[aria-label="Console 프로젝트 접기"]'),
+      container.querySelector('[aria-label="Console 팀 접기"]'),
     ).not.toBeNull();
 
     await cleanup();
@@ -1097,12 +1108,12 @@ describe("Sidebar", () => {
     );
 
     const trigger = container.querySelector<HTMLButtonElement>(
-      '[aria-label="Briar 프로젝트 메뉴"]',
+      '[aria-label="Briar 팀 메뉴"]',
     );
     await act(async () => trigger?.click());
     expect(trigger?.getAttribute("aria-expanded")).toBe("true");
     expect(container.querySelector('[role="menu"]')?.textContent).toContain(
-      "프로젝트 설정",
+      "팀 설정",
     );
 
     await act(async () => {

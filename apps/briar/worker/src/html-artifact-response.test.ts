@@ -39,4 +39,17 @@ describe("HTML artifact responses", () => {
     expect(response.headers.get("Content-Security-Policy")).toBe("sandbox");
     expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff");
   });
+
+  it("serves a PDF with its exact type instead of an HTML preview policy", () => {
+    const response = channelAttachmentResponse({
+      filename: "product brief.pdf",
+      content_type: "application/pdf",
+      byte_size: 15,
+    }, object, null);
+
+    expect(response.headers.get("Content-Type")).toBe("application/pdf");
+    expect(response.headers.get("Content-Disposition")).toContain("inline;");
+    expect(response.headers.get("Content-Security-Policy")).toBeNull();
+    expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff");
+  });
 });
