@@ -22,6 +22,7 @@ const GROK_DEFAULT_PROXY_BASE = "https://cli-chat-proxy.grok.com/v1";
 const GROK_WEEKLY_MINUTES = 10_080;
 const GROK_MONTHLY_MINUTES = 43_200;
 const GROK_TOKEN_SKEW_MILLIS = 5 * 60_000;
+const CLAUDE_TOKEN_SKEW_MILLIS = 5 * 60_000;
 const DEFAULT_CACHE_TTL_MS = 5 * 60_000;
 const DEFAULT_PROBE_TIMEOUT_MS = 10_000;
 
@@ -344,19 +345,55 @@ const readClaudeCredentialsFromKeychain = (home: string) => {
   return null;
 };
 
-const extractClaudeAccessToken = (credentials: string) => {
+export type ClaudeTokenState = "usable" | "stale" | "expired";
+
+type ClaudeStoredToken = {
+  accessToken: string;
+  state: ClaudeTokenState;
+};
+
+/**
+ * Claude Code refreshes its access token lazily, so a lapsed token in the
+ * credential store only means the usage API cannot be called right now — the
+ * login itself is expired only once the refresh token is unusable too.
+ */
+export const readClaudeStoredToken = (
+  credentials: string,
+  now: number,
+): ClaudeStoredToken | null => {
+  let oauth: Record<string, unknown> | undefined;
   try {
     const parsed = JSON.parse(credentials) as {
-      claudeAiOauth?: { accessToken?: string; access_token?: string };
+      claudeAiOauth?: Record<string, unknown>;
     };
-    const token =
-      parsed.claudeAiOauth?.accessToken ??
-      parsed.claudeAiOauth?.access_token ??
-      null;
-    return token && token.trim().length > 0 ? token.trim() : null;
+    oauth = parsed.claudeAiOauth;
   } catch {
     return null;
   }
+  if (!oauth) return null;
+  const rawToken =
+    typeof oauth.accessToken === "string"
+      ? oauth.accessToken
+      : typeof oauth.access_token === "string"
+        ? oauth.access_token
+        : null;
+  const accessToken = rawToken?.trim();
+  if (!accessToken) return null;
+  const expiresAt =
+    typeof oauth.expiresAt === "number" ? oauth.expiresAt : null;
+  if (expiresAt === null || expiresAt > now + CLAUDE_TOKEN_SKEW_MILLIS) {
+    return { accessToken, state: "usable" };
+  }
+  const refreshToken =
+    typeof oauth.refreshToken === "string" ? oauth.refreshToken.trim() : "";
+  const refreshTokenExpiresAt =
+    typeof oauth.refreshTokenExpiresAt === "number"
+      ? oauth.refreshTokenExpiresAt
+      : null;
+  const refreshable =
+    refreshToken.length > 0 &&
+    (refreshTokenExpiresAt === null || refreshTokenExpiresAt > now);
+  return { accessToken, state: refreshable ? "stale" : "expired" };
 };
 
 export async function probeClaudeUsage(
@@ -373,14 +410,22 @@ export async function probeClaudeUsage(
   if (!credentials) {
     return unknownUsage("Claude login is required.");
   }
-  const accessToken = extractClaudeAccessToken(credentials);
-  if (!accessToken) {
+  const stored = readClaudeStoredToken(credentials, Date.now());
+  if (!stored) {
     return unknownUsage("Claude login is required.");
+  }
+  if (stored.state === "stale") {
+    return unknownUsage(
+      "Claude access token is stale. Run Claude Code to refresh it.",
+    );
+  }
+  if (stored.state === "expired") {
+    return unknownUsage("Claude login has expired. Run `claude` to sign in.");
   }
   try {
     const response = await fetchImpl(CLAUDE_USAGE_URL, {
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: `Bearer ${stored.accessToken}`,
         "anthropic-beta": "oauth-2025-04-20",
         "User-Agent": "claude-code/2.1.0",
       },
@@ -388,7 +433,9 @@ export async function probeClaudeUsage(
     });
     if (!response.ok) {
       if (response.status === 401 || response.status === 403) {
-        return unknownUsage("Claude login has expired.");
+        return unknownUsage(
+          "Claude rejected the stored credentials. Run `claude` to sign in.",
+        );
       }
       return unknownUsage(
         `Failed to load Claude usage. HTTP ${response.status}`,
