@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "web:build": "bash ../../scripts/with-release-env.sh env VITE_BRIAR_WEB=true vite build",
+    "web:build": "bash ../../scripts/with-release-env.sh env VITE_BRIAR_WEB=true vite build --outDir dist-web",
     "build:release": "bash ../../scripts/with-release-env.sh vite build && bash ../../scripts/verify-release-config.sh",
     "lint": "oxlint . --config ../../.oxlintrc.jsonc",
     "lint:type-aware": "oxlint --type-aware . --config ../../.oxlintrc.jsonc",

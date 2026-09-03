@@ -45,6 +45,7 @@
     "dev:all": "bash scripts/dev-all.sh",
     "dev:workspace": "turbo run dev",
     "build": "turbo run build",
+    "build:workspaces": "turbo run build --filter=!@briar/app",
     "web:build": "turbo run web:build --filter=@briar/app",
     "build:release": "turbo run build:release --filter=@briar/app",
     "check": "turbo run lint lint:type-aware typecheck skills:check //#lint:repo //#lint:repo:type-aware",
