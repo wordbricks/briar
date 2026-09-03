@@ -37,8 +37,15 @@ import {
 } from "./components/CompanionBottomNavigation";
 import { CompanionEmptyState, CompanionHeader } from "./components/CompanionHeader";
 import { ConnectionHealth } from "./components/ConnectionHealth";
-import { HuntDashboard } from "./components/hunt/HuntDashboard";
 import { Inbox } from "./components/Inbox";
+import { HuntDashboardWithTeam } from "./components/app/HuntDashboardWithTeam";
+import { RunPageWithRun } from "./components/app/RunPageWithRun";
+import {
+  TeamAgentsWithDashboard,
+  TeamLobbyWithDashboard,
+  TeamSettingsWithDashboard,
+  WorkerDispatchDialogWithTeam,
+} from "./components/app/TeamViewsWithDashboard";
 import { InboxDetailPanel } from "./components/InboxDetailPanel";
 import {
   InboxDetailTargetBoundary,
@@ -317,21 +324,10 @@ const PlanningProjectDialog = lazy(() =>
     default: m.PlanningProjectDialog,
   })),
 );
-const RunPage = lazy(() =>
-  import("./components/hunt/detail/RunPage").then((m) => ({
-    default: m.RunPage,
-  })),
-);
-const TeamAgents = lazy(() =>
-  import("./components/TeamAgents").then((m) => ({ default: m.TeamAgents })),
-);
 const TeamAgentSessionDetail = lazy(() =>
   import("./components/TeamAgentSessionDetail").then((m) => ({
     default: m.TeamAgentSessionDetail,
   })),
-);
-const TeamLobby = lazy(() =>
-  import("./components/TeamLobby").then((m) => ({ default: m.TeamLobby })),
 );
 const TeamOnboarding = lazy(() =>
   import("./components/TeamOnboarding").then((m) => ({
@@ -348,11 +344,6 @@ const TeamSchedule = lazy(() =>
     default: m.TeamSchedule,
   })),
 );
-const TeamSettings = lazy(() =>
-  import("./components/TeamSettings").then((m) => ({
-    default: m.TeamSettings,
-  })),
-);
 const Teams = lazy(() =>
   import("./components/app/TeamsWithPlanningProjects").then((m) => ({
     default: m.TeamsWithPlanningProjects,
@@ -361,11 +352,6 @@ const Teams = lazy(() =>
 const UnifiedSettingsSidebar = lazy(() =>
   import("./components/UnifiedSettingsSidebar").then((m) => ({
     default: m.UnifiedSettingsSidebar,
-  })),
-);
-const WorkerDispatchDialog = lazy(() =>
-  import("./components/WorkerDispatchDialog").then((m) => ({
-    default: m.WorkerDispatchDialog,
   })),
 );
 
@@ -3617,21 +3603,8 @@ export function App({
 
     return withLazyBoundary(
       inboxDetailRun ? (
-      <RunPage
-        availableProviders={
-          briar.dashboard?.organizationProviders?.length
-            ? briar.dashboard.organizationProviders
-            : [
-                ...new Set(
-                  (briar.dashboard?.workers ?? []).flatMap(
-                    (worker) => worker.providers,
-                  ),
-                ),
-              ]
-        }
-        availableRuns={briar.dashboard?.runs ?? []}
+      <RunPageWithRun
         conversationInboxSyncSignal={conversationInboxSyncSignal}
-        error={briar.recoveryError}
         highlightedMessageId={
           inboxDetailTarget.kind === "conversation"
             ? inboxDetailTarget.conversationMessageId ?? null
@@ -3642,39 +3615,12 @@ export function App({
             ? "conversation"
             : undefined
         }
-        isDeletingIssue={briar.deletingIssueId === inboxDetailRun.id}
         isProcessing={processingIssueIds.has(inboxDetailRun.id)}
-        isRecovering={briar.recoveringRunId === inboxDetailRun.id}
         isSidebarOpen
-        issueKeyPrefix={briar.dashboard?.team.issueKeyPrefix}
-        isUpdatingIssue={briar.updatingIssueId === inboxDetailRun.id}
-        mentionMembers={briar.dashboard?.members ?? []}
         mentionAgents={issueAgents.filter(
           (agent) => agent.teamId === inboxDetailTarget.projectId,
         )}
-        currentUserId={briar.user?.id ?? null}
-        onAddDependency={(prerequisiteRunId) =>
-          briar.addIssueDependency(inboxDetailRun.id, prerequisiteRunId)}
-        onAddRelated={(relatedRunId) =>
-          briar.addRelatedIssue(inboxDetailRun.id, relatedRunId)}
-        onLinkSubIssue={(childRunId) =>
-          briar.setIssueParent(childRunId, inboxDetailRun.id)}
-        onSetParent={(parentRunId) =>
-          briar.setIssueParent(inboxDetailRun.id, parentRunId)}
-        onUnlinkSubIssue={(childRunId) =>
-          briar.setIssueParent(childRunId, null)}
-        onAcceptIssueAction={(proposal) =>
-          briar.acceptConversationIssueAction(inboxDetailRun.id, proposal)}
-        onAcceptIssueExecution={(proposal, input) =>
-          briar.acceptConversationIssueExecution(
-            inboxDetailRun.id,
-            proposal,
-            input,
-          )}
-        executionPolicy={briar.dashboard?.executionPolicy}
-        executionWorkers={briar.dashboard?.workers ?? []}
         onBack={() => setInboxDetailTarget(null)}
-        onCancel={() => briar.cancelRun(inboxDetailRun.id)}
         onDelete={async () => {
           await briar.deleteIssue(inboxDetailRun.id);
           setInboxDetailTarget(null);
@@ -3694,14 +3640,6 @@ export function App({
           setInboxDetailTarget(null);
           setPendingBriarLink({ kind: "channel", ...relatedMessage });
         }}
-        onLoadAttachment={briar.readIssueAttachment}
-        onLoadIssueMessages={() => briar.readIssueMessages(inboxDetailRun.id)}
-        onLoadRunEvents={() => briar.readRunEvents(inboxDetailRun.id)}
-        onLoadRunEvidence={() => briar.readRunEvidence(inboxDetailRun.id)}
-        onLoadRunEvidenceImage={briar.readRunEvidenceImage}
-        onCompleteResultReview={() =>
-          briar.completeResultReview(inboxDetailRun.id)}
-        onMove={(placement) => briar.moveRun(inboxDetailRun.id, placement)}
         onOpenFullPage={() => {
           setInboxDetailTarget(null);
           setRequestedSessionId(null);
@@ -3722,45 +3660,15 @@ export function App({
           setInboxDetailTarget(null);
           processIssueNow(inboxDetailRun);
         }}
-        onRemoveDependency={(prerequisiteRunId) =>
-          briar.removeIssueDependency(inboxDetailRun.id, prerequisiteRunId)}
-        onRemoveRelated={(relatedRunId) =>
-          briar.removeRelatedIssue(inboxDetailRun.id, relatedRunId)}
-        onRetry={() => briar.retryRun(inboxDetailRun.id)}
-        onRework={(input) => briar.reworkRun(inboxDetailRun.id, input)}
-        onResume={() => briar.resumeRun(inboxDetailRun.id)}
         onSendIssueMessage={(input) =>
           sendIssueMessage(inboxDetailRun.id, input)}
-        onEditIssueMessage={(messageId, input) =>
-          briar.updateIssueMessage(inboxDetailRun.id, messageId, input)}
-        onDeleteIssueMessage={(messageId) =>
-          briar.removeIssueMessage(inboxDetailRun.id, messageId)}
-        onUpdateIssue={(input) => briar.editIssue(inboxDetailRun.id, input)}
-        onUpdateIssueSubscription={(subscribed) =>
-          briar.editIssueSubscription(inboxDetailRun.id, subscribed)}
-        onUpdateIssueCheckpoints={(checkpoints) =>
-          briar.editIssueCheckpoints(inboxDetailRun.id, checkpoints)}
-        onUpdateIssuePreferences={(input) =>
-          briar.editIssueExecutionPreferences(inboxDetailRun.id, input)}
         onViewingIssueConversationChange={setViewingIssueConversationRunId}
         performedAgentName={
           issueAgents.find((agent) => agent.id === inboxDetailRun.agentId)
             ?.name ?? null
         }
-        onAcceptSkillExecution={(proposal, input) =>
-          briar.acceptConversationSkillExecution(
-            inboxDetailRun.id,
-            proposal,
-            input,
-          )}
-        organizationId={
-          briar.projects.find(
-            (project) => project.id === inboxDetailTarget.projectId,
-          )?.organizationId ?? null
-        }
         projectId={inboxDetailTarget.projectId}
-        run={inboxDetailRun}
-        token={briar.token}
+        runId={inboxDetailRun.id}
       />
     ) : inboxDetailSession ? (
       <TeamAgentSessionDetail
@@ -4374,8 +4282,7 @@ export function App({
         ) : activePage === "settings" &&
           settingsTarget.scope === "project" &&
           activeProject ? (
-          <TeamSettings
-            dashboard={briar.dashboard}
+          <TeamSettingsWithDashboard
             githubRepository={
               briar.dashboard?.settings.githubRepository ??
               localTeamReadiness(
@@ -4446,9 +4353,8 @@ export function App({
             velen={briar.velen}
           />
         ) : activePage === "lobby" && activeProject ? (
-          <TeamLobby
+          <TeamLobbyWithDashboard
             connectionState={briar.activeProjectConnectionState}
-            dashboard={briar.dashboard}
             isSidebarOpen={isSidebarOpen}
             onLoadUsageSummary={loadProjectHomeUsage}
             onLoadMergeActivity={loadProjectHomeMerges}
@@ -4480,9 +4386,8 @@ export function App({
             requiresLocalReadiness={!briar.remoteMode}
           />
         ) : activePage === "agents" && activeProject ? (
-          <TeamAgents
+          <TeamAgentsWithDashboard
             agentListRequestKey={agentListRequestKey}
-            dashboard={briar.dashboard}
             error={briar.error}
             isSidebarOpen={isSidebarOpen}
             onIssueOpen={(runId) => {
@@ -4568,20 +4473,13 @@ export function App({
           />
 
         ) : (
-          <HuntDashboard
+          <HuntDashboardWithTeam
             agents={activeProjectAgents}
             conversationInboxSyncSignal={conversationInboxSyncSignal}
-            currentUserId={briar.user?.id ?? null}
-            dashboard={briar.dashboard}
             error={quickProcessError ?? briar.error}
-            isCreatingIssue={briar.isCreatingIssue}
             isIssueDialogOpen={isIssueDialogOpen}
             createIssueDefaultProjectId={createIssueProjectId}
-            deletingIssueId={briar.deletingIssueId}
-            updatingIssueId={briar.updatingIssueId}
             noProject={!activeProject}
-            recoveringRunId={briar.recoveringRunId}
-            recoveryError={briar.recoveryError}
             requestedRunId={requestedRunId}
             requestedRunMessageId={requestedRunMessageId}
             requestedRunInitialTab={requestedRunInitialTab}
@@ -4589,7 +4487,6 @@ export function App({
             issueListRequestKey={issueListRequestKey}
             isSidebarOpen={isSidebarOpen}
             onAddProject={briar.startProjectCreation}
-            onCreateIssue={briar.addIssue}
             onIssueDialogOpenChange={(isOpen) => {
               if (!isOpen) setCreateIssueProjectId(null);
               setIsIssueDialogOpen(isOpen);
@@ -4616,49 +4513,20 @@ export function App({
                 );
               }
             }}
-            onMoveIssueProject={briar.moveIssueProject}
-            onAddIssueDependency={briar.addIssueDependency}
-            onAddRelatedIssue={briar.addRelatedIssue}
-            onAcceptIssueAction={briar.acceptConversationIssueAction}
-            onAcceptIssueExecution={briar.acceptConversationIssueExecution}
-            onAcceptSkillExecution={briar.acceptConversationSkillExecution}
-            onRemoveIssueDependency={briar.removeIssueDependency}
-            onRemoveRelatedIssue={briar.removeRelatedIssue}
-            onSetIssueParent={briar.setIssueParent}
             onRelatedMessageOpen={(relatedMessage) => {
               setPendingBriarLink({ kind: "channel", ...relatedMessage });
             }}
-            onUpdateIssue={briar.editIssue}
-            onUpdateIssueSubscription={briar.editIssueSubscription}
-            onUpdateIssueCheckpoints={briar.editIssueCheckpoints}
-            onUpdateIssuePreferences={briar.editIssueExecutionPreferences}
-            onLoadAttachment={briar.readIssueAttachment}
-            onLoadIssueMessages={briar.readIssueMessages}
-            onLoadRunEvents={briar.readRunEvents}
-            onLoadRunEvidence={briar.readRunEvidence}
-            onLoadRunEvidenceImage={briar.readRunEvidenceImage}
-            onCompleteResultReview={briar.completeResultReview}
-            onMoveRun={briar.moveRun}
             onProcessIssueNow={processIssueNow}
-            onRetryRun={briar.retryRun}
-            onReworkRun={briar.reworkRun}
-            onCancelRun={briar.cancelRun}
-            onUnassignRun={(runId) => briar.unassignRun(activeProject?.id ?? "", runId)}
-            onResumeRun={briar.resumeRun}
             onRequestedRunOpen={() => {
               setRequestedRunId(null);
               setRequestedRunMessageId(null);
               setRequestedRunInitialTab(null);
             }}
             onSendIssueMessage={sendIssueMessage}
-            onEditIssueMessage={briar.updateIssueMessage}
-            onDeleteIssueMessage={briar.removeIssueMessage}
             processingIssueIds={processingIssueIds}
             projects={activeOrganizationProjects}
-            issueProjects={briar.planningProjects}
             activeIssueProjectId={activePlanningProjectId}
             sessions={autoHunt.sessions}
-            token={briar.token}
           />
           )}
         </Suspense>
@@ -4839,10 +4707,9 @@ export function App({
           </>
         ) : companionPage === "lobby" && activeProject ? (
           <>
-            <TeamLobby
+            <TeamLobbyWithDashboard
               companionMode
               connectionState={briar.activeProjectConnectionState}
-              dashboard={briar.dashboard}
               isSidebarOpen={false}
               onBack={() => setCompanionPage("home")}
               onLoadUsageSummary={loadProjectHomeUsage}
@@ -4947,22 +4814,15 @@ export function App({
             />
           </>
         ) : (
-          <HuntDashboard
+          <HuntDashboardWithTeam
             agents={activeProjectAgents}
             conversationInboxSyncSignal={conversationInboxSyncSignal}
-            currentUserId={briar.user?.id ?? null}
             companionMode
             companionStatus={companionStatus}
             companionUnreadDmCount={unreadDirectMessageCount}
             companionUnreadInboxCount={inbox.unreadCount}
-            dashboard={briar.dashboard}
             error={quickProcessError ?? briar.error}
-            isCreatingIssue={briar.isCreatingIssue}
             isIssueDialogOpen={isIssueDialogOpen}
-            deletingIssueId={briar.deletingIssueId}
-            updatingIssueId={briar.updatingIssueId}
-            recoveringRunId={briar.recoveringRunId}
-            recoveryError={briar.recoveryError}
             requestedRunId={requestedRunId}
             requestedRunMessageId={requestedRunMessageId}
             requestedRunInitialTab={requestedRunInitialTab}
@@ -4974,7 +4834,6 @@ export function App({
               setCompanionStatus(status);
               setCompanionPage("issues");
             }}
-            onCreateIssue={briar.addIssue}
             onIssueDialogOpenChange={(isOpen) => {
               if (!isOpen) setCreateIssueProjectId(null);
               setIsIssueDialogOpen(isOpen);
@@ -4983,54 +4842,25 @@ export function App({
             onViewingIssueConversationChange={setViewingIssueConversationRunId}
             onDeleteIssue={briar.deleteIssue}
             onTransferIssue={briar.transferIssue}
-            onMoveIssueProject={briar.moveIssueProject}
-            onAddIssueDependency={briar.addIssueDependency}
-            onAddRelatedIssue={briar.addRelatedIssue}
-            onAcceptIssueAction={briar.acceptConversationIssueAction}
-            onAcceptIssueExecution={briar.acceptConversationIssueExecution}
-            onAcceptSkillExecution={briar.acceptConversationSkillExecution}
-            onRemoveIssueDependency={briar.removeIssueDependency}
-            onRemoveRelatedIssue={briar.removeRelatedIssue}
-            onSetIssueParent={briar.setIssueParent}
             onRelatedMessageOpen={(relatedMessage) => {
               setPendingBriarLink({ kind: "channel", ...relatedMessage });
             }}
-            onUpdateIssue={briar.editIssue}
-            onUpdateIssueSubscription={briar.editIssueSubscription}
-            onUpdateIssueCheckpoints={briar.editIssueCheckpoints}
-            onUpdateIssuePreferences={briar.editIssueExecutionPreferences}
-            onLoadAttachment={briar.readIssueAttachment}
-            onLoadIssueMessages={briar.readIssueMessages}
-            onLoadRunEvents={briar.readRunEvents}
-            onLoadRunEvidence={briar.readRunEvidence}
-            onLoadRunEvidenceImage={briar.readRunEvidenceImage}
-            onCompleteResultReview={briar.completeResultReview}
-            onMoveRun={briar.moveRun}
             onProcessIssueNow={processIssueNow}
             onRequestedRunOpen={() => {
               setRequestedRunId(null);
               setRequestedRunMessageId(null);
               setRequestedRunInitialTab(null);
             }}
-            onRetryRun={briar.retryRun}
-            onReworkRun={briar.reworkRun}
-            onCancelRun={briar.cancelRun}
-            onUnassignRun={(runId) => briar.unassignRun(activeProject?.id ?? "", runId)}
-            onResumeRun={briar.resumeRun}
             onSendIssueMessage={sendIssueMessage}
-            onEditIssueMessage={briar.updateIssueMessage}
-            onDeleteIssueMessage={briar.removeIssueMessage}
             processingIssueIds={processingIssueIds}
             projects={activeOrganizationProjects}
-            issueProjects={briar.planningProjects}
             activeIssueProjectId={activePlanningProjectId}
             sessions={autoHunt.sessions}
-            token={briar.token}
           />
         )}
         </Suspense>
         <Suspense fallback={null}>
-        <WorkerDispatchDialog
+        <WorkerDispatchDialogWithTeam
           didDispatchSuccessfully={completedDispatchRunId === dispatchRun?.id}
           error={quickProcessError}
           isDispatching={Boolean(quickStartingRunId)}
@@ -5041,9 +4871,7 @@ export function App({
           }}
           onSubmit={(input) => void submitWorkerDispatch(input)}
           open={Boolean(dispatchRun)}
-          policy={briar.dashboard?.executionPolicy}
           run={dispatchRun}
-          workers={briar.dashboard?.workers ?? []}
         />
         </Suspense>
       </div>
@@ -5181,7 +5009,7 @@ export function App({
           )}
         />
       ) : null}
-      <WorkerDispatchDialog
+      <WorkerDispatchDialogWithTeam
         didDispatchSuccessfully={completedDispatchRunId === dispatchRun?.id}
         error={quickProcessError}
         isDispatching={Boolean(quickStartingRunId)}
@@ -5192,9 +5020,7 @@ export function App({
         }}
         onSubmit={(input) => void submitWorkerDispatch(input)}
         open={Boolean(dispatchRun)}
-        policy={briar.dashboard?.executionPolicy}
         run={dispatchRun}
-        workers={briar.dashboard?.workers ?? []}
       />
       <FirstRunTutorial
         initialPhase={

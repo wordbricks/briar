@@ -137,6 +137,33 @@ Phase 2A를 구현하며 확인한, 이후 단계에 영향을 주는 사실:
 - **`useAutoHuntSessions`의 `AutoHuntSession` 타입을 `state/`가 import한다.** Phase 7이
   훅을 정리할 때 타입을 `types.ts`로 옮기는 것이 낫다.
 
+### 기준 갱신 (2026-09-04, Phase 2B-2 이후)
+
+뷰를 엔티티에 붙이며 확인한 사실:
+
+- **`RunPage`는 완전한 행 단위 구독이 되었다.** `components/app/RunPageWithRun`이
+  런 객체 대신 `runId`를 받고 `runAtom(runId)`을 읽는다. 열린 런이 바뀌면 셸 리렌더
+  0회로 상세만 다시 그린다(`RunPageWithRun.test.tsx`가 검증).
+- **`HuntDashboard`는 아직 아니다.** 보드는 런 **객체**로 필터·정렬·칸반 컬럼·에이전트
+  연결·카운트를 모두 계산하므로, 목록을 id만으로 그리려면 로컬 필터 상태
+  (`query` / `status` / `source` / `propertyFilters` / `view`)를 atom으로 올리고
+  파생 `boardRunIdsAtom`을 만들어야 한다. 1,279줄 컴포넌트와 1,076줄 테스트의
+  재작성이라 이 PR의 "동작 변화 없음" 제약과 맞지 않아 **후속으로 남긴다.** 지금
+  달성된 것은 셸이 보드에 새 프롭을 밀어 넣지 않는 것이고, 무변경 델타 틱은 이미
+  리렌더 0회다.
+- **연결 래퍼가 lazy 경계를 대신 들고 있어야 한다.** App이 래퍼를 정적으로 import하고
+  래퍼 안에서 `lazy(() => import(...))`를 하면 코드 스플리팅이 그대로 유지된다.
+  래퍼를 lazy로 감싸면 청크가 한 번 더 겹친다.
+- **`renderCounter.track`은 프롭이 밀려 들어온 렌더만 센다.** 래퍼 컴포넌트를 감싸므로
+  내부 구독으로 인한 리렌더는 잡히지 않는다. 컴포넌트 자신의 리렌더를 세려면 본문에
+  `useRenderCount`가 필요하다.
+- **`WorkerDispatchDialog`는 대시보드가 아니라 두 family만 필요하다.**
+  `teamWorkersAtom` / `teamExecutionPolicyAtom`만 읽으므로 런 변경이 다이얼로그에
+  아예 닿지 않는다. Phase 5가 이중 렌더를 지울 때 래퍼 하나만 남기면 된다.
+- **`briar.dashboard`는 App에 아직 남아 있다.** 인박스 상세가 어떤 뷰를 그릴지 고르고
+  (`inboxDetailRun` 조회), 워크플로 자동 생성 effect가 설정을 본다. Phase 3/4가
+  가져간다.
+
 ## 목표
 
 1. `apps/briar/src/hooks/useBriar.ts`(4,668줄)와 `apps/briar/src/App.tsx`(5,116줄)가
@@ -780,7 +807,7 @@ Phase 2 이후 언제든 착수 가능하며 Phase 3–7과 병행할 수 있다
 | 0 | #1581 | 머지됨 | `state/registry.ts`, `state/platform.ts`, `state/demo-fixtures.ts`, `state/inbox-selection.ts`, `test/render-count.tsx`. `ProjectConnection`은 `types.ts`로. |
 | 1 | #1583 | 머지됨 | `state/session|organization|team|planning`의 atoms/actions, `useActiveOrganizationPersistence`, `components/app/`의 연결 래퍼 4종과 `AppEffects`. `activeProjectIdRef` 제거. |
 | 2A | #1584, #1585 | 머지됨 | #1584: `state/entities`(runs / teams / workers / members / providers / channels / upsert / retention), `state/team`의 팀별 family, `state/sync`의 `events` / `apply` / `view`. #1585: `sync/loader`, `sync/useTeamSync`, `useBriar` 파사드를 `dashboardViewAtom` 위로 옮기고 `dashboardRef` / `dashboardCursor` / `dashboardRequest` / `dashboardRequestGeneration` / `dashboardCache` 제거. Phase 1의 대시보드 주입 콜백 8개 삭제. |
-| 2B | | 예정 | |
+| 2B | #1586, #1587 | 머지됨 | #1586: `sync/optimistic`, `state/issues`(atoms / actions), `state/run-detail`(atoms / actions), `useBriar`의 `setDashboard` 제거. #1587: `components/app`의 `HuntDashboardWithTeam` / `RunPageWithRun` / `TeamViewsWithDashboard`, App.tsx의 삼중 이슈·런 프롭 블록 삭제와 렌더 카운트 테스트. 보드 목록의 id 전용 렌더는 후속. |
 | 3 | | 예정 | |
 | 4 | | 예정 | |
 | 5 | | 예정 | |
