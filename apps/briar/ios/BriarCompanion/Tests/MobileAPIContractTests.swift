@@ -204,6 +204,28 @@ final class MobileAPIContractTests: XCTestCase {
         XCTAssertEqual(denied, .accessDenied("The user denied access"))
     }
 
+    func testDeviceAuthorizationDecodesBetterAuth17RequestErrors() async {
+        let invalidScope = deviceAuthorizationClient(status: 400, body: #"""
+        {
+            "error":"invalid_scope",
+            "error_description":"The requested scope is not available"
+        }
+        """#)
+        do {
+            _ = try await invalidScope.requestDeviceCode()
+            XCTFail("The request error must not authorize a device")
+        } catch {
+            XCTAssertEqual(
+                error as? DeviceAuthorizationRequestError,
+                DeviceAuthorizationRequestError(
+                    statusCode: 400,
+                    code: .invalidScope,
+                    message: "The requested scope is not available"
+                )
+            )
+        }
+    }
+
     private func deviceAuthorizationClient(
         status: Int,
         body: String

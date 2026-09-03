@@ -50,6 +50,20 @@ import { scheduleAgentSkillExecutionRealtimeFlush } from "./realtime-scheduling"
 import { handleLegacyUpdateBootstrapRoute } from "./legacy-update-bootstrap";
 
 const formatSchemaIssue = SchemaIssue.makeFormatterStandardSchemaV1();
+const webAppApiPrefix = "/app-api";
+
+export const normalizeWebAppApiRequest = (request: Request) => {
+  const url = new URL(request.url);
+  if (
+    url.pathname !== webAppApiPrefix &&
+    !url.pathname.startsWith(`${webAppApiPrefix}/`)
+  ) {
+    return request;
+  }
+  url.pathname = url.pathname.slice(webAppApiPrefix.length) || "/";
+  return new Request(url, request);
+};
+
 const bearerToken = (request: Request) => {
   const authorization = request.headers.get("authorization") ?? "";
   return authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
@@ -214,6 +228,7 @@ export default {
     env: Env,
     ctx?: ExecutionContext,
   ): Promise<Response> {
+    request = normalizeWebAppApiRequest(request);
     const url = new URL(request.url);
     if (request.method === "OPTIONS") {
       return new Response(null, {

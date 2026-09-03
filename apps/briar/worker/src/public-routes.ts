@@ -255,9 +255,7 @@ export async function handlePublicRoute(input: {
     const client = url.searchParams.get("client");
     const deviceClient = client === "mobile" || client === "android"
       ? "mobile"
-      : client === "web"
-        ? "web"
-        : "desktop";
+      : "desktop";
     return otpDevicePage(url.origin, deviceClient);
   }
 

@@ -39,6 +39,9 @@ enum DeviceAuthorizationRequestErrorCode: String, Equatable, Sendable {
     case invalidRequest = "invalid_request"
     case invalidClient = "invalid_client"
     case invalidGrant = "invalid_grant"
+    case invalidScope = "invalid_scope"
+    case serverError = "server_error"
+    case unauthorizedClient = "unauthorized_client"
 }
 
 struct DeviceAuthorizationRequestError: LocalizedError, Equatable, Sendable {
@@ -403,11 +406,14 @@ struct DeviceAuthorizationHTTPClient: DeviceAuthorizationClientProtocol, Sendabl
                 DeviceCodeErrorPayload.self,
                 from: data
             ),
-            !payload.errorDescription.isEmpty
+            !payload.errorDescription.isEmpty,
+            let errorCode = DeviceAuthorizationRequestErrorCode(
+                rawValue: payload.error.rawValue
+            )
         else { throw MobileAPIError.invalidResponse }
         throw DeviceAuthorizationRequestError(
             statusCode: status,
-            code: payload.error == .invalidClient ? .invalidClient : .invalidRequest,
+            code: errorCode,
             message: payload.errorDescription
         )
     }
@@ -581,6 +587,9 @@ private struct DeviceCodeResponsePayload: Decodable {
 private enum DeviceCodeErrorCode: String, Decodable {
     case invalidRequest = "invalid_request"
     case invalidClient = "invalid_client"
+    case invalidScope = "invalid_scope"
+    case serverError = "server_error"
+    case unauthorizedClient = "unauthorized_client"
 }
 
 private struct DeviceCodeErrorPayload: Decodable {
