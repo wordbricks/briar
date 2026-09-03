@@ -274,6 +274,48 @@ workspace / workflow / integrations를 옮기며 확인한, 이후 단계에 영
   `ensureProjectSelected` / `refresh` / `addIssueMessage` 계열이다.
   `projectReadiness` 3종과 `connectedTeamIds`는 사라졌다.
 
+### 기준 갱신 (2026-09-04, Phase 5 이후)
+
+셸을 자르며 확인한, 이후 단계에 영향을 주는 사실:
+
+- **`AppEffects`는 이제 한 번만 마운트된다.** 셸 선택보다 위에 있으므로 컴패니언
+  모드에서도 로그아웃 상태와 팀 0개 상태에서 돈다(데스크톱은 원래 그랬다).
+  Phase 2A가 두 번째 마운트로 고쳤던 "컴패니언에서 대시보드 동기화가 안 돈다"는
+  문제는 이 통합으로 구조적으로 사라졌다.
+- **게이트 순서는 모드마다 다르다.** 데스크톱은 복원 → 초대 → 초기 온보딩 →
+  로그인 → 첫 조직 설정이고, 컴패니언은 **로그아웃일 때만** 앞의 네 개를 거친
+  뒤 팀이 없으면 빈 화면으로 간다. 이전 코드에서 컴패니언 분기가 `!briar.user`
+  일 때만 `content`를 반환하던 것과 같은 규칙이며, `AuthGate`가 그대로 옮겼다.
+- **`briar.error`의 합이 세 곳으로 늘었다.** `AuthGate` / `CompanionShell` /
+  `DesktopShell`이 각각 `sessionError ?? localInventoryError`를 다시 만든다.
+  Phase 7이 파사드를 지울 때 파생 atom 하나로 합치면 세 곳이 한 줄이 된다.
+- **App 자신의 리렌더는 아직 0회가 아니다.** `useBriar`가 `activeDashboardAtom`
+  을 구독하고 `useInbox`가 대시보드를 인자로 받으므로 런 변경은 여전히 App을
+  리렌더한다. Phase 5의 렌더 카운트 테스트는 그래서 `AuthGate` /
+  `DesktopShell` / `CompanionShell` / `InboxDetailContent` 네 컴포넌트의 0회를
+  고정한다. App까지 0회로 만들려면 `useInbox` 전환(현재 비목표)과 파사드
+  제거(Phase 7)가 함께 필요하다.
+- **셸 프롭은 묶음으로 나눈다.** `navigation` / `inbox` / `autoHunt` / `agents` /
+  `repositorySetup` / `session`. 경계 규칙은 Phase 4-2와 같다: atom에 있으면
+  셸이 직접 읽고, App이 **결정하는** 것만 프롭이다. `navigation` 묶음이 Phase 6이
+  통째로 가져갈 블록의 인터페이스다.
+- **한쪽 셸만 쓰는 훅은 그 셸로 함께 옮긴다.** `useHorizontalPaneResize`는
+  데스크톱 인박스만의 것이었고, `useMobileNavigationGestures` /
+  `useMobileBackHandler`는 컴패니언만의 것이었다. 후자는 등록된 핸들러가 없으면
+  네이티브 뒤로가기를 통과시키므로 게이트 화면에서 빠져도 동작이 같다.
+- **`navigationActiveProjectIdRef` 대입은 콜백이 되었다.** 셸이 팀을 고를 때
+  `navigation.setDefaultTeam(teamId)`를 부른다. ref 자체는 Phase 6이 가져갈
+  블록에 남아 있다.
+- **oxlint는 미사용 import를 잡지 않고 `noUnusedLocals`도 꺼져 있다.** 5-1이
+  죽은 import 13개와 `lazy()` 상수를 남겼고 5-2가 정리했다. 블록을 옮긴 뒤에는
+  스크립트로 확인한다(미사용 로컬은 죽은 **구독**이기도 하다).
+- **Radix 다이얼로그는 `document.body`로 포탈한다.** 오버레이를 세는 테스트는
+  마운트마다 `document.body.replaceChildren()`가 필요하고, `lazy()` 오버레이는
+  `beforeEach`에서 미리 `import()` 해야 `act()` 플러시 안에서 해소된다.
+- **팀 창 스코프는 순수 함수로 뽑았다.** `lib/team-window-scope.ts`의
+  `visibleTeams` / `visibleOrganizations` / `activeOrganizationTeams`가 셸이 세
+  번 반복하던 삼항 사슬이다.
+
 ## 목표
 
 1. `apps/briar/src/hooks/useBriar.ts`(4,668줄)와 `apps/briar/src/App.tsx`(5,116줄)가
@@ -816,19 +858,25 @@ PR 묶음 B. 액션과 뷰:
 - 완료 조건: `Channels`, `CompanionChannels`, `DirectMessages`, `CommandPalette`가
   직접 구독. App.tsx 약 3,000줄.
 
-### Phase 5. 셸 분리 (M)
+### Phase 5. 셸 분리 (M) — 완료
 
 - `AuthGate`, `DesktopShell`, `CompanionShell`, `AppDialogs`,
   `InboxDetailContent`, `AppSettingsSidebar` 컴포넌트 추출.
-  `WorkerDispatchDialog` 이중 렌더(4912, 5071) 제거.
-- App.tsx는 `AppEffects` + `AuthGate` + 셸 선택 + `AppDialogs` 조립만 남긴다.
-- 완료 조건: App.tsx 500줄 이하. 데스크톱 / 컴패니언 / 웹 모드 수동 스모크.
+  `WorkerDispatchDialog` 이중 렌더 제거, `AppEffects` 단일 마운트.
+- 셸 사이에 끼어 있던 App 소유 로직은 훅 5종(`useRepositorySetup`,
+  `useIssueAgents`, `useAgentDispatch`, `useInvitationFlow`, `useLaunchIntro`)
+  으로 나갔다.
+- App.tsx는 `AppEffects` + `AuthGate` + 셸 선택 + `AppDialogs` 조립만 남는다.
+- 결과: App.tsx 3,053줄 → 783줄, `briar.` 키 42개 → 28개. Phase 6이 가져갈
+  내비게이션 블록은 `hooks/useAppNavigation.ts`로 그대로 옮겨 두었다.
 
 ### Phase 6. 내비게이션 (M, 결합도 최고)
 
-- 853–1237의 조정 effect 6개를 `useAppNavigation()` 하나로 통째로 추출(순서 계약
-  유지). 그다음 `useNavigationHistory` 내부 상태를 `state/navigation` atom으로
-  전환하고 `activePage`, `activeRunId` 등을 파생 atom으로 노출.
+- 조정 effect 6개의 `useAppNavigation()` 추출은 Phase 5-4가 순서 계약을 지켜
+  **그대로** 끝냈다(`hooks/useAppNavigation.ts`). 남은 일은
+  `useNavigationHistory` 내부 상태를 `state/navigation` atom으로 전환하고
+  `activePage`, `activeRunId` 등을 파생 atom으로 노출하는 것이다. 그러면
+  `DesktopShellNavigation` 프롭 묶음이 사라진다.
 - 완료 조건: 내비게이션 관련 기존 테스트(`useNavigationHistory.test.ts`, 키보드
   커맨드 테스트) 통과. `Sidebar`와 `CompanionHeader`가 `activePageAtom`만 구독.
 
@@ -920,7 +968,7 @@ Phase 2 이후 언제든 착수 가능하며 Phase 3–7과 병행할 수 있다
 | 2B | #1586, #1587 | 머지됨 | #1586: `sync/optimistic`, `state/issues`(atoms / actions), `state/run-detail`(atoms / actions), `useBriar`의 `setDashboard` 제거. #1587: `components/app`의 `HuntDashboardWithTeam` / `RunPageWithRun` / `TeamViewsWithDashboard`, App.tsx의 삼중 이슈·런 프롭 블록 삭제와 렌더 카운트 테스트. 보드 목록의 id 전용 렌더는 후속. |
 | 3 | #1588, #1589 | 머지됨 | #1588: `state/workspace`(atoms / api / health / readiness / actions / `useWorkspaceSync`), `state/workflow`(actions / `useWorkflowAutoGeneration`), `state/integrations`(atoms / actions), `sync/events`의 `team-settings-changed`와 `sync/commit`. `useBriar`의 workspace `useState` 7개·ref 5개와 `commitTeamDashboard` / `commitTeamSettings` 제거, Phase 1 주입 콜백 3개(`bumpReconnectRequest`, `clearWorkspaceViews`, `resetTeamHealth`) 삭제. `AutoHuntSession` 계열 타입을 `types.ts`로. #1589: `components/app/WorkspaceViews`의 연결 래퍼 4종과 `TeamSettingsWithDashboard` 확장, App.tsx 프롭 블록 삭제, 파사드에서 25개 키 제거. |
 | 4 | #1590, #1591 | 머지됨 | #1590: `entities/channels` 연결(저장 인덱스), `sync`의 채널 카탈로그 이벤트 4종, `state/channels`(atoms / api / actions / `useChannelCatalogSync`), `components/app`의 `ChannelViews` 3종과 `CommandPaletteWithContext`, `lockedTeamIdAtom`을 `state/platform.ts`로 통합. #1591: `state/dialogs`와 `state/navigation` atom, `hooks`의 `useStatusTray` / `useDeepLinks` / `useCommandPaletteItems` / `useAppShortcuts` / `useWorkerDispatch`, `lib/navigation-history-items`, `AppDialogViews`와 `AppSettingsWithWorkspace` 래퍼, `Sidebar` / `OrganizationSettings` / `TeamLobby` 래퍼 확장. App.tsx 4,947줄 → 3,053줄, `briar.` 키 55개 → 42개. |
-| 5 | | 예정 | |
+| 5 | #1592, #1593, #1594, #1595 | 머지됨 | #1592: `hooks`의 `useRepositorySetup` / `useIssueAgents` / `useAgentDispatch` / `useInvitationFlow` / `useLaunchIntro`, `components/app`의 `InboxDetailContent` / `AppSettingsSidebar`, `lib`의 `inbox-detail-label` / `team-window-scope`. #1593: `AuthGate` / `AppDialogs` / `CompanionShell`, `AppEffects` 단일 마운트, `WorkerDispatchDialog` 이중 렌더 제거, 5-1이 남긴 죽은 import 정리. #1594: `DesktopShell`과 트리가 나가며 드러난 죽은 로컬 40여 개 제거. #1595: 내비게이션 블록을 `hooks/useAppNavigation.ts`로 그대로 이동(Phase 6의 첫 항목을 미리 끝냄). App.tsx 3,053줄 → 783줄, `briar.` 키 42개 → 28개. |
 | 6 | | 예정 | |
 | 7 | | 예정 | |
 | 8 | | 예정 | |
