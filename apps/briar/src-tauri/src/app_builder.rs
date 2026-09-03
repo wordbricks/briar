@@ -18,6 +18,7 @@ pub(super) fn run() {
     #[cfg(desktop)]
     let builder = builder
         .manage(ExitConfirmationState::default())
+        .manage(LaunchIntroState::default())
         .on_menu_event(|app, event| {
             if event.id() == APP_QUIT_MENU_ID {
                 request_exit_confirmation(app);
@@ -63,6 +64,13 @@ pub(super) fn run() {
     let app = builder
         .setup(move |_app| {
             ipc_builder.mount_events(_app);
+            // Before anything else in setup: the intro has to be on screen
+            // while the frontend bundle is still downloading, not after it
+            // mounted and asked for one.
+            #[cfg(target_os = "macos")]
+            start_launch_intro_if_needed(_app.handle());
+            #[cfg(desktop)]
+            start_main_window_visibility_watchdog(_app.handle());
             #[cfg(target_os = "macos")]
             if let Err(error) = macos_inbox_notifications::install(_app.handle()) {
                 eprintln!("Inbox notification install skipped: {error}");

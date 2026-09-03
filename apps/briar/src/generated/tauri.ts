@@ -7,6 +7,21 @@ import * as __TAURI_EVENT from "@tauri-apps/api/event";
 export const commands = {
 	prepareLaunchIntro: () => __TAURI_INVOKE<null>("prepare_launch_intro"),
 	showMainWindow: () => __TAURI_INVOKE<null>("show_main_window"),
+	/**
+	 *  Reports that the main window committed its first real screen.
+	 *
+	 *  Called once the session restore settles, which is the moment the app shows
+	 *  either the dashboard or the login/onboarding screen instead of the session
+	 *  loading spinner.
+	 */
+	markMainWindowReady: () => __TAURI_INVOKE<null>("mark_main_window_ready"),
+	/**
+	 *  Shows the main window behind the intro once it is worth looking at.
+	 *
+	 *  Resolves no earlier than the frontend's readiness signal (capped by
+	 *  [`MAIN_WINDOW_READY_WAIT`]) so the intro can start its fade knowing the
+	 *  first real screen is already painted underneath it.
+	 */
 	revealMainWindow: () => __TAURI_INVOKE<null>("reveal_main_window"),
 	finishLaunchIntro: () => __TAURI_INVOKE<null>("finish_launch_intro"),
 	setMainWindowOnboardingMode: (compact: boolean) => __TAURI_INVOKE<null>("set_main_window_onboarding_mode", { compact }),

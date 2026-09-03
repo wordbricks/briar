@@ -61,6 +61,7 @@ pub(super) fn builder() -> Builder<tauri::Wry> {
         .commands(collect_commands![
             prepare_launch_intro,
             show_main_window,
+            mark_main_window_ready,
             reveal_main_window,
             finish_launch_intro,
             set_main_window_onboarding_mode,

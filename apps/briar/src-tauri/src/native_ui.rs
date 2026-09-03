@@ -2,6 +2,189 @@ use super::*;
 #[cfg(all(desktop, not(target_os = "macos")))]
 use tauri_specta::Event as _;
 
+/// Marker file written to the app data directory once the first-run intro has
+/// played through.
+///
+/// The intro window is opened from `setup`, long before any webview can read
+/// `localStorage`, so the "already seen" answer has to live on disk. The
+/// frontend keeps its own `localStorage` flag for the in-app preview flows.
+#[cfg(any(target_os = "macos", test))]
+pub(super) const LAUNCH_INTRO_SEEN_FILE: &str = "launch-intro-seen.v2";
+
+/// Longest [`reveal_main_window`] waits for the first real screen to commit.
+///
+/// The intro holds for five seconds regardless; this only bounds the extra
+/// wait when boot is slower than the animation.
+#[cfg(desktop)]
+pub(super) const MAIN_WINDOW_READY_WAIT: std::time::Duration = std::time::Duration::from_secs(12);
+
+/// Backstop for an intro whose script never finishes.
+///
+/// Covers the five second hold plus [`MAIN_WINDOW_READY_WAIT`] plus the fade
+/// and IPC round trips.
+#[cfg(target_os = "macos")]
+pub(super) const LAUNCH_INTRO_WATCHDOG: std::time::Duration = std::time::Duration::from_secs(20);
+
+/// Backstop for a launch that never reports readiness and never opens an intro.
+///
+/// The main window is created hidden, so a frontend that fails before the
+/// reveal effect runs (a broken bundle showing the `startup-error` overlay)
+/// would otherwise stay invisible forever.
+#[cfg(desktop)]
+pub(super) const MAIN_WINDOW_VISIBILITY_WATCHDOG: std::time::Duration =
+    std::time::Duration::from_secs(10);
+
+/// Whether [`display_main_window`] should recenter before showing.
+///
+/// Centering an already visible window makes it jump, so it only applies to
+/// the first show of a window that launched hidden.
+#[cfg(desktop)]
+pub(super) fn should_center_main_window(is_visible: bool) -> bool {
+    !is_visible
+}
+
+#[cfg(desktop)]
+#[derive(Debug, Default)]
+struct LaunchIntroStatus {
+    main_ready: bool,
+    reveal_requested: bool,
+}
+
+/// Handshake between the launch intro window and the main window's first
+/// screen.
+///
+/// The intro asks to reveal the main window after its five second hold;
+/// [`LaunchIntroShared::wait_for_main_ready`] keeps that request parked until
+/// the frontend reports that it committed a real screen, so the user never
+/// sees the session loading spinner behind the intro.
+#[cfg(desktop)]
+#[derive(Debug, Default)]
+pub(super) struct LaunchIntroShared {
+    status: Mutex<LaunchIntroStatus>,
+    ready: std::sync::Condvar,
+}
+
+#[cfg(desktop)]
+impl LaunchIntroShared {
+    fn status(&self) -> std::sync::MutexGuard<'_, LaunchIntroStatus> {
+        // A poisoned lock must not keep the main window hidden forever.
+        self.status
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+    }
+
+    pub(super) fn mark_main_ready(&self) {
+        {
+            let mut status = self.status();
+            if status.main_ready {
+                return;
+            }
+            status.main_ready = true;
+        }
+        self.ready.notify_all();
+    }
+
+    pub(super) fn is_main_ready(&self) -> bool {
+        self.status().main_ready
+    }
+
+    /// Records that the intro asked for the reveal. Returns whether this is the
+    /// first request.
+    pub(super) fn request_reveal(&self) -> bool {
+        let mut status = self.status();
+        let first = !status.reveal_requested;
+        status.reveal_requested = true;
+        first
+    }
+
+    pub(super) fn reveal_requested(&self) -> bool {
+        self.status().reveal_requested
+    }
+
+    /// Blocks until the main window reports readiness or `cap` elapses.
+    ///
+    /// Returns whether readiness arrived within the cap.
+    pub(super) fn wait_for_main_ready(&self, cap: std::time::Duration) -> bool {
+        let deadline = std::time::Instant::now() + cap;
+        let mut status = self.status();
+        while !status.main_ready {
+            let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+            if remaining.is_zero() {
+                return false;
+            }
+            let (next, timeout) = self
+                .ready
+                .wait_timeout(status, remaining)
+                .unwrap_or_else(|error| error.into_inner());
+            status = next;
+            if timeout.timed_out() && !status.main_ready {
+                return false;
+            }
+        }
+        true
+    }
+}
+
+/// Managed handle to [`LaunchIntroShared`].
+#[cfg(desktop)]
+#[derive(Debug, Default)]
+pub(super) struct LaunchIntroState(Arc<LaunchIntroShared>);
+
+#[cfg(desktop)]
+impl LaunchIntroState {
+    pub(super) fn shared(&self) -> Arc<LaunchIntroShared> {
+        Arc::clone(&self.0)
+    }
+}
+
+#[cfg(any(target_os = "macos", test))]
+pub(super) fn launch_intro_marker_path(app_data_directory: &Path) -> PathBuf {
+    app_data_directory.join(LAUNCH_INTRO_SEEN_FILE)
+}
+
+#[cfg(any(target_os = "macos", test))]
+pub(super) fn has_seen_launch_intro(app_data_directory: &Path) -> bool {
+    launch_intro_marker_path(app_data_directory).exists()
+}
+
+#[cfg(any(target_os = "macos", test))]
+pub(super) fn record_launch_intro_seen(app_data_directory: &Path) -> Result<(), String> {
+    let path = launch_intro_marker_path(app_data_directory);
+    if path.exists() {
+        return Ok(());
+    }
+    fs::create_dir_all(app_data_directory)
+        .and_then(|_| fs::write(&path, b"1"))
+        .map_err(|error| format!("첫 실행 인트로 기록을 저장하지 못했습니다: {error}"))
+}
+
+/// What a launch should do about the first-run intro.
+#[cfg(any(target_os = "macos", test))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum LaunchIntroDecision {
+    /// Play the intro and write the marker when it finishes.
+    Show,
+    /// The marker is already on disk.
+    AlreadySeen,
+    /// A profile that predates the marker: adopt it without replaying the
+    /// intro, so an update never shows the first-run animation twice.
+    AdoptExistingProfile,
+}
+
+#[cfg(any(target_os = "macos", test))]
+pub(super) fn launch_intro_decision(
+    intro_seen: bool,
+    has_existing_session: bool,
+) -> LaunchIntroDecision {
+    if intro_seen {
+        LaunchIntroDecision::AlreadySeen
+    } else if has_existing_session {
+        LaunchIntroDecision::AdoptExistingProfile
+    } else {
+        LaunchIntroDecision::Show
+    }
+}
+
 #[cfg(any(target_os = "macos", test))]
 pub(super) fn launch_intro_bounds(
     monitor_x: i32,
@@ -222,10 +405,14 @@ pub(super) fn set_main_window_onboarding_mode(
     Ok(())
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(desktop)]
 pub(super) fn display_main_window(app: &AppHandle, focus: bool) -> Result<(), String> {
     let main = main_window(app)?;
-    main.center().map_err(|error| error.to_string())?;
+    // `visible: false` in the window config means the first show is also the
+    // first placement; a window that is already on screen keeps its position.
+    if should_center_main_window(main.is_visible().unwrap_or(false)) {
+        main.center().map_err(|error| error.to_string())?;
+    }
     main.show().map_err(|error| error.to_string())?;
     if focus {
         main.set_focus().map_err(|error| error.to_string())?;
@@ -236,15 +423,45 @@ pub(super) fn display_main_window(app: &AppHandle, focus: bool) -> Result<(), St
 #[tauri::command]
 #[specta::specta]
 pub(super) fn show_main_window(app: tauri::AppHandle) -> Result<(), String> {
-    #[cfg(target_os = "macos")]
+    #[cfg(desktop)]
     {
+        // While the intro is on screen the reveal path owns the main window,
+        // so a frontend that believes it already played the intro (a cleared
+        // localStorage, say) cannot pop the window out from behind it.
+        if app.get_webview_window("launch-intro").is_some() {
+            return Ok(());
+        }
         display_main_window(&app, true)
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(desktop))]
     {
         let _ = app;
         Ok(())
     }
+}
+
+/// Reports that the main window committed its first real screen.
+///
+/// Called once the session restore settles, which is the moment the app shows
+/// either the dashboard or the login/onboarding screen instead of the session
+/// loading spinner.
+#[tauri::command]
+#[specta::specta]
+pub(super) fn mark_main_window_ready(webview: tauri::Webview) -> Result<(), String> {
+    #[cfg(desktop)]
+    {
+        if webview.window().label() != "main" {
+            return Ok(());
+        }
+        webview
+            .app_handle()
+            .state::<LaunchIntroState>()
+            .shared()
+            .mark_main_ready();
+    }
+    #[cfg(not(desktop))]
+    let _ = webview;
+    Ok(())
 }
 
 #[tauri::command]
@@ -306,14 +523,32 @@ pub(super) struct StatusTrayRunItem {
     pub(super) project_name: String,
 }
 
+/// Shows the main window behind the intro once it is worth looking at.
+///
+/// Resolves no earlier than the frontend's readiness signal (capped by
+/// [`MAIN_WINDOW_READY_WAIT`]) so the intro can start its fade knowing the
+/// first real screen is already painted underneath it.
 #[tauri::command]
 #[specta::specta]
-pub(super) fn reveal_main_window(app: tauri::AppHandle) -> Result<(), String> {
-    #[cfg(target_os = "macos")]
+pub(super) async fn reveal_main_window(app: tauri::AppHandle) -> Result<(), String> {
+    #[cfg(desktop)]
     {
+        let shared = {
+            let state = app.state::<LaunchIntroState>();
+            state.shared()
+        };
+        shared.request_reveal();
+        if !shared.is_main_ready() {
+            let waiter = Arc::clone(&shared);
+            tauri::async_runtime::spawn_blocking(move || {
+                waiter.wait_for_main_ready(MAIN_WINDOW_READY_WAIT)
+            })
+            .await
+            .map_err(|error| format!("Briar 메인 창 준비를 기다리지 못했습니다: {error}"))?;
+        }
         display_main_window(&app, false)
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(desktop))]
     {
         let _ = app;
         Ok(())
@@ -328,6 +563,7 @@ pub(super) fn finish_launch_intro(app: tauri::AppHandle) -> Result<(), String> {
         if let Some(intro) = app.get_webview_window("launch-intro") {
             intro.destroy().map_err(|error| error.to_string())?;
         }
+        persist_launch_intro_seen(&app);
         display_main_window(&app, true)
     }
     #[cfg(not(target_os = "macos"))]
@@ -337,85 +573,176 @@ pub(super) fn finish_launch_intro(app: tauri::AppHandle) -> Result<(), String> {
     }
 }
 
+/// Writes the "intro seen" marker, logging instead of failing the caller.
+#[cfg(target_os = "macos")]
+pub(super) fn persist_launch_intro_seen(app: &AppHandle) {
+    match app.path().app_data_dir() {
+        Ok(directory) => {
+            if let Err(error) = record_launch_intro_seen(&directory) {
+                eprintln!("Launch intro marker write failed: {error}");
+            }
+        }
+        Err(error) => eprintln!("Launch intro marker path failed: {error}"),
+    }
+}
+
+/// Opens the first-run intro from `setup` when this profile has never seen it.
+///
+/// Running before the frontend boots is the whole point: the intro covers the
+/// bundle download, the React mount, and the session restore instead of
+/// starting after them.
+#[cfg(target_os = "macos")]
+pub(super) fn start_launch_intro_if_needed(app: &AppHandle) {
+    let app_data_directory = match app.path().app_data_dir() {
+        Ok(directory) => directory,
+        Err(error) => {
+            eprintln!("Launch intro marker path failed: {error}");
+            return;
+        }
+    };
+    let has_existing_session = session_file_path(app)
+        .map(|path| path.exists())
+        .unwrap_or(false);
+    match launch_intro_decision(
+        has_seen_launch_intro(&app_data_directory),
+        has_existing_session,
+    ) {
+        LaunchIntroDecision::AlreadySeen => {}
+        LaunchIntroDecision::AdoptExistingProfile => {
+            if let Err(error) = record_launch_intro_seen(&app_data_directory) {
+                eprintln!("Launch intro marker write failed: {error}");
+            }
+        }
+        LaunchIntroDecision::Show => {
+            if let Err(error) = open_launch_intro_window(app) {
+                eprintln!("Launch intro startup failed: {error}");
+            }
+        }
+    }
+}
+
 #[tauri::command]
 #[specta::specta]
 pub(super) fn prepare_launch_intro(app: tauri::AppHandle) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
-        if app.get_webview_window("launch-intro").is_some() {
-            return Ok(());
-        }
-
-        let main = main_window(&app)?;
-        main.center().map_err(|error| error.to_string())?;
-        main.hide().map_err(|error| error.to_string())?;
-
-        let monitor = match main.current_monitor().map_err(|error| error.to_string())? {
-            Some(monitor) => monitor,
-            None => main
-                .primary_monitor()
-                .map_err(|error| error.to_string())?
-                .ok_or_else(|| "No macOS display is available".to_string())?,
-        };
-        let position = monitor.position();
-        let size = monitor.size();
-        let work_area = monitor.work_area();
-        let (x, y, width, height) = launch_intro_bounds(
-            position.x,
-            position.y,
-            size.width,
-            size.height,
-            work_area.position.y,
-        );
-        let scale_factor = monitor.scale_factor();
-
-        let build_result = WebviewWindowBuilder::new(
-            &app,
-            "launch-intro",
-            WebviewUrl::App("index.html?launchIntro=native".into()),
-        )
-        .title("")
-        .position(x as f64 / scale_factor, y as f64 / scale_factor)
-        .inner_size(width as f64 / scale_factor, height as f64 / scale_factor)
-        .decorations(false)
-        .resizable(false)
-        .minimizable(false)
-        .maximizable(false)
-        .closable(false)
-        .always_on_top(true)
-        .visible_on_all_workspaces(true)
-        .shadow(false)
-        .transparent(true)
-        .background_color(Color(0, 0, 0, 0))
-        .initialization_script("document.documentElement.classList.add('launch-intro-document');")
-        .focused(true)
-        .visible(true)
-        .build();
-
-        if let Err(error) = build_result {
-            let _ = display_main_window(&app, true);
-            return Err(error.to_string());
-        }
-
-        // The intro window is driven by frontend timers. If its script fails to
-        // load after an update, do not leave the production app running with
-        // every window hidden forever.
-        let fallback_app = app.clone();
-        std::thread::spawn(move || {
-            std::thread::sleep(std::time::Duration::from_secs(7));
-            if let Some(intro) = fallback_app.get_webview_window("launch-intro") {
-                let _ = intro.destroy();
-                let _ = display_main_window(&fallback_app, true);
-            }
-        });
-
-        Ok(())
+        open_launch_intro_window(&app)
     }
     #[cfg(not(target_os = "macos"))]
     {
         let _ = app;
         Err("The native launch intro is only available on macOS".to_string())
     }
+}
+
+/// Builds the always-on-top intro window over the current display.
+///
+/// Idempotent: a launch that already opened the intro from `setup` keeps the
+/// window the frontend's effect would otherwise duplicate.
+#[cfg(target_os = "macos")]
+pub(super) fn open_launch_intro_window(app: &AppHandle) -> Result<(), String> {
+    if app.get_webview_window("launch-intro").is_some() {
+        return Ok(());
+    }
+
+    let main = main_window(app)?;
+    main.hide().map_err(|error| error.to_string())?;
+
+    let monitor = match main.current_monitor().map_err(|error| error.to_string())? {
+        Some(monitor) => monitor,
+        None => main
+            .primary_monitor()
+            .map_err(|error| error.to_string())?
+            .ok_or_else(|| "No macOS display is available".to_string())?,
+    };
+    let position = monitor.position();
+    let size = monitor.size();
+    let work_area = monitor.work_area();
+    let (x, y, width, height) = launch_intro_bounds(
+        position.x,
+        position.y,
+        size.width,
+        size.height,
+        work_area.position.y,
+    );
+    let scale_factor = monitor.scale_factor();
+
+    // A dedicated entry, not `index.html`: the intro must not download and
+    // evaluate the whole app bundle a second time just to draw a splash.
+    let build_result = WebviewWindowBuilder::new(
+        app,
+        "launch-intro",
+        WebviewUrl::App("intro.html?launchIntro=native".into()),
+    )
+    .title("")
+    .position(x as f64 / scale_factor, y as f64 / scale_factor)
+    .inner_size(width as f64 / scale_factor, height as f64 / scale_factor)
+    .decorations(false)
+    .resizable(false)
+    .minimizable(false)
+    .maximizable(false)
+    .closable(false)
+    .always_on_top(true)
+    .visible_on_all_workspaces(true)
+    .shadow(false)
+    .transparent(true)
+    .background_color(Color(0, 0, 0, 0))
+    .initialization_script("document.documentElement.classList.add('launch-intro-document');")
+    .focused(true)
+    .visible(true)
+    .build();
+
+    if let Err(error) = build_result {
+        let _ = display_main_window(app, true);
+        return Err(error.to_string());
+    }
+
+    // The intro window is driven by frontend timers. If its script fails to
+    // load after an update, do not leave the production app running with
+    // every window hidden forever.
+    let fallback_app = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(LAUNCH_INTRO_WATCHDOG);
+        if let Some(intro) = fallback_app.get_webview_window("launch-intro") {
+            let _ = intro.destroy();
+            persist_launch_intro_seen(&fallback_app);
+            let _ = display_main_window(&fallback_app, true);
+        }
+    });
+
+    Ok(())
+}
+
+/// Shows the main window if a launch never revealed it.
+///
+/// The window is created hidden, so a frontend that crashes before its reveal
+/// effect runs would otherwise leave the app with nothing on screen — including
+/// the `startup-error` overlay it just rendered into that hidden webview.
+#[cfg(desktop)]
+pub(super) fn start_main_window_visibility_watchdog(app: &AppHandle) {
+    let watchdog_app = app.clone();
+    let shared = {
+        let state = app.state::<LaunchIntroState>();
+        state.shared()
+    };
+    std::thread::spawn(move || {
+        std::thread::sleep(MAIN_WINDOW_VISIBILITY_WATCHDOG);
+        // An intro on screen owns the reveal and has its own watchdog, and a
+        // reveal already parked on the readiness gate will show the window
+        // itself once boot settles.
+        if watchdog_app.get_webview_window("launch-intro").is_some() || shared.reveal_requested() {
+            return;
+        }
+        let Some(main) = watchdog_app.get_webview_window("main") else {
+            return;
+        };
+        if main.is_visible().unwrap_or(true) {
+            return;
+        }
+        if let Err(error) = display_main_window(&watchdog_app, true) {
+            eprintln!("Main window visibility watchdog failed: {error}");
+        }
+    });
 }
 
 /// Menu id of the custom Quit item installed by [`install_app_menu`].
@@ -673,7 +1000,12 @@ pub(crate) fn request_exit_confirmation(app: &AppHandle) {
             "종료".to_string(),
             "취소".to_string(),
         ));
-    let dialog = match app.get_webview_window("main") {
+    // Parenting to a window that has never been shown would hide the sheet
+    // along with it, so only attach once the main window is on screen.
+    let dialog = match app
+        .get_webview_window("main")
+        .filter(|main| main.is_visible().unwrap_or(false))
+    {
         Some(main) => dialog.parent(&main),
         None => dialog,
     };
