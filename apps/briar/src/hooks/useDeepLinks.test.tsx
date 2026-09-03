@@ -8,6 +8,10 @@ import { ToastProvider } from "../components/ui/toast";
 import { I18nProvider } from "../i18n";
 import type { ChannelSummary } from "../lib/channels-contract";
 import { demoDashboard } from "../lib/demo-data";
+import {
+  issueNavigationLocation,
+  projectNavigationLocation,
+} from "../lib/app-navigation";
 import { activeOrganizationIdAtom, organizationsAtom } from "../state/organization/atoms";
 import { lockedTeamIdAtom } from "../state/platform";
 import { createTestRegistry, type AtomRegistry } from "../state/registry";
@@ -19,7 +23,13 @@ import {
   channelCatalogCursorAtom,
   requestedChannelMessageAtom,
 } from "../state/channels/atoms";
+import { createNavigationActions } from "../state/navigation/actions";
 import {
+  activePageAtom,
+  activeRunIdAtom,
+  navigationChannelIdAtom,
+  navigationLocationAtom,
+  navigationTeamIdAtom,
   pendingBriarLinkAtom,
   pendingInboxNotificationTargetAtom,
   requestedRunIdAtom,
@@ -91,10 +101,6 @@ const channel = (overrides: Partial<ChannelSummary> = {}): ChannelSummary => ({
 });
 
 interface Recorder {
-  readonly channels: { channelId: string; page: string }[];
-  readonly issues: { runId: string; teamId?: string | null }[];
-  readonly pages: string[];
-  readonly replaced: unknown[];
   readonly ensured: string[];
   readonly selectedOrganizations: string[];
   readonly selectedTeams: string[];
@@ -102,15 +108,26 @@ interface Recorder {
 }
 
 const recorder = (): Recorder => ({
-  channels: [],
-  issues: [],
-  pages: [],
-  replaced: [],
   ensured: [],
   selectedOrganizations: [],
   selectedTeams: [],
   inboxReads: [],
 });
+
+/** Where the resolver left the user, as the navigation atoms report it. */
+const destination = (registry: AtomRegistry) => ({
+  channelId: registry.get(navigationChannelIdAtom),
+  page: registry.get(activePageAtom),
+  runId: registry.get(activeRunIdAtom),
+  teamId: registry.get(navigationTeamIdAtom),
+});
+
+const nowhere = {
+  channelId: null,
+  page: "lobby",
+  runId: null,
+  teamId: null,
+};
 
 /** Listeners that record their registration and never fire on their own. */
 const inertListeners = (): Partial<DeepLinkListeners> => ({
@@ -178,16 +195,6 @@ const harness = (
   const calls = recorder();
   const input: UseDeepLinksInput = {
     listeners: { ...inertListeners(), ...overrides },
-    navigation: {
-      navigateToChannel: (channelId, page) =>
-        calls.channels.push({ channelId, page }),
-      navigateToIssue: (runId, teamId) => calls.issues.push({ runId, teamId }),
-      navigateToPage: (page) => calls.pages.push(page),
-      replaceNavigationLocation: (location) => calls.replaced.push(location),
-    },
-    navigationTeamId: null,
-    navigationUserBoundaryChanged: false,
-    selectedRunId: null,
     session: {
       ensureTeamSelected: async (teamId) => {
         calls.ensured.push(teamId);
@@ -236,15 +243,16 @@ describe("useDeepLinks", () => {
     });
     await flush();
     // The catalog has not landed, so the link is still pending.
-    expect(calls.channels).toEqual([]);
+    expect(destination(registry)).toEqual(nowhere);
     expect(registry.get(pendingBriarLinkAtom)).not.toBeNull();
 
     await act(async () => loadCatalog(registry, [channel()]));
     await flush();
 
-    expect(calls.channels).toEqual([
-      { channelId: "channel-1", page: "channels" },
-    ]);
+    expect(destination(registry)).toMatchObject({
+      channelId: "channel-1",
+      page: "channels",
+    });
     expect(registry.get(activeChannelIdAtom)).toBe("channel-1");
     expect(registry.get(pendingBriarLinkAtom)).toBeNull();
 
@@ -269,7 +277,7 @@ describe("useDeepLinks", () => {
     await flush();
 
     expect(calls.selectedOrganizations).toEqual([organization.id]);
-    expect(calls.channels).toEqual([]);
+    expect(destination(registry)).toEqual(nowhere);
 
     await view.cleanup();
   });
@@ -290,7 +298,7 @@ describe("useDeepLinks", () => {
     await flush();
 
     expect(calls.selectedOrganizations).toEqual([]);
-    expect(calls.channels).toEqual([]);
+    expect(destination(registry)).toEqual(nowhere);
     expect(registry.get(pendingBriarLinkAtom)).not.toBeNull();
 
     await view.cleanup();
@@ -312,7 +320,10 @@ describe("useDeepLinks", () => {
     });
     await flush();
 
-    expect(calls.channels).toEqual([{ channelId: "channel-1", page: "dms" }]);
+    expect(destination(registry)).toMatchObject({
+      channelId: "channel-1",
+      page: "dms",
+    });
     expect(registry.get(requestedChannelMessageAtom)).toEqual({
       channelId: "channel-1",
       messageId: "message-1",
@@ -336,7 +347,11 @@ describe("useDeepLinks", () => {
     await flush();
 
     expect(calls.ensured).toEqual([teamB.id]);
-    expect(calls.issues).toEqual([{ runId: "run-1", teamId: teamB.id }]);
+    expect(destination(registry)).toMatchObject({
+      page: "issues",
+      runId: "run-1",
+      teamId: teamB.id,
+    });
     expect(registry.get(requestedRunIdAtom)).toBe("run-1");
     expect(registry.get(pendingBriarLinkAtom)).toBeNull();
 
@@ -357,7 +372,7 @@ describe("useDeepLinks", () => {
     });
     await flush();
 
-    expect(calls.issues).toEqual([]);
+    expect(destination(registry)).toEqual(nowhere);
     expect(registry.get(requestedRunIdAtom)).toBeNull();
 
     await view.cleanup();
@@ -376,7 +391,10 @@ describe("useDeepLinks", () => {
     });
     await flush();
 
-    expect(calls.pages).toEqual(["agents"]);
+    expect(destination(registry)).toMatchObject({
+      page: "agents",
+      teamId: teamA.id,
+    });
     expect(registry.get(requestedSessionIdAtom)).toBe("session-1");
     expect(registry.get(pendingBriarLinkAtom)).toBeNull();
 
@@ -401,7 +419,11 @@ describe("useDeepLinks", () => {
     // switches teams and the pass that routes both send it.
     expect(calls.inboxReads).toEqual(["message-9", "message-9"]);
     expect(calls.selectedTeams).toEqual([teamB.id]);
-    expect(calls.issues).toEqual([{ runId: "run-9", teamId: teamB.id }]);
+    expect(destination(registry)).toMatchObject({
+      page: "issues",
+      runId: "run-9",
+      teamId: teamB.id,
+    });
     expect(registry.get(requestedRunIdAtom)).toBe("run-9");
     expect(registry.get(pendingInboxNotificationTargetAtom)).toBeNull();
 
@@ -450,20 +472,21 @@ describe("useDeepLinks", () => {
   });
 
   it("leaves an issue page whose run is gone", async () => {
-    const { calls, input, registry } = harness();
+    const { input, registry } = harness();
     applySyncEvent(registry, {
       kind: "team-snapshot",
       teamId: teamA.id,
       payload: { ...demoDashboard, team: teamA, runs: [] },
     });
-    const view = await mount(registry, {
-      ...input,
-      navigationTeamId: teamA.id,
-      selectedRunId: "run-gone",
-    });
+    createNavigationActions(registry).navigateToLocation(
+      issueNavigationLocation(teamA.id, "run-gone"),
+    );
+    const view = await mount(registry, input);
     await flush();
 
-    expect(calls.replaced).toHaveLength(1);
+    expect(registry.get(navigationLocationAtom)).toBe(
+      projectNavigationLocation("issues", teamA.id),
+    );
 
     await view.cleanup();
   });

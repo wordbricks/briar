@@ -130,7 +130,7 @@ function Harness({ lockedProjectId }: { lockedProjectId: string | null }) {
   });
   // The polling, visibility and scope-invalidation effects moved to
   // `useTeamSync`, which the app mounts here.
-  return <AppEffects />;
+  return <AppEffects selectTeam={() => undefined} />;
 }
 
 const flush = async () => {

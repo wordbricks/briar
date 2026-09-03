@@ -20,7 +20,6 @@ import { CommandPaletteWithContext } from "./CommandPaletteWithContext";
 import { TeamOnboardingWithWorkspace } from "./WorkspaceViews";
 import { WorkerDispatchDialogWithTeam } from "./TeamViewsWithDashboard";
 import type { CommandPaletteItem } from "../CommandPalette";
-import type { ActivePage } from "../../lib/app-navigation";
 
 /*
   Everything that floats above the shell, in one place.
@@ -72,21 +71,16 @@ export interface AppDialogsProps {
   /** False while a gate owns the screen, exactly as the shell decided before. */
   readonly commandPaletteAvailable: boolean;
   readonly commandPaletteItems: CommandPaletteItem[];
-  /** Where the palette is being opened from, for its own ranking. */
-  readonly activePage: ActivePage;
-  readonly selectedRunId: string | null;
   readonly teamOnboarding: TeamOnboardingDialogState;
   readonly firstRunTutorial: FirstRunTutorialState;
   readonly launchIntro: LaunchIntroState;
 }
 
 export function AppDialogs({
-  activePage,
   commandPaletteAvailable,
   commandPaletteItems,
   firstRunTutorial,
   launchIntro,
-  selectedRunId,
   teamOnboarding,
 }: AppDialogsProps) {
   const { t } = useI18n();
@@ -138,7 +132,6 @@ export function AppDialogs({
       <PlanningProjectDialogWithPlanning />
       {commandPaletteAvailable && isCommandPaletteOpen ? (
         <CommandPaletteWithContext
-          activePage={activePage}
           initialQuery={initialQuery}
           items={commandPaletteItems}
           onOpenChange={(open) => {
@@ -146,7 +139,6 @@ export function AppDialogs({
             if (!open) setInitialQuery("");
           }}
           open={isCommandPaletteOpen}
-          selectedRunId={selectedRunId}
           shortcutLabel={formatShortcut(configuredKeybindings.commandPalette)}
         />
       ) : null}

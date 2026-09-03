@@ -9,16 +9,14 @@ import { I18nProvider } from "../i18n";
 import type { ChannelSummary } from "../lib/channels-contract";
 import { demoDashboard } from "../lib/demo-data";
 import { loadKeybindings } from "../lib/keybindings";
-import {
-  activeChannelIdAtom,
-  channelCatalogCursorAtom,
-} from "../state/channels/atoms";
+import { channelCatalogCursorAtom } from "../state/channels/atoms";
 import { isCommandPaletteOpenAtom } from "../state/dialogs/atoms";
 import {
   activeOrganizationIdAtom,
   organizationsAtom,
 } from "../state/organization/atoms";
 import { lockedTeamIdAtom } from "../state/platform";
+import { createNavigationActions } from "../state/navigation/actions";
 import { createTestRegistry, type AtomRegistry } from "../state/registry";
 import { tokenAtom, userAtom } from "../state/session/atoms";
 import { applySyncEvent } from "../state/sync/apply";
@@ -83,21 +81,12 @@ const channel = (overrides: Partial<ChannelSummary> = {}): ChannelSummary => ({
   ...overrides,
 });
 
-const baseInput: Omit<CommandPaletteItemsInput, "activePage"> = {
-  canGoBack: false,
-  canGoForward: false,
+const baseInput: CommandPaletteItemsInput = {
   commandPaletteAvailable: true,
-  goBack: () => undefined,
-  goForward: () => undefined,
   keybindings: loadKeybindings(),
   keyboardShortcutsShortcut: "⌘/",
-  navigateToIssue: () => undefined,
-  navigateToPage: () => undefined,
-  openAppSettings: () => undefined,
   selectTeam: () => undefined,
-  selectedRunId: null,
   sessions: [],
-  startTeamCreation: () => undefined,
   unreadInboxCount: 0,
 };
 
@@ -122,7 +111,7 @@ const build = async (
     <RegistryContext.Provider value={registry}>
       <I18nProvider>
         <Probe
-          input={{ activePage: "issues", ...baseInput, ...overrides }}
+          input={{ ...baseInput, ...overrides }}
           onItems={(next) => {
             items = next;
           }}
@@ -145,6 +134,10 @@ const harness = (open = true): AtomRegistry => {
     [lockedTeamIdAtom, null],
     [isCommandPaletteOpenAtom, open],
   ]);
+  // Where the palette is being opened from is read from the store now. A reset
+  // rather than a visit keeps the history empty, which is what the "nowhere to
+  // go back to" case below expects.
+  createNavigationActions(registry).resetNavigation("issues");
   applySyncEvent(registry, {
     kind: "team-snapshot",
     teamId: team.id,
@@ -194,7 +187,9 @@ describe("useCommandPaletteItems", () => {
   });
 
   it("marks the open issue as current and ranks it first", async () => {
-    const items = await build(harness(), { selectedRunId: "run-1" });
+    const registry = harness();
+    createNavigationActions(registry).navigateToIssue("run-1", team.id);
+    const items = await build(registry);
     const issue = items.find((item) => item.id === "issue:run-1");
     expect(issue?.active).toBe(true);
     expect(issue?.section).toBe("context");
@@ -231,10 +226,12 @@ describe("useCommandPaletteItems", () => {
     const still = await build(harness());
     expect(ids(still)).not.toContain("navigation:back");
 
-    const moved = await build(harness(), {
-      canGoBack: true,
-      canGoForward: true,
-    });
+    const registry = harness();
+    const actions = createNavigationActions(registry);
+    actions.navigateToPage("agents", team.id);
+    actions.navigateToPage("lobby", team.id);
+    actions.goBack();
+    const moved = await build(registry);
     expect(ids(moved)).toContain("navigation:back");
     expect(ids(moved)).toContain("navigation:forward");
   });

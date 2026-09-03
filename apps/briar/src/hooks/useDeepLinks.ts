@@ -4,11 +4,6 @@ import { useEffect } from "react";
 import { useI18n } from "../i18n";
 import { useToast } from "../components/ui/toast";
 import { resolveIssueHierarchyLocation } from "../lib/api";
-import type {
-  ActivePage,
-  AppNavigationLocation,
-  ChannelNavigationPage,
-} from "../lib/app-navigation";
 import { projectNavigationLocation } from "../lib/app-navigation";
 import { listenForClickedIssueLinks } from "../lib/external-links";
 import { navigateToIssueLink } from "../lib/issue-link-navigation";
@@ -24,9 +19,13 @@ import {
   requestedChannelMessageAtom,
 } from "../state/channels/atoms";
 import { activePlanningProjectIdAtom } from "../state/dialogs/atoms";
+import { useNavigationActions } from "../state/navigation/actions";
 import {
+  activeRunIdAtom,
   companionPageAtom,
   companionStatusAtom,
+  navigationTeamIdAtom,
+  navigationUserBoundaryChangedAtom,
   pendingBriarLinkAtom,
   pendingInboxNotificationTargetAtom,
   requestedRunIdAtom,
@@ -53,22 +52,10 @@ import { activeTeamIdAtom, teamsAtom } from "../state/team/atoms";
 
   The resolver's shape is what kept this in the app shell: it waits on state it
   does not own and then writes request atoms that a dozen views read. It reads
-  the waiting conditions from atoms now; navigation and the two session calls
-  that can switch teams are still the shell's and come in as parameters.
+  the waiting conditions and where the user already is from atoms now, and moves
+  through the navigation actions; the two session calls that can switch teams
+  are the only thing still handed in.
 */
-
-/** Where a resolved deep link sends the user. */
-export interface DeepLinkNavigation {
-  readonly navigateToChannel: (
-    channelId: string,
-    page: ChannelNavigationPage,
-    organizationId?: string | null,
-    projectId?: string | null,
-  ) => void;
-  readonly navigateToIssue: (runId: string, projectId?: string | null) => void;
-  readonly navigateToPage: (page: ActivePage, projectId?: string | null) => void;
-  readonly replaceNavigationLocation: (location: AppNavigationLocation) => void;
-}
 
 /** The session and inbox calls the resolver makes on the way. */
 export interface DeepLinkSession {
@@ -99,23 +86,12 @@ const liveListeners: DeepLinkListeners = {
 };
 
 export interface UseDeepLinksInput {
-  readonly navigation: DeepLinkNavigation;
   readonly session: DeepLinkSession;
-  /** The team the navigation location points at, for the orphan run fallback. */
-  readonly navigationTeamId: string | null;
-  /** The run the navigation location points at. */
-  readonly selectedRunId: string | null;
-  /** Set while the account just changed, when nothing may be reconciled. */
-  readonly navigationUserBoundaryChanged: boolean;
   readonly listeners?: Partial<DeepLinkListeners> | undefined;
 }
 
 export function useDeepLinks({
-  navigation,
   session,
-  navigationTeamId,
-  selectedRunId,
-  navigationUserBoundaryChanged,
   listeners: listenerOverrides,
 }: UseDeepLinksInput): void {
   const { t } = useI18n();
@@ -152,9 +128,18 @@ export function useDeepLinks({
   const setActivePlanningProjectId = useAtomSet(activePlanningProjectIdAtom);
   const setCompanionPage = useAtomSet(companionPageAtom);
   const setCompanionStatus = useAtomSet(companionStatusAtom);
+  const navigationTeamId = useAtomValue(navigationTeamIdAtom);
+  const selectedRunId = useAtomValue(activeRunIdAtom);
+  const navigationUserBoundaryChanged = useAtomValue(
+    navigationUserBoundaryChangedAtom,
+  );
   const { markOrganizationChannelRead, selectChannel } = useChannelActions();
-  const { navigateToChannel, navigateToIssue, navigateToPage } = navigation;
-  const { replaceNavigationLocation } = navigation;
+  const {
+    navigateToChannel,
+    navigateToIssue,
+    navigateToPage,
+    replaceNavigationLocation,
+  } = useNavigationActions();
   const { ensureTeamSelected, markInboxRead, selectOrganization, selectTeam } =
     session;
 

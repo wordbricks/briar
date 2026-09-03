@@ -11,7 +11,10 @@ import {
   projectNavigationLocation,
   settingsNavigationLocation,
 } from "../../lib/app-navigation";
-import { useChannelActions } from "../channels/actions";
+import {
+  setChannelNavigationBridge,
+  useChannelActions,
+} from "../channels/actions";
 import {
   activeChannelIdAtom,
   activeOrganizationChannelsAtom,
@@ -101,6 +104,18 @@ export function useNavigationReconciliation({
   const { selectOrganization } = useOrganizationActions();
   const { replaceNavigationLocation, resetNavigation } = actions;
   const navigationUserId = user?.id ?? null;
+
+  /*
+    The channel actions navigate, and navigation is a peer domain rather than
+    one they may import, so they ask for it through a bridge. Both sides are
+    registry bound, which is why installing it once is enough.
+  */
+  useEffect(() => {
+    setChannelNavigationBridge(registry, {
+      navigateToChannel: actions.navigateToChannel,
+      navigateToPage: actions.navigateToPage,
+    });
+  }, [actions, registry]);
 
   // 1. A different account took over: the visit stack the previous one built
   //    is dropped, and nothing below reconciles on that render.

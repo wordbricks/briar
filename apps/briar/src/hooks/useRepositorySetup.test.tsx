@@ -7,7 +7,11 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { I18nProvider } from "../i18n";
 import { demoDashboard, demoRepositoryReadiness } from "../lib/demo-data";
 import { repositorySetupTeamIdAtom } from "../state/dialogs/atoms";
-import { settingsTargetAtom } from "../state/navigation/atoms";
+import {
+  activePageAtom,
+  navigationLocationAtom,
+  settingsTargetAtom,
+} from "../state/navigation/atoms";
 import { createTestRegistry, type AtomRegistry } from "../state/registry";
 import { teamsAtom } from "../state/team/atoms";
 import { workspaceApiAtom } from "../state/workspace/api";
@@ -16,7 +20,6 @@ import {
   teamReadinessAtom,
 } from "../state/workspace/atoms";
 import { createReactTestRoot } from "../test/react";
-import type { ActivePage } from "../lib/app-navigation";
 import type { Project } from "../types";
 import type { ReconnectOutcome } from "../state/workspace/actions";
 import { useRepositorySetup, type RepositorySetup } from "./useRepositorySetup";
@@ -39,14 +42,10 @@ const readyTeam = teamOf("team-ready");
 const unconnectedTeam = teamOf("team-unconnected");
 
 class SetupBridge {
-  readonly navigations: { page: ActivePage; teamId?: string | null }[] = [];
   readonly selectedTeams: string[] = [];
   readonly reconnects: string[] = [];
   reconnectOutcome: ReconnectOutcome = "opened";
 
-  navigateToPage = (page: ActivePage, teamId?: string | null) => {
-    this.navigations.push({ page, teamId });
-  };
   selectTeam = (teamId: string) => {
     this.selectedTeams.push(teamId);
   };
@@ -60,7 +59,6 @@ let latest: RepositorySetup;
 
 function Harness({ bridge }: { readonly bridge: SetupBridge }) {
   latest = useRepositorySetup({
-    navigateToPage: bridge.navigateToPage,
     reconnectTeam: bridge.reconnectTeam,
     selectTeam: bridge.selectTeam,
   });
@@ -121,7 +119,7 @@ describe("useRepositorySetup", () => {
     await flush();
     expect(bridge.selectedTeams).toEqual([unconnectedTeam.id]);
     expect(registry.get(repositorySetupTeamIdAtom)).toBe(unconnectedTeam.id);
-    expect(bridge.navigations).toEqual([]);
+    expect(registry.get(navigationLocationAtom)).toBe("lobby");
     await view.cleanup();
   });
 
@@ -136,9 +134,7 @@ describe("useRepositorySetup", () => {
     await flush();
     expect(bridge.selectedTeams).toEqual([readyTeam.id]);
     expect(registry.get(repositorySetupTeamIdAtom)).toBeNull();
-    expect(bridge.navigations).toEqual([
-      { page: "settings", teamId: readyTeam.id },
-    ]);
+    expect(registry.get(activePageAtom)).toBe("settings");
     expect(registry.get(settingsTargetAtom)).toEqual({
       scope: "project",
       projectId: readyTeam.id,

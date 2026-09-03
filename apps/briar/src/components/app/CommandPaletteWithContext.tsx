@@ -3,13 +3,16 @@ import { lazy, Suspense, type ComponentProps } from "react";
 
 import { directMessageDisplayName } from "../../lib/direct-messages";
 import { formatIssueKey } from "../../lib/issue-key";
-import type { ActivePage } from "../../lib/app-navigation";
 import { channelAtom } from "../../state/entities/channels";
 import { runAtom, teamRunIdsAtom } from "../../state/entities/runs";
 import {
   activeChannelIdAtom,
   channelsLoadingAtom,
 } from "../../state/channels/atoms";
+import {
+  activePageAtom,
+  activeRunIdAtom,
+} from "../../state/navigation/atoms";
 import { activeOrganizationAtom } from "../../state/organization/atoms";
 import { loadingAtom, userAtom } from "../../state/session/atoms";
 import { activeTeamAtom } from "../../state/team/atoms";
@@ -24,8 +27,8 @@ const CommandPalette = lazy(() =>
   Its context line and its loading flag were assembled in the shell out of the
   dashboard, the channel catalog, the session and the selected team — four
   reads that put the whole shell in the palette's dependency graph for two
-  strings. The palette's items are still built by the shell: they carry the
-  navigation callbacks only it can supply.
+  strings. Where the user is comes from the navigation atoms, so the shell no
+  longer names the page or the open run either.
 
   The `lazy()` boundary lives here so the chunk split stays exactly where the
   shell had it.
@@ -34,18 +37,11 @@ const CommandPalette = lazy(() =>
 type CommandPaletteShellProps = Omit<
   ComponentProps<typeof CommandPalette>,
   "contextLabel" | "loading"
-> & {
-  /** The page the shell is showing, which decides how a channel is labelled. */
-  readonly activePage: ActivePage;
-  /** The run the navigation location points at, if any. */
-  readonly selectedRunId: string | null;
-};
+>;
 
-export function CommandPaletteWithContext({
-  activePage,
-  selectedRunId,
-  ...props
-}: CommandPaletteShellProps) {
+export function CommandPaletteWithContext(props: CommandPaletteShellProps) {
+  const activePage = useAtomValue(activePageAtom);
+  const selectedRunId = useAtomValue(activeRunIdAtom);
   const sessionLoading = useAtomValue(loadingAtom);
   const channelsLoading = useAtomValue(channelsLoadingAtom);
   const user = useAtomValue(userAtom);

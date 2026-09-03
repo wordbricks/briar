@@ -60,7 +60,6 @@ const payload: DashboardPayload = {
 };
 
 const props: AppDialogsProps = {
-  activePage: "issues",
   commandPaletteAvailable: true,
   commandPaletteItems: [],
   firstRunTutorial: {
@@ -74,7 +73,6 @@ const props: AppDialogsProps = {
     preview: false,
     visible: false,
   },
-  selectedRunId: null,
   teamOnboarding: {
     includeDeveloperTools: false,
     onCancel: () => undefined,
