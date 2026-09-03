@@ -30,6 +30,20 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.188",
+        date: "2026년 9월 3일",
+        title: "웹 로그인 흐름을 정리하고 Team·Project를 이슈 속성으로 다룹니다",
+        summary:
+          "웹 로그인을 브라우저 쿠키 세션 기반으로 바꾸고, 이슈의 Team·Project를 다른 속성처럼 관리합니다.",
+        items: [
+          "웹 로그인을 Better Auth 쿠키 세션 기반으로 통일해 이전 세션이 남아 인증이 꼬이지 않도록 고칩니다.",
+          "웹 로그아웃 시 서버 세션과 HttpOnly 쿠키를 함께 종료합니다.",
+          "이메일 OTP·Google 로그인을 표준 흐름으로 전환하고 Better Auth를 1.7.2로 업그레이드합니다.",
+          "이슈 카드 메뉴와 속성 패널에서 Team·Project를 속성으로 다루어 이동을 간소화합니다.",
+          "iOS 컴패니언 컨트롤 탭에 Team 선택기를 추가합니다.",
+        ],
+      },
+      {
         version: "1.2.187",
         date: "2026년 9월 3일",
         title: "제공자 설정을 보호하고 로딩 스피너를 정리합니다",
@@ -1508,6 +1522,20 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.188",
+        date: "September 3, 2026",
+        title: "Streamline web sign-in and treat Team and Project as issue properties",
+        summary:
+          "Move web sign-in onto cookie sessions and manage an issue's Team and Project like any other property.",
+        items: [
+          "Web sign-in now uses Better Auth cookie sessions so stale sessions can no longer leave auth in a mixed state.",
+          "Web sign-out ends both the server session and the HttpOnly cookie.",
+          "Switch email OTP and Google sign-in to standard flows and upgrade Better Auth to 1.7.2.",
+          "Issue card menus and the property panel now treat Team and Project as properties, simplifying moves.",
+          "The iOS companion control tab gains a Team picker.",
+        ],
+      },
       {
         version: "1.2.187",
         date: "September 3, 2026",
@@ -3078,7 +3106,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-187">
+          <a href="#v1-2-188">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -3100,7 +3128,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.187"
+                      entry.version === "1.2.188" || entry.version === "1.2.187"
                         ? "2026-09-03"
                         : entry.version === "1.2.186"
                         ? "2026-09-03"
