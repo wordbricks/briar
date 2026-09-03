@@ -23,6 +23,7 @@ export const workerD1TestFiles = [
   "worker/src/channel-message-pdf.test.ts",
   "worker/src/channel-proposal-routes.test.ts",
   "worker/src/channels.test.ts",
+  "worker/src/db.test.ts",
   "worker/src/dm-memory-learning-storage.test.ts",
   "worker/src/dm-memory-repository.test.ts",
   "worker/src/dm-memory-retrieval.test.ts",
@@ -54,4 +55,5 @@ export const workerD1TestFiles = [
   "worker/src/worker-reply-completion-application.test.ts",
   "worker/src/workers.test.ts",
   "worker/src/workflow-policy.test.ts",
+  "worker/src/workflow-v2.test.ts",
 ] as const;

@@ -66,6 +66,37 @@
       "outputs": ["dist/**"],
       "cache": true
     },
+    "d1:migrate:local": {
+      "inputs": [
+        "migrations/**",
+        "wrangler.jsonc",
+        "package.json",
+        "$TURBO_ROOT$/package.json",
+        "$TURBO_ROOT$/bun.lock"
+      ],
+      "outputs": [],
+      "cache": true
+    },
+    "test:d1:migrations": {
+      "inputs": [
+        "migrations/**",
+        "migrations-snapshot/**",
+        "src/i18n/locale.ts",
+        "src/lib/**/*.ts",
+        "worker/src/**/*.ts",
+        "vitest.max-workers.ts",
+        "vitest.worker-migrations.config.ts",
+        "vitest.worker.shared.ts",
+        "worker-configuration.d.ts",
+        "wrangler.jsonc",
+        "package.json",
+        "$TURBO_ROOT$/package.json",
+        "$TURBO_ROOT$/bun.lock",
+        "$TURBO_ROOT$/packages/contracts/src/**"
+      ],
+      "outputs": [],
+      "cache": true
+    },
     "typecheck": {
       "dependsOn": ["transit", "worker:check"],
       "outputs": []

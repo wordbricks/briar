@@ -114,11 +114,40 @@ The first failed context interrupts its still-running siblings, so a known
 failure does not leave expensive builds or Miniflare pools running. Local CI
 assumes the repository dependencies have already been installed.
 
-All four contexts, `d1-migrations` included, run in parallel. The D1 migration
-suite pins itself to a single Vitest worker while `app-worker` runs so the
-combined Miniflare pool stays small; wrangler state for `d1:migrate:local` lives
-in a private temporary directory. Set `BRIAR_CI_SERIAL_CONTEXTS=true` to run the
-contexts one at a time on constrained machines.
+All four contexts, `d1-migrations` included, run in parallel. While the
+`app-worker` context runs alongside it, `test:d1:migrations` is pinned to a
+single Vitest worker: every migration test replays the full history from an
+empty database, and at the machine-derived worker count those files time out
+against the parallel Worker suites and the Rust build. The pin costs nothing on
+a warm cache, where the step does not run at all. Set
+`BRIAR_CI_SERIAL_CONTEXTS=true` to run the contexts one at a time on constrained
+machines, or `VITEST_MAX_WORKERS` to pin the pool size yourself.
+
+`d1:migrate:local` and `test:d1:migrations` are cached by Turborepo, so a run
+that changes nothing under `apps/briar/migrations/` re-verifies nothing. Their
+inputs are declared explicitly in `apps/briar/turbo.json`: the migration files
+and the schema snapshot, every `.ts` file under `worker/src/` and `src/lib/`,
+the Vitest configs they load (`vitest.worker-migrations.config.ts`,
+`vitest.worker.shared.ts`, `vitest.max-workers.ts`), `wrangler.jsonc`, the
+generated contracts, and the root manifest and lockfile.
+`VITEST_MAX_WORKERS` is in `globalPassThroughEnv` and never enters the hash.
+
+The globs cover whole directories rather than the exact import closure of the
+16 migration tests. Editing an unrelated Worker test therefore reruns the
+migration suite (~60s), but such a change also reruns the much longer
+`app-worker` test step in parallel, so the critical path does not move — and no
+list has to be kept in sync when a migration test is added.
+
+Because Turborepo also hashes pass-through arguments, local CI applies the
+migrations into the fixed, git-ignored `apps/briar/.wrangler/ci-d1-state`
+instead of a fresh temporary directory, and removes it first so wrangler still
+starts from an empty database.
+
+To rerun either task against an unchanged tree:
+
+```sh
+bunx turbo run test:d1:migrations --filter=@briar/app --force
+```
 
 ### The D1 schema snapshot
 
@@ -131,9 +160,10 @@ each test file's isolated database.
 
 The migrations remain the source of truth. `d1:migrate:local`, `d1:migrate:remote`
 and the migration regression suite (`test:d1:migrations`, which covers
-`worker/src/**/*.migration.test.ts`, `db.test.ts` and `workflow-v2.test.ts`)
-still replay the real files, so migration behaviour is never validated through
-the snapshot.
+`worker/src/**/*.migration.test.ts`) still replay the real files, so migration
+behaviour is never validated through the snapshot. `db.test.ts` and
+`workflow-v2.test.ts` are repository integration tests rather than migration
+tests and run in the `worker-d1` project on the snapshot schema.
 
 After adding or editing a migration that changes the schema or seeds rows:
 

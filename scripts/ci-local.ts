@@ -382,14 +382,31 @@ const runAppWorker = Effect.fn("runAppWorkerCi")(
   },
 );
 
+// Fixed, git-ignored path instead of a per-run temporary directory: Turborepo
+// hashes pass-through arguments, so a random `--persist-to` made
+// `d1:migrate:local` miss its cache on every run. The directory is removed
+// first, so wrangler still applies the full migration history to an empty
+// database whenever the task actually executes.
+const d1StateDirectory = join(
+  workspaceRoot,
+  "apps",
+  "briar",
+  ".wrangler",
+  "ci-d1-state",
+);
+
 const runD1Migrations = Effect.fn("runD1MigrationsCi")(
   function* runD1MigrationsCiEffect(
     timings: Ref.Ref<ReadonlyArray<Timing>>,
     logPath: string,
-    stateDirectory: string,
     overlapAppWorker: boolean,
   ) {
     const fileSystem = yield* FileSystem.FileSystem;
+    const stateDirectory = d1StateDirectory;
+    yield* fileSystem.remove(stateDirectory, {
+      force: true,
+      recursive: true,
+    }).pipe(fileSystemError(`clear ${stateDirectory}`));
     yield* fileSystem.makeDirectory(stateDirectory, { recursive: true }).pipe(
       fileSystemError(`create ${stateDirectory}`),
     );
@@ -423,6 +440,11 @@ const runD1Migrations = Effect.fn("runD1MigrationsCi")(
       "test-migrations",
       {
         argv: ["bun", "run", "test:d1:migrations"],
+        // Pinned while the app-worker context is running: the migration suite
+        // starts each file from an empty database and replays the whole
+        // history, so at full worker count it times out against the parallel
+        // Worker suites and the Rust build. Cheap now that a warm cache skips
+        // the step entirely.
         env: overlapAppWorker ? { VITEST_MAX_WORKERS: "1" } : undefined,
       },
     );
@@ -749,12 +771,7 @@ const runCi = Effect.fn("runCi")(
             contextProgram = runAppWorker(timings, logPath);
             break;
           case "d1-migrations":
-            contextProgram = runD1Migrations(
-              timings,
-              logPath,
-              join(temporaryRoot, "d1-state"),
-              overlapAppWorker,
-            );
+            contextProgram = runD1Migrations(timings, logPath, overlapAppWorker);
             break;
           case "rust":
             contextProgram = runRust(timings, logPath);

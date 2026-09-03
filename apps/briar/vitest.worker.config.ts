@@ -3,11 +3,7 @@ import { resolveMaxWorkers } from "./vitest.max-workers";
 import { createWorkerTestPlugin } from "./vitest.worker.shared";
 import { workerD1TestFiles } from "./vitest.worker.test-files";
 
-const migrationTestGlobs = [
-  "worker/src/**/*.migration.test.ts",
-  "worker/src/db.test.ts",
-  "worker/src/workflow-v2.test.ts",
-];
+const migrationTestGlobs = ["worker/src/**/*.migration.test.ts"];
 
 export default defineConfig(async () => ({
   plugins: [await createWorkerTestPlugin({ migrations: false })],
