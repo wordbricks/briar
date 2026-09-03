@@ -4,6 +4,7 @@ import ReactMarkdown, {
   type Options,
 } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { remarkUnderline } from "../lib/remark-underline";
 
 const defaultComponents: Components = {
   table: ({ children, node: _node, ...props }) => (
@@ -11,6 +12,7 @@ const defaultComponents: Components = {
       <table {...props}>{children}</table>
     </div>
   ),
+  u: ({ children }) => <u>{children}</u>,
 };
 
 export function MarkdownContent({
@@ -32,7 +34,7 @@ export function MarkdownContent({
     <div className={classes}>
       <ReactMarkdown
         components={{ ...defaultComponents, ...components }}
-        remarkPlugins={[remarkGfm, ...remarkPlugins]}
+        remarkPlugins={[remarkGfm, remarkUnderline, ...remarkPlugins]}
         skipHtml
         urlTransform={urlTransform}
       >
