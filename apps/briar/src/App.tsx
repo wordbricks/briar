@@ -132,7 +132,7 @@ import {
   isInboxRunDetailTarget,
 } from "./lib/inbox-notifications";
 import type { InboxNotificationTarget } from "./generated/tauri";
-import { inboxDetailTargetAtom } from "./lib/inbox-selection";
+import { inboxDetailTargetAtom } from "./state/inbox-selection";
 import {
   clearFirstRunTutorialPending,
   hasPendingFirstRunTutorial,
