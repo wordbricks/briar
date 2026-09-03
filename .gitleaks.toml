@@ -12,3 +12,11 @@ targetRules = ["generic-api-key"]
 regexTarget = "line"
 paths = ['''(^|/)config/release\.env$''']
 regexes = ['''^APPLE_API_ISSUER=[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$''']
+
+[[allowlists]]
+description = "The Jay slot 10 test fixture contains a public campaign identifier, not a promotion credential"
+condition = "AND"
+targetRules = ["generic-api-key"]
+paths = ['''^apps/briar/worker/src/managed-computer-promotion-campaigns\.test\.ts$''']
+regexTarget = "line"
+regexes = ['''^\s*code_key: "getbriar-jay-10",\s*$''']

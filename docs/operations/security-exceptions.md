@@ -1,5 +1,19 @@
 # Security exceptions
 
+## Gitleaks public promotion campaign identifier
+
+- Recorded: 2026-09-03
+- Review by: 2026-10-03
+- Finding: `generic-api-key` on the public Jay slot 10 campaign identifier
+  in `apps/briar/worker/src/managed-computer-promotion-campaigns.test.ts`,
+  introduced by commit `1a74d6a8046ac296b40ba303c93765eb3962949a`.
+- This is the public campaign identifier stored in the migration. Promotion
+  credentials are separate values in `MANAGED_COMPUTER_PROMOTION_CODE`.
+- Scope: the allowlist requires both that exact test file and the exact
+  `code_key` line. Other identifiers, credentials, and files remain scanned.
+- Removal condition: remove the entry when Gitleaks no longer flags this
+  public identifier, or when the historical fixture is no longer scanned.
+
 ## GHSA-w3rx-r6r6-pgpr and GHSA-5p2g-fcmc-qvqq — temporary landing build exception
 
 - Recorded: 2026-08-23
