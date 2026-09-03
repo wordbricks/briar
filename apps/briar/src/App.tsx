@@ -8,32 +8,14 @@ import {
   useState,
 } from "react";
 import { useAtom, useAtomSet, useAtomValue } from "@effect/atom-react";
+import * as Atom from "effect/unstable/reactivity/Atom";
 import {
-  Activity,
-  ArrowLeft,
-  ArrowRight,
-  Bot,
-  Building2,
-  CalendarDays,
-  FolderKanban,
-  FolderPlus,
-  Hash,
-  House,
   Inbox as InboxIcon,
-  Keyboard as KeyboardIcon,
-  ListTodo,
   MessageCircle,
-  MessagesSquare,
-  PanelLeft,
-  Plus,
-  Settings,
 } from "lucide-react";
 import { AgentUsageStatusBar } from "./components/AgentUsageStatusBar";
 import { AppVersionStatus } from "./components/AppVersionStatus";
-import {
-  CompanionBottomNavigation,
-  type CompanionStatusFilter,
-} from "./components/CompanionBottomNavigation";
+import { CompanionBottomNavigation } from "./components/CompanionBottomNavigation";
 import { CompanionEmptyState, CompanionHeader } from "./components/CompanionHeader";
 import { Inbox } from "./components/Inbox";
 import { HuntDashboardWithTeam } from "./components/app/HuntDashboardWithTeam";
@@ -45,6 +27,7 @@ import {
   WorkerDispatchDialogWithTeam,
 } from "./components/app/TeamViewsWithDashboard";
 import {
+  AppSettingsWithWorkspace,
   ConnectionHealthWithWorkspace,
   TeamOnboardingWithWorkspace,
   TeamRepositorySetupDialogWithWorkspace,
@@ -63,17 +46,20 @@ import {
   DirectMessagesWithCatalog,
 } from "./components/app/ChannelViews";
 import { CommandPaletteWithContext } from "./components/app/CommandPaletteWithContext";
+import {
+  KeyboardShortcutsDialogWithPreferences,
+  PlanningProjectDialogWithPlanning,
+  keyboardShortcutsModifierLabel,
+} from "./components/app/AppDialogViews";
 import { AppEffects } from "./components/app/AppEffects";
 import { LoginScreenWithSession } from "./components/app/LoginScreenWithSession";
 import { loadProjectMergeActivity } from "./lib/app-rpc/github";
-import { TeamIcon } from "./components/TeamIcon";
 import { SessionLoadingScreen } from "./components/SessionLoadingScreen";
 import { EmptyState, MainContent, PageHeader } from "./components/layout";
 import { Button } from "./components/ui/button";
 import { LoadingState } from "./components/ui/loading-state";
 import { useToast } from "./components/ui/toast";
 import { SidebarWithSession } from "./components/app/SidebarWithSession";
-import type { UnifiedSettingsTarget } from "./components/UnifiedSettingsSidebar";
 import {
   WindowNavigationControls,
   type WindowNavigationHistoryItem,
@@ -81,11 +67,12 @@ import {
 import { appSettingsNavigationGroups } from "./components/app-settings-navigation";
 import { useBriar, type UseBriarOptions } from "./hooks/useBriar";
 import { commands } from "./generated/tauri";
-import {
-  collapseLinkedAutoHuntSessions,
-  useAutoHuntSessions,
-} from "./hooks/useAutoHuntSessions";
+import { useAutoHuntSessions } from "./hooks/useAutoHuntSessions";
+import { useAppShortcuts } from "./hooks/useAppShortcuts";
+import { useCommandPaletteItems } from "./hooks/useCommandPaletteItems";
+import { useDeepLinks } from "./hooks/useDeepLinks";
 import { useInbox } from "./hooks/useInbox";
+import { useWorkerDispatch } from "./hooks/useWorkerDispatch";
 import {
   inboxConversationSyncSignal,
   useInboxNotificationClicks,
@@ -122,6 +109,7 @@ import {
   storeOrganizationInvitationProgress,
 } from "./lib/organization-invitation";
 import { syncAppBadgeCount } from "./lib/app-badge";
+import { buildNavigationHistoryItems } from "./lib/navigation-history-items";
 import {
   clampInboxPaneWidth,
   inboxPaneWidthDefault,
@@ -130,13 +118,6 @@ import {
   loadInboxPaneWidth,
   saveInboxPaneWidth,
 } from "./lib/inbox-pane-width";
-import { DASHBOARD_POLL_INTERVAL_MS } from "./lib/dashboard-polling";
-import {
-  buildStatusTrayItems,
-  buildStatusTraySnapshot,
-  listenForStatusTrayOpenRun,
-  syncStatusTray,
-} from "./lib/status-tray";
 import type { MessageKey } from "./i18n/messages";
 import {
   inboxNotificationTarget,
@@ -144,7 +125,38 @@ import {
   isInboxRunDetailTarget,
 } from "./lib/inbox-notifications";
 import type { InboxNotificationTarget } from "./generated/tauri";
+import { activeDashboardAtom } from "./state/sync/view";
 import { inboxDetailTargetAtom } from "./state/inbox-selection";
+import {
+  activePlanningProjectIdAtom,
+  commandPaletteInitialQueryAtom,
+  completedDispatchRunIdAtom,
+  createIssueTeamIdAtom,
+  dispatchRunAtom,
+  isCommandPaletteOpenAtom,
+  isIssueDialogOpenAtom,
+  isKeyboardShortcutsOpenAtom,
+  isNavigationHistoryOpenAtom,
+  isSidebarOpenAtom,
+  planningProjectEditIdAtom,
+  planningProjectTeamIdAtom,
+  quickProcessErrorAtom,
+  quickStartingRunIdAtom,
+  repositorySetupTeamIdAtom,
+} from "./state/dialogs/atoms";
+import {
+  agentListRequestKeyAtom,
+  companionPageAtom,
+  companionStatusAtom,
+  issueListRequestKeyAtom,
+  pendingBriarLinkAtom,
+  pendingInboxNotificationTargetAtom,
+  requestedRunIdAtom,
+  requestedRunInitialTabAtom,
+  requestedRunMessageIdAtom,
+  requestedSessionIdAtom,
+  settingsTargetAtom,
+} from "./state/navigation/atoms";
 import {
   setChannelNavigationBridge,
   useChannelActions,
@@ -164,6 +176,11 @@ import {
   visibleOrganizationChannelsAtom,
 } from "./state/channels/atoms";
 import { useRegistry } from "./state/registry";
+import { useWorkspaceActions } from "./state/workspace/actions";
+import {
+  connectedTeamIdsAtom,
+  teamReadinessAtom,
+} from "./state/workspace/atoms";
 import {
   clearFirstRunTutorialPending,
   hasPendingFirstRunTutorial,
@@ -181,17 +198,9 @@ import {
   readTeamWindowProjectId,
 } from "./lib/team-window";
 import {
-  listenForBriarLinks,
-  parseWebAppIssuePath,
-  type BriarLinkTarget,
-} from "./lib/issue-links";
-import { listenForClickedIssueLinks } from "./lib/external-links";
-import { navigateToIssueLink } from "./lib/issue-link-navigation";
-import {
   localTeamConnectionState,
   teamRepositoryDestination,
 } from "./lib/local-team-connection";
-import type { IssueDetailTab } from "./lib/issue-detail-tab";
 import { settingsAccountSelection } from "./lib/settings-account-selection";
 import { LITELLM_MAIN_PRICING_SOURCE } from "./lib/agent-usage-pricing";
 import { createCachedTeamUsageSummaryLoader } from "./lib/team-usage-summary";
@@ -199,12 +208,10 @@ import {
   dispatchHuntRun,
   loadAgentUsageReport,
   loadDashboard,
-  loadStatusTrayRuns,
   loadProjectAgents,
   loadProjectUsageSummary,
   runProjectAgentTaskOnWorker,
   retryHuntRun,
-  resolveIssueHierarchyLocation,
 } from "./lib/api";
 import { createInboxRealtimeTransport } from "./lib/channel-realtime";
 import { startDesktopChannelTransition } from "./lib/channel-performance";
@@ -227,18 +234,8 @@ import {
   recoveryAgent,
   takePlannedUpdateAgentRecoveries,
 } from "./lib/planned-update-recovery";
-import {
-  formatShortcut,
-  isMacPlatform,
-  loadKeybindings,
-  loadKeyboardNavigationPreferences,
-  subscribeKeyboardNavigationPreferences,
-} from "./lib/keybindings";
-import {
-  appKeyboardShortcutSpecs,
-  createKeyboardShortcutHelpSections,
-  type AppKeyboardShortcutCommandId,
-} from "./lib/app-keyboard-shortcuts";
+import { formatShortcut, loadKeybindings } from "./lib/keybindings";
+import { appKeyboardShortcutSpecs } from "./lib/app-keyboard-shortcuts";
 import { hasOpenKeyboardShortcutOverlay } from "./lib/keyboard-shortcuts";
 import { formatIssueKey } from "./lib/issue-key";
 import { listenForAppMenuSettings } from "./lib/app-menu";
@@ -262,15 +259,12 @@ import {
   type ChannelNavigationPage,
 } from "./lib/app-navigation";
 import { useI18n } from "./i18n";
-import type { HuntRun, ProjectAgent, StatusTrayRun } from "./types";
+import type { HuntRun, ProjectAgent } from "./types";
 
 // Views and overlays that never show on the first screen load from their own
 // chunk. Each is behind a `<Suspense>` boundary whose fallback is an empty
 // surface: a local chunk resolves in a few milliseconds, so a spinner would
 // flash rather than inform.
-const AppSettings = lazy(() =>
-  import("./components/AppSettings").then((m) => ({ default: m.AppSettings })),
-);
 const CompanionSettings = lazy(() =>
   import("./components/CompanionSettings").then((m) => ({
     default: m.CompanionSettings,
@@ -296,11 +290,6 @@ const InvitationOnboarding = lazy(() =>
     default: m.InvitationOnboarding,
   })),
 );
-const KeyboardShortcutsDialog = lazy(() =>
-  import("./components/KeyboardShortcutsDialog").then((m) => ({
-    default: m.KeyboardShortcutsDialog,
-  })),
-);
 const LaunchIntro = lazy(() =>
   import("./components/LaunchIntro").then((m) => ({ default: m.LaunchIntro })),
 );
@@ -315,11 +304,6 @@ const OrganizationCreate = lazy(() =>
 const OrganizationSettings = lazy(() =>
   import("./components/app/OrganizationSettingsWithSession").then((m) => ({
     default: m.OrganizationSettingsWithSession,
-  })),
-);
-const PlanningProjectDialog = lazy(() =>
-  import("./components/PlanningProjectDialog").then((m) => ({
-    default: m.PlanningProjectDialog,
   })),
 );
 const TeamAgentSessionDetail = lazy(() =>
@@ -415,6 +399,12 @@ export function App({
   const briar = useBriar(scheduleSessionOptions);
   const registry = useRegistry();
   /*
+    The payload on screen, read from the store rather than through the facade.
+    Everything left in the shell that touches it — the inbox detail renderer and
+    the two dispatch reconciliations — reads this one subscription.
+  */
+  const activeDashboard = useAtomValue(activeDashboardAtom);
+  /*
     The channel catalog and everything selected inside it live in
     `state/channels` now. The shell reads the few values its own navigation and
     keyboard handlers need; the conversation views subscribe on their own.
@@ -448,7 +438,6 @@ export function App({
     selectChannel,
     setViewingChannel,
   } = useChannelActions();
-  const [statusTrayRuns, setStatusTrayRuns] = useState<StatusTrayRun[]>([]);
   const loadUsageReport = useCallback(async () => {
     if (!briar.token || !briar.activeOrganizationId) {
       return {
@@ -492,12 +481,12 @@ export function App({
     );
   }, [autoHunt.configureSync, briar.projects, briar.token]);
   useEffect(() => {
-    if (!briar.dashboard) return;
+    if (!activeDashboard) return;
     autoHunt.reconcileWorkerDispatches(
-      briar.dashboard.team.id,
-      briar.dashboard.runs,
+      activeDashboard.team.id,
+      activeDashboard.runs,
     );
-  }, [autoHunt.reconcileWorkerDispatches, briar.dashboard]);
+  }, [autoHunt.reconcileWorkerDispatches, activeDashboard]);
   const inboxRealtime = useMemo(
     () =>
       briar.token && briar.activeOrganizationId && briar.user?.id
@@ -511,7 +500,7 @@ export function App({
   const inbox = useInbox(
     briar.user?.id ?? null,
     briar.activeOrganizationId,
-    briar.dashboard,
+    activeDashboard,
     autoHunt.sessions,
     briar.projects,
     briar.token,
@@ -562,121 +551,7 @@ export function App({
   const mobilePlatform = getMobilePlatform() ?? "android";
   const previewsLaunchIntro = isLaunchIntroPreview();
   const runsOnDesktopTauri = isDesktopTauri();
-  const runsOnMacDesktop = isMacDesktopTauri();
   const runsOnWeb = isWebApp();
-  useEffect(() => {
-    if (!runsOnMacDesktop || projectWindowProjectId) return;
-    const dashboard = briar.dashboard;
-    if (!dashboard) return;
-    const projectRuns: StatusTrayRun[] = dashboard.runs
-      .filter((run) => run.status === "running")
-      .map((run) => ({
-        teamId: dashboard.team.id,
-        teamName: dashboard.team.name,
-        id: run.id,
-        title: run.title,
-        status: "running",
-        workflowStage: run.workflowStage,
-        workflowStageLabel:
-          run.workflow.stages.find((stage) => stage.id === run.workflowStage)
-            ?.label ?? null,
-        startedAt: run.startedAt,
-        updatedAt: run.updatedAt,
-        lastEventAt: run.lastEventAt,
-      }));
-    setStatusTrayRuns((current) => [
-      ...current.filter((run) => run.teamId !== dashboard.team.id),
-      ...projectRuns,
-    ]);
-  }, [briar.dashboard, projectWindowProjectId, runsOnMacDesktop]);
-  useEffect(() => {
-    if (!runsOnMacDesktop || projectWindowProjectId) return;
-    const token = briar.token;
-    const organizationId = briar.activeOrganizationId;
-    if (!token || !organizationId) {
-      setStatusTrayRuns([]);
-      return;
-    }
-    setStatusTrayRuns([]);
-    let cancelled = false;
-    let timer: number | null = null;
-    let request: AbortController | null = null;
-    const refreshStatusTray = async () => {
-      request = new AbortController();
-      try {
-        const result = await loadStatusTrayRuns(
-          token,
-          organizationId,
-          request.signal,
-        );
-        if (!cancelled) setStatusTrayRuns(result.runs);
-      } catch {
-        // Keep the last known tray projection across transient network errors.
-      } finally {
-        request = null;
-        if (!cancelled) {
-          timer = window.setTimeout(
-            () => void refreshStatusTray(),
-            DASHBOARD_POLL_INTERVAL_MS,
-          );
-        }
-      }
-    };
-
-    void refreshStatusTray();
-    return () => {
-      cancelled = true;
-      request?.abort();
-      if (timer !== null) window.clearTimeout(timer);
-    };
-  }, [
-    briar.activeOrganizationId,
-    briar.token,
-    projectWindowProjectId,
-    runsOnMacDesktop,
-  ]);
-  useEffect(() => {
-    if (!runsOnMacDesktop || projectWindowProjectId) return;
-    const items = buildStatusTrayItems(
-      statusTrayRuns,
-      {
-        untitledTitle: t("statusTray.untitledIssue"),
-        localizeStatus: (fallback, run) => {
-          if (run.status === "running" && run.workflowStage) {
-            const stageKey = `stage.${run.workflowStage}` as MessageKey;
-            const localized = t(stageKey);
-            if (localized && localized !== stageKey) return localized;
-            return run.workflowStageLabel ?? fallback;
-          }
-          const statusKey = `status.${run.status}` as MessageKey;
-          const localized = t(statusKey);
-          return localized && localized !== statusKey ? localized : fallback;
-        },
-      },
-    );
-    const snapshot = buildStatusTraySnapshot(items, {
-      runningLabel: t("statusTray.running"),
-      emptyLabel: t("statusTray.empty"),
-      openLabel: t("statusTray.openBriar"),
-      quitLabel: t("statusTray.quitBriar"),
-      moreLabel: t("statusTray.more"),
-    });
-    void syncStatusTray(snapshot).catch(() => {
-      // Tray bridge may be unavailable outside the packaged macOS app.
-    });
-  }, [
-    locale,
-    projectWindowProjectId,
-    runsOnMacDesktop,
-    statusTrayRuns,
-    t,
-  ]);
-  useEffect(() => {
-    if (!runsOnDesktopTauri || projectWindowProjectId) return;
-    void commands.syncExecutionWorkerLabels().catch(() => {
-      // Offline startup must not block the rest of the desktop app.
-    });
-  }, [projectWindowProjectId, runsOnDesktopTauri]);
   // Preview changes the timing, not the macOS presentation surface.
   const usesNativeLaunchIntro = isMacDesktopTauri();
   const [isLaunchIntroVisible, setIsLaunchIntroVisible] = useState(
@@ -687,15 +562,21 @@ export function App({
       (previewsLaunchIntro || shouldShowLaunchIntro()),
   );
 
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
-  const [isNavigationHistoryOpen, setIsNavigationHistoryOpen] = useState(false);
-  const [commandPaletteInitialQuery, setCommandPaletteInitialQuery] =
-    useState("");
-  const [isKeyboardShortcutsOpen, setIsKeyboardShortcutsOpen] =
-    useState(false);
-  const [sequenceShortcutsEnabled, setSequenceShortcutsEnabled] = useState(
-    () => loadKeyboardNavigationPreferences().sequenceShortcutsEnabled,
+  const [isSidebarOpen, setIsSidebarOpen] = useAtom(isSidebarOpenAtom);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useAtom(
+    isCommandPaletteOpenAtom,
+  );
+  const [isNavigationHistoryOpen, setIsNavigationHistoryOpen] = useAtom(
+    isNavigationHistoryOpenAtom,
+  );
+  const commandPaletteInitialQuery = useAtomValue(
+    commandPaletteInitialQueryAtom,
+  );
+  const setCommandPaletteInitialQuery = useAtomSet(
+    commandPaletteInitialQueryAtom,
+  );
+  const [isKeyboardShortcutsOpen, setIsKeyboardShortcutsOpen] = useAtom(
+    isKeyboardShortcutsOpenAtom,
   );
   const {
     containerRef: inboxLayoutRef,
@@ -711,11 +592,7 @@ export function App({
     min: inboxPaneWidthMin,
     save: saveInboxPaneWidth,
   });
-  const [settingsTarget, setSettingsTarget] =
-    useState<UnifiedSettingsTarget>({
-      scope: "application",
-      section: "source-control",
-    });
+  const [settingsTarget, setSettingsTarget] = useAtom(settingsTargetAtom);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(
     hasCompletedInitialOnboarding,
   );
@@ -1158,14 +1035,9 @@ export function App({
   useEffect(() => {
     setChannelNavigationBridge(registry, { navigateToChannel, navigateToPage });
   }, [navigateToChannel, navigateToPage, registry]);
-  const [pendingBriarLink, setPendingBriarLink] =
-    useState<BriarLinkTarget | null>(() => {
-      if (!runsOnWeb) return null;
-      const target = parseWebAppIssuePath(window.location.pathname);
-      return target ? { kind: "issue", ...target } : null;
-    });
+  const [pendingBriarLink, setPendingBriarLink] = useAtom(pendingBriarLinkAtom);
   const [pendingInboxNotificationTarget, setPendingInboxNotificationTarget] =
-    useState<InboxNotificationTarget | null>(null);
+    useAtom(pendingInboxNotificationTargetAtom);
   const setInboxDetailTarget = useAtomSet(inboxDetailTargetAtom);
   const handleInboxNotificationClick = useCallback(
     (target: InboxNotificationTarget) => {
@@ -1174,356 +1046,60 @@ export function App({
     [projectWindowProjectId],
   );
   useInboxNotificationClicks(handleInboxNotificationClick);
-  const [requestedRunId, setRequestedRunId] = useState<string | null>(null);
-  const [requestedRunMessageId, setRequestedRunMessageId] = useState<string | null>(null);
-  const [requestedRunInitialTab, setRequestedRunInitialTab] =
-    useState<IssueDetailTab | null>(null);
-  const [issueListRequestKey, setIssueListRequestKey] = useState(0);
-  const [agentListRequestKey, setAgentListRequestKey] = useState(0);
-  const [requestedSessionId, setRequestedSessionId] = useState<string | null>(
-    null,
+  const [requestedRunId, setRequestedRunId] = useAtom(requestedRunIdAtom);
+  const [requestedRunMessageId, setRequestedRunMessageId] = useAtom(
+    requestedRunMessageIdAtom,
   );
-  const [isIssueDialogOpen, setIsIssueDialogOpen] = useState(false);
-  const [createIssueProjectId, setCreateIssueProjectId] = useState<string | null>(
-    null,
+  const [requestedRunInitialTab, setRequestedRunInitialTab] = useAtom(
+    requestedRunInitialTabAtom,
   );
-  const [planningProjectTeamId, setPlanningProjectTeamId] = useState<
-    string | null
-  >(null);
-  const [planningProjectEditId, setPlanningProjectEditId] = useState<
-    string | null
-  >(null);
-  const [activePlanningProjectId, setActivePlanningProjectId] = useState<
-    string | null
-  >(null);
-  const [quickStartingRunId, setQuickStartingRunId] = useState<string | null>(
-    null,
+  const [issueListRequestKey, setIssueListRequestKey] = useAtom(
+    issueListRequestKeyAtom,
   );
-  const [quickProcessError, setQuickProcessError] = useState<string | null>(
-    null,
+  const [agentListRequestKey, setAgentListRequestKey] = useAtom(
+    agentListRequestKeyAtom,
   );
-  const [completedDispatchRunId, setCompletedDispatchRunId] = useState<
-    string | null
-  >(null);
-  const [dispatchRun, setDispatchRun] = useState<HuntRun | null>(null);
-  const [companionPage, setCompanionPage] = useState<
-    "issues" | "dms" | "home" | "inbox" | "lobby" | "settings"
-  >("issues");
-  const [companionStatus, setCompanionStatus] =
-    useState<CompanionStatusFilter>("all");
-  useEffect(
-    () =>
-      projectWindowProjectId
-        ? undefined
-        : listenForBriarLinks(setPendingBriarLink),
-    [projectWindowProjectId],
+  const [requestedSessionId, setRequestedSessionId] = useAtom(
+    requestedSessionIdAtom,
   );
-  useEffect(
-    () =>
-      listenForClickedIssueLinks((target) =>
-        setPendingBriarLink({ kind: "issue", ...target }),
-      ),
-    [],
+  const [isIssueDialogOpen, setIsIssueDialogOpen] = useAtom(
+    isIssueDialogOpenAtom,
   );
-  useEffect(() => {
-    if (!runsOnMacDesktop || projectWindowProjectId) return;
-    return listenForStatusTrayOpenRun((payload) => {
-      setPendingBriarLink({
-        kind: "issue",
-        projectId: payload.projectId,
-        runId: payload.runId,
-      });
-    });
-  }, [projectWindowProjectId, runsOnMacDesktop]);
-  useEffect(() => {
-    if (!pendingBriarLink || !briar.user || briar.loading) return;
-    if (pendingBriarLink.kind === "channel") {
-      setRequestedRunMessageId(null);
-      if (
-        !briar.organizations.some(
-          (organization) => organization.id === pendingBriarLink.organizationId,
-        )
-      ) {
-        return;
-      }
-      if (pendingBriarLink.organizationId !== briar.activeOrganizationId) {
-        briar.setActiveOrganizationId(pendingBriarLink.organizationId);
-        return;
-      }
-      if (channelsLoading || channelCatalogCursor === null) {
-        return;
-      }
-      setRequestedRunInitialTab(null);
-      setRequestedRunId(null);
-      setRequestedSessionId(null);
-      setRequestedChannelMessage(
-        pendingBriarLink.messageId && pendingBriarLink.rootMessageId
-          ? {
-              channelId: pendingBriarLink.channelId,
-              messageId: pendingBriarLink.messageId,
-              rootMessageId: pendingBriarLink.rootMessageId,
-            }
-          : null,
-      );
-      setRequestedChannelId(
-        briar.companionMode &&
-          !(pendingBriarLink.messageId && pendingBriarLink.rootMessageId)
-          ? pendingBriarLink.channelId
-          : null,
-      );
-      selectChannel(pendingBriarLink.channelId);
-      markOrganizationChannelRead(pendingBriarLink.channelId);
-      if (briar.companionMode) {
-        setCompanionPage(
-          organizationChannels.find(
-              (channel) => channel.id === pendingBriarLink.channelId,
-            )?.kind === "dm"
-            ? "dms"
-            : "home",
-        );
-      } else {
-        navigateToChannel(
-          pendingBriarLink.channelId,
-          organizationChannels.find(
-            (channel) => channel.id === pendingBriarLink.channelId,
-          )?.kind === "dm"
-            ? "dms"
-            : "channels",
-          pendingBriarLink.organizationId,
-        );
-      }
-      setPendingBriarLink(null);
-      return;
-    }
-    if (pendingBriarLink.kind === "issue") {
-      const target = pendingBriarLink;
-      setPendingBriarLink(null);
-      void (async () => {
-        let resolvedTarget = target;
-        if (briar.token) {
-          try {
-            const location = await resolveIssueHierarchyLocation(
-              briar.token,
-              target.projectId,
-              target.runId,
-            );
-            resolvedTarget = {
-              ...target,
-              projectId: location.teamId,
-              runId: location.runId,
-            };
-            setActivePlanningProjectId(location.projectId);
-          } catch {
-            // Compatibility with servers that predate hierarchy resolution.
-          }
-        }
-        return navigateToIssueLink({
-          target: resolvedTarget,
-          activeProjectId: briar.activeProjectId,
-          availableProjectIds: briar.projects.map((project) => project.id),
-          lockedProjectId: projectWindowProjectId,
-          ensureProjectSelected: briar.ensureProjectSelected,
-          openIssue: ({ projectId, runId }) => {
-            setRequestedSessionId(null);
-            setRequestedRunMessageId(null);
-            setRequestedRunInitialTab(null);
-            setRequestedRunId(runId);
-            setCompanionPage("issues");
-            setCompanionStatus("all");
-            navigateToIssue(runId, projectId);
-          },
-        });
-      })().then((outcome) => {
-        if (outcome.status !== "rejected") return;
-        toast(
-          t(
-            outcome.reason === "project-window-locked"
-              ? "navigation.issueLinkProjectWindow"
-              : "navigation.issueLinkProjectUnavailable",
-          ),
-          { tone: "error" },
-        );
-      });
-      return;
-    }
-    if (
-      !briar.projects.some(
-        (project) => project.id === pendingBriarLink.projectId,
-      )
-    ) {
-      return;
-    }
-
-    if (pendingBriarLink.projectId !== briar.activeProjectId) {
-      briar.setActiveProjectId(pendingBriarLink.projectId);
-    }
-    setRequestedRunMessageId(null);
-    setRequestedRunInitialTab(null);
-    setRequestedRunId(null);
-    setRequestedSessionId(pendingBriarLink.sessionId);
-    if (briar.companionMode) setCompanionPage("dms");
-    else navigateToPage("agents", pendingBriarLink.projectId);
-    setPendingBriarLink(null);
-  }, [
-    briar.activeOrganizationId,
-    briar.activeProjectId,
-    briar.companionMode,
-    briar.loading,
-    briar.organizations,
-    briar.projects,
-    briar.ensureProjectSelected,
-    briar.setActiveOrganizationId,
-    briar.setActiveProjectId,
-    briar.user,
-    channelCatalogCursor,
-    channelsLoading,
-    markOrganizationChannelRead,
-    navigateToChannel,
-    navigateToIssue,
-    navigateToPage,
-    organizationChannels,
-    pendingBriarLink,
-    projectWindowProjectId,
-    t,
-    toast,
-  ]);
-  useEffect(() => {
-    if (
-      navigationUserBoundaryChanged ||
-      !selectedRunId ||
-      !navigationProjectId ||
-      briar.dashboard?.team.id !== navigationProjectId ||
-      briar.dashboard.runs.some((run) => run.id === selectedRunId)
-    ) {
-      return;
-    }
-    if (requestedRunId === selectedRunId) {
-      setRequestedRunId(null);
-      setRequestedRunMessageId(null);
-      setRequestedRunInitialTab(null);
-      toast(t("navigation.issueLinkIssueUnavailable"), { tone: "error" });
-    }
-    replaceNavigationLocation(
-      projectNavigationLocation("issues", navigationProjectId),
-    );
-  }, [
-    briar.dashboard,
-    navigationProjectId,
+  const [createIssueProjectId, setCreateIssueProjectId] = useAtom(
+    createIssueTeamIdAtom,
+  );
+  const [planningProjectTeamId, setPlanningProjectTeamId] = useAtom(
+    planningProjectTeamIdAtom,
+  );
+  const [planningProjectEditId, setPlanningProjectEditId] = useAtom(
+    planningProjectEditIdAtom,
+  );
+  const [activePlanningProjectId, setActivePlanningProjectId] = useAtom(
+    activePlanningProjectIdAtom,
+  );
+  const quickStartingRunId = useAtomValue(quickStartingRunIdAtom);
+  const [quickProcessError, setQuickProcessError] = useAtom(
+    quickProcessErrorAtom,
+  );
+  const [companionPage, setCompanionPage] = useAtom(companionPageAtom);
+  const [companionStatus, setCompanionStatus] = useAtom(companionStatusAtom);
+  useDeepLinks({
+    navigation: {
+      navigateToChannel,
+      navigateToIssue,
+      navigateToPage,
+      replaceNavigationLocation,
+    },
+    navigationTeamId: navigationProjectId,
     navigationUserBoundaryChanged,
-    replaceNavigationLocation,
-    requestedRunId,
     selectedRunId,
-    t,
-    toast,
-  ]);
-  useEffect(() => {
-    if (!pendingInboxNotificationTarget || !briar.user || briar.loading) return;
-    const targetProject = briar.projects.find(
-      (project) => project.id === pendingInboxNotificationTarget.projectId,
-    );
-    if (!targetProject) return;
-
-    inbox.markRead(pendingInboxNotificationTarget.messageId);
-    if (pendingInboxNotificationTarget.projectId !== briar.activeProjectId) {
-      briar.setActiveProjectId(pendingInboxNotificationTarget.projectId);
-      return;
-    }
-    if (
-      pendingInboxNotificationTarget.kind === "channel" &&
-      (channelsLoading ||
-        channelCatalogCursor === null ||
-        briar.activeOrganizationId !== targetProject.organizationId)
-    ) {
-      return;
-    }
-    if (
-      pendingInboxNotificationTarget.kind === "issue" ||
-      pendingInboxNotificationTarget.kind === "conversation"
-    ) {
-      setRequestedSessionId(null);
-      setRequestedRunMessageId(
-        pendingInboxNotificationTarget.kind === "conversation"
-          ? pendingInboxNotificationTarget.conversationMessageId ?? null
-          : null,
-      );
-      setRequestedRunInitialTab(
-        pendingInboxNotificationTarget.kind === "conversation"
-          ? "conversation"
-          : null,
-      );
-      setRequestedRunId(pendingInboxNotificationTarget.targetId);
-      if (briar.companionMode) {
-        setCompanionStatus("all");
-        setCompanionPage("issues");
-      } else {
-        navigateToIssue(
-          pendingInboxNotificationTarget.targetId,
-          pendingInboxNotificationTarget.projectId,
-        );
-      }
-    } else if (pendingInboxNotificationTarget.kind === "channel") {
-      const { channelMessageId, rootMessageId } = pendingInboxNotificationTarget;
-      if (!channelMessageId || !rootMessageId) return;
-      setRequestedRunMessageId(null);
-      setRequestedRunInitialTab(null);
-      setRequestedRunId(null);
-      setRequestedSessionId(null);
-      setRequestedChannelMessage({
-        channelId: pendingInboxNotificationTarget.targetId,
-        messageId: channelMessageId,
-        rootMessageId,
-      });
-      selectChannel(pendingInboxNotificationTarget.targetId);
-      markOrganizationChannelRead(pendingInboxNotificationTarget.targetId);
-      if (briar.companionMode) {
-        setCompanionPage(
-          organizationChannels.find(
-              (channel) => channel.id === pendingInboxNotificationTarget.targetId,
-            )?.kind === "dm"
-            ? "dms"
-            : "home",
-        );
-      } else {
-        navigateToChannel(
-          pendingInboxNotificationTarget.targetId,
-          organizationChannels.find(
-            (channel) => channel.id === pendingInboxNotificationTarget.targetId,
-          )?.kind === "dm"
-            ? "dms"
-            : "channels",
-          targetProject.organizationId,
-          targetProject.id,
-        );
-      }
-    } else {
-      setRequestedRunMessageId(null);
-      setRequestedRunInitialTab(null);
-      setRequestedRunId(null);
-      setRequestedSessionId(pendingInboxNotificationTarget.targetId);
-      if (briar.companionMode) setCompanionPage("dms");
-      else navigateToPage(
-        "agents",
-        pendingInboxNotificationTarget.projectId,
-      );
-    }
-    setPendingInboxNotificationTarget(null);
-  }, [
-    briar.activeProjectId,
-    briar.companionMode,
-    briar.loading,
-    briar.projects,
-    briar.setActiveProjectId,
-    briar.user,
-    channelCatalogCursor,
-    channelsLoading,
-    inbox.markRead,
-    markOrganizationChannelRead,
-    navigateToChannel,
-    navigateToIssue,
-    navigateToPage,
-    organizationChannels,
-    pendingInboxNotificationTarget,
-  ]);
+    session: {
+      ensureTeamSelected: briar.ensureProjectSelected,
+      markInboxRead: inbox.markRead,
+      selectOrganization: briar.setActiveOrganizationId,
+      selectTeam: briar.setActiveProjectId,
+    },
+  });
   useMobileNavigationGestures(briar.companionMode);
   useMobileBackHandler(
     () => {
@@ -1539,8 +1115,9 @@ export function App({
     },
     { enabled: briar.companionMode },
   );
-  const [repositorySetupProjectId, setRepositorySetupProjectId] =
-    useState<string | null>(null);
+  const [repositorySetupProjectId, setRepositorySetupProjectId] = useAtom(
+    repositorySetupTeamIdAtom,
+  );
   const repositorySetupTriggerRef = useRef<HTMLElement | null>(null);
   const repositoryReconnectRequestRef = useRef(0);
   const rememberRepositorySetupTrigger = useCallback(() => {
@@ -1583,6 +1160,7 @@ export function App({
     },
     [briar.reconnectProject, rememberRepositorySetupTrigger],
   );
+  const { refreshProjectReadiness } = useWorkspaceActions();
   const hasCompactedWindowForOnboarding = useRef(false);
   const activeProject = briar.projects.find(
     (project) => project.id === briar.activeProjectId,
@@ -1590,11 +1168,13 @@ export function App({
   const openProjectRepository = useCallback((projectId: string) => {
     if (!briar.projects.some((project) => project.id === projectId)) return;
 
+    // Read at call time: the inventory and the probe are the workspace store's,
+    // and depending on them here rebuilt this callback on every probe.
     const connectionState = localTeamConnectionState(
-      briar.connectedTeamIds,
+      registry.get(connectedTeamIdsAtom),
       projectId,
     );
-    const readiness = briar.projectReadiness[projectId] ?? null;
+    const readiness = registry.get(teamReadinessAtom(projectId)).readiness;
     const destination = teamRepositoryDestination({
       connectionState,
       readiness,
@@ -1616,14 +1196,13 @@ export function App({
 
     rememberRepositorySetupTrigger();
     setRepositorySetupProjectId(projectId);
-    void briar.refreshProjectReadiness(projectId);
+    void refreshProjectReadiness(projectId);
   }, [
-    briar.connectedTeamIds,
-    briar.projectReadiness,
     briar.projects,
     briar.remoteMode,
-    briar.refreshProjectReadiness,
     briar.setActiveProjectId,
+    refreshProjectReadiness,
+    registry,
     rememberRepositorySetupTrigger,
     navigateToPage,
   ]);
@@ -1645,18 +1224,18 @@ export function App({
           project.organizationId === briar.activeOrganizationId ||
           project.id === briar.activeProjectId,
       );
-  const activeDashboardRef = useRef(briar.dashboard);
-  activeDashboardRef.current = briar.dashboard;
   const loadOrganizationProjectDashboard = useCallback(
     (projectId: string, signal: AbortSignal) => {
-      const activeDashboard = activeDashboardRef.current;
-      if (activeDashboard?.team.id === projectId) {
-        return Promise.resolve(activeDashboard);
+      // Read at call time from the store, which is what the render phase ref
+      // assignment this replaces was working around.
+      const openDashboard = registry.get(activeDashboardAtom);
+      if (openDashboard?.team.id === projectId) {
+        return Promise.resolve(openDashboard);
       }
       if (!briar.token) return Promise.resolve(null);
       return loadDashboard(briar.token, projectId, signal);
     },
-    [briar.token],
+    [briar.token, registry],
   );
   const openOrganizationIssue = useCallback(
     (projectId: string, runId: string) => {
@@ -1691,199 +1270,27 @@ export function App({
         )
       : []
     : briar.organizations;
-  const navigationHistoryItems = useMemo<WindowNavigationHistoryItem[]>(() => {
-    const pageLabels = {
-      agents: t("sidebar.agents"),
-      channels: t("sidebar.channels"),
-      dms: t("sidebar.dms"),
-      inbox: t("sidebar.inbox"),
-      "my-issues": t("sidebar.myIssues"),
-      projects: t("projects.title"),
-      "organization-create": t("sidebar.addOrganization"),
-      issues: t("sidebar.issues"),
-      lobby: t("lobby.eyebrow"),
-      schedule: t("sidebar.schedule"),
-      settings: t("account.settings"),
-    } satisfies Record<ActivePage, string>;
-    const applicationSettingLabels = new Map(
-      appSettingsNavigationGroups.flatMap((group) =>
-        group.items.map((item) => [item.id, t(item.labelKey)] as const)
-      ),
-    );
-    const organizationSettingLabels = {
-      agents: t("organization.agents"),
-      general: t("organization.general"),
-      integrations: t("organization.integrations"),
-      members: t("organization.membersAndInvites"),
-      workers: t("organization.workers"),
-    };
-    const projectSettingLabels = {
-      "agent-configuration": t("settings.navAgent"),
-      execution: t("settings.navExecution"),
-      general: t("settings.navGeneral"),
-      integrations: t("settings.navIntegrations"),
-      "issue-import": t("settings.navIssueImport"),
-      tabs: t("settings.navTabs"),
-      workflow: t("settings.navWorkflow"),
-    };
-    const pageIcon = (page: ActivePage) => {
-      if (page === "lobby") return <House aria-hidden="true" size={16} />;
-      if (page === "issues") return <Activity aria-hidden="true" size={16} />;
-      if (page === "agents") return <Bot aria-hidden="true" size={16} />;
-      if (page === "schedule") return <CalendarDays aria-hidden="true" size={16} />;
-      if (page === "inbox") return <InboxIcon aria-hidden="true" size={16} />;
-      if (page === "my-issues") return <ListTodo aria-hidden="true" size={16} />;
-      if (page === "projects") return <FolderKanban aria-hidden="true" size={16} />;
-      if (page === "channels") return <Hash aria-hidden="true" size={16} />;
-      if (page === "dms") return <MessageCircle aria-hidden="true" size={16} />;
-      if (page === "organization-create") {
-        return <Building2 aria-hidden="true" size={16} />;
-      }
-      return <Settings aria-hidden="true" size={16} />;
-    };
-    const createItem = (
-      index: number,
-      location: AppNavigationLocation,
-      item: Omit<WindowNavigationHistoryItem, "index" | "location">,
-    ): WindowNavigationHistoryItem => ({ index, location, ...item });
-
-    return navigationHistoryEntries.map((location, index) => {
-      const page = pageFromNavigationLocation(location);
-      const projectId = projectIdFromNavigationLocation(location);
-      const project = projectId
-        ? briar.projects.find((candidate) => candidate.id === projectId)
-        : undefined;
-      const organizationId = organizationIdFromNavigationLocation(location);
-      const organization = organizationId
-        ? briar.organizations.find(
-            (candidate) => candidate.id === organizationId,
-          )
-        : undefined;
-      const runId = runIdFromNavigationLocation(location);
-      if (runId) {
-        const run = projectId && briar.dashboard?.team.id === projectId
-          ? briar.dashboard.runs.find((candidate) => candidate.id === runId)
-          : undefined;
-        return createItem(index, location, {
-          context: project?.name ?? null,
-          eyebrow: run
-            ? formatIssueKey(project?.issueKeyPrefix, run.runNumber)
-            : t("sidebar.issues"),
-          icon: <Activity aria-hidden="true" size={16} />,
-          label: run?.title ?? t("sidebar.issues"),
-        });
-      }
-
-      const channelId = channelIdFromNavigationLocation(location);
-      if (channelId) {
-        const channel = organizationChannels.find(
-          (candidate) => candidate.id === channelId,
-        );
-        const isDirectMessage = page === "dms" || channel?.kind === "dm";
-        const channelName = channel
-          ? isDirectMessage
-            ? directMessageDisplayName(channel, briar.user?.id ?? null)
-            : channel.name
-          : isDirectMessage
-            ? t("sidebar.dms")
-            : t("sidebar.channels");
-        return createItem(index, location, {
-          context: organization?.name ?? null,
-          eyebrow: isDirectMessage
-            ? t("sidebar.dms")
-            : channel
-              ? `#${channel.slug}`
-              : t("sidebar.channels"),
-          icon: isDirectMessage
-            ? <MessageCircle aria-hidden="true" size={16} />
-            : <Hash aria-hidden="true" size={16} />,
-          label: channelName,
-        });
-      }
-
-      const settingsTarget = settingsTargetFromNavigationLocation(location);
-      if (settingsTarget) {
-        const sectionLabel = settingsTarget.scope === "application"
-          ? applicationSettingLabels.get(settingsTarget.section) ??
-            t("account.settings")
-          : settingsTarget.scope === "organization"
-            ? organizationSettingLabels[settingsTarget.section]
-            : projectSettingLabels[settingsTarget.section];
-        const settingsOwner = settingsTarget.scope === "organization"
-          ? briar.organizations.find(
-              (candidate) => candidate.id === settingsTarget.organizationId,
-            )?.name
-          : settingsTarget.scope === "project"
-            ? briar.projects.find(
-                (candidate) => candidate.id === settingsTarget.projectId,
-              )?.name
-            : null;
-        return createItem(index, location, {
-          context: settingsTarget.scope === "application"
-            ? null
-            : settingsTarget.scope === "organization"
-              ? t("organization.settingsLabel")
-              : t("sidebar.projectSettings"),
-          eyebrow: settingsOwner ?? t("account.settings"),
-          icon: settingsTarget.scope === "organization"
-            ? <Building2 aria-hidden="true" size={16} />
-            : <Settings aria-hidden="true" size={16} />,
-          label: sectionLabel,
-        });
-      }
-
-      if (page === "inbox" || page === "my-issues") {
-        return createItem(index, location, {
-          context: null,
-          eyebrow: organization?.name ?? t("sidebar.myIssues"),
-          icon: pageIcon(page),
-          label: pageLabels[page],
-        });
-      }
-
-      if (page === "organization-create") {
-        return createItem(index, location, {
-          context: null,
-          eyebrow: t("sidebar.organizationSettings"),
-          icon: pageIcon(page),
-          label: pageLabels[page],
-        });
-      }
-
-      if (projectId && isProjectNavigationPage(page)) {
-        return createItem(index, location, {
-          context: null,
-          eyebrow: project?.name ?? t("sidebar.projects"),
-          icon: pageIcon(page),
-          label: pageLabels[page],
-        });
-      }
-
-      if (page === "channels" || page === "dms") {
-        return createItem(index, location, {
-          context: project?.name ?? null,
-          eyebrow: organization?.name ?? t("navigation.history"),
-          icon: pageIcon(page),
-          label: pageLabels[page],
-        });
-      }
-
-      return createItem(index, location, {
-        context: null,
-        eyebrow: "Briar",
-        icon: pageIcon(page),
-        label: pageLabels[page],
-      });
-    });
-  }, [
-    briar.dashboard,
-    briar.organizations,
-    briar.projects,
-    briar.user?.id,
-    navigationHistoryEntries,
-    organizationChannels,
-    t,
-  ]);
+  const navigationHistoryItems = useMemo(
+    () =>
+      buildNavigationHistoryItems({
+        channels: organizationChannels,
+        currentUserId: briar.user?.id ?? null,
+        dashboard: activeDashboard,
+        entries: navigationHistoryEntries,
+        organizations: briar.organizations,
+        t,
+        teams: briar.projects,
+      }),
+    [
+      activeDashboard,
+      briar.organizations,
+      briar.projects,
+      briar.user?.id,
+      navigationHistoryEntries,
+      organizationChannels,
+      t,
+    ],
+  );
   const openProjectInNewWindow = useCallback(
     async (projectId: string) => {
       const project = briar.projects.find((candidate) => candidate.id === projectId);
@@ -1997,66 +1404,7 @@ export function App({
       mentionedAgentIds?: string[];
     },
   ) => briar.addIssueMessage(runId, input);
-  const processIssueNow = (run: HuntRun) => {
-    if (!activeProject) return;
-    setQuickProcessError(null);
-    setCompletedDispatchRunId(null);
-    if (run.executionReadiness === "waiting") {
-      setQuickProcessError(
-        t("issue.waitingOnPrerequisites", {
-          count: run.waitingOnPrerequisiteCount ?? 0,
-        }),
-      );
-      return;
-    }
-    setDispatchRun(run);
-  };
-  const submitWorkerDispatch = async (input: {
-    provider: AgentProvider;
-    model: string | null;
-    effort: ModelEffort | null;
-    workerId: string | null;
-  }) => {
-    if (
-      !activeProject ||
-      !briar.token ||
-      !dispatchRun ||
-      quickStartingRunId ||
-      completedDispatchRunId
-    ) return;
-    setQuickStartingRunId(dispatchRun.id);
-    setQuickProcessError(null);
-    try {
-      await dispatchHuntRun(
-        briar.token,
-        activeProject.id,
-        dispatchRun.id,
-        {
-          ...input,
-          workerId: input.workerId || null,
-          persistPreferences: true,
-          reassign: Boolean(dispatchRun.dispatchedAt || dispatchRun.workerId),
-        },
-      );
-      setCompletedDispatchRunId(dispatchRun.id);
-      try {
-        await briar.refresh();
-      } catch (caught) {
-        setQuickProcessError(
-          caught instanceof Error ? caught.message : String(caught),
-        );
-      }
-      await new Promise((resolve) => setTimeout(resolve, 400));
-      setDispatchRun(null);
-      setCompletedDispatchRunId(null);
-    } catch (caught) {
-      setQuickProcessError(
-        caught instanceof Error ? caught.message : String(caught),
-      );
-    } finally {
-      setQuickStartingRunId(null);
-    }
-  };
+  const { processIssueNow, submitWorkerDispatch } = useWorkerDispatch();
 
   const dispatchAgentAutoHunt = useCallback(async (
     projectId: string,
@@ -2067,8 +1415,8 @@ export function App({
     const token = briar.token;
     if (!token) throw new Error("로그인이 필요합니다.");
     const executionDashboard =
-      briar.dashboard?.team.id === projectId
-        ? briar.dashboard
+      activeDashboard?.team.id === projectId
+        ? activeDashboard
         : await loadDashboard(token, projectId);
     const result = await dispatchAutoHuntToWorkers(
       {
@@ -2108,7 +1456,7 @@ export function App({
   }, [
     activeProject?.id,
     autoHunt.startWorkerDispatchSession,
-    briar.dashboard,
+    activeDashboard,
     briar.refresh,
     briar.token,
   ]);
@@ -2217,12 +1565,15 @@ export function App({
     runsOnDesktopTauri,
   ]);
 
+  // Switching teams abandons whatever dispatch was on screen for the old one.
   useEffect(() => {
-    setQuickProcessError(null);
-    setQuickStartingRunId(null);
-    setCompletedDispatchRunId(null);
-    setDispatchRun(null);
-  }, [briar.activeProjectId]);
+    Atom.batch(() => {
+      registry.set(quickProcessErrorAtom, null);
+      registry.set(quickStartingRunIdAtom, null);
+      registry.set(completedDispatchRunIdAtom, null);
+      registry.set(dispatchRunAtom, null);
+    });
+  }, [briar.activeProjectId, registry]);
 
   const acceptCurrentInvitation = useCallback(async () => {
     if (!invitationToken || !briar.user) return;
@@ -2365,6 +1716,18 @@ export function App({
     setIsLaunchIntroVisible(false);
   }, []);
 
+  /**
+   * Selecting a team from the palette, including the "where am I" ref the
+   * navigation helpers default their team id from.
+   */
+  const selectPaletteTeam = useCallback(
+    (teamId: string) => {
+      navigationActiveProjectIdRef.current = teamId;
+      briar.setActiveProjectId(teamId);
+    },
+    [briar.setActiveProjectId],
+  );
+
   const openAppSettings = useCallback(() => {
     setSettingsTarget({
       scope: "application",
@@ -2409,214 +1772,23 @@ export function App({
     setIsCommandPaletteOpen(open);
     if (!open) setCommandPaletteInitialQuery("");
   }, []);
-
-  useEffect(
-    () => subscribeKeyboardNavigationPreferences((preferences) => {
-      setSequenceShortcutsEnabled(preferences.sequenceShortcutsEnabled);
-    }),
-    [],
+  const closeCommandPalette = useCallback(
+    () => handleCommandPaletteOpenChange(false),
+    [handleCommandPaletteOpenChange],
   );
 
-  useEffect(() => {
-    if (commandPaletteAvailable) return;
-    handleCommandPaletteOpenChange(false);
-    setIsKeyboardShortcutsOpen(false);
-  }, [commandPaletteAvailable, handleCommandPaletteOpenChange]);
-
-  const keyboardShortcutTriggers = {
-    createIssue: () => {
-      if (!activeProject) return;
-      setCreateIssueProjectId(activeProject.id);
-      navigateToPage("issues");
-      setIsIssueDialogOpen(true);
-    },
-    goAgents: () => {
-      setRequestedSessionId(null);
-      setAgentListRequestKey((key) => key + 1);
-      navigateToPage("agents");
-    },
-    goChannels: () => navigateToPage("channels"),
-    goDms: () => navigateToPage("dms"),
-    goInbox: () => navigateToPage("inbox"),
-    goIssues: () => {
-      setRequestedRunId(null);
-      setIssueListRequestKey((key) => key + 1);
-      navigateToPage("issues");
-    },
-    goProjectHome: () => navigateToPage("lobby"),
-    goSchedule: () => navigateToPage("schedule"),
-    goSettings: openAppSettings,
-    openChannel: () => openCommandPalette("c:"),
-    openCommandPalette: () => openCommandPalette(),
-    openDm: () => openCommandPalette("d:"),
-    openIssue: () => openCommandPalette("i:"),
-    openProject: () => openCommandPalette("p:"),
-    openSession: () => openCommandPalette("s:"),
-    showKeyboardShortcuts: () => setIsKeyboardShortcutsOpen(true),
-    toggleSidebar: () => setIsSidebarOpen((open) => !open),
-  } satisfies Record<AppKeyboardShortcutCommandId, () => void>;
-  const keyboardShortcutDisabled = {
-    createIssue: !activeProject,
-    goAgents: !activeProject,
-    goChannels: !briar.activeOrganizationId,
-    goDms: !briar.activeOrganizationId || Boolean(projectWindowProjectId),
-    goInbox: !briar.activeOrganizationId,
-    goIssues: !activeProject,
-    goProjectHome: !activeProject,
-    goSchedule: !activeProject || !isTeamScheduleTabEnabled(activeProject),
-    goSettings: false,
-    openChannel: !briar.activeOrganizationId,
-    openCommandPalette: false,
-    openDm: !briar.activeOrganizationId || Boolean(projectWindowProjectId),
-    openIssue: !activeProject,
-    openProject: activeOrganizationProjects.length === 0,
-    openSession: !activeProject,
-    showKeyboardShortcuts: false,
-    toggleSidebar: false,
-  } satisfies Record<AppKeyboardShortcutCommandId, boolean>;
-  const sequenceShortcutShellAvailable =
-    commandPaletteAvailable &&
-    sequenceShortcutsEnabled &&
-    !isCommandPaletteOpen &&
-    !isKeyboardShortcutsOpen;
-  const sequenceCommandAvailable = (id: AppKeyboardShortcutCommandId) =>
-    sequenceShortcutShellAvailable &&
-    !keyboardShortcutDisabled[id] &&
-    !hasOpenKeyboardShortcutOverlay(document);
-  const sequenceHandler = (id: AppKeyboardShortcutCommandId) => ({
-    isAvailable: () => sequenceCommandAvailable(id),
-    run: () => {
-      keyboardShortcutTriggers[id]();
-      return "handled" as const;
-    },
-  });
-  useAppKeyboardCommandScope({
-    fallthrough: true,
-    handlers: {
-      createIssue: sequenceHandler("createIssue"),
-      goAgents: sequenceHandler("goAgents"),
-      goChannels: sequenceHandler("goChannels"),
-      goDms: sequenceHandler("goDms"),
-      goInbox: sequenceHandler("goInbox"),
-      goIssues: sequenceHandler("goIssues"),
-      goProjectHome: sequenceHandler("goProjectHome"),
-      goSchedule: sequenceHandler("goSchedule"),
-      goSettings: sequenceHandler("goSettings"),
-      historyBack: {
-        isAvailable: () => commandPaletteAvailable,
-        run: () => {
-          if (canGoBack) goBack();
-          return "consume";
-        },
-      },
-      historyForward: {
-        isAvailable: () => commandPaletteAvailable,
-        run: () => {
-          if (canGoForward) goForward();
-          return "consume";
-        },
-      },
-      openNavigationHistory: {
-        isAvailable: () =>
-          commandPaletteAvailable &&
-          (isNavigationHistoryOpen || !hasOpenKeyboardShortcutOverlay(document)),
-        run: () => {
-          setIsNavigationHistoryOpen((open) => !open);
-          return "handled";
-        },
-      },
-      openChannel: sequenceHandler("openChannel"),
-      openCommandPalette: {
-        run: ({ input }) => {
-          const configured = Boolean(
-            input.altKey ||
-              input.controlKey ||
-              input.ctrlKey ||
-              input.metaKey,
-          );
-          if (!configured && !sequenceCommandAvailable("openCommandPalette")) {
-            return "pass";
-          }
-          const anotherDialogOpen = !isCommandPaletteOpen &&
-            hasOpenKeyboardShortcutOverlay(document);
-          if (!commandPaletteAvailable || anotherDialogOpen) {
-            return configured ? "consume" : "pass";
-          }
-          if (isCommandPaletteOpen) handleCommandPaletteOpenChange(false);
-          else openCommandPalette();
-          return "handled";
-        },
-      },
-      openDm: sequenceHandler("openDm"),
-      openIssue: sequenceHandler("openIssue"),
-      openProject: sequenceHandler("openProject"),
-      openSession: sequenceHandler("openSession"),
-      openSettings: {
-        isAvailable: () => commandPaletteAvailable,
-        run: () => {
-          openAppSettings();
-          return "handled";
-        },
-      },
-      showKeyboardShortcuts: {
-        run: ({ input }) => {
-          const primaryModifier =
-            Boolean(input.metaKey) !==
-              Boolean(input.controlKey || input.ctrlKey) &&
-            Boolean(input.metaKey || input.controlKey || input.ctrlKey) &&
-            !input.altKey &&
-            !input.shiftKey;
-          if (!primaryModifier) {
-            if (!sequenceCommandAvailable("showKeyboardShortcuts")) {
-              return "pass";
-            }
-            setIsKeyboardShortcutsOpen(true);
-            return "handled";
-          }
-          const anotherDialogOpen = !isKeyboardShortcutsOpen &&
-            hasOpenKeyboardShortcutOverlay(document);
-          if (!commandPaletteAvailable || anotherDialogOpen) return "pass";
-          setIsKeyboardShortcutsOpen((open) => !open);
-          return "handled";
-        },
-      },
-      toggleSidebar: {
-        run: ({ input }) => {
-          const configured = Boolean(
-            input.altKey ||
-              input.controlKey ||
-              input.ctrlKey ||
-              input.metaKey,
-          );
-          if (!configured && !sequenceCommandAvailable("toggleSidebar")) {
-            return "pass";
-          }
-          if (hasOpenKeyboardShortcutOverlay(document)) {
-            return configured ? "consume" : "pass";
-          }
-          setIsSidebarOpen((open) => !open);
-          return "handled";
-        },
-      },
-      ...(appZoomCommands
-        ? {
-            zoomIn: {
-              run: () => {
-                appZoomCommands.zoomIn();
-                return "handled" as const;
-              },
-            },
-            zoomOut: {
-              run: () => {
-                appZoomCommands.zoomOut();
-                return "handled" as const;
-              },
-            },
-          }
-        : {}),
-    },
-    id: "app-global",
-    priority: 0,
+  useAppShortcuts({
+    activePage,
+    appZoomCommands,
+    canGoBack,
+    canGoForward,
+    closeCommandPalette,
+    commandPaletteAvailable,
+    goBack,
+    goForward,
+    navigateToPage,
+    openAppSettings,
+    openCommandPalette,
   });
 
   const keyboardCommandState = useAppKeyboardCommandState();
@@ -2641,627 +1813,24 @@ export function App({
           : [];
       })
     : [];
-  const keyboardShortcutsModifierLabel = isMacPlatform() ? "⌘/" : "Ctrl+/";
-  const keyboardShortcutHelpSections = createKeyboardShortcutHelpSections({
-    commandPaletteShortcut: formatShortcut(
-      configuredKeybindings.commandPalette,
-    ),
-    keyboardShortcutsShortcut: keyboardShortcutsModifierLabel,
-    sequenceShortcutsEnabled,
-    sidebarShortcut: formatShortcut(configuredKeybindings.sidebarToggle),
-    t,
+  const commandPaletteItems = useCommandPaletteItems({
+    activePage,
+    canGoBack,
+    canGoForward,
+    commandPaletteAvailable,
+    goBack,
+    goForward,
+    keybindings: configuredKeybindings,
+    keyboardShortcutsShortcut: keyboardShortcutsModifierLabel(),
+    navigateToIssue,
+    navigateToPage,
+    openAppSettings,
+    selectTeam: selectPaletteTeam,
+    selectedRunId,
+    sessions: autoHunt.sessions,
+    startTeamCreation: briar.startProjectCreation,
+    unreadInboxCount: visibleInboxUnreadCount,
   });
-
-  const paletteSections = {
-    actions: {
-      id: "actions",
-      label: t("commandPalette.groupActions"),
-    },
-    context: {
-      id: "context",
-      label: t("commandPalette.groupContext"),
-    },
-    channels: {
-      id: "channels",
-      label: t("commandPalette.groupChannels"),
-    },
-    continue: {
-      id: "continue",
-      label: t("commandPalette.groupContinue"),
-    },
-    directMessages: {
-      id: "direct-messages",
-      label: t("commandPalette.groupDirectMessages"),
-    },
-    issues: {
-      id: "issues",
-      label: t("commandPalette.groupIssues"),
-    },
-    navigation: {
-      id: "navigation",
-      label: t("commandPalette.groupNavigation"),
-    },
-    projects: {
-      id: "projects",
-      label: t("commandPalette.groupProjects"),
-    },
-  } as const;
-  const commandPaletteItems: CommandPaletteItem[] = [];
-  const addPaletteItem = (
-    item: Omit<CommandPaletteItem, "section" | "sectionLabel">,
-    section: (typeof paletteSections)[keyof typeof paletteSections],
-  ) => {
-    if (!commandPaletteAvailable || !isCommandPaletteOpen) return;
-    commandPaletteItems.push({
-      ...item,
-      section: section.id,
-      sectionLabel: section.label,
-    });
-  };
-  const openPaletteIssue = (runId: string) => {
-    setRequestedSessionId(null);
-    setRequestedRunInitialTab(null);
-    setRequestedRunId(runId);
-    navigateToIssue(runId);
-  };
-
-  if (visibleInboxUnreadCount > 0) {
-    addPaletteItem({
-      active: activePage === "inbox",
-      description: t("commandPalette.unreadCount", {
-        count: visibleInboxUnreadCount,
-      }),
-      icon: <InboxIcon />,
-      id: "navigation:inbox",
-      keywords: ["inbox", "notifications", "받은 편지함", "알림", "收件箱", "通知"],
-      label: t("sidebar.inbox"),
-      onSelect: () => navigateToPage("inbox"),
-      priority: 180 + visibleInboxUnreadCount,
-      scope: "navigation",
-    }, paletteSections.continue);
-  }
-  if (!projectWindowProjectId && briar.activeOrganizationId) {
-    if (activeProject) {
-      addPaletteItem({
-        active: activePage === "projects",
-        description: activeProject.name,
-        icon: <FolderKanban />,
-        id: `navigation:projects:${activeProject.id}`,
-        keywords: ["projects", "project list", "프로젝트", "项目"],
-        label: t("sidebar.projects"),
-        onSelect: () => navigateToPage("projects", activeProject.id),
-        priority: activePage === "projects" ? 125 : 55,
-        scope: "navigation",
-      }, paletteSections.navigation);
-    }
-    addPaletteItem({
-      active: activePage === "my-issues",
-      description: activeOrganization?.name,
-      icon: <ListTodo />,
-      id: `navigation:my-issues:${briar.activeOrganizationId}`,
-      keywords: ["my issues", "issues", "내 이슈", "我的问题"],
-      label: t("sidebar.myIssues"),
-      onSelect: () => navigateToPage("my-issues"),
-      priority: activePage === "my-issues" ? 120 : 50,
-      scope: "navigation",
-    }, paletteSections.navigation);
-  }
-
-  const paletteProjectIds = new Set(
-    activeOrganizationProjects.map((project) => project.id),
-  );
-  const runningPaletteSessions = isCommandPaletteOpen
-    ? collapseLinkedAutoHuntSessions(autoHunt.sessions)
-        .filter(
-          (session) =>
-            session.status === "running" &&
-            paletteProjectIds.has(session.projectId),
-        )
-        .sort((left, right) => right.startedAt.localeCompare(left.startedAt))
-    : [];
-  for (const session of runningPaletteSessions) {
-    const project = activeOrganizationProjects.find(
-      (candidate) => candidate.id === session.projectId,
-    );
-    const label = session.request?.trim() || session.agentName?.trim() ||
-      t("sidebar.untitledAgentSession");
-    addPaletteItem({
-      description: t("commandPalette.runningSession", {
-        project: project?.name ?? t("sidebar.projects"),
-      }),
-      icon: <Bot />,
-      id: `session:${session.id}`,
-      keywords: [
-        session.agentName ?? "",
-        session.request ?? "",
-        project?.name ?? "",
-        "agent session",
-        "에이전트 세션",
-        "智能体会话",
-      ],
-      label,
-      onSelect: () => {
-        const changesProject = Boolean(
-          project && project.id !== briar.activeProjectId,
-        );
-        if (changesProject && project) {
-          navigationActiveProjectIdRef.current = project.id;
-          briar.setActiveProjectId(project.id);
-        }
-        setRequestedRunId(null);
-        setRequestedSessionId(session.id);
-        navigateToPage("agents", project?.id ?? briar.activeProjectId);
-      },
-      priority: 160,
-      scope: "sessions",
-    }, paletteSections.continue);
-  }
-
-  if (activeProject) {
-    addPaletteItem({
-      description: t("commandPalette.createIssueDescription", {
-        project: activeProject.name,
-      }),
-      icon: <Plus />,
-      id: `action:create-issue:${activeProject.id}`,
-      keywords: [
-        "create issue",
-        "new issue",
-        "new task",
-        "이슈 만들기",
-        "새 이슈",
-        "问题",
-        "新建问题",
-        activeProject.name,
-      ],
-      label: t("dashboard.createIssue"),
-      onSelect: () => {
-        setCreateIssueProjectId(activeProject.id);
-        navigateToPage("issues");
-        setIsIssueDialogOpen(true);
-      },
-      priority: 220,
-      remember: false,
-      restoreFocusOnSelect: false,
-      scope: "actions",
-    }, paletteSections.context);
-    addPaletteItem({
-      active:
-        activePage === "settings" &&
-        settingsTarget.scope === "project" &&
-        settingsTarget.projectId === activeProject.id,
-      description: t("commandPalette.projectSettingsDescription", {
-        project: activeProject.name,
-      }),
-      icon: <Settings />,
-      id: `action:project-settings:${activeProject.id}`,
-      keywords: [
-        "team settings",
-        "project settings",
-        "팀 설정",
-        "프로젝트 설정",
-        "团队设置",
-        "项目设置",
-        activeProject.name,
-      ],
-      label: t("sidebar.projectSettings"),
-      onSelect: () => {
-        setSettingsTarget({
-          scope: "project",
-          projectId: activeProject.id,
-          section: "general",
-        });
-        navigateToPage("settings");
-      },
-      priority: 150,
-      scope: "actions",
-    }, paletteSections.context);
-  }
-
-  addPaletteItem({
-    description: t("commandPalette.keyboardShortcutsDescription"),
-    icon: <KeyboardIcon />,
-    id: "action:keyboard-shortcuts",
-    keywords: [
-      "keyboard shortcuts",
-      "hotkeys",
-      "vim",
-      "keyboard mode",
-      "단축키",
-      "키보드",
-      "快捷键",
-    ],
-    label: t("keyboardShortcuts.title"),
-    onSelect: () => setIsKeyboardShortcutsOpen(true),
-    priority: 90,
-    remember: false,
-    restoreFocusOnSelect: false,
-    scope: "actions",
-    shortcut: keyboardShortcutsModifierLabel,
-  }, paletteSections.actions);
-
-  addPaletteItem({
-    description: t(
-      isSidebarOpen
-        ? "commandPalette.hideSidebarDescription"
-        : "commandPalette.showSidebarDescription",
-    ),
-    icon: <PanelLeft />,
-    id: "action:toggle-sidebar",
-    keywords: ["sidebar", "panel", "사이드바", "패널", "侧边栏"],
-    label: t(
-      isSidebarOpen ? "commandPalette.hideSidebar" : "commandPalette.showSidebar",
-    ),
-    onSelect: () => setIsSidebarOpen((open) => !open),
-    priority: 80,
-    remember: false,
-    scope: "actions",
-    shortcut: formatShortcut(configuredKeybindings.sidebarToggle),
-  }, paletteSections.actions);
-
-  if (!projectWindowProjectId) {
-    addPaletteItem({
-      icon: <FolderPlus />,
-      id: "action:add-project",
-      keywords: ["new team", "add team", "new project", "add project", "팀 추가", "프로젝트 추가", "新建团队", "新建项目"],
-      label: t("sidebar.addProject"),
-      onSelect: briar.startProjectCreation,
-      priority: 60,
-      remember: false,
-      restoreFocusOnSelect: false,
-      scope: "actions",
-    }, paletteSections.actions);
-    if (activeOrganization) {
-      addPaletteItem({
-        active:
-          activePage === "settings" &&
-          settingsTarget.scope === "organization" &&
-          settingsTarget.organizationId === activeOrganization.id,
-        description: activeOrganization.name,
-        icon: <Building2 />,
-        id: `action:organization-settings:${activeOrganization.id}`,
-        keywords: [
-          "organization settings",
-          "workspace settings",
-          "조직 설정",
-          "组织设置",
-          activeOrganization.name,
-        ],
-        label: t("sidebar.organizationSettings"),
-        onSelect: () => {
-          setSettingsTarget({
-            scope: "organization",
-            organizationId: activeOrganization.id,
-            section: "general",
-          });
-          navigateToPage("settings");
-        },
-        priority: 50,
-        scope: "actions",
-      }, paletteSections.actions);
-    }
-  }
-
-  if (canGoBack) {
-    addPaletteItem({
-      icon: <ArrowLeft />,
-      id: "navigation:back",
-      keywords: ["back", "history", "뒤로", "이전", "后退"],
-      label: t("navigation.back"),
-      onSelect: goBack,
-      priority: 200,
-      remember: false,
-      scope: "navigation",
-      shortcut: "⌘[",
-    }, paletteSections.navigation);
-  }
-  if (canGoForward) {
-    addPaletteItem({
-      icon: <ArrowRight />,
-      id: "navigation:forward",
-      keywords: ["forward", "history", "앞으로", "다음", "前进"],
-      label: t("navigation.forward"),
-      onSelect: goForward,
-      priority: 190,
-      remember: false,
-      scope: "navigation",
-      shortcut: "⌘]",
-    }, paletteSections.navigation);
-  }
-  if (activeProject) {
-    addPaletteItem({
-      active: activePage === "lobby",
-      description: activeProject.name,
-      icon: <House />,
-      id: `navigation:project-home:${activeProject.id}`,
-      keywords: ["home", "overview", "project home", "홈", "项目主页", activeProject.name],
-      label: t("lobby.eyebrow"),
-      onSelect: () => navigateToPage("lobby"),
-      priority: activePage === "lobby" ? 120 : 70,
-      scope: "navigation",
-    }, paletteSections.navigation);
-    addPaletteItem({
-      active: activePage === "issues",
-      description: activeProject.name,
-      icon: <Activity />,
-      id: `navigation:issues:${activeProject.id}`,
-      keywords: ["issues", "tasks", "이슈", "작업", "问题", activeProject.name],
-      label: t("sidebar.issues"),
-      onSelect: () => {
-        setRequestedRunId(null);
-        setIssueListRequestKey((key) => key + 1);
-        navigateToPage("issues");
-      },
-      priority: activePage === "issues" ? 120 : 70,
-      scope: "navigation",
-    }, paletteSections.navigation);
-    addPaletteItem({
-      active: activePage === "agents",
-      description: activeProject.name,
-      icon: <Bot />,
-      id: `navigation:agents:${activeProject.id}`,
-      keywords: ["agents", "sessions", "에이전트", "세션", "智能体", activeProject.name],
-      label: t("sidebar.agents"),
-      onSelect: () => {
-        setRequestedSessionId(null);
-        setAgentListRequestKey((key) => key + 1);
-        navigateToPage("agents");
-      },
-      priority: activePage === "agents" ? 120 : 60,
-      scope: "navigation",
-    }, paletteSections.navigation);
-    if (isTeamScheduleTabEnabled(activeProject)) {
-      addPaletteItem({
-        active: activePage === "schedule",
-        description: activeProject.name,
-        icon: <CalendarDays />,
-        id: `navigation:schedule:${activeProject.id}`,
-        keywords: ["schedule", "calendar", "스케줄", "일정", "日程", activeProject.name],
-        label: t("sidebar.schedule"),
-        onSelect: () => navigateToPage("schedule"),
-        priority: activePage === "schedule" ? 120 : 50,
-        scope: "navigation",
-      }, paletteSections.navigation);
-    }
-  }
-  if (briar.activeOrganizationId && briar.token) {
-    addPaletteItem({
-      active: activePage === "channels",
-      description: activeOrganization?.name,
-      icon: <MessagesSquare />,
-      id: `navigation:channels:${briar.activeOrganizationId}`,
-      keywords: ["channels", "chat", "채널", "대화", "频道"],
-      label: t("sidebar.channels"),
-      onSelect: () => {
-        const channel = visibleOrganizationChannels.find(
-          (candidate) => candidate.id === activeChannelId,
-        ) ?? visibleOrganizationChannels[0];
-        if (channel) openOrganizationChannel(channel.id);
-        else navigateToPage("channels");
-      },
-      priority: activePage === "channels" ? 120 : 50,
-      scope: "navigation",
-    }, paletteSections.navigation);
-  }
-  if (!projectWindowProjectId) {
-    addPaletteItem({
-      active: activePage === "dms",
-      description: activeOrganization?.name,
-      icon: <MessageCircle />,
-      id: `navigation:dms:${briar.activeOrganizationId ?? "none"}`,
-      keywords: ["direct messages", "dm", "messages", "다이렉트 메시지", "私信"],
-      label: t("sidebar.dms"),
-      onSelect: () => {
-        const directMessage = organizationDirectMessages.find(
-          (candidate) => candidate.id === activeChannelId,
-        ) ?? organizationDirectMessages[0];
-        if (directMessage) openOrganizationChannel(directMessage.id);
-        else navigateToPage("dms");
-      },
-      priority: activePage === "dms" ? 120 : 50,
-      scope: "navigation",
-    }, paletteSections.navigation);
-  }
-  if (visibleInboxUnreadCount === 0) {
-    addPaletteItem({
-      active: activePage === "inbox",
-      icon: <InboxIcon />,
-      id: "navigation:inbox",
-      keywords: ["inbox", "notifications", "받은 편지함", "알림", "收件箱", "通知"],
-      label: t("sidebar.inbox"),
-      onSelect: () => navigateToPage("inbox"),
-      priority: activePage === "inbox" ? 120 : 45,
-      scope: "navigation",
-    }, paletteSections.navigation);
-  }
-  addPaletteItem({
-    active: activePage === "settings" && settingsTarget.scope === "application",
-    icon: <Settings />,
-    id: "navigation:app-settings",
-    keywords: ["settings", "preferences", "설정", "환경설정", "设置"],
-    label: t("appSettings.title"),
-    onSelect: openAppSettings,
-    priority: activePage === "settings" ? 100 : 40,
-    scope: "navigation",
-    shortcut: "⌘,",
-  }, paletteSections.navigation);
-
-  for (const project of isCommandPaletteOpen ? activeOrganizationProjects : []) {
-    const organizationName = briar.organizations.find(
-      (organization) => organization.id === project.organizationId,
-    )?.name ?? project.organizationName;
-    addPaletteItem({
-      active: project.id === briar.activeProjectId,
-      description:
-        project.id === briar.activeProjectId
-          ? t("commandPalette.currentProject")
-          : organizationName,
-      icon: <TeamIcon className="size-4" project={project} />,
-      id: `project:${project.id}`,
-      keywords: [
-        project.name,
-        organizationName,
-        "team",
-        "project",
-        "팀",
-        "프로젝트",
-        "团队",
-        "项目",
-      ],
-      label: project.name,
-      onSelect: () => {
-        const changesProject = project.id !== briar.activeProjectId;
-        if (changesProject) {
-          navigationActiveProjectIdRef.current = project.id;
-          briar.setActiveProjectId(project.id);
-        }
-        setRequestedRunId(null);
-        setRequestedSessionId(null);
-        navigateToPage("issues", project.id);
-      },
-      priority: project.id === briar.activeProjectId ? 100 : 20,
-      scope: "projects",
-    }, paletteSections.projects);
-
-    if (project.id !== activeProject?.id) {
-      addPaletteItem({
-        description: t("commandPalette.createIssueDescription", {
-          project: project.name,
-        }),
-        icon: <Plus />,
-        id: `action:create-issue:${project.id}`,
-        keywords: [
-          "create issue",
-          "new issue",
-          "이슈 만들기",
-          "새 이슈",
-          "新建问题",
-          project.name,
-        ],
-        label: t("commandPalette.createIssueIn", { project: project.name }),
-        onSelect: () => {
-          navigationActiveProjectIdRef.current = project.id;
-          briar.setActiveProjectId(project.id);
-          setCreateIssueProjectId(project.id);
-          navigateToPage("issues", project.id);
-          setIsIssueDialogOpen(true);
-        },
-        priority: -50,
-        remember: false,
-        restoreFocusOnSelect: false,
-        scope: "actions",
-      }, paletteSections.actions);
-    }
-  }
-
-  const paletteDashboard = isCommandPaletteOpen ? briar.dashboard : null;
-  if (paletteDashboard && activeProject && paletteDashboard.team.id === activeProject.id) {
-    const runs = [...paletteDashboard.runs].sort((left, right) => {
-      if (left.id === selectedRunId) return -1;
-      if (right.id === selectedRunId) return 1;
-      return right.updatedAt.localeCompare(left.updatedAt);
-    });
-    for (const run of runs) {
-      const issueKey = formatIssueKey(activeProject.issueKeyPrefix, run.runNumber);
-      const needsAttention = ["blocked", "failed", "paused"].includes(run.status);
-      const isCurrent = run.id === selectedRunId;
-      const section = isCurrent
-        ? paletteSections.context
-        : needsAttention || run.status === "running"
-          ? paletteSections.continue
-          : paletteSections.issues;
-      addPaletteItem({
-        active: isCurrent,
-        description: t("commandPalette.issueDescription", {
-          key: issueKey,
-          status: t(`status.${run.status}` as MessageKey),
-        }),
-        icon: <Activity />,
-        id: `issue:${run.id}`,
-        keywords: [
-          issueKey,
-          run.sourceKey,
-          run.title,
-          t(`status.${run.status}` as MessageKey),
-          activeProject.name,
-          "issue",
-          "task",
-          "이슈",
-          "작업",
-          "问题",
-        ],
-        label: run.title,
-        onSelect: () => openPaletteIssue(run.id),
-        priority: isCurrent ? 190 : needsAttention ? 140 : run.status === "running" ? 120 : 0,
-        scope: "issues",
-      }, section);
-    }
-  }
-
-  for (const channel of isCommandPaletteOpen ? visibleOrganizationChannels : []) {
-    const isCurrent =
-      channel.id === activeChannelId && activePage === "channels";
-    const unread = channel.hasUnread;
-    addPaletteItem({
-      active: isCurrent,
-      description: channel.topic?.trim() || `#${channel.slug}`,
-      icon: <Hash />,
-      id: `channel:${channel.id}`,
-      keywords: [
-        channel.name,
-        channel.slug,
-        channel.topic ?? "",
-        activeOrganization?.name ?? "",
-        "channel",
-        "채널",
-        "频道",
-      ],
-      label: channel.name,
-      onSelect: () => openOrganizationChannel(channel.id),
-      priority: isCurrent ? 180 : unread ? 130 : 0,
-      scope: "channels",
-    }, isCurrent
-      ? paletteSections.context
-      : unread
-        ? paletteSections.continue
-        : paletteSections.channels);
-  }
-
-  for (const directMessage of isCommandPaletteOpen ? organizationDirectMessages : []) {
-    const name = directMessageDisplayName(
-      directMessage,
-      briar.user?.id ?? null,
-    );
-    const isCurrent =
-      directMessage.id === activeChannelId && activePage === "dms";
-    const unread = directMessage.hasUnread;
-    const participantNames = directMessage.dmParticipants
-      .map((participant) => participant.name);
-    addPaletteItem({
-      active: isCurrent,
-      description: unread
-        ? t("dm.unread")
-        : t("commandPalette.directMessageDescription"),
-      icon: <MessageCircle />,
-      id: `direct-message:${directMessage.id}`,
-      keywords: [
-        name,
-        ...participantNames,
-        "direct message",
-        "dm",
-        "다이렉트 메시지",
-        "私信",
-      ],
-      label: name,
-      onSelect: () => openOrganizationChannel(directMessage.id),
-      priority: isCurrent ? 180 : unread ? 130 : 0,
-      scope: "direct-messages",
-    }, isCurrent
-      ? paletteSections.context
-      : unread
-        ? paletteSections.continue
-        : paletteSections.directMessages);
-  }
 
   const unifiedSettingsSidebar = withLazyBoundary(
     <UnifiedSettingsSidebar
@@ -3295,7 +1864,7 @@ export function App({
         ? inboxDetailTarget.targetId
         : null;
     const inboxDetailRun = isInboxRunDetailTarget(inboxDetailTarget)
-      ? briar.dashboard?.runs.find(
+      ? activeDashboard?.runs.find(
           (run) => run.id === inboxDetailTarget.targetId,
         ) ?? null
       : null;
@@ -3306,7 +1875,7 @@ export function App({
       : null;
     const isInboxDetailLoading = Boolean(
       isInboxRunDetailTarget(inboxDetailTarget) &&
-        briar.dashboard?.team.id !== inboxDetailTarget.projectId,
+        activeDashboard?.team.id !== inboxDetailTarget.projectId,
     );
 
     return withLazyBoundary(
@@ -3396,7 +1965,7 @@ export function App({
         onStop={() => autoHunt.stopSession(inboxDetailSession.id)}
         session={inboxDetailSession}
         token={briar.token}
-        workers={briar.dashboard?.workers ?? []}
+        workers={activeDashboard?.workers ?? []}
       />
     ) : inboxDetailChannelId && briar.activeOrganizationId && briar.token ? (
       <ChannelsWithCatalog
@@ -3461,7 +2030,7 @@ export function App({
 
   const inboxDetailLabel = (inboxDetailTarget: InboxNotificationTarget) =>
     (isInboxRunDetailTarget(inboxDetailTarget)
-      ? briar.dashboard?.runs.find(
+      ? activeDashboard?.runs.find(
           (run) => run.id === inboxDetailTarget.targetId,
         )?.title
       : null) ??
@@ -3570,12 +2139,7 @@ export function App({
           <SidebarWithSession
             activeChannelId={desktopActiveChannelId}
             activePage={activePage}
-            activePlanningProjectId={activePlanningProjectId}
             agents={issueAgents}
-            channels={visibleOrganizationChannels}
-            channelsLoading={channelsLoading}
-            connectedTeamIds={briar.connectedTeamIds}
-            isOpen={isSidebarOpen}
             onAddProject={briar.startProjectCreation}
             onAddPlanningProject={(teamId) => {
               setPlanningProjectEditId(null);
@@ -3680,13 +2244,8 @@ export function App({
             }}
             onSettings={openAppSettings}
             onLogout={() => void briar.logout()}
-            projects={visibleProjects}
-            projectReadiness={briar.projectReadiness}
-            projectReadinessError={briar.projectReadinessError}
-            projectWindowProjectId={projectWindowProjectId}
             sessions={autoHunt.sessions}
             unreadInboxCount={visibleInboxUnreadCount}
-            unreadDmCount={unreadDirectMessageCount}
           />
         ) : null}
         <div className="app-content-surface">
@@ -3714,62 +2273,28 @@ export function App({
         ) : activePage === "settings" &&
           settingsTarget.scope === "application" &&
           briar.user ? (
-          <AppSettings
-            connectionState={briar.activeProjectConnectionState}
-            error={
-              activeProject
-                ? briar.projectReadinessError[activeProject.id] ?? null
-                : null
-            }
+          <AppSettingsWithWorkspace
             initialSection={settingsTarget.section}
-            isSidebarOpen={isSidebarOpen}
-            loading={
-              activeProject
-                ? briar.projectReadinessLoadingProjects.has(activeProject.id)
-                : false
-            }
             navigationSidebar={unifiedSettingsSidebar}
             onBack={closeSettings}
-            onAccountDelete={
-              briar.demoMode ? undefined : briar.deleteAccount
-            }
+            onAccountDelete={briar.demoMode ? undefined : briar.deleteAccount}
             onAccountSave={briar.updateAccountProfile}
-            onRefresh={() =>
-              activeProject
-                ? briar.refreshProjectReadiness(activeProject.id)
-                : Promise.resolve(null)
-            }
             onLoadUsageReport={loadUsageReport}
             onSectionChange={(section) => {
               const target = { scope: "application" as const, section };
               setSettingsTarget(target);
               navigateToLocation(settingsNavigationLocation(target));
             }}
-            projectId={activeProject?.id ?? ""}
-            projectName={activeProject?.name ?? ""}
-            readiness={
-              activeProject
-                ? briar.projectReadiness[activeProject.id] ?? null
-                : null
-            }
-            requiresLocalReadiness={!briar.remoteMode}
-            usageScopeKey={briar.activeOrganizationId ?? "none"}
-            user={briar.user}
           />
         ) : activePage === "settings" &&
         settingsTarget.scope === "organization" &&
         settingsOrganization ? (
           <OrganizationSettings
             initialSection={settingsTarget.section}
-            isSidebarOpen={isSidebarOpen}
             key={settingsOrganization.id}
             navigationSidebar={unifiedSettingsSidebar}
             onBack={closeSettings}
             organization={settingsOrganization}
-            onLogoChange={briar.changeOrganizationLogo}
-            onRename={briar.renameOrganization}
-            connectedTeamIds={briar.connectedTeamIds}
-            projects={visibleProjects}
           />
         ) : activePage === "dms" &&
           !projectWindowProjectId &&
@@ -3964,7 +2489,6 @@ export function App({
           />
         ) : activePage === "lobby" && activeProject ? (
           <TeamLobbyWithDashboard
-            connectionState={briar.activeProjectConnectionState}
             isSidebarOpen={isSidebarOpen}
             onLoadUsageSummary={loadProjectHomeUsage}
             onLoadMergeActivity={loadProjectHomeMerges}
@@ -3992,8 +2516,6 @@ export function App({
               navigateToPage("settings");
             }}
             project={activeProject}
-            readiness={briar.projectReadiness[activeProject.id] ?? null}
-            requiresLocalReadiness={!briar.remoteMode}
           />
         ) : activePage === "agents" && activeProject ? (
           <TeamAgentsWithDashboard
@@ -4238,7 +2760,7 @@ export function App({
             onStop={() => autoHunt.stopSession(requestedCompanionSession.id)}
             session={requestedCompanionSession}
             token={briar.token}
-            workers={briar.dashboard?.workers ?? []}
+            workers={activeDashboard?.workers ?? []}
           />
         ) : companionPage === "settings" ? (
           <CompanionSettings
@@ -4280,7 +2802,6 @@ export function App({
           <>
             <TeamLobbyWithDashboard
               companionMode
-              connectionState={briar.activeProjectConnectionState}
               isSidebarOpen={false}
               onBack={() => setCompanionPage("home")}
               onLoadUsageSummary={loadProjectHomeUsage}
@@ -4298,8 +2819,6 @@ export function App({
               onOpenRepository={() => undefined}
               onOpenSettings={() => setCompanionPage("settings")}
               project={activeProject}
-              readiness={briar.projectReadiness[activeProject.id] ?? null}
-              requiresLocalReadiness={!briar.remoteMode}
             />
             <CompanionBottomNavigation
               activeDestination="home"
@@ -4419,17 +2938,7 @@ export function App({
         </Suspense>
         <Suspense fallback={null}>
         <WorkerDispatchDialogWithTeam
-          didDispatchSuccessfully={completedDispatchRunId === dispatchRun?.id}
-          error={quickProcessError}
-          isDispatching={Boolean(quickStartingRunId)}
-          onOpenChange={(open) => {
-            if (!open && !quickStartingRunId && !completedDispatchRunId) {
-              setDispatchRun(null);
-            }
-          }}
           onSubmit={(input) => void submitWorkerDispatch(input)}
-          open={Boolean(dispatchRun)}
-          run={dispatchRun}
         />
         </Suspense>
       </div>
@@ -4441,41 +2950,7 @@ export function App({
       <AppEffects />
       {content}
       <Suspense fallback={null}>
-      <PlanningProjectDialog
-        onCreate={(input) => {
-          if (!planningProjectTeamId) {
-            return Promise.reject(new Error("프로젝트를 추가할 팀이 없습니다."));
-          }
-          return briar.addPlanningProject(planningProjectTeamId, input);
-        }}
-        onUpdate={briar.editPlanningProject}
-        onDelete={async (projectId) => {
-          await briar.deletePlanningProject(projectId);
-          setActivePlanningProjectId((current) =>
-            current === projectId ? null : current
-          );
-        }}
-        onOpenChange={(open) => {
-          if (!open) {
-            setPlanningProjectTeamId(null);
-            setPlanningProjectEditId(null);
-          }
-        }}
-        open={planningProjectTeamId !== null || planningProjectEditId !== null}
-        project={
-          briar.planningProjects.find(
-            (project) => project.id === planningProjectEditId,
-          ) ?? null
-        }
-        teamName={
-          briar.projects.find((team) => team.id === (
-            planningProjectTeamId ?? briar.planningProjects.find(
-              (project) => project.id === planningProjectEditId,
-            )?.teamId
-          ))
-            ?.name ?? ""
-        }
-      />
+      <PlanningProjectDialogWithPlanning />
       {commandPaletteAvailable && isCommandPaletteOpen ? (
         <CommandPaletteWithContext
           activePage={activePage}
@@ -4487,13 +2962,9 @@ export function App({
           shortcutLabel={formatShortcut(configuredKeybindings.commandPalette)}
         />
       ) : null}
-      {commandPaletteAvailable ? (
-        <KeyboardShortcutsDialog
-          onOpenChange={setIsKeyboardShortcutsOpen}
-          open={isKeyboardShortcutsOpen}
-          sections={keyboardShortcutHelpSections}
-        />
-      ) : null}
+      <KeyboardShortcutsDialogWithPreferences
+        available={commandPaletteAvailable}
+      />
       {pendingShortcut ? (
         <KeyboardShortcutModeHint
           choices={pendingShortcutChoices}
@@ -4538,17 +3009,7 @@ export function App({
         )}
       />
       <WorkerDispatchDialogWithTeam
-        didDispatchSuccessfully={completedDispatchRunId === dispatchRun?.id}
-        error={quickProcessError}
-        isDispatching={Boolean(quickStartingRunId)}
-        onOpenChange={(open) => {
-          if (!open && !quickStartingRunId && !completedDispatchRunId) {
-            setDispatchRun(null);
-          }
-        }}
         onSubmit={(input) => void submitWorkerDispatch(input)}
-        open={Boolean(dispatchRun)}
-        run={dispatchRun}
       />
       <FirstRunTutorial
         initialPhase={
