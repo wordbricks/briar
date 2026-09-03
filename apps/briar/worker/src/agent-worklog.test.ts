@@ -8,7 +8,7 @@ import {
   retainedRawTranscriptEvents,
 } from "./agent-worklog";
 import { MAX_TRANSCRIPT_PAYLOAD_BYTES } from "./transcript-limits";
-import { executeD1Sql } from "./test-helpers/d1";
+import { executeD1Sql } from "./test-helpers/d1-sql";
 
 const projectId = "11111111-1111-4111-8111-111111111111";
 const observedAt = "2026-08-13T00:00:00.000Z";

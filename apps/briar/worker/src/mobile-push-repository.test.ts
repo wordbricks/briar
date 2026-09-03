@@ -4,7 +4,7 @@ import {
   acknowledgeMobilePushOutbox,
   listMobilePushOutbox,
 } from "./mobile-push-repository";
-import { executeD1Sql } from "./test-helpers/d1";
+import { executeD1Sql } from "./test-helpers/d1-sql";
 
 describe("mobile push repository", () => {
   const db = env.DB;

@@ -12,7 +12,7 @@ import {
   startManagedComputerProvisioning,
 } from "./managed-computer-repository";
 import { recordWorkerHeartbeat } from "./workers";
-import { executeD1Sql } from "./test-helpers/d1";
+import { executeD1Sql } from "./test-helpers/d1-sql";
 import {
   workerRuntimeMetadataFixture,
   workerRuntimeProtoJsonFixture,

@@ -1,9 +1,7 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
-import {
-  applyD1Migrations,
-  executeD1Sql,
-} from "./test-helpers/d1";
+import { applyD1Migrations } from "./test-helpers/d1";
+import { executeD1Sql } from "./test-helpers/d1-sql";
 
 describe("workflow checkpoint storage migration", () => {
   it("fails closed for execution policy, removes bad user defaults, and guards writes", async () => {

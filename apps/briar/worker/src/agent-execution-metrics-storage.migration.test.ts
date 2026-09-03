@@ -2,10 +2,8 @@ import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import { encodeAgentExecutionMetricsJson } from "../../src/lib/agent-execution-metrics";
 import { parseExecutionMetrics } from "./agent-result-json";
-import {
-  applyD1Migrations,
-  executeD1Sql,
-} from "./test-helpers/d1";
+import { applyD1Migrations } from "./test-helpers/d1";
+import { executeD1Sql } from "./test-helpers/d1-sql";
 
 const canonicalMetrics = {
   inputTokens: 1_000,

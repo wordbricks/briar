@@ -21,6 +21,14 @@ export default defineConfig(async () => ({
       "worker/src/html-artifact-preview-shell.test.ts",
     ],
     hookTimeout: 60_000,
+    // These tests never touch D1, so the module registry and the workerd
+    // runtime can be shared across files. Vitest otherwise builds a fresh
+    // Miniflare instance - a new workerd process - for every test file, which
+    // cost about 0.9s of boot plus a full re-import of each file's module graph
+    // (60 workerd boots and 342s of cumulative import time, versus 8 boots and
+    // 118s here). The D1 projects keep the default isolation because they
+    // depend on starting from an empty database.
+    isolate: false,
     // Avoid contending with the SQLite-heavy D1 project for workerd processes.
     sequence: { groupOrder: 0 },
     // Capped: each worker boots its own workerd, so past ~8 the process
