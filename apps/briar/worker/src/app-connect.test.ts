@@ -9,8 +9,8 @@ import {
 import { appConnectTeamServices } from "./app-connect-team";
 import type { TeamRow } from "./team-repository";
 
-const listProjectsUrl =
-  "https://api.example.test/briar.app.v1.TeamService/ListProjects";
+const listTeamsUrl =
+  "https://api.example.test/briar.app.v1.TeamService/ListTeams";
 
 const projectRow = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -26,7 +26,7 @@ const projectRow = {
   created_at: "2026-08-20T00:00:00.000Z",
 } satisfies TeamRow;
 
-const connectRequest = () => new Request(listProjectsUrl, {
+const connectRequest = () => new Request(listTeamsUrl, {
   method: "POST",
   headers: {
     authorization: "Bearer session-token",
@@ -78,7 +78,7 @@ describe("app Connect adapter", () => {
     expect(response?.headers.get("access-control-allow-headers"))
       .toContain("connect-protocol-version");
     expect(await response?.json()).toEqual({
-      projects: [{
+      teams: [{
         id: projectRow.id,
         name: projectRow.name,
         issueKeyPrefix: projectRow.issue_key_prefix,
@@ -120,7 +120,7 @@ describe("app Connect adapter", () => {
       requireSession: vi.fn<AppConnectServices["requireSession"]>(),
       listTeams: vi.fn<AppConnectServices["listTeams"]>(),
     } satisfies AppConnectServices;
-    const request = new Request(listProjectsUrl, {
+    const request = new Request(listTeamsUrl, {
       method: "POST",
       headers: {
         "connect-protocol-version": "1",
