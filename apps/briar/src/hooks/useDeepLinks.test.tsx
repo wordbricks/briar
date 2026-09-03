@@ -41,10 +41,10 @@ import { createReactTestRoot } from "../test/react";
 import type { Organization, Project, SessionUser } from "../types";
 import { setInboxCallbacks } from "../state/inbox/actions";
 import {
-  useDeepLinks,
-  type DeepLinkListeners,
-  type UseDeepLinksInput,
-} from "./useDeepLinks";
+  deepLinkListenerApiAtom,
+  type DeepLinkListenerApi,
+} from "../state/deep-links/atoms";
+import { useDeepLinks, type UseDeepLinksInput } from "./useDeepLinks";
 
 /*
   The resolver's branches, driven through the atoms it waits on.
@@ -122,13 +122,15 @@ const nowhere = {
   teamId: null,
 };
 
-/** Listeners that record their registration and never fire on their own. */
-const inertListeners = (): Partial<DeepLinkListeners> => ({
+/** Listeners that register and never fire on their own. */
+const inertListeners: DeepLinkListenerApi = {
   listenForBriarLinks: () => () => {},
   listenForClickedIssueLinks: () => () => {},
   listenForStatusTrayOpenRun: () => () => {},
+  listenForAppMenuSettings: () => () => {},
   macDesktop: false,
-});
+  desktop: false,
+};
 
 function Effects({ input }: { input: UseDeepLinksInput }) {
   useDeepLinks(input);
@@ -158,7 +160,6 @@ const flush = async () => {
 };
 
 const harness = (
-  overrides: Partial<DeepLinkListeners> = {},
   registryOverrides: {
     activeTeamId?: string | null;
     activeOrganizationId?: string | null;
@@ -184,6 +185,9 @@ const harness = (
     ],
     [lockedTeamIdAtom, null],
     [pendingBriarLinkAtom, null],
+    // The listeners are subscription atoms now; these register and stay quiet,
+    // and the cases below drive the resolver by writing the pending target.
+    [deepLinkListenerApiAtom, inertListeners],
   ]);
   const calls = recorder();
   /*
@@ -198,9 +202,7 @@ const harness = (
     markRead: (messageId) => calls.inboxReads.push(messageId),
     markUnread: () => undefined,
   });
-  const input: UseDeepLinksInput = {
-    listeners: { ...inertListeners(), ...overrides },
-  };
+  const input: UseDeepLinksInput = {};
   return { calls, input, registry };
 };
 
@@ -251,7 +253,7 @@ describe("useDeepLinks", () => {
   });
 
   it("switches organizations first when the link points at another one", async () => {
-    const { input, registry } = harness({}, {
+    const { input, registry } = harness({
       activeOrganizationId: "org-b",
     });
     const view = await mount(registry, input);
@@ -393,7 +395,7 @@ describe("useDeepLinks", () => {
   });
 
   it("selects the team a notification points at before routing to it", async () => {
-    const { calls, input, registry } = harness({}, { activeTeamId: teamA.id });
+    const { calls, input, registry } = harness({ activeTeamId: teamA.id });
     const view = await mount(registry, input);
 
     await act(async () => {

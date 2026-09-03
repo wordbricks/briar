@@ -15,7 +15,11 @@ import { applySyncEvent } from "../state/sync/apply";
 import { activeTeamIdAtom } from "../state/team/atoms";
 import { createReactTestRoot } from "../test/react";
 import type { DashboardPayload, HuntRun, Project, StatusTrayRun } from "../types";
-import { useStatusTray, type StatusTrayDeps } from "./useStatusTray";
+import {
+  statusTrayApiAtom,
+  type StatusTrayApi,
+} from "../state/status-tray/atoms";
+import { useStatusTray } from "./useStatusTray";
 
 /*
   The tray is a side effect with no view, so what these cases check is what
@@ -59,12 +63,12 @@ class TrayBridge {
   readonly workerLabelRefreshes: number[] = [];
   pollResult: StatusTrayRun[] = [];
 
-  deps(overrides: Partial<StatusTrayDeps> = {}): Partial<StatusTrayDeps> {
+  api(overrides: Partial<StatusTrayApi> = {}): StatusTrayApi {
     return {
       loadStatusTrayRuns: (async (_token: string, organizationId: string) => {
         this.pollRequests.push(organizationId);
         return { runs: this.pollResult };
-      }) as StatusTrayDeps["loadStatusTrayRuns"],
+      }) as StatusTrayApi["loadStatusTrayRuns"],
       syncStatusTray: async (snapshot: StatusTraySnapshot) => {
         this.snapshots.push(snapshot);
       },
@@ -80,17 +84,17 @@ class TrayBridge {
   }
 }
 
-function Effects({ deps }: { deps: Partial<StatusTrayDeps> }) {
-  useStatusTray(deps);
+function Effects() {
+  useStatusTray();
   return null;
 }
 
-const mount = async (registry: AtomRegistry, deps: Partial<StatusTrayDeps>) => {
+const mount = async (registry: AtomRegistry) => {
   const view = createReactTestRoot();
   await view.render(
     <RegistryContext.Provider value={registry}>
       <I18nProvider>
-        <Effects deps={deps} />
+        <Effects />
       </I18nProvider>
     </RegistryContext.Provider>,
   );
@@ -105,12 +109,16 @@ const flush = async () => {
   }
 };
 
-const harness = (lockedTeamId: string | null = null): AtomRegistry =>
+const harness = (
+  bridge: TrayBridge,
+  lockedTeamId: string | null = null,
+): AtomRegistry =>
   createTestRegistry([
     [tokenAtom, "token-1"],
     [activeOrganizationIdAtom, "org-a"],
     [activeTeamIdAtom, team.id],
     [lockedTeamIdAtom, lockedTeamId],
+    [statusTrayApiAtom, bridge.api()],
   ]);
 
 const trayTitles = (snapshot: StatusTraySnapshot | undefined) =>
@@ -127,10 +135,10 @@ afterEach(() => {
 
 describe("useStatusTray", () => {
   it("pushes the open dashboard's running runs to the tray", async () => {
-    const registry = harness();
     const bridge = new TrayBridge();
+    const registry = harness(bridge);
 
-    const view = await mount(registry, bridge.deps());
+    const view = await mount(registry);
     await flush();
     // The organization poll starts from an empty tray, so nothing is on it yet.
     expect(trayTitles(bridge.snapshots.at(-1))).toEqual([]);
@@ -156,11 +164,11 @@ describe("useStatusTray", () => {
   });
 
   it("keeps the polled runs of other teams alongside the open one", async () => {
-    const registry = harness();
     const bridge = new TrayBridge();
+    const registry = harness(bridge);
     bridge.pollResult = [trayRun("run-other", "team-b")];
 
-    const view = await mount(registry, bridge.deps());
+    const view = await mount(registry);
     await flush();
     expect(bridge.pollRequests).toEqual(["org-a"]);
 
@@ -181,15 +189,15 @@ describe("useStatusTray", () => {
   });
 
   it("does nothing in a project window", async () => {
-    const registry = harness("team-a");
     const bridge = new TrayBridge();
+    const registry = harness(bridge, "team-a");
     applySyncEvent(registry, {
       kind: "team-snapshot",
       teamId: team.id,
       payload: payload([runningRun("run-1")]),
     });
 
-    const view = await mount(registry, bridge.deps());
+    const view = await mount(registry);
     await flush();
 
     expect(bridge.snapshots).toEqual([]);
@@ -200,10 +208,11 @@ describe("useStatusTray", () => {
   });
 
   it("does nothing outside the packaged macOS app", async () => {
-    const registry = harness();
     const bridge = new TrayBridge();
+    const registry = harness(bridge);
+    registry.set(statusTrayApiAtom, bridge.api({ macDesktop: false }));
 
-    const view = await mount(registry, bridge.deps({ macDesktop: false }));
+    const view = await mount(registry);
     await flush();
 
     expect(bridge.snapshots).toEqual([]);
@@ -215,11 +224,11 @@ describe("useStatusTray", () => {
   });
 
   it("empties the tray when the account signs out", async () => {
-    const registry = harness();
     const bridge = new TrayBridge();
+    const registry = harness(bridge);
     bridge.pollResult = [trayRun("run-other", "team-b")];
 
-    const view = await mount(registry, bridge.deps());
+    const view = await mount(registry);
     await flush();
     expect(trayTitles(bridge.snapshots.at(-1))).toContain("Run run-other");
 
