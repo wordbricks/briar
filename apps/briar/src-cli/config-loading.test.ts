@@ -131,7 +131,7 @@ describe("CLI config loading", () => {
     );
 
     expect(result.status).toBe(0);
-    expect(JSON.parse(result.stdout)).toMatchObject({ projectId });
+    expect(JSON.parse(result.stdout)).toMatchObject({ teamId: projectId });
     const canonical = JSON.parse(
       await readFile(join(directory, "config.json"), "utf8"),
     );

@@ -1,10 +1,10 @@
 import * as Schema from "effect/Schema";
 import * as SchemaGetter from "effect/SchemaGetter";
-import type { ProjectAgentLocale } from "../../src/lib/project-agent";
+import type { ProjectAgentLocale } from "../../src/lib/team-agent";
 import {
   isProjectIconColor,
   isProjectIconName,
-} from "../../src/lib/project-icon-library";
+} from "../../src/lib/team-icon-library";
 import type { TeamIconUpdate } from "./team-command-repository";
 import { createOrganization } from "./organization-command-repository";
 import { hasOrganizationCapability } from "./organization-access";

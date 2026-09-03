@@ -31,7 +31,7 @@ import type {
   AgentExecutionCostEstimate,
   AgentUsagePricing,
 } from "../../src/lib/agent-usage-pricing";
-import type { ProjectUsageSummary } from "../../src/lib/project-usage-summary";
+import type { ProjectUsageSummary } from "../../src/lib/team-usage-summary";
 import { appAgentProvider } from "./app-connect-mappers";
 import type {
   listOrganizationUsageRunsApplication,

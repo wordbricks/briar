@@ -718,7 +718,7 @@ describe("conversational Agent Skill execution approval", () => {
     await expect(transientSessionPayload(seeded.proposal.id))
       .resolves.toBeNull();
     await expect(
-      agentClient.getTeamAgentSession(
+      agentClient.getProjectAgentSession(
         {
           projectId,
           sessionId: acceptedBody.proposal.resultSessionId,

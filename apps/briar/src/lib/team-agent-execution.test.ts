@@ -41,7 +41,7 @@ describe("executeTeamAgentTask", () => {
           skill: "# Release agent",
         },
         dashboard: {
-          project: { id: "project-1" },
+          team: { id: "project-1" },
           runs: [],
         } as unknown as DashboardPayload,
         message: "Prepare the release.",
@@ -104,7 +104,7 @@ describe("executeTeamAgentTask", () => {
             skill: "# Release agent",
           },
           dashboard: {
-            project: { id: "project-1" },
+            team: { id: "project-1" },
             runs: [],
           } as unknown as DashboardPayload,
           message: "Publish the release.",
@@ -143,7 +143,7 @@ describe("executeTeamAgentTask", () => {
           skill: "# Release agent",
         },
         dashboard: {
-          project: { id: "project-1" },
+          team: { id: "project-1" },
           runs: [],
         } as unknown as DashboardPayload,
         message: "Retry the upload.",

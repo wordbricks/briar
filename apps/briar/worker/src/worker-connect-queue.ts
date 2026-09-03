@@ -1458,7 +1458,7 @@ export function createWorkerQueueService(
     renewWorkLease: (request) => renewWorkLease(input, request, services),
     checkpointChannelReplySession: (request) => checkpointChannelReplySessionRpc(input, request, services),
     handoffWork: (request) => handoffWork(input, request, services),
-    completeTeamAgentTask: (request) => completeTeamAgentTask(input, request, services),
+    completeProjectAgentTask: (request) => completeTeamAgentTask(input, request, services),
     recordMergeBatchCandidateEnqueued: (request) => recordMergeBatchCandidateEnqueuedRpc(input, request, services),
     recordMergeBatchAuthority: (request) => recordMergeBatchAuthorityRpc(input, request, services),
     recordMergeBatchValidation: (request) => recordMergeBatchValidationRpc(input, request, services),

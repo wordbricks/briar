@@ -21,7 +21,7 @@ import {
   ProjectAgentScheduleNotificationLevel
     as ProtoProjectAgentScheduleNotificationLevel,
   ProjectAgentScheduleRecurrence as ProtoProjectAgentScheduleRecurrence,
-  TeamAgentScheduleRunStatus as ProtoProjectAgentScheduleRunStatus,
+  ProjectAgentScheduleRunStatus as ProtoProjectAgentScheduleRunStatus,
   type ProjectAgentScheduleWrite,
   type ProjectAgentSession,
   ProjectAgentSessionEventType,
@@ -940,7 +940,7 @@ const toProjectAgentSession = (input: {
   })),
   status: sessionStatus[input.payload.status],
   issues: input.payload.issues.map((issue) => ({
-    $typeName: "briar.app.v1.TeamAgentSessionIssue",
+    $typeName: "briar.app.v1.ProjectAgentSessionIssue",
     runId: issue.runId,
     runNumber: issue.runNumber,
     sourceKey: issue.sourceKey,
@@ -959,7 +959,7 @@ const toProjectAgentSession = (input: {
   summary: input.payload.summary ?? undefined,
   error: input.payload.error ?? undefined,
   events: input.payload.events.map((event) => ({
-    $typeName: "briar.app.v1.TeamAgentSessionEvent",
+    $typeName: "briar.app.v1.ProjectAgentSessionEvent",
     id: event.id,
     type: sessionEventType[event.type],
     occurredAt: requiredTimestamp(event.occurredAt, "Agent session event"),
@@ -1142,7 +1142,7 @@ export const createAppAgentService = (
     };
   },
 
-  createTeamAgent: async (input) => {
+  createProjectAgent: async (input) => {
     const session = await services.requireSession(auth, request);
     const project = await requireProject(
       db,
@@ -1166,7 +1166,7 @@ export const createAppAgentService = (
     return { agent: toProjectAgent(agent) };
   },
 
-  updateTeamAgent: async (input) => {
+  updateProjectAgent: async (input) => {
     const session = await services.requireSession(auth, request);
     const project = await requireProject(
       db,
@@ -1192,7 +1192,7 @@ export const createAppAgentService = (
     return { agent: toProjectAgent(agent) };
   },
 
-  deleteTeamAgent: async (input) => {
+  deleteProjectAgent: async (input) => {
     const session = await services.requireSession(auth, request);
     const project = await requireProject(
       db,
@@ -1217,7 +1217,7 @@ export const createAppAgentService = (
     return { deleted: true };
   },
 
-  listTeamAgents: async (input) => {
+  listProjectAgents: async (input) => {
     const session = await services.requireSession(auth, request);
     const project = await requireProject(
       db,
@@ -1230,7 +1230,7 @@ export const createAppAgentService = (
     };
   },
 
-  listTeamAgentSchedules: async (input) => {
+  listProjectAgentSchedules: async (input) => {
     const session = await services.requireSession(auth, request);
     const project = await requireProject(
       db,
@@ -1246,7 +1246,7 @@ export const createAppAgentService = (
     };
   },
 
-  createTeamAgentSchedule: async (input) => {
+  createProjectAgentSchedule: async (input) => {
     const session = await services.requireSession(auth, request);
     const project = await requireProject(
       db,
@@ -1271,7 +1271,7 @@ export const createAppAgentService = (
     return { schedule: toProjectAgentSchedule(schedule) };
   },
 
-  updateTeamAgentSchedule: async (input) => {
+  updateProjectAgentSchedule: async (input) => {
     const session = await services.requireSession(auth, request);
     const project = await requireProject(
       db,
@@ -1296,7 +1296,7 @@ export const createAppAgentService = (
     return { schedule: toProjectAgentSchedule(schedule) };
   },
 
-  deleteTeamAgentSchedule: async (input) => {
+  deleteProjectAgentSchedule: async (input) => {
     const session = await services.requireSession(auth, request);
     const project = await requireProject(
       db,
@@ -1320,7 +1320,7 @@ export const createAppAgentService = (
     return { deleted };
   },
 
-  listTeamAgentScheduleRuns: async (input) => {
+  listProjectAgentScheduleRuns: async (input) => {
     const session = await services.requireSession(auth, request);
     const project = await requireProject(
       db,
@@ -1362,7 +1362,7 @@ export const createAppAgentService = (
     };
   },
 
-  completeTeamAgentScheduleRun: async (input) => {
+  completeProjectAgentScheduleRun: async (input) => {
     const session = await services.requireSession(auth, request);
     const project = await requireProject(
       db,
@@ -1443,7 +1443,7 @@ export const createAppAgentService = (
     };
   },
 
-  listTeamAgentSessions: async (input) => {
+  listProjectAgentSessions: async (input) => {
     const session = await services.requireSession(auth, request);
     const project = await requireProject(
       db,
@@ -1528,7 +1528,7 @@ export const createAppAgentService = (
     };
   },
 
-  getTeamAgentSession: async (input) => {
+  getProjectAgentSession: async (input) => {
     const sessionId = decodeSessionId(input.sessionId);
     const session = await services.requireSession(auth, request);
     const project = await requireProject(

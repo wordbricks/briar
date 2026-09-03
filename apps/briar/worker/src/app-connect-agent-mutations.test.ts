@@ -132,14 +132,14 @@ describe("AgentService mutations", () => {
 
   it("allows development managers and rejects editor or viewer mutations", async () => {
     await expect(
-      client(tokens.developer).createTeamAgent(createInput, options(tokens.developer)),
+      client(tokens.developer).createProjectAgent(createInput, options(tokens.developer)),
     ).resolves.toMatchObject({
       agent: { name: "Capability Agent" },
     });
 
     for (const token of [tokens.editor, tokens.viewer]) {
       const error = await client(token)
-        .createTeamAgent(createInput, options(token))
+        .createProjectAgent(createInput, options(token))
         .catch((cause: unknown) => cause);
       expect(error).toBeInstanceOf(ConnectError);
       expect((error as ConnectError).code).toBe(Code.PermissionDenied);
@@ -170,7 +170,7 @@ describe("AgentService mutations", () => {
 
     for (const [index, skill] of malformedSkills.entries()) {
       const error = await client(tokens.owner)
-        .createTeamAgent(
+        .createProjectAgent(
           {
             ...createInput,
             name: `Invalid Skill Agent ${index}`,
@@ -253,7 +253,7 @@ describe("AgentService mutations", () => {
 
     const ownerClient = client(tokens.owner);
     const callOptions = options(tokens.owner);
-    const created = await ownerClient.createTeamAgent(
+    const created = await ownerClient.createProjectAgent(
       {
         ...createInput,
         name: "Pinned Agent",
@@ -270,7 +270,7 @@ describe("AgentService mutations", () => {
     });
 
     const crossProjectError = await ownerClient
-      .createTeamAgent(
+      .createProjectAgent(
         {
           ...createInput,
           name: "Wrong Project",
@@ -284,7 +284,7 @@ describe("AgentService mutations", () => {
 
     const agentId = created.agent?.id;
     expect(agentId).toBeTruthy();
-    const preserved = await ownerClient.updateTeamAgent(
+    const preserved = await ownerClient.updateProjectAgent(
       {
         projectId,
         agentId: agentId!,
@@ -305,7 +305,7 @@ describe("AgentService mutations", () => {
     });
     expect(preserved.agent?.model).toBeUndefined();
 
-    const cleared = await ownerClient.updateTeamAgent(
+    const cleared = await ownerClient.updateProjectAgent(
       {
         projectId,
         agentId: agentId!,

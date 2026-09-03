@@ -9,7 +9,7 @@ import {
   type ProjectAgentScheduleIntervalUnit,
   type ProjectAgentScheduleNotificationLevel,
   type ProjectAgentScheduleRecurrence,
-} from "../../src/lib/project-agent-schedule";
+} from "../../src/lib/team-agent-schedule";
 import {
   listAgentSkills,
   type AgentSkillRow,

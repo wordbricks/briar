@@ -7,7 +7,7 @@ import {
   agentResponsibilityMaxLength,
   agentSkillsMaxCount,
 } from "../../src/lib/agent-limits";
-import { defaultProjectAgentCalendarColor } from "../../src/lib/project-agent";
+import { defaultProjectAgentCalendarColor } from "../../src/lib/team-agent";
 import {
   isValidProjectAgentScheduleTimeZone,
   normalizeProjectAgentScheduleDay,
@@ -16,7 +16,7 @@ import {
   projectAgentScheduleIntervalUnits,
   projectAgentScheduleNotificationLevels,
   projectAgentScheduleRecurrences,
-} from "../../src/lib/project-agent-schedule";
+} from "../../src/lib/team-agent-schedule";
 import {
   channelAgentSkillInputSchema,
   organizationAgentInputSchema,

@@ -1,5 +1,5 @@
 import { normalizeAutoHuntWorkflow } from "../../src/lib/auto-hunt-contract";
-import { parseProjectAgentScheduleDays } from "../../src/lib/project-agent-schedule";
+import { parseProjectAgentScheduleDays } from "../../src/lib/team-agent-schedule";
 import { agentSkillJson } from "./agent-skills";
 import { parseStructuredResult } from "./agent-result-json";
 import type {

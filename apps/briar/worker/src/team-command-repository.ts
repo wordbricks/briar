@@ -7,7 +7,7 @@ import {
   defaultProjectAgentCopy,
   projectAgentSkill,
   type ProjectAgentLocale,
-} from "../../src/lib/project-agent";
+} from "../../src/lib/team-agent";
 import type { TeamRow } from "./team-repository";
 
 export type TeamIconUpdate =

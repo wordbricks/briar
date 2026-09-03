@@ -21,7 +21,7 @@ import {
   type ConnectRouter,
   type ServiceImpl,
 } from "@connectrpc/connect";
-import { normalizeProjectAgentLocale } from "../../src/lib/project-agent";
+import { normalizeProjectAgentLocale } from "../../src/lib/team-agent";
 import type {
   AutoHuntWorkflowCheckpoint,
   AutoHuntWorkflowInput,

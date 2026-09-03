@@ -22,7 +22,7 @@ import {
   GitHubPullRequestIdentitySchema,
 } from "@briar/contracts/gen/briar/types/v1/github_identity_pb";
 import { Code, ConnectError } from "@connectrpc/connect";
-import type { ProjectMergeActivity } from "../../src/lib/project-merge-activity";
+import type { ProjectMergeActivity } from "../../src/lib/team-merge-activity";
 
 export const appProjectMergeActivity = (activity: ProjectMergeActivity) =>
   create(GetProjectMergeActivityResponseSchema, {

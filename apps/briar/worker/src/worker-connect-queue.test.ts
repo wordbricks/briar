@@ -291,7 +291,7 @@ describe("WorkerQueueService lifecycle semantics", () => {
       },
     });
 
-    await expect(service.completeTeamAgentTask(request, context))
+    await expect(service.completeProjectAgentTask(request, context))
       .resolves.toEqual({ replayed: true });
     expect(complete).toHaveBeenCalledWith({
       db: input.db,

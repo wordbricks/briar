@@ -1,6 +1,6 @@
 import * as Schema from "effect/Schema";
 import { IsoDateTimeWithOffset } from "../../src/lib/date-time-schema";
-import { MERGE_ACTIVITY_DAY, type MergedPullRequest, type ProjectMergeActivity } from "../../src/lib/project-merge-activity";
+import { MERGE_ACTIVITY_DAY, type MergedPullRequest, type ProjectMergeActivity } from "../../src/lib/team-merge-activity";
 
 const encoder = new TextEncoder();
 

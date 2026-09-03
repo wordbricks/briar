@@ -4,7 +4,7 @@ import {
   summarizeProjectUsage,
   type ProjectUsageDateRange,
   type ProjectUsagePeriod,
-} from "../../src/lib/project-usage-summary";
+} from "../../src/lib/team-usage-summary";
 import { normalizeAutoHuntWorkflow } from "../../src/lib/auto-hunt-contract";
 import { parseExecutionMetrics } from "./agent-result-json";
 import {

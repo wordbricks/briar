@@ -1,4 +1,4 @@
-import { projectAgentSkill } from "../../src/lib/project-agent";
+import { projectAgentSkill } from "../../src/lib/team-agent";
 import {
   assertAgentSkillReplacementAllowed,
   hydrateAgentSkills,

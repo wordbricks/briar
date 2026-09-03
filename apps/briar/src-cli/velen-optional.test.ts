@@ -153,7 +153,7 @@ describe("optional Velen CLI preflight", () => {
     expect(result.status).toBe(0);
     expect(JSON.parse(result.stdout)).toMatchObject({
       ok: true,
-      projectId: "11111111-1111-4111-8111-111111111111",
+      teamId: "11111111-1111-4111-8111-111111111111",
     });
   });
 
