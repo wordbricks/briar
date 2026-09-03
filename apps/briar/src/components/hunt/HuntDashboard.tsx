@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
 import { Typography } from "@/components/ui/typography";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentProps } from "react";
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import { NativeSelect } from "@/components/NativeSelect";
 import { CompanionBottomNavigation, type CompanionStatusFilter } from "@/components/CompanionBottomNavigation";
 import type { AutoHuntSession } from "@/hooks/useAutoHuntSessions";
@@ -34,12 +34,17 @@ import { IssueCollection, type IssueCollectionState, type IssueWorkflowContext }
 import { IssuePropertyFilterMenu } from "./board/IssuePropertyFilterMenu";
 import { KanbanCard } from "./board/KanbanCard";
 import { KanbanColumnMenu } from "./board/KanbanColumnMenu";
-import { RunPage } from "./detail/RunPage";
 import { CreateIssueDialog } from "./editor/CreateIssueDialog";
 import { EditIssueDialog } from "./editor/EditIssueDialog";
 import { DashboardView, IssuePropertyFilters, SourceFilter, StatusFilter, emptyIssuePropertyFilters, runMatchesIssuePropertyFilters } from "./model/filters";
 import { localizeWorkflowStage } from "./model/formatters";
 import { KanbanColumn, KanbanPointerDrag, kanbanAutoScrollEdge, kanbanAutoScrollInterval, kanbanColumnForRun, kanbanPointerDragThreshold, placementMatchesRun } from "./model/kanban";
+// The issue detail page pulls the whole markdown rendering stack, so it loads
+// from its own chunk the first time an issue is opened.
+const RunPage = lazy(() => import("./detail/RunPage").then(m => ({
+  default: m.RunPage
+})));
+const runPageFallback = <div className="lazy-view-placeholder h-full w-full" />;
 function runIdFromCreateIssueResult(value: unknown) {
   if (typeof value !== "object" || value === null || !("runId" in value) || typeof value.runId !== "string") {
     return null;
@@ -834,7 +839,7 @@ function HuntDashboardContent({
       </MainContent>;
   }
   if (selected) {
-    return <>
+    return <Suspense fallback={runPageFallback}>
       <RunPage assignedWorker={workerById.get(selected.workerId ?? "") ?? workerById.get(selected.requestedWorkerId ?? "") ?? null} companionMode={companionMode} conversationInboxSyncSignal={conversationInboxSyncSignal} highlightedMessageId={selectedRunMessageId} initialDetailTab={selectedRunInitialTab ?? undefined} issueKeyPrefix={dashboard?.team.issueKeyPrefix} currentUserId={currentUserId} error={displayedError} showErrorToast={false} isDeletingIssue={deletingIssueId === selected.id} isRecovering={recoveringRunId === selected.id} isUpdatingIssue={updatingIssueId === selected.id} isSidebarOpen={isSidebarOpen} issueProjects={issueProjects.filter(project => project.teamId === dashboard?.team.id && project.status !== "cancelled")} onBack={() => {
         setSelectedRunMessageId(null);
         setSelectedRunInitialTab(null);
@@ -855,7 +860,7 @@ function HuntDashboardContent({
         setSelectedRunId(runId);
       }} onLoadAttachment={onLoadAttachment} onLoadIssueMessages={() => onLoadIssueMessages(selected.id)} onLoadRunEvents={() => onLoadRunEvents(selected.id)} onLoadRunEvidence={() => onLoadRunEvidence(selected.id)} onLoadRunEvidenceImage={onLoadRunEvidenceImage} onViewingIssueConversationChange={onViewingIssueConversationChange} onCompleteResultReview={onCompleteResultReview ? () => onCompleteResultReview(selected.id) : undefined} mentionMembers={dashboard?.members ?? []} mentionAgents={agents.filter(agent => agent.teamId === dashboard?.team.id)} onMove={placement => onMoveRun(selected.id, placement)} onMoveIssueProject={onMoveIssueProject && selected.projectId ? targetProjectId => onMoveIssueProject(selected.id, selected.projectId!, targetProjectId) : undefined} onProcessNow={onProcessIssueNow ? () => onProcessIssueNow(selected) : undefined} onRetry={() => onRetryRun(selected.id)} onRework={onReworkRun ? input => onReworkRun(selected.id, input) : undefined} onResume={() => onResumeRun(selected.id)} onSendIssueMessage={input => onSendIssueMessage(selected.id, input)} onEditIssueMessage={(messageId, input) => onEditIssueMessage(selected.id, messageId, input)} onDeleteIssueMessage={messageId => onDeleteIssueMessage(selected.id, messageId)} onUpdateIssue={input => onUpdateIssue(selected.id, input)} onUpdateIssueCheckpoints={checkpoints => onUpdateIssueCheckpoints(selected.id, checkpoints)} onUpdateIssuePreferences={input => onUpdateIssuePreferences(selected.id, input)} onUpdateIssueSubscription={onUpdateIssueSubscription ? subscribed => onUpdateIssueSubscription(selected.id, subscribed) : undefined} availableProviders={availableProviders} executionPolicy={dashboard?.executionPolicy} executionWorkers={dashboard?.workers ?? []} performedAgentName={agentAssociationsByRunId.performedAgents.get(selected.id)?.name ?? null} performedAgentProvider={agentAssociationsByRunId.performedAgents.get(selected.id)?.provider ?? null} performedAgentModel={agentAssociationsByRunId.performedAgents.get(selected.id)?.model ?? null} organizationId={dashboard!.team.organizationId} projectId={dashboard!.team.id} run={selected} isProcessing={processingIssueIds.has(selected.id)} availableRuns={dashboard!.runs} token={token} />
         {createIssueDialog}
-      </>;
+      </Suspense>;
   }
   return <MainContent id="issues">
       {!companionMode ? <IssueCollection
