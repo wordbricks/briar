@@ -69,7 +69,6 @@ const navigation: DesktopShellProps["navigation"] = {
   replaceNavigationLocation: () => undefined,
   resetNavigation: () => undefined,
   selectedRunId: null,
-  setDefaultTeam: () => undefined,
 };
 
 const props: DesktopShellProps = {

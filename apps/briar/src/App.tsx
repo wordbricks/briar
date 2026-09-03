@@ -306,7 +306,6 @@ export function App({
     replaceNavigationLocation,
     resetNavigation,
     selectedRunId,
-    setDefaultTeam,
   } = navigation;
   const setPendingInboxNotificationTarget = useAtomSet(
     pendingInboxNotificationTargetAtom,
@@ -482,18 +481,6 @@ export function App({
     teamWindowTeamId: projectWindowProjectId,
   });
 
-  /**
-   * Selecting a team from the palette, including the "where am I" ref the
-   * navigation helpers default their team id from.
-   */
-  const selectPaletteTeam = useCallback(
-    (teamId: string) => {
-      setDefaultTeam(teamId);
-      briar.setActiveProjectId(teamId);
-    },
-    [briar.setActiveProjectId, setDefaultTeam],
-  );
-
   const openAppSettings = useCallback(() => {
     setSettingsTarget({
       scope: "application",
@@ -569,7 +556,7 @@ export function App({
     navigateToIssue,
     navigateToPage,
     openAppSettings,
-    selectTeam: selectPaletteTeam,
+    selectTeam: briar.setActiveProjectId,
     selectedRunId,
     sessions: autoHunt.sessions,
     startTeamCreation: briar.startProjectCreation,
@@ -660,7 +647,6 @@ export function App({
         replaceNavigationLocation,
         resetNavigation,
         selectedRunId,
-        setDefaultTeam,
       }}
       openAppSettings={openAppSettings}
       openOrganizationIssue={openOrganizationIssue}

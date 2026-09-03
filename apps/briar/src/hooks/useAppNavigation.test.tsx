@@ -7,6 +7,17 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { I18nProvider } from "../i18n";
 import { AppKeyboardCommandProvider } from "./appKeyboardCommands";
 import { demoDashboard } from "../lib/demo-data";
+import {
+  channelNavigationLocation,
+  channelPageNavigationLocation,
+  organizationNavigationLocation,
+  projectNavigationLocation,
+  settingsNavigationLocation,
+} from "../lib/app-navigation";
+import { organizationChannelsAtom } from "../state/entities/channels";
+import { applySyncEvent } from "../state/sync/apply";
+import { channelApiAtom } from "../state/channels/api";
+import { activeChannelIdAtom } from "../state/channels/atoms";
 import { settingsTargetAtom } from "../state/navigation/atoms";
 import {
   activeOrganizationIdAtom,
@@ -16,20 +27,24 @@ import { createTestRegistry, type AtomRegistry } from "../state/registry";
 import {
   loadingAtom,
   restoringSessionAtom,
+  tokenAtom,
   userAtom,
 } from "../state/session/atoms";
 import { activeTeamIdAtom, teamsAtom } from "../state/team/atoms";
 import { createReactTestRoot } from "../test/react";
+import type { ChannelSummary } from "../lib/channels-contract";
 import type { Organization, Project, SessionUser } from "../types";
 import { useAppNavigation, type AppNavigation } from "./useAppNavigation";
 
 /*
   The reconciliation the location and the store owe each other.
 
-  Phase 5 moved this block out of `App.tsx` untouched, and Phase 6 rewrites it,
-  so these cases pin the two rules that would be silently lost in either move:
-  a project page carries the selected team in its location, and walking onto a
-  team the account no longer has falls back instead of rendering nothing.
+  Phase 5 moved this block out of `App.tsx` untouched and Phase 6 rewrites it,
+  so these cases pin every outcome of the six effects that run in a fixed order
+  — user boundary reset, settings target sync, team id backfill, team existence
+  fallback, organization existence fallback, schedule tab gate — plus the
+  navigation callbacks that feed them. They are written against the pre-refactor
+  hook and must keep passing against the atom based one.
 */
 
 const user: SessionUser = {
@@ -38,21 +53,57 @@ const user: SessionUser = {
   email: "tester@briar.local",
 };
 
-const teamOf = (id: string): Project => ({
+const teamOf = (id: string, overrides: Partial<Project> = {}): Project => ({
   ...demoDashboard.team,
   id,
   name: id,
+  ...overrides,
 });
 const teamA = teamOf("team-a");
 const teamB = teamOf("team-b");
+const scheduleLessTeam = teamOf("team-no-schedule", {
+  scheduleTabEnabled: false,
+});
 
-const organization: Organization = {
-  id: teamA.organizationId,
-  name: "Org",
-  handle: "org",
+const organizationOf = (id: string): Organization => ({
+  id,
+  name: id,
+  handle: id,
   logo: null,
   role: "owner",
   createdAt: "2026-09-01T00:00:00.000Z",
+});
+const organization = organizationOf(teamA.organizationId);
+const otherOrganization = organizationOf("organization-b");
+
+const channelOf = (id: string): ChannelSummary => ({
+  id,
+  organizationId: organization.id,
+  kind: "channel",
+  slug: id,
+  name: id,
+  topic: null,
+  visibility: "public",
+  defaultProjectId: null,
+  archivedAt: null,
+  memberCount: 1,
+  agentCount: 0,
+  createdByUserId: user.id,
+  createdAt: "2026-09-01T00:00:00.000Z",
+  updatedAt: "2026-09-01T00:00:00.000Z",
+  lastMessageAt: null,
+  lastMessagePreview: null,
+  lastReadAt: null,
+  hasUnread: false,
+  dmParticipants: [],
+});
+
+const seedChannels = (registry: AtomRegistry, channels: ChannelSummary[]) => {
+  applySyncEvent(registry, {
+    kind: "channel-catalog-snapshot",
+    organizationId: organization.id,
+    channels,
+  });
 };
 
 let latest: AppNavigation;
@@ -75,17 +126,24 @@ const flush = async (attempts = 4) => {
   }
 };
 
-const harness = (teams: Project[] = [teamA, teamB]): AtomRegistry =>
+const harness = (
+  teams: Project[] = [teamA, teamB],
+  organizations: Organization[] = [organization],
+): AtomRegistry =>
   createTestRegistry([
     [userAtom, user],
     [restoringSessionAtom, false],
     // The fallback effects wait for the session to settle before replacing a
     // location, exactly as they did inline.
     [loadingAtom, false],
+    [tokenAtom, "token-1"],
     [teamsAtom, teams],
-    [activeTeamIdAtom, teamA.id],
-    [organizationsAtom, [organization]],
-    [activeOrganizationIdAtom, organization.id],
+    [activeTeamIdAtom, teams[0]?.id ?? null],
+    [organizationsAtom, organizations],
+    [activeOrganizationIdAtom, organizations[0]?.id ?? null],
+    // Marking a channel read confirms with the server; nothing here needs the
+    // round trip, and the local write is what the assertions look at.
+    [channelApiAtom, { markChannelRead: async () => undefined }],
   ]);
 
 const mount = async (registry: AtomRegistry) => {
@@ -197,6 +255,375 @@ describe("useAppNavigation", () => {
     });
     await flush();
     expect(latest.activePage).toBe("lobby");
+    await view.cleanup();
+  });
+
+  it("backfills the selected team onto a bare project page location", async () => {
+    const registry = harness();
+    const view = await mount(registry);
+
+    // `resetNavigation` writes the page with no team in it, which is the one
+    // entry point the team backfill effect exists for.
+    await act(async () => {
+      latest.resetNavigation("agents");
+    });
+    await flush();
+    expect(latest.activePage).toBe("agents");
+    expect(latest.activeNavigationLocation).toBe(
+      projectNavigationLocation("agents", teamA.id),
+    );
+    await view.cleanup();
+  });
+
+  it("adopts the settings target a settings location names", async () => {
+    const registry = harness();
+    const view = await mount(registry);
+
+    await act(async () => {
+      latest.navigateToLocation(
+        settingsNavigationLocation({
+          scope: "organization",
+          organizationId: organization.id,
+          section: "members",
+        }),
+      );
+    });
+    await flush();
+    expect(registry.get(settingsTargetAtom)).toEqual({
+      scope: "organization",
+      organizationId: organization.id,
+      section: "members",
+    });
+    await view.cleanup();
+  });
+
+  it("writes the stored settings target into a bare settings location", async () => {
+    const registry = harness();
+    const view = await mount(registry);
+
+    await act(async () => {
+      registry.set(settingsTargetAtom, {
+        scope: "application",
+        section: "keybindings",
+      });
+      latest.navigateToLocation("settings");
+    });
+    await flush();
+    expect(latest.activeNavigationLocation).toBe(
+      settingsNavigationLocation({
+        scope: "application",
+        section: "keybindings",
+      }),
+    );
+    await view.cleanup();
+  });
+
+  it("keeps a channel location on a team the account lost, on the same organization", async () => {
+    const registry = harness();
+    seedChannels(registry, [
+      channelOf("channel-a"),
+    ]);
+    const view = await mount(registry);
+
+    await act(async () => {
+      latest.navigateToChannel(
+        "channel-a",
+        "channels",
+        organization.id,
+        teamB.id,
+      );
+    });
+    await flush();
+    expect(latest.activePage).toBe("channels");
+    expect(latest.desktopActiveChannelId).toBe("channel-a");
+
+    await act(async () => {
+      registry.set(teamsAtom, [teamA]);
+    });
+    await flush();
+    // The channel survives; only the team in the location is swapped.
+    expect(latest.activeNavigationLocation).toBe(
+      channelNavigationLocation(
+        "channels",
+        organization.id,
+        "channel-a",
+        teamA.id,
+      ),
+    );
+    await view.cleanup();
+  });
+
+  it("sends a settings location for a lost team to the account settings", async () => {
+    const registry = harness();
+    const view = await mount(registry);
+
+    await act(async () => {
+      latest.navigateToLocation(
+        settingsNavigationLocation({
+          scope: "project",
+          projectId: teamB.id,
+          section: "general",
+        }),
+      );
+    });
+    await flush();
+    expect(latest.activePage).toBe("settings");
+
+    await act(async () => {
+      registry.set(teamsAtom, [teamA]);
+    });
+    await flush();
+    expect(latest.activeNavigationLocation).toBe(
+      settingsNavigationLocation({
+        scope: "application",
+        section: "account",
+      }),
+    );
+    await view.cleanup();
+  });
+
+  it("falls back to the lobby when no team is left to land on", async () => {
+    const registry = harness();
+    const view = await mount(registry);
+
+    await act(async () => {
+      latest.navigateToPage("issues", teamB.id);
+    });
+    await flush();
+
+    await act(async () => {
+      // Losing the last team clears the selection too; leaving a selected id
+      // behind makes the backfill and the fallback undo each other forever.
+      registry.set(teamsAtom, []);
+      registry.set(activeTeamIdAtom, null);
+    });
+    await flush();
+    expect(latest.activeNavigationLocation).toBe("lobby");
+    await view.cleanup();
+  });
+
+  it("falls back when the location names an organization the account lost", async () => {
+    const registry = harness([teamA, teamB], [organization, otherOrganization]);
+    const view = await mount(registry);
+
+    await act(async () => {
+      latest.navigateToLocation(
+        organizationNavigationLocation(otherOrganization.id, "inbox"),
+      );
+    });
+    await flush();
+    expect(latest.activePage).toBe("inbox");
+
+    await act(async () => {
+      registry.set(organizationsAtom, [organization]);
+    });
+    await flush();
+    expect(latest.activeNavigationLocation).toBe(
+      organizationNavigationLocation(organization.id, "inbox"),
+    );
+    await view.cleanup();
+  });
+
+  it("keeps a channel page on the fallback organization when the named one is gone", async () => {
+    const registry = harness([teamA, teamB], [organization, otherOrganization]);
+    const view = await mount(registry);
+
+    await act(async () => {
+      latest.navigateToLocation(
+        channelPageNavigationLocation("channels", otherOrganization.id),
+      );
+    });
+    await flush();
+
+    await act(async () => {
+      registry.set(organizationsAtom, [organization]);
+    });
+    await flush();
+    expect(latest.activeNavigationLocation).toBe(
+      channelPageNavigationLocation("channels", organization.id, teamA.id),
+    );
+    await view.cleanup();
+  });
+
+  it("leaves the schedule page when the team turned its tab off", async () => {
+    const registry = harness([scheduleLessTeam]);
+    const view = await mount(registry);
+
+    await act(async () => {
+      latest.navigateToPage("schedule", scheduleLessTeam.id);
+    });
+    await flush();
+    expect(latest.activeNavigationLocation).toBe(
+      projectNavigationLocation("issues", scheduleLessTeam.id),
+    );
+    expect(latest.activePage).toBe("issues");
+    await view.cleanup();
+  });
+
+  it("stays on the schedule page while the tab is enabled", async () => {
+    const registry = harness();
+    const view = await mount(registry);
+
+    await act(async () => {
+      latest.navigateToPage("schedule");
+    });
+    await flush();
+    expect(latest.activePage).toBe("schedule");
+    await view.cleanup();
+  });
+
+  it("opens an issue on the team that owns it", async () => {
+    const registry = harness();
+    const view = await mount(registry);
+
+    await act(async () => {
+      latest.navigateToIssue("run-1", teamB.id);
+    });
+    await flush();
+    expect(latest.activePage).toBe("issues");
+    expect(latest.selectedRunId).toBe("run-1");
+    expect(latest.navigationProjectId).toBe(teamB.id);
+    await view.cleanup();
+  });
+
+  it("ignores an issue with no team to open it under", async () => {
+    const registry = harness([]);
+    const view = await mount(registry);
+    const before = latest.activeNavigationLocation;
+
+    await act(async () => {
+      latest.navigateToIssue("run-1", null);
+    });
+    await flush();
+    expect(latest.activeNavigationLocation).toBe(before);
+    expect(latest.selectedRunId).toBeNull();
+    await view.cleanup();
+  });
+
+  it("opens a channel and marks it read", async () => {
+    const registry = harness();
+    seedChannels(registry, [
+      { ...channelOf("channel-a"), hasUnread: true },
+    ]);
+    const view = await mount(registry);
+
+    await act(async () => {
+      latest.navigateToChannel("channel-a", "channels");
+    });
+    await flush();
+    expect(latest.activePage).toBe("channels");
+    expect(registry.get(activeChannelIdAtom)).toBe("channel-a");
+    expect(
+      registry
+        .get(organizationChannelsAtom(organization.id))
+        .find((channel) => channel.id === "channel-a")?.hasUnread,
+    ).toBe(false);
+    await view.cleanup();
+  });
+
+  it("replaces the desktop channel destination without adding a visit", async () => {
+    const registry = harness();
+    seedChannels(registry, [
+      channelOf("channel-a"),
+      channelOf("channel-b"),
+    ]);
+    const view = await mount(registry);
+
+    await act(async () => {
+      latest.navigateToChannel("channel-a", "channels");
+    });
+    await flush();
+    const entriesBefore = latest.navigationHistoryEntries.length;
+
+    await act(async () => {
+      latest.handleDesktopChannelFallback("channel-b", "channels");
+    });
+    await flush();
+    expect(latest.navigationHistoryEntries).toHaveLength(entriesBefore);
+    expect(latest.desktopActiveChannelId).toBe("channel-b");
+    await view.cleanup();
+  });
+
+  it("clears the open channel when the fallback has none to offer", async () => {
+    const registry = harness();
+    seedChannels(registry, [
+      channelOf("channel-a"),
+    ]);
+    const view = await mount(registry);
+
+    await act(async () => {
+      latest.navigateToChannel("channel-a", "channels");
+    });
+    await flush();
+    expect(registry.get(activeChannelIdAtom)).toBe("channel-a");
+
+    await act(async () => {
+      latest.handleDesktopChannelFallback(null, "channels");
+    });
+    await flush();
+    expect(registry.get(activeChannelIdAtom)).toBeNull();
+    expect(latest.activeNavigationLocation).toBe(
+      channelPageNavigationLocation("channels", organization.id, teamA.id),
+    );
+    await view.cleanup();
+  });
+
+  it("moves back and forward through the history it recorded", async () => {
+    const registry = harness();
+    const view = await mount(registry);
+
+    await act(async () => {
+      latest.navigateToPage("issues");
+    });
+    await flush();
+    await act(async () => {
+      latest.navigateToPage("agents");
+    });
+    await flush();
+    expect(latest.canGoBack).toBe(true);
+    expect(latest.canGoForward).toBe(false);
+
+    await act(async () => {
+      latest.goBack();
+    });
+    await flush();
+    expect(latest.activePage).toBe("issues");
+    expect(latest.canGoForward).toBe(true);
+
+    await act(async () => {
+      latest.goForward();
+    });
+    await flush();
+    expect(latest.activePage).toBe("agents");
+
+    await act(async () => {
+      latest.goToNavigationHistory(0);
+    });
+    await flush();
+    expect(latest.navigationHistoryIndex).toBe(0);
+    await view.cleanup();
+  });
+
+  it("drops the history the account before it built", async () => {
+    const registry = harness();
+    const view = await mount(registry);
+
+    await act(async () => {
+      latest.navigateToPage("issues");
+    });
+    await flush();
+    await act(async () => {
+      latest.navigateToPage("agents");
+    });
+    await flush();
+    expect(latest.navigationHistoryEntries.length).toBeGreaterThan(1);
+
+    await act(async () => {
+      registry.set(userAtom, { ...user, id: "user-2" });
+    });
+    await flush();
+    expect(latest.canGoBack).toBe(false);
+    expect(latest.canGoForward).toBe(false);
     await view.cleanup();
   });
 });
