@@ -5812,13 +5812,6 @@ button.issue-message-state { width:100%; cursor:pointer; }
   flex: 0 0 auto;
   padding: 0 16px 8px;
 }
-.channel-error {
-  border-bottom: 1px solid #e5c7c1;
-  background: #fbf1ef;
-  padding: 9px 18px;
-  color: #8c3a2c;
-  font-size: 12px;
-}
 .channel-empty { display: grid; place-items: center; height: 100%; }
 
 .channel-composer {
@@ -6240,8 +6233,6 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .companion-channel-sheet-action strong { font-weight:700; }
 .companion-channel-empty,
 .companion-channel-loading { display: flex; align-items: center; justify-content: center; padding: 28px 16px; color: var(--muted-foreground, #777168); font-size: 13px; }
-.companion-channel-error { border-bottom:1px solid var(--status-destructive-border); background:var(--status-destructive-surface); margin:0; padding:9px 16px; color:var(--status-destructive-foreground); font-size:var(--text-sm); }
-
 .companion-channel-composer { min-height:58px; position: sticky; bottom: 0; margin:0 max(12px,env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left)); display: flex; flex-wrap:wrap; align-items:center; gap: 8px; border:1px solid color-mix(in srgb,var(--border,#d6d1c8) 64%,white); border-radius:27px; background:color-mix(in srgb,var(--card,#fff) 84%,transparent); padding:6px; box-shadow:0 8px 24px rgba(22,20,28,.1); backdrop-filter:blur(22px) saturate(160%); -webkit-backdrop-filter:blur(22px) saturate(160%); }
 .companion-channel-thread-typing { margin:0 max(12px,env(safe-area-inset-right)) 0 max(12px,env(safe-area-inset-left)); padding:0 2px 4px; }
 .companion-channel-composer-add { width:40px; height:40px; flex:0 0 40px; border:0; border-radius:50%; color:var(--foreground,#1c1915); background:color-mix(in srgb,var(--muted,#f2efe9) 88%,transparent); }
