@@ -14,6 +14,10 @@ import {
   type DeviceAuthorizationClientId,
   type DeviceAuthorizationLaunchOptions,
 } from "./device-authorization-client";
+export type {
+  DeviceAuthorizationLaunchOptions,
+  DeviceLoginMethod,
+} from "./device-authorization-client";
 export {
   deleteAccount,
   loadSession,
@@ -247,10 +251,6 @@ export type DeviceAuthorization = {
 export type DeviceClientId = Exclude<
   DeviceAuthorizationClientId,
   "briar-cli"
->;
-
-export type DeviceLoginMethod = NonNullable<
-  DeviceAuthorizationLaunchOptions["method"]
 >;
 
 export async function beginDeviceAuthorization(

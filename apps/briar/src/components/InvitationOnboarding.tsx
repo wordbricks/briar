@@ -18,8 +18,9 @@ import { LoadingState } from "@/components/ui/loading-state";
 import { Typography } from "@/components/ui/typography";
 import { useI18n } from "../i18n";
 import { ApiError, loadOrganizationInvitation } from "../lib/api";
+import type { DeviceLoginMethod } from "../lib/api";
 import type { OrganizationInvitationPreview, SessionUser } from "../types";
-import { GoogleIcon, type LoginMethod } from "./LoginScreen";
+import { GoogleIcon } from "./LoginScreen";
 import { Logo } from "./Logo";
 
 type Translate = ReturnType<typeof useI18n>["t"];
@@ -62,7 +63,7 @@ export function InvitationOnboarding({
   onAccept: () => Promise<void>;
   onCancelLogin: () => void;
   onLeave: () => void;
-  onLogin: (method: LoginMethod) => void;
+  onLogin: (method: DeviceLoginMethod) => void;
   onSwitchAccount: () => Promise<void>;
   token: string;
   user: SessionUser | null;
