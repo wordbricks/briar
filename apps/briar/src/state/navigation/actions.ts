@@ -23,6 +23,7 @@ import {
   navigationHistoryAtom,
   navigationOrganizationIdAtom,
   navigationTeamIdAtom,
+  settingsTargetAtom,
 } from "./atoms";
 import { reduceNavigationHistory, type NavigationAction } from "./history";
 
@@ -72,6 +73,8 @@ export interface NavigationActions {
   ) => void;
   /** Drops the visit stack and starts a new one at `page`. */
   readonly resetNavigation: (page: ActivePage) => void;
+  /** Opens the application settings on the account screen. */
+  readonly openAppSettings: () => void;
   /** Returns past every settings entry the stack holds. */
   readonly closeSettings: () => void;
   readonly goBack: () => void;
@@ -185,6 +188,16 @@ export function createNavigationActions(
 
     resetNavigation(page) {
       dispatch({ type: "reset", value: page });
+    },
+
+    openAppSettings() {
+      Atom.batch(() => {
+        registry.set(settingsTargetAtom, {
+          scope: "application",
+          section: "account",
+        });
+        navigateToPage("settings");
+      });
     },
 
     closeSettings() {

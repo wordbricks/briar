@@ -5,7 +5,7 @@ import { useI18n } from "../../i18n";
 import { getMobilePlatform } from "../../lib/platform";
 import { activeOrganizationTeams } from "../../lib/team-window-scope";
 import { CompanionBottomNavigation } from "../CompanionBottomNavigation";
-import { CompanionHeader } from "../CompanionHeader";
+import { CompanionHeaderWithSession } from "./CompanionHeaderWithSession";
 import { Inbox } from "../Inbox";
 import { inboxNotificationTarget } from "../../lib/inbox-notifications";
 import {
@@ -237,16 +237,10 @@ export function CompanionShell({
     <div
       className={`app-shell companion-shell platform-${mobilePlatform}`}
     >
-      <CompanionHeader
-        activeOrganizationId={activeOrganizationId}
-        activeProjectId={activeTeamId}
-        loading={loading}
+      <CompanionHeaderWithSession
+        hasOpenAgentSession={requestedCompanionSession !== null}
         onLogout={() => void session.logout()}
-        onMarkAllRead={
-          companionPage === "inbox" && inbox.unreadCount > 0
-            ? inbox.markAllRead
-            : undefined
-        }
+        onMarkAllRead={inbox.markAllRead}
         onOrganizationChange={(organizationId) => {
           session.selectOrganization(organizationId);
           setCompanionPage("issues");
@@ -254,27 +248,16 @@ export function CompanionShell({
           setRequestedRunId(null);
           setRequestedSessionId(null);
         }}
-        onProjectChange={(projectId) => {
-          session.selectTeam(projectId);
+        onRefresh={() => void session.refresh()}
+        onSettings={() => setCompanionPage("settings")}
+        onTeamChange={(teamId) => {
+          session.selectTeam(teamId);
           setCompanionPage("issues");
           setCompanionStatus("all");
           setRequestedRunId(null);
           setRequestedSessionId(null);
         }}
-        onRefresh={() => void session.refresh()}
-        onSettings={() => setCompanionPage("settings")}
-        organizations={organizations}
-        pageTitle={
-          companionPage === "issues" && !requestedCompanionSession
-            ? t("companion.navTasks")
-            : companionPage === "inbox"
-              ? t("inbox.title")
-              : companionPage === "dms"
-                ? t("sidebar.dms")
-                : null
-        }
-        projects={teams}
-        user={user}
+        unreadInboxCount={inbox.unreadCount}
       />
       <Suspense fallback={lazyViewFallback}>
       {requestedCompanionSession ? (

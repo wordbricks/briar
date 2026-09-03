@@ -14,6 +14,10 @@ import {
   activeOrganizationIdAtom,
   organizationsAtom,
 } from "../../state/organization/atoms";
+import {
+  activePageAtom,
+  desktopActiveChannelIdAtom,
+} from "../../state/navigation/atoms";
 import { planningProjectsAtom } from "../../state/planning/atoms";
 import { lockedTeamIdAtom } from "../../state/platform";
 import { tokenAtom, userAtom } from "../../state/session/atoms";
@@ -68,17 +72,19 @@ export function SidebarSessionBoundary({
 
 /**
  * `Sidebar` wired to the store. Everything it lists — the teams this window may
- * show, the channels of the active organization, what this device knows about
- * each repository — comes from atoms; the shell keeps only the callbacks that
- * navigate and the agent sessions it owns.
+ * show, the channels of the active organization, where the user is, what this
+ * device knows about each repository — comes from atoms; the shell keeps only
+ * the callbacks that navigate and the agent sessions it owns.
  *
- * `activeChannelId` stays a prop because the open channel follows the
- * navigation history, which the shell still owns.
+ * The settings pages bring their own navigation column, so the sidebar takes
+ * itself off screen there rather than making the shell branch on the page.
  */
 export function SidebarWithSession(
   props: Omit<
     ComponentProps<typeof Sidebar>,
     | keyof SidebarSessionState
+    | "activeChannelId"
+    | "activePage"
     | "activePlanningProjectId"
     | "channels"
     | "channelsLoading"
@@ -91,6 +97,8 @@ export function SidebarWithSession(
     | "unreadDmCount"
   >,
 ) {
+  const activeChannelId = useAtomValue(desktopActiveChannelIdAtom);
+  const activePage = useAtomValue(activePageAtom);
   const activePlanningProjectId = useAtomValue(activePlanningProjectIdAtom);
   const channels = useAtomValue(visibleOrganizationChannelsAtom);
   const channelsLoading = useAtomValue(channelsLoadingAtom);
@@ -101,6 +109,7 @@ export function SidebarWithSession(
   const projectReadiness = useAtomValue(teamReadinessRecordAtom);
   const projectReadinessError = useAtomValue(teamReadinessErrorRecordAtom);
   const projects = useAtomValue(visibleTeamsAtom);
+  if (activePage === "settings") return null;
   return (
     <SidebarSessionBoundary>
       {({ user, ...session }) =>
@@ -110,6 +119,8 @@ export function SidebarWithSession(
           <Sidebar
             {...props}
             {...session}
+            activeChannelId={activeChannelId}
+            activePage={activePage}
             activePlanningProjectId={activePlanningProjectId}
             channels={channels}
             channelsLoading={channelsLoading}

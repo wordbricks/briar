@@ -1,7 +1,6 @@
 import { useAtom, useAtomSet, useAtomValue } from "@effect/atom-react";
 import { useEffect } from "react";
 
-import type { ActivePage } from "../lib/app-navigation";
 import type { AppKeyboardShortcutCommandId } from "../lib/app-keyboard-shortcuts";
 import type { AppZoomCommands } from "../lib/app-zoom";
 import { subscribeKeyboardNavigationPreferences } from "../lib/keybindings";
@@ -16,14 +15,18 @@ import {
   isSidebarOpenAtom,
   sequenceShortcutsEnabledAtom,
 } from "../state/dialogs/atoms";
+import { useNavigationActions } from "../state/navigation/actions";
 import {
+  activePageAtom,
   agentListRequestKeyAtom,
+  canGoBackAtom,
+  canGoForwardAtom,
   issueListRequestKeyAtom,
   requestedRunIdAtom,
   requestedSessionIdAtom,
 } from "../state/navigation/atoms";
 import { activeOrganizationIdAtom } from "../state/organization/atoms";
-import { lockedTeamIdAtom } from "../state/platform";
+import { companionMode, lockedTeamIdAtom } from "../state/platform";
 import {
   activeOrganizationTeamsAtom,
   activeTeamAtom,
@@ -34,25 +37,23 @@ import { useAppKeyboardCommandScope } from "./appKeyboardCommands";
   The application wide keyboard scope.
 
   Every binding here either navigates, opens an overlay or toggles the sidebar,
-  which is why it was written inline next to the state it moves. The state is
-  atoms now, so the scope reads and writes it directly and the shell hands over
-  only the navigation it owns and the zoom commands the window supplies.
+  which is why it was written inline next to the state it moves. Both halves are
+  the store's now — the scope reads and writes the atoms and calls the
+  navigation actions — so what the shell still hands over is whether a gate owns
+  the screen, the palette's own open and close, and the window's zoom commands.
 
-  The two effects that came with it belong to the same contract: the stored
-  sequence-shortcut preference, and closing both overlays the moment a gate
-  (login, onboarding, the launch intro) takes the screen.
+  The first scope below belongs to the settings page rather than the app. It is
+  registered here because this is the app's keyboard hook, and its priority puts
+  it ahead of the global scope regardless of registration order.
+
+  The two effects belong to the same contract: the stored sequence-shortcut
+  preference, and closing both overlays the moment a gate (login, onboarding,
+  the launch intro) takes the screen.
 */
 
 export interface UseAppShortcutsInput {
-  readonly activePage: ActivePage;
   /** False while a gate owns the screen: nothing here may fire. */
   readonly commandPaletteAvailable: boolean;
-  readonly canGoBack: boolean;
-  readonly canGoForward: boolean;
-  readonly goBack: () => void;
-  readonly goForward: () => void;
-  readonly navigateToPage: (page: ActivePage, teamId?: string | null) => void;
-  readonly openAppSettings: () => void;
   /** Opens the palette, optionally pre-filled with a scope prefix. */
   readonly openCommandPalette: (initialQuery?: string) => void;
   readonly closeCommandPalette: () => void;
@@ -60,18 +61,21 @@ export interface UseAppShortcutsInput {
 }
 
 export function useAppShortcuts({
-  activePage,
   commandPaletteAvailable,
-  canGoBack,
-  canGoForward,
-  goBack,
-  goForward,
-  navigateToPage,
-  openAppSettings,
   openCommandPalette,
   closeCommandPalette,
   appZoomCommands,
 }: UseAppShortcutsInput): void {
+  const activePage = useAtomValue(activePageAtom);
+  const canGoBack = useAtomValue(canGoBackAtom);
+  const canGoForward = useAtomValue(canGoForwardAtom);
+  const {
+    closeSettings,
+    goBack,
+    goForward,
+    navigateToPage,
+    openAppSettings,
+  } = useNavigationActions();
   const activeTeam = useAtomValue(activeTeamAtom);
   const activeOrganizationId = useAtomValue(activeOrganizationIdAtom);
   const activeOrganizationTeams = useAtomValue(activeOrganizationTeamsAtom);
@@ -92,6 +96,24 @@ export function useAppShortcuts({
   const setRequestedSessionId = useAtomSet(requestedSessionIdAtom);
   const setIssueListRequestKey = useAtomSet(issueListRequestKeyAtom);
   const setAgentListRequestKey = useAtomSet(agentListRequestKeyAtom);
+
+  useAppKeyboardCommandScope({
+    fallthrough: true,
+    handlers: {
+      closeSettings: {
+        isAvailable: () =>
+          activePage === "settings" &&
+          !companionMode &&
+          !hasOpenKeyboardShortcutOverlay(document),
+        run: () => {
+          closeSettings();
+          return "handled";
+        },
+      },
+    },
+    id: "settings-page",
+    priority: 100,
+  });
 
   useEffect(
     () => subscribeKeyboardNavigationPreferences((preferences) => {

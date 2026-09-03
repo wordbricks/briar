@@ -12,7 +12,6 @@ import { useToast } from "./components/ui/toast";
 import { useBriar, type UseBriarOptions } from "./hooks/useBriar";
 import { useAutoHuntSessions } from "./hooks/useAutoHuntSessions";
 import { useAgentDispatch } from "./hooks/useAgentDispatch";
-import { useAppNavigation } from "./hooks/useAppNavigation";
 import { useAppShortcuts } from "./hooks/useAppShortcuts";
 import { useCommandPaletteItems } from "./hooks/useCommandPaletteItems";
 import { useDeepLinks } from "./hooks/useDeepLinks";
@@ -31,7 +30,6 @@ import {
   markInitialOnboardingComplete,
 } from "./lib/initial-onboarding";
 import { syncAppBadgeCount } from "./lib/app-badge";
-import { buildNavigationHistoryItems } from "./lib/navigation-history-items";
 import { loadKeybindings } from "./lib/keybindings";
 import type { InboxNotificationTarget } from "./generated/tauri";
 import { activeDashboardAtom } from "./state/sync/view";
@@ -41,6 +39,7 @@ import {
   isKeyboardShortcutsOpenAtom,
   isNavigationHistoryOpenAtom,
 } from "./state/dialogs/atoms";
+import { useNavigationActions } from "./state/navigation/actions";
 import {
   issueListRequestKeyAtom,
   pendingInboxNotificationTargetAtom,
@@ -48,7 +47,6 @@ import {
   requestedRunInitialTabAtom,
   requestedRunMessageIdAtom,
   requestedSessionIdAtom,
-  settingsTargetAtom,
 } from "./state/navigation/atoms";
 import {
   activeOrganizationChannelsAtom,
@@ -275,38 +273,13 @@ export function App({
     commandPaletteInitialQueryAtom,
   );
   const isKeyboardShortcutsOpen = useAtomValue(isKeyboardShortcutsOpenAtom);
-  const setSettingsTarget = useAtomSet(settingsTargetAtom);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(
     hasCompletedInitialOnboarding,
   );
   const [pendingFirstRunTutorialUserId, setPendingFirstRunTutorialUserId] =
     useState<string | null>(null);
-  const navigation = useAppNavigation({
-    selectTeam: briar.setActiveProjectId,
-  });
-  const {
-    activePage,
-    activeProjectForTabs,
-    canGoBack,
-    canGoForward,
-    closeSettings,
-    desktopActiveChannelId,
-    goBack,
-    goForward,
-    goToNavigationHistory,
-    handleDesktopChannelFallback,
-    navigateToChannel,
-    navigateToIssue,
-    navigateToLocation,
-    navigateToPage,
-    navigationHistoryEntries,
-    navigationHistoryIndex,
-    navigationProjectId,
-    navigationUserBoundaryChanged,
-    replaceNavigationLocation,
-    resetNavigation,
-    selectedRunId,
-  } = navigation;
+  const { navigateToIssue, openAppSettings, resetNavigation } =
+    useNavigationActions();
   const setPendingInboxNotificationTarget = useAtomSet(
     pendingInboxNotificationTargetAtom,
   );
@@ -323,15 +296,6 @@ export function App({
   const setIssueListRequestKey = useAtomSet(issueListRequestKeyAtom);
   const setRequestedSessionId = useAtomSet(requestedSessionIdAtom);
   useDeepLinks({
-    navigation: {
-      navigateToChannel,
-      navigateToIssue,
-      navigateToPage,
-      replaceNavigationLocation,
-    },
-    navigationTeamId: navigationProjectId,
-    navigationUserBoundaryChanged,
-    selectedRunId,
     session: {
       ensureTeamSelected: briar.ensureProjectSelected,
       markInboxRead: inbox.markRead,
@@ -347,7 +311,6 @@ export function App({
     repositorySetupTeamId,
     restoreTrigger: restoreRepositorySetupTrigger,
   } = useRepositorySetup({
-    navigateToPage,
     reconnectTeam: briar.reconnectProject,
     selectTeam: briar.setActiveProjectId,
   });
@@ -396,27 +359,6 @@ export function App({
       briar.ensureProjectSelected,
       navigateToIssue,
       toast,
-    ],
-  );
-  const navigationHistoryItems = useMemo(
-    () =>
-      buildNavigationHistoryItems({
-        channels: organizationChannels,
-        currentUserId: briar.user?.id ?? null,
-        dashboard: activeDashboard,
-        entries: navigationHistoryEntries,
-        organizations: briar.organizations,
-        t,
-        teams: briar.projects,
-      }),
-    [
-      activeDashboard,
-      briar.organizations,
-      briar.projects,
-      briar.user?.id,
-      navigationHistoryEntries,
-      organizationChannels,
-      t,
     ],
   );
   const openProjectInNewWindow = useCallback(
@@ -481,14 +423,6 @@ export function App({
     teamWindowTeamId: projectWindowProjectId,
   });
 
-  const openAppSettings = useCallback(() => {
-    setSettingsTarget({
-      scope: "application",
-      section: "account",
-    });
-    navigateToPage("settings");
-  }, [navigateToPage]);
-
   useEffect(() => {
     if (!runsOnDesktopTauri) return;
     return listenForAppMenuSettings(openAppSettings);
@@ -531,35 +465,18 @@ export function App({
   );
 
   useAppShortcuts({
-    activePage,
     appZoomCommands,
-    canGoBack,
-    canGoForward,
     closeCommandPalette,
     commandPaletteAvailable,
-    goBack,
-    goForward,
-    navigateToPage,
-    openAppSettings,
     openCommandPalette,
   });
 
   const commandPaletteItems = useCommandPaletteItems({
-    activePage,
-    canGoBack,
-    canGoForward,
     commandPaletteAvailable,
-    goBack,
-    goForward,
     keybindings: configuredKeybindings,
     keyboardShortcutsShortcut: keyboardShortcutsModifierLabel(),
-    navigateToIssue,
-    navigateToPage,
-    openAppSettings,
     selectTeam: briar.setActiveProjectId,
-    selectedRunId,
     sessions: autoHunt.sessions,
-    startTeamCreation: briar.startProjectCreation,
     unreadInboxCount: visibleInboxUnreadCount,
   });
 
@@ -626,29 +543,6 @@ export function App({
       loadProjectHomeMerges={loadProjectHomeMerges}
       loadProjectHomeUsage={loadProjectHomeUsage}
       loadUsageReport={loadUsageReport}
-      navigation={{
-        activePage,
-        activeProjectForTabs,
-        canGoBack,
-        canGoForward,
-        closeSettings,
-        desktopActiveChannelId,
-        goBack,
-        goForward,
-        goToNavigationHistory,
-        handleDesktopChannelFallback,
-        navigateToChannel,
-        navigateToIssue,
-        navigateToLocation,
-        navigateToPage,
-        navigationHistoryIndex,
-        navigationHistoryItems,
-        navigationProjectId,
-        replaceNavigationLocation,
-        resetNavigation,
-        selectedRunId,
-      }}
-      openAppSettings={openAppSettings}
       openOrganizationIssue={openOrganizationIssue}
       openProjectInNewWindow={openProjectInNewWindow}
       repositorySetup={{
@@ -672,7 +566,7 @@ export function App({
 
   return (
     <>
-      <AppEffects />
+      <AppEffects selectTeam={briar.setActiveProjectId} />
       <AuthGate
         acceptingInvitation={invitation.acceptingInvitation}
         invitationToken={invitation.invitationToken}
@@ -700,7 +594,6 @@ export function App({
         {shell}
       </AuthGate>
       <AppDialogs
-        activePage={activePage}
         commandPaletteAvailable={commandPaletteAvailable}
         commandPaletteItems={commandPaletteItems}
         firstRunTutorial={{
@@ -731,7 +624,6 @@ export function App({
           preview: previewsLaunchIntro,
           visible: isLaunchIntroVisible,
         }}
-        selectedRunId={selectedRunId}
         teamOnboarding={{
           includeDeveloperTools: invitation.developerToolsSetupRequested,
           onCancel: () => {

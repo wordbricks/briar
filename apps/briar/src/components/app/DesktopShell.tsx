@@ -11,8 +11,6 @@ import {
   InboxWithSelection,
 } from "../InboxSelectionBoundary";
 import { EmptyState, MainContent, PageHeader } from "../layout";
-import { WindowNavigationControls } from "../WindowNavigationControls";
-import type { WindowNavigationHistoryItem } from "../WindowNavigationControls";
 import { AppSettingsSidebar } from "./AppSettingsSidebar";
 import {
   ChannelsWithCatalog,
@@ -21,6 +19,7 @@ import {
 import { HuntDashboardWithTeam } from "./HuntDashboardWithTeam";
 import { InboxDetailContent } from "./InboxDetailContent";
 import { SidebarWithSession } from "./SidebarWithSession";
+import { WindowNavigationControlsWithHistory } from "./WindowNavigationControlsWithHistory";
 import {
   TeamAgentsWithDashboard,
   TeamLobbyWithDashboard,
@@ -65,7 +64,6 @@ import {
   activePlanningProjectIdAtom,
   createIssueTeamIdAtom,
   isIssueDialogOpenAtom,
-  isNavigationHistoryOpenAtom,
   isSidebarOpenAtom,
   planningProjectEditIdAtom,
   planningProjectTeamIdAtom,
@@ -73,8 +71,15 @@ import {
 } from "../../state/dialogs/atoms";
 import { inboxDetailTargetAtom } from "../../state/inbox-selection";
 import { useIssueActions } from "../../state/issues/actions";
+import { useNavigationActions } from "../../state/navigation/actions";
 import {
+  activePageAtom,
+  activeRunIdAtom,
+  activeTeamForTabsAtom,
   agentListRequestKeyAtom,
+  canGoBackAtom,
+  desktopActiveChannelIdAtom,
+  navigationTeamIdAtom,
   issueListRequestKeyAtom,
   pendingBriarLinkAtom,
   requestedRunIdAtom,
@@ -104,8 +109,6 @@ import {
 } from "../../state/team/atoms";
 import { useWorkspaceActions } from "../../state/workspace/actions";
 import { localInventoryErrorAtom } from "../../state/workspace/atoms";
-import type { AppNavigationLocation, ActivePage } from "../../lib/app-navigation";
-import type { ChannelNavigationPage } from "../../lib/app-navigation";
 import type { createCachedTeamUsageSummaryLoader } from "../../lib/team-usage-summary";
 import type { InboxMessageWithReadState } from "../../hooks/useInbox";
 import type { AgentAutoHuntOptions } from "../../hooks/useAgentDispatch";
@@ -159,41 +162,6 @@ const Teams = lazy(() =>
 
 /** Neutral placeholder that fills the slot a lazy view is about to occupy. */
 const lazyViewFallback = <div className="lazy-view-placeholder h-full w-full" />;
-
-/** Where the shell is, and every way it can move. Phase 6 owns this block. */
-export interface DesktopShellNavigation {
-  readonly activePage: ActivePage;
-  readonly selectedRunId: string | null;
-  readonly canGoBack: boolean;
-  readonly canGoForward: boolean;
-  readonly navigationHistoryIndex: number;
-  readonly navigationHistoryItems: WindowNavigationHistoryItem[];
-  readonly goBack: () => void;
-  readonly goForward: () => void;
-  readonly goToNavigationHistory: (index: number) => void;
-  readonly navigateToPage: (page: ActivePage, teamId?: string | null) => void;
-  readonly navigateToIssue: (runId: string, teamId?: string | null) => void;
-  readonly navigateToChannel: (
-    channelId: string,
-    page: ChannelNavigationPage,
-    organizationId?: string | null,
-    teamId?: string | null,
-  ) => void;
-  readonly navigateToLocation: (location: AppNavigationLocation) => void;
-  readonly replaceNavigationLocation: (location: AppNavigationLocation) => void;
-  readonly resetNavigation: (page: ActivePage) => void;
-  readonly closeSettings: () => void;
-  readonly handleDesktopChannelFallback: (
-    channelId: string | null,
-    page: ChannelNavigationPage,
-  ) => void;
-  /** The channel the desktop is looking at, resolved from the location. */
-  readonly desktopActiveChannelId: string | null;
-  /** The team the location names, which may differ from the selected one. */
-  readonly navigationProjectId: string | null;
-  /** The team whose tabs the page chain shows. */
-  readonly activeProjectForTabs: Project | undefined;
-}
 
 /** The agent list, still `useIssueAgents`'s. */
 export interface DesktopShellAgents {
@@ -270,7 +238,6 @@ export interface DesktopShellProps {
   readonly agents: DesktopShellAgents;
   readonly autoHunt: DesktopShellAutoHunt;
   readonly inbox: DesktopShellInbox;
-  readonly navigation: DesktopShellNavigation;
   readonly repositorySetup: DesktopShellRepositorySetup;
   readonly session: DesktopShellSession;
   readonly channelInboxSyncSignal: string;
@@ -286,7 +253,6 @@ export interface DesktopShellProps {
   ) => Promise<DashboardPayload | null>;
   readonly openOrganizationIssue: (teamId: string, runId: string) => void;
   readonly openProjectInNewWindow: (teamId: string) => Promise<void>;
-  readonly openAppSettings: () => void;
   readonly startAgentAutoHunt: (
     agent: ProjectAgent,
     runs: HuntRun[],
@@ -309,8 +275,6 @@ export function DesktopShell({
   loadProjectHomeMerges,
   loadProjectHomeUsage,
   loadUsageReport,
-  navigation,
-  openAppSettings,
   openOrganizationIssue,
   openProjectInNewWindow,
   repositorySetup,
@@ -319,28 +283,24 @@ export function DesktopShell({
   startProjectAgentTask,
 }: DesktopShellProps) {
   const { t } = useI18n();
+  const activePage = useAtomValue(activePageAtom);
+  const activeProjectForTabs = useAtomValue(activeTeamForTabsAtom);
+  const canGoBack = useAtomValue(canGoBackAtom);
+  const desktopActiveChannelId = useAtomValue(desktopActiveChannelIdAtom);
+  const navigationProjectId = useAtomValue(navigationTeamIdAtom);
+  const selectedRunId = useAtomValue(activeRunIdAtom);
   const {
-    activePage,
-    activeProjectForTabs,
-    canGoBack,
-    canGoForward,
     closeSettings,
-    desktopActiveChannelId,
     goBack,
-    goForward,
-    goToNavigationHistory,
     handleDesktopChannelFallback,
     navigateToChannel,
     navigateToIssue,
     navigateToLocation,
     navigateToPage,
-    navigationHistoryIndex,
-    navigationHistoryItems,
-    navigationProjectId,
+    openAppSettings,
     replaceNavigationLocation,
     resetNavigation,
-    selectedRunId,
-  } = navigation;
+  } = useNavigationActions();
   const {
     activeTeamAgents: activeProjectAgents,
     all: issueAgents,
@@ -373,9 +333,6 @@ export function DesktopShell({
   const inventoryError = useAtomValue(localInventoryErrorAtom);
   const error = rawSessionError ?? inventoryError;
   const [isSidebarOpen, setIsSidebarOpen] = useAtom(isSidebarOpenAtom);
-  const [isNavigationHistoryOpen, setIsNavigationHistoryOpen] = useAtom(
-    isNavigationHistoryOpenAtom,
-  );
   const [settingsTarget, setSettingsTarget] = useAtom(settingsTargetAtom);
   const [requestedRunId, setRequestedRunId] = useAtom(requestedRunIdAtom);
   const [requestedRunMessageId, setRequestedRunMessageId] = useAtom(
@@ -500,23 +457,8 @@ export function DesktopShell({
   return (
     <div className="desktop-app-frame">
       <div className="app-shell">
-        <WindowNavigationControls
-          canGoBack={canGoBack}
-          canGoForward={canGoForward}
-          historyIndex={navigationHistoryIndex}
-          historyItems={navigationHistoryItems}
-          isHistoryOpen={isNavigationHistoryOpen}
-          isSidebarOpen={isSidebarOpen}
-          onBack={goBack}
-          onForward={goForward}
-          onHistoryOpenChange={setIsNavigationHistoryOpen}
-          onHistorySelect={goToNavigationHistory}
-          onSidebarToggle={() => setIsSidebarOpen((open) => !open)}
-        />
-      {activePage !== "settings" ? (
+        <WindowNavigationControlsWithHistory />
         <SidebarWithSession
-          activeChannelId={desktopActiveChannelId}
-          activePage={activePage}
           agents={issueAgents}
           onAddProject={startTeamCreation}
           onAddPlanningProject={(teamId) => {
@@ -622,7 +564,6 @@ export function DesktopShell({
           sessions={autoHunt.sessions}
           unreadInboxCount={visibleInboxUnreadCount}
         />
-      ) : null}
       <div className="app-content-surface">
       <Suspense fallback={null}>
       <TeamRepositorySetupDialogWithWorkspace

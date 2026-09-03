@@ -4,47 +4,57 @@ import { RegistryContext } from "@effect/atom-react";
 import { act } from "react";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { I18nProvider } from "../i18n";
-import { AppKeyboardCommandProvider } from "./appKeyboardCommands";
-import { demoDashboard } from "../lib/demo-data";
+import { demoDashboard } from "../../lib/demo-data";
 import {
   channelNavigationLocation,
   channelPageNavigationLocation,
   organizationNavigationLocation,
   projectNavigationLocation,
   settingsNavigationLocation,
-} from "../lib/app-navigation";
-import { organizationChannelsAtom } from "../state/entities/channels";
-import { applySyncEvent } from "../state/sync/apply";
-import { channelApiAtom } from "../state/channels/api";
-import { activeChannelIdAtom } from "../state/channels/atoms";
-import { settingsTargetAtom } from "../state/navigation/atoms";
+} from "../../lib/app-navigation";
+import { organizationChannelsAtom } from "../entities/channels";
+import { applySyncEvent } from "../sync/apply";
+import { channelApiAtom } from "../channels/api";
+import { activeChannelIdAtom } from "../channels/atoms";
+import {
+  activePageAtom,
+  activeRunIdAtom,
+  canGoBackAtom,
+  canGoForwardAtom,
+  desktopActiveChannelIdAtom,
+  navigationHistoryEntriesAtom,
+  navigationHistoryIndexAtom,
+  navigationLocationAtom,
+  navigationTeamIdAtom,
+  settingsTargetAtom,
+} from "./atoms";
 import {
   activeOrganizationIdAtom,
   organizationsAtom,
-} from "../state/organization/atoms";
-import { createTestRegistry, type AtomRegistry } from "../state/registry";
+} from "../organization/atoms";
+import { createTestRegistry, type AtomRegistry } from "../registry";
 import {
   loadingAtom,
   restoringSessionAtom,
   tokenAtom,
   userAtom,
-} from "../state/session/atoms";
-import { activeTeamIdAtom, teamsAtom } from "../state/team/atoms";
-import { createReactTestRoot } from "../test/react";
-import type { ChannelSummary } from "../lib/channels-contract";
-import type { Organization, Project, SessionUser } from "../types";
-import { useAppNavigation, type AppNavigation } from "./useAppNavigation";
+} from "../session/atoms";
+import { activeTeamIdAtom, teamsAtom } from "../team/atoms";
+import { createReactTestRoot } from "../../test/react";
+import type { ChannelSummary } from "../../lib/channels-contract";
+import type { Organization, Project, SessionUser } from "../../types";
+import { createNavigationActions, type NavigationActions } from "./actions";
+import { useNavigationReconciliation } from "./useNavigationReconciliation";
 
 /*
   The reconciliation the location and the store owe each other.
 
-  Phase 5 moved this block out of `App.tsx` untouched and Phase 6 rewrites it,
-  so these cases pin every outcome of the six effects that run in a fixed order
-  — user boundary reset, settings target sync, team id backfill, team existence
+  These cases pin every outcome of the six effects that run in a fixed order —
+  user boundary reset, settings target sync, team id backfill, team existence
   fallback, organization existence fallback, schedule tab gate — plus the
-  navigation callbacks that feed them. They are written against the pre-refactor
-  hook and must keep passing against the atom based one.
+  navigation actions that feed them. They were written against the block while
+  it still lived in the app shell and have followed it unchanged since, which is
+  what makes them this phase's characterization.
 */
 
 const user: SessionUser = {
@@ -106,11 +116,11 @@ const seedChannels = (registry: AtomRegistry, channels: ChannelSummary[]) => {
   });
 };
 
-let latest: AppNavigation;
+let actions: NavigationActions;
 const selectedTeams: string[] = [];
 
 function Harness() {
-  latest = useAppNavigation({
+  useNavigationReconciliation({
     selectTeam: (teamId) => {
       selectedTeams.push(teamId);
     },
@@ -147,14 +157,11 @@ const harness = (
   ]);
 
 const mount = async (registry: AtomRegistry) => {
+  actions = createNavigationActions(registry);
   const view = createReactTestRoot();
   await view.render(
     <RegistryContext.Provider value={registry}>
-      <I18nProvider>
-        <AppKeyboardCommandProvider>
-          <Harness />
-        </AppKeyboardCommandProvider>
-      </I18nProvider>
+      <Harness />
     </RegistryContext.Provider>,
   );
   await flush();
@@ -167,17 +174,17 @@ beforeEach(() => {
   selectedTeams.length = 0;
 });
 
-describe("useAppNavigation", () => {
+describe("navigation reconciliation", () => {
   it("puts the selected team into a project page's location", async () => {
     const registry = harness();
     const view = await mount(registry);
 
     await act(async () => {
-      latest.navigateToPage("issues");
+      actions.navigateToPage("issues");
     });
     await flush();
-    expect(latest.activePage).toBe("issues");
-    expect(latest.navigationProjectId).toBe(teamA.id);
+    expect(registry.get(activePageAtom)).toBe("issues");
+    expect(registry.get(navigationTeamIdAtom)).toBe(teamA.id);
     await view.cleanup();
   });
 
@@ -186,10 +193,10 @@ describe("useAppNavigation", () => {
     const view = await mount(registry);
 
     await act(async () => {
-      latest.navigateToPage("issues", teamB.id);
+      actions.navigateToPage("issues", teamB.id);
     });
     await flush();
-    expect(latest.navigationProjectId).toBe(teamB.id);
+    expect(registry.get(navigationTeamIdAtom)).toBe(teamB.id);
     expect(selectedTeams).toContain(teamB.id);
     await view.cleanup();
   });
@@ -199,17 +206,17 @@ describe("useAppNavigation", () => {
     const view = await mount(registry);
 
     await act(async () => {
-      latest.navigateToPage("issues", teamB.id);
+      actions.navigateToPage("issues", teamB.id);
     });
     await flush();
-    expect(latest.navigationProjectId).toBe(teamB.id);
+    expect(registry.get(navigationTeamIdAtom)).toBe(teamB.id);
 
     await act(async () => {
       registry.set(teamsAtom, [teamA]);
     });
     await flush();
     // The gone team is replaced rather than left on screen.
-    expect(latest.navigationProjectId).toBe(teamA.id);
+    expect(registry.get(navigationTeamIdAtom)).toBe(teamA.id);
     await view.cleanup();
   });
 
@@ -222,10 +229,10 @@ describe("useAppNavigation", () => {
         scope: "application",
         section: "account",
       });
-      latest.navigateToPage("settings");
+      actions.navigateToPage("settings");
     });
     await flush();
-    expect(latest.activePage).toBe("settings");
+    expect(registry.get(activePageAtom)).toBe("settings");
     expect(registry.get(settingsTargetAtom)).toEqual({
       scope: "application",
       section: "account",
@@ -233,10 +240,10 @@ describe("useAppNavigation", () => {
 
     // Leaving settings goes back past every settings entry in the history.
     await act(async () => {
-      latest.closeSettings();
+      actions.closeSettings();
     });
     await flush();
-    expect(latest.activePage).not.toBe("settings");
+    expect(registry.get(activePageAtom)).not.toBe("settings");
     await view.cleanup();
   });
 
@@ -245,16 +252,16 @@ describe("useAppNavigation", () => {
     const view = await mount(registry);
 
     await act(async () => {
-      latest.navigateToPage("agents", teamA.id);
+      actions.navigateToPage("agents", teamA.id);
     });
     await flush();
-    expect(latest.activePage).toBe("agents");
+    expect(registry.get(activePageAtom)).toBe("agents");
 
     await act(async () => {
       registry.set(userAtom, { ...user, id: "user-2" });
     });
     await flush();
-    expect(latest.activePage).toBe("lobby");
+    expect(registry.get(activePageAtom)).toBe("lobby");
     await view.cleanup();
   });
 
@@ -265,11 +272,11 @@ describe("useAppNavigation", () => {
     // `resetNavigation` writes the page with no team in it, which is the one
     // entry point the team backfill effect exists for.
     await act(async () => {
-      latest.resetNavigation("agents");
+      actions.resetNavigation("agents");
     });
     await flush();
-    expect(latest.activePage).toBe("agents");
-    expect(latest.activeNavigationLocation).toBe(
+    expect(registry.get(activePageAtom)).toBe("agents");
+    expect(registry.get(navigationLocationAtom)).toBe(
       projectNavigationLocation("agents", teamA.id),
     );
     await view.cleanup();
@@ -280,7 +287,7 @@ describe("useAppNavigation", () => {
     const view = await mount(registry);
 
     await act(async () => {
-      latest.navigateToLocation(
+      actions.navigateToLocation(
         settingsNavigationLocation({
           scope: "organization",
           organizationId: organization.id,
@@ -306,10 +313,10 @@ describe("useAppNavigation", () => {
         scope: "application",
         section: "keybindings",
       });
-      latest.navigateToLocation("settings");
+      actions.navigateToLocation("settings");
     });
     await flush();
-    expect(latest.activeNavigationLocation).toBe(
+    expect(registry.get(navigationLocationAtom)).toBe(
       settingsNavigationLocation({
         scope: "application",
         section: "keybindings",
@@ -326,7 +333,7 @@ describe("useAppNavigation", () => {
     const view = await mount(registry);
 
     await act(async () => {
-      latest.navigateToChannel(
+      actions.navigateToChannel(
         "channel-a",
         "channels",
         organization.id,
@@ -334,15 +341,15 @@ describe("useAppNavigation", () => {
       );
     });
     await flush();
-    expect(latest.activePage).toBe("channels");
-    expect(latest.desktopActiveChannelId).toBe("channel-a");
+    expect(registry.get(activePageAtom)).toBe("channels");
+    expect(registry.get(desktopActiveChannelIdAtom)).toBe("channel-a");
 
     await act(async () => {
       registry.set(teamsAtom, [teamA]);
     });
     await flush();
     // The channel survives; only the team in the location is swapped.
-    expect(latest.activeNavigationLocation).toBe(
+    expect(registry.get(navigationLocationAtom)).toBe(
       channelNavigationLocation(
         "channels",
         organization.id,
@@ -358,7 +365,7 @@ describe("useAppNavigation", () => {
     const view = await mount(registry);
 
     await act(async () => {
-      latest.navigateToLocation(
+      actions.navigateToLocation(
         settingsNavigationLocation({
           scope: "project",
           projectId: teamB.id,
@@ -367,13 +374,13 @@ describe("useAppNavigation", () => {
       );
     });
     await flush();
-    expect(latest.activePage).toBe("settings");
+    expect(registry.get(activePageAtom)).toBe("settings");
 
     await act(async () => {
       registry.set(teamsAtom, [teamA]);
     });
     await flush();
-    expect(latest.activeNavigationLocation).toBe(
+    expect(registry.get(navigationLocationAtom)).toBe(
       settingsNavigationLocation({
         scope: "application",
         section: "account",
@@ -387,7 +394,7 @@ describe("useAppNavigation", () => {
     const view = await mount(registry);
 
     await act(async () => {
-      latest.navigateToPage("issues", teamB.id);
+      actions.navigateToPage("issues", teamB.id);
     });
     await flush();
 
@@ -398,7 +405,7 @@ describe("useAppNavigation", () => {
       registry.set(activeTeamIdAtom, null);
     });
     await flush();
-    expect(latest.activeNavigationLocation).toBe("lobby");
+    expect(registry.get(navigationLocationAtom)).toBe("lobby");
     await view.cleanup();
   });
 
@@ -407,18 +414,18 @@ describe("useAppNavigation", () => {
     const view = await mount(registry);
 
     await act(async () => {
-      latest.navigateToLocation(
+      actions.navigateToLocation(
         organizationNavigationLocation(otherOrganization.id, "inbox"),
       );
     });
     await flush();
-    expect(latest.activePage).toBe("inbox");
+    expect(registry.get(activePageAtom)).toBe("inbox");
 
     await act(async () => {
       registry.set(organizationsAtom, [organization]);
     });
     await flush();
-    expect(latest.activeNavigationLocation).toBe(
+    expect(registry.get(navigationLocationAtom)).toBe(
       organizationNavigationLocation(organization.id, "inbox"),
     );
     await view.cleanup();
@@ -429,7 +436,7 @@ describe("useAppNavigation", () => {
     const view = await mount(registry);
 
     await act(async () => {
-      latest.navigateToLocation(
+      actions.navigateToLocation(
         channelPageNavigationLocation("channels", otherOrganization.id),
       );
     });
@@ -439,7 +446,7 @@ describe("useAppNavigation", () => {
       registry.set(organizationsAtom, [organization]);
     });
     await flush();
-    expect(latest.activeNavigationLocation).toBe(
+    expect(registry.get(navigationLocationAtom)).toBe(
       channelPageNavigationLocation("channels", organization.id, teamA.id),
     );
     await view.cleanup();
@@ -450,13 +457,13 @@ describe("useAppNavigation", () => {
     const view = await mount(registry);
 
     await act(async () => {
-      latest.navigateToPage("schedule", scheduleLessTeam.id);
+      actions.navigateToPage("schedule", scheduleLessTeam.id);
     });
     await flush();
-    expect(latest.activeNavigationLocation).toBe(
+    expect(registry.get(navigationLocationAtom)).toBe(
       projectNavigationLocation("issues", scheduleLessTeam.id),
     );
-    expect(latest.activePage).toBe("issues");
+    expect(registry.get(activePageAtom)).toBe("issues");
     await view.cleanup();
   });
 
@@ -465,10 +472,10 @@ describe("useAppNavigation", () => {
     const view = await mount(registry);
 
     await act(async () => {
-      latest.navigateToPage("schedule");
+      actions.navigateToPage("schedule");
     });
     await flush();
-    expect(latest.activePage).toBe("schedule");
+    expect(registry.get(activePageAtom)).toBe("schedule");
     await view.cleanup();
   });
 
@@ -477,26 +484,26 @@ describe("useAppNavigation", () => {
     const view = await mount(registry);
 
     await act(async () => {
-      latest.navigateToIssue("run-1", teamB.id);
+      actions.navigateToIssue("run-1", teamB.id);
     });
     await flush();
-    expect(latest.activePage).toBe("issues");
-    expect(latest.selectedRunId).toBe("run-1");
-    expect(latest.navigationProjectId).toBe(teamB.id);
+    expect(registry.get(activePageAtom)).toBe("issues");
+    expect(registry.get(activeRunIdAtom)).toBe("run-1");
+    expect(registry.get(navigationTeamIdAtom)).toBe(teamB.id);
     await view.cleanup();
   });
 
   it("ignores an issue with no team to open it under", async () => {
     const registry = harness([]);
     const view = await mount(registry);
-    const before = latest.activeNavigationLocation;
+    const before = registry.get(navigationLocationAtom);
 
     await act(async () => {
-      latest.navigateToIssue("run-1", null);
+      actions.navigateToIssue("run-1", null);
     });
     await flush();
-    expect(latest.activeNavigationLocation).toBe(before);
-    expect(latest.selectedRunId).toBeNull();
+    expect(registry.get(navigationLocationAtom)).toBe(before);
+    expect(registry.get(activeRunIdAtom)).toBeNull();
     await view.cleanup();
   });
 
@@ -508,10 +515,10 @@ describe("useAppNavigation", () => {
     const view = await mount(registry);
 
     await act(async () => {
-      latest.navigateToChannel("channel-a", "channels");
+      actions.navigateToChannel("channel-a", "channels");
     });
     await flush();
-    expect(latest.activePage).toBe("channels");
+    expect(registry.get(activePageAtom)).toBe("channels");
     expect(registry.get(activeChannelIdAtom)).toBe("channel-a");
     expect(
       registry
@@ -530,17 +537,17 @@ describe("useAppNavigation", () => {
     const view = await mount(registry);
 
     await act(async () => {
-      latest.navigateToChannel("channel-a", "channels");
+      actions.navigateToChannel("channel-a", "channels");
     });
     await flush();
-    const entriesBefore = latest.navigationHistoryEntries.length;
+    const entriesBefore = registry.get(navigationHistoryEntriesAtom).length;
 
     await act(async () => {
-      latest.handleDesktopChannelFallback("channel-b", "channels");
+      actions.handleDesktopChannelFallback("channel-b", "channels");
     });
     await flush();
-    expect(latest.navigationHistoryEntries).toHaveLength(entriesBefore);
-    expect(latest.desktopActiveChannelId).toBe("channel-b");
+    expect(registry.get(navigationHistoryEntriesAtom)).toHaveLength(entriesBefore);
+    expect(registry.get(desktopActiveChannelIdAtom)).toBe("channel-b");
     await view.cleanup();
   });
 
@@ -552,17 +559,17 @@ describe("useAppNavigation", () => {
     const view = await mount(registry);
 
     await act(async () => {
-      latest.navigateToChannel("channel-a", "channels");
+      actions.navigateToChannel("channel-a", "channels");
     });
     await flush();
     expect(registry.get(activeChannelIdAtom)).toBe("channel-a");
 
     await act(async () => {
-      latest.handleDesktopChannelFallback(null, "channels");
+      actions.handleDesktopChannelFallback(null, "channels");
     });
     await flush();
     expect(registry.get(activeChannelIdAtom)).toBeNull();
-    expect(latest.activeNavigationLocation).toBe(
+    expect(registry.get(navigationLocationAtom)).toBe(
       channelPageNavigationLocation("channels", organization.id, teamA.id),
     );
     await view.cleanup();
@@ -573,34 +580,34 @@ describe("useAppNavigation", () => {
     const view = await mount(registry);
 
     await act(async () => {
-      latest.navigateToPage("issues");
+      actions.navigateToPage("issues");
     });
     await flush();
     await act(async () => {
-      latest.navigateToPage("agents");
+      actions.navigateToPage("agents");
     });
     await flush();
-    expect(latest.canGoBack).toBe(true);
-    expect(latest.canGoForward).toBe(false);
+    expect(registry.get(canGoBackAtom)).toBe(true);
+    expect(registry.get(canGoForwardAtom)).toBe(false);
 
     await act(async () => {
-      latest.goBack();
+      actions.goBack();
     });
     await flush();
-    expect(latest.activePage).toBe("issues");
-    expect(latest.canGoForward).toBe(true);
+    expect(registry.get(activePageAtom)).toBe("issues");
+    expect(registry.get(canGoForwardAtom)).toBe(true);
 
     await act(async () => {
-      latest.goForward();
+      actions.goForward();
     });
     await flush();
-    expect(latest.activePage).toBe("agents");
+    expect(registry.get(activePageAtom)).toBe("agents");
 
     await act(async () => {
-      latest.goToNavigationHistory(0);
+      actions.goToNavigationHistory(0);
     });
     await flush();
-    expect(latest.navigationHistoryIndex).toBe(0);
+    expect(registry.get(navigationHistoryIndexAtom)).toBe(0);
     await view.cleanup();
   });
 
@@ -609,21 +616,21 @@ describe("useAppNavigation", () => {
     const view = await mount(registry);
 
     await act(async () => {
-      latest.navigateToPage("issues");
+      actions.navigateToPage("issues");
     });
     await flush();
     await act(async () => {
-      latest.navigateToPage("agents");
+      actions.navigateToPage("agents");
     });
     await flush();
-    expect(latest.navigationHistoryEntries.length).toBeGreaterThan(1);
+    expect(registry.get(navigationHistoryEntriesAtom).length).toBeGreaterThan(1);
 
     await act(async () => {
       registry.set(userAtom, { ...user, id: "user-2" });
     });
     await flush();
-    expect(latest.canGoBack).toBe(false);
-    expect(latest.canGoForward).toBe(false);
+    expect(registry.get(canGoBackAtom)).toBe(false);
+    expect(registry.get(canGoForwardAtom)).toBe(false);
     await view.cleanup();
   });
 });

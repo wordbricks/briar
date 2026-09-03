@@ -24,7 +24,6 @@ import type { CommandPaletteItem } from "../components/CommandPalette";
 import { TeamIcon } from "../components/TeamIcon";
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
-import type { ActivePage } from "../lib/app-navigation";
 import { directMessageDisplayName } from "../lib/direct-messages";
 import { formatIssueKey } from "../lib/issue-key";
 import { formatShortcut, type Keybindings } from "../lib/keybindings";
@@ -42,8 +41,13 @@ import {
   isKeyboardShortcutsOpenAtom,
   isSidebarOpenAtom,
 } from "../state/dialogs/atoms";
+import { useNavigationActions } from "../state/navigation/actions";
 import {
+  activePageAtom,
+  activeRunIdAtom,
   agentListRequestKeyAtom,
+  canGoBackAtom,
+  canGoForwardAtom,
   issueListRequestKeyAtom,
   requestedRunIdAtom,
   requestedRunInitialTabAtom,
@@ -58,6 +62,7 @@ import {
 import { lockedTeamIdAtom } from "../state/platform";
 import { tokenAtom, userAtom } from "../state/session/atoms";
 import { activeDashboardAtom } from "../state/sync/view";
+import { useTeamActions } from "../state/team/actions";
 import {
   activeOrganizationTeamsAtom,
   activeTeamAtom,
@@ -76,27 +81,18 @@ import type { AutoHuntSession } from "../types";
   app shell, reading two dozen shell values, rebuilt on every shell render even
   while the palette is closed.
 
-  It reads what it shows from atoms now. What is still a parameter is what the
-  shell decides: where the user is, what the history can do, and the three
-  callbacks that move them.
+  It reads what it shows from atoms now, including where the user is and what
+  the history can do. What is still a parameter is what the app decides: whether
+  a gate owns the screen, the auto hunt sessions, the inbox count, and the team
+  selection the session facade still owns.
 */
 
 /** What the shell knows and the palette cannot read from the store. */
 export interface CommandPaletteItemsInput {
-  readonly activePage: ActivePage;
-  readonly selectedRunId: string | null;
   /** False while a gate — login, onboarding, the intro — owns the screen. */
   readonly commandPaletteAvailable: boolean;
-  readonly canGoBack: boolean;
-  readonly canGoForward: boolean;
-  readonly goBack: () => void;
-  readonly goForward: () => void;
-  readonly navigateToPage: (page: ActivePage, teamId?: string | null) => void;
-  readonly navigateToIssue: (runId: string, teamId?: string | null) => void;
-  readonly openAppSettings: () => void;
-  /** Selects a team, including the shell's own "where am I" bookkeeping. */
+  /** Selects a team, still the session facade's. */
   readonly selectTeam: (teamId: string) => void;
-  readonly startTeamCreation: () => void;
   readonly sessions: readonly AutoHuntSession[];
   readonly unreadInboxCount: number;
   readonly keybindings: Keybindings;
@@ -104,24 +100,26 @@ export interface CommandPaletteItemsInput {
 }
 
 export function useCommandPaletteItems({
-  activePage,
-  selectedRunId,
   commandPaletteAvailable,
-  canGoBack,
-  canGoForward,
-  goBack,
-  goForward,
-  navigateToPage,
-  navigateToIssue,
-  openAppSettings,
   selectTeam,
-  startTeamCreation,
   sessions,
   unreadInboxCount,
   keybindings,
   keyboardShortcutsShortcut,
 }: CommandPaletteItemsInput): CommandPaletteItem[] {
   const { t } = useI18n();
+  const activePage = useAtomValue(activePageAtom);
+  const selectedRunId = useAtomValue(activeRunIdAtom);
+  const canGoBack = useAtomValue(canGoBackAtom);
+  const canGoForward = useAtomValue(canGoForwardAtom);
+  const {
+    goBack,
+    goForward,
+    navigateToIssue,
+    navigateToPage,
+    openAppSettings,
+  } = useNavigationActions();
+  const { startTeamCreation } = useTeamActions();
   const user = useAtomValue(userAtom);
   const token = useAtomValue(tokenAtom);
   const organizations = useAtomValue(organizationsAtom);

@@ -10,7 +10,9 @@ import { ToastProvider } from "../ui/toast";
 import { TooltipProvider } from "../ui/tooltip";
 import { demoDashboard } from "../../lib/demo-data";
 import { createCachedTeamUsageSummaryLoader } from "../../lib/team-usage-summary";
+import { settingsNavigationLocation } from "../../lib/app-navigation";
 import { demoOrganization, demoUser } from "../../state/demo-fixtures";
+import { createNavigationActions } from "../../state/navigation/actions";
 import {
   activeOrganizationIdAtom,
   organizationsAtom,
@@ -27,10 +29,11 @@ import { DesktopShell, type DesktopShellProps } from "./DesktopShell";
 /*
   The desktop shell, rendered against a demo session.
 
-  What Phase 5 changed is where the shell lives, not what it draws, so these
-  are smoke cases: the frame and the issue board come up, the page chain follows
-  `activePage`, and a run edit reaches the board without the shell rendering
-  again — which is what the app's props no longer carrying the payload buys.
+  What the refactors changed is where the shell lives and where it reads from,
+  not what it draws, so these are smoke cases: the frame and the issue board
+  come up, the page chain follows the navigation location, and a run edit
+  reaches the board without the shell rendering again — which is what the app's
+  props no longer carrying the payload buys.
 */
 
 const team = demoDashboard.team;
@@ -46,29 +49,6 @@ const payload: DashboardPayload = {
   runs: [run],
   cursor: 1,
   generatedAt: "2026-09-01T00:00:00.000Z",
-};
-
-const navigation: DesktopShellProps["navigation"] = {
-  activePage: "issues",
-  activeProjectForTabs: team,
-  canGoBack: false,
-  canGoForward: false,
-  closeSettings: () => undefined,
-  desktopActiveChannelId: null,
-  goBack: () => undefined,
-  goForward: () => undefined,
-  goToNavigationHistory: () => undefined,
-  handleDesktopChannelFallback: () => undefined,
-  navigateToChannel: () => undefined,
-  navigateToIssue: () => undefined,
-  navigateToLocation: () => undefined,
-  navigateToPage: () => undefined,
-  navigationHistoryIndex: 0,
-  navigationHistoryItems: [],
-  navigationProjectId: team.id,
-  replaceNavigationLocation: () => undefined,
-  resetNavigation: () => undefined,
-  selectedRunId: null,
 };
 
 const props: DesktopShellProps = {
@@ -115,8 +95,6 @@ const props: DesktopShellProps = {
       knownModels: 0,
     },
   }),
-  navigation,
-  openAppSettings: () => undefined,
   openOrganizationIssue: () => undefined,
   openProjectInNewWindow: async () => undefined,
   repositorySetup: {
@@ -169,6 +147,9 @@ const harness = (): AtomRegistry => {
     teamId: team.id,
     payload,
   });
+  // The shell reads where it is from the store, so the harness puts it on the
+  // issue board the same way a visit would.
+  createNavigationActions(registry).navigateToPage("issues", team.id);
   return registry;
 };
 
@@ -219,12 +200,17 @@ describe("DesktopShell", () => {
 
   it("hides the sidebar on the settings page", async () => {
     const registry = harness();
-    const { render, view } = await mount(registry);
+    const { view } = await mount(registry);
     await settle(() => view.container.textContent?.includes(run.title) === true);
     const sidebarBefore = view.container.querySelectorAll("nav").length;
 
-    await render({
-      navigation: { ...navigation, activePage: "settings" },
+    await act(async () => {
+      createNavigationActions(registry).navigateToLocation(
+        settingsNavigationLocation({
+          scope: "application",
+          section: "account",
+        }),
+      );
     });
     await flush(6);
     // The settings pages bring their own navigation column.

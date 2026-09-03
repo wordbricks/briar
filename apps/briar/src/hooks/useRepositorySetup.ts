@@ -6,6 +6,7 @@ import {
   teamRepositoryDestination,
 } from "../lib/local-team-connection";
 import { repositorySetupTeamIdAtom } from "../state/dialogs/atoms";
+import { useNavigationActions } from "../state/navigation/actions";
 import { settingsTargetAtom } from "../state/navigation/atoms";
 import { remoteMode } from "../state/platform";
 import { useRegistry } from "../state/registry";
@@ -15,7 +16,6 @@ import {
   connectedTeamIdsAtom,
   teamReadinessAtom,
 } from "../state/workspace/atoms";
-import type { ActivePage } from "../lib/app-navigation";
 import type { ReconnectOutcome } from "../state/workspace/actions";
 
 /*
@@ -29,8 +29,6 @@ import type { ReconnectOutcome } from "../state/workspace/actions";
 */
 
 export interface RepositorySetupInput {
-  /** Navigating to the settings page, still the shell's. */
-  readonly navigateToPage: (page: ActivePage, teamId?: string | null) => void;
   /** Selecting a team, still the session facade's. */
   readonly selectTeam: (teamId: string) => void;
   /** Reconnecting a team's checkout, from the workspace store. */
@@ -56,11 +54,11 @@ export interface RepositorySetup {
 }
 
 export function useRepositorySetup({
-  navigateToPage,
   reconnectTeam,
   selectTeam,
 }: RepositorySetupInput): RepositorySetup {
   const registry = useRegistry();
+  const { navigateToPage } = useNavigationActions();
   const [repositorySetupTeamId, setRepositorySetupTeamId] = useAtom(
     repositorySetupTeamIdAtom,
   );
