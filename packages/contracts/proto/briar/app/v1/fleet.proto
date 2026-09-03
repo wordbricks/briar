@@ -27,6 +27,7 @@ service FleetService {
   rpc ApplyForManagedComputer(ApplyForManagedComputerRequest) returns (ApplyForManagedComputerResponse);
   rpc RetryManagedComputer(RetryManagedComputerRequest) returns (RetryManagedComputerResponse);
   rpc RetireManagedComputer(RetireManagedComputerRequest) returns (RetireManagedComputerResponse);
+  rpc TerminateManagedComputer(TerminateManagedComputerRequest) returns (TerminateManagedComputerResponse);
   rpc CreateManagedComputerRemoteSession(CreateManagedComputerRemoteSessionRequest) returns (CreateManagedComputerRemoteSessionResponse);
   rpc EndManagedComputerRemoteSession(EndManagedComputerRemoteSessionRequest) returns (EndManagedComputerRemoteSessionResponse);
   rpc CreateManagedComputerSetupSession(CreateManagedComputerSetupSessionRequest) returns (CreateManagedComputerSetupSessionResponse);
@@ -336,6 +337,16 @@ message RetireManagedComputerRequest {
 }
 
 message RetireManagedComputerResponse {
+  ManagedComputer computer = 1;
+  bool duplicate = 2;
+}
+
+message TerminateManagedComputerRequest {
+  string organization_id = 1;
+  string managed_computer_id = 2;
+}
+
+message TerminateManagedComputerResponse {
   ManagedComputer computer = 1;
   bool duplicate = 2;
 }

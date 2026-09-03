@@ -9,6 +9,7 @@ import {
   PowerOff,
   RefreshCw,
   ServerCog,
+  Trash2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -19,6 +20,7 @@ import {
   loadManagedComputers,
   retireManagedComputer,
   retryManagedComputer,
+  terminateManagedComputer,
   validateManagedComputerPromotion,
 } from "../lib/api";
 import { ApiError } from "../lib/api/errors";
@@ -85,6 +87,8 @@ function managedComputerErrorKey(error: unknown) {
       "managedComputer.error.retryUnavailable",
     MANAGED_COMPUTER_RETIRE_UNAVAILABLE:
       "managedComputer.error.retireUnavailable",
+    MANAGED_COMPUTER_TERMINATE_UNAVAILABLE:
+      "managedComputer.error.terminateUnavailable",
   } as const)[error.code] ?? null;
 }
 
@@ -139,6 +143,8 @@ export function ManagedComputersCard({
   const [retireCandidate, setRetireCandidate] = useState<ManagedComputer | null>(
     null,
   );
+  const [terminatingId, setTerminatingId] = useState<string | null>(null);
+  const [terminateCandidate, setTerminateCandidate] = useState<ManagedComputer | null>(null);
   const [remoteComputer, setRemoteComputer] = useState<ManagedComputer | null>(null);
   const [setupComputer, setSetupComputer] = useState<ManagedComputer | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -152,7 +158,7 @@ export function ManagedComputersCard({
         loadManagedComputers(token, organizationId),
       ]);
       setProduct(nextProduct);
-      setComputers(nextComputers.computers);
+      setComputers(nextComputers.computers.filter((computer) => computer.state !== "terminated"));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
@@ -270,6 +276,24 @@ export function ManagedComputersCard({
     }
   };
 
+  const terminate = async () => {
+    const computer = terminateCandidate;
+    if (!computer || terminatingId) return;
+    setTerminatingId(computer.id);
+    setError(null);
+    try {
+      await terminateManagedComputer(token, organizationId, computer.id);
+      setComputers((current) => current.filter((candidate) => candidate.id !== computer.id));
+      setTerminateCandidate(null);
+      onProjectConnected();
+    } catch (caught) {
+      setTerminateCandidate(null);
+      displayError(caught);
+    } finally {
+      setTerminatingId(null);
+    }
+  };
+
   const specification = product?.product.specification;
   const purchaseDisabled =
     !product?.applicationsEnabled || !product.canApply || submitting;
@@ -356,8 +380,8 @@ export function ManagedComputersCard({
             );
             return (
               <article className="px-5 py-4" key={computer.id}>
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="flex min-w-0 items-start gap-3">
+              <div className="flex flex-col items-start justify-between gap-3 sm:flex-row">
+                <div className="flex min-w-0 flex-1 items-start gap-3">
                   <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-secondary text-muted-foreground">
                     <ServerCog aria-hidden="true" size={18} />
                   </span>
@@ -383,7 +407,7 @@ export function ManagedComputersCard({
                     </Typography>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   {computer.state === "needs_setup" ? (
                     <Button
                       onClick={() => setSetupComputer(computer)}
@@ -461,6 +485,25 @@ export function ManagedComputersCard({
                     >
                       <PowerOff size={14} />
                       {t("managedComputer.retireAction")}
+                    </Button>
+                  ) : null}
+                  {product?.canApply && computer.state === "stopped" ? (
+                    <Button
+                      aria-label={t("managedComputer.terminate", {
+                        id: computer.id.slice(0, 8),
+                      })}
+                      className="text-destructive hover:text-destructive"
+                      disabled={terminatingId !== null}
+                      onClick={() => {
+                        setError(null);
+                        setTerminateCandidate(computer);
+                      }}
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      <Trash2 aria-hidden="true" size={14} />
+                      {t("managedComputer.terminateAction")}
                     </Button>
                   ) : null}
                 </div>
@@ -629,6 +672,47 @@ export function ManagedComputersCard({
             >
               {retiringId ? <Spinner size={15} /> : <PowerOff size={15} />}
               {t("managedComputer.retireConfirm")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        onOpenChange={(open) => {
+          if (!open && !terminatingId) setTerminateCandidate(null);
+        }}
+        open={terminateCandidate !== null}
+      >
+        <DialogContent className="sm:max-w-md" showClose={!terminatingId}>
+          <DialogHeader>
+            <DialogTitle>
+              {terminateCandidate
+                ? t("managedComputer.terminateTitle", {
+                    id: terminateCandidate.id.slice(0, 8),
+                  })
+                : null}
+            </DialogTitle>
+            <DialogDescription>
+              {t("managedComputer.terminateDescription")}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              disabled={Boolean(terminatingId)}
+              onClick={() => setTerminateCandidate(null)}
+              type="button"
+              variant="outline"
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              disabled={Boolean(terminatingId)}
+              onClick={() => void terminate()}
+              type="button"
+              variant="destructive"
+            >
+              {terminatingId ? <Spinner size={15} /> : <Trash2 aria-hidden="true" size={15} />}
+              {t(terminatingId ? "managedComputer.terminating" : "managedComputer.terminateAction")}
             </Button>
           </DialogFooter>
         </DialogContent>

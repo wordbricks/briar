@@ -57,6 +57,9 @@ public protocol BriarAPI_FleetServiceClientInterface: Sendable {
     func `retireManagedComputer`(request: BriarAPI_RetireManagedComputerRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_RetireManagedComputerResponse>
 
     @available(iOS 13, *)
+    func `terminateManagedComputer`(request: BriarAPI_TerminateManagedComputerRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_TerminateManagedComputerResponse>
+
+    @available(iOS 13, *)
     func `createManagedComputerRemoteSession`(request: BriarAPI_CreateManagedComputerRemoteSessionRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_CreateManagedComputerRemoteSessionResponse>
 
     @available(iOS 13, *)
@@ -148,6 +151,11 @@ public final class BriarAPI_FleetServiceClient: BriarAPI_FleetServiceClientInter
     }
 
     @available(iOS 13, *)
+    public func `terminateManagedComputer`(request: BriarAPI_TerminateManagedComputerRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_TerminateManagedComputerResponse> {
+        return await self.client.unary(path: "/briar.app.v1.FleetService/TerminateManagedComputer", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
     public func `createManagedComputerRemoteSession`(request: BriarAPI_CreateManagedComputerRemoteSessionRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CreateManagedComputerRemoteSessionResponse> {
         return await self.client.unary(path: "/briar.app.v1.FleetService/CreateManagedComputerRemoteSession", idempotencyLevel: .unknown, request: request, headers: headers)
     }
@@ -183,6 +191,7 @@ public final class BriarAPI_FleetServiceClient: BriarAPI_FleetServiceClientInter
             public static let applyForManagedComputer = Connect.MethodSpec(name: "ApplyForManagedComputer", service: "briar.app.v1.FleetService", type: .unary)
             public static let retryManagedComputer = Connect.MethodSpec(name: "RetryManagedComputer", service: "briar.app.v1.FleetService", type: .unary)
             public static let retireManagedComputer = Connect.MethodSpec(name: "RetireManagedComputer", service: "briar.app.v1.FleetService", type: .unary)
+            public static let terminateManagedComputer = Connect.MethodSpec(name: "TerminateManagedComputer", service: "briar.app.v1.FleetService", type: .unary)
             public static let createManagedComputerRemoteSession = Connect.MethodSpec(name: "CreateManagedComputerRemoteSession", service: "briar.app.v1.FleetService", type: .unary)
             public static let endManagedComputerRemoteSession = Connect.MethodSpec(name: "EndManagedComputerRemoteSession", service: "briar.app.v1.FleetService", type: .unary)
             public static let createManagedComputerSetupSession = Connect.MethodSpec(name: "CreateManagedComputerSetupSession", service: "briar.app.v1.FleetService", type: .unary)
