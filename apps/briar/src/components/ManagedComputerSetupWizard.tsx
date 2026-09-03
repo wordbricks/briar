@@ -366,6 +366,26 @@ export function ManagedComputerSetupWizard({
     setCredentialSubmitted(true);
   };
 
+  const skipProviderChallenge = () => {
+    if (!challenge) return;
+    const socket = socketRef.current;
+    if (!socket || socket.readyState !== WebSocket.OPEN) return;
+    socket.send(toBinary(
+      ManagedComputerSetupToAgentSchema,
+      create(ManagedComputerSetupToAgentSchema, {
+        payload: {
+          case: "submit",
+          value: create(ManagedComputerSetupSubmitSchema, {
+            challengeId: challenge.challengeId,
+            value: "SKIP",
+          }),
+        },
+      }),
+    ));
+    setChallenge(null);
+    setCredentialSubmitted(true);
+  };
+
   const copyCode = async () => {
     if (!challenge?.userCode) return;
     await navigator.clipboard.writeText(challenge.userCode);
@@ -594,6 +614,21 @@ export function ManagedComputerSetupWizard({
                         {t("managedComputer.setup.submitCredential")}
                       </Button>
                     </div>
+                    {provider === "opencode" && challenge.service === "provider" ? (
+                      <div className="mt-1 text-center">
+                        <button
+                          className="text-xs text-muted-foreground underline hover:text-foreground"
+                          disabled={credentialSubmitted}
+                          onClick={skipProviderChallenge}
+                          type="button"
+                        >
+                          {t("managedComputer.setup.skipProvider")}
+                        </button>
+                        <Typography className="mt-1" tone="muted" variant="caption">
+                          {t("managedComputer.setup.skipProviderDescription")}
+                        </Typography>
+                      </div>
+                    ) : null}
                   </div>
                 ) : (
                   <Typography className="text-center" tone="muted" variant="caption">

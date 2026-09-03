@@ -336,6 +336,15 @@ async function providerAuthenticated(provider: ManagedComputerSetupProvider) {
   return opencodeAuthenticated(homedir());
 }
 
+export const OPENCODE_SKIP_SENTINEL = "SKIP";
+
+class ProviderSkippedError extends Error {
+  constructor() {
+    super("Provider authentication was skipped");
+    this.name = "ProviderSkippedError";
+  }
+}
+
 function abortError() {
   const error = new Error("Managed computer setup was cancelled");
   error.name = "AbortError";
@@ -576,16 +585,29 @@ async function runAuthentication(
         processHandle.exited.then((code) => ({ type: "exit" as const, code })),
         waitForAbort(input.signal),
       ]);
-      if (next.type === "input") processHandle.write(`${next.value}\n`);
+      if (next.type === "input") {
+        if (next.value === OPENCODE_SKIP_SENTINEL && input.provider === "opencode") {
+          throw new ProviderSkippedError();
+        }
+        processHandle.write(`${next.value}\n`);
+      }
       else if (next.code !== 0) {
         throw new Error(authenticationFailureMessage(output));
       }
       else return;
     }
+    const exitRace: Promise<number>[] = [processHandle.exited];
+    if (input.provider === "opencode") {
+      exitRace.push(new Promise<number>((resolve) => {
+        const timer = setTimeout(() => resolve(-1), 30_000);
+        timer.unref?.();
+      }));
+    }
     const code = await Promise.race([
-      processHandle.exited,
+      Promise.race(exitRace),
       waitForAbort(input.signal),
     ]);
+    if (code === -1) return;
     if (code !== 0) throw new Error(authenticationFailureMessage(output));
   } finally {
     processHandle.kill();
@@ -657,16 +679,25 @@ export async function runManagedComputerGuidedSetup(
   dependencies.emit(setupStateMessage("github", "complete"));
 
   dependencies.emit(setupStateMessage("provider", "working", input.provider));
+  let providerSkipped = false;
   if (!(await providerAuthenticated(input.provider))) {
-    await runAuthentication({
-      service: "provider",
-      provider: input.provider,
-      command: managedComputerProviderAuthCommand(input.provider),
-      challengeId: `${input.provider}-auth`,
-      signal: input.signal,
-    }, dependencies);
-    if (!(await providerAuthenticated(input.provider))) {
-      throw new Error(`${input.provider} authentication did not complete`);
+    try {
+      await runAuthentication({
+        service: "provider",
+        provider: input.provider,
+        command: managedComputerProviderAuthCommand(input.provider),
+        challengeId: `${input.provider}-auth`,
+        signal: input.signal,
+      }, dependencies);
+      if (!(await providerAuthenticated(input.provider))) {
+        throw new Error(`${input.provider} authentication did not complete`);
+      }
+    } catch (error) {
+      if (error instanceof ProviderSkippedError) {
+        providerSkipped = true;
+      } else {
+        throw error;
+      }
     }
   }
   dependencies.emit(setupStateMessage("provider", "complete", input.provider));
@@ -681,10 +712,13 @@ export async function runManagedComputerGuidedSetup(
   dependencies.emit(setupStateMessage("worker", "working"));
   const enabled = onlyProviderEnabled(input.provider);
   const [providerHealth, providerCapabilities] = await Promise.all([
-    inspectWorkerProviderHealth(enabled),
+    inspectWorkerProviderHealth(enabled, providerSkipped ? {
+      authenticated: async (provider) => provider === input.provider || false,
+    } : undefined),
     discoverWorkerProviderCapabilities(enabled, { refresh: true }),
   ]);
-  if (!providerHealth[input.provider].healthy) {
+  if (!providerHealth[input.provider].healthy &&
+      !(providerSkipped && providerHealth[input.provider].reason === "not_authenticated")) {
     throw new Error(`${input.provider} is authenticated but not ready`);
   }
   const response = await setupRpc.bindManagedComputerSetup({
