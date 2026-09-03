@@ -14,6 +14,8 @@ export default defineConfig(async () => ({
     include: [...workerD1TestFiles],
     setupFiles: ["./worker/src/test-setup.ts"],
     hookTimeout: 60_000,
+    // See the note in `vitest.worker.config.ts`: this only orders the two
+    // projects inside `vitest.worker-projects.config.ts`.
     sequence: { groupOrder: 1 },
     // Each worker boots workerd and owns an isolated D1 database.
     maxWorkers: resolveMaxWorkers(8),

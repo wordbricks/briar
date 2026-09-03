@@ -83,6 +83,11 @@
       "outputs": [],
       "cache": true
     },
+    "test:all": {
+      "dependsOn": ["test"],
+      "outputs": [],
+      "cache": false
+    },
     "skills:check": {
       "outputs": []
     },
