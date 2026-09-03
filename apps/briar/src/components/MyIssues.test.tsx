@@ -10,14 +10,14 @@ import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { MyIssues } from "./MyIssues";
 
 const projectOne: Project = {
-  ...demoDashboard.project,
+  ...demoDashboard.team,
   id: "project-one",
   name: "Briar web",
   issueKeyPrefix: "WEB",
   icon: "data:image/png;base64,project-one",
 };
 const projectTwo: Project = {
-  ...demoDashboard.project,
+  ...demoDashboard.team,
   id: "project-two",
   name: "Briar mobile",
   issueKeyPrefix: "MOB",
@@ -26,7 +26,7 @@ const projectTwo: Project = {
 
 const dashboardFor = (project: Project, runs: DashboardPayload["runs"]): DashboardPayload => ({
   ...demoDashboard,
-  project,
+  team: project,
   runs,
 });
 

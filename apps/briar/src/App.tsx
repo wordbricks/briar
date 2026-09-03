@@ -1,5 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useAtomSet } from "@effect/atom-react";
 import {
   Activity,
@@ -24,65 +31,38 @@ import {
 import { AgentUsageStatusBar } from "./components/AgentUsageStatusBar";
 import { WorkerStatusBar } from "./components/WorkerStatusBar";
 import { AppVersionStatus } from "./components/AppVersionStatus";
-import { AppSettings } from "./components/AppSettings";
 import {
   CompanionBottomNavigation,
   type CompanionStatusFilter,
 } from "./components/CompanionBottomNavigation";
 import { CompanionEmptyState, CompanionHeader } from "./components/CompanionHeader";
-import { CompanionSettings } from "./components/CompanionSettings";
 import { ConnectionHealth } from "./components/ConnectionHealth";
 import { HuntDashboard } from "./components/hunt/HuntDashboard";
-import { RunPage } from "./components/hunt/detail/RunPage";
-import { WorkerDispatchDialog } from "./components/WorkerDispatchDialog";
 import { Inbox } from "./components/Inbox";
-import { MyIssues } from "./components/MyIssues";
 import { InboxDetailPanel } from "./components/InboxDetailPanel";
 import {
   InboxDetailTargetBoundary,
   InboxWithSelection,
 } from "./components/InboxSelectionBoundary";
 import { Channels } from "./components/Channels";
-import {
-  CommandPalette,
-  type CommandPaletteItem,
-} from "./components/CommandPalette";
+import type { CommandPaletteItem } from "./components/CommandPalette";
 import { KeyboardShortcutModeHint } from "./components/KeyboardShortcutModeHint";
-import { KeyboardShortcutsDialog } from "./components/KeyboardShortcutsDialog";
 import { DirectMessages } from "./components/DirectMessages";
 import {
   CompanionChannels,
   type CompanionChannelCache,
 } from "./components/CompanionChannels";
-import { FirstOrganizationSetup } from "./components/FirstOrganizationSetup";
-import { FirstRunTutorial } from "./components/FirstRunTutorial";
-import { InitialOnboarding } from "./components/InitialOnboarding";
-import { InvitationOnboarding } from "./components/InvitationOnboarding";
-import { LaunchIntro } from "./components/LaunchIntro";
-import { LoginScreen } from "./components/LoginScreen";
-import { OrganizationSettings } from "./components/OrganizationSettings";
-import { OrganizationCreate } from "./components/OrganizationCreate";
-import { ProjectOnboarding } from "./components/ProjectOnboarding";
-import { PlanningProjectDialog } from "./components/PlanningProjectDialog";
-import { Projects } from "./components/Projects";
-import { ProjectLobby } from "./components/ProjectLobby";
+import { AppEffects } from "./components/app/AppEffects";
+import { LoginScreenWithSession } from "./components/app/LoginScreenWithSession";
 import { loadProjectMergeActivity } from "./lib/app-rpc/github";
-import { ProjectAgents } from "./components/ProjectAgents";
-import { ProjectIcon } from "./components/ProjectIcon";
-import { ProjectAgentSessionDetail } from "./components/ProjectAgentSessionDetail";
-import { ProjectSchedule } from "./components/ProjectSchedule";
-import { ProjectRepositorySetupDialog } from "./components/ProjectRepositorySetupDialog";
-import { ProjectSettings } from "./components/ProjectSettings";
+import { TeamIcon } from "./components/TeamIcon";
 import { SessionLoadingScreen } from "./components/SessionLoadingScreen";
 import { EmptyState, MainContent, PageHeader } from "./components/layout";
 import { Button } from "./components/ui/button";
 import { LoadingState } from "./components/ui/loading-state";
 import { useToast } from "./components/ui/toast";
-import { Sidebar } from "./components/Sidebar";
-import {
-  UnifiedSettingsSidebar,
-  type UnifiedSettingsTarget,
-} from "./components/UnifiedSettingsSidebar";
+import { SidebarWithSession } from "./components/app/SidebarWithSession";
+import type { UnifiedSettingsTarget } from "./components/UnifiedSettingsSidebar";
 import {
   WindowNavigationControls,
   type WindowNavigationHistoryItem,
@@ -110,7 +90,7 @@ import {
   useAppKeyboardCommandScope,
   useAppKeyboardCommandState,
 } from "./hooks/appKeyboardCommands";
-import { isProjectScheduleTabEnabled } from "./lib/project-tabs";
+import { isTeamScheduleTabEnabled } from "./lib/team-tabs";
 import {
   clearLaunchIntroPreview,
   isLaunchIntroPreview,
@@ -153,13 +133,13 @@ import {
   isInboxRunDetailTarget,
 } from "./lib/inbox-notifications";
 import type { InboxNotificationTarget } from "./generated/tauri";
-import { inboxDetailTargetAtom } from "./lib/inbox-selection";
+import { inboxDetailTargetAtom } from "./state/inbox-selection";
 import {
   clearFirstRunTutorialPending,
   hasPendingFirstRunTutorial,
   markFirstRunTutorialPending,
   shouldShowFirstOrganizationSetup as resolveShouldShowFirstOrganizationSetup,
-} from "./lib/project-onboarding";
+} from "./lib/team-onboarding";
 import {
   getMobilePlatform,
   isDesktopTauri,
@@ -167,9 +147,9 @@ import {
   isWebApp,
 } from "./lib/platform";
 import {
-  openProjectWindow,
-  readProjectWindowProjectId,
-} from "./lib/project-window";
+  openTeamWindow,
+  readTeamWindowProjectId,
+} from "./lib/team-window";
 import {
   listenForBriarLinks,
   parseWebAppIssuePath,
@@ -179,14 +159,14 @@ import { listenForClickedIssueLinks } from "./lib/external-links";
 import { navigateToIssueLink } from "./lib/issue-link-navigation";
 import { isRepositoryConnectedForImport } from "./lib/linear-import";
 import {
-  localProjectConnectionState,
-  localProjectReadiness,
-  projectRepositoryDestination,
-} from "./lib/local-project-connection";
+  localTeamConnectionState,
+  localTeamReadiness,
+  teamRepositoryDestination,
+} from "./lib/local-team-connection";
 import type { IssueDetailTab } from "./lib/issue-detail-tab";
 import { settingsAccountSelection } from "./lib/settings-account-selection";
 import { LITELLM_MAIN_PRICING_SOURCE } from "./lib/agent-usage-pricing";
-import { createCachedProjectUsageSummaryLoader } from "./lib/project-usage-summary";
+import { createCachedTeamUsageSummaryLoader } from "./lib/team-usage-summary";
 import {
   createChannel,
   deleteChannel,
@@ -222,17 +202,17 @@ import { directMessageDisplayName } from "./lib/direct-messages";
 import { cn } from "./lib/utils";
 import { dispatchAutoHuntToWorkers } from "./lib/auto-hunt-worker-dispatch";
 import {
-  projectSupportsExecutionSelection,
-  projectWorkerCapabilityCatalog,
-} from "./lib/project-worker-capabilities";
-import { demoProjectAgents } from "./lib/demo-project-agents";
-import { executeProjectAgentTask } from "./lib/project-agent-execution";
-import { runProjectAgent } from "./lib/project-llm";
+  teamSupportsExecutionSelection,
+  teamWorkerCapabilityCatalog,
+} from "./lib/team-worker-capabilities";
+import { demoTeamAgents } from "./lib/demo-team-agents";
+import { executeTeamAgentTask } from "./lib/team-agent-execution";
+import { runTeamAgent } from "./lib/team-llm";
 import type {
   AgentProvider,
   ModelEffort,
-  ProjectAgentRunInput,
-} from "./lib/project-llm";
+  TeamAgentRunInput,
+} from "./lib/team-llm";
 import {
   recoveryAgent,
   takePlannedUpdateAgentRecoveries,
@@ -274,6 +254,128 @@ import {
 import { useI18n } from "./i18n";
 import type { HuntRun, ProjectAgent, StatusTrayRun } from "./types";
 
+// Views and overlays that never show on the first screen load from their own
+// chunk. Each is behind a `<Suspense>` boundary whose fallback is an empty
+// surface: a local chunk resolves in a few milliseconds, so a spinner would
+// flash rather than inform.
+const AppSettings = lazy(() =>
+  import("./components/AppSettings").then((m) => ({ default: m.AppSettings })),
+);
+const CommandPalette = lazy(() =>
+  import("./components/CommandPalette").then((m) => ({
+    default: m.CommandPalette,
+  })),
+);
+const CompanionSettings = lazy(() =>
+  import("./components/CompanionSettings").then((m) => ({
+    default: m.CompanionSettings,
+  })),
+);
+const FirstOrganizationSetup = lazy(() =>
+  import("./components/FirstOrganizationSetup").then((m) => ({
+    default: m.FirstOrganizationSetup,
+  })),
+);
+const FirstRunTutorial = lazy(() =>
+  import("./components/FirstRunTutorial").then((m) => ({
+    default: m.FirstRunTutorial,
+  })),
+);
+const InitialOnboarding = lazy(() =>
+  import("./components/InitialOnboarding").then((m) => ({
+    default: m.InitialOnboarding,
+  })),
+);
+const InvitationOnboarding = lazy(() =>
+  import("./components/InvitationOnboarding").then((m) => ({
+    default: m.InvitationOnboarding,
+  })),
+);
+const KeyboardShortcutsDialog = lazy(() =>
+  import("./components/KeyboardShortcutsDialog").then((m) => ({
+    default: m.KeyboardShortcutsDialog,
+  })),
+);
+const LaunchIntro = lazy(() =>
+  import("./components/LaunchIntro").then((m) => ({ default: m.LaunchIntro })),
+);
+const MyIssues = lazy(() =>
+  import("./components/MyIssues").then((m) => ({ default: m.MyIssues })),
+);
+const OrganizationCreate = lazy(() =>
+  import("./components/OrganizationCreate").then((m) => ({
+    default: m.OrganizationCreate,
+  })),
+);
+const OrganizationSettings = lazy(() =>
+  import("./components/app/OrganizationSettingsWithSession").then((m) => ({
+    default: m.OrganizationSettingsWithSession,
+  })),
+);
+const PlanningProjectDialog = lazy(() =>
+  import("./components/PlanningProjectDialog").then((m) => ({
+    default: m.PlanningProjectDialog,
+  })),
+);
+const RunPage = lazy(() =>
+  import("./components/hunt/detail/RunPage").then((m) => ({
+    default: m.RunPage,
+  })),
+);
+const TeamAgents = lazy(() =>
+  import("./components/TeamAgents").then((m) => ({ default: m.TeamAgents })),
+);
+const TeamAgentSessionDetail = lazy(() =>
+  import("./components/TeamAgentSessionDetail").then((m) => ({
+    default: m.TeamAgentSessionDetail,
+  })),
+);
+const TeamLobby = lazy(() =>
+  import("./components/TeamLobby").then((m) => ({ default: m.TeamLobby })),
+);
+const TeamOnboarding = lazy(() =>
+  import("./components/TeamOnboarding").then((m) => ({
+    default: m.TeamOnboarding,
+  })),
+);
+const TeamRepositorySetupDialog = lazy(() =>
+  import("./components/TeamRepositorySetupDialog").then((m) => ({
+    default: m.TeamRepositorySetupDialog,
+  })),
+);
+const TeamSchedule = lazy(() =>
+  import("./components/TeamSchedule").then((m) => ({
+    default: m.TeamSchedule,
+  })),
+);
+const TeamSettings = lazy(() =>
+  import("./components/TeamSettings").then((m) => ({
+    default: m.TeamSettings,
+  })),
+);
+const Teams = lazy(() =>
+  import("./components/app/TeamsWithPlanningProjects").then((m) => ({
+    default: m.TeamsWithPlanningProjects,
+  })),
+);
+const UnifiedSettingsSidebar = lazy(() =>
+  import("./components/UnifiedSettingsSidebar").then((m) => ({
+    default: m.UnifiedSettingsSidebar,
+  })),
+);
+const WorkerDispatchDialog = lazy(() =>
+  import("./components/WorkerDispatchDialog").then((m) => ({
+    default: m.WorkerDispatchDialog,
+  })),
+);
+
+/** Neutral placeholder that fills the slot a lazy view is about to occupy. */
+const lazyViewFallback = <div className="lazy-view-placeholder h-full w-full" />;
+
+const withLazyBoundary = (view: React.ReactNode) => (
+  <Suspense fallback={lazyViewFallback}>{view}</Suspense>
+);
+
 type AgentAutoHuntOptions = {
   coordinatorConversationId?: string | null;
   parentSessionId?: string;
@@ -291,7 +393,7 @@ export function App({
 }) {
   const { locale, t } = useI18n();
   const { toast } = useToast();
-  const [projectWindowProjectId] = useState(readProjectWindowProjectId);
+  const [projectWindowProjectId] = useState(readTeamWindowProjectId);
   const autoHunt = useAutoHuntSessions();
   const [invitationToken, setInvitationToken] = useState(
     loadOrganizationInvitationToken,
@@ -307,7 +409,7 @@ export function App({
     deferDefaultOrganization: true,
     lockedProjectId: projectWindowProjectId,
     startScheduledAgentSession: (run) =>
-      autoHunt.startTaskSession(run.projectId, run.agent.id, {
+      autoHunt.startTaskSession(run.teamId, run.agent.id, {
         agentName: run.agent.name,
         request: run.scheduleName,
         startedAt: run.startedAt,
@@ -322,7 +424,7 @@ export function App({
       runs,
       dispatch,
     ) => autoHunt.startWorkerDispatchSession(
-      run.projectId,
+      run.teamId,
       run.agent,
       runs,
       {
@@ -570,7 +672,7 @@ export function App({
     [briar.token],
   );
   const loadProjectHomeUsage = useMemo(
-    () => createCachedProjectUsageSummaryLoader(async (projectId, period, range) => {
+    () => createCachedTeamUsageSummaryLoader(async (projectId, period, range) => {
       if (!briar.token) return null;
       return loadProjectUsageSummary(briar.token, projectId, period, range);
     }),
@@ -588,7 +690,7 @@ export function App({
   useEffect(() => {
     if (!briar.dashboard) return;
     autoHunt.reconcileWorkerDispatches(
-      briar.dashboard.project.id,
+      briar.dashboard.team.id,
       briar.dashboard.runs,
     );
   }, [autoHunt.reconcileWorkerDispatches, briar.dashboard]);
@@ -665,8 +767,8 @@ export function App({
     const projectRuns: StatusTrayRun[] = dashboard.runs
       .filter((run) => run.status === "running")
       .map((run) => ({
-        projectId: dashboard.project.id,
-        projectName: dashboard.project.name,
+        teamId: dashboard.team.id,
+        teamName: dashboard.team.name,
         id: run.id,
         title: run.title,
         status: "running",
@@ -679,7 +781,7 @@ export function App({
         lastEventAt: run.lastEventAt,
       }));
     setStatusTrayRuns((current) => [
-      ...current.filter((run) => run.projectId !== dashboard.project.id),
+      ...current.filter((run) => run.teamId !== dashboard.team.id),
       ...projectRuns,
     ]);
   }, [briar.dashboard, projectWindowProjectId, runsOnMacDesktop]);
@@ -798,6 +900,7 @@ export function App({
     separatorProps: inboxResizeProps,
   } = useHorizontalPaneResize({
     clamp: clampInboxPaneWidth,
+    cssVariable: "--inbox-detail-pane-width",
     defaultWidth: inboxPaneWidthDefault,
     load: loadInboxPaneWidth,
     max: inboxPaneWidthMax,
@@ -1221,7 +1324,7 @@ export function App({
     if (
       !navigationUserBoundaryChanged &&
       activePage === "schedule" &&
-      !isProjectScheduleTabEnabled(activeProjectForTabs)
+      !isTeamScheduleTabEnabled(activeProjectForTabs)
     ) {
       replaceNavigationLocation(
         activeProjectForTabs
@@ -1567,7 +1670,7 @@ export function App({
       navigationUserBoundaryChanged ||
       !selectedRunId ||
       !navigationProjectId ||
-      briar.dashboard?.project.id !== navigationProjectId ||
+      briar.dashboard?.team.id !== navigationProjectId ||
       briar.dashboard.runs.some((run) => run.id === selectedRunId)
     ) {
       return;
@@ -1764,12 +1867,12 @@ export function App({
   const openProjectRepository = useCallback((projectId: string) => {
     if (!briar.projects.some((project) => project.id === projectId)) return;
 
-    const connectionState = localProjectConnectionState(
-      briar.connectedProjectIds,
+    const connectionState = localTeamConnectionState(
+      briar.connectedTeamIds,
       projectId,
     );
     const readiness = briar.projectReadiness[projectId] ?? null;
-    const destination = projectRepositoryDestination({
+    const destination = teamRepositoryDestination({
       connectionState,
       readiness,
       requiresLocalReadiness: !briar.remoteMode,
@@ -1792,7 +1895,7 @@ export function App({
     setRepositorySetupProjectId(projectId);
     void briar.refreshProjectReadiness(projectId);
   }, [
-    briar.connectedProjectIds,
+    briar.connectedTeamIds,
     briar.projectReadiness,
     briar.projects,
     briar.remoteMode,
@@ -1824,7 +1927,7 @@ export function App({
   const loadOrganizationProjectDashboard = useCallback(
     (projectId: string, signal: AbortSignal) => {
       const activeDashboard = activeDashboardRef.current;
-      if (activeDashboard?.project.id === projectId) {
+      if (activeDashboard?.team.id === projectId) {
         return Promise.resolve(activeDashboard);
       }
       if (!briar.token) return Promise.resolve(null);
@@ -1948,7 +2051,7 @@ export function App({
         : undefined;
       const runId = runIdFromNavigationLocation(location);
       if (runId) {
-        const run = projectId && briar.dashboard?.project.id === projectId
+        const run = projectId && briar.dashboard?.team.id === projectId
           ? briar.dashboard.runs.find((candidate) => candidate.id === runId)
           : undefined;
         return createItem(index, location, {
@@ -2075,7 +2178,7 @@ export function App({
     async (projectId: string) => {
       const project = briar.projects.find((candidate) => candidate.id === projectId);
       if (!project) throw new Error("Project is no longer available.");
-      await openProjectWindow(project);
+      await openTeamWindow(project);
     },
     [briar.projects],
   );
@@ -2086,7 +2189,7 @@ export function App({
     : null;
   const [issueAgents, setIssueAgents] = useState<ProjectAgent[]>([]);
   const activeProjectAgents = useMemo(
-    () => issueAgents.filter((agent) => agent.projectId === activeProject?.id),
+    () => issueAgents.filter((agent) => agent.teamId === activeProject?.id),
     [activeProject?.id, issueAgents],
   );
   useEffect(() => {
@@ -2098,13 +2201,13 @@ export function App({
     let cancelled = false;
     const agents = briar.token
       ? loadProjectAgents(briar.token, activeProject.id)
-      : Promise.resolve(demoProjectAgents(activeProject.id, locale));
+      : Promise.resolve(demoTeamAgents(activeProject.id, locale));
     void agents
       .then((loadedAgents) => {
         if (!cancelled) {
           setIssueAgents((current) => [
             ...current.filter(
-              (agent) => agent.projectId !== activeProject.id,
+              (agent) => agent.teamId !== activeProject.id,
             ),
             ...loadedAgents,
           ]);
@@ -2247,14 +2350,14 @@ export function App({
 
   const dispatchAgentAutoHunt = useCallback(async (
     projectId: string,
-    agent: ProjectAgentRunInput["agent"],
+    agent: TeamAgentRunInput["agent"],
     runs: HuntRun[],
     options?: AgentAutoHuntOptions,
   ) => {
     const token = briar.token;
     if (!token) throw new Error("로그인이 필요합니다.");
     const executionDashboard =
-      briar.dashboard?.project.id === projectId
+      briar.dashboard?.team.id === projectId
         ? briar.dashboard
         : await loadDashboard(token, projectId);
     const result = await dispatchAutoHuntToWorkers(
@@ -2267,12 +2370,12 @@ export function App({
       {
         agent,
         runs,
-        providerModels: projectWorkerCapabilityCatalog(
+        providerModels: teamWorkerCapabilityCatalog(
           executionDashboard.workers ?? [],
           executionDashboard.executionPolicy,
         ),
         selectionAvailable: (selection) =>
-          projectSupportsExecutionSelection(
+          teamSupportsExecutionSelection(
             executionDashboard.workers ?? [],
             executionDashboard.executionPolicy,
             selection.provider,
@@ -2356,9 +2459,9 @@ export function App({
         try {
           const dashboard = await loadDashboard(token, recovery.projectId);
           const agent = recoveryAgent(recovery);
-          await executeProjectAgentTask(
+          await executeTeamAgentTask(
             {
-              runAgent: runProjectAgent,
+              runAgent: runTeamAgent,
               startSession: (session) =>
                 autoHunt.startTaskSession(
                   recovery.projectId,
@@ -2478,6 +2581,10 @@ export function App({
     invitationProgress,
   ]);
 
+  // The main window is created hidden. On a first launch Rust already opened
+  // the intro before this bundle finished downloading, so `prepareLaunchIntro`
+  // is a no-op here and the reveal path owns the first show; otherwise this is
+  // what puts the window on screen.
   useEffect(() => {
     if (!runsOnDesktopTauri || projectWindowProjectId) return;
     let cancelled = false;
@@ -2489,10 +2596,10 @@ export function App({
       try {
         if (shouldPrepareLaunchIntro) {
           await commands.prepareLaunchIntro();
+          markLaunchIntroSeen();
         } else {
           await commands.showMainWindow();
         }
-        if (shouldPrepareLaunchIntro) markLaunchIntroSeen();
       } catch (error) {
         console.error("Failed to prepare the native launch experience", error);
         await commands.showMainWindow().catch(() => undefined);
@@ -2527,6 +2634,20 @@ export function App({
     runsOnDesktopTauri,
     shouldShowInitialOnboarding,
   ]);
+
+  // Tells Rust the window is worth showing: the session restore settled, so
+  // this render is the dashboard or the login/onboarding screen rather than
+  // the loading spinner. The intro's reveal is parked until this lands.
+  //
+  // Declared after the onboarding resize so the window is already at its final
+  // size by the time the reveal can act on it.
+  useEffect(() => {
+    if (!runsOnDesktopTauri || projectWindowProjectId) return;
+    if (briar.restoringSession) return;
+    void commands.markMainWindowReady().catch((error) => {
+      console.error("Failed to report Briar window readiness", error);
+    });
+  }, [briar.restoringSession, projectWindowProjectId, runsOnDesktopTauri]);
 
   const completeLaunchIntro = useCallback(() => {
     clearLaunchIntroPreview();
@@ -2632,7 +2753,7 @@ export function App({
     goInbox: !briar.activeOrganizationId,
     goIssues: !activeProject,
     goProjectHome: !activeProject,
-    goSchedule: !activeProject || !isProjectScheduleTabEnabled(activeProject),
+    goSchedule: !activeProject || !isTeamScheduleTabEnabled(activeProject),
     goSettings: false,
     openChannel: !briar.activeOrganizationId,
     openCommandPalette: false,
@@ -3195,7 +3316,7 @@ export function App({
       priority: activePage === "agents" ? 120 : 60,
       scope: "navigation",
     }, paletteSections.navigation);
-    if (isProjectScheduleTabEnabled(activeProject)) {
+    if (isTeamScheduleTabEnabled(activeProject)) {
       addPaletteItem({
         active: activePage === "schedule",
         description: activeProject.name,
@@ -3281,7 +3402,7 @@ export function App({
         project.id === briar.activeProjectId
           ? t("commandPalette.currentProject")
           : organizationName,
-      icon: <ProjectIcon className="size-4" project={project} />,
+      icon: <TeamIcon className="size-4" project={project} />,
       id: `project:${project.id}`,
       keywords: [
         project.name,
@@ -3340,7 +3461,7 @@ export function App({
   }
 
   const paletteDashboard = isCommandPaletteOpen ? briar.dashboard : null;
-  if (paletteDashboard && activeProject && paletteDashboard.project.id === activeProject.id) {
+  if (paletteDashboard && activeProject && paletteDashboard.team.id === activeProject.id) {
     const runs = [...paletteDashboard.runs].sort((left, right) => {
       if (left.id === selectedRunId) return -1;
       if (right.id === selectedRunId) return 1;
@@ -3448,7 +3569,7 @@ export function App({
         : paletteSections.directMessages);
   }
 
-  const unifiedSettingsSidebar = (
+  const unifiedSettingsSidebar = withLazyBoundary(
     <UnifiedSettingsSidebar
       activeTarget={settingsTarget}
       isOpen={isSidebarOpen}
@@ -3491,10 +3612,11 @@ export function App({
       : null;
     const isInboxDetailLoading = Boolean(
       isInboxRunDetailTarget(inboxDetailTarget) &&
-        briar.dashboard?.project.id !== inboxDetailTarget.projectId,
+        briar.dashboard?.team.id !== inboxDetailTarget.projectId,
     );
 
-    return inboxDetailRun ? (
+    return withLazyBoundary(
+      inboxDetailRun ? (
       <RunPage
         availableProviders={
           briar.dashboard?.organizationProviders?.length
@@ -3524,11 +3646,11 @@ export function App({
         isProcessing={processingIssueIds.has(inboxDetailRun.id)}
         isRecovering={briar.recoveringRunId === inboxDetailRun.id}
         isSidebarOpen
-        issueKeyPrefix={briar.dashboard?.project.issueKeyPrefix}
+        issueKeyPrefix={briar.dashboard?.team.issueKeyPrefix}
         isUpdatingIssue={briar.updatingIssueId === inboxDetailRun.id}
         mentionMembers={briar.dashboard?.members ?? []}
         mentionAgents={issueAgents.filter(
-          (agent) => agent.projectId === inboxDetailTarget.projectId,
+          (agent) => agent.teamId === inboxDetailTarget.projectId,
         )}
         currentUserId={briar.user?.id ?? null}
         onAddDependency={(prerequisiteRunId) =>
@@ -3641,7 +3763,7 @@ export function App({
         token={briar.token}
       />
     ) : inboxDetailSession ? (
-      <ProjectAgentSessionDetail
+      <TeamAgentSessionDetail
         isSidebarOpen
         issueKeyPrefix={
           briar.projects.find(
@@ -3704,6 +3826,7 @@ export function App({
         organizationName={activeOrganization?.name}
         projects={activeOrganizationProjects}
         requestedMessage={requestedChannelMessage}
+        onRequestedMessageOpen={clearRequestedChannelMessage}
         token={briar.token}
       />
     ) : isInboxDetailLoading ? (
@@ -3731,6 +3854,7 @@ export function App({
           {t("common.close")}
         </Button>
       </div>
+      ),
     );
   };
 
@@ -3750,7 +3874,7 @@ export function App({
   if (briar.restoringSession) {
     content = <SessionLoadingScreen />;
   } else if (invitationToken) {
-    content = (
+    content = withLazyBoundary(
       <InvitationOnboarding
         accepting={acceptingInvitation}
         error={briar.error}
@@ -3776,7 +3900,7 @@ export function App({
       />
     );
   } else if (shouldShowInitialOnboarding) {
-    content = (
+    content = withLazyBoundary(
       <InitialOnboarding
         authenticated={Boolean(briar.user)}
         error={briar.error}
@@ -3796,11 +3920,8 @@ export function App({
     );
   } else if (!briar.user) {
     content = (
-      <LoginScreen
+      <LoginScreenWithSession
         companionMode={briar.companionMode}
-        error={briar.error}
-        loading={briar.loading}
-        loginCode={briar.loginCode}
         onCancel={briar.cancelLogin}
         onLogin={(method) => void briar.login({ method, locale })}
         onSendEmailCode={(email) => briar.sendLoginEmailCode(email, locale)}
@@ -3810,7 +3931,7 @@ export function App({
       />
     );
   } else if (shouldShowFirstOrganizationSetup) {
-    content = (
+    content = withLazyBoundary(
       <FirstOrganizationSetup
         onCheckHandle={briar.checkOrganizationHandle}
         onCreate={async (input) => {
@@ -3845,16 +3966,14 @@ export function App({
             onSidebarToggle={() => setIsSidebarOpen((open) => !open)}
           />
         {activePage !== "settings" ? (
-          <Sidebar
+          <SidebarWithSession
             activeChannelId={desktopActiveChannelId}
             activePage={activePage}
-            activeOrganizationId={briar.activeOrganizationId}
             activePlanningProjectId={activePlanningProjectId}
-            activeProjectId={briar.activeProjectId}
             agents={issueAgents}
             channels={visibleOrganizationChannels}
             channelsLoading={channelsLoading}
-            connectedProjectIds={briar.connectedProjectIds}
+            connectedTeamIds={briar.connectedTeamIds}
             isOpen={isSidebarOpen}
             onAddProject={briar.startProjectCreation}
             onAddPlanningProject={(teamId) => {
@@ -3960,24 +4079,21 @@ export function App({
             }}
             onSettings={openAppSettings}
             onLogout={() => void briar.logout()}
-            organizations={briar.organizations}
             projects={visibleProjects}
-            planningProjects={briar.planningProjects}
             projectReadiness={briar.projectReadiness}
             projectReadinessError={briar.projectReadinessError}
             projectWindowProjectId={projectWindowProjectId}
             sessions={autoHunt.sessions}
-            token={briar.token}
             unreadInboxCount={visibleInboxUnreadCount}
             unreadDmCount={unreadDirectMessageCount}
-            user={briar.user}
           />
         ) : null}
         <div className="app-content-surface">
+        <Suspense fallback={null}>
         {repositorySetupProjectId ? (
-          <ProjectRepositorySetupDialog
-            connectionState={localProjectConnectionState(
-              briar.connectedProjectIds,
+          <TeamRepositorySetupDialog
+            connectionState={localTeamConnectionState(
+              briar.connectedTeamIds,
               repositorySetupProjectId,
             )}
             error={briar.projectReadinessError[repositorySetupProjectId] ?? null}
@@ -4006,6 +4122,8 @@ export function App({
             }
           />
         ) : null}
+        </Suspense>
+        <Suspense fallback={lazyViewFallback}>
         {activePage === "organization-create" ? (
           <OrganizationCreate
             onBack={() =>
@@ -4074,10 +4192,8 @@ export function App({
             organization={settingsOrganization}
             onLogoChange={briar.changeOrganizationLogo}
             onRename={briar.renameOrganization}
-            connectedProjectIds={briar.connectedProjectIds}
+            connectedTeamIds={briar.connectedTeamIds}
             projects={visibleProjects}
-            token={briar.token ?? ""}
-            userId={briar.user.id}
           />
         ) : activePage === "dms" &&
           !projectWindowProjectId &&
@@ -4139,7 +4255,7 @@ export function App({
             />
           </MainContent>
         ) : activePage === "projects" && activeProjectForTabs ? (
-          <Projects
+          <Teams
             isSidebarOpen={isSidebarOpen}
             onCreate={() => {
               setPlanningProjectEditId(null);
@@ -4157,7 +4273,6 @@ export function App({
               setPlanningProjectTeamId(null);
               setPlanningProjectEditId(planningProjectId);
             }}
-            projects={briar.planningProjects}
             teamId={activeProjectForTabs.id}
             teamName={activeProjectForTabs.name}
           />
@@ -4179,11 +4294,6 @@ export function App({
               isResizingInbox && "is-resizing-inbox cursor-col-resize select-none",
             )}
             ref={inboxLayoutRef}
-            style={
-              {
-                "--inbox-detail-pane-width": `${inboxDetailPaneWidth}%`,
-              } as CSSProperties
-            }
           >
             <InboxWithSelection
               desktopEmbedded
@@ -4264,11 +4374,11 @@ export function App({
         ) : activePage === "settings" &&
           settingsTarget.scope === "project" &&
           activeProject ? (
-          <ProjectSettings
+          <TeamSettings
             dashboard={briar.dashboard}
             githubRepository={
               briar.dashboard?.settings.githubRepository ??
-              localProjectReadiness(
+              localTeamReadiness(
                 briar.activeProjectConnectionState,
                 briar.projectReadiness[activeProject.id] ?? null,
               )?.githubRepository ??
@@ -4285,7 +4395,7 @@ export function App({
               const fallbackProject = briar.projects.find(
                 (project) => project.id !== activeProject.id,
               );
-              await briar.deleteProject(activeProject.id);
+              await briar.deleteTeam(activeProject.id);
               autoHunt.removeProjectSessions(activeProject.id);
               replaceNavigationLocation(
                 fallbackProject
@@ -4328,7 +4438,7 @@ export function App({
             project={activeProject}
             repositoryConnected={isRepositoryConnectedForImport({
               projectId: activeProject.id,
-              connectedProjectIds: briar.connectedProjectIds,
+              connectedTeamIds: briar.connectedTeamIds,
               githubRepository: briar.dashboard?.settings.githubRepository,
               repositoryPath: briar.health?.repositoryPath,
             })}
@@ -4336,7 +4446,7 @@ export function App({
             velen={briar.velen}
           />
         ) : activePage === "lobby" && activeProject ? (
-          <ProjectLobby
+          <TeamLobby
             connectionState={briar.activeProjectConnectionState}
             dashboard={briar.dashboard}
             isSidebarOpen={isSidebarOpen}
@@ -4370,7 +4480,7 @@ export function App({
             requiresLocalReadiness={!briar.remoteMode}
           />
         ) : activePage === "agents" && activeProject ? (
-          <ProjectAgents
+          <TeamAgents
             agentListRequestKey={agentListRequestKey}
             dashboard={briar.dashboard}
             error={briar.error}
@@ -4399,7 +4509,7 @@ export function App({
             token={briar.token}
           />
         ) : activePage === "schedule" && activeProject ? (
-          <ProjectSchedule
+          <TeamSchedule
             isSidebarOpen={isSidebarOpen}
             project={activeProject}
             token={briar.token}
@@ -4551,6 +4661,7 @@ export function App({
             token={briar.token}
           />
           )}
+        </Suspense>
         </div>
         </div>
         <div className="app-status-bar">
@@ -4653,8 +4764,9 @@ export function App({
           projects={briar.projects}
           user={briar.user}
         />
+        <Suspense fallback={lazyViewFallback}>
         {requestedCompanionSession ? (
-          <ProjectAgentSessionDetail
+          <TeamAgentSessionDetail
             isSidebarOpen
             issueKeyPrefix={
               briar.projects.find(
@@ -4722,7 +4834,7 @@ export function App({
           </>
         ) : companionPage === "lobby" && activeProject ? (
           <>
-            <ProjectLobby
+            <TeamLobby
               companionMode
               connectionState={briar.activeProjectConnectionState}
               dashboard={briar.dashboard}
@@ -4911,6 +5023,8 @@ export function App({
             token={briar.token}
           />
         )}
+        </Suspense>
+        <Suspense fallback={null}>
         <WorkerDispatchDialog
           didDispatchSuccessfully={completedDispatchRunId === dispatchRun?.id}
           error={quickProcessError}
@@ -4926,13 +5040,16 @@ export function App({
           run={dispatchRun}
           workers={briar.dashboard?.workers ?? []}
         />
+        </Suspense>
       </div>
     );
   }
 
   return (
     <>
+      <AppEffects />
       {content}
+      <Suspense fallback={null}>
       <PlanningProjectDialog
         onCreate={(input) => {
           if (!planningProjectTeamId) {
@@ -5000,7 +5117,7 @@ export function App({
       {!briar.remoteMode &&
       briar.user &&
       (briar.isCreatingProject || briar.projectConnection) ? (
-        <ProjectOnboarding
+        <TeamOnboarding
           canCancel={briar.organizations.length > 0}
           connection={briar.projectConnection}
           error={briar.error}
@@ -5110,6 +5227,7 @@ export function App({
           preview={previewsLaunchIntro}
         />
       ) : null}
+      </Suspense>
     </>
   );
 }

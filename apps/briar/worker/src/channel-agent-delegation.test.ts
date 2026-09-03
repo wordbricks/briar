@@ -17,7 +17,7 @@ import {
   snapshotChannelReplyExecutionTargets,
 } from "./channels";
 import {
-  createProjectAgent,
+  createTeamAgent,
   recordHuntEvent,
   type HuntEventInput,
 } from "./db";
@@ -76,8 +76,8 @@ const backlogEvent = (sourceKey: string): HuntEventInput => ({
 describe("Organization Agent channel delegation", () => {
   const db = cloudflareEnv.DB;
   const archives = cloudflareEnv.ARCHIVES;
-  let projectAgent: Awaited<ReturnType<typeof createProjectAgent>>;
-  let otherProjectAgent: Awaited<ReturnType<typeof createProjectAgent>>;
+  let projectAgent: Awaited<ReturnType<typeof createTeamAgent>>;
+  let otherProjectAgent: Awaited<ReturnType<typeof createTeamAgent>>;
   let organizationAgent: NonNullable<
     Awaited<ReturnType<typeof createOrganizationAgent>>
   >;
@@ -179,7 +179,7 @@ describe("Organization Agent channel delegation", () => {
       effort: null,
       createdAt: now,
     }))!;
-    projectAgent = await createProjectAgent(db, projectId, {
+    projectAgent = await createTeamAgent(db, projectId, {
       name: "Briar Guide",
       provider: "claude",
       model: null,
@@ -199,7 +199,7 @@ describe("Organization Agent channel delegation", () => {
         position: 0,
       }],
     });
-    otherProjectAgent = await createProjectAgent(db, otherProjectId, {
+    otherProjectAgent = await createTeamAgent(db, otherProjectId, {
       name: "Other Guide",
       provider: "claude",
       model: null,

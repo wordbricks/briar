@@ -1,6 +1,6 @@
 {
   "name": "briar",
-  "version": "1.2.187",
+  "version": "1.2.188",
   "license": "Apache-2.0",
   "private": true,
   "type": "module",
@@ -54,7 +54,7 @@
     "lint:type-aware": "turbo run lint:type-aware //#lint:repo:type-aware",
     "lint:repo:type-aware": "oxlint --type-aware scripts --config .oxlintrc.jsonc",
     "typecheck": "turbo run typecheck",
-    "test": "turbo run test //#test:repo-tools",
+    "test": "turbo run test:all //#test:repo-tools",
     "test:repo-tools": "vitest run --maxWorkers=1 --no-file-parallelism scripts/apply-remote-d1-migrations.test.ts scripts/production-git-target.test.ts scripts/remote-operation-lease.test.ts scripts/ci-local.test.ts scripts/ci-worktree-lock.test.ts scripts/ios-release-config.test.ts scripts/macos-dmg-release.test.ts scripts/verify-encrypted-env.test.ts scripts/verify-signoff-ready.test.ts tools/oxlint/anti-slop/rules/no-raw-tauri-ipc.test.ts",
     "prepare": "effect-tsgo patch --typescript --no-oxlint",
     "ci:local": "bun run scripts/ci-local.ts",

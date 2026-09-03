@@ -48,7 +48,7 @@ const dashboardProps = {
 };
 const dashboardAgent: ProjectAgent = {
   id: "agent-1",
-  projectId: demoDashboard.project.id,
+  teamId: demoDashboard.team.id,
   name: "Briar Agent",
   avatar: "data:image/png;base64,avatar",
   codexPet: null,
@@ -96,7 +96,7 @@ function dashboardAgentSession(run: HuntRun, status: AutoHuntSession["status"] =
   return {
     id: "session-1",
     dispatchGroupId: "dispatch-1",
-    projectId: demoDashboard.project.id,
+    projectId: demoDashboard.team.id,
     agentId: dashboardAgent.id,
     sessionType: "dispatch",
     status,
@@ -691,7 +691,7 @@ describe("IssueEditor", () => {
         onCreate={async (_projectId, input) => {
           createdInput = input;
         }}
-        projects={[demoDashboard.project]}
+        projects={[demoDashboard.team]}
       />,
     );
     const titleInput = container.querySelector<HTMLInputElement>(".issue-title-input");
@@ -728,7 +728,7 @@ describe("IssueEditor", () => {
         onCreate={async (_projectId, input) => {
           createdInput = input;
         }}
-        projects={[demoDashboard.project]}
+        projects={[demoDashboard.team]}
       />,
     );
     await act(async () => {
@@ -754,7 +754,7 @@ describe("IssueEditor", () => {
       description: "",
       status: "queued",
       priority: "2",
-      projectId: demoDashboard.project.id,
+      projectId: demoDashboard.team.id,
       assigneeUserId: "user-2",
     });
     let createdInput: CreateIssueInput | undefined;
@@ -785,7 +785,7 @@ describe("IssueEditor", () => {
         onCreate={async (_projectId, input) => {
           createdInput = input;
         }}
-        projects={[demoDashboard.project]}
+        projects={[demoDashboard.team]}
       />,
     );
     const titleInput = container.querySelector<HTMLInputElement>(".issue-title-input");

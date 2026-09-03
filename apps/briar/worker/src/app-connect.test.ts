@@ -6,11 +6,11 @@ import {
   handleAppConnectRequest,
   type AppConnectServices,
 } from "./app-connect";
-import { appConnectProjectServices } from "./app-connect-project";
-import type { ProjectRow } from "./project-repository";
+import { appConnectTeamServices } from "./app-connect-team";
+import type { TeamRow } from "./team-repository";
 
-const listProjectsUrl =
-  "https://api.example.test/briar.app.v1.ProjectService/ListProjects";
+const listTeamsUrl =
+  "https://api.example.test/briar.app.v1.TeamService/ListTeams";
 
 const projectRow = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -24,9 +24,9 @@ const projectRow = {
   organization_name: "Wordbricks",
   member_role: "owner",
   created_at: "2026-08-20T00:00:00.000Z",
-} satisfies ProjectRow;
+} satisfies TeamRow;
 
-const connectRequest = () => new Request(listProjectsUrl, {
+const connectRequest = () => new Request(listTeamsUrl, {
   method: "POST",
   headers: {
     authorization: "Bearer session-token",
@@ -50,13 +50,13 @@ describe("app Connect adapter", () => {
         user: { id: "user-1" },
       }) as Awaited<ReturnType<AppConnectServices["requireSession"]>>,
     );
-    const listProjects = vi.fn<AppConnectServices["listProjects"]>(
+    const listTeams = vi.fn<AppConnectServices["listTeams"]>(
       async () => [projectRow],
     );
     const services = {
-      ...appConnectProjectServices,
+      ...appConnectTeamServices,
       requireSession,
-      listProjects,
+      listTeams,
     } satisfies AppConnectServices;
     const request = connectRequest();
     const requireRunExecutionProject = vi.fn(async () => projectRow.id);
@@ -72,13 +72,13 @@ describe("app Connect adapter", () => {
     );
 
     expect(requireSession).toHaveBeenCalledWith(auth, request);
-    expect(listProjects).toHaveBeenCalledWith(db, "user-1");
+    expect(listTeams).toHaveBeenCalledWith(db, "user-1");
     expect(response?.status).toBe(200);
     expect(response?.headers.get("access-control-allow-origin")).toBe("*");
     expect(response?.headers.get("access-control-allow-headers"))
       .toContain("connect-protocol-version");
     expect(await response?.json()).toEqual({
-      projects: [{
+      teams: [{
         id: projectRow.id,
         name: projectRow.name,
         issueKeyPrefix: projectRow.issue_key_prefix,
@@ -116,11 +116,11 @@ describe("app Connect adapter", () => {
       ATTACHMENTS: {} as R2Bucket,
     } as Env;
     const services = {
-      ...appConnectProjectServices,
+      ...appConnectTeamServices,
       requireSession: vi.fn<AppConnectServices["requireSession"]>(),
-      listProjects: vi.fn<AppConnectServices["listProjects"]>(),
+      listTeams: vi.fn<AppConnectServices["listTeams"]>(),
     } satisfies AppConnectServices;
-    const request = new Request(listProjectsUrl, {
+    const request = new Request(listTeamsUrl, {
       method: "POST",
       headers: {
         "connect-protocol-version": "1",
@@ -141,6 +141,6 @@ describe("app Connect adapter", () => {
       code: "resource_exhausted",
     });
     expect(services.requireSession).not.toHaveBeenCalled();
-    expect(services.listProjects).not.toHaveBeenCalled();
+    expect(services.listTeams).not.toHaveBeenCalled();
   });
 });

@@ -14,7 +14,7 @@ import {
 } from "react";
 import { useI18n } from "../i18n";
 import { issueExecutionApprovalUnavailable } from "../lib/issue-execution-approval";
-import type { AgentProvider, ModelEffort } from "../lib/project-llm";
+import type { AgentProvider, ModelEffort } from "../lib/team-llm";
 import type {
   ExecutionWorker,
   HuntRun,

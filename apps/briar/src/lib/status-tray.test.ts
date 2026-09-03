@@ -6,8 +6,8 @@ function run(
   partial: Partial<StatusTrayRun> & Pick<StatusTrayRun, "id" | "title">,
 ): StatusTrayRun {
   return {
-    projectId: "project-1",
-    projectName: "Briar",
+    teamId: "project-1",
+    teamName: "Briar",
     status: "running",
     workflowStage: partial.workflowStage ?? "implementing",
     workflowStageLabel: partial.workflowStageLabel ?? "구현",
@@ -50,8 +50,8 @@ describe("status tray snapshot builders", () => {
       run({
         id: "crane-run",
         title: "Crane issue",
-        projectId: "project-2",
-        projectName: "Crane",
+        teamId: "project-2",
+        teamName: "Crane",
       }),
     ]);
 

@@ -80,9 +80,9 @@ export function mergeDashboardDelta(
   )
     ? current.organizationProviders
     : delta.organizationProviders;
-  const project = delta.project && !sameValue(current.project, delta.project)
-    ? delta.project
-    : current.project;
+  const team = delta.team && !sameValue(current.team, delta.team)
+    ? delta.team
+    : current.team;
   const settings = delta.settings && !sameValue(current.settings, delta.settings)
     ? delta.settings
     : current.settings;
@@ -110,7 +110,7 @@ export function mergeDashboardDelta(
     runs !== current.runs ||
     workers !== current.workers ||
     organizationProviders !== current.organizationProviders ||
-    project !== current.project ||
+    team !== current.team ||
     settings !== current.settings ||
     executionPolicy !== current.executionPolicy ||
     members !== current.members ||
@@ -120,7 +120,7 @@ export function mergeDashboardDelta(
   return {
     dashboard: {
       ...current,
-      project,
+      team,
       settings,
       runs,
       workers,

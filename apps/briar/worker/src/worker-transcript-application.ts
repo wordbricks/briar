@@ -13,7 +13,7 @@ import {
   updateHuntRunExecutionMetrics,
 } from "./db";
 import { HttpError } from "./http-response";
-import type { AuthenticatedWorkerProject } from "./worker-route-auth";
+import type { AuthenticatedWorkerTeam } from "./worker-route-auth";
 import type { TranscriptEventInput } from "./workers";
 import type { TranscriptWorkIdentity } from "./worker-transcript-mappers";
 
@@ -38,7 +38,7 @@ const workerTranscriptApplicationServices: WorkerTranscriptApplicationServices =
 const activeClaim = async (input: {
   readonly db: D1Database;
   readonly projectId: string;
-  readonly worker: AuthenticatedWorkerProject;
+  readonly worker: AuthenticatedWorkerTeam;
   readonly work: TranscriptWorkIdentity;
   readonly observedAt: string;
   readonly claimTokenHash: string;
@@ -105,7 +105,7 @@ export async function appendTranscriptEventsApplication(
     readonly db: D1Database;
     readonly archives: R2Bucket;
     readonly projectId: string;
-    readonly worker: AuthenticatedWorkerProject;
+    readonly worker: AuthenticatedWorkerTeam;
     readonly work: TranscriptWorkIdentity;
     readonly sessionId: string;
     readonly agentProvider: AgentProvider;
@@ -139,7 +139,7 @@ export async function appendTranscriptEventsApplication(
 const finalIssueClaim = async (input: {
   readonly db: D1Database;
   readonly projectId: string;
-  readonly worker: AuthenticatedWorkerProject;
+  readonly worker: AuthenticatedWorkerTeam;
   readonly work: TranscriptWorkIdentity;
   readonly executionId: string;
   readonly runAttempt: number;
@@ -184,7 +184,7 @@ export async function reportIssueExecutionTelemetryApplication(
   input: {
     readonly db: D1Database;
     readonly projectId: string;
-    readonly worker: AuthenticatedWorkerProject;
+    readonly worker: AuthenticatedWorkerTeam;
     readonly work: TranscriptWorkIdentity;
     readonly executionId: string;
     readonly agentProvider: AgentProvider;

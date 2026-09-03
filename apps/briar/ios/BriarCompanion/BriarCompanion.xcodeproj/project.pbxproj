@@ -73,7 +73,7 @@
 		66CB1172D780CBF60B2C4725 /* DirectMessagesViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54CCA2946DCE0666A5C40619 /* DirectMessagesViews.swift */; };
 		672D43AE0BB6BFB08A7BA2A6 /* SwiftProtobuf in Frameworks */ = {isa = PBXBuildFile; productRef = B367A19F0A22977E0FDF8995 /* SwiftProtobuf */; };
 		67E549B02B014BE24C59E29B /* InboxViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = E80FCA400D10FEE6AF26FBAA /* InboxViews.swift */; };
-		6822A46895420B4D8D2B0AE0 /* ProjectIconView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C50DB71AFF1E7CA7B051BEEB /* ProjectIconView.swift */; };
+		6822A46895420B4D8D2B0AE0 /* TeamIconView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C50DB71AFF1E7CA7B051BEEB /* TeamIconView.swift */; };
 		688F10DC58647BC283EDD87F /* BriarContracts.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = EC3D59F8A1B18D2394FD88C9 /* BriarContracts.framework */; };
 		6988ACFCBAD0E76137538F28 /* IssueWriteModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C9EE6E17DC9F346B0A712DD /* IssueWriteModels.swift */; };
 		6B326F011260ACFD4E776FA8 /* dashboard.connect.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C8A2465F8FD58758747D7EA /* dashboard.connect.swift */; };
@@ -83,10 +83,10 @@
 		74B130C1F14FD69784F54B06 /* RemotePushNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEEA34E5BB158CB079EEBFC7 /* RemotePushNotifications.swift */; };
 		75B4AE1DD56B75DD66212E13 /* Connect in Frameworks */ = {isa = PBXBuildFile; productRef = 6C702308DEFB985EF50F387B /* Connect */; };
 		79316553BBC89E224B19BE93 /* RemotePushNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEEA34E5BB158CB079EEBFC7 /* RemotePushNotifications.swift */; };
-		7A0253B6871F1B82E3B8AD5E /* ProjectIconView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C50DB71AFF1E7CA7B051BEEB /* ProjectIconView.swift */; };
+		7A0253B6871F1B82E3B8AD5E /* TeamIconView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C50DB71AFF1E7CA7B051BEEB /* TeamIconView.swift */; };
 		7D68B3A5B1EE04012E57D3C7 /* ChannelsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F137DEE3E6FF7F8A153AC8F6 /* ChannelsStore.swift */; };
 		80D11047E59F6029C83E8470 /* channel.connect.swift in Sources */ = {isa = PBXBuildFile; fileRef = F06BC7D3CCF449905C3520FB /* channel.connect.swift */; };
-		826D55E3CC843C4D6CDEB234 /* project.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6043AEFCDEA9CFCFF8263EC /* project.pb.swift */; };
+		826D55E3CC843C4D6CDEB234 /* team.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6043AEFCDEA9CFCFF8263EC /* team.pb.swift */; };
 		8330A879DCA7D826BD783916 /* InboxStoreSyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05F476E8CD1B263CE45F5CF1 /* InboxStoreSyncTests.swift */; };
 		83E461C754E9D88F746961D2 /* InboxStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBD28955B6995BA7B485085B /* InboxStore.swift */; };
 		8733685C8D417EB80DAC77CE /* issue.connect.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB1AB5B0E9614EE7D0DB7CE5 /* issue.connect.swift */; };
@@ -113,7 +113,7 @@
 		A17F67B12946ADE07AF4E7DF /* AgentsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17FF04740F5A18F25325D2C /* AgentsStore.swift */; };
 		A22AF0B2CD4B1D549FD4B721 /* fleet.mock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14C2B20FE26375716AC37013 /* fleet.mock.swift */; };
 		A2583E61E93F48BA9F74561F /* DmMemory.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2A83FBB5F0F68854441186A /* DmMemory.swift */; };
-		A2B6BCC98A929E8D9B7011BC /* project.connect.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48BC061E16C5068969283B5D /* project.connect.swift */; };
+		A2B6BCC98A929E8D9B7011BC /* team.connect.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48BC061E16C5068969283B5D /* team.connect.swift */; };
 		A2E278A9A475BB7D7F2FCA36 /* BriarCompanionUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CA08856EAF2B67E13727846 /* BriarCompanionUITests.swift */; };
 		A2F13135A46A9A55D9B5ECCF /* MessageMentions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 151B809A488C8E38ABA12C73 /* MessageMentions.swift */; };
 		A2FAECA169C615CCCCBC17E7 /* AgentModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61217A3C52F459A88E333CD1 /* AgentModels.swift */; };
@@ -157,7 +157,7 @@
 		DC70136D9CD22F33F740BBE4 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 73C8DE502A3DAA054172B395 /* Assets.xcassets */; };
 		E120F8FE913482D43E546870 /* fleet.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F7316C27C7E73CF9DAC24CC /* fleet.pb.swift */; };
 		E57A80FF76256DE142AF8B33 /* CoreConnect.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3A0DAF596DFA24E90833C53 /* CoreConnect.swift */; };
-		E7374AC1B41B6011DFE7337D /* project.mock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66C0B2EFCEE4C98F323991B1 /* project.mock.swift */; };
+		E7374AC1B41B6011DFE7337D /* team.mock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66C0B2EFCEE4C98F323991B1 /* team.mock.swift */; };
 		E88C5500AE05DEE13EDC5E9C /* realtime_control.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 592D767B90F774DB900387AD /* realtime_control.pb.swift */; };
 		EA3D7F4BD2F999AF67127AE8 /* AgentsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17FF04740F5A18F25325D2C /* AgentsStore.swift */; };
 		EB9CEFCEEA7E9C457495F75F /* DashboardModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34368CFC402513DE2753ABCA /* DashboardModels.swift */; };
@@ -306,7 +306,7 @@
 		4684CCE43652DD2F547108EA /* dm_memory.mock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = dm_memory.mock.swift; sourceTree = "<group>"; };
 		46BD848F54967DE5872E25CD /* ConversationViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationViews.swift; sourceTree = "<group>"; };
 		48888E3E40EC72372BEEB40F /* BriarCompanion.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = BriarCompanion.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		48BC061E16C5068969283B5D /* project.connect.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = project.connect.swift; sourceTree = "<group>"; };
+		48BC061E16C5068969283B5D /* team.connect.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = team.connect.swift; sourceTree = "<group>"; };
 		4DBAE843F4181E4041EE9A69 /* ProfileImageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileImageTests.swift; sourceTree = "<group>"; };
 		4E017171354BC7FB72C83C74 /* reporting.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = reporting.pb.swift; sourceTree = "<group>"; };
 		5004E20D26F2AC91C541EE9A /* BriarCompanionApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BriarCompanionApp.swift; sourceTree = "<group>"; };
@@ -321,7 +321,7 @@
 		60F2969694A8EC6FF1813790 /* account.mock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = account.mock.swift; sourceTree = "<group>"; };
 		61217A3C52F459A88E333CD1 /* AgentModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentModels.swift; sourceTree = "<group>"; };
 		6560F18BE176A37A2F5C2627 /* account.connect.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = account.connect.swift; sourceTree = "<group>"; };
-		66C0B2EFCEE4C98F323991B1 /* project.mock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = project.mock.swift; sourceTree = "<group>"; };
+		66C0B2EFCEE4C98F323991B1 /* team.mock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = team.mock.swift; sourceTree = "<group>"; };
 		69E1F9AD7F6FE98A0C76ACD0 /* ConversationPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationPresentationTests.swift; sourceTree = "<group>"; };
 		6B5F0E3F338DC5E3C1A397CA /* CompanionReadTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionReadTests.swift; sourceTree = "<group>"; };
 		6BA3D0AFE307A16DE8A9A442 /* merge_queue.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = merge_queue.pb.swift; sourceTree = "<group>"; };
@@ -371,7 +371,7 @@
 		BE4A7257E57301E7AE968D86 /* BriarCompanion.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BriarCompanion.entitlements; sourceTree = "<group>"; };
 		C0DEFA6DD8128EA0D6D1EFBB /* channel.mock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = channel.mock.swift; sourceTree = "<group>"; };
 		C3A2BD65A5BF60B1D39F7690 /* DeviceAuthorization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceAuthorization.swift; sourceTree = "<group>"; };
-		C50DB71AFF1E7CA7B051BEEB /* ProjectIconView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectIconView.swift; sourceTree = "<group>"; };
+		C50DB71AFF1E7CA7B051BEEB /* TeamIconView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeamIconView.swift; sourceTree = "<group>"; };
 		CA0F64F92C55982968520373 /* organization.connect.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = organization.connect.swift; sourceTree = "<group>"; };
 		CA71D4C0DF552FFD0C500981 /* worker.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = worker.pb.swift; sourceTree = "<group>"; };
 		CB1AB5B0E9614EE7D0DB7CE5 /* issue.connect.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = issue.connect.swift; sourceTree = "<group>"; };
@@ -396,7 +396,7 @@
 		F10A04D41AB039273FA6B91E /* InboxModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxModels.swift; sourceTree = "<group>"; };
 		F137DEE3E6FF7F8A153AC8F6 /* ChannelsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelsStore.swift; sourceTree = "<group>"; };
 		F35D1C669DD97F245139645C /* AttachmentPipelineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttachmentPipelineTests.swift; sourceTree = "<group>"; };
-		F6043AEFCDEA9CFCFF8263EC /* project.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = project.pb.swift; sourceTree = "<group>"; };
+		F6043AEFCDEA9CFCFF8263EC /* team.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = team.pb.swift; sourceTree = "<group>"; };
 		FD14868F9918DAE630EEE34C /* realtime_control.mock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = realtime_control.mock.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -513,8 +513,8 @@
 				6BA3D0AFE307A16DE8A9A442 /* merge_queue.pb.swift */,
 				CA0F64F92C55982968520373 /* organization.connect.swift */,
 				3649EF54DD00BBD97DF2FCBE /* organization.pb.swift */,
-				48BC061E16C5068969283B5D /* project.connect.swift */,
-				F6043AEFCDEA9CFCFF8263EC /* project.pb.swift */,
+				48BC061E16C5068969283B5D /* team.connect.swift */,
+				F6043AEFCDEA9CFCFF8263EC /* team.pb.swift */,
 				93B2CEACE7CBCA7F825B9DE7 /* realtime_control.connect.swift */,
 				592D767B90F774DB900387AD /* realtime_control.pb.swift */,
 				8494CBE4DE832D91FC511CC7 /* reporting.connect.swift */,
@@ -587,7 +587,7 @@
 				151B809A488C8E38ABA12C73 /* MessageMentions.swift */,
 				8A65B754A339632E2DB2E3E6 /* MobileAPIContract.swift */,
 				3A1B95F49B19C05E7C2C20F0 /* ProfileImage.swift */,
-				C50DB71AFF1E7CA7B051BEEB /* ProjectIconView.swift */,
+				C50DB71AFF1E7CA7B051BEEB /* TeamIconView.swift */,
 				78BCFF20096EA979837ADEBC /* RealtimeConnect.swift */,
 				EEEA34E5BB158CB079EEBFC7 /* RemotePushNotifications.swift */,
 				E824C71CF3A757A4B40140EE /* SelectableText.swift */,
@@ -611,7 +611,7 @@
 				35E1DCD4A561FE3F6380C044 /* linear_import.mock.swift */,
 				8F5F2EB1A3439EA050E954B1 /* merge_queue.mock.swift */,
 				6C163E49260290ADF3D883BD /* organization.mock.swift */,
-				66C0B2EFCEE4C98F323991B1 /* project.mock.swift */,
+				66C0B2EFCEE4C98F323991B1 /* team.mock.swift */,
 				FD14868F9918DAE630EEE34C /* realtime_control.mock.swift */,
 				80BB9356BE45ADFDEE713D69 /* reporting.mock.swift */,
 			);
@@ -978,7 +978,7 @@
 				DB31CB3B90494B1D840978DF /* linear_import.mock.swift in Sources */,
 				5A466A11EB1A8A2FA3082592 /* merge_queue.mock.swift in Sources */,
 				9A9D978C665BCCBDBF57D9C5 /* organization.mock.swift in Sources */,
-				E7374AC1B41B6011DFE7337D /* project.mock.swift in Sources */,
+				E7374AC1B41B6011DFE7337D /* team.mock.swift in Sources */,
 				5415F07E987CCCD336FFEF00 /* realtime_control.mock.swift in Sources */,
 				957E8AFF03429BC551975288 /* reporting.mock.swift in Sources */,
 			);
@@ -1023,7 +1023,7 @@
 				A2F13135A46A9A55D9B5ECCF /* MessageMentions.swift in Sources */,
 				CA7B900E6D87CA423BBF87A2 /* MobileAPIContract.swift in Sources */,
 				BEC056CE4861F51B5A287BF6 /* ProfileImage.swift in Sources */,
-				7A0253B6871F1B82E3B8AD5E /* ProjectIconView.swift in Sources */,
+				7A0253B6871F1B82E3B8AD5E /* TeamIconView.swift in Sources */,
 				D11D46C02042A874F43EEFD8 /* RealtimeConnect.swift in Sources */,
 				79316553BBC89E224B19BE93 /* RemotePushNotifications.swift in Sources */,
 				A4142A5A077B1E5302037B68 /* SelectableText.swift in Sources */,
@@ -1089,8 +1089,8 @@
 				2438D03C067C26CDBFE61547 /* merge_queue.pb.swift in Sources */,
 				F5B6AD2DCEB8E8E25D7C82FC /* organization.connect.swift in Sources */,
 				611A83D238A5702F2065137A /* organization.pb.swift in Sources */,
-				A2B6BCC98A929E8D9B7011BC /* project.connect.swift in Sources */,
-				826D55E3CC843C4D6CDEB234 /* project.pb.swift in Sources */,
+				A2B6BCC98A929E8D9B7011BC /* team.connect.swift in Sources */,
+				826D55E3CC843C4D6CDEB234 /* team.pb.swift in Sources */,
 				921C8B38B3838485535BF1AF /* provider.pb.swift in Sources */,
 				B532FA624619C1D5F63C921B /* realtime.pb.swift in Sources */,
 				2605D001E3586D14CF40FA44 /* realtime_control.connect.swift in Sources */,
@@ -1150,7 +1150,7 @@
 				D3A6AD589D6C6456AC8B1345 /* MessageMentions.swift in Sources */,
 				0376DCB4538E3FA2EC0DF1BF /* MobileAPIContract.swift in Sources */,
 				EECEC6D146D6DF1526985D0A /* ProfileImage.swift in Sources */,
-				6822A46895420B4D8D2B0AE0 /* ProjectIconView.swift in Sources */,
+				6822A46895420B4D8D2B0AE0 /* TeamIconView.swift in Sources */,
 				465B8DE2CA09602F8373770E /* RealtimeConnect.swift in Sources */,
 				74B130C1F14FD69784F54B06 /* RemotePushNotifications.swift in Sources */,
 				AEB95933E31042AD6B98B29D /* SelectableText.swift in Sources */,

@@ -69,18 +69,18 @@ final class CompanionStore: ObservableObject {
         do {
             let services = servicesFactory.authenticatedServices(token: token)
             let account = services.account
-            let project = services.project
+            let teamService = services.team
             async let userResponse = account.getCurrentUser(
                 request: BriarAPI_GetCurrentUserRequest(),
                 headers: [:]
             )
-            async let projectResponse = project.listProjects(
-                request: BriarAPI_ListProjectsRequest(),
+            async let teamResponse = teamService.listTeams(
+                request: BriarAPI_ListTeamsRequest(),
                 headers: [:]
             )
-            let (accountResponse, loadedProjects) = await (userResponse, projectResponse)
+            let (accountResponse, loadedTeams) = await (userResponse, teamResponse)
             let loadedUser = try CurrentUser(connectMessage: accountResponse.briarValue())
-            let projects = try loadedProjects.briarValue().projects.map(Project.init(connectMessage:))
+            let projects = try loadedTeams.briarValue().teams.map(Project.init(connectMessage:))
             guard
                 activeToken == token,
                 expectedGeneration == sessionGeneration,
@@ -89,7 +89,7 @@ final class CompanionStore: ObservableObject {
             user = loadedUser
             if expectedCatalogRevision == projectCatalogRevision {
                 applyProjectCatalog(projects)
-                try await loadPlanningProjects(using: project)
+                try await loadPlanningProjects(using: teamService)
             }
             let currentProjects = expectedCatalogRevision == projectCatalogRevision
                 ? projects
@@ -125,19 +125,19 @@ final class CompanionStore: ObservableObject {
         projectCatalogRevision &+= 1
         let expectedCatalogRevision = projectCatalogRevision
         do {
-            let project = servicesFactory.authenticatedServices(token: token).project
-            let response = await project.listProjects(
-                request: BriarAPI_ListProjectsRequest(),
+            let teamService = servicesFactory.authenticatedServices(token: token).team
+            let response = await teamService.listTeams(
+                request: BriarAPI_ListTeamsRequest(),
                 headers: [:]
             )
-            let projects = try response.briarValue().projects.map(Project.init(connectMessage:))
+            let projects = try response.briarValue().teams.map(Project.init(connectMessage:))
             guard
                 activeToken == token,
                 expectedGeneration == sessionGeneration,
                 expectedCatalogRevision == projectCatalogRevision
             else { throw CancellationError() }
             applyProjectCatalog(projects)
-            try await loadPlanningProjects(using: project)
+            try await loadPlanningProjects(using: teamService)
             if let selectedProjectID,
                !projects.contains(where: { $0.id == selectedProjectID }) {
                 self.selectedProjectID = Self.defaultProjectID(for: projects)
@@ -225,7 +225,7 @@ final class CompanionStore: ObservableObject {
         request.name = name
         if let description { request.description_p = description }
         request.status = planningProjectStatusMessage(status)
-        let response = await servicesFactory.authenticatedServices(token: token).project
+        let response = await servicesFactory.authenticatedServices(token: token).team
             .createPlanningProject(request: request, headers: [:])
         let message = try response.briarValue()
         guard message.hasProject else { throw MobileAPIError.invalidResponse }
@@ -237,7 +237,7 @@ final class CompanionStore: ObservableObject {
     }
 
     private func loadPlanningProjects(
-        using service: any BriarAPI_ProjectServiceClientInterface
+        using service: any BriarAPI_TeamServiceClientInterface
     ) async throws {
         var loaded: [PlanningProject] = []
         for team in projects {

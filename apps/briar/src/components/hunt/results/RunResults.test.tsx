@@ -42,7 +42,7 @@ const dashboardProps = {
 };
 const dashboardAgent: ProjectAgent = {
   id: "agent-1",
-  projectId: demoDashboard.project.id,
+  teamId: demoDashboard.team.id,
   name: "Briar Agent",
   avatar: "data:image/png;base64,avatar",
   codexPet: null,
@@ -90,7 +90,7 @@ function dashboardAgentSession(run: HuntRun, status: AutoHuntSession["status"] =
   return {
     id: "session-1",
     dispatchGroupId: "dispatch-1",
-    projectId: demoDashboard.project.id,
+    projectId: demoDashboard.team.id,
     agentId: dashboardAgent.id,
     sessionType: "dispatch",
     status,

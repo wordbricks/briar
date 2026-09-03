@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useAtom, useAtomInitialValues } from "@effect/atom-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AutoHuntSession } from "./useAutoHuntSessions";
 import {
   acceptOrganizationInvitation as acceptRemoteOrganizationInvitation,
@@ -19,21 +20,17 @@ import {
   createOrganization as createRemoteOrganization,
   createIssue,
   createIssueMessage,
-  createPlanningProject as createRemotePlanningProject,
-  createProject,
-  deleteAccount as deleteRemoteAccount,
-  deletePlanningProject as deleteRemotePlanningProject,
+  createTeam,
   deleteIssue as deleteRemoteIssue,
   deleteIssueMessage,
   transferIssue as transferRemoteIssue,
-  deleteProject as deleteRemoteProject,
+  deleteTeam as deleteRemoteProject,
   dispatchHuntRun,
   unassignHuntRun,
   editIssueMessage,
   errorWithMessage,
   importLinearIssues,
   isApiErrorStatus,
-  isApiConfigured,
   loadDashboard,
   loadDashboardDelta,
   loadGithubIntegration,
@@ -44,10 +41,9 @@ import {
   loadRunEvidenceImage,
   loadLinearImportStates,
   loadOrganizations,
-  loadProjects,
+  loadTeams,
   loadTeamProjects,
   loadSession,
-  isOrganizationHandleAvailable as checkRemoteOrganizationHandle,
   moveHuntRun,
   moveIssueToPlanningProject as moveRemoteIssueToPlanningProject,
   pollDeviceToken,
@@ -55,7 +51,6 @@ import {
   retryHuntRun,
   reworkPausedHuntRun,
   resumeHuntRun,
-  updatePlanningProject as updateRemotePlanningProject,
   removeIssueDependency,
   removeIssueParent as removeRemoteIssueParent,
   removeRelatedIssue,
@@ -64,16 +59,9 @@ import {
   updateIssueCheckpoints,
   updateIssueExecutionPreferences,
   updateIssueSubscription,
-  updateAccountProfile as updateRemoteAccountProfile,
-  updateOrganization as updateRemoteOrganization,
-  updateOrganizationLogo as updateRemoteOrganizationLogo,
-  updateProjectIcon as updateRemoteProjectIcon,
-  type ProjectIconUpdate,
-  updateProjectIssueKeyPrefix as updateRemoteProjectIssueKeyPrefix,
-  updateProjectTabs as updateRemoteProjectTabs,
-  updateProjectSettings,
+  updateTeamIcon as updateRemoteProjectIcon,
+  updateTeamSettings,
   updateCheckpointPolicy,
-  type DeviceClientId,
   type DeviceAuthorizationLaunchOptions,
 } from "../lib/api";
 import {
@@ -81,53 +69,52 @@ import {
   demoRunEvents,
   demoRepositoryReadiness,
 } from "../lib/demo-data";
-import { deleteAndroidPushRegistration } from "../lib/inbox-notifications";
 import {
   isRepositoryConnectedForImport,
   type LinearStatusMapping,
 } from "../lib/linear-import";
 import {
   configureLocalExecutionWorker,
-  connectLocalProject,
-  createProjectWorkspace,
-  disconnectLocalProject,
+  connectLocalTeam,
+  createTeamWorkspace,
+  disconnectLocalTeam,
   discoverRepositoryIcon,
   inspectLovableRepositoryCompatibility,
   inspectVelen,
   inspectRepositoryReadiness,
-  loadProjectRepositoryReadiness,
+  loadTeamRepositoryReadiness,
   loadAutoHuntHealth,
-  loadConnectedProjectIds,
-  prepareProjectRepository,
+  loadConnectedTeamIds,
+  prepareTeamRepository,
   pickGitRepository,
-  preflightLocalProjectConnection,
-  prepareConfiguredProjectRepository,
+  preflightLocalTeamConnection,
+  prepareConfiguredTeamRepository,
   repairAutoHunt,
-  resolveProjectConnectionWorkflow,
-  updateLocalProjectVelenOrg,
-  updateLocalProjectWorkflow,
+  resolveTeamConnectionWorkflow,
+  updateLocalTeamVelenOrg,
+  updateLocalTeamWorkflow,
   type LocalAutoHuntConfig,
-} from "../lib/project-connection";
+} from "../lib/team-connection";
 import type {
   AutoHuntHealth,
   PreparedProjectRepository,
   RepositoryReadiness,
   VelenInspection,
 } from "../generated/tauri";
-import { projectIconFromDataUrl } from "../lib/project-icon";
+import { teamIconFromDataUrl } from "../lib/team-icon";
 import {
   createLocalProjectReadinessCoordinator,
-  isProjectConnectedLocally,
-  localProjectConnectionState,
+  isTeamConnectedLocally,
+  localTeamConnectionState,
   type LocalProjectInventoryObservation,
-  type LocalProjectReadinessObservation,
+  type LocalTeamReadinessObservation,
   withoutConnectedProject,
-} from "../lib/local-project-connection";
+} from "../lib/local-team-connection";
 import {
-  analyzeProjectWorkflowRequirements,
-  generateProjectWorkflow,
-  reviseProjectWorkflow,
-} from "../lib/project-workflow";
+  analyzeTeamWorkflowRequirements,
+  generateTeamWorkflow,
+  reviseTeamWorkflow,
+} from "../lib/team-workflow";
 import {
   shouldSyncSharedWorkflow,
   syncSharedProjectWorkflows,
@@ -138,10 +125,7 @@ import {
   writeSessionToken,
 } from "../lib/token-store";
 import { restoreStoredSession } from "../lib/session-restore";
-import {
-  resolveActiveAccountSelection,
-  writeActiveOrganizationId,
-} from "../lib/active-organization";
+import { resolveActiveAccountSelection } from "../lib/active-organization";
 import { ensureDefaultOrganization } from "../lib/default-organization";
 import {
   isAuthorizationCancelled,
@@ -157,20 +141,18 @@ import { mergeDashboardDelta } from "../lib/dashboard-sync";
 import {
   isRepositoryWorkflowPending,
   progressForAutoHuntRun,
-  repositoryWorkflowBootstrap,
   workflowWithAdditionalCheckpoints,
   type AutoHuntWorkflowCheckpoint,
 } from "../lib/auto-hunt-contract";
-import { isMobileCompanion, isWebApp } from "../lib/platform";
 import { defaultIssueKeyPrefix } from "../lib/issue-key";
 import { canonicalizeIssueAttachmentReferences } from "../lib/issue-markdown";
 import { mergeIssueMessages } from "../lib/issue-message-merge";
 import {
-  runProjectAgent,
-  type ProjectLlmProgress,
-} from "../lib/project-llm";
-import { executeScheduledProjectAgent } from "../lib/project-agent-schedule-execution";
-import { startProjectAgentSchedulePolling } from "../lib/project-agent-schedule-runner";
+  runTeamAgent,
+  type TeamLlmProgress,
+} from "../lib/team-llm";
+import { executeScheduledTeamAgent } from "../lib/team-agent-schedule-execution";
+import { startTeamAgentSchedulePolling } from "../lib/team-agent-schedule-runner";
 import type {
   ClaimedProjectAgentScheduleRun,
   AgentSkillExecutionApprovalInput,
@@ -190,14 +172,86 @@ import type {
   IssueResultReview,
   Organization,
   PlanningProject,
-  PlanningProjectStatus,
   Project,
   ProjectSettings,
   RunEvidence,
   RunEvidenceImage,
-  SessionUser,
   UpdateIssueInput,
 } from "../types";
+import {
+  demoOrganization,
+  demoUser,
+  emptyDashboard,
+  initialDemoIssueMessages,
+  initialDemoRunEvidence,
+} from "../state/demo-fixtures";
+import {
+  companionMode,
+  demoMode,
+  deviceClientId,
+  remoteMode,
+  webMode,
+} from "../state/platform";
+import { useRegistry } from "../state/registry";
+import {
+  useOrganizationActions,
+  type OrganizationActionDeps,
+} from "../state/organization/actions";
+import {
+  activeOrganizationIdAtom,
+  organizationsAtom,
+} from "../state/organization/atoms";
+import {
+  usePlanningActions,
+  type PlanningActionDeps,
+} from "../state/planning/actions";
+import { planningProjectsAtom } from "../state/planning/atoms";
+import {
+  useSessionActions,
+  type SessionActionDeps,
+} from "../state/session/actions";
+import {
+  loadingAtom,
+  loginCodeAtom,
+  restoringSessionAtom,
+  sessionErrorAtom,
+  tokenAtom,
+  userAtom,
+} from "../state/session/atoms";
+import { useTeamActions, type TeamActionDeps } from "../state/team/actions";
+import {
+  activeTeamIdAtom,
+  deletingTeamIdAtom,
+  isCreatingTeamAtom,
+  teamConnectionAtom,
+  teamsAtom,
+} from "../state/team/atoms";
+
+/**
+ * Reads the hook performs on its own: session bootstrap, dashboard sync and the
+ * local project inventory. They default to the live API, and tests supply
+ * in-memory implementations so `useBriar` can be exercised without module
+ * mocking. User triggered mutations keep calling the API directly.
+ */
+export type BriarDataSources = {
+  loadConnectedTeamIds: typeof loadConnectedTeamIds;
+  loadDashboard: typeof loadDashboard;
+  loadDashboardDelta: typeof loadDashboardDelta;
+  loadOrganizations: typeof loadOrganizations;
+  loadSession: typeof loadSession;
+  loadTeamProjects: typeof loadTeamProjects;
+  loadTeams: typeof loadTeams;
+};
+
+const liveDataSources: BriarDataSources = {
+  loadConnectedTeamIds,
+  loadDashboard,
+  loadDashboardDelta,
+  loadOrganizations,
+  loadSession,
+  loadTeamProjects,
+  loadTeams,
+};
 
 export type UseBriarOptions = {
   adoptRemoteAgentSession?: (session: AutoHuntSession) => void;
@@ -222,175 +276,58 @@ export type UseBriarOptions = {
     runs: readonly HuntRun[],
     dispatch: { dispatchId: string; runIds: string[] },
   ) => void;
+  dataSources?: Partial<BriarDataSources>;
 };
 
-export type ProjectConnection = {
-  kind: "new" | "reconnect";
-  project: Project;
-  agentToken: string | null;
-  workflow?: ProjectSettings["workflow"];
-};
-
-const demoMode = import.meta.env.VITE_BRIAR_DEMO !== "false" && !isApiConfigured;
-const companionMode = isMobileCompanion();
-const webMode = isWebApp();
-const remoteMode = companionMode || webMode;
-const deviceClientId: DeviceClientId = companionMode
-  ? "briar-mobile"
-  : "briar-desktop";
-const demoUser: SessionUser = {
-  id: "demo-user",
-  name: "Jay",
-  email: "demo@briar.local",
-};
-const demoOrganization: Organization = {
-  id: demoDashboard.project.organizationId,
-  name: demoDashboard.project.organizationName,
-  handle: "briar",
-  logo: null,
-  role: demoDashboard.project.role,
-  createdAt: demoDashboard.project.createdAt,
-};
-const demoMessageTime = new Date(Date.now() - 18 * 60_000).toISOString();
-const demoReplyTime = new Date(Date.now() - 8 * 60_000).toISOString();
-const initialDemoIssueMessages = {
-  "demo-1": [
-    {
-      id: "demo-message-1",
-      runId: "demo-1",
-      parentMessageId: null,
-      body: "이벤트 스트림에서 빠지는 상태가 없는지 같이 확인해 주세요.",
-      attachments: [],
-      author: {
-        id: demoUser.id,
-        name: demoUser.name,
-        image: null,
-        provider: null,
-      },
-      replyCount: 1,
-      proposedAction: null,
-      executionProposal: null,
-      skillExecutionProposal: null,
-      createdAt: demoMessageTime,
-      updatedAt: demoMessageTime,
-    },
-    {
-      id: "demo-message-reply-1",
-      runId: "demo-1",
-      parentMessageId: "demo-message-1",
-      body: "완료·실패·중단 상태까지 회귀 테스트에 포함했습니다.",
-      attachments: [],
-      author: {
-        id: null,
-        name: "Briar · Codex",
-        image: null,
-        provider: "codex",
-      },
-      replyCount: 0,
-      proposedAction: null,
-      executionProposal: null,
-      skillExecutionProposal: null,
-      createdAt: demoReplyTime,
-      updatedAt: demoReplyTime,
-    },
-  ],
-} satisfies Record<string, IssueMessage[]>;
-
-const initialDemoRunEvidence = {
-  "demo-1": [
-    {
-      key: "BRIAR-12:analyzing:repository_findings",
-      attempt: 1,
-      revision: 1,
-      stage: "analyzing",
-      type: "repository_findings",
-      status: "passed",
-      detail: "이벤트 스트림과 이슈 상세 화면의 연결 지점을 확인했습니다.",
-      command: "rg -n \"AgentEvent|HuntDashboard\" src src-tauri",
-      url: null,
-      metadata: { filesReviewed: 6 },
-      actor: "briar-workflow",
-      observedAt: demoMessageTime,
-      recordedAt: demoMessageTime,
-      requiredRevision: 1,
-      canonical: true,
-    },
-    {
-      key: "BRIAR-12:implementing:diff",
-      attempt: 1,
-      revision: 1,
-      stage: "implementing",
-      type: "diff",
-      status: "pending",
-      detail: "이벤트 스트림 어댑터와 회귀 테스트를 작성하고 있습니다.",
-      command: null,
-      url: null,
-      metadata: null,
-      actor: "briar-workflow",
-      observedAt: demoReplyTime,
-      recordedAt: demoReplyTime,
-      requiredRevision: 1,
-      canonical: true,
-    },
-  ],
-} satisfies Record<string, RunEvidence[]>;
-
-const emptyDashboard = (project: Project): DashboardPayload => ({
-  project,
-  settings: {
-    velenOrg: null,
-    dataSource: null,
-    linear: { enabled: false, source: null, teamKey: null },
-    githubRepository: null,
-    githubRepositoryId: null,
-    workflow: repositoryWorkflowBootstrap,
-  },
-  runs: [],
-  generatedAt: new Date().toISOString(),
-});
+/**
+ * How many previously visited projects keep their last-known dashboard in
+ * memory. Entries are evicted least-recently-committed first.
+ */
+const DASHBOARD_CACHE_LIMIT = 8;
 
 export function useBriar(options: UseBriarOptions = {}) {
   const {
     adoptRemoteAgentSession,
+    dataSources,
     deferDefaultOrganization = false,
     lockedProjectId = null,
     startScheduledAgentSession,
     startScheduledAgentWorkerDispatch,
     settleScheduledAgentSession,
   } = options;
-  const [user, setUser] = useState<SessionUser | null>(demoMode ? demoUser : null);
-  const [token, setToken] = useState<string | null>(null);
-  const [projects, setProjects] = useState<Project[]>(
-    demoMode ? [demoDashboard.project] : [],
+  // Resolved once per hook instance so the seam keeps a stable identity.
+  const dataSourcesRef = useRef<BriarDataSources | null>(null);
+  dataSourcesRef.current ??= { ...liveDataSources, ...dataSources };
+  const remote = dataSourcesRef.current;
+  const registry = useRegistry();
+  /*
+    Two root atoms start from a demo default that a project window has to
+    narrow: such a window is pinned to one team, and demo mode must not preselect
+    a different one. The initial value therefore cannot live in the atom module,
+    so it is seeded here — once per registry, before the first read below.
+  */
+  useAtomInitialValues(
+    useMemo(() => {
+      const demoSelectionApplies =
+        demoMode &&
+        (!lockedProjectId || lockedProjectId === demoDashboard.team.id);
+      return [
+        [
+          activeOrganizationIdAtom,
+          demoSelectionApplies ? demoOrganization.id : null,
+        ],
+        [
+          activeTeamIdAtom,
+          demoSelectionApplies ? demoDashboard.team.id : null,
+        ],
+      ] as const;
+    }, [lockedProjectId]),
   );
-  const [planningProjects, setPlanningProjects] = useState<PlanningProject[]>(
-    demoMode
-      ? [{
-        id: demoDashboard.project.id,
-        workspaceId: demoOrganization.id,
-        workspaceName: demoOrganization.name,
-        teamId: demoDashboard.project.id,
-        teamName: demoDashboard.project.name,
-        name: "General",
-        description: "",
-        status: "active",
-        leadUserId: null,
-        leadName: null,
-        startDate: null,
-        targetDate: null,
-        icon: null,
-        color: null,
-        sortOrder: 0,
-        isDefault: true,
-        role: "owner",
-        createdAt: demoDashboard.project.createdAt,
-        updatedAt: demoDashboard.project.createdAt,
-      }]
-      : [],
-  );
-  const [organizations, setOrganizations] = useState<Organization[]>(
-    demoMode ? [demoOrganization] : [],
-  );
+  const [user, setUser] = useAtom(userAtom);
+  const [token, setToken] = useAtom(tokenAtom);
+  const [projects, setProjects] = useAtom(teamsAtom);
+  const [planningProjects, setPlanningProjects] = useAtom(planningProjectsAtom);
+  const [organizations, setOrganizations] = useAtom(organizationsAtom);
 
   useEffect(() => {
     if (demoMode) return;
@@ -400,7 +337,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     }
     let cancelled = false;
     void Promise.all(
-      projects.map((team) => loadTeamProjects(token, team.id)),
+      projects.map((team) => remote.loadTeamProjects(token, team.id)),
     ).then((groups) => {
       if (!cancelled) setPlanningProjects(groups.flat());
     }).catch((caught) => {
@@ -412,38 +349,31 @@ export function useBriar(options: UseBriarOptions = {}) {
       cancelled = true;
     };
   }, [projects, token]);
-  const [activeOrganizationId, setActiveOrganizationId] = useState<string | null>(
-    demoMode && (!lockedProjectId || lockedProjectId === demoDashboard.project.id)
-      ? demoOrganization.id
-      : null,
+  const [activeOrganizationId, setActiveOrganizationId] = useAtom(
+    activeOrganizationIdAtom,
   );
-  const [activeProjectId, setActiveProjectId] = useState<string | null>(
-    demoMode && (!lockedProjectId || lockedProjectId === demoDashboard.project.id)
-      ? demoDashboard.project.id
-      : null,
-  );
-  const [connectedProjectIds, setConnectedProjectIds] = useState<
+  const [activeProjectId, setActiveProjectId] = useAtom(activeTeamIdAtom);
+  const [connectedTeamIds, setConnectedProjectIds] = useState<
     string[] | null
-  >(demoMode ? [demoDashboard.project.id] : null);
+  >(demoMode ? [demoDashboard.team.id] : null);
   const [dashboard, setDashboardState] = useState<DashboardPayload | null>(
-    demoMode && (!lockedProjectId || lockedProjectId === demoDashboard.project.id)
+    demoMode && (!lockedProjectId || lockedProjectId === demoDashboard.team.id)
       ? demoDashboard
       : null,
   );
-  const [loading, setLoading] = useState(!demoMode);
-  const [restoringSession, setRestoringSession] = useState(!demoMode);
-  const [loginCode, setLoginCode] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useAtom(loadingAtom);
+  const [restoringSession, setRestoringSession] = useAtom(restoringSessionAtom);
+  const [loginCode, setLoginCode] = useAtom(loginCodeAtom);
+  const [error, setError] = useAtom(sessionErrorAtom);
   const [localProjectInventoryError, setLocalProjectInventoryError] = useState<
     string | null
   >(null);
-  const [projectConnection, setProjectConnection] =
-    useState<ProjectConnection | null>(null);
-  const [isCreatingProject, setIsCreatingProject] = useState(false);
+  const [projectConnection, setProjectConnection] = useAtom(teamConnectionAtom);
+  const [isCreatingProject, setIsCreatingProject] = useAtom(isCreatingTeamAtom);
   const [isCreatingIssue, setIsCreatingIssue] = useState(false);
   const [updatingIssueId, setUpdatingIssueId] = useState<string | null>(null);
   const [deletingIssueId, setDeletingIssueId] = useState<string | null>(null);
-  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
+  const [deletingProjectId, setDeletingProjectId] = useAtom(deletingTeamIdAtom);
   const [recoveringRunId, setRecoveringRunId] = useState<string | null>(null);
   const issueMessagesByRun = useRef<Record<string, IssueMessage[]>>(
     demoMode ? initialDemoIssueMessages : {},
@@ -463,7 +393,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     Record<string, RepositoryReadiness>
   >(
     demoMode
-      ? { [demoDashboard.project.id]: demoRepositoryReadiness }
+      ? { [demoDashboard.team.id]: demoRepositoryReadiness }
       : {},
   );
   const [projectReadinessError, setProjectReadinessError] = useState<
@@ -476,14 +406,12 @@ export function useBriar(options: UseBriarOptions = {}) {
   const loginAttempt = useRef(0);
   const reconnectRequest = useRef(0);
   const healthRequest = useRef(0);
-  const activeProjectIdRef = useRef(activeProjectId);
-  activeProjectIdRef.current = activeProjectId;
   const readinessCoordinatorRef = useRef<ReturnType<
     typeof createLocalProjectReadinessCoordinator<RepositoryReadiness>
   > | null>(null);
   readinessCoordinatorRef.current ??= createLocalProjectReadinessCoordinator({
-    loadConnectedProjectIds,
-    loadReadiness: loadProjectRepositoryReadiness,
+    loadConnectedTeamIds: remote.loadConnectedTeamIds,
+    loadReadiness: loadTeamRepositoryReadiness,
   });
   const readinessCoordinator = readinessCoordinatorRef.current;
   const workflowGenerationAttempts = useRef(new Set<string>());
@@ -493,12 +421,12 @@ export function useBriar(options: UseBriarOptions = {}) {
   const resumeRequestIds = useRef(new Map<string, string>());
   const reworkRequestIds = useRef(new Map<string, string>());
   const dashboardRef = useRef<DashboardPayload | null>(
-    demoMode && (!lockedProjectId || lockedProjectId === demoDashboard.project.id)
+    demoMode && (!lockedProjectId || lockedProjectId === demoDashboard.team.id)
       ? demoDashboard
       : null,
   );
   const dashboardCursor = useRef<number | null>(
-    demoMode && (!lockedProjectId || lockedProjectId === demoDashboard.project.id)
+    demoMode && (!lockedProjectId || lockedProjectId === demoDashboard.team.id)
       ? (demoDashboard.cursor ?? null)
       : null,
   );
@@ -508,6 +436,48 @@ export function useBriar(options: UseBriarOptions = {}) {
     promise: Promise<void>;
   } | null>(null);
   const dashboardRequestGeneration = useRef(0);
+  /**
+   * Last-known dashboard per project so switching back to a visited project
+   * renders instantly instead of blanking the whole UI. The delta cursor is not
+   * stored separately: it travels inside `DashboardPayload.cursor`, which is the
+   * same field `setDashboard` derives `dashboardCursor` from, so a cursor can
+   * never leak across projects.
+   */
+  const dashboardCache = useRef(new Map<string, DashboardPayload>());
+  /**
+   * Project whose dashboard is currently rendered from the cache. It forces the
+   * next fetch for that project to be a full snapshot instead of a delta, and
+   * drives the `dashboardStale` flag consumers can surface.
+   */
+  const staleDashboardProjectId = useRef<string | null>(null);
+  const [dashboardStale, setDashboardStale] = useState(false);
+
+  const rememberDashboard = useCallback((next: DashboardPayload | null) => {
+    if (!next) return;
+    const cache = dashboardCache.current;
+    // Re-inserting moves the entry to the end, so the Map doubles as LRU order.
+    cache.delete(next.team.id);
+    cache.set(next.team.id, next);
+    while (cache.size > DASHBOARD_CACHE_LIMIT) {
+      const oldest = cache.keys().next();
+      if (oldest.done) break;
+      cache.delete(oldest.value);
+    }
+  }, []);
+
+  /**
+   * Drops the "showing a cached payload" marker. Called whenever the dashboard
+   * is intentionally emptied or replaced by fresh data.
+   */
+  const clearDashboardStaleness = useCallback(() => {
+    staleDashboardProjectId.current = null;
+    setDashboardStale(false);
+  }, []);
+
+  const clearDashboardCache = useCallback(() => {
+    dashboardCache.current.clear();
+    clearDashboardStaleness();
+  }, [clearDashboardStaleness]);
 
   const setDashboard = useCallback((
     value: Parameters<typeof setDashboardState>[0],
@@ -515,15 +485,39 @@ export function useBriar(options: UseBriarOptions = {}) {
     dashboardRequestGeneration.current += 1;
     dashboardRequest.current?.abort.abort();
     dashboardRequest.current = null;
+    // Every intentional clear (logout, account deletion, organization change,
+    // a project with nothing cached) also drops the stale marker.
+    if (value === null) clearDashboardStaleness();
     setDashboardState((current) => {
       const next = typeof value === "function" ? value(current) : value;
       dashboardRef.current = next;
       dashboardCursor.current = next && Number.isSafeInteger(next.cursor)
         ? (next.cursor ?? null)
         : null;
+      rememberDashboard(next);
       return next;
     });
-  }, []);
+  }, [clearDashboardStaleness, rememberDashboard]);
+
+  /**
+   * Renders the cached dashboard for `projectId` so a project switch never
+   * blanks the UI. Returns false when nothing is cached, leaving the caller to
+   * fall back to the loading state.
+   */
+  const showCachedDashboard = useCallback((projectId: string) => {
+    const cached = dashboardCache.current.get(projectId);
+    // A cached payload always carries its own project, so consumers comparing
+    // `dashboard.team.id` with the active project keep working.
+    if (!cached || cached.team.id !== projectId) return false;
+    dashboardRef.current = cached;
+    setDashboard(cached);
+    dashboardCursor.current = Number.isSafeInteger(cached.cursor)
+      ? (cached.cursor ?? null)
+      : null;
+    staleDashboardProjectId.current = projectId;
+    setDashboardStale(true);
+    return true;
+  }, [setDashboard]);
 
   const setConnectedProjectInventory = useCallback((next: string[] | null) => {
     setConnectedProjectIds((current) => {
@@ -538,7 +532,7 @@ export function useBriar(options: UseBriarOptions = {}) {
   const applyLocalProjectInventoryObservation = useCallback((
     observation: LocalProjectInventoryObservation,
   ) => {
-    setConnectedProjectInventory(observation.connectedProjectIds);
+    setConnectedProjectInventory(observation.connectedTeamIds);
     setLocalProjectInventoryError(
       observation.status === "error"
         ? `로컬 프로젝트 연결 목록을 읽지 못했습니다: ${
@@ -548,7 +542,7 @@ export function useBriar(options: UseBriarOptions = {}) {
           }`
         : null,
     );
-    return observation.connectedProjectIds;
+    return observation.connectedTeamIds;
   }, [setConnectedProjectInventory]);
 
   const setProjectReadinessLoading = useCallback(
@@ -580,6 +574,156 @@ export function useBriar(options: UseBriarOptions = {}) {
     setError(null);
   }, [clearLoginTimer]);
 
+  /*
+    Bridges to the domain action modules. The session, organization, team and
+    planning actions own the root atoms outright, but the dashboard, its
+    per-team cache, the health probe and the reconnect generation still live
+    here, so each transition those actions cannot express is handed back as one
+    of the stable callbacks below.
+  */
+
+  const bumpReconnectRequest = useCallback(() => {
+    reconnectRequest.current += 1;
+  }, []);
+
+  const readDashboardTeamId = useCallback(
+    () => dashboardRef.current?.team.id ?? null,
+    [],
+  );
+
+  const clearSignedOutViews = useCallback(() => {
+    setConnectedProjectIds(null);
+    setLocalProjectInventoryError(null);
+    setDashboard(null);
+    clearDashboardCache();
+  }, [clearDashboardCache, setDashboard]);
+
+  const resetTeamViews = useCallback(() => {
+    setDashboard(null);
+    setHealth(null);
+    setHealthError(null);
+  }, [setDashboard]);
+
+  const renameDashboardOrganization = useCallback(
+    (organizationId: string, organizationName: string) => {
+      setDashboard((current) =>
+        current?.team.organizationId === organizationId
+          ? { ...current, team: { ...current.team, organizationName } }
+          : current,
+      );
+    },
+    [setDashboard],
+  );
+
+  const applyTeamToDashboard = useCallback(
+    (project: Project) => {
+      setDashboard((current) =>
+        current?.team.id === project.id ? { ...current, team: project } : current,
+      );
+    },
+    [setDashboard],
+  );
+
+  const applyOrganizationSwitch = useCallback(
+    (project: Project | null, dashboardMatchesProject: boolean) => {
+      if (demoMode && project) {
+        setDashboard(
+          project.id === demoDashboard.team.id
+            ? demoDashboard
+            : emptyDashboard(project),
+        );
+      } else if (!dashboardMatchesProject) {
+        // Keep the last-known board on screen instead of blanking the UI. The
+        // organization prune effect keeps this entry because the restored
+        // project belongs to the organization we are switching to.
+        if (!project || !showCachedDashboard(project.id)) setDashboard(null);
+      }
+      if (!dashboardMatchesProject) {
+        setHealth(null);
+        setHealthError(null);
+      }
+    },
+    [setDashboard, showCachedDashboard],
+  );
+
+  const countDashboardIssues = useCallback(
+    (planningProjectId: string) =>
+      dashboardRef.current?.runs.filter(
+        (run) => run.projectId === planningProjectId,
+      ).length ?? 0,
+    [],
+  );
+
+  const movePlanningProjectIssues = useCallback(
+    (
+      teamId: string,
+      fromPlanningProjectId: string,
+      toPlanningProject: PlanningProject,
+    ) => {
+      setDashboard((current) =>
+        current?.team.id === teamId
+          ? {
+              ...current,
+              runs: current.runs.map((run) =>
+                run.projectId === fromPlanningProjectId
+                  ? {
+                      ...run,
+                      projectId: toPlanningProject.id,
+                      projectName: toPlanningProject.name,
+                    }
+                  : run,
+              ),
+            }
+          : current,
+      );
+    },
+    [setDashboard],
+  );
+
+  const sessionActionDeps: SessionActionDeps = {
+    bumpReconnectRequest,
+    cancelLogin,
+    clearSignedOutViews,
+  };
+  const { deleteAccount, logout, updateAccountProfile } =
+    useSessionActions(sessionActionDeps);
+
+  const organizationActionDeps: OrganizationActionDeps = {
+    applyOrganizationSwitch,
+    bumpReconnectRequest,
+    lockedTeamId: lockedProjectId,
+    readDashboardTeamId,
+    renameDashboardOrganization,
+    resetTeamViews,
+  };
+  const {
+    addOrganization,
+    changeOrganizationLogo,
+    checkOrganizationHandle,
+    renameOrganization,
+    selectOrganization,
+  } = useOrganizationActions(organizationActionDeps);
+
+  const teamActionDeps: TeamActionDeps = {
+    applyTeamToDashboard,
+    bumpReconnectRequest,
+  };
+  const {
+    cancelTeamCreation,
+    changeTeamIcon,
+    changeTeamIssueKeyPrefix,
+    changeTeamScheduleTab,
+    finishTeamCreation,
+    startTeamCreation,
+  } = useTeamActions(teamActionDeps);
+
+  const planningActionDeps: PlanningActionDeps = {
+    countDashboardIssues,
+    movePlanningProjectIssues,
+  };
+  const { addPlanningProject, editPlanningProject, removePlanningProject } =
+    usePlanningActions(planningActionDeps);
+
   useEffect(() => {
     if (!companionMode) return;
     const handleAuthReturn = () => {
@@ -592,11 +736,6 @@ export function useBriar(options: UseBriarOptions = {}) {
   }, [clearLoginTimer]);
 
   useEffect(() => {
-    if (lockedProjectId || !user || !activeOrganizationId) return;
-    writeActiveOrganizationId(user.id, activeOrganizationId);
-  }, [activeOrganizationId, lockedProjectId, user]);
-
-  useEffect(() => {
     dashboardRef.current = dashboard;
     dashboardCursor.current = dashboard && Number.isSafeInteger(dashboard.cursor)
       ? (dashboard.cursor ?? null)
@@ -607,15 +746,39 @@ export function useBriar(options: UseBriarOptions = {}) {
     dashboardRequestGeneration.current += 1;
     dashboardRequest.current?.abort.abort();
     dashboardRequest.current = null;
-    if (dashboardRef.current?.project.id !== activeProjectId) {
+    if (dashboardRef.current?.team.id !== activeProjectId) {
       dashboardCursor.current = null;
     }
   }, [activeProjectId, token]);
+
+  // Cached dashboards are session scoped: a new (or cleared) token must never
+  // reuse the previous account's payloads.
+  useEffect(() => {
+    clearDashboardCache();
+  }, [clearDashboardCache, token]);
+
+  // …and organization scoped: leaving an organization drops every dashboard
+  // that belongs to it. The project selected together with the organization is
+  // restored from the cache before this effect runs, so it survives the prune.
+  useEffect(() => {
+    const cache = dashboardCache.current;
+    for (const [projectId, cached] of cache) {
+      if (cached.team.organizationId === activeOrganizationId) continue;
+      cache.delete(projectId);
+    }
+  }, [activeOrganizationId]);
 
   const refresh = useCallback(async (
     mode: "delta" | "snapshot" = "delta",
   ) => {
     if (demoMode || !token || !activeProjectId) return;
+    // While a cached (stale) dashboard is on screen the next fetch has to be a
+    // full snapshot: the cached cursor may be arbitrarily old, and the payload
+    // must be replaced rather than delta-patched.
+    const resolvedMode =
+      mode === "snapshot" || staleDashboardProjectId.current === activeProjectId
+        ? "snapshot"
+        : "delta";
     const currentRequest = dashboardRequest.current;
     if (currentRequest?.projectId === activeProjectId && mode === "delta") {
       return currentRequest.promise;
@@ -626,32 +789,32 @@ export function useBriar(options: UseBriarOptions = {}) {
     const projectId = activeProjectId;
     const promise = (async () => {
       try {
-        let current = dashboardRef.current?.project.id === projectId
+        let current = dashboardRef.current?.team.id === projectId
           ? dashboardRef.current
           : null;
         let cursor = dashboardCursor.current;
-        if (mode === "snapshot" || !current || cursor === null) {
-          current = await loadDashboard(token, projectId, abort.signal);
+        if (resolvedMode === "snapshot" || !current || cursor === null) {
+          current = await remote.loadDashboard(token, projectId, abort.signal);
           cursor = current.cursor ?? null;
         } else {
           let pages = 0;
           while (true) {
             let delta;
             try {
-              delta = await loadDashboardDelta(
+              delta = await remote.loadDashboardDelta(
                 token,
                 projectId,
                 cursor,
                 abort.signal,
               );
               if (delta.reset) {
-                current = await loadDashboard(token, projectId, abort.signal);
+                current = await remote.loadDashboard(token, projectId, abort.signal);
                 cursor = current.cursor ?? null;
                 break;
               }
             } catch (caught) {
               if (!isApiErrorStatus(caught, 410)) throw caught;
-              current = await loadDashboard(token, projectId, abort.signal);
+              current = await remote.loadDashboard(token, projectId, abort.signal);
               cursor = current.cursor ?? null;
               break;
             }
@@ -661,7 +824,7 @@ export function useBriar(options: UseBriarOptions = {}) {
             pages += 1;
             if (!delta.hasMore) break;
             if (pages >= 20) {
-              current = await loadDashboard(token, projectId, abort.signal);
+              current = await remote.loadDashboard(token, projectId, abort.signal);
               cursor = current.cursor ?? null;
               break;
             }
@@ -669,12 +832,23 @@ export function useBriar(options: UseBriarOptions = {}) {
         }
         if (
           abort.signal.aborted ||
-          generation !== dashboardRequestGeneration.current
+          generation !== dashboardRequestGeneration.current ||
+          // A response that outlived its project must never be committed under
+          // another project's identity.
+          registry.get(activeTeamIdAtom) !== projectId
         ) return;
         dashboardCursor.current = cursor;
         if (current !== dashboardRef.current) {
           dashboardRef.current = current;
           setDashboard(current);
+        } else {
+          // The delta advanced the cursor without changing any entity; keep the
+          // cache entry warm so a project switch still restores this payload.
+          rememberDashboard(current);
+        }
+        if (staleDashboardProjectId.current === projectId) {
+          staleDashboardProjectId.current = null;
+          setDashboardStale(false);
         }
         setError(null);
       } catch (caught) {
@@ -688,7 +862,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     })();
     dashboardRequest.current = { projectId, abort, promise };
     return promise;
-  }, [activeProjectId, token]);
+  }, [activeProjectId, registry, token]);
 
   useEffect(() => {
     if (demoMode) return;
@@ -714,9 +888,9 @@ export function useBriar(options: UseBriarOptions = {}) {
               await clearSessionToken();
             }
           : clearSessionToken,
-        loadOrganizations,
-        loadProjects,
-        loadSession,
+        loadOrganizations: remote.loadOrganizations,
+        loadTeams: remote.loadTeams,
+        loadSession: remote.loadSession,
         readToken: webMode
           ? browserAuthClient.readSessionCredential
           : readSessionToken,
@@ -743,7 +917,7 @@ export function useBriar(options: UseBriarOptions = {}) {
               result.organizations,
               {
                 createOrganization: createRemoteOrganization,
-                loadOrganizations,
+                loadOrganizations: remote.loadOrganizations,
               },
             );
       } catch (caught) {
@@ -751,7 +925,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         return;
       }
       const inventoryObservation: LocalProjectInventoryObservation = remoteMode
-        ? { status: "loaded", connectedProjectIds: null, error: null }
+        ? { status: "loaded", connectedTeamIds: null, error: null }
         : await readinessCoordinator.inspectInventory();
       if (cancelled) return;
       setToken(result.token);
@@ -821,17 +995,17 @@ export function useBriar(options: UseBriarOptions = {}) {
       demoMode ||
       remoteMode ||
       !token ||
-      connectedProjectIds === null
+      connectedTeamIds === null
     ) {
       return;
     }
     const projectIds = projects
       .map((project) => project.id)
       .filter((projectId) =>
-        isProjectConnectedLocally(connectedProjectIds, projectId),
+        isTeamConnectedLocally(connectedTeamIds, projectId),
       );
     if (projectIds.length === 0) return;
-    return startProjectAgentSchedulePolling(
+    return startTeamAgentSchedulePolling(
       {
         claim: (projectIds) => claimProjectAgentScheduleRuns(token, projectIds),
         complete: (projectId, runId, input) =>
@@ -844,9 +1018,9 @@ export function useBriar(options: UseBriarOptions = {}) {
             claimToken,
           ),
         execute: (run) =>
-          executeScheduledProjectAgent(
+          executeScheduledTeamAgent(
             {
-              loadDashboard,
+              loadDashboard: remote.loadDashboard,
               dispatchRun: (
                 currentToken,
                 projectId,
@@ -861,7 +1035,7 @@ export function useBriar(options: UseBriarOptions = {}) {
                 ),
               retryRun: (currentToken, projectId, runId, reason) =>
                 retryHuntRun(currentToken, projectId, runId, reason),
-              runAgent: runProjectAgent,
+              runAgent: runTeamAgent,
               startSession: startScheduledAgentSession,
               startWorkerDispatchSession:
                 startScheduledAgentWorkerDispatch,
@@ -875,7 +1049,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       projectIds,
     );
   }, [
-    connectedProjectIds,
+    connectedTeamIds,
     lockedProjectId,
     projects,
     settleScheduledAgentSession,
@@ -886,19 +1060,19 @@ export function useBriar(options: UseBriarOptions = {}) {
 
   const applyProjectReadinessObservation = useCallback((
     projectId: string,
-    observation: LocalProjectReadinessObservation<RepositoryReadiness>,
+    observation: LocalTeamReadinessObservation<RepositoryReadiness>,
   ) => {
     if (observation.status === "superseded") return null;
     applyLocalProjectInventoryObservation(
       observation.status === "unknown"
         ? {
             status: "error",
-            connectedProjectIds: null,
+            connectedTeamIds: null,
             error: observation.error,
           }
         : {
             status: "loaded",
-            connectedProjectIds: observation.connectedProjectIds,
+            connectedTeamIds: observation.connectedTeamIds,
             error: null,
           },
     );
@@ -961,14 +1135,14 @@ export function useBriar(options: UseBriarOptions = {}) {
       demoMode ||
       remoteMode ||
       !token ||
-      connectedProjectIds === null
+      connectedTeamIds === null
     ) {
       return;
     }
     const projectIds = projects
       .map((project) => project.id)
       .filter((projectId) =>
-        isProjectConnectedLocally(connectedProjectIds, projectId),
+        isTeamConnectedLocally(connectedTeamIds, projectId),
       );
     if (projectIds.length === 0) return;
 
@@ -977,8 +1151,8 @@ export function useBriar(options: UseBriarOptions = {}) {
       projectIds,
       lastSyncedKeys: lastSyncedSharedWorkflowKeys.current,
       loadSharedWorkflow: async (projectId) =>
-        (await loadDashboard(token, projectId)).settings.workflow,
-      updateLocalWorkflow: updateLocalProjectWorkflow,
+        (await remote.loadDashboard(token, projectId)).settings.workflow,
+      updateLocalWorkflow: updateLocalTeamWorkflow,
     }).then((results) => {
       if (cancelled) return;
       for (const result of results) {
@@ -999,7 +1173,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       cancelled = true;
     };
   }, [
-    connectedProjectIds,
+    connectedTeamIds,
     lockedProjectId,
     projects,
     refreshProjectReadiness,
@@ -1014,7 +1188,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       remoteMode ||
       !projectId ||
       // 이 기기에 저장소를 연결하기 전에는 로컬 상태를 검사할 대상이 없습니다.
-      !isProjectConnectedLocally(connectedProjectIds, projectId)
+      !isTeamConnectedLocally(connectedTeamIds, projectId)
     ) {
       setHealth(null);
       setHealthError(null);
@@ -1023,13 +1197,13 @@ export function useBriar(options: UseBriarOptions = {}) {
     }
     const isCurrent = () =>
       request === healthRequest.current &&
-      activeProjectIdRef.current === projectId;
+      registry.get(activeTeamIdAtom) === projectId;
     setHealthLoading(true);
     try {
       // Project workflow tools are shared via project settings. Mirror them
       // into the local config so this worker machine can probe readiness.
       const sharedWorkflow =
-        dashboardRef.current?.project.id === projectId
+        dashboardRef.current?.team.id === projectId
           ? dashboardRef.current.settings.workflow
           : null;
       const syncPlan = shouldSyncSharedWorkflow({
@@ -1041,7 +1215,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       });
       if (syncPlan.sync && sharedWorkflow) {
         try {
-          await updateLocalProjectWorkflow(projectId, sharedWorkflow);
+          await updateLocalTeamWorkflow(projectId, sharedWorkflow);
           if (syncPlan.key) {
             lastSyncedSharedWorkflowKeys.current.set(
               projectId,
@@ -1075,7 +1249,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     } finally {
       if (isCurrent()) setHealthLoading(false);
     }
-  }, [activeProjectId, connectedProjectIds, refreshProjectReadiness]);
+  }, [activeProjectId, connectedTeamIds, refreshProjectReadiness, registry]);
 
   useEffect(() => {
     void refreshHealth();
@@ -1087,24 +1261,24 @@ export function useBriar(options: UseBriarOptions = {}) {
   // not object identity, so dashboard snapshot polling does not re-probe
   // every cycle.
   const sharedWorkflowSyncKey = dashboard?.settings.workflow
-    ? `${dashboard.project.id}:${JSON.stringify(dashboard.settings.workflow)}`
+    ? `${dashboard.team.id}:${JSON.stringify(dashboard.settings.workflow)}`
     : null;
   useEffect(() => {
     if (
       demoMode ||
       remoteMode ||
-      !dashboard?.project.id ||
+      !dashboard?.team.id ||
       !sharedWorkflowSyncKey ||
-      !isProjectConnectedLocally(connectedProjectIds, dashboard.project.id)
+      !isTeamConnectedLocally(connectedTeamIds, dashboard.team.id)
     ) {
       return;
     }
-    if (dashboard.project.id !== activeProjectId) return;
+    if (dashboard.team.id !== activeProjectId) return;
     void refreshHealth();
   }, [
     activeProjectId,
-    connectedProjectIds,
-    dashboard?.project.id,
+    connectedTeamIds,
+    dashboard?.team.id,
     refreshHealth,
     sharedWorkflowSyncKey,
   ]);
@@ -1128,7 +1302,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     };
   }, [
     applyProjectReadinessObservation,
-    connectedProjectIds,
+    connectedTeamIds,
     lockedProjectId,
     projects,
     readinessCoordinator,
@@ -1141,7 +1315,7 @@ export function useBriar(options: UseBriarOptions = {}) {
   ) => {
     const [nextUser, nextProjects, loadedOrganizations] = await Promise.all([
       loadSession(nextToken),
-      loadProjects(nextToken),
+      loadTeams(nextToken),
       loadOrganizations(nextToken),
     ]);
     const nextOrganizations = deferDefaultOrganization
@@ -1156,7 +1330,7 @@ export function useBriar(options: UseBriarOptions = {}) {
           },
         );
     const inventoryObservation: LocalProjectInventoryObservation = remoteMode
-      ? { status: "loaded", connectedProjectIds: null, error: null }
+      ? { status: "loaded", connectedTeamIds: null, error: null }
       : await readinessCoordinator.inspectInventory();
     if (attempt !== loginAttempt.current) return;
     if (nextToken === browserCookieSessionCredential) {
@@ -1321,7 +1495,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         );
         const [nextOrganizations, nextProjects] = await Promise.all([
           loadOrganizations(token),
-          loadProjects(token),
+          loadTeams(token),
         ]);
         setOrganizations(nextOrganizations);
         setProjects(nextProjects);
@@ -1341,100 +1515,13 @@ export function useBriar(options: UseBriarOptions = {}) {
     [token],
   );
 
-  const logout = useCallback(async () => {
-    reconnectRequest.current += 1;
-    cancelLogin();
-    if (token) {
-      await deleteAndroidPushRegistration(token).catch(() => false);
-    }
-    if (webMode && token === browserCookieSessionCredential) {
-      await browserAuthClient.signOut();
-    }
-    await clearSessionToken();
-    setToken(null);
-    setUser(null);
-    setProjects([]);
-    setOrganizations([]);
-    setConnectedProjectIds(null);
-    setLocalProjectInventoryError(null);
-    setActiveOrganizationId(null);
-    setDashboard(null);
-    setActiveProjectId(null);
-    setProjectConnection(null);
-    setIsCreatingProject(false);
-  }, [cancelLogin, token]);
-
-  const updateAccountProfile = useCallback(
-    async (input: {
-      username: string | null;
-      name: string;
-      image: string | null;
-    }) => {
-      if (!user) throw new Error("로그인이 필요합니다.");
-      const nextUser =
-        demoMode || !token
-          ? { ...user, ...input }
-          : await updateRemoteAccountProfile(token, input);
-      setUser(nextUser);
-      return nextUser;
-    },
-    [token, user],
-  );
-
-  const deleteAccount = useCallback(
-    async (confirmation: string) => {
-      reconnectRequest.current += 1;
-      if (!token) throw new Error("로그인이 필요합니다.");
-      await deleteRemoteAccount(token, confirmation);
-      await Promise.allSettled(
-        projects.map((project) => disconnectLocalProject(project.id)),
-      );
-      cancelLogin();
-      if (webMode && token === browserCookieSessionCredential) {
-        await browserAuthClient.signOut().catch(() => undefined);
-      }
-      await clearSessionToken();
-      setToken(null);
-      setUser(null);
-      setProjects([]);
-      setOrganizations([]);
-      setConnectedProjectIds(null);
-      setLocalProjectInventoryError(null);
-      setActiveOrganizationId(null);
-      setDashboard(null);
-      setActiveProjectId(null);
-      setProjectConnection(null);
-      setIsCreatingProject(false);
-    },
-    [cancelLogin, projects, token],
-  );
-
-  const startProjectCreation = useCallback(() => {
-    reconnectRequest.current += 1;
-    setError(null);
-    setIsCreatingProject(true);
-  }, []);
-
-  const cancelProjectCreation = useCallback(() => {
-    reconnectRequest.current += 1;
-    setError(null);
-    setIsCreatingProject(false);
-    setProjectConnection(null);
-  }, []);
-
-  const finishProjectCreation = useCallback(() => {
-    setError(null);
-    setIsCreatingProject(false);
-    setProjectConnection(null);
-  }, []);
-
   const selectProject = useCallback(
     (projectId: string) => {
       if (lockedProjectId && projectId !== lockedProjectId) return;
       const project = projects.find((candidate) => candidate.id === projectId);
       if (!project) return;
       const dashboardMatchesProject =
-        dashboardRef.current?.project.id === projectId;
+        dashboardRef.current?.team.id === projectId;
       if (activeProjectId === projectId && dashboardMatchesProject) {
         setActiveOrganizationId(project.organizationId);
         setError(null);
@@ -1445,7 +1532,8 @@ export function useBriar(options: UseBriarOptions = {}) {
       setActiveOrganizationId(project.organizationId);
       if (!demoMode) {
         if (!dashboardMatchesProject) {
-          setDashboard(null);
+          // Keep the last-known board on screen instead of blanking the UI.
+          if (!showCachedDashboard(projectId)) setDashboard(null);
         }
         setError(null);
         if (activeProjectId === projectId && !dashboardMatchesProject) {
@@ -1454,13 +1542,13 @@ export function useBriar(options: UseBriarOptions = {}) {
         return;
       }
       setDashboard(
-        project.id === demoDashboard.project.id
+        project.id === demoDashboard.team.id
           ? demoDashboard
           : emptyDashboard(project),
       );
       setError(null);
     },
-    [activeProjectId, lockedProjectId, projects, refresh],
+    [activeProjectId, lockedProjectId, projects, refresh, showCachedDashboard],
   );
 
   const ensureProjectSelected = useCallback(
@@ -1471,7 +1559,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       let nextProjects = projects;
       let project = nextProjects.find((candidate) => candidate.id === projectId);
       if (!project && token && !demoMode) {
-        nextProjects = await loadProjects(token);
+        nextProjects = await remote.loadTeams(token);
         setProjects(nextProjects);
         project = nextProjects.find((candidate) => candidate.id === projectId);
       }
@@ -1479,7 +1567,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         throw new Error("요청한 프로젝트를 찾을 수 없습니다.");
       }
       const dashboardMatchesProject =
-        dashboardRef.current?.project.id === project.id;
+        dashboardRef.current?.team.id === project.id;
       if (activeProjectId === project.id && dashboardMatchesProject) {
         setActiveOrganizationId(project.organizationId);
         setError(null);
@@ -1490,7 +1578,8 @@ export function useBriar(options: UseBriarOptions = {}) {
       setActiveOrganizationId(project.organizationId);
       if (!demoMode) {
         if (!dashboardMatchesProject) {
-          setDashboard(null);
+          // Keep the last-known board on screen instead of blanking the UI.
+          if (!showCachedDashboard(project.id)) setDashboard(null);
         }
         setError(null);
         if (activeProjectId === project.id && !dashboardMatchesProject) {
@@ -1499,285 +1588,22 @@ export function useBriar(options: UseBriarOptions = {}) {
         return project;
       }
       setDashboard(
-        project.id === demoDashboard.project.id
+        project.id === demoDashboard.team.id
           ? demoDashboard
           : emptyDashboard(project),
       );
       setError(null);
       return project;
     },
-    [activeProjectId, demoMode, lockedProjectId, projects, refresh, token],
-  );
-
-  const selectOrganization = useCallback(
-    (organizationId: string) => {
-      if (lockedProjectId) {
-        const lockedProject = projects.find(
-          (project) => project.id === lockedProjectId,
-        );
-        if (lockedProject?.organizationId !== organizationId) return;
-        reconnectRequest.current += 1;
-        setActiveOrganizationId(organizationId);
-        setActiveProjectId(lockedProject.id);
-        setError(null);
-        return;
-      }
-      if (!organizations.some((organization) => organization.id === organizationId)) {
-        return;
-      }
-      const project =
-        projects.find((candidate) => candidate.organizationId === organizationId) ??
-        null;
-      const dashboardMatchesProject = project
-        ? dashboardRef.current?.project.id === project.id
-        : dashboardRef.current === null;
-      if (
-        activeOrganizationId === organizationId &&
-        activeProjectId === (project?.id ?? null) &&
-        dashboardMatchesProject
-      ) {
-        setError(null);
-        return;
-      }
-      reconnectRequest.current += 1;
-      setActiveOrganizationId(organizationId);
-      setActiveProjectId(project?.id ?? null);
-      if (demoMode && project) {
-        setDashboard(
-          project.id === demoDashboard.project.id
-            ? demoDashboard
-            : emptyDashboard(project),
-        );
-      } else if (!dashboardMatchesProject) {
-        setDashboard(null);
-      }
-      if (!dashboardMatchesProject) {
-        setHealth(null);
-        setHealthError(null);
-      }
-      setError(null);
-    },
-    [activeOrganizationId, activeProjectId, lockedProjectId, organizations, projects],
-  );
-
-  const renameOrganization = useCallback(
-    async (organizationId: string, name: string) => {
-      const currentOrganization = organizations.find(
-        (organization) => organization.id === organizationId,
-      );
-      if (!currentOrganization) {
-        throw new Error("변경할 조직을 찾을 수 없습니다.");
-      }
-      if (!demoMode && !token) throw new Error("로그인이 필요합니다.");
-      const organization =
-        demoMode || !token
-          ? { ...currentOrganization, name }
-          : (
-              await updateRemoteOrganization(token, organizationId, name)
-            ).organization;
-      setOrganizations((current) =>
-        current.map((candidate) =>
-          candidate.id === organizationId ? organization : candidate,
-        ),
-      );
-      setProjects((current) =>
-        current.map((project) =>
-          project.organizationId === organizationId
-            ? { ...project, organizationName: organization.name }
-            : project,
-        ),
-      );
-      setDashboard((current) =>
-        current?.project.organizationId === organizationId
-          ? {
-              ...current,
-              project: {
-                ...current.project,
-                organizationName: organization.name,
-              },
-            }
-          : current,
-      );
-      return organization;
-    },
-    [organizations, token],
-  );
-
-  const changeOrganizationLogo = useCallback(
-    async (organizationId: string, logo: string | null) => {
-      const currentOrganization = organizations.find(
-        (organization) => organization.id === organizationId,
-      );
-      if (!currentOrganization) {
-        throw new Error("변경할 조직을 찾을 수 없습니다.");
-      }
-      if (!demoMode && !token) throw new Error("로그인이 필요합니다.");
-      const organization =
-        demoMode || !token
-          ? { ...currentOrganization, logo }
-          : (
-              await updateRemoteOrganizationLogo(token, organizationId, logo)
-            ).organization;
-      setOrganizations((current) =>
-        current.map((candidate) =>
-          candidate.id === organizationId ? organization : candidate,
-        ),
-      );
-      return organization;
-    },
-    [organizations, token],
-  );
-
-  const changeProjectIcon = useCallback(
-    async (projectId: string, update: ProjectIconUpdate) => {
-      const currentProject = projects.find((project) => project.id === projectId);
-      if (!currentProject) throw new Error("변경할 프로젝트를 찾을 수 없습니다.");
-      if (!demoMode && !token) throw new Error("로그인이 필요합니다.");
-      const project =
-        demoMode || !token
-          ? {
-              ...currentProject,
-              icon: update.type === "image" ? update.dataUrl : null,
-              iconName: update.type === "named" ? update.name : null,
-              iconColor: update.type === "named" ? update.color : null,
-            }
-          : (await updateRemoteProjectIcon(token, projectId, update)).project;
-      setProjects((current) =>
-        current.map((candidate) =>
-          candidate.id === projectId ? project : candidate,
-        ),
-      );
-      setDashboard((current) =>
-        current?.project.id === projectId
-          ? { ...current, project }
-          : current,
-      );
-      setProjectConnection((current) =>
-        current?.project.id === projectId
-          ? { ...current, project }
-          : current,
-      );
-      return project;
-    },
-    [projects, token],
-  );
-
-  const changeProjectIssueKeyPrefix = useCallback(
-    async (projectId: string, issueKeyPrefix: string) => {
-      const currentProject = projects.find((project) => project.id === projectId);
-      if (!currentProject) throw new Error("변경할 프로젝트를 찾을 수 없습니다.");
-      if (!demoMode && !token) throw new Error("로그인이 필요합니다.");
-      const project =
-        demoMode || !token
-          ? { ...currentProject, issueKeyPrefix }
-          : (
-              await updateRemoteProjectIssueKeyPrefix(
-                token,
-                projectId,
-                issueKeyPrefix,
-              )
-            ).project;
-      setProjects((current) =>
-        current.map((candidate) =>
-          candidate.id === projectId ? project : candidate,
-        ),
-      );
-      setDashboard((current) =>
-        current?.project.id === projectId
-          ? { ...current, project }
-          : current,
-      );
-      setProjectConnection((current) =>
-        current?.project.id === projectId
-          ? { ...current, project }
-          : current,
-      );
-      return project;
-    },
-    [projects, token],
-  );
-
-  const changeProjectScheduleTab = useCallback(
-    async (projectId: string, scheduleTabEnabled: boolean) => {
-      const currentProject = projects.find((project) => project.id === projectId);
-      if (!currentProject) throw new Error("변경할 프로젝트를 찾을 수 없습니다.");
-      if (!demoMode && !token) throw new Error("로그인이 필요합니다.");
-      const project =
-        demoMode || !token
-          ? { ...currentProject, scheduleTabEnabled }
-          : (
-              await updateRemoteProjectTabs(token, projectId, {
-                schedule: scheduleTabEnabled,
-              })
-            ).project;
-      setProjects((current) =>
-        current.map((candidate) =>
-          candidate.id === projectId ? project : candidate,
-        ),
-      );
-      setDashboard((current) =>
-        current?.project.id === projectId
-          ? { ...current, project }
-          : current,
-      );
-      setProjectConnection((current) =>
-        current?.project.id === projectId
-          ? { ...current, project }
-          : current,
-      );
-      return project;
-    },
-    [projects, token],
-  );
-
-  const checkOrganizationHandle = useCallback(
-    async (handle: string) => {
-      if (demoMode) {
-        return !organizations.some(
-          (organization) => organization.handle === handle,
-        );
-      }
-      if (!token) throw new Error("로그인이 필요합니다.");
-      return checkRemoteOrganizationHandle(token, handle);
-    },
-    [organizations, token],
-  );
-
-  const addOrganization = useCallback(
-    async (input: { name: string; handle: string }) => {
-      reconnectRequest.current += 1;
-      let organization: Organization;
-      if (demoMode) {
-        if (
-          organizations.some(
-            (candidate) => candidate.handle === input.handle,
-          )
-        ) {
-          throw new Error("Organization handle already exists");
-        }
-        organization = {
-          id: crypto.randomUUID(),
-          name: input.name.trim(),
-          handle: input.handle,
-          logo: null,
-          role: "owner",
-          createdAt: new Date().toISOString(),
-        };
-      } else {
-        if (!token) throw new Error("로그인이 필요합니다.");
-        const result = await createRemoteOrganization(token, input);
-        organization = result.organization;
-      }
-      setOrganizations((current) => [...current, organization]);
-      setActiveOrganizationId(organization.id);
-      setActiveProjectId(null);
-      setDashboard(null);
-      setHealth(null);
-      setHealthError(null);
-      setError(null);
-      return organization;
-    },
-    [organizations, token],
+    [
+      activeProjectId,
+      demoMode,
+      lockedProjectId,
+      projects,
+      refresh,
+      showCachedDashboard,
+      token,
+    ],
   );
 
   const addProject = useCallback(
@@ -1812,7 +1638,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       setLoading(true);
       setError(null);
       try {
-        const result = await createProject(token, {
+        const result = await createTeam(token, {
           ...input,
           organizationId: activeOrganizationId ?? undefined,
         });
@@ -1852,7 +1678,7 @@ export function useBriar(options: UseBriarOptions = {}) {
           if (!token) throw new Error("로그인이 필요합니다.");
           await deleteRemoteProject(token, projectId);
           try {
-            await disconnectLocalProject(projectId);
+            await disconnectLocalTeam(projectId);
           } catch (caught) {
             localCleanupWarning =
               caught instanceof Error ? caught.message : String(caught);
@@ -1888,7 +1714,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         if (deletedActiveProject) {
           setDashboard(
             demoMode && nextActiveProject
-              ? nextActiveProject.id === demoDashboard.project.id
+              ? nextActiveProject.id === demoDashboard.team.id
                 ? demoDashboard
                 : emptyDashboard(nextActiveProject)
               : null,
@@ -1930,7 +1756,7 @@ export function useBriar(options: UseBriarOptions = {}) {
 
   const createProjectRepository = useCallback(async (name: string) => {
     setError(null);
-    return await createProjectWorkspace(name);
+    return await createTeamWorkspace(name);
   }, []);
 
   const prepareGithubProjectRepository = useCallback(async (
@@ -1942,16 +1768,16 @@ export function useBriar(options: UseBriarOptions = {}) {
     setError(null);
     try {
       const projectDashboard = await loadDashboard(token, projectId);
-      const saved = await updateProjectSettings(token, projectId, {
+      const saved = await updateTeamSettings(token, projectId, {
         ...projectDashboard.settings,
         githubRepository,
       });
       const { credential, prepared } =
-        await prepareConfiguredProjectRepository(
+        await prepareConfiguredTeamRepository(
           saved.settings,
           () => createProjectGithubCredential(token, projectId),
           (projectCredential) =>
-            prepareProjectRepository(projectId, projectCredential),
+            prepareTeamRepository(projectId, projectCredential),
         );
       const connectedSettings = {
         ...saved.settings,
@@ -1959,7 +1785,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         githubRepository: credential.repository.fullName,
       };
       setDashboard((current) =>
-        current?.project.id === projectId
+        current?.team.id === projectId
           ? { ...current, settings: connectedSettings }
           : { ...projectDashboard, settings: connectedSettings }
       );
@@ -2011,14 +1837,14 @@ export function useBriar(options: UseBriarOptions = {}) {
 
   const preflightProjectConnection = useCallback(
     async (autoHunt: LocalAutoHuntConfig, repositoryPath: string) =>
-      preflightLocalProjectConnection({ autoHunt, repositoryPath }),
+      preflightLocalTeamConnection({ autoHunt, repositoryPath }),
     [],
   );
 
   const connectProject = useCallback(async (
     autoHunt: LocalAutoHuntConfig,
     repositoryPath: string,
-    onWorkflowProgress?: (progress: ProjectLlmProgress) => void,
+    onWorkflowProgress?: (progress: TeamLlmProgress) => void,
   ) => {
     if (!projectConnection) throw new Error("연결할 프로젝트가 없습니다.");
     if (!repositoryPath) throw new Error("연결할 Git 저장소를 선택하세요.");
@@ -2037,7 +1863,7 @@ export function useBriar(options: UseBriarOptions = {}) {
             : current,
         );
       }
-      const connected = await connectLocalProject({
+      const connected = await connectLocalTeam({
         projectId: connection.project.id,
         agentToken,
         repositoryPath,
@@ -2062,11 +1888,11 @@ export function useBriar(options: UseBriarOptions = {}) {
       }
       const {
         workflow: generatedWorkflow,
-        shouldPersistProjectSettings,
-      } = await resolveProjectConnectionWorkflow(
+        shouldPersistTeamSettings,
+      } = await resolveTeamConnectionWorkflow(
         connection.project.role,
         connection.workflow,
-        () => generateProjectWorkflow(
+        () => generateTeamWorkflow(
           connection.project.id,
           undefined,
           onWorkflowProgress,
@@ -2075,7 +1901,7 @@ export function useBriar(options: UseBriarOptions = {}) {
           ? autoHunt.workflow
           : undefined,
       );
-      await updateLocalProjectWorkflow(
+      await updateLocalTeamWorkflow(
         connection.project.id,
         generatedWorkflow,
       );
@@ -2093,8 +1919,8 @@ export function useBriar(options: UseBriarOptions = {}) {
         workflow: generatedWorkflow,
       };
       let savedSettings = initialSettings;
-      if (token && shouldPersistProjectSettings) {
-        const saved = await updateProjectSettings(
+      if (token && shouldPersistTeamSettings) {
+        const saved = await updateTeamSettings(
           token,
           connection.project.id,
           initialSettings,
@@ -2112,7 +1938,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         try {
           const discovered = await discoverRepositoryIcon(connected.repositoryPath);
           if (discovered) {
-            const icon = await projectIconFromDataUrl(discovered);
+            const icon = await teamIconFromDataUrl(discovered);
             connectedProject = (
               await updateRemoteProjectIcon(token, connectedProject.id, {
                 type: "image",
@@ -2130,10 +1956,10 @@ export function useBriar(options: UseBriarOptions = {}) {
         }
       }
 
-      if (shouldPersistProjectSettings) {
+      if (shouldPersistTeamSettings) {
         setDashboard((current) =>
-          current?.project.id === connection.project.id
-            ? { ...current, project: connectedProject, settings: savedSettings }
+          current?.team.id === connection.project.id
+            ? { ...current, team: connectedProject, settings: savedSettings }
             : {
                 ...emptyDashboard(connectedProject),
                 settings: savedSettings,
@@ -2187,16 +2013,16 @@ export function useBriar(options: UseBriarOptions = {}) {
       return next;
     });
     try {
-      const projectDashboard = dashboard?.project.id === projectId
+      const projectDashboard = dashboard?.team.id === projectId
         ? dashboard
         : await loadDashboard(token, projectId);
       const settings = projectDashboard.settings;
       const { credential, prepared } =
-        await prepareConfiguredProjectRepository(
+        await prepareConfiguredTeamRepository(
           settings,
           () => createProjectGithubCredential(token, projectId),
           (projectCredential) =>
-            prepareProjectRepository(projectId, projectCredential),
+            prepareTeamRepository(projectId, projectCredential),
         );
       const connectedSettings = {
         ...settings,
@@ -2204,7 +2030,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         githubRepository: credential.repository.fullName,
       };
       const agentToken = (await createAgentToken(token, projectId)).agentToken;
-      await connectLocalProject({
+      await connectLocalTeam({
         projectId,
         agentToken,
         repositoryPath: prepared.repositoryPath,
@@ -2226,14 +2052,14 @@ export function useBriar(options: UseBriarOptions = {}) {
         throw new Error("저장소 연결 상태를 다시 확인하지 못했습니다.");
       }
       await configureLocalExecutionWorker(projectId, token, true);
-      const readiness = await loadProjectRepositoryReadiness(projectId);
+      const readiness = await loadTeamRepositoryReadiness(projectId);
       if (!readiness) {
         throw new Error("준비한 저장소 상태를 확인하지 못했습니다.");
       }
       if (!isCurrent()) return null;
       setProjectReadiness((current) => ({ ...current, [projectId]: readiness }));
       setDashboard((current) =>
-        current?.project.id === projectId
+        current?.team.id === projectId
           ? { ...current, settings: connectedSettings }
           : current
       );
@@ -2261,7 +2087,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     const request = ++healthRequest.current;
     const isCurrent = () =>
       request === healthRequest.current &&
-      activeProjectIdRef.current === projectId;
+      registry.get(activeTeamIdAtom) === projectId;
     setHealthLoading(true);
     setHealthError(null);
     try {
@@ -2277,7 +2103,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     } finally {
       if (isCurrent()) setHealthLoading(false);
     }
-  }, [activeProjectId]);
+  }, [activeProjectId, registry]);
 
   const reconnectProject = useCallback(async (projectId = activeProjectId) => {
     const request = ++reconnectRequest.current;
@@ -2294,7 +2120,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         // must not launch a second LLM generation from the same pending
         // workflow snapshot.
         workflow = await automaticGeneration;
-      } else if (dashboard?.project.id === project.id) {
+      } else if (dashboard?.team.id === project.id) {
         workflow = dashboard.settings.workflow;
       } else {
         if (!token) throw new Error("로그인이 필요합니다.");
@@ -2327,17 +2153,17 @@ export function useBriar(options: UseBriarOptions = {}) {
       previousWorkflow: ProjectSettings["workflow"],
       nextWorkflow: ProjectSettings["workflow"],
     ) => {
-      if (!token || !dashboard || dashboard.project.id !== projectId) {
+      if (!token || !dashboard || dashboard.team.id !== projectId) {
         throw new Error("워크플로우를 갱신할 팀 설정이 없습니다.");
       }
-      await updateLocalProjectWorkflow(projectId, nextWorkflow);
+      await updateLocalTeamWorkflow(projectId, nextWorkflow);
       try {
-        const result = await updateProjectSettings(token, projectId, {
+        const result = await updateTeamSettings(token, projectId, {
           ...dashboard.settings,
           workflow: nextWorkflow,
         });
         setDashboard((current) =>
-          current?.project.id === projectId
+          current?.team.id === projectId
             ? { ...current, settings: result.settings }
             : current,
         );
@@ -2347,7 +2173,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         ]);
       } catch (caught) {
         try {
-          await updateLocalProjectWorkflow(projectId, previousWorkflow);
+          await updateLocalTeamWorkflow(projectId, previousWorkflow);
         } catch (rollbackError) {
           const cause = caught instanceof Error ? caught.message : String(caught);
           const rollback = rollbackError instanceof Error
@@ -2370,12 +2196,12 @@ export function useBriar(options: UseBriarOptions = {}) {
         throw new Error("워크플로우 재생성은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
       }
       if (!token) throw new Error("로그인이 필요합니다.");
-      if (!dashboard || dashboard.project.id !== projectId) {
+      if (!dashboard || dashboard.team.id !== projectId) {
         throw new Error("워크플로우를 갱신할 팀 설정이 없습니다.");
       }
 
       const previousWorkflow = dashboard.settings.workflow;
-      const generatedWorkflow = await generateProjectWorkflow(
+      const generatedWorkflow = await generateTeamWorkflow(
         projectId,
         previousWorkflow,
       );
@@ -2391,18 +2217,18 @@ export function useBriar(options: UseBriarOptions = {}) {
   const analyzeWorkflowRequirements = useCallback(
     async (
       projectId: string,
-      onProgress?: (progress: ProjectLlmProgress) => void,
+      onProgress?: (progress: TeamLlmProgress) => void,
     ) => {
       if (demoMode) {
         throw new Error("필요 도구 분석은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
       }
       if (!token) throw new Error("로그인이 필요합니다.");
-      if (!dashboard || dashboard.project.id !== projectId) {
+      if (!dashboard || dashboard.team.id !== projectId) {
         throw new Error("필요 도구를 분석할 팀 설정이 없습니다.");
       }
 
       const previousWorkflow = dashboard.settings.workflow;
-      const analyzedWorkflow = await analyzeProjectWorkflowRequirements(
+      const analyzedWorkflow = await analyzeTeamWorkflowRequirements(
         projectId,
         previousWorkflow,
         onProgress,
@@ -2422,12 +2248,12 @@ export function useBriar(options: UseBriarOptions = {}) {
         throw new Error("워크플로우 수정은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
       }
       if (!token) throw new Error("로그인이 필요합니다.");
-      if (!dashboard || dashboard.project.id !== projectId) {
+      if (!dashboard || dashboard.team.id !== projectId) {
         throw new Error("워크플로우를 갱신할 팀 설정이 없습니다.");
       }
 
       const previousWorkflow = dashboard.settings.workflow;
-      const revisedWorkflow = await reviseProjectWorkflow(
+      const revisedWorkflow = await reviseTeamWorkflow(
         projectId,
         previousWorkflow,
         requestedChange,
@@ -2447,11 +2273,11 @@ export function useBriar(options: UseBriarOptions = {}) {
       scope: "project" | "user",
       checkpoints: NonNullable<
         ProjectSettings["checkpointPolicy"]
-      >["projectMandatory"],
+      >["teamMandatory"],
       expectedRevision: number,
     ) => {
       if (!token) throw new Error("로그인이 필요합니다.");
-      if (!dashboard || dashboard.project.id !== projectId) {
+      if (!dashboard || dashboard.team.id !== projectId) {
         throw new Error("체크포인트를 저장할 팀 설정이 없습니다.");
       }
       const result = await updateCheckpointPolicy(token, projectId, {
@@ -2459,7 +2285,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         checkpoints,
         expectedRevision,
       });
-      setDashboard((current) => current?.project.id === projectId
+      setDashboard((current) => current?.team.id === projectId
         ? {
             ...current,
             settings: {
@@ -2474,13 +2300,13 @@ export function useBriar(options: UseBriarOptions = {}) {
   );
 
   useEffect(() => {
-    const projectId = dashboard?.project.id;
+    const projectId = dashboard?.team.id;
     if (
       demoMode ||
       remoteMode ||
       !token ||
       !projectId ||
-      !connectedProjectIds?.includes(projectId) ||
+      !connectedTeamIds?.includes(projectId) ||
       projectConnection?.project.id === projectId ||
       !isRepositoryWorkflowPending(dashboard.settings.workflow) ||
       workflowGenerationAttempts.current.has(projectId)
@@ -2501,7 +2327,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         }
       });
   }, [
-    connectedProjectIds,
+    connectedTeamIds,
     dashboard,
     projectConnection,
     regenerateWorkflow,
@@ -2511,14 +2337,14 @@ export function useBriar(options: UseBriarOptions = {}) {
   const assertRepositoryReadyForLinearImport = useCallback(
     (projectId: string) => {
       const githubRepository =
-        dashboard?.project.id === projectId
+        dashboard?.team.id === projectId
           ? dashboard.settings.githubRepository
           : null;
       const repositoryPath =
         health?.projectId === projectId ? health.repositoryPath : null;
       const ready = isRepositoryConnectedForImport({
         projectId,
-        connectedProjectIds,
+        connectedTeamIds,
         githubRepository,
         repositoryPath,
       });
@@ -2528,7 +2354,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         );
       }
     },
-    [connectedProjectIds, dashboard, health],
+    [connectedTeamIds, dashboard, health],
   );
 
   const connectLinearForImport = useCallback(
@@ -2638,13 +2464,13 @@ export function useBriar(options: UseBriarOptions = {}) {
 
   const saveVelenIntegration = useCallback(
     async (projectId: string, org: string | null) => {
-      if (!dashboard || dashboard.project.id !== projectId) {
+      if (!dashboard || dashboard.team.id !== projectId) {
         throw new Error("Velen 연결을 저장할 팀 설정이 없습니다.");
       }
       const normalized = org?.trim() || null;
       if (demoMode) {
         setDashboard((current) =>
-          current?.project.id === projectId
+          current?.team.id === projectId
             ? {
                 ...current,
                 settings: {
@@ -2667,9 +2493,9 @@ export function useBriar(options: UseBriarOptions = {}) {
       const previous = dashboard.settings.velenOrg;
       const local = remoteMode
         ? normalized
-        : await updateLocalProjectVelenOrg(projectId, normalized);
+        : await updateLocalTeamVelenOrg(projectId, normalized);
       try {
-        const result = await updateProjectSettings(token, projectId, {
+        const result = await updateTeamSettings(token, projectId, {
           ...dashboard.settings,
           velenOrg: local,
           ...(local
@@ -2680,7 +2506,7 @@ export function useBriar(options: UseBriarOptions = {}) {
               }),
         });
         setDashboard((current) =>
-          current?.project.id === projectId
+          current?.team.id === projectId
             ? { ...current, settings: result.settings }
             : current,
         );
@@ -2688,7 +2514,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       } catch (caught) {
         if (!remoteMode) {
           try {
-            await updateLocalProjectVelenOrg(projectId, previous);
+            await updateLocalTeamVelenOrg(projectId, previous);
           } catch (rollbackError) {
             const cause = caught instanceof Error ? caught.message : String(caught);
             const rollback = rollbackError instanceof Error
@@ -2705,132 +2531,6 @@ export function useBriar(options: UseBriarOptions = {}) {
     [dashboard, token],
   );
 
-  const addPlanningProject = useCallback(
-    async (
-      teamId: string,
-      input: {
-        name: string;
-        description?: string;
-        status?: PlanningProjectStatus;
-      },
-    ) => {
-      const team = projects.find((candidate) => candidate.id === teamId);
-      if (!team) throw new Error("프로젝트를 추가할 팀이 없습니다.");
-      if (demoMode) {
-        const observedAt = new Date().toISOString();
-        const project: PlanningProject = {
-          id: crypto.randomUUID(),
-          workspaceId: team.organizationId ?? demoOrganization.id,
-          workspaceName: team.organizationName ?? demoOrganization.name,
-          teamId,
-          teamName: team.name,
-          name: input.name.trim(),
-          description: input.description?.trim() ?? "",
-          status: input.status ?? "planned",
-          leadUserId: null,
-          leadName: null,
-          startDate: null,
-          targetDate: null,
-          icon: null,
-          color: null,
-          sortOrder: planningProjects.filter((candidate) => candidate.teamId === teamId).length,
-          isDefault: false,
-          role: team.role ?? "owner",
-          createdAt: observedAt,
-          updatedAt: observedAt,
-        };
-        setPlanningProjects((current) => [...current, project]);
-        return project;
-      }
-      if (!token) throw new Error("로그인이 필요합니다.");
-      const project = await createRemotePlanningProject(token, teamId, input);
-      setPlanningProjects((current) => [...current, project].sort(
-        (left, right) => left.teamId.localeCompare(right.teamId) ||
-          left.sortOrder - right.sortOrder ||
-          left.createdAt.localeCompare(right.createdAt),
-      ));
-      return project;
-    },
-    [planningProjects, projects, token],
-  );
-
-  const editPlanningProject = useCallback(
-    async (
-      projectId: string,
-      input: { name: string; description: string; status: PlanningProjectStatus },
-    ) => {
-      const existing = planningProjects.find((candidate) => candidate.id === projectId);
-      if (!existing) throw new Error("수정할 프로젝트가 없습니다.");
-      const normalized = {
-        name: input.name.trim(),
-        description: input.description.trim(),
-        status: input.status,
-      };
-      const project = demoMode
-        ? { ...existing, ...normalized, updatedAt: new Date().toISOString() }
-        : await (async () => {
-            if (!token) throw new Error("로그인이 필요합니다.");
-            return updateRemotePlanningProject(token, projectId, normalized);
-          })();
-      setPlanningProjects((current) => current.map((candidate) =>
-        candidate.id === projectId ? project : candidate
-      ));
-      return project;
-    },
-    [planningProjects, token],
-  );
-
-  const removePlanningProject = useCallback(
-    async (projectId: string) => {
-      const project = planningProjects.find(
-        (candidate) => candidate.id === projectId,
-      );
-      if (!project) throw new Error("삭제할 프로젝트가 없습니다.");
-      if (project.isDefault) {
-        throw new Error("팀의 기본 프로젝트는 삭제할 수 없습니다.");
-      }
-      const defaultProject = planningProjects.find(
-        (candidate) => candidate.teamId === project.teamId && candidate.isDefault,
-      );
-      if (!defaultProject) {
-        throw new Error("이슈를 옮길 기본 프로젝트를 찾을 수 없습니다.");
-      }
-      const result = demoMode
-        ? {
-            movedIssueCount: dashboard?.runs.filter(
-              (run) => run.projectId === projectId,
-            ).length ?? 0,
-          }
-        : await (async () => {
-            if (!token) throw new Error("로그인이 필요합니다.");
-            return deleteRemotePlanningProject(token, projectId);
-          })();
-      setPlanningProjects((current) =>
-        current.filter((candidate) => candidate.id !== projectId),
-      );
-      if (result.movedIssueCount > 0) {
-        setDashboard((current) =>
-          current?.project.id === project.teamId
-            ? {
-                ...current,
-                runs: current.runs.map((run) =>
-                  run.projectId === projectId
-                    ? {
-                        ...run,
-                        projectId: defaultProject.id,
-                        projectName: defaultProject.name,
-                      }
-                    : run,
-                ),
-              }
-            : current,
-        );
-      }
-      return result;
-    },
-    [dashboard?.runs, planningProjects, setDashboard, token],
-  );
-
   const addIssue = useCallback(
     async (projectId: string, input: CreateIssueInput) => {
       const planningProject = planningProjects.find((candidate) => candidate.id === projectId);
@@ -2843,7 +2543,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       setError(null);
       try {
         if (demoMode) {
-          const targetDashboard = dashboard?.project.id === teamId
+          const targetDashboard = dashboard?.team.id === teamId
             ? dashboard
             : emptyDashboard(project);
           const occurredAt = new Date().toISOString();
@@ -3015,7 +2715,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     async (runId: string, sourceProjectId: string, targetProjectId: string) => {
       if (!dashboard) throw new Error("이슈를 이동할 팀이 없습니다.");
       const target = planningProjects.find((project) => project.id === targetProjectId);
-      if (!target || target.teamId !== dashboard.project.id) {
+      if (!target || target.teamId !== dashboard.team.id) {
         throw new Error("같은 팀의 프로젝트로만 이슈를 이동할 수 있습니다.");
       }
       setError(null);
@@ -4547,25 +4247,26 @@ export function useBriar(options: UseBriarOptions = {}) {
     addPlanningProject,
     moveIssueProject,
     addProject,
-    cancelProjectCreation,
+    cancelProjectCreation: cancelTeamCreation,
     cancelLogin,
     changeOrganizationLogo,
-    changeProjectIcon,
-    changeProjectIssueKeyPrefix,
-    changeProjectScheduleTab,
+    changeProjectIcon: changeTeamIcon,
+    changeProjectIssueKeyPrefix: changeTeamIssueKeyPrefix,
+    changeProjectScheduleTab: changeTeamScheduleTab,
     checkOrganizationHandle,
     connectProject,
-    connectedProjectIds,
-    activeProjectConnectionState: localProjectConnectionState(
-      connectedProjectIds,
+    connectedTeamIds,
+    activeProjectConnectionState: localTeamConnectionState(
+      connectedTeamIds,
       activeProjectId,
     ),
     dashboard,
+    dashboardStale,
     deleteAccount,
     deleteIssue: removeIssue,
     transferIssue: transferIssueToProject,
     deletePlanningProject: removePlanningProject,
-    deleteProject: removeProject,
+    deleteTeam: removeProject,
     deletingIssueId,
     deletingProjectId,
     demoMode,
@@ -4576,7 +4277,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     health,
     healthError,
     healthLoading,
-    finishProjectCreation,
+    finishProjectCreation: finishTeamCreation,
     isCreatingProject,
     isCreatingIssue,
     updatingIssueId,
@@ -4660,7 +4361,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       return unassignHuntRun(token, projectId, runId).then(() => refresh());
     },
     moveRun,
-    startProjectCreation,
+    startProjectCreation: startTeamCreation,
     token,
     user,
     velen,

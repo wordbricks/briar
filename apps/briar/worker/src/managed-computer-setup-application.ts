@@ -1,4 +1,4 @@
-import { createProjectGithubCredentialApplication } from "./project-github-application";
+import { createTeamGithubCredentialApplication } from "./team-github-application";
 import {
   bindManagedComputerSetup,
   managedComputerSetupContext,
@@ -22,7 +22,7 @@ export async function getManagedComputerSetupContextApplication(input: {
     observedAt: input.observedAt,
   });
   const repositoryCredential = context.settings.githubRepository
-    ? await createProjectGithubCredentialApplication({
+    ? await createTeamGithubCredentialApplication({
         db: input.db,
         env: input.env,
         project: {

@@ -1,6 +1,8 @@
+import * as BunRuntime from "@effect/platform-bun/BunRuntime";
 import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
+import * as Effect from "effect/Effect";
 import { backfillRemoteArchiveStorage } from "./backfill-archive-storage";
 import { verifyProductionGitTarget } from "./production-git-target";
 import { withRemoteOperationLease } from "./remote-operation-lease";
@@ -221,14 +223,20 @@ export async function applyRemoteD1Migrations({
   return 0;
 }
 
-async function main(): Promise<void> {
-  const headSha = await verifyProductionGitTarget();
-  const exitCode = await withRemoteOperationLease({
-    headSha,
-    name: "worker-production",
-    runner: runWrangler,
-  }, (signal) => applyRemoteD1Migrations({ signal }));
-  if (exitCode !== 0) process.exitCode = exitCode;
-}
+const main = Effect.fn("applyRemoteD1Migrations.main")(
+  function* applyRemoteD1MigrationsMainEffect() {
+    const headSha = yield* verifyProductionGitTarget();
+    const exitCode = yield* withRemoteOperationLease({
+      headSha,
+      name: "worker-production",
+      runner: runWrangler,
+    }, (signal) => applyRemoteD1Migrations({ signal }));
+    if (exitCode !== 0) {
+      yield* Effect.sync(() => {
+        process.exitCode = exitCode;
+      });
+    }
+  },
+);
 
-if (import.meta.main) await main();
+if (import.meta.main) main().pipe(BunRuntime.runMain);

@@ -6,7 +6,7 @@ import {
 import { processArchiveCleanupQueue } from "./archive";
 import {
   deleteAccountData,
-  getProjectRunChildMismatch,
+  getTeamRunChildMismatch,
   planAccountDeletion,
 } from "./db";
 import { HttpError } from "./http-response";
@@ -23,7 +23,7 @@ const isUniqueConstraintError = (error: unknown) =>
 
 export type AccountApplicationServices = {
   readonly deleteAccountData: typeof deleteAccountData;
-  readonly getProjectRunChildMismatch: typeof getProjectRunChildMismatch;
+  readonly getTeamRunChildMismatch: typeof getTeamRunChildMismatch;
   readonly planAccountDeletion: typeof planAccountDeletion;
   readonly authEmailIdentifierHash: typeof authEmailIdentifierHash;
   readonly processArchiveCleanupQueue: typeof processArchiveCleanupQueue;
@@ -33,7 +33,7 @@ export type AccountApplicationServices = {
 
 export const accountApplicationServices: AccountApplicationServices = {
   deleteAccountData,
-  getProjectRunChildMismatch,
+  getTeamRunChildMismatch,
   planAccountDeletion,
   authEmailIdentifierHash,
   processArchiveCleanupQueue,
@@ -131,7 +131,7 @@ export async function deleteAccountApplication(
   }
 
   for (const projectId of plan.projectIds) {
-    if (await services.getProjectRunChildMismatch(input.db, projectId)) {
+    if (await services.getTeamRunChildMismatch(input.db, projectId)) {
       throw new HttpError(
         409,
         "Project transfer reconciliation is required before deletion",

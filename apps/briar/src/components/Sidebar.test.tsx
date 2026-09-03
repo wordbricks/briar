@@ -13,7 +13,7 @@ const sidebarProps = {
   activeOrganizationId: "organization-1",
   activeProjectId: "project-1",
   agents: [],
-  connectedProjectIds: ["project-1"],
+  connectedTeamIds: ["project-1"],
   isOpen: true,
   onAddProject: () => undefined,
   onAgentSessionOpen: () => undefined,
@@ -1004,7 +1004,7 @@ describe("Sidebar", () => {
         agents={[
           {
             id: "agent-1",
-            projectId: "project-1",
+            teamId: "project-1",
             name: "Design agent",
             avatar: "data:image/png;base64,avatar",
             codexPet: null,
@@ -1063,7 +1063,7 @@ describe("Sidebar", () => {
       <Sidebar
         {...sidebarProps}
         activeProjectId="project-2"
-        connectedProjectIds={["project-1", "project-2"]}
+        connectedTeamIds={["project-1", "project-2"]}
         onAgentSessionOpen={onAgentSessionOpen}
         onProjectChange={onProjectChange}
         projects={[
@@ -1221,7 +1221,7 @@ describe("Sidebar", () => {
       root,
       <Sidebar
         {...sidebarProps}
-        connectedProjectIds={[]}
+        connectedTeamIds={[]}
         onProjectRepositoryOpen={onProjectRepositoryOpen}
         projectReadiness={{
           "project-1": {
@@ -1264,7 +1264,7 @@ describe("Sidebar", () => {
       <I18nProvider>
         <Sidebar
           {...sidebarProps}
-          connectedProjectIds={null}
+          connectedTeamIds={null}
           projectReadiness={{}}
           projectReadinessError={{
             "project-1": "로컬 프로젝트 연결 목록을 읽지 못했습니다.",

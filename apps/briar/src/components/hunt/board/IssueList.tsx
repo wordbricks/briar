@@ -6,11 +6,11 @@ import { runMeta } from "@/lib/stages";
 import { type AutoHuntWorkflowCheckpoint } from "@/lib/auto-hunt-contract";
 import { formatIssueKey } from "@/lib/issue-key";
 import type { HuntRun, HuntRunPlacement, IssueExecutionPreferences, OrganizationMember, PlanningProject, Project } from "@/types";
-import { type AgentProvider } from "@/lib/project-llm";
+import { type AgentProvider } from "@/lib/team-llm";
 import { useI18n } from "@/i18n";
 import type { MessageKey } from "@/i18n/messages";
 import { IssueContextMenu } from "./IssueContextMenu";
-import { ProjectIcon } from "../../ProjectIcon";
+import { TeamIcon } from "../../TeamIcon";
 import { PullRequestIconLink } from "./PullRequestIconLink";
 import { RunStatusPill } from "../detail/RunStatusPill";
 import { localizeStatus, relativeTime } from "../model/formatters";
@@ -129,7 +129,7 @@ export function IssueList({
           }} onPointerDown={() => setCursorId(run.id)} ref={navigation.getItemRef(run.id)} role="row" tabIndex={0}>
                 <span className="issue-list-task" role="cell">
                   <span className="issue-list-task-kicker">
-                    {project ? <ProjectIcon className="issue-list-project-icon" project={project} /> : null}
+                    {project ? <TeamIcon className="issue-list-project-icon" project={project} /> : null}
                     <small>
                       {formatIssueKey(issueKeyPrefixForRun?.(run) ?? issueKeyPrefix, run.runNumber)} · {run.sourceKey}
                       {assignee ? ` · ${assignee.name}` : ""}

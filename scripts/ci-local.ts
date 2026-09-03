@@ -253,41 +253,43 @@ const recordTiming = Effect.fn("recordCiTiming")(
   },
 );
 
-const timed = <A, E, R>(
-  timings: Ref.Ref<ReadonlyArray<Timing>>,
-  context: string,
-  label: string,
-  logPath: string,
-  effect: Effect.Effect<A, E, R>,
-) => Effect.gen(function* timedEffect() {
-  const startedAt = yield* Clock.currentTimeMillis;
-  return yield* effect.pipe(
-    Effect.onExit((exit) =>
-      Effect.gen(function* recordTimedExitEffect() {
-        const finishedAt = yield* Clock.currentTimeMillis;
-        const timing = {
-          context,
-          label,
-          seconds: elapsedSeconds(startedAt, finishedAt),
-          status: exitStatus(exit),
-        } as const;
-        yield* recordTiming(timings, timing);
-        yield* appendLog(
-          logPath,
-          `[local-ci] [timing] ${context} ${label} ${timing.seconds}s ${timing.status}\n`,
-        );
-        const marker = timing.status === "ok"
-          ? "✓"
-          : timing.status === "cancelled"
-            ? "⊘"
-            : "✗";
-        yield* Effect.sync(() => process.stdout.write(
-          `[local-ci] ${marker} ${context}/${label} (${timing.seconds}s)\n`,
-        ));
-      })
-    ),
-  );
-});
+const timed = Effect.fn("timedCi")(
+  function* timedCiEffect<A, E, R>(
+    timings: Ref.Ref<ReadonlyArray<Timing>>,
+    context: string,
+    label: string,
+    logPath: string,
+    effect: Effect.Effect<A, E, R>,
+  ) {
+    const startedAt = yield* Clock.currentTimeMillis;
+    return yield* effect.pipe(
+      Effect.onExit((exit) =>
+        Effect.gen(function* recordTimedExitEffect() {
+          const finishedAt = yield* Clock.currentTimeMillis;
+          const timing = {
+            context,
+            label,
+            seconds: elapsedSeconds(startedAt, finishedAt),
+            status: exitStatus(exit),
+          } as const;
+          yield* recordTiming(timings, timing);
+          yield* appendLog(
+            logPath,
+            `[local-ci] [timing] ${context} ${label} ${timing.seconds}s ${timing.status}\n`,
+          );
+          const marker = timing.status === "ok"
+            ? "✓"
+            : timing.status === "cancelled"
+              ? "⊘"
+              : "✗";
+          yield* Effect.sync(() => process.stdout.write(
+            `[local-ci] ${marker} ${context}/${label} (${timing.seconds}s)\n`,
+          ));
+        })
+      ),
+    );
+  },
+);
 
 const runTimedCommand = Effect.fn("runTimedCiCommand")(
   function* runTimedCiCommandEffect(
@@ -418,6 +420,11 @@ const runD1Migrations = Effect.fn("runD1MigrationsCi")(
       "test-migrations",
       {
         argv: ["bun", "run", "test:d1:migrations"],
+        // Pinned while the app-worker context is running: the migration suite
+        // starts each file from an empty database and replays the whole
+        // history, so at full worker count it times out against the parallel
+        // Worker suites and the Rust build. Cheap now that a warm cache skips
+        // the step entirely.
         env: overlapAppWorker ? { VITEST_MAX_WORKERS: "1" } : undefined,
       },
     );
@@ -433,18 +440,15 @@ const resolveCargoTargetDirectory = Effect.fn("resolveCargoTargetDirectory")(
       return undefined;
     }
 
-    let cacheBase = "";
-    if (!override) {
-      const executor = yield* CiCommandExecutor;
-      const result = yield* executor.execute({
-        argv: ["getconf", "DARWIN_USER_CACHE_DIR"],
-        output: { _tag: "capture" },
-      });
-      if (result.exitCode === 0) cacheBase = result.output.trim();
-    }
+    // Shared with the release scripts (see scripts/release-cargo-cache.sh).
+    // Deliberately under the XDG cache rather than DARWIN_USER_CACHE_DIR: macOS
+    // treats the latter as purgeable, and every eviction turned a ~20s
+    // incremental Rust check into a ~10 minute cold build.
+    const cacheBase = process.env.XDG_CACHE_HOME?.trim() ||
+      join(process.env.HOME ?? process.env.TMPDIR ?? "/tmp", ".cache");
     const targetDirectory = override || join(
-      (cacheBase || process.env.TMPDIR || "/tmp").replace(/\/$/u, ""),
-      "briar/ci/cargo-target",
+      cacheBase.replace(/\/$/u, ""),
+      "briar/cargo-target",
     );
     if (!targetDirectory.startsWith("/") || !targetDirectory.endsWith("/cargo-target")) {
       return yield* new CiInvariantError({
@@ -483,7 +487,20 @@ const runRust = Effect.fn("runRustCi")(
       ],
     });
     const targetDirectory = yield* resolveCargoTargetDirectory(logPath);
-    const env = targetDirectory ? { CARGO_TARGET_DIR: targetDirectory } : undefined;
+    // Lint and build in one pass: scripts/ci-rust-lint-wrapper.sh compiles the
+    // workspace crates through clippy-driver with `-D warnings`, so `cargo test`
+    // enforces exactly what the separate `cargo clippy --all-targets -- -D
+    // warnings` step did (clippy and rustc warnings, lib/bin/test targets) while
+    // compiling the crate once instead of once in check mode and once for the
+    // test binaries. Dependencies still compile with plain rustc.
+    const clippyDriver = yield* capture("rust", "clippy-driver-path", [
+      "rustup", "which", "--toolchain", rustToolchain, "clippy-driver",
+    ]);
+    const env = {
+      ...(targetDirectory ? { CARGO_TARGET_DIR: targetDirectory } : {}),
+      BRIAR_CLIPPY_DRIVER: clippyDriver.output.trim(),
+      RUSTC_WORKSPACE_WRAPPER: join(workspaceRoot, "scripts", "ci-rust-lint-wrapper.sh"),
+    };
     yield* runTimedCommand(timings, "rust", logPath, "cargo-fmt", {
       argv: [
         "rustup", "run", rustToolchain, "cargo", "fmt",
@@ -491,14 +508,10 @@ const runRust = Effect.fn("runRustCi")(
       ],
       env,
     });
-    yield* runTimedCommand(timings, "rust", logPath, "cargo-clippy", {
-      argv: [
-        "rustup", "run", rustToolchain, "cargo", "clippy",
-        "--manifest-path", "apps/briar/src-tauri/Cargo.toml",
-        "--all-targets", "--", "-D", "warnings",
-      ],
-      env,
-    });
+    yield* appendLog(
+      logPath,
+      "[local-ci] rust: clippy runs inside cargo test via RUSTC_WORKSPACE_WRAPPER.\n",
+    );
     yield* runTimedCommand(timings, "rust", logPath, "cargo-test", {
       argv: [
         "rustup", "run", rustToolchain, "cargo", "test",
@@ -627,44 +640,46 @@ const printFailureTail = Effect.fn("printCiFailureTail")(
   },
 );
 
-const runContext = <E, R>(
-  timings: Ref.Ref<ReadonlyArray<Timing>>,
-  context: string,
-  logPath: string,
-  program: Effect.Effect<void, E, R>,
-) => Effect.gen(function* runContextEffect() {
-  const fileSystem = yield* FileSystem.FileSystem;
-  yield* fileSystem.writeFileString(
-    logPath,
-    `\n[local-ci] === ${context} ===\n`,
-  ).pipe(fileSystemError(`initialize ${logPath}`));
-  const startedAt = yield* Clock.currentTimeMillis;
-  return yield* program.pipe(
-    Effect.onExit((exit) =>
-      Effect.gen(function* finishContextEffect() {
-        const finishedAt = yield* Clock.currentTimeMillis;
-        const status = exitStatus(exit);
-        const seconds = elapsedSeconds(startedAt, finishedAt);
-        yield* recordTiming(timings, {
-          context,
-          label: "context-total",
-          seconds,
-          status,
-        });
-        yield* appendLog(
-          logPath,
-          `[local-ci] [timing] ${context} context-total ${seconds}s ${status}\n`,
-        );
-        if (status === "fail") {
-          yield* printFailureTail(logPath);
-        }
-        yield* Effect.sync(() => process.stdout.write(
-          `[local-ci] ${status === "ok" ? "✓" : status === "cancelled" ? "⊘" : "✗"} ${context} (${seconds}s)\n`,
-        ));
-      })
-    ),
-  );
-});
+const runContext = Effect.fn("runCiContext")(
+  function* runCiContextEffect<E, R>(
+    timings: Ref.Ref<ReadonlyArray<Timing>>,
+    context: string,
+    logPath: string,
+    program: Effect.Effect<void, E, R>,
+  ) {
+    const fileSystem = yield* FileSystem.FileSystem;
+    yield* fileSystem.writeFileString(
+      logPath,
+      `\n[local-ci] === ${context} ===\n`,
+    ).pipe(fileSystemError(`initialize ${logPath}`));
+    const startedAt = yield* Clock.currentTimeMillis;
+    return yield* program.pipe(
+      Effect.onExit((exit) =>
+        Effect.gen(function* finishContextEffect() {
+          const finishedAt = yield* Clock.currentTimeMillis;
+          const status = exitStatus(exit);
+          const seconds = elapsedSeconds(startedAt, finishedAt);
+          yield* recordTiming(timings, {
+            context,
+            label: "context-total",
+            seconds,
+            status,
+          });
+          yield* appendLog(
+            logPath,
+            `[local-ci] [timing] ${context} context-total ${seconds}s ${status}\n`,
+          );
+          if (status === "fail") {
+            yield* printFailureTail(logPath);
+          }
+          yield* Effect.sync(() => process.stdout.write(
+            `[local-ci] ${status === "ok" ? "✓" : status === "cancelled" ? "⊘" : "✗"} ${context} (${seconds}s)\n`,
+          ));
+        })
+      ),
+    );
+  },
+);
 
 const runSharedInputs = Effect.fn("runSharedInputs")(
   function* runSharedInputsEffect(
@@ -761,40 +776,42 @@ const checkSignoffTarget = Effect.fn("checkSignoffTarget")(
     yield* Effect.try({
       try: () => verifySignoffTargetUnchanged(target, workspaceRoot),
       catch: (cause) => new CiInvariantError({
-        message: `Signoff target changed: ${errorMessage(cause)}`,
+        message: `Signoff target changed: ${String(cause)}`,
       }),
     });
   },
 );
 
-const withSignoffLifecycle = <A, E, R>(
-  target: SignoffTarget,
-  contexts: ReadonlyArray<CiContextName>,
-  program: Effect.Effect<A, E, R>,
-) => Effect.gen(function* signoffLifecycleEffect() {
-  const lifecycle = Effect.gen(function* signoffRunEffect() {
-    yield* publishSignoffStatuses(target, contexts, "pending");
-    const monitoredProgram = program.pipe(
-      Effect.andThen(checkSignoffTarget(target)),
+const withSignoffLifecycle = Effect.fn("withSignoffLifecycle")(
+  function* withSignoffLifecycleEffect<A, E, R>(
+    target: SignoffTarget,
+    contexts: ReadonlyArray<CiContextName>,
+    program: Effect.Effect<A, E, R>,
+  ) {
+    const lifecycle = Effect.gen(function* signoffRunEffect() {
+      yield* publishSignoffStatuses(target, contexts, "pending");
+      const monitoredProgram = program.pipe(
+        Effect.andThen(checkSignoffTarget(target)),
+      );
+      const targetMonitor = Effect.sleep(10_000).pipe(
+        Effect.andThen(checkSignoffTarget(target)),
+        Effect.forever,
+      );
+      return yield* Effect.raceFirst(monitoredProgram, targetMonitor);
+    });
+    return yield* lifecycle.pipe(
+      Effect.onExit((exit) =>
+        Exit.isSuccess(exit)
+          ? Effect.void
+          : publishSignoffStatuses(target, contexts, "failure").pipe(
+            Effect.catch((error) => Effect.sync(() => process.stderr.write(
+              `[local-ci] Could not publish final failure statuses: ${String(error)}\n`,
+            ))),
+          )
+      ),
     );
-    const targetMonitor = Effect.sleep(10_000).pipe(
-      Effect.andThen(checkSignoffTarget(target)),
-      Effect.forever,
-    );
-    return yield* Effect.raceFirst(monitoredProgram, targetMonitor);
-  });
-  return yield* lifecycle.pipe(
-    Effect.onExit((exit) =>
-      Exit.isSuccess(exit)
-        ? Effect.void
-        : publishSignoffStatuses(target, contexts, "failure").pipe(
-          Effect.catch((error) => Effect.sync(() => process.stderr.write(
-            `[local-ci] Could not publish final failure statuses: ${errorMessage(error)}\n`,
-          ))),
-        )
-    ),
-  );
-});
+  },
+);
 
 const runCi = Effect.fn("runCi")(
   function* runCiEffect(options: CiOptions, signoffTarget?: SignoffTarget) {
@@ -902,14 +919,14 @@ const signoffPreflight = Effect.fn("signoffPreflight")(
     return yield* Effect.try({
       try: () => verifySignoffReady(workspaceRoot),
       catch: (cause) => new CiInvariantError({
-        message: `Signoff preflight failed: ${errorMessage(cause)}`,
+        message: `Signoff preflight failed: ${String(cause)}`,
       }),
     });
   },
 );
 
-const withWorktreeCiLock = <A, E, R>(program: Effect.Effect<A, E, R>) =>
-  Effect.gen(function* worktreeCiLockEffect() {
+const withWorktreeCiLock = Effect.fn("withWorktreeCiLock")(
+  function* withWorktreeCiLockEffect<A, E, R>(program: Effect.Effect<A, E, R>) {
     const lockPathResult = yield* capture(
       "local-ci",
       "resolve-worktree-lock",
@@ -926,7 +943,8 @@ const withWorktreeCiLock = <A, E, R>(program: Effect.Effect<A, E, R>) =>
       headResult.output.trim(),
       program,
     );
-  });
+  },
+);
 
 const selectedContexts = (
   contexts: ReadonlyArray<CiContextName | "all">,
@@ -979,12 +997,6 @@ const CiLive = CiCommandExecutor.layer.pipe(
   Layer.provideMerge(BunServices.layer),
 );
 
-const errorMessage = (error: unknown) =>
-  typeof error === "object" && error !== null && "message" in error &&
-      typeof error.message === "string"
-    ? error.message
-    : String(error);
-
 export const runCiMain = () => {
   ciCommand.pipe(
     Command.run({ version: process.env.npm_package_version ?? "0.0.0" }),
@@ -992,7 +1004,7 @@ export const runCiMain = () => {
     Effect.tapError((error) =>
       CliError.isCliError(error)
         ? Effect.void
-        : Effect.sync(() => process.stderr.write(`[local-ci] ${errorMessage(error)}\n`))
+        : Effect.sync(() => process.stderr.write(`[local-ci] ${String(error)}\n`))
     ),
     Effect.provide(CiLive),
     BunRuntime.runMain({ disableErrorReporting: true }),

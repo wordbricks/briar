@@ -333,7 +333,7 @@ const runs: HuntRun[] = runSeeds.map(({ events, ...run }) => ({
 }));
 
 export const demoDashboard: DashboardPayload = {
-  project: {
+  team: {
     id: "demo-project",
     name: "Briar",
     issueKeyPrefix: "AH",
@@ -362,7 +362,7 @@ export const demoDashboard: DashboardPayload = {
         { stage: stage.id, stageLabel: stage.label, position: "before" as const },
         { stage: stage.id, stageLabel: stage.label, position: "after" as const },
       ]),
-      projectMandatory: [
+      teamMandatory: [
         { key: "project-after-local_qa", stage: "local_qa", position: "after" },
       ],
       userDefaults: [
@@ -372,7 +372,7 @@ export const demoDashboard: DashboardPayload = {
         { key: "user-before-implementing", stage: "implementing", position: "before" },
         { key: "project-after-local_qa", stage: "local_qa", position: "after" },
       ],
-      projectRevision: 1,
+      teamRevision: 1,
       userRevision: 1,
     },
   },

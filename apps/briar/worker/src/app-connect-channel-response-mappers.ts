@@ -94,7 +94,7 @@ import type {
   ChannelSummary,
   ChannelThreadSubscriber,
 } from "../../src/lib/channels-contract";
-import { decodeProjectAgentSessionInput } from "./project-request-contract";
+import { decodeTeamAgentSessionInput } from "./team-request-contract";
 
 const internal = (message: string, cause?: unknown): never => {
   throw new ConnectError(message, Code.Internal, undefined, undefined, cause);
@@ -850,9 +850,9 @@ type SkillApprovalSession = NonNullable<SkillApprovalResult["session"]>;
 
 const appProjectAgentSession = (session: SkillApprovalSession) => {
   const source: Readonly<Record<string, unknown>> = session;
-  let payload: ReturnType<typeof decodeProjectAgentSessionInput>;
+  let payload: ReturnType<typeof decodeTeamAgentSessionInput>;
   try {
-    payload = decodeProjectAgentSessionInput({
+    payload = decodeTeamAgentSessionInput({
       dispatchGroupId: source.dispatchGroupId,
       agentId: source.agentId,
       agentName: source.agentName,

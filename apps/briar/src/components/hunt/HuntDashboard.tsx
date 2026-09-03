@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
 import { Typography } from "@/components/ui/typography";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentProps } from "react";
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import { NativeSelect } from "@/components/NativeSelect";
 import { CompanionBottomNavigation, type CompanionStatusFilter } from "@/components/CompanionBottomNavigation";
 import type { AutoHuntSession } from "@/hooks/useAutoHuntSessions";
@@ -25,7 +25,7 @@ import { type IssueDetailTab } from "@/lib/issue-detail-tab";
 import { readKanbanColumnIds, toggleKanbanColumnId, writeKanbanColumnIds } from "@/lib/kanban-column-storage";
 import { formatIssueKey } from "@/lib/issue-key";
 import type { AgentSkillExecutionApprovalInput, AgentSkillExecutionProposal, CreateIssueInput, DashboardPayload, HuntEvent, HuntRun, HuntRunPlacement, IssueAttachment, IssueMessage, IssueMessageSendResult, IssueProposedAction, IssueExecutionApprovalInput, IssueExecutionProposal, IssueExecutionPreferences, PlanningProject, Project, ProjectAgent, RelatedMessageReference, RunEvidence, RunEvidenceImage, UpdateIssueInput } from "@/types";
-import { sortAgentProviders, type AgentProvider } from "@/lib/project-llm";
+import { sortAgentProviders, type AgentProvider } from "@/lib/team-llm";
 import { useI18n } from "@/i18n";
 import type { MessageKey } from "@/i18n/messages";
 import { CompanionTaskSwipeAction } from "./board/CompanionTaskSwipeAction";
@@ -34,12 +34,17 @@ import { IssueCollection, type IssueCollectionState, type IssueWorkflowContext }
 import { IssuePropertyFilterMenu } from "./board/IssuePropertyFilterMenu";
 import { KanbanCard } from "./board/KanbanCard";
 import { KanbanColumnMenu } from "./board/KanbanColumnMenu";
-import { RunPage } from "./detail/RunPage";
 import { CreateIssueDialog } from "./editor/CreateIssueDialog";
 import { EditIssueDialog } from "./editor/EditIssueDialog";
 import { DashboardView, IssuePropertyFilters, SourceFilter, StatusFilter, emptyIssuePropertyFilters, runMatchesIssuePropertyFilters } from "./model/filters";
 import { localizeWorkflowStage } from "./model/formatters";
 import { KanbanColumn, KanbanPointerDrag, kanbanAutoScrollEdge, kanbanAutoScrollInterval, kanbanColumnForRun, kanbanPointerDragThreshold, placementMatchesRun } from "./model/kanban";
+// The issue detail page pulls the whole markdown rendering stack, so it loads
+// from its own chunk the first time an issue is opened.
+const RunPage = lazy(() => import("./detail/RunPage").then(m => ({
+  default: m.RunPage
+})));
+const runPageFallback = <div className="lazy-view-placeholder h-full w-full" />;
 function runIdFromCreateIssueResult(value: unknown) {
   if (typeof value !== "object" || value === null || !("runId" in value) || typeof value.runId !== "string") {
     return null;
@@ -427,7 +432,7 @@ function HuntDashboardContent({
   });
   useEffect(() => {
     setPropertyFilters(emptyIssuePropertyFilters());
-  }, [dashboard?.project.id]);
+  }, [dashboard?.team.id]);
   useEffect(() => {
     if (!isSourceFilterOpen) return;
     const closeOnOutsideClick = (event: MouseEvent) => {
@@ -471,14 +476,14 @@ function HuntDashboardContent({
   const deletingRunFromMenu = runs.find(run => run.id === deletingRunFromMenuId) ?? null;
   const transferringRunFromMenu = runs.find(run => run.id === transferringRunFromMenuId) ?? null;
   const transferDestinationProjects = useMemo(() => {
-    const activeProjectId = dashboard?.project.id;
-    const organizationId = dashboard?.project.organizationId;
+    const activeProjectId = dashboard?.team.id;
+    const organizationId = dashboard?.team.organizationId;
     if (!activeProjectId) return [];
     return projects.filter(project => project.id !== activeProjectId && (!organizationId || project.organizationId === organizationId));
-  }, [dashboard?.project.id, dashboard?.project.organizationId, projects]);
+  }, [dashboard?.team.id, dashboard?.team.organizationId, projects]);
   const transferDestinationOptions = useMemo(() => {
     const sourcePlanningProjectId = transferringRunFromMenu?.projectId;
-    const teamId = dashboard?.project.id;
+    const teamId = dashboard?.team.id;
     const planningOptions = teamId
       ? issueProjects
         .filter((project) =>
@@ -498,7 +503,7 @@ function HuntDashboardContent({
       })),
     ];
   }, [
-    dashboard?.project.id,
+    dashboard?.team.id,
     issueProjects,
     transferDestinationProjects,
     transferringRunFromMenu?.projectId,
@@ -515,12 +520,12 @@ function HuntDashboardContent({
       if (status === "active" && ["completed", "cancelled"].includes(run.status)) return false;
       if (status === "attention" && !["paused", "blocked", "failed"].includes(run.status)) return false;
       if (status === "completed" && !["completed", "cancelled"].includes(run.status)) return false;
-      return !normalized || [run.title, run.sourceKey, run.repository, formatIssueKey(dashboard?.project.issueKeyPrefix, run.runNumber)].join(" ").toLowerCase().includes(normalized);
+      return !normalized || [run.title, run.sourceKey, run.repository, formatIssueKey(dashboard?.team.issueKeyPrefix, run.runNumber)].join(" ").toLowerCase().includes(normalized);
     });
     // Mobile companion Tasks list: newest updated first (iOS native parity).
     if (!companionMode) return next;
     return [...next].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
-  }, [companionMode, dashboard?.project.issueKeyPrefix, query, propertyFilters, runs, source, status]);
+  }, [companionMode, dashboard?.team.issueKeyPrefix, query, propertyFilters, runs, source, status]);
   const agentAssociationsByRunId = useMemo(() => {
     const agentById = new Map(agents.map(agent => [agent.id, agent]));
     const activeAgents = new Map<string, ProjectAgent>();
@@ -535,7 +540,7 @@ function HuntDashboardContent({
     }
     const recentSessions = [...sessions].sort((left, right) => Date.parse(right.startedAt) - Date.parse(left.startedAt));
     for (const session of recentSessions) {
-      if (session.projectId !== dashboard?.project.id || !session.agentId) continue;
+      if (session.projectId !== dashboard?.team.id || !session.agentId) continue;
       const agent = agentById.get(session.agentId);
       if (!agent) continue;
       for (const issue of session.issues) {
@@ -551,7 +556,7 @@ function HuntDashboardContent({
       activeAgents,
       performedAgents
     };
-  }, [agents, dashboard?.project.id, runs, sessions]);
+  }, [agents, dashboard?.team.id, runs, sessions]);
   const workerById = useMemo(() => new Map((dashboard?.workers ?? []).map(worker => [worker.id, worker])), [dashboard?.workers]);
   const availableProviders = useMemo<AgentProvider[]>(() => {
     if (dashboard?.organizationProviders?.length) {
@@ -576,7 +581,7 @@ function HuntDashboardContent({
     if (!selected || !selectedInboxVersion) return;
     onIssueViewed?.(selected.id);
   }, [onIssueViewed, selected?.id, selectedInboxVersion]);
-  const projectId = dashboard?.project.id ?? null;
+  const projectId = dashboard?.team.id ?? null;
   useEffect(() => {
     setCollapsedColumnIds(readKanbanColumnIds("collapse", currentUserId, projectId));
     setHiddenColumnIds(readKanbanColumnIds("hide", currentUserId, projectId));
@@ -764,9 +769,9 @@ function HuntDashboardContent({
   }, [keyboardKanbanRunIds]);
   const selectableIssueProjects = issueProjects.length > 0
     ? dashboard
-      ? issueProjects.filter(project => project.teamId === dashboard.project.id)
+      ? issueProjects.filter(project => project.teamId === dashboard.team.id)
       : issueProjects
-    : (projects.length > 0 ? projects : dashboard ? [dashboard.project] : [])
+    : (projects.length > 0 ? projects : dashboard ? [dashboard.team] : [])
       .map(project => ({ ...project, teamId: project.id, isDefault: true }));
   const defaultIssueProjectId = selectableIssueProjects.some(
     project => project.id === createIssueDefaultProjectId,
@@ -800,7 +805,7 @@ function HuntDashboardContent({
     execution: {
       checkpoints: dashboard.settings.checkpointPolicy?.effective ?? dashboard.settings.workflow.execution.checkpoints
     }
-  } : undefined} workflowTeamId={dashboard?.project.id} /> : null;
+  } : undefined} workflowTeamId={dashboard?.team.id} /> : null;
   const collectionState = useMemo<IssueCollectionState>(() => ({
     propertyFilters,
     query,
@@ -814,10 +819,10 @@ function HuntDashboardContent({
     view,
   }), [propertyFilters, query, setStatus, source, status, view]);
   const issueWorkflowContext = useMemo<IssueWorkflowContext | undefined>(() => dashboard ? {
-    id: dashboard.project.id,
-    label: dashboard.project.name,
+    id: dashboard.team.id,
+    label: dashboard.team.name,
     settings: dashboard.settings,
-  } : undefined, [dashboard?.project.id, dashboard?.project.name, dashboard?.settings]);
+  } : undefined, [dashboard?.team.id, dashboard?.team.name, dashboard?.settings]);
   const workflowForRun = useCallback(() => issueWorkflowContext, [issueWorkflowContext]);
   if (noProject) {
     return <MainContent id="issues">
@@ -834,8 +839,8 @@ function HuntDashboardContent({
       </MainContent>;
   }
   if (selected) {
-    return <>
-      <RunPage assignedWorker={workerById.get(selected.workerId ?? "") ?? workerById.get(selected.requestedWorkerId ?? "") ?? null} companionMode={companionMode} conversationInboxSyncSignal={conversationInboxSyncSignal} highlightedMessageId={selectedRunMessageId} initialDetailTab={selectedRunInitialTab ?? undefined} issueKeyPrefix={dashboard?.project.issueKeyPrefix} currentUserId={currentUserId} error={displayedError} showErrorToast={false} isDeletingIssue={deletingIssueId === selected.id} isRecovering={recoveringRunId === selected.id} isUpdatingIssue={updatingIssueId === selected.id} isSidebarOpen={isSidebarOpen} issueProjects={issueProjects.filter(project => project.teamId === dashboard?.project.id && project.status !== "cancelled")} onBack={() => {
+    return <Suspense fallback={runPageFallback}>
+      <RunPage assignedWorker={workerById.get(selected.workerId ?? "") ?? workerById.get(selected.requestedWorkerId ?? "") ?? null} companionMode={companionMode} conversationInboxSyncSignal={conversationInboxSyncSignal} highlightedMessageId={selectedRunMessageId} initialDetailTab={selectedRunInitialTab ?? undefined} issueKeyPrefix={dashboard?.team.issueKeyPrefix} currentUserId={currentUserId} error={displayedError} showErrorToast={false} isDeletingIssue={deletingIssueId === selected.id} isRecovering={recoveringRunId === selected.id} isUpdatingIssue={updatingIssueId === selected.id} isSidebarOpen={isSidebarOpen} issueProjects={issueProjects.filter(project => project.teamId === dashboard?.team.id && project.status !== "cancelled")} onBack={() => {
         setSelectedRunMessageId(null);
         setSelectedRunInitialTab(null);
         setSelectedRunId(null);
@@ -849,13 +854,13 @@ function HuntDashboardContent({
         setSelectedRunMessageId(null);
         setSelectedRunInitialTab(null);
         setSelectedRunId(null);
-      } : undefined} transferProjects={transferDestinationProjects} teams={projects} currentTeam={dashboard?.project ?? null} onAddDependency={onAddIssueDependency ? prerequisiteRunId => onAddIssueDependency(selected.id, prerequisiteRunId) : undefined} onAddRelated={onAddRelatedIssue ? relatedRunId => onAddRelatedIssue(selected.id, relatedRunId) : undefined} onCreateSubIssue={() => openCreateSubIssueDialog(selected.id)} onLinkSubIssue={onSetIssueParent ? childRunId => onSetIssueParent(childRunId, selected.id) : undefined} onSetParent={onSetIssueParent ? parentRunId => onSetIssueParent(selected.id, parentRunId) : undefined} onUnlinkSubIssue={onSetIssueParent ? childRunId => onSetIssueParent(childRunId, null) : undefined} onAcceptIssueAction={onAcceptIssueAction ? proposal => onAcceptIssueAction(selected.id, proposal) : undefined} onAcceptIssueExecution={onAcceptIssueExecution ? (proposal, input) => onAcceptIssueExecution(selected.id, proposal, input) : undefined} onAcceptSkillExecution={onAcceptSkillExecution ? (proposal, input) => onAcceptSkillExecution(selected.id, proposal, input) : undefined} onRemoveDependency={onRemoveIssueDependency ? prerequisiteRunId => onRemoveIssueDependency(selected.id, prerequisiteRunId) : undefined} onRemoveRelated={onRemoveRelatedIssue ? relatedRunId => onRemoveRelatedIssue(selected.id, relatedRunId) : undefined} onRelatedMessageOpen={onRelatedMessageOpen} onDependencyOpen={runId => {
+      } : undefined} transferProjects={transferDestinationProjects} teams={projects} currentTeam={dashboard?.team ?? null} onAddDependency={onAddIssueDependency ? prerequisiteRunId => onAddIssueDependency(selected.id, prerequisiteRunId) : undefined} onAddRelated={onAddRelatedIssue ? relatedRunId => onAddRelatedIssue(selected.id, relatedRunId) : undefined} onCreateSubIssue={() => openCreateSubIssueDialog(selected.id)} onLinkSubIssue={onSetIssueParent ? childRunId => onSetIssueParent(childRunId, selected.id) : undefined} onSetParent={onSetIssueParent ? parentRunId => onSetIssueParent(selected.id, parentRunId) : undefined} onUnlinkSubIssue={onSetIssueParent ? childRunId => onSetIssueParent(childRunId, null) : undefined} onAcceptIssueAction={onAcceptIssueAction ? proposal => onAcceptIssueAction(selected.id, proposal) : undefined} onAcceptIssueExecution={onAcceptIssueExecution ? (proposal, input) => onAcceptIssueExecution(selected.id, proposal, input) : undefined} onAcceptSkillExecution={onAcceptSkillExecution ? (proposal, input) => onAcceptSkillExecution(selected.id, proposal, input) : undefined} onRemoveDependency={onRemoveIssueDependency ? prerequisiteRunId => onRemoveIssueDependency(selected.id, prerequisiteRunId) : undefined} onRemoveRelated={onRemoveRelatedIssue ? relatedRunId => onRemoveRelatedIssue(selected.id, relatedRunId) : undefined} onRelatedMessageOpen={onRelatedMessageOpen} onDependencyOpen={runId => {
         setSelectedRunMessageId(null);
         setSelectedRunInitialTab(null);
         setSelectedRunId(runId);
-      }} onLoadAttachment={onLoadAttachment} onLoadIssueMessages={() => onLoadIssueMessages(selected.id)} onLoadRunEvents={() => onLoadRunEvents(selected.id)} onLoadRunEvidence={() => onLoadRunEvidence(selected.id)} onLoadRunEvidenceImage={onLoadRunEvidenceImage} onViewingIssueConversationChange={onViewingIssueConversationChange} onCompleteResultReview={onCompleteResultReview ? () => onCompleteResultReview(selected.id) : undefined} mentionMembers={dashboard?.members ?? []} mentionAgents={agents.filter(agent => agent.projectId === dashboard?.project.id)} onMove={placement => onMoveRun(selected.id, placement)} onMoveIssueProject={onMoveIssueProject && selected.projectId ? targetProjectId => onMoveIssueProject(selected.id, selected.projectId!, targetProjectId) : undefined} onProcessNow={onProcessIssueNow ? () => onProcessIssueNow(selected) : undefined} onRetry={() => onRetryRun(selected.id)} onRework={onReworkRun ? input => onReworkRun(selected.id, input) : undefined} onResume={() => onResumeRun(selected.id)} onSendIssueMessage={input => onSendIssueMessage(selected.id, input)} onEditIssueMessage={(messageId, input) => onEditIssueMessage(selected.id, messageId, input)} onDeleteIssueMessage={messageId => onDeleteIssueMessage(selected.id, messageId)} onUpdateIssue={input => onUpdateIssue(selected.id, input)} onUpdateIssueCheckpoints={checkpoints => onUpdateIssueCheckpoints(selected.id, checkpoints)} onUpdateIssuePreferences={input => onUpdateIssuePreferences(selected.id, input)} onUpdateIssueSubscription={onUpdateIssueSubscription ? subscribed => onUpdateIssueSubscription(selected.id, subscribed) : undefined} availableProviders={availableProviders} executionPolicy={dashboard?.executionPolicy} executionWorkers={dashboard?.workers ?? []} performedAgentName={agentAssociationsByRunId.performedAgents.get(selected.id)?.name ?? null} performedAgentProvider={agentAssociationsByRunId.performedAgents.get(selected.id)?.provider ?? null} performedAgentModel={agentAssociationsByRunId.performedAgents.get(selected.id)?.model ?? null} organizationId={dashboard!.project.organizationId} projectId={dashboard!.project.id} run={selected} isProcessing={processingIssueIds.has(selected.id)} availableRuns={dashboard!.runs} token={token} />
+      }} onLoadAttachment={onLoadAttachment} onLoadIssueMessages={() => onLoadIssueMessages(selected.id)} onLoadRunEvents={() => onLoadRunEvents(selected.id)} onLoadRunEvidence={() => onLoadRunEvidence(selected.id)} onLoadRunEvidenceImage={onLoadRunEvidenceImage} onViewingIssueConversationChange={onViewingIssueConversationChange} onCompleteResultReview={onCompleteResultReview ? () => onCompleteResultReview(selected.id) : undefined} mentionMembers={dashboard?.members ?? []} mentionAgents={agents.filter(agent => agent.teamId === dashboard?.team.id)} onMove={placement => onMoveRun(selected.id, placement)} onMoveIssueProject={onMoveIssueProject && selected.projectId ? targetProjectId => onMoveIssueProject(selected.id, selected.projectId!, targetProjectId) : undefined} onProcessNow={onProcessIssueNow ? () => onProcessIssueNow(selected) : undefined} onRetry={() => onRetryRun(selected.id)} onRework={onReworkRun ? input => onReworkRun(selected.id, input) : undefined} onResume={() => onResumeRun(selected.id)} onSendIssueMessage={input => onSendIssueMessage(selected.id, input)} onEditIssueMessage={(messageId, input) => onEditIssueMessage(selected.id, messageId, input)} onDeleteIssueMessage={messageId => onDeleteIssueMessage(selected.id, messageId)} onUpdateIssue={input => onUpdateIssue(selected.id, input)} onUpdateIssueCheckpoints={checkpoints => onUpdateIssueCheckpoints(selected.id, checkpoints)} onUpdateIssuePreferences={input => onUpdateIssuePreferences(selected.id, input)} onUpdateIssueSubscription={onUpdateIssueSubscription ? subscribed => onUpdateIssueSubscription(selected.id, subscribed) : undefined} availableProviders={availableProviders} executionPolicy={dashboard?.executionPolicy} executionWorkers={dashboard?.workers ?? []} performedAgentName={agentAssociationsByRunId.performedAgents.get(selected.id)?.name ?? null} performedAgentProvider={agentAssociationsByRunId.performedAgents.get(selected.id)?.provider ?? null} performedAgentModel={agentAssociationsByRunId.performedAgents.get(selected.id)?.model ?? null} organizationId={dashboard!.team.organizationId} projectId={dashboard!.team.id} run={selected} isProcessing={processingIssueIds.has(selected.id)} availableRuns={dashboard!.runs} token={token} />
         {createIssueDialog}
-      </>;
+      </Suspense>;
   }
   return <MainContent id="issues">
       {!companionMode ? <IssueCollection
@@ -869,7 +874,7 @@ function HuntDashboardContent({
         headerTrailing={<Button aria-keyshortcuts="Meta+N" aria-label={t("dashboard.createIssue")} className="create-issue-button" onClick={() => openCreateIssueDialog()} type="button"><Plus size={16} />{t("issue.newIssue")}</Button>}
         isLoading={issuesLoading}
         isSidebarOpen={isSidebarOpen}
-        issueKeyPrefixForRun={() => dashboard?.project.issueKeyPrefix}
+        issueKeyPrefixForRun={() => dashboard?.team.issueKeyPrefix}
         members={dashboard?.members ?? []}
         onCheckpointsChange={(run, checkpoints) => onUpdateIssueCheckpoints(run.id, checkpoints).catch(() => undefined)}
         onCreateInColumn={openCreateIssueDialog}
@@ -908,7 +913,7 @@ function HuntDashboardContent({
           void onMoveIssueProject(run.id, run.projectId, targetProjectId).catch(() => undefined);
         } : undefined}
         teams={projects}
-        currentTeamId={dashboard?.project.id ?? null}
+        currentTeamId={dashboard?.team.id ?? null}
         planningProjects={issueProjects}
         processingIssueIds={processingIssueIds}
         recoveringRunId={recoveringRunId}
@@ -916,7 +921,7 @@ function HuntDashboardContent({
         scrollLeftRef={kanbanScrollLeftRef}
         searchPlaceholder={t("dashboard.search")}
         state={collectionState}
-        storageScopeId={dashboard?.project.id}
+        storageScopeId={dashboard?.team.id}
         title={t("dashboard.queue")}
         token={token}
         updatingIssueId={updatingIssueId}
@@ -969,7 +974,7 @@ function HuntDashboardContent({
           </div>}
         {issuesLoading ? <div aria-live="polite" aria-busy="true" className="issues-loading-overlay" role="status">
             <LoadingState label={t("dashboard.loadingIssues")} />
-          </div> : view === "list" && !companionMode ? <IssueList availableProviders={availableProviders} issueKeyPrefix={dashboard?.project.issueKeyPrefix} deletingIssueId={deletingIssueId} onDelete={runId => {
+          </div> : view === "list" && !companionMode ? <IssueList availableProviders={availableProviders} issueKeyPrefix={dashboard?.team.issueKeyPrefix} deletingIssueId={deletingIssueId} onDelete={runId => {
         setContextDeleteError(null);
         setDeletingRunFromMenuId(runId);
       }} onEdit={setEditingRunId} onTransfer={onTransferIssue ? runId => {
@@ -984,7 +989,7 @@ function HuntDashboardContent({
       } : undefined} onProjectChange={onMoveIssueProject ? (run, targetProjectId) => {
         if (!run.projectId || run.projectId === targetProjectId) return;
         void onMoveIssueProject(run.id, run.projectId, targetProjectId).catch(() => undefined);
-      } : undefined} teams={projects} currentTeamId={dashboard?.project.id ?? null} planningProjects={issueProjects} onMove={(run, placement) => onMoveRun(run.id, placement).catch(() => undefined)} onOpen={runId => {
+      } : undefined} teams={projects} currentTeamId={dashboard?.team.id ?? null} planningProjects={issueProjects} onMove={(run, placement) => onMoveRun(run.id, placement).catch(() => undefined)} onOpen={runId => {
         setSelectedRunMessageId(null);
         setSelectedRunInitialTab(null);
         setSelectedRunId(runId);
@@ -1032,7 +1037,7 @@ function HuntDashboardContent({
                 </header> : null}
               {isCollapsed ? null : <div className="kanban-column-content">
                 {column.runs.length ? column.runs.map(run => <CompanionTaskSwipeAction disabled={!onProcessIssueNow || run.executionReadiness === "waiting" || run.status === "queued" && Boolean(run.leaseExpiresAt) && Date.parse(run.leaseExpiresAt!) > Date.now() || processingIssueIds.has(run.id)} enabled={companionMode && (run.status === "backlog" || run.status === "queued")} key={run.id} onProcessNow={() => onProcessIssueNow?.(run)}>
-                    <KanbanCard availableProviders={availableProviders} issueKeyPrefix={dashboard?.project.issueKeyPrefix} activeAgent={agentAssociationsByRunId.activeAgents.get(run.id) ?? null} assignee={dashboard?.members?.find(member => member.userId === run.assigneeUserId) ?? null} assignedWorker={workerById.get(run.workerId ?? "") ?? workerById.get(run.requestedWorkerId ?? "") ?? null} cardRef={kanbanNavigation.getItemRef(run.id)} hideAssignmentBadges={!companionMode && ["completed", "cancelled", "paused", "blocked", "failed"].includes(run.status)} contextMenuDisabled={companionMode} deletingIssueId={deletingIssueId} isDragging={draggedRunId === run.id} isKeyboardCursor={kanbanCursorRunId === run.id} isMoving={recoveringRunId === run.id} onDelete={() => {
+                    <KanbanCard availableProviders={availableProviders} issueKeyPrefix={dashboard?.team.issueKeyPrefix} activeAgent={agentAssociationsByRunId.activeAgents.get(run.id) ?? null} assignee={dashboard?.members?.find(member => member.userId === run.assigneeUserId) ?? null} assignedWorker={workerById.get(run.workerId ?? "") ?? workerById.get(run.requestedWorkerId ?? "") ?? null} cardRef={kanbanNavigation.getItemRef(run.id)} hideAssignmentBadges={!companionMode && ["completed", "cancelled", "paused", "blocked", "failed"].includes(run.status)} contextMenuDisabled={companionMode} deletingIssueId={deletingIssueId} isDragging={draggedRunId === run.id} isKeyboardCursor={kanbanCursorRunId === run.id} isMoving={recoveringRunId === run.id} onDelete={() => {
                       setContextDeleteError(null);
                       setDeletingRunFromMenuId(run.id);
                     }} onTransfer={onTransferIssue ? () => {
@@ -1046,7 +1051,7 @@ function HuntDashboardContent({
                     } : undefined} onProjectChange={onMoveIssueProject && run.projectId ? targetProjectId => {
                       if (targetProjectId === run.projectId) return;
                       void onMoveIssueProject(run.id, run.projectId!, targetProjectId).catch(() => undefined);
-                    } : undefined} teams={projects} currentTeamId={dashboard?.project.id ?? null} planningProjects={issueProjects.filter(project => !run.teamId || project.teamId === run.teamId)} onPointerCancel={event => {
+                    } : undefined} teams={projects} currentTeamId={dashboard?.team.id ?? null} planningProjects={issueProjects.filter(project => !run.teamId || project.teamId === run.teamId)} onPointerCancel={event => {
                       if (pointerDragRef.current?.pointerId === event.pointerId) {
                         clearKanbanDragState();
                       }

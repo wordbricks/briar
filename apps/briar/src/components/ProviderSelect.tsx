@@ -5,7 +5,7 @@ import {
   agentProviders,
   sortAgentProviders,
   type AgentProvider,
-} from "../lib/project-llm";
+} from "../lib/team-llm";
 import { AgentProviderIcon } from "./AgentIcons";
 import { SelectMenu, type SelectMenuOption } from "./SelectMenu";
 

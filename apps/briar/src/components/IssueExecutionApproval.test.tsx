@@ -4,7 +4,7 @@ import { act } from "react";
 import type { Root } from "react-dom/client";
 import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { defaultAgentProviderModelCatalog } from "../lib/project-llm";
+import { defaultAgentProviderModelCatalog } from "../lib/team-llm";
 import type { ExecutionWorker, HuntRun } from "../types";
 import {
   IssueExecutionApproval,

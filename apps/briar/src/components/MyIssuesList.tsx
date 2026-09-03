@@ -15,7 +15,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { Input } from "./ui/input";
 import { Typography } from "./ui/typography";
 import { PageHeader } from "./layout";
-import { ProjectIcon } from "./ProjectIcon";
+import { TeamIcon } from "./TeamIcon";
 import { PullRequestIconLink } from "./hunt/board/PullRequestIconLink";
 import { relativeTime, localizeStatus } from "./hunt/model/formatters";
 import { useI18n } from "../i18n";
@@ -321,7 +321,7 @@ export function MyIssuesList({
                               <StatusIcon run={run} />
                             </span>
                             <span className="my-issues-reference-key" role="cell">
-                              <ProjectIcon className="issue-list-project-icon" project={project} />
+                              <TeamIcon className="issue-list-project-icon" project={project} />
                               {projectKey}
                             </span>
                             <span className="my-issues-reference-copy" role="cell">

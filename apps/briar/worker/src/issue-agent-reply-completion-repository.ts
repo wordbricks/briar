@@ -1,6 +1,6 @@
 import { type IssueAttachmentInput } from "./issue-attachment-repository";
 import { type IssueAgentReplyJobRow } from "./issue-agent-reply-repository";
-import { encodeApprovedProjectAgentTaskSession } from "./project-agent-session-materialization";
+import { encodeApprovedTeamAgentTaskSession } from "./team-agent-session-materialization";
 import {
   consumeReplyAttachmentStatements,
   replyAttachmentAvailabilityGuard,
@@ -115,7 +115,7 @@ export async function completeIssueAgentReplyOutput(
       consentTaskBinding?.execution_mode === "task" &&
       consentTaskBinding.approval_policy === "invoke_is_consent" &&
       consentTaskBinding.worker_id && consentTaskBinding.requested_by_user_id
-    ? encodeApprovedProjectAgentTaskSession({
+    ? encodeApprovedTeamAgentTaskSession({
       sessionId: consentTaskSessionId,
       agentId: consentTaskBinding.agent_id,
       agentName: consentTaskBinding.agent_name,

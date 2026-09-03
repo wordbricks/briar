@@ -2,8 +2,8 @@ import type { BriarAuth } from "./auth";
 import { json } from "./http-response";
 import { listOrganizationsApplication } from "./organization-application";
 import type { OrganizationRow } from "./organization-repository";
-import { projectJson } from "./project-json";
-import { listProjects } from "./project-repository";
+import { teamJson } from "./team-json";
+import { listTeams } from "./team-repository";
 import { requireSession } from "./session-auth";
 
 const legacyOrganizationJson = (organization: OrganizationRow) => ({
@@ -42,6 +42,6 @@ export async function handleLegacyUpdateBootstrapRoute(input: {
     });
     return json({ organizations: organizations.map(legacyOrganizationJson) });
   }
-  const projects = await listProjects(db, session.user.id);
-  return json({ projects: projects.map(projectJson) });
+  const projects = await listTeams(db, session.user.id);
+  return json({ projects: projects.map(teamJson) });
 }

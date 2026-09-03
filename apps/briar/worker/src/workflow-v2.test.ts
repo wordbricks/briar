@@ -11,7 +11,7 @@ import {
   completeWorkflowStageLifecycle,
   completeWorkflowStage,
   createOrganization,
-  createProject,
+  createTeam,
   getHuntRunForProject,
   getWorkflowProgress,
   initializeWorkflowProgress,
@@ -24,7 +24,6 @@ import {
   startWorkflowStage,
   HuntTransitionError,
 } from "./db";
-import { applyD1Migrations } from "./test-helpers/d1";
 
 const baseTime = Date.parse("2026-08-01T00:00:00Z");
 const at = (minute: number) =>
@@ -122,7 +121,6 @@ describe("workflow v2 D1 persistence and transitions", () => {
 
   beforeAll(async () => {
     db = env.DB;
-    await applyD1Migrations(db);
     await db
       .prepare(
         `insert into user (
@@ -142,7 +140,7 @@ describe("workflow v2 D1 persistence and transitions", () => {
       handle: "workflow-org",
       ownerUserId: "workflow-owner",
     });
-    const project = await createProject(db, {
+    const project = await createTeam(db, {
       ownerUserId: "workflow-owner",
       organizationId: organization.id,
       name: "Workflow Project",

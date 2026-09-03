@@ -663,7 +663,7 @@ struct ProjectSelectionView: View {
                                 selectedProjectID = project.id
                             } label: {
                                 HStack(spacing: 12) {
-                                    ProjectIconView(icon: project.icon, size: 28)
+                                    TeamIconView(icon: project.icon, size: 28)
                                     Text(project.name)
                                         .foregroundStyle(.primary)
                                     Spacer()

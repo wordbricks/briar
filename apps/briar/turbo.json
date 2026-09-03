@@ -66,9 +66,119 @@
       "outputs": ["dist/**"],
       "cache": true
     },
+    "d1:migrate:local": {
+      "inputs": [
+        "migrations/**",
+        "wrangler.jsonc",
+        "package.json",
+        "$TURBO_ROOT$/package.json",
+        "$TURBO_ROOT$/bun.lock"
+      ],
+      "outputs": [],
+      "cache": true
+    },
+    "test:d1:migrations": {
+      "inputs": [
+        "migrations/**",
+        "migrations-snapshot/**",
+        "src/i18n/locale.ts",
+        "src/lib/**/*.ts",
+        "worker/src/**/*.ts",
+        "vitest.max-workers.ts",
+        "vitest.worker-migrations.config.ts",
+        "vitest.worker.shared.ts",
+        "worker-configuration.d.ts",
+        "wrangler.jsonc",
+        "package.json",
+        "$TURBO_ROOT$/package.json",
+        "$TURBO_ROOT$/bun.lock",
+        "$TURBO_ROOT$/packages/contracts/src/**"
+      ],
+      "outputs": [],
+      "cache": true
+    },
     "typecheck": {
       "dependsOn": ["transit", "worker:check"],
       "outputs": []
+    },
+    "test:all": {
+      "dependsOn": ["test:unit", "test:worker:unit", "test:worker:d1"],
+      "outputs": [],
+      "cache": false
+    },
+    "test:unit": {
+      "inputs": [
+        "src/**",
+        "src-agent/**",
+        "src-cli/**",
+        "src-tauri/*.json",
+        "src-tauri/capabilities/**",
+        "worker/src/**/*.ts",
+        "!worker/src/**/*.test.ts",
+        "worker/src/html-artifact-preview-shell.test.ts",
+        "index.html",
+        "vite.config.ts",
+        "vitest.max-workers.ts",
+        "package.json",
+        "$TURBO_ROOT$/.env*",
+        "$TURBO_ROOT$/package.json",
+        "$TURBO_ROOT$/bun.lock",
+        "$TURBO_ROOT$/packages/agent-exec/src/**",
+        "$TURBO_ROOT$/packages/contracts/src/**"
+      ],
+      "outputs": [],
+      "cache": true
+    },
+    "test:worker:unit": {
+      "inputs": [
+        "worker/src/**",
+        "!worker/src/**/*.migration.test.ts",
+        "!worker/src/html-artifact-preview-shell.test.ts",
+        "src/assets/**",
+        "src/i18n/**/*.ts",
+        "src/lib/**/*.ts",
+        "!src/lib/**/*.test.ts",
+        "src-cli/**/*.ts",
+        "!src-cli/**/*.test.ts",
+        "vitest.max-workers.ts",
+        "vitest.worker.config.ts",
+        "vitest.worker.shared.ts",
+        "vitest.worker.test-files.ts",
+        "worker-configuration.d.ts",
+        "wrangler.jsonc",
+        "package.json",
+        "$TURBO_ROOT$/package.json",
+        "$TURBO_ROOT$/bun.lock",
+        "$TURBO_ROOT$/packages/contracts/src/**"
+      ],
+      "outputs": [],
+      "cache": true
+    },
+    "test:worker:d1": {
+      "inputs": [
+        "worker/src/**",
+        "!worker/src/**/*.migration.test.ts",
+        "!worker/src/html-artifact-preview-shell.test.ts",
+        "migrations-snapshot/**",
+        "src/assets/**",
+        "src/i18n/**/*.ts",
+        "src/lib/**/*.ts",
+        "!src/lib/**/*.test.ts",
+        "src-cli/**/*.ts",
+        "!src-cli/**/*.test.ts",
+        "vitest.max-workers.ts",
+        "vitest.worker-d1.config.ts",
+        "vitest.worker.shared.ts",
+        "vitest.worker.test-files.ts",
+        "worker-configuration.d.ts",
+        "wrangler.jsonc",
+        "package.json",
+        "$TURBO_ROOT$/package.json",
+        "$TURBO_ROOT$/bun.lock",
+        "$TURBO_ROOT$/packages/contracts/src/**"
+      ],
+      "outputs": [],
+      "cache": true
     },
     "test": {
       "dependsOn": ["transit"],

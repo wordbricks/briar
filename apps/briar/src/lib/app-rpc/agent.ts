@@ -58,7 +58,7 @@ import {
   structuredResultFromProto,
   structuredResultToProto,
 } from "./mappers";
-import { workflowFromProto } from "./project-configuration-mappers";
+import { workflowFromProto } from "./team-configuration-mappers";
 
 const agentClient = appTransport ? createClient(AgentService, appTransport) : undefined;
 
@@ -150,7 +150,7 @@ const codexPetSpriteVersion = (value: number | undefined): 1 | 2 => {
 
 export const projectAgentFromMessage = (agent: ProjectAgentMessage): ProjectAgent => ({
   id: agent.id,
-  projectId: agent.projectId,
+  teamId: agent.projectId,
   name: agent.name,
   avatar: agent.avatar ?? null,
   codexPet:
@@ -521,7 +521,7 @@ const projectAgentScheduleFromMessage = (
   schedule: ProjectAgentScheduleMessage,
 ): ProjectAgentSchedule => ({
   id: schedule.id,
-  projectId: schedule.projectId,
+  teamId: schedule.projectId,
   agentId: schedule.agentId,
   agentName: schedule.agentName,
   agentProvider: agentProviderFromProto(schedule.agentProvider),
@@ -545,7 +545,7 @@ const projectAgentScheduleRunFromMessage = (
   const agent = requiredMessage(scheduleRun.agent, "agentScheduleRun.agent");
   return {
     id: scheduleRun.id,
-    projectId: scheduleRun.projectId,
+    teamId: scheduleRun.projectId,
     scheduleId: scheduleRun.scheduleId,
     scheduleName: scheduleRun.scheduleName,
     agent: {

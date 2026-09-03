@@ -41,7 +41,7 @@ function createDependencies() {
   return {
     clearToken: vi.fn(async () => undefined),
     loadOrganizations: vi.fn(async () => organizations),
-    loadProjects: vi.fn(async () => projects),
+    loadTeams: vi.fn(async () => projects),
     loadSession: vi.fn(async () => user),
     readToken: vi.fn(async (): Promise<string | null> => "stored-token"),
   };
@@ -69,7 +69,7 @@ describe("restoreStoredSession", () => {
       status: "unauthorized",
     });
     expect(dependencies.clearToken).toHaveBeenCalledOnce();
-    expect(dependencies.loadProjects).not.toHaveBeenCalled();
+    expect(dependencies.loadTeams).not.toHaveBeenCalled();
     expect(dependencies.loadOrganizations).not.toHaveBeenCalled();
   });
 
@@ -89,7 +89,7 @@ describe("restoreStoredSession", () => {
       status: "unauthorized",
     });
     expect(dependencies.clearToken).toHaveBeenCalledOnce();
-    expect(dependencies.loadProjects).not.toHaveBeenCalled();
+    expect(dependencies.loadTeams).not.toHaveBeenCalled();
     expect(dependencies.loadOrganizations).not.toHaveBeenCalled();
   });
 

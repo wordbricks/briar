@@ -1,4 +1,4 @@
-import { StrictMode } from "react";
+import { StrictMode, type ComponentType } from "react";
 import { createRoot } from "react-dom/client";
 import { RegistryProvider } from "@effect/atom-react";
 import { App } from "./App";
@@ -6,10 +6,9 @@ import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { AppUpdateProvider } from "./components/AppUpdateProvider";
 import { AppKeyboardCommandProvider } from "./hooks/appKeyboardCommands";
 import { DevelopmentBadge } from "./components/DevelopmentBadge";
-import { NativeLaunchIntro } from "./components/NativeLaunchIntro";
 import { ToastProvider } from "./components/ui/toast";
 import { TooltipProvider } from "./components/ui/tooltip";
-import { I18nProvider } from "./i18n";
+import { detectLocale, I18nProvider, loadLocaleMessages } from "./i18n";
 import {
   createAppZoomCommands,
   type AppZoomCommands,
@@ -20,6 +19,9 @@ import { isMacDesktopTauri } from "./lib/platform";
 import { initializeTheme, ThemeProvider } from "./theme";
 import "./styles/globals.css";
 import "./styles.css";
+// Kept after styles.css so the extracted intro rules land in their original
+// cascade position; intro-main.tsx imports the same file on its own.
+import "./styles/launch-intro.css";
 import "./styles/dark.css";
 
 initializeTheme();
@@ -35,31 +37,47 @@ if (nativeLaunchIntro) {
   appZoomCommands = createAppZoomCommands();
 }
 
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <RegistryProvider>
-      <ThemeProvider>
-        <I18nProvider>
-          <TooltipProvider delayDuration={200}>
-            <ToastProvider>
-              <AppErrorBoundary>
-                {nativeLaunchIntro ? (
-                  <NativeLaunchIntro />
-                ) : (
-                  <AppUpdateProvider>
-                    <AppKeyboardCommandProvider>
-                      <App appZoomCommands={appZoomCommands} />
-                    </AppKeyboardCommandProvider>
-                  </AppUpdateProvider>
-                )}
-              </AppErrorBoundary>
-              {import.meta.env.DEV && !nativeLaunchIntro ? (
-                <DevelopmentBadge />
-              ) : null}
-            </ToastProvider>
-          </TooltipProvider>
-        </I18nProvider>
-      </ThemeProvider>
-    </RegistryProvider>
-  </StrictMode>,
-);
+async function start() {
+  // Resolve the active locale (a local chunk, a few milliseconds) before the
+  // first paint so non-Korean users never see the fallback strings flash.
+  const locale = detectLocale();
+  const [messages, NativeLaunchIntro] = await Promise.all([
+    loadLocaleMessages(locale),
+    nativeLaunchIntro
+      ? import("./components/NativeLaunchIntro").then(
+          (module): ComponentType => module.NativeLaunchIntro,
+        )
+      : Promise.resolve(null),
+  ]);
+
+  createRoot(document.getElementById("root")!).render(
+    <StrictMode>
+      <RegistryProvider>
+        <ThemeProvider>
+          <I18nProvider initial={{ locale, messages }}>
+            <TooltipProvider delayDuration={200}>
+              <ToastProvider>
+                <AppErrorBoundary>
+                  {NativeLaunchIntro ? (
+                    <NativeLaunchIntro />
+                  ) : (
+                    <AppUpdateProvider>
+                      <AppKeyboardCommandProvider>
+                        <App appZoomCommands={appZoomCommands} />
+                      </AppKeyboardCommandProvider>
+                    </AppUpdateProvider>
+                  )}
+                </AppErrorBoundary>
+                {import.meta.env.DEV && !nativeLaunchIntro ? (
+                  <DevelopmentBadge />
+                ) : null}
+              </ToastProvider>
+            </TooltipProvider>
+          </I18nProvider>
+        </ThemeProvider>
+      </RegistryProvider>
+    </StrictMode>,
+  );
+}
+
+void start();

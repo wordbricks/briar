@@ -3,9 +3,10 @@
 import { RegistryProvider, useAtomSet } from "@effect/atom-react";
 import { act } from "react";
 import { createReactTestRoot, renderReactTestRoot } from "../test/react";
+import { createRenderCounter } from "../test/render-count";
 import { describe, expect, it } from "vitest";
 
-import { inboxDetailTargetAtom } from "../lib/inbox-selection";
+import { inboxDetailTargetAtom } from "../state/inbox-selection";
 import { InboxDetailTargetBoundary } from "./InboxSelectionBoundary";
 
 describe("InboxSelectionBoundary", () => {
@@ -13,8 +14,7 @@ describe("InboxSelectionBoundary", () => {
     const { cleanup, container, root } = createReactTestRoot({
       attachToDocument: true,
     });
-    let shellRenderCount = 0;
-    let detailRenderCount = 0;
+    const renders = createRenderCounter();
 
     function SelectMessage() {
       const setTarget = useAtomSet(inboxDetailTargetAtom);
@@ -35,15 +35,16 @@ describe("InboxSelectionBoundary", () => {
     }
 
     function AppShell() {
-      shellRenderCount += 1;
+      renders.useRenderCount("shell");
       return (
         <>
           <SelectMessage />
           <InboxDetailTargetBoundary>
-            {(target) => {
-              detailRenderCount += 1;
-              return <output>{target?.messageId ?? "none"}</output>;
-            }}
+            {(target) =>
+              renders.record(
+                "detail",
+                <output>{target?.messageId ?? "none"}</output>,
+              )}
           </InboxDetailTargetBoundary>
         </>
       );
@@ -55,14 +56,12 @@ describe("InboxSelectionBoundary", () => {
         <AppShell />
       </RegistryProvider>,
     );
-    expect(shellRenderCount).toBe(1);
-    expect(detailRenderCount).toBe(1);
+    renders.expectRenderCounts({ detail: 1, shell: 1 });
 
     await act(async () => container.querySelector("button")?.click());
 
     expect(container.querySelector("output")?.textContent).toBe("message-1");
-    expect(shellRenderCount).toBe(1);
-    expect(detailRenderCount).toBe(2);
+    renders.expectRenderCounts({ detail: 2, shell: 1 });
 
     await cleanup();
   });

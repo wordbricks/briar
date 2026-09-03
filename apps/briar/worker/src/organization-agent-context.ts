@@ -9,11 +9,11 @@ import {
   readArchivedProjectAgentSession,
 } from "./archive";
 import {
-  type ProjectAgentSessionRow,
+  type TeamAgentSessionRow,
 } from "./db";
 import { hydrateAgentSkills } from "./agent-skills";
 import type { OrganizationAgentRow } from "./organization-agents";
-import { decodeStoredProjectAgentSessionPayload } from "./project-request-contract";
+import { decodeStoredTeamAgentSessionPayload } from "./team-request-contract";
 
 export const organizationAgentContextDefaultPageSize = 25;
 export const organizationAgentContextMaxPageSize = 50;
@@ -348,8 +348,8 @@ type ContextIssuePullRequestRow = {
   url: string;
 };
 
-const sessionContextJson = (row: ProjectAgentSessionRow) => {
-  const payload = { ...decodeStoredProjectAgentSessionPayload(row.payload_json) };
+const sessionContextJson = (row: TeamAgentSessionRow) => {
+  const payload = { ...decodeStoredTeamAgentSessionPayload(row.payload_json) };
   delete payload.requestedByUserId;
   return {
     id: row.id,
@@ -388,7 +388,7 @@ const getContextSession = async (
     input.projectId,
     input.sessionId,
     input.snapshotAt,
-  ).first<ProjectAgentSessionRow>();
+  ).first<TeamAgentSessionRow>();
   if (hot) return hot;
   const metadata = await db.prepare(
     `select * from briar_log_archives
@@ -1088,7 +1088,7 @@ async function organizationAgentContextSessionSummaries(
     sessionType: row.session_type,
     summary: row.payload_json === null
       ? null
-      : decodeStoredProjectAgentSessionPayload(row.payload_json).summary,
+      : decodeStoredTeamAgentSessionPayload(row.payload_json).summary,
     archived: row.archived === 1,
     startedAt: row.started_at,
     completedAt: row.completed_at,
@@ -1140,7 +1140,7 @@ async function organizationAgentContextSessionDetails(
       throw error;
     }
   }));
-  return rows.filter((row): row is ProjectAgentSessionRow => row !== null)
+  return rows.filter((row): row is TeamAgentSessionRow => row !== null)
     .map(sessionContextJson);
 }
 

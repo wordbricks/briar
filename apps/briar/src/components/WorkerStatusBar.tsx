@@ -15,7 +15,7 @@ import {
   requestOrganizationExecutionWorkerUpdate,
 } from "../lib/api";
 import { supportsManagedComputerRemoteDesktop } from "../lib/platform";
-import type { AgentProvider } from "../lib/project-llm";
+import type { AgentProvider } from "../lib/team-llm";
 import {
   compareSemanticVersions,
   isSemanticVersion,

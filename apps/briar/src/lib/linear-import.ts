@@ -155,12 +155,12 @@ export function canImportLinearIssues(input: {
  */
 export function isRepositoryConnectedForImport(input: {
   projectId: string;
-  connectedProjectIds: string[] | null;
+  connectedTeamIds: string[] | null;
   githubRepository: string | null | undefined;
   repositoryPath: string | null | undefined;
 }): boolean {
   if (input.githubRepository?.trim()) return true;
   if (input.repositoryPath?.trim()) return true;
-  if (input.connectedProjectIds === null) return false;
-  return input.connectedProjectIds.includes(input.projectId);
+  if (input.connectedTeamIds === null) return false;
+  return input.connectedTeamIds.includes(input.projectId);
 }

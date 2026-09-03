@@ -21,7 +21,7 @@ import {
 import {
   defaultAppProviderSettings,
   loadAppProviderSettings,
-} from "../lib/project-llm";
+} from "../lib/team-llm";
 import type {
   AgentUsageSnapshot,
   AgentUsageWindow,

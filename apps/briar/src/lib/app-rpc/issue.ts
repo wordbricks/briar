@@ -102,7 +102,7 @@ import { appCallOptions, appTransport } from "./core";
 import {
   workflowCheckpointFromProto,
   workflowCheckpointToProto,
-} from "./project-configuration-mappers";
+} from "./team-configuration-mappers";
 
 const issueClient = appTransport
   ? createClient(IssueService, appTransport)

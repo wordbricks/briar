@@ -3,7 +3,7 @@ import {
   buildInboxFeedMessages,
   type InboxFeedProjectData,
 } from "./inbox-feed";
-import { encodeStoredProjectAgentSessionSummary } from "./project-request-contract";
+import { encodeStoredTeamAgentSessionSummary } from "./team-request-contract";
 
 const occurredAt = "2026-08-11T13:00:00.000Z";
 const currentUserId = "inbox-user-a";
@@ -14,7 +14,7 @@ const sessionSummaryJson = (input: {
   status: "completed" | "failed";
   completedAt: string;
   issues?: Array<{ title: string; outcome: "blocked" | "failed" }>;
-}) => encodeStoredProjectAgentSessionSummary({
+}) => encodeStoredTeamAgentSessionSummary({
   dispatchGroupId: input.id,
   agentId: null,
   agentName: "Second Agent",

@@ -6,9 +6,9 @@ import type {
 
 import {
   type ModelEffort,
-  type ProjectAgentProvider,
-  type ProjectAgentTaskJobRow,
-} from "./project-agent-model";
+  type TeamAgentProvider,
+  type TeamAgentTaskJobRow,
+} from "./team-agent-model";
 
 export type AgentSkillExecutionProposalRow = {
   id: string;
@@ -28,7 +28,7 @@ export type AgentSkillExecutionProposalRow = {
   skill_name: string;
   skill_instructions: string;
   skill_kind: AgentSkillKind;
-  provider: ProjectAgentProvider;
+  provider: TeamAgentProvider;
   model: string | null;
   effort: ModelEffort | null;
   execution_mode: AgentSkillExecutionMode;
@@ -71,7 +71,7 @@ export type AgentSkillExecutionApprovalAuditRow = {
   skill_name: string;
   skill_instructions: string;
   skill_kind: AgentSkillKind;
-  provider: ProjectAgentProvider;
+  provider: TeamAgentProvider;
   model: string | null;
   effort: ModelEffort | null;
   execution_mode: AgentSkillExecutionMode;
@@ -379,7 +379,7 @@ export async function acceptConversationAgentSkillExecutionProposal(
 
 export async function publishAgentSkillTaskResult(
   db: D1Database,
-  task: ProjectAgentTaskJobRow,
+  task: TeamAgentTaskJobRow,
   publishedAt: string,
 ) {
   if (

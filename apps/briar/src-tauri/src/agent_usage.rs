@@ -28,6 +28,7 @@ const GROK_DEFAULT_PROXY_BASE: &str = "https://cli-chat-proxy.grok.com/v1";
 const GROK_WEEKLY_MINUTES: u64 = 10_080;
 const GROK_MONTHLY_MINUTES: u64 = 43_200;
 const GROK_TOKEN_SKEW_MILLIS: u64 = 5 * 60 * 1_000;
+const CLAUDE_TOKEN_SKEW_MILLIS: u64 = 5 * 60 * 1_000;
 
 #[derive(Clone, Debug, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
@@ -57,6 +58,9 @@ pub(crate) struct ProviderUsage {
     plan_type: Option<String>,
     account_label: Option<String>,
     authenticated: bool,
+    /// True when the stored credentials cannot be used again without a fresh
+    /// sign-in, so the UI must stop reporting the account as connected.
+    reauthentication_required: bool,
     updated_at: u64,
     error: Option<String>,
 }
@@ -93,6 +97,9 @@ struct ClaudeCredentials {
 #[serde(rename_all = "camelCase")]
 struct ClaudeOauthCredentials {
     access_token: Option<String>,
+    expires_at: Option<u64>,
+    refresh_token: Option<String>,
+    refresh_token_expires_at: Option<u64>,
     email: Option<String>,
     #[serde(alias = "emailAddress")]
     email_address: Option<String>,
@@ -102,8 +109,35 @@ struct ClaudeOauthCredentials {
 
 struct ClaudeAccountCredentials {
     access_token: String,
+    expires_at: Option<u64>,
+    has_refresh_token: bool,
+    refresh_token_expires_at: Option<u64>,
     account_label: Option<String>,
     plan_type: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ClaudeTokenState {
+    /// The stored access token is still valid.
+    Usable,
+    /// The access token lapsed, but Claude Code refreshes it on its next run.
+    Stale,
+    /// Neither the access token nor the refresh token can be used again.
+    Expired,
+}
+
+struct ClaudeUsageError {
+    message: String,
+    reauthentication_required: bool,
+}
+
+impl ClaudeUsageError {
+    fn transient(message: String) -> Self {
+        Self {
+            message,
+            reauthentication_required: false,
+        }
+    }
 }
 
 #[derive(Deserialize)]
@@ -482,6 +516,7 @@ fn parse_codex_response(message: &Value) -> Result<ProviderUsage, String> {
             .map(str::to_string),
         account_label: None,
         authenticated: true,
+        reauthentication_required: false,
         updated_at: now_millis(),
         error: None,
     })
@@ -523,6 +558,31 @@ async fn load_claude(home: &Path) -> ProviderUsage {
             )
         }
     };
+    // Claude Code refreshes its access token lazily, so a lapsed token in the
+    // credential store says nothing about whether the login itself is still
+    // good. Only report an expired login once the refresh token is gone too.
+    match claude_token_state(&credentials, now_millis()) {
+        ClaudeTokenState::Usable => {}
+        ClaudeTokenState::Stale => {
+            return provider_without_usage_with_account(
+                agent::AgentProviderKind::Claude,
+                ProviderUsageStatus::Unavailable,
+                "Claude 액세스 토큰이 만료되어 usage를 불러오지 못했습니다. Claude Code를 실행하면 자동으로 갱신됩니다."
+                    .to_string(),
+                credentials.account_label,
+                true,
+            );
+        }
+        ClaudeTokenState::Expired => {
+            return requires_reauthentication(provider_without_usage_with_account(
+                agent::AgentProviderKind::Claude,
+                ProviderUsageStatus::Error,
+                "Claude 로그인이 만료되었습니다. `claude` 를 실행해 다시 로그인하세요.".to_string(),
+                credentials.account_label,
+                false,
+            ));
+        }
+    }
     match fetch_claude_usage(&credentials.access_token).await {
         Ok(mut usage) => {
             usage.account_label = credentials.account_label;
@@ -530,13 +590,38 @@ async fn load_claude(home: &Path) -> ProviderUsage {
             usage.authenticated = true;
             usage
         }
-        Err(error) => provider_without_usage_with_account(
-            agent::AgentProviderKind::Claude,
-            ProviderUsageStatus::Error,
-            error,
-            credentials.account_label,
-            true,
-        ),
+        Err(error) => {
+            let usage = provider_without_usage_with_account(
+                agent::AgentProviderKind::Claude,
+                ProviderUsageStatus::Error,
+                error.message,
+                credentials.account_label,
+                !error.reauthentication_required,
+            );
+            if error.reauthentication_required {
+                requires_reauthentication(usage)
+            } else {
+                usage
+            }
+        }
+    }
+}
+
+fn claude_token_state(credentials: &ClaudeAccountCredentials, now: u64) -> ClaudeTokenState {
+    let expired = credentials
+        .expires_at
+        .is_some_and(|expires_at| expires_at <= now + CLAUDE_TOKEN_SKEW_MILLIS);
+    if !expired {
+        return ClaudeTokenState::Usable;
+    }
+    let refreshable = credentials.has_refresh_token
+        && credentials
+            .refresh_token_expires_at
+            .is_none_or(|expires_at| expires_at > now);
+    if refreshable {
+        ClaudeTokenState::Stale
+    } else {
+        ClaudeTokenState::Expired
     }
 }
 
@@ -608,6 +693,12 @@ fn parse_claude_account_credentials(credentials: &str) -> Result<ClaudeAccountCr
         .ok_or_else(|| "Claude 로그인이 필요합니다.".to_string())?;
     Ok(ClaudeAccountCredentials {
         access_token,
+        expires_at: oauth.expires_at,
+        has_refresh_token: oauth
+            .refresh_token
+            .as_ref()
+            .is_some_and(|value| !value.trim().is_empty()),
+        refresh_token_expires_at: oauth.refresh_token_expires_at,
         account_label: oauth
             .email_address
             .or(oauth.email)
@@ -620,11 +711,12 @@ fn parse_claude_account_credentials(credentials: &str) -> Result<ClaudeAccountCr
     })
 }
 
-async fn fetch_claude_usage(access_token: &str) -> Result<ProviderUsage, String> {
+async fn fetch_claude_usage(access_token: &str) -> Result<ProviderUsage, ClaudeUsageError> {
     let _ = rustls::crypto::ring::default_provider().install_default();
     let mut headers = HeaderMap::new();
-    let authorization = HeaderValue::from_str(&format!("Bearer {access_token}"))
-        .map_err(|_| "Claude 인증 정보를 읽지 못했습니다.".to_string())?;
+    let authorization = HeaderValue::from_str(&format!("Bearer {access_token}")).map_err(|_| {
+        ClaudeUsageError::transient("Claude 인증 정보를 읽지 못했습니다.".to_string())
+    })?;
     headers.insert(AUTHORIZATION, authorization);
     headers.insert(
         "anthropic-beta",
@@ -635,22 +727,24 @@ async fn fetch_claude_usage(access_token: &str) -> Result<ProviderUsage, String>
         .timeout(CLAUDE_TIMEOUT)
         .default_headers(headers)
         .build()
-        .map_err(|error| format!("Claude usage 연결을 만들지 못했습니다: {error}"))?
+        .map_err(|error| {
+            ClaudeUsageError::transient(format!("Claude usage 연결을 만들지 못했습니다: {error}"))
+        })?
         .get(CLAUDE_USAGE_URL)
         .send()
         .await
-        .map_err(|error| format!("Claude usage를 불러오지 못했습니다: {error}"))?;
+        .map_err(|error| {
+            ClaudeUsageError::transient(format!("Claude usage를 불러오지 못했습니다: {error}"))
+        })?;
     if !response.status().is_success() {
-        return Err(match response.status().as_u16() {
-            401 | 403 => "Claude 로그인이 만료되었습니다.".to_string(),
-            429 => "Claude usage 조회 한도에 도달했습니다. 잠시 후 다시 시도하세요.".to_string(),
-            status => format!("Claude usage를 불러오지 못했습니다. HTTP {status}"),
-        });
+        return Err(claude_usage_error_for_status(response.status().as_u16()));
     }
     let body = response
         .json::<ClaudeUsageResponse>()
         .await
-        .map_err(|error| format!("Claude usage 응답을 읽지 못했습니다: {error}"))?;
+        .map_err(|error| {
+            ClaudeUsageError::transient(format!("Claude usage 응답을 읽지 못했습니다: {error}"))
+        })?;
     let session = body
         .five_hour
         .as_ref()
@@ -660,7 +754,9 @@ async fn fetch_claude_usage(access_token: &str) -> Result<ProviderUsage, String>
         .as_ref()
         .and_then(|window| map_claude_window(window, 10_080));
     if session.is_none() && weekly.is_none() {
-        return Err("Claude 계정에 usage 정보가 없습니다.".to_string());
+        return Err(ClaudeUsageError::transient(
+            "Claude 계정에 usage 정보가 없습니다.".to_string(),
+        ));
     }
     Ok(ProviderUsage {
         provider: agent::AgentProviderKind::Claude,
@@ -671,9 +767,28 @@ async fn fetch_claude_usage(access_token: &str) -> Result<ProviderUsage, String>
         plan_type: None,
         account_label: None,
         authenticated: true,
+        reauthentication_required: false,
         updated_at: now_millis(),
         error: None,
     })
+}
+
+fn claude_usage_error_for_status(status: u16) -> ClaudeUsageError {
+    match status {
+        // The token was not expired locally, so the API rejecting it means the
+        // credentials were revoked rather than simply gone stale.
+        401 | 403 => ClaudeUsageError {
+            message: "Claude 인증이 거부되었습니다. `claude` 를 실행해 다시 로그인하세요."
+                .to_string(),
+            reauthentication_required: true,
+        },
+        429 => ClaudeUsageError::transient(
+            "Claude usage 조회 한도에 도달했습니다. 잠시 후 다시 시도하세요.".to_string(),
+        ),
+        status => ClaudeUsageError::transient(format!(
+            "Claude usage를 불러오지 못했습니다. HTTP {status}"
+        )),
+    }
 }
 
 fn map_claude_window(raw: &ClaudeUsageWindow, minutes: u64) -> Option<AgentUsageWindow> {
@@ -822,6 +937,7 @@ async fn fetch_grok_usage(session: &GrokAuthSession) -> Result<ProviderUsage, St
             .filter(|value| !value.trim().is_empty()),
         account_label: None,
         authenticated: true,
+        reauthentication_required: false,
         updated_at: now_millis(),
         error: None,
     })
@@ -1045,6 +1161,7 @@ fn parse_agy_cli_quota(value: &Value) -> Result<ProviderUsage, String> {
         plan_type: None,
         account_label: None,
         authenticated: true,
+        reauthentication_required: false,
         updated_at: now_millis(),
         error: None,
     })
@@ -1449,6 +1566,7 @@ fn parse_agy_quota(body: &Value) -> Result<ProviderUsage, String> {
         plan_type: None,
         account_label: None,
         authenticated: true,
+        reauthentication_required: false,
         updated_at: now_millis(),
         error: None,
     })
@@ -1494,6 +1612,7 @@ fn connected_provider_without_windows(
         plan_type: None,
         account_label,
         authenticated: true,
+        reauthentication_required: false,
         updated_at: now_millis(),
         error: None,
     }
@@ -1527,9 +1646,15 @@ fn provider_without_usage_with_account(
         plan_type: None,
         account_label,
         authenticated,
+        reauthentication_required: false,
         updated_at: now_millis(),
         error: Some(error),
     }
+}
+
+fn requires_reauthentication(mut usage: ProviderUsage) -> ProviderUsage {
+    usage.reauthentication_required = true;
+    usage
 }
 
 fn now_millis() -> u64 {
@@ -1605,6 +1730,77 @@ mod tests {
         )
         .unwrap();
         assert_eq!(token, "secret");
+    }
+
+    #[test]
+    fn treats_lapsed_claude_access_token_with_live_refresh_token_as_stale() {
+        let now = 1_800_000_000_000;
+        let credentials = parse_claude_account_credentials(&format!(
+            r#"{{"claudeAiOauth":{{"accessToken":"secret","refreshToken":"refresh","expiresAt":{}}}}}"#,
+            now - 1_000
+        ))
+        .unwrap();
+        assert!(credentials.has_refresh_token);
+        assert_eq!(
+            claude_token_state(&credentials, now),
+            ClaudeTokenState::Stale
+        );
+    }
+
+    #[test]
+    fn treats_claude_login_as_expired_only_without_a_usable_refresh_token() {
+        let now = 1_800_000_000_000;
+        let without_refresh = parse_claude_account_credentials(&format!(
+            r#"{{"claudeAiOauth":{{"accessToken":"secret","expiresAt":{}}}}}"#,
+            now - 1_000
+        ))
+        .unwrap();
+        assert_eq!(
+            claude_token_state(&without_refresh, now),
+            ClaudeTokenState::Expired
+        );
+
+        let stale_refresh = parse_claude_account_credentials(&format!(
+            r#"{{"claudeAiOauth":{{"accessToken":"secret","refreshToken":"refresh","expiresAt":{},"refreshTokenExpiresAt":{}}}}}"#,
+            now - 1_000,
+            now - 1_000
+        ))
+        .unwrap();
+        assert_eq!(
+            claude_token_state(&stale_refresh, now),
+            ClaudeTokenState::Expired
+        );
+    }
+
+    #[test]
+    fn keeps_using_a_claude_access_token_that_has_not_lapsed() {
+        let now = 1_800_000_000_000;
+        let fresh = parse_claude_account_credentials(&format!(
+            r#"{{"claudeAiOauth":{{"accessToken":"secret","refreshToken":"refresh","expiresAt":{}}}}}"#,
+            now + CLAUDE_TOKEN_SKEW_MILLIS + 1_000
+        ))
+        .unwrap();
+        assert_eq!(claude_token_state(&fresh, now), ClaudeTokenState::Usable);
+
+        let undated = parse_claude_account_credentials(
+            r#"{"claudeAiOauth":{"accessToken":"secret","refreshToken":"refresh"}}"#,
+        )
+        .unwrap();
+        assert_eq!(claude_token_state(&undated, now), ClaudeTokenState::Usable);
+    }
+
+    #[test]
+    fn asks_for_reauthentication_only_when_claude_rejects_the_token() {
+        let rejected = claude_usage_error_for_status(401);
+        assert!(rejected.reauthentication_required);
+        assert!(!rejected.message.contains("로그인이 만료"));
+
+        let throttled = claude_usage_error_for_status(429);
+        assert!(!throttled.reauthentication_required);
+
+        let server_error = claude_usage_error_for_status(500);
+        assert!(!server_error.reauthentication_required);
+        assert!(server_error.message.contains("HTTP 500"));
     }
 
     #[test]

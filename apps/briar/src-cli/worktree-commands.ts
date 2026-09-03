@@ -376,7 +376,7 @@ async function syncCompletedWorktreeRecordsFromDashboard(
     DashboardService,
     config.apiUrl,
     config.userToken,
-  ).getDashboard({ projectId: project.id });
+  ).getDashboard({ teamId: project.id });
   const completedRuns = dashboard.runs
     .filter(
       (run): run is typeof run & {

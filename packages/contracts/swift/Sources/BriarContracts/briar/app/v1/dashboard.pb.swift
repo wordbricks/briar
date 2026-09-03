@@ -25,7 +25,7 @@ public nonisolated struct BriarAPI_GetDashboardRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var projectID: String = String()
+  public var teamID: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -37,14 +37,14 @@ public nonisolated struct BriarAPI_GetDashboardResponse: @unchecked Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var project: BriarAPI_Project {
-    get {_storage._project ?? BriarAPI_Project()}
-    set {_uniqueStorage()._project = newValue}
+  public var team: BriarAPI_Team {
+    get {_storage._team ?? BriarAPI_Team()}
+    set {_uniqueStorage()._team = newValue}
   }
-  /// Returns true if `project` has been explicitly set.
-  public var hasProject: Bool {_storage._project != nil}
-  /// Clears the value of `project`. Subsequent reads from it will return its default value.
-  public mutating func clearProject() {_uniqueStorage()._project = nil}
+  /// Returns true if `team` has been explicitly set.
+  public var hasTeam: Bool {_storage._team != nil}
+  /// Clears the value of `team`. Subsequent reads from it will return its default value.
+  public mutating func clearTeam() {_uniqueStorage()._team = nil}
 
   public var runs: [BriarAPI_DashboardRun] {
     get {_storage._runs}
@@ -61,8 +61,8 @@ public nonisolated struct BriarAPI_GetDashboardResponse: @unchecked Sendable {
     set {_uniqueStorage()._organizationProviders = newValue}
   }
 
-  public var executionPolicy: BriarAPI_ProjectExecutionWorkerPolicy {
-    get {_storage._executionPolicy ?? BriarAPI_ProjectExecutionWorkerPolicy()}
+  public var executionPolicy: BriarAPI_TeamExecutionWorkerPolicy {
+    get {_storage._executionPolicy ?? BriarAPI_TeamExecutionWorkerPolicy()}
     set {_uniqueStorage()._executionPolicy = newValue}
   }
   /// Returns true if `executionPolicy` has been explicitly set.
@@ -99,8 +99,8 @@ public nonisolated struct BriarAPI_GetDashboardResponse: @unchecked Sendable {
   /// Clears the value of `generatedAt`. Subsequent reads from it will return its default value.
   public mutating func clearGeneratedAt() {_uniqueStorage()._generatedAt = nil}
 
-  public var settings: BriarAPI_ProjectSettings {
-    get {_storage._settings ?? BriarAPI_ProjectSettings()}
+  public var settings: BriarAPI_TeamSettings {
+    get {_storage._settings ?? BriarAPI_TeamSettings()}
     set {_uniqueStorage()._settings = newValue}
   }
   /// Returns true if `settings` has been explicitly set.
@@ -120,7 +120,7 @@ public nonisolated struct BriarAPI_SyncDashboardRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var projectID: String = String()
+  public var teamID: String = String()
 
   public var cursor: UInt64 = 0
 
@@ -183,14 +183,14 @@ public nonisolated struct BriarAPI_SyncDashboardResponse: @unchecked Sendable {
     set {_uniqueStorage()._deletedRunIds = newValue}
   }
 
-  public var project: BriarAPI_Project {
-    get {_storage._project ?? BriarAPI_Project()}
-    set {_uniqueStorage()._project = newValue}
+  public var team: BriarAPI_Team {
+    get {_storage._team ?? BriarAPI_Team()}
+    set {_uniqueStorage()._team = newValue}
   }
-  /// Returns true if `project` has been explicitly set.
-  public var hasProject: Bool {_storage._project != nil}
-  /// Clears the value of `project`. Subsequent reads from it will return its default value.
-  public mutating func clearProject() {_uniqueStorage()._project = nil}
+  /// Returns true if `team` has been explicitly set.
+  public var hasTeam: Bool {_storage._team != nil}
+  /// Clears the value of `team`. Subsequent reads from it will return its default value.
+  public mutating func clearTeam() {_uniqueStorage()._team = nil}
 
   public var workers: [BriarAPI_DashboardWorker] {
     get {_storage._workers}
@@ -202,8 +202,8 @@ public nonisolated struct BriarAPI_SyncDashboardResponse: @unchecked Sendable {
     set {_uniqueStorage()._organizationProviders = newValue}
   }
 
-  public var executionPolicy: BriarAPI_ProjectExecutionWorkerPolicy {
-    get {_storage._executionPolicy ?? BriarAPI_ProjectExecutionWorkerPolicy()}
+  public var executionPolicy: BriarAPI_TeamExecutionWorkerPolicy {
+    get {_storage._executionPolicy ?? BriarAPI_TeamExecutionWorkerPolicy()}
     set {_uniqueStorage()._executionPolicy = newValue}
   }
   /// Returns true if `executionPolicy` has been explicitly set.
@@ -243,8 +243,8 @@ public nonisolated struct BriarAPI_SyncDashboardResponse: @unchecked Sendable {
   /// Clears the value of `generatedAt`. Subsequent reads from it will return its default value.
   public mutating func clearGeneratedAt() {_uniqueStorage()._generatedAt = nil}
 
-  public var settings: BriarAPI_ProjectSettings {
-    get {_storage._settings ?? BriarAPI_ProjectSettings()}
+  public var settings: BriarAPI_TeamSettings {
+    get {_storage._settings ?? BriarAPI_TeamSettings()}
     set {_uniqueStorage()._settings = newValue}
   }
   /// Returns true if `settings` has been explicitly set.
@@ -264,7 +264,7 @@ public nonisolated struct BriarAPI_ListRunEventsRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var projectID: String = String()
+  public var teamID: String = String()
 
   public var runID: String = String()
 
@@ -1578,7 +1578,7 @@ fileprivate nonisolated let _protobuf_package = "briar.app.v1"
 
 nonisolated extension BriarAPI_GetDashboardRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".GetDashboardRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}team_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1586,21 +1586,21 @@ nonisolated extension BriarAPI_GetDashboardRequest: SwiftProtobuf.Message, Swift
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.projectID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.teamID) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.projectID.isEmpty {
-      try visitor.visitSingularStringField(value: self.projectID, fieldNumber: 1)
+    if !self.teamID.isEmpty {
+      try visitor.visitSingularStringField(value: self.teamID, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: BriarAPI_GetDashboardRequest, rhs: BriarAPI_GetDashboardRequest) -> Bool {
-    if lhs.projectID != rhs.projectID {return false}
+    if lhs.teamID != rhs.teamID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1608,20 +1608,20 @@ nonisolated extension BriarAPI_GetDashboardRequest: SwiftProtobuf.Message, Swift
 
 nonisolated extension BriarAPI_GetDashboardResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".GetDashboardResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}project\0\u{1}runs\0\u{1}workers\0\u{3}organization_providers\0\u{3}execution_policy\0\u{1}members\0\u{3}conversation_notifications\0\u{3}channel_notifications\0\u{1}cursor\0\u{3}generated_at\0\u{1}settings\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}team\0\u{1}runs\0\u{1}workers\0\u{3}organization_providers\0\u{3}execution_policy\0\u{1}members\0\u{3}conversation_notifications\0\u{3}channel_notifications\0\u{1}cursor\0\u{3}generated_at\0\u{1}settings\0")
 
   fileprivate class _StorageClass {
-    var _project: BriarAPI_Project? = nil
+    var _team: BriarAPI_Team? = nil
     var _runs: [BriarAPI_DashboardRun] = []
     var _workers: [BriarAPI_DashboardWorker] = []
     var _organizationProviders: [BriarTypes_AgentProvider] = []
-    var _executionPolicy: BriarAPI_ProjectExecutionWorkerPolicy? = nil
+    var _executionPolicy: BriarAPI_TeamExecutionWorkerPolicy? = nil
     var _members: [BriarAPI_OrganizationMember] = []
     var _conversationNotifications: [BriarAPI_ConversationNotification] = []
     var _channelNotifications: [BriarAPI_ChannelNotification] = []
     var _cursor: UInt64 = 0
     var _generatedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
-    var _settings: BriarAPI_ProjectSettings? = nil
+    var _settings: BriarAPI_TeamSettings? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -1632,7 +1632,7 @@ nonisolated extension BriarAPI_GetDashboardResponse: SwiftProtobuf.Message, Swif
     private init() {}
 
     init(copying source: _StorageClass) {
-      _project = source._project
+      _team = source._team
       _runs = source._runs
       _workers = source._workers
       _organizationProviders = source._organizationProviders
@@ -1661,7 +1661,7 @@ nonisolated extension BriarAPI_GetDashboardResponse: SwiftProtobuf.Message, Swif
         // allocates stack space for every case branch when no optimizations are
         // enabled. https://github.com/apple/swift-protobuf/issues/1034
         switch fieldNumber {
-        case 1: try { try decoder.decodeSingularMessageField(value: &_storage._project) }()
+        case 1: try { try decoder.decodeSingularMessageField(value: &_storage._team) }()
         case 2: try { try decoder.decodeRepeatedMessageField(value: &_storage._runs) }()
         case 3: try { try decoder.decodeRepeatedMessageField(value: &_storage._workers) }()
         case 4: try { try decoder.decodeRepeatedEnumField(value: &_storage._organizationProviders) }()
@@ -1684,7 +1684,7 @@ nonisolated extension BriarAPI_GetDashboardResponse: SwiftProtobuf.Message, Swif
       // allocates stack space for every if/case branch local when no optimizations
       // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
       // https://github.com/apple/swift-protobuf/issues/1182
-      try { if let v = _storage._project {
+      try { if let v = _storage._team {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
       } }()
       if !_storage._runs.isEmpty {
@@ -1726,7 +1726,7 @@ nonisolated extension BriarAPI_GetDashboardResponse: SwiftProtobuf.Message, Swif
       let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
         let _storage = _args.0
         let rhs_storage = _args.1
-        if _storage._project != rhs_storage._project {return false}
+        if _storage._team != rhs_storage._team {return false}
         if _storage._runs != rhs_storage._runs {return false}
         if _storage._workers != rhs_storage._workers {return false}
         if _storage._organizationProviders != rhs_storage._organizationProviders {return false}
@@ -1748,7 +1748,7 @@ nonisolated extension BriarAPI_GetDashboardResponse: SwiftProtobuf.Message, Swif
 
 nonisolated extension BriarAPI_SyncDashboardRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SyncDashboardRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{1}cursor\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}team_id\0\u{1}cursor\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1756,7 +1756,7 @@ nonisolated extension BriarAPI_SyncDashboardRequest: SwiftProtobuf.Message, Swif
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.projectID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.teamID) }()
       case 2: try { try decoder.decodeSingularUInt64Field(value: &self.cursor) }()
       default: break
       }
@@ -1764,8 +1764,8 @@ nonisolated extension BriarAPI_SyncDashboardRequest: SwiftProtobuf.Message, Swif
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.projectID.isEmpty {
-      try visitor.visitSingularStringField(value: self.projectID, fieldNumber: 1)
+    if !self.teamID.isEmpty {
+      try visitor.visitSingularStringField(value: self.teamID, fieldNumber: 1)
     }
     if self.cursor != 0 {
       try visitor.visitSingularUInt64Field(value: self.cursor, fieldNumber: 2)
@@ -1774,7 +1774,7 @@ nonisolated extension BriarAPI_SyncDashboardRequest: SwiftProtobuf.Message, Swif
   }
 
   public static func ==(lhs: BriarAPI_SyncDashboardRequest, rhs: BriarAPI_SyncDashboardRequest) -> Bool {
-    if lhs.projectID != rhs.projectID {return false}
+    if lhs.teamID != rhs.teamID {return false}
     if lhs.cursor != rhs.cursor {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -1843,7 +1843,7 @@ nonisolated extension BriarAPI_ConversationNotificationsPatch: SwiftProtobuf.Mes
 
 nonisolated extension BriarAPI_SyncDashboardResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SyncDashboardResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}cursor\0\u{3}has_more\0\u{1}reset\0\u{1}runs\0\u{3}deleted_run_ids\0\u{1}project\0\u{1}workers\0\u{3}organization_providers\0\u{3}execution_policy\0\u{1}members\0\u{3}conversation_notifications\0\u{3}channel_notifications\0\u{3}generated_at\0\u{1}settings\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}cursor\0\u{3}has_more\0\u{1}reset\0\u{1}runs\0\u{3}deleted_run_ids\0\u{1}team\0\u{1}workers\0\u{3}organization_providers\0\u{3}execution_policy\0\u{1}members\0\u{3}conversation_notifications\0\u{3}channel_notifications\0\u{3}generated_at\0\u{1}settings\0")
 
   fileprivate class _StorageClass {
     var _cursor: UInt64 = 0
@@ -1851,15 +1851,15 @@ nonisolated extension BriarAPI_SyncDashboardResponse: SwiftProtobuf.Message, Swi
     var _reset: Bool = false
     var _runs: [BriarAPI_DashboardRun] = []
     var _deletedRunIds: [String] = []
-    var _project: BriarAPI_Project? = nil
+    var _team: BriarAPI_Team? = nil
     var _workers: [BriarAPI_DashboardWorker] = []
     var _organizationProviders: [BriarTypes_AgentProvider] = []
-    var _executionPolicy: BriarAPI_ProjectExecutionWorkerPolicy? = nil
+    var _executionPolicy: BriarAPI_TeamExecutionWorkerPolicy? = nil
     var _members: BriarAPI_OrganizationMembersPatch? = nil
     var _conversationNotifications: BriarAPI_ConversationNotificationsPatch? = nil
     var _channelNotifications: [BriarAPI_ChannelNotification] = []
     var _generatedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
-    var _settings: BriarAPI_ProjectSettings? = nil
+    var _settings: BriarAPI_TeamSettings? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -1875,7 +1875,7 @@ nonisolated extension BriarAPI_SyncDashboardResponse: SwiftProtobuf.Message, Swi
       _reset = source._reset
       _runs = source._runs
       _deletedRunIds = source._deletedRunIds
-      _project = source._project
+      _team = source._team
       _workers = source._workers
       _organizationProviders = source._organizationProviders
       _executionPolicy = source._executionPolicy
@@ -1907,7 +1907,7 @@ nonisolated extension BriarAPI_SyncDashboardResponse: SwiftProtobuf.Message, Swi
         case 3: try { try decoder.decodeSingularBoolField(value: &_storage._reset) }()
         case 4: try { try decoder.decodeRepeatedMessageField(value: &_storage._runs) }()
         case 5: try { try decoder.decodeRepeatedStringField(value: &_storage._deletedRunIds) }()
-        case 6: try { try decoder.decodeSingularMessageField(value: &_storage._project) }()
+        case 6: try { try decoder.decodeSingularMessageField(value: &_storage._team) }()
         case 7: try { try decoder.decodeRepeatedMessageField(value: &_storage._workers) }()
         case 8: try { try decoder.decodeRepeatedEnumField(value: &_storage._organizationProviders) }()
         case 9: try { try decoder.decodeSingularMessageField(value: &_storage._executionPolicy) }()
@@ -1943,7 +1943,7 @@ nonisolated extension BriarAPI_SyncDashboardResponse: SwiftProtobuf.Message, Swi
       if !_storage._deletedRunIds.isEmpty {
         try visitor.visitRepeatedStringField(value: _storage._deletedRunIds, fieldNumber: 5)
       }
-      try { if let v = _storage._project {
+      try { if let v = _storage._team {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
       } }()
       if !_storage._workers.isEmpty {
@@ -1984,7 +1984,7 @@ nonisolated extension BriarAPI_SyncDashboardResponse: SwiftProtobuf.Message, Swi
         if _storage._reset != rhs_storage._reset {return false}
         if _storage._runs != rhs_storage._runs {return false}
         if _storage._deletedRunIds != rhs_storage._deletedRunIds {return false}
-        if _storage._project != rhs_storage._project {return false}
+        if _storage._team != rhs_storage._team {return false}
         if _storage._workers != rhs_storage._workers {return false}
         if _storage._organizationProviders != rhs_storage._organizationProviders {return false}
         if _storage._executionPolicy != rhs_storage._executionPolicy {return false}
@@ -2004,7 +2004,7 @@ nonisolated extension BriarAPI_SyncDashboardResponse: SwiftProtobuf.Message, Swi
 
 nonisolated extension BriarAPI_ListRunEventsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ListRunEventsRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}run_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}team_id\0\u{3}run_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2012,7 +2012,7 @@ nonisolated extension BriarAPI_ListRunEventsRequest: SwiftProtobuf.Message, Swif
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.projectID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.teamID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.runID) }()
       default: break
       }
@@ -2020,8 +2020,8 @@ nonisolated extension BriarAPI_ListRunEventsRequest: SwiftProtobuf.Message, Swif
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.projectID.isEmpty {
-      try visitor.visitSingularStringField(value: self.projectID, fieldNumber: 1)
+    if !self.teamID.isEmpty {
+      try visitor.visitSingularStringField(value: self.teamID, fieldNumber: 1)
     }
     if !self.runID.isEmpty {
       try visitor.visitSingularStringField(value: self.runID, fieldNumber: 2)
@@ -2030,7 +2030,7 @@ nonisolated extension BriarAPI_ListRunEventsRequest: SwiftProtobuf.Message, Swif
   }
 
   public static func ==(lhs: BriarAPI_ListRunEventsRequest, rhs: BriarAPI_ListRunEventsRequest) -> Bool {
-    if lhs.projectID != rhs.projectID {return false}
+    if lhs.teamID != rhs.teamID {return false}
     if lhs.runID != rhs.runID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true

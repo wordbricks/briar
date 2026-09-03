@@ -18,8 +18,8 @@ import {
   LINEAR_IMPORT_ISSUE_LIMIT,
 } from "./linear";
 import { importLinearHuntRuns } from "./linear-import-repository";
-import { getProject } from "./project-command-repository";
-import { getProjectSettings } from "./project-settings-repository";
+import { getTeam } from "./team-command-repository";
+import { getTeamSettings } from "./team-settings-repository";
 import {
   mutableArray,
   strictSchema,
@@ -84,8 +84,8 @@ export type LinearImportApplicationServices = {
   readonly fetchLinearIssuesForTeams: typeof fetchLinearIssuesForTeams;
   readonly fetchLinearViewerAndTeams: typeof fetchLinearViewerAndTeams;
   readonly fetchLinearWorkflowStates: typeof fetchLinearWorkflowStates;
-  readonly getProject: typeof getProject;
-  readonly getProjectSettings: typeof getProjectSettings;
+  readonly getTeam: typeof getTeam;
+  readonly getTeamSettings: typeof getTeamSettings;
   readonly importLinearHuntRuns: typeof importLinearHuntRuns;
 };
 
@@ -93,8 +93,8 @@ export const linearImportApplicationServices: LinearImportApplicationServices = 
   fetchLinearIssuesForTeams,
   fetchLinearViewerAndTeams,
   fetchLinearWorkflowStates,
-  getProject,
-  getProjectSettings,
+  getTeam,
+  getTeamSettings,
   importLinearHuntRuns,
 };
 
@@ -106,7 +106,7 @@ const requireDevelopmentProject = async (
   },
   services: LinearImportApplicationServices,
 ) => {
-  const project = await services.getProject(
+  const project = await services.getTeam(
     input.db,
     input.projectId,
     input.userId,
@@ -165,7 +165,7 @@ export async function importLinearIssuesApplication(
   services: LinearImportApplicationServices = linearImportApplicationServices,
 ) {
   const project = await requireDevelopmentProject(input, services);
-  const settings = await services.getProjectSettings(input.db, project.id);
+  const settings = await services.getTeamSettings(input.db, project.id);
   const workflow = settings?.workflow_json
     ? normalizeAutoHuntWorkflow(JSON.parse(settings.workflow_json))
     : cloneAutoHuntWorkflow();

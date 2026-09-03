@@ -54,7 +54,7 @@ import {
   type AgentProviderModelCatalogEntry,
   defaultAgentProviderModelCatalog,
   sortAgentModelsByPreference,
-} from "../lib/project-llm";
+} from "../lib/team-llm";
 import {
   readAgentProviderModelPreferences,
   writeAgentProviderModelPreference,
@@ -93,9 +93,9 @@ import { AgentUsageSettings } from "./AgentUsageSettings";
 import { AppearanceSettings } from "./AppearanceSettings";
 import { InboxNotificationSettings } from "./InboxNotificationSettings";
 import {
-  localProjectReadiness,
-  type LocalProjectConnectionState,
-} from "../lib/local-project-connection";
+  localTeamReadiness,
+  type LocalTeamConnectionState,
+} from "../lib/local-team-connection";
 import type { AgentUsageReport, SessionUser } from "../types";
 import { AccountDeletionSettings } from "./AccountDeletionSettings";
 import { AccountProfileSettings } from "./AccountProfileSettings";
@@ -171,7 +171,7 @@ export function AppSettings({
   usageScopeKey,
   user,
 }: {
-  connectionState: LocalProjectConnectionState;
+  connectionState: LocalTeamConnectionState;
   error: string | null;
   initialSection?: SettingsSection;
   isSidebarOpen: boolean;
@@ -196,7 +196,7 @@ export function AppSettings({
 }) {
   const { t } = useI18n();
   const inspectedReadiness = requiresLocalReadiness
-    ? localProjectReadiness(connectionState, readiness)
+    ? localTeamReadiness(connectionState, readiness)
     : null;
   const githubRequired = inspectedReadiness?.requiresGithub === true;
   const unresolvedReadiness = connectionState === "disconnected"
@@ -1737,7 +1737,11 @@ function ProviderDetails({
   usage?: ProviderUsage;
 }) {
   const { t } = useI18n();
-  const connected = Boolean(installed && authenticated);
+  // A usage probe that hit revoked or expired credentials outranks the local
+  // CLI auth check, which only sees that a credential file exists.
+  const connected = Boolean(
+    installed && authenticated && !usage?.reauthenticationRequired,
+  );
   const connectionLabel = loading
     ? t("appSettings.checkingProviders")
     : !installed

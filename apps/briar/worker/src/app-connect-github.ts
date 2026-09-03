@@ -31,16 +31,16 @@ import {
 } from "./github-integration-application";
 import { HttpError } from "./http-response";
 import {
-  createProjectGithubCommitStatusApplication,
-  createProjectGithubCredentialApplication,
-  createProjectGithubPullRequestApplication,
-  getProjectGithubPullRequestApplication,
-  getProjectGithubRepositoryApplication,
-  getProjectMergeActivityApplication,
-  mergeProjectGithubPullRequestApplication,
-  requireProjectGithubAccess,
-  updateProjectGithubPullRequestApplication,
-} from "./project-github-application";
+  createTeamGithubCommitStatusApplication,
+  createTeamGithubCredentialApplication,
+  createTeamGithubPullRequestApplication,
+  getTeamGithubPullRequestApplication,
+  getTeamGithubRepositoryApplication,
+  getTeamMergeActivityApplication,
+  mergeTeamGithubPullRequestApplication,
+  requireTeamGithubAccess,
+  updateTeamGithubPullRequestApplication,
+} from "./team-github-application";
 import { decodeRequestSync } from "./request-schema";
 import { UuidString } from "./schema-codecs";
 import { requireSession } from "./session-auth";
@@ -60,34 +60,34 @@ export type AppConnectGithubInput = {
 export type AppConnectGithubServices = {
   readonly beginInstallation: typeof beginGithubInstallationApplication;
   readonly createCommitStatus:
-    typeof createProjectGithubCommitStatusApplication;
-  readonly createCredential: typeof createProjectGithubCredentialApplication;
+    typeof createTeamGithubCommitStatusApplication;
+  readonly createCredential: typeof createTeamGithubCredentialApplication;
   readonly createPullRequest:
-    typeof createProjectGithubPullRequestApplication;
+    typeof createTeamGithubPullRequestApplication;
   readonly getIntegration: typeof getGithubIntegrationApplication;
-  readonly getPullRequest: typeof getProjectGithubPullRequestApplication;
-  readonly getRepository: typeof getProjectGithubRepositoryApplication;
-  readonly getMergeActivity: typeof getProjectMergeActivityApplication;
-  readonly mergePullRequest: typeof mergeProjectGithubPullRequestApplication;
-  readonly requireProjectAccess: typeof requireProjectGithubAccess;
+  readonly getPullRequest: typeof getTeamGithubPullRequestApplication;
+  readonly getRepository: typeof getTeamGithubRepositoryApplication;
+  readonly getMergeActivity: typeof getTeamMergeActivityApplication;
+  readonly mergePullRequest: typeof mergeTeamGithubPullRequestApplication;
+  readonly requireProjectAccess: typeof requireTeamGithubAccess;
   readonly requireSession: typeof requireSession;
   readonly updatePullRequest:
-    typeof updateProjectGithubPullRequestApplication;
+    typeof updateTeamGithubPullRequestApplication;
 };
 
 export const appConnectGithubServices: AppConnectGithubServices = {
   beginInstallation: beginGithubInstallationApplication,
-  createCommitStatus: createProjectGithubCommitStatusApplication,
-  createCredential: createProjectGithubCredentialApplication,
-  createPullRequest: createProjectGithubPullRequestApplication,
+  createCommitStatus: createTeamGithubCommitStatusApplication,
+  createCredential: createTeamGithubCredentialApplication,
+  createPullRequest: createTeamGithubPullRequestApplication,
   getIntegration: getGithubIntegrationApplication,
-  getPullRequest: getProjectGithubPullRequestApplication,
-  getRepository: getProjectGithubRepositoryApplication,
-  getMergeActivity: getProjectMergeActivityApplication,
-  mergePullRequest: mergeProjectGithubPullRequestApplication,
-  requireProjectAccess: requireProjectGithubAccess,
+  getPullRequest: getTeamGithubPullRequestApplication,
+  getRepository: getTeamGithubRepositoryApplication,
+  getMergeActivity: getTeamMergeActivityApplication,
+  mergePullRequest: mergeTeamGithubPullRequestApplication,
+  requireProjectAccess: requireTeamGithubAccess,
   requireSession,
-  updatePullRequest: updateProjectGithubPullRequestApplication,
+  updatePullRequest: updateTeamGithubPullRequestApplication,
 };
 
 const decodeUuid = decodeRequestSync(UuidString);

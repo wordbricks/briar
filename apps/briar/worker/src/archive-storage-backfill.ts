@@ -7,9 +7,9 @@ import {
 } from "./archive-contract";
 import type { ArchiveBucket, ArchiveMetadataRow } from "./archive";
 import {
-  decodeStoredProjectAgentSessionPayload,
-  encodeStoredProjectAgentSessionPayload,
-} from "./project-request-contract";
+  decodeStoredTeamAgentSessionPayload,
+  encodeStoredTeamAgentSessionPayload,
+} from "./team-request-contract";
 
 const encoder = new TextEncoder();
 const canonicalObjectMarker = ".canonical-v1-";
@@ -97,10 +97,10 @@ export function canonicalizeProjectAgentSessionArchive(
         : row.id,
     requestedByUserId: row.requested_by_user_id,
   });
-  const payload = decodeStoredProjectAgentSessionPayload(canonicalPayloadJson);
+  const payload = decodeStoredTeamAgentSessionPayload(canonicalPayloadJson);
   const canonicalRow = decodeArchivedProjectAgentSession({
     ...row,
-    payload_json: encodeStoredProjectAgentSessionPayload(payload),
+    payload_json: encodeStoredTeamAgentSessionPayload(payload),
   });
   return [
     JSON.stringify(manifest),

@@ -7,6 +7,19 @@ const leaseNamePattern = /^[a-z][a-z0-9-]{0,79}$/u;
 const ownerPattern = /^[0-9a-f-]{36}$/u;
 const headShaPattern = /^[0-9a-f]{40}$/u;
 
+const LeaseConfiguration = Schema.Struct({
+  database: Schema.NonEmptyString,
+  headSha: Schema.String.check(Schema.isPattern(headShaPattern)),
+  heartbeatMillis: Schema.Int.check(
+    Schema.isBetween({ minimum: 1_000, maximum: 3_599_999 }),
+  ),
+  name: Schema.String.check(Schema.isPattern(leaseNamePattern)),
+  owner: Schema.String.check(Schema.isPattern(ownerPattern)),
+  ttlSeconds: Schema.Int.check(
+    Schema.isBetween({ minimum: 60, maximum: 3_600 }),
+  ),
+});
+
 const NumericValue = Schema.Union([Schema.Number, Schema.NumberFromString]);
 const LeaseRow = Schema.Struct({
   owner: Schema.optional(Schema.String),
@@ -21,6 +34,14 @@ const decodeWranglerQueryOutput = Schema.decodeUnknownSync(WranglerQueryOutput);
 
 export class RemoteLeaseCommandError extends Schema.TaggedError<RemoteLeaseCommandError>()(
   "RemoteLeaseCommandError",
+  {
+    cause: Schema.Defect(),
+    message: Schema.String,
+  },
+) {}
+
+export class RemoteLeaseConfigurationError extends Schema.TaggedError<RemoteLeaseConfigurationError>()(
+  "RemoteLeaseConfigurationError",
   {
     cause: Schema.Defect(),
     message: Schema.String,
@@ -59,6 +80,10 @@ type Lease = {
   readonly owner: string;
 };
 
+type ValidatedLeaseOptions = typeof LeaseConfiguration.Type & {
+  readonly runner: WranglerRunner;
+};
+
 const escapeSql = (value: string) => value.replaceAll("'", "''");
 
 const leaseTableSql = `create table if not exists briar_production_operation_leases (
@@ -77,39 +102,32 @@ const leaseTableSql = `create table if not exists briar_production_operation_lea
     check (expires_at > acquired_at)
 ) strict;`;
 
-function validateOptions(options: RemoteOperationLeaseOptions) {
-  const owner = options.owner ?? crypto.randomUUID();
-  const ttlSeconds = options.ttlSeconds ?? 20 * 60;
-  const heartbeatMillis = options.heartbeatMillis ?? 60_000;
-  if (!leaseNamePattern.test(options.name)) {
-    throw new Error("Remote operation lease name is invalid.");
-  }
-  if (!ownerPattern.test(owner)) {
-    throw new Error("Remote operation lease owner must be a UUID.");
-  }
-  if (!headShaPattern.test(options.headSha)) {
-    throw new Error("Remote operation lease headSha must be a full Git SHA.");
-  }
-  if (!Number.isInteger(ttlSeconds) || ttlSeconds < 60 || ttlSeconds > 3_600) {
-    throw new Error("Remote operation lease TTL must be 60-3600 seconds.");
-  }
-  if (
-    !Number.isInteger(heartbeatMillis) ||
-    heartbeatMillis < 1_000 ||
-    heartbeatMillis >= ttlSeconds * 1_000
-  ) {
-    throw new Error("Remote operation lease heartbeat must be shorter than its TTL.");
-  }
-  return {
-    database: options.database ?? "briar-db",
-    headSha: options.headSha,
-    heartbeatMillis,
-    name: options.name,
-    owner,
-    runner: options.runner,
-    ttlSeconds,
-  } as const;
-}
+const validateOptions = Effect.fn("remoteOperationLease.validateOptions")(
+  function* validateRemoteOperationLeaseOptionsEffect(
+    options: RemoteOperationLeaseOptions,
+  ): Effect.fn.Return<ValidatedLeaseOptions, RemoteLeaseConfigurationError> {
+    const configuration = yield* Schema.decodeUnknownEffect(LeaseConfiguration)({
+      database: options.database ?? "briar-db",
+      headSha: options.headSha,
+      heartbeatMillis: options.heartbeatMillis ?? 60_000,
+      name: options.name,
+      owner: options.owner ?? crypto.randomUUID(),
+      ttlSeconds: options.ttlSeconds ?? 20 * 60,
+    }).pipe(
+      Effect.mapError((cause) => new RemoteLeaseConfigurationError({
+        cause,
+        message: "Remote operation lease configuration is invalid.",
+      })),
+    );
+    if (configuration.heartbeatMillis >= configuration.ttlSeconds * 1_000) {
+      return yield* new RemoteLeaseConfigurationError({
+        cause: new Error("heartbeat must be shorter than TTL"),
+        message: "Remote operation lease heartbeat must be shorter than its TTL.",
+      });
+    }
+    return { ...configuration, runner: options.runner };
+  },
+);
 
 const query = Effect.fn("remoteOperationLease.query")(
   function* queryEffect(
@@ -157,7 +175,7 @@ const lastLeaseRow = (
 };
 
 const acquire = Effect.fn("remoteOperationLease.acquire")(
-  function* acquireEffect(options: ReturnType<typeof validateOptions>) {
+  function* acquireEffect(options: ValidatedLeaseOptions) {
     const name = escapeSql(options.name);
     const owner = escapeSql(options.owner);
     const headSha = escapeSql(options.headSha);
@@ -207,7 +225,7 @@ where name = '${name}';`);
 
 const renew = Effect.fn("remoteOperationLease.renew")(
   function* renewEffect(
-    options: ReturnType<typeof validateOptions>,
+    options: ValidatedLeaseOptions,
     lease: Lease,
   ) {
     const name = escapeSql(lease.name);
@@ -229,7 +247,7 @@ where name = '${name}' and owner = '${owner}';`);
 
 const release = Effect.fn("remoteOperationLease.release")(
   function* releaseEffect(
-    options: ReturnType<typeof validateOptions>,
+    options: ValidatedLeaseOptions,
     lease: Lease,
   ) {
     const result = yield* Effect.tryPromise({
@@ -256,30 +274,31 @@ const release = Effect.fn("remoteOperationLease.release")(
   },
 );
 
-export async function withRemoteOperationLease<A>(
-  options: RemoteOperationLeaseOptions,
-  operation: (signal: AbortSignal) => Promise<A>,
-) {
-  const validated = validateOptions(options);
-  const program = Effect.acquireUseRelease(
-    acquire(validated),
-    (lease) => {
-      const heartbeat = Effect.sleep(validated.heartbeatMillis).pipe(
-        Effect.andThen(renew(validated, lease)),
-        Effect.forever,
-      );
-      const use = Effect.tryPromise({
-        try: operation,
-        catch: (cause) => new RemoteLeaseCommandError({
-          cause,
-          message: `Production operation ${lease.name} failed.`,
-        }),
-      });
-      return Effect.raceFirst(use, heartbeat);
-    },
-    (lease) => release(validated, lease).pipe(
-      Effect.catch((error) => Effect.sync(() => console.warn(error.message))),
-    ),
-  );
-  return Effect.runPromise(program);
-}
+export const withRemoteOperationLease = Effect.fn("withRemoteOperationLease")(
+  function* withRemoteOperationLeaseEffect<A>(
+    options: RemoteOperationLeaseOptions,
+    operation: (signal: AbortSignal) => Promise<A>,
+  ) {
+    const validated = yield* validateOptions(options);
+    return yield* Effect.acquireUseRelease(
+      acquire(validated),
+      (lease) => {
+        const heartbeat = Effect.sleep(validated.heartbeatMillis).pipe(
+          Effect.andThen(renew(validated, lease)),
+          Effect.forever,
+        );
+        const use = Effect.tryPromise({
+          try: operation,
+          catch: (cause) => new RemoteLeaseCommandError({
+            cause,
+            message: `Production operation ${lease.name} failed.`,
+          }),
+        });
+        return Effect.raceFirst(use, heartbeat);
+      },
+      (lease) => release(validated, lease).pipe(
+        Effect.catch((error) => Effect.logWarning(error.message)),
+      ),
+    );
+  },
+);

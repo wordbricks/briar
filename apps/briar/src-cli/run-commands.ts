@@ -24,7 +24,7 @@ import {
 } from "@briar/contracts/gen/briar/app/v1/issue_pb";
 import { IssueDifficulty, RunStatus } from "@briar/contracts/gen/briar/app/v1/common_pb";
 import { DashboardService } from "@briar/contracts/gen/briar/app/v1/dashboard_pb";
-import { ProjectService } from "@briar/contracts/gen/briar/app/v1/project_pb";
+import { TeamService } from "@briar/contracts/gen/briar/app/v1/team_pb";
 import {
   RecordRunEvidenceRequestSchema,
   RecordRunEvidenceResponseSchema,
@@ -162,15 +162,15 @@ async function createIssueCommand() {
   const config = await loadConfig();
   if (!config.userToken) throw new Error("먼저 `briar login`을 실행하세요.");
   const project = await currentProject(config);
-  const projectClient = createAuthenticatedConnectClient(
-    ProjectService,
+  const teamClient = createAuthenticatedConnectClient(
+    TeamService,
     config.apiUrl,
     config.userToken,
   );
   const planningProjectId = await resolveIssueCreationProjectId({
     configuredProjectId: value("--project")?.trim(),
     loadProjects: async () =>
-      (await projectClient.listTeamPlanningProjects({ teamId: project.id })).projects,
+      (await teamClient.listTeamPlanningProjects({ teamId: project.id })).projects,
   });
   const priorityValue = value("--priority");
   const input = decodeCreateIssueInput({
@@ -260,7 +260,7 @@ const defaultIssueUpdateCommandDependencies: IssueUpdateCommandDependencies = {
       DashboardService,
       config.apiUrl,
       config.userToken,
-    ).getDashboard({ projectId: project.id });
+    ).getDashboard({ teamId: project.id });
     const run = response.runs.find((candidate) => candidate.id === runId);
     return run && {
       title: run.title,

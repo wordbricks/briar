@@ -1,7 +1,7 @@
 import {
   type ModelEffort,
-  type ProjectAgentProvider,
-} from "./project-agent-model";
+  type TeamAgentProvider,
+} from "./team-agent-model";
 
 export type IssueExecutionProposalRow = {
   id: string;
@@ -23,7 +23,7 @@ export type IssueExecutionProposalRow = {
   status: "pending" | "accepted" | "invalidated";
   approval_reserved_by_user_id: string | null;
   approval_reserved_at: string | null;
-  requested_provider: ProjectAgentProvider | null;
+  requested_provider: TeamAgentProvider | null;
   requested_model: string | null;
   requested_effort: ModelEffort | null;
   requested_worker_id: string | null;
@@ -147,7 +147,7 @@ export async function reserveIssueExecutionProposalApproval(
     conversationRunId: string;
     proposalId: string;
     userId: string;
-    provider: ProjectAgentProvider;
+    provider: TeamAgentProvider;
     model: string | null;
     effort: ModelEffort | null;
     workerId: string | null;

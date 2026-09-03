@@ -6,8 +6,8 @@ import {
 
 import {
   type ModelEffort,
-  type ProjectAgentProvider,
-} from "./project-agent-model";
+  type TeamAgentProvider,
+} from "./team-agent-model";
 
 export type IssueAgentReplyJobRow = {
   id: string;
@@ -23,8 +23,8 @@ export type IssueAgentReplyJobRow = {
   status: "queued" | "running" | "completed" | "failed";
   preferred_worker_id: string | null;
   claimed_worker_id: string | null;
-  preferred_provider: ProjectAgentProvider | null;
-  agent_provider: ProjectAgentProvider | null;
+  preferred_provider: TeamAgentProvider | null;
+  agent_provider: TeamAgentProvider | null;
   skill_id?: string | null;
   selected_skill_id_snapshot?: string | null;
   selected_agent_name_snapshot?: string | null;
@@ -32,7 +32,7 @@ export type IssueAgentReplyJobRow = {
   selected_skill_name_snapshot?: string | null;
   selected_skill_instructions_snapshot?: string | null;
   selected_skill_kind_snapshot?: AgentSkillKind | null;
-  selected_skill_provider_snapshot?: ProjectAgentProvider | null;
+  selected_skill_provider_snapshot?: TeamAgentProvider | null;
   selected_skill_model_snapshot?: string | null;
   selected_skill_effort_snapshot?: ModelEffort | null;
   skill_execution_request_snapshot?: string | null;
@@ -209,7 +209,7 @@ export async function claimNextIssueAgentReply(
   projectId: string,
   input: {
     workerId: string;
-    agentProvider: ProjectAgentProvider;
+    agentProvider: TeamAgentProvider;
     claimTokenHash: string;
     claimedAt: string;
     leaseExpiresAt: string;

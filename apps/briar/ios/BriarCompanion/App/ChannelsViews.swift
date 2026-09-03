@@ -237,7 +237,7 @@ struct ProjectLobbyView: View {
             LazyVStack(alignment: .leading, spacing: 20) {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 12) {
-                        ProjectIconView(icon: project.icon, size: 42)
+                        TeamIconView(icon: project.icon, size: 42)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(project.name)
                                 .font(.headline)

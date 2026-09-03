@@ -448,7 +448,7 @@ struct ExecutionConfigurationFields: View {
 
     let providers: [AgentProvider]
     let workers: [DashboardWorker]
-    let policy: ProjectExecutionWorkerPolicy?
+    let policy: TeamExecutionWorkerPolicy?
     let capabilities: AgentProviderCapabilityCatalog
     let locale: CompanionLocale
 
@@ -550,7 +550,7 @@ struct ExecutionProposalApprovalSheet: View {
     let targetTitle: String
     let providers: [AgentProvider]
     let workers: [DashboardWorker]
-    let policy: ProjectExecutionWorkerPolicy?
+    let policy: TeamExecutionWorkerPolicy?
     let locale: CompanionLocale
     let delegationNotice: String?
     let createsIssue: Bool
@@ -560,7 +560,7 @@ struct ExecutionProposalApprovalSheet: View {
         targetTitle: String,
         providers: [AgentProvider],
         workers: [DashboardWorker],
-        policy: ProjectExecutionWorkerPolicy? = nil,
+        policy: TeamExecutionWorkerPolicy? = nil,
         locale: CompanionLocale,
         delegationNotice: String? = nil,
         createsIssue: Bool = false,
@@ -754,7 +754,7 @@ struct AgentSkillExecutionApprovalSheet: View {
 
     let proposal: AgentSkillExecutionProposal
     let workers: [DashboardWorker]
-    let policy: ProjectExecutionWorkerPolicy?
+    let policy: TeamExecutionWorkerPolicy?
     let locale: CompanionLocale
     let approve: @MainActor (
         AcceptAgentSkillExecutionProposalRequest

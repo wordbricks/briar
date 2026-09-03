@@ -40,7 +40,7 @@ import {
 import {
   workflowFromProto,
   workflowToProto,
-} from "../src/lib/app-rpc/project-configuration-mappers";
+} from "../src/lib/app-rpc/team-configuration-mappers";
 import { agentProviders } from "../src/lib/agent-provider";
 import { IsoDateTimeWithOffset } from "../src/lib/date-time-schema";
 

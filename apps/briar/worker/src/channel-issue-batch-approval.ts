@@ -5,8 +5,8 @@ import type {
 } from "../../src/lib/channels-contract";
 import { channelRelatedMessageReference } from "./channel-proposal-helpers";
 import { stableJson } from "./hunt-run-codec";
-import type { ProjectRow } from "./project-repository";
-import { getProjectSettings } from "./project-settings-repository";
+import type { TeamRow } from "./team-repository";
+import { getTeamSettings } from "./team-settings-repository";
 import { digestRunId } from "./run-identity";
 import { workflowSnapshotForRun } from "./workflow-policy";
 
@@ -65,7 +65,7 @@ export async function listChannelIssueBatchItems(
 
 export async function materializeChannelIssueBatch(input: {
   db: D1Database;
-  project: Pick<ProjectRow, "id" | "name">;
+  project: Pick<TeamRow, "id" | "name">;
   organizationId: string;
   channelId: string;
   proposalId: string;
@@ -79,7 +79,7 @@ export async function materializeChannelIssueBatch(input: {
   batch: ChannelIssueBatchProposalPayload["batch"];
 }) {
   const [settings, workflow, items] = await Promise.all([
-    getProjectSettings(input.db, input.project.id),
+    getTeamSettings(input.db, input.project.id),
     workflowSnapshotForRun(
       input.db,
       input.project.id,

@@ -16,7 +16,7 @@ import {
   completeGithubDelivery,
   completeWorkflowStageLifecycle,
   createOrganization,
-  createProject,
+  createTeam,
   disconnectGithubInstallation,
   getHuntRunForProject,
   getWorkflowProgress,
@@ -29,7 +29,7 @@ import {
   resumeWorkflowCheckpoint,
   startWorkflowStageLifecycle,
   syncGithubPullRequest,
-  updateProjectSettings,
+  updateTeamSettings,
 } from "./db";
 
 const repository = "example/repository";
@@ -159,13 +159,13 @@ describe("GitHub pull request D1 integration", () => {
     },
   ): Promise<Scenario> => {
     scenarioNumber += 1;
-    const project = await createProject(db, {
+    const project = await createTeam(db, {
       ownerUserId: ownerId,
       organizationId,
       name: `GitHub DB project ${scenarioNumber}`,
       agentTokenHash: scenarioNumber.toString(16).padStart(64, "0"),
     });
-    await updateProjectSettings(db, project.id, {
+    await updateTeamSettings(db, project.id, {
       velenOrg: null,
       dataSource: null,
       linear: { enabled: false, source: null, teamKey: null },

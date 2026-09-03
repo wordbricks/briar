@@ -1,11 +1,11 @@
 import type {
   HuntEventRow,
   IssueMessageRow,
-  ProjectAgentSessionRow,
+  TeamAgentSessionRow,
   RunEvidenceImageRow,
   RunEvidenceRow,
 } from "./db";
-import { upsertProjectAgentSessionSummary } from "./db";
+import { upsertTeamAgentSessionSummary } from "./db";
 import type { TranscriptSessionRow } from "./workers";
 import type {
   AgentTranscriptSegmentRow,
@@ -34,9 +34,9 @@ import {
   attachmentObjectReferenceBindings,
 } from "./attachment-object-ownership";
 import {
-  decodeStoredProjectAgentSessionPayload,
-  encodeStoredProjectAgentSessionPayload,
-} from "./project-request-contract";
+  decodeStoredTeamAgentSessionPayload,
+  encodeStoredTeamAgentSessionPayload,
+} from "./team-request-contract";
 
 export const defaultArchiveRowLimit = 500;
 export const maxArchiveUncompressedBytes = 16 * 1024 * 1024;
@@ -551,9 +551,9 @@ const projectSessionCandidate = async (
        order by updated_at, project_id, id limit 1`,
     )
     .bind(cutoff)
-    .first<ProjectAgentSessionRow>();
+    .first<TeamAgentSessionRow>();
   if (!session) return null;
-  decodeStoredProjectAgentSessionPayload(session.payload_json);
+  decodeStoredTeamAgentSessionPayload(session.payload_json);
   return {
     projectId: session.project_id,
     runId: null,
@@ -824,7 +824,7 @@ const purgeArchiveRecords = async (
     case "project_agent_sessions":
       for (const record of records) {
         const session = decodeArchivedProjectAgentSession(record.data);
-        await upsertProjectAgentSessionSummary(db, session, true);
+        await upsertTeamAgentSessionSummary(db, session, true);
         await db
           .prepare(
             `delete from briar_project_agent_sessions
@@ -869,7 +869,7 @@ const readArchiveObject = async (
 export async function readArchivedProjectAgentSession(
   bucket: ArchiveBucket,
   metadata: ArchiveMetadataRow,
-): Promise<ProjectAgentSessionRow> {
+): Promise<TeamAgentSessionRow> {
   if (metadata.archive_kind !== "project_agent_sessions") {
     throw new Error(
       `Archive is not a project agent session: ${metadata.id}`,
@@ -906,7 +906,7 @@ export async function readArchivedProjectAgentSession(
 
 async function restoreArchivedProjectAgentSessionRequester(
   db: D1Database,
-  session: ProjectAgentSessionRow,
+  session: TeamAgentSessionRow,
 ) {
   if (session.requested_by_user_id !== null) return session;
   const approval = await db
@@ -920,11 +920,11 @@ async function restoreArchivedProjectAgentSessionRequester(
     .bind(session.project_id, session.id)
     .first<{ approved_by_user_id: string }>();
   if (!approval) return session;
-  const payload = decodeStoredProjectAgentSessionPayload(session.payload_json);
+  const payload = decodeStoredTeamAgentSessionPayload(session.payload_json);
   return {
     ...session,
     requested_by_user_id: approval.approved_by_user_id,
-    payload_json: encodeStoredProjectAgentSessionPayload({
+    payload_json: encodeStoredTeamAgentSessionPayload({
       ...payload,
       requestedByUserId: approval.approved_by_user_id,
     }),

@@ -25,10 +25,10 @@ import {
 } from "../hooks/useAutoHuntSessions";
 import { useI18n, type Locale } from "../i18n";
 import {
-  isLocalProjectRepositoryReady,
-  localProjectConnectionState,
-} from "../lib/local-project-connection";
-import { isProjectScheduleTabEnabled } from "../lib/project-tabs";
+  isLocalTeamRepositoryReady,
+  localTeamConnectionState,
+} from "../lib/local-team-connection";
+import { isTeamScheduleTabEnabled } from "../lib/team-tabs";
 import type { RepositoryReadiness } from "../generated/tauri";
 import type {
   ChannelSummary,
@@ -41,8 +41,8 @@ import type {
   ProjectAgent,
   SessionUser,
 } from "../types";
-import { ProjectAgentAvatar } from "./ProjectAgentAvatar";
-import { ProjectIcon } from "./ProjectIcon";
+import { TeamAgentAvatar } from "./TeamAgentAvatar";
+import { TeamIcon } from "./TeamIcon";
 import {
   SidebarCollapsibleSection,
   SidebarOrganizationChannels,
@@ -77,7 +77,7 @@ export function Sidebar({
   agents,
   channels,
   channelsLoading = false,
-  connectedProjectIds,
+  connectedTeamIds,
   isOpen,
   onAddProject,
   onAddPlanningProject,
@@ -124,7 +124,7 @@ export function Sidebar({
   agents: ProjectAgent[];
   channels?: ChannelSummary[];
   channelsLoading?: boolean;
-  connectedProjectIds: string[] | null;
+  connectedTeamIds: string[] | null;
   isOpen: boolean;
   onAddProject: () => void;
   onAddPlanningProject?: (teamId: string) => void;
@@ -417,7 +417,7 @@ export function Sidebar({
           type="button"
         >
           {projectWindowProject ? (
-            <ProjectIcon className="size-5" project={projectWindowProject} />
+            <TeamIcon className="size-5" project={projectWindowProject} />
           ) : null}
           <span>
             {projectWindowProject?.name ?? t("sidebar.projectUnavailable")}
@@ -686,7 +686,7 @@ export function Sidebar({
                             type="button"
                           >
                             {agent ? (
-                              <ProjectAgentAvatar
+                              <TeamAgentAvatar
                                 agent={agent}
                                 isRunning
                                 token={token}
@@ -717,7 +717,7 @@ export function Sidebar({
                   </div>
                 ) : null}
               </div>
-              {isProjectScheduleTabEnabled(projectWindowProject) ? (
+              {isTeamScheduleTabEnabled(projectWindowProject) ? (
                 <a
                   aria-current={activePage === "schedule" ? "page" : undefined}
                   className={`sidebar-project-view${
@@ -766,15 +766,15 @@ export function Sidebar({
             const isMenuOpen = project.id === openProjectMenuId;
             const readiness = projectReadiness[project.id];
             const readinessError = projectReadinessError[project.id];
-            const connectionState = localProjectConnectionState(
-              connectedProjectIds,
+            const connectionState = localTeamConnectionState(
+              connectedTeamIds,
               project.id,
             );
             const needsConnection = connectionState === "disconnected";
             const needsAttention =
               connectionState === "connected" &&
               Boolean(readiness) &&
-              !isLocalProjectRepositoryReady(readiness ?? null);
+              !isLocalTeamRepositoryReady(readiness ?? null);
             const needsInspection =
               connectionState !== "disconnected" &&
               !readiness &&
@@ -828,7 +828,7 @@ export function Sidebar({
                       onClick={() => selectProject(project.id)}
                       type="button"
                     >
-                      <ProjectIcon className="size-4" project={project} />
+                      <TeamIcon className="size-4" project={project} />
                       <span>{project.name}</span>
                       {isActive && <i aria-label={t("sidebar.currentProject")} />}
                     </button>
@@ -1121,7 +1121,7 @@ export function Sidebar({
                                 type="button"
                               >
                                 {agent ? (
-                                  <ProjectAgentAvatar
+                                  <TeamAgentAvatar
                                     agent={agent}
                                     isRunning
                                     token={token}
@@ -1168,7 +1168,7 @@ export function Sidebar({
                         projectName={project.name}
                       />
                     ) : null}
-                    {isProjectScheduleTabEnabled(project) ? (
+                    {isTeamScheduleTabEnabled(project) ? (
                       <a
                         aria-current={
                           isActive && activePage === "schedule" ? "page" : undefined

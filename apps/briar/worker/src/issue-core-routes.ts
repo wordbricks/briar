@@ -10,8 +10,8 @@ import {
   deleteIssue,
   deleteIssueDependency,
   getHuntRunForProject,
-  getProjectSettings,
-  getProject,
+  getTeamSettings,
+  getTeam,
   listIssueAttachments,
   listIssueSubscriptions,
   subscribeIssue,
@@ -112,7 +112,7 @@ async function requireIssueProject(
     "results:review",
   deniedMessage: string,
 ) {
-  const project = await getProject(input.db, input.projectId, input.userId);
+  const project = await getTeam(input.db, input.projectId, input.userId);
   if (!project) throw new HttpError(404, "Project not found");
   if (!hasOrganizationCapability(project.member_role, capability)) {
     throw new HttpError(403, deniedMessage);
@@ -271,7 +271,7 @@ export async function createProjectIssue(
       eventKey: `${sourceKey}:${canonicalIssue.status}:intake`,
       occurredAt: observedAt,
       actor: attribution.actor,
-      repository: (await getProjectSettings(input.db, project.id))
+      repository: (await getTeamSettings(input.db, project.id))
         ?.github_repository ?? project.name,
       detail: attribution.detail,
       priority: canonicalIssue.priority,

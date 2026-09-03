@@ -1,6 +1,6 @@
 import * as Schema from "effect/Schema";
 import { IsoDateTimeWithOffset } from "../../src/lib/date-time-schema";
-import { MERGE_ACTIVITY_DAY, type MergedPullRequest, type ProjectMergeActivity } from "../../src/lib/project-merge-activity";
+import { MERGE_ACTIVITY_DAY, type MergedPullRequest, type TeamMergeActivity } from "../../src/lib/team-merge-activity";
 
 const encoder = new TextEncoder();
 
@@ -56,7 +56,7 @@ const decodeRepository = Schema.decodeUnknownSync(GitHubRepositoryResponse, {
   errors: "all",
 });
 
-export type ProjectGithubIdentity = {
+export type TeamGithubIdentity = {
   installationId: number;
   repositoryId: number;
   repository: string;
@@ -150,7 +150,7 @@ async function githubJson(response: Response, operation: string) {
 
 export async function createGithubInstallationToken(
   env: Pick<Env, "GITHUB_APP_ID" | "GITHUB_APP_PRIVATE_KEY">,
-  identity: ProjectGithubIdentity,
+  identity: TeamGithubIdentity,
   fetchImpl: typeof fetch = fetch,
 ) {
   const appId = env.GITHUB_APP_ID?.trim();
@@ -197,7 +197,7 @@ export async function createGithubInstallationToken(
 
 async function projectGithubRequest(
   env: Pick<Env, "GITHUB_APP_ID" | "GITHUB_APP_PRIVATE_KEY">,
-  identity: ProjectGithubIdentity,
+  identity: TeamGithubIdentity,
   path: string,
   init: RequestInit = {},
   fetchImpl: typeof fetch = fetch,
@@ -217,7 +217,7 @@ async function projectGithubRequest(
   );
 }
 
-const repositoryPath = (identity: ProjectGithubIdentity) =>
+const repositoryPath = (identity: TeamGithubIdentity) =>
   `/repos/${encodeURIComponent(identity.repository.split("/")[0])}/${
     encodeURIComponent(identity.repository.split("/")[1])
   }`;
@@ -231,10 +231,10 @@ const decodeActivityPage = Schema.decodeUnknownSync(Schema.Array(Schema.Struct({
 
 export async function getProjectGithubMergeActivity(
   env: Pick<Env, "GITHUB_APP_ID" | "GITHUB_APP_PRIVATE_KEY">,
-  identity: ProjectGithubIdentity,
+  identity: TeamGithubIdentity,
   now = Date.now(),
   fetchImpl: typeof fetch = fetch,
-): Promise<ProjectMergeActivity> {
+): Promise<TeamMergeActivity> {
   const credential = await createGithubInstallationToken(env, identity, fetchImpl);
   const since = now - 16 * MERGE_ACTIVITY_DAY;
   const pullRequests = new Map<number, MergedPullRequest>();
@@ -269,7 +269,7 @@ export async function getProjectGithubMergeActivity(
 
 export async function getProjectGithubRepository(
   env: Pick<Env, "GITHUB_APP_ID" | "GITHUB_APP_PRIVATE_KEY">,
-  identity: ProjectGithubIdentity,
+  identity: TeamGithubIdentity,
 ) {
   const repository = decodeRepository(await projectGithubRequest(
     env,
@@ -289,7 +289,7 @@ export async function getProjectGithubRepository(
 }
 
 const pullRequestJson = (
-  identity: ProjectGithubIdentity,
+  identity: TeamGithubIdentity,
   input: typeof GitHubPullRequestResponse.Type,
 ) => ({
   repositoryId: identity.repositoryId,
@@ -310,7 +310,7 @@ const pullRequestJson = (
 
 export async function getProjectGithubPullRequest(
   env: Pick<Env, "GITHUB_APP_ID" | "GITHUB_APP_PRIVATE_KEY">,
-  identity: ProjectGithubIdentity,
+  identity: TeamGithubIdentity,
   pullRequestNumber: number,
 ) {
   const payload = decodePullRequest(await projectGithubRequest(
@@ -323,7 +323,7 @@ export async function getProjectGithubPullRequest(
 
 export async function createProjectGithubPullRequest(
   env: Pick<Env, "GITHUB_APP_ID" | "GITHUB_APP_PRIVATE_KEY">,
-  identity: ProjectGithubIdentity,
+  identity: TeamGithubIdentity,
   input: { title: string; head: string; base: string; body: string; draft: boolean },
 ) {
   const payload = decodePullRequest(await projectGithubRequest(
@@ -337,7 +337,7 @@ export async function createProjectGithubPullRequest(
 
 export async function updateProjectGithubPullRequest(
   env: Pick<Env, "GITHUB_APP_ID" | "GITHUB_APP_PRIVATE_KEY">,
-  identity: ProjectGithubIdentity,
+  identity: TeamGithubIdentity,
   pullRequestNumber: number,
   input: Record<string, unknown>,
 ) {
@@ -352,7 +352,7 @@ export async function updateProjectGithubPullRequest(
 
 export async function mergeProjectGithubPullRequest(
   env: Pick<Env, "GITHUB_APP_ID" | "GITHUB_APP_PRIVATE_KEY">,
-  identity: ProjectGithubIdentity,
+  identity: TeamGithubIdentity,
   pullRequestNumber: number,
   input: { mergeMethod: "merge" | "squash" | "rebase"; expectedHeadSha?: string },
 ) {
@@ -372,7 +372,7 @@ export async function mergeProjectGithubPullRequest(
 
 export async function createProjectGithubCommitStatus(
   env: Pick<Env, "GITHUB_APP_ID" | "GITHUB_APP_PRIVATE_KEY">,
-  identity: ProjectGithubIdentity,
+  identity: TeamGithubIdentity,
   input: {
     sha: string;
     state: "error" | "failure" | "pending" | "success";

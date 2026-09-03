@@ -600,7 +600,7 @@ const managedComputerSetupSessionFromProto = (
     id: session.id,
     managedComputerId: session.managedComputerId,
     organizationId: session.organizationId,
-    projectId: session.projectId,
+    teamId: session.projectId,
     status,
     expiresAt: requiredTimestamp(
       session.expiresAt,

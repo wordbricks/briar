@@ -32,7 +32,7 @@ import {
   statusForDashboardStage,
   workflowStageForDashboardStage,
 } from "./hunt-run-model";
-import { getProjectSettings } from "./project-settings-repository";
+import { getTeamSettings } from "./team-settings-repository";
 import {
   digestRunId,
   scopedRunKey,
@@ -189,7 +189,7 @@ const assertRunCompletionEligible = async (
   if (!resultSummary?.trim()) {
     throw new HuntTransitionError("Run completion requires a result summary");
   }
-  const settings = await getProjectSettings(db, projectId);
+  const settings = await getTeamSettings(db, projectId);
   if (
     settings?.linear_enabled === 1 &&
     trackerProvider === "linear" &&

@@ -24,9 +24,10 @@ import {
 } from "lucide-react";
 import { Spinner } from "./ui/spinner";
 import { DmMemoryCitations } from "./DmMemoryCitations";
-import { DmMemoryDialog } from "./DmMemoryDialog";
 import { DmComputerPanel } from "./DmComputerPanel";
 import {
+  lazy,
+  Suspense,
   useCallback,
   useEffect,
   useId,
@@ -35,7 +36,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
   type Dispatch,
   type ReactNode,
   type RefObject,
@@ -202,6 +202,11 @@ type CachedDesktopChannel = {
   messages: ChannelMessage[];
   nextCursor: string | null;
 };
+
+/** Only opened from the DM header menu, so it loads on demand. */
+const DmMemoryDialog = lazy(() =>
+  import("./DmMemoryDialog").then((m) => ({ default: m.DmMemoryDialog })),
+);
 
 const desktopChannelMessagePageSize = 20;
 const desktopChannelVirtualizationThreshold = 40;
@@ -383,9 +388,9 @@ export function Channels({
     effectiveWidth: effectiveThreadWidth,
     isResizing: isResizingThread,
     separatorProps: threadResizeProps,
-    width: threadWidth,
   } = useHorizontalPaneResize({
     clamp: clampChannelThreadWidth,
+    cssVariable: "--channel-thread-width",
     defaultWidth: channelThreadWidthDefault,
     load: loadChannelThreadWidth,
     max: channelThreadWidthMax,
@@ -1223,13 +1228,6 @@ export function Channels({
         showRequestedThreadOnly ? " channels-inbox-thread-only" : ""
       }`}
       ref={channelsRef}
-      style={
-        threadWidth === null
-          ? undefined
-          : ({
-              "--channel-thread-width": `${threadWidth}%`,
-            } as CSSProperties)
-      }
     >
       {!showRequestedThreadOnly ? (
         <div
@@ -1687,10 +1685,12 @@ export function Channels({
           if (!open) setHeaderProfile(null);
         }}
       />
-      {memoryOpen && surface === "dm" && activeChannel && <DmMemoryDialog
-        key={`${organizationId}:${activeChannel.id}:${currentUserId}`}
-        scope={{ token, organizationId, channelId: activeChannel.id }} onClose={() => setMemoryOpen(false)}
-      />}
+      {memoryOpen && surface === "dm" && activeChannel && <Suspense fallback={null}>
+        <DmMemoryDialog
+          key={`${organizationId}:${activeChannel.id}:${currentUserId}`}
+          scope={{ token, organizationId, channelId: activeChannel.id }} onClose={() => setMemoryOpen(false)}
+        />
+      </Suspense>}
       {surface === "channel" && webhooksOpen && activeChannel ? (
         <ChannelWebhooksDialog
           channel={activeChannel}

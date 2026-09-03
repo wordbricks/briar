@@ -48,11 +48,11 @@ import {
 import { AgentExecutionMetricsSchema } from "@briar/contracts/gen/briar/types/v1/agent_execution_pb";
 import {
   LinearSettingsSchema,
-  ProjectExecutionWorkerPolicy_SelectionMode,
-  ProjectExecutionWorkerPolicySchema,
-  ProjectSchema,
-  ProjectSettingsSchema,
-} from "@briar/contracts/gen/briar/app/v1/project_pb";
+  TeamExecutionWorkerPolicy_SelectionMode,
+  TeamExecutionWorkerPolicySchema,
+  TeamSchema,
+  TeamSettingsSchema,
+} from "@briar/contracts/gen/briar/app/v1/team_pb";
 import {
   OrganizationInvitationPreviewSchema,
   OrganizationInvitationSchema,
@@ -90,8 +90,8 @@ import type {
   OrganizationRole,
   OrganizationRow,
 } from "./organization-repository";
-import type { ProjectRow } from "./project-repository";
-import type { settingsJson } from "./project-settings-json";
+import type { TeamRow } from "./team-repository";
+import type { settingsJson } from "./team-settings-json";
 import type { checkpointPolicyJson } from "./workflow-policy";
 import type { workerJson } from "./worker-json";
 
@@ -464,7 +464,7 @@ export const appCheckpointPolicy = (
 
 export const appProjectSettings = (
   settings: ProjectSettingsJson,
-) => create(ProjectSettingsSchema, {
+) => create(TeamSettingsSchema, {
   velenOrg: settings.velenOrg ?? undefined,
   dataSource: settings.dataSource ?? undefined,
   linear: create(LinearSettingsSchema, {
@@ -482,7 +482,7 @@ export const appProjectSettings = (
     : undefined,
 });
 
-export const appProject = (project: ProjectRow) => create(ProjectSchema, {
+export const appProject = (project: TeamRow) => create(TeamSchema, {
   id: project.id,
   name: project.name,
   issueKeyPrefix: project.issue_key_prefix,
@@ -768,10 +768,10 @@ export const appExecutionPolicy = (policy: {
   readonly defaultWorkerId: string | null;
   readonly allowedWorkerIds: readonly string[];
   readonly updatedAt: string | null;
-}) => create(ProjectExecutionWorkerPolicySchema, {
+}) => create(TeamExecutionWorkerPolicySchema, {
   selectionMode: policy.selectionMode === "any"
-    ? ProjectExecutionWorkerPolicy_SelectionMode.ANY
-    : ProjectExecutionWorkerPolicy_SelectionMode.ALLOWLIST,
+    ? TeamExecutionWorkerPolicy_SelectionMode.ANY
+    : TeamExecutionWorkerPolicy_SelectionMode.ALLOWLIST,
   defaultWorkerId: policy.defaultWorkerId ?? undefined,
   allowedWorkerIds: [...policy.allowedWorkerIds],
   updatedAt: policy.updatedAt ? timestamp(policy.updatedAt) : undefined,

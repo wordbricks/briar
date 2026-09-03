@@ -23,7 +23,7 @@ final class DashboardSyncTests: XCTestCase {
         workflow.execution = BriarTypes_WorkflowExecution()
         workflow.completion = BriarTypes_WorkflowCompletion()
 
-        var settings = BriarAPI_ProjectSettings()
+        var settings = BriarAPI_TeamSettings()
         settings.linear = BriarAPI_LinearSettings()
         settings.workflow = workflow
 
@@ -162,7 +162,7 @@ final class DashboardSyncTests: XCTestCase {
         cursor: UInt64,
         run: DashboardRun
     ) -> BriarAPI_GetDashboardResponse {
-        var projectMessage = BriarAPI_Project()
+        var projectMessage = BriarAPI_Team()
         projectMessage.id = project.id.uuidString.lowercased()
         projectMessage.name = project.name
         projectMessage.issueKeyPrefix = project.issueKeyPrefix
@@ -172,7 +172,7 @@ final class DashboardSyncTests: XCTestCase {
         projectMessage.role = .owner
         projectMessage.createdAt = Google_Protobuf_Timestamp(date: project.createdAt)
 
-        var settings = BriarAPI_ProjectSettings()
+        var settings = BriarAPI_TeamSettings()
         settings.linear = BriarAPI_LinearSettings()
         settings.workflow = wireWorkflow()
 
@@ -187,7 +187,7 @@ final class DashboardSyncTests: XCTestCase {
         runMessage.lastEventAt = Google_Protobuf_Timestamp(date: run.updatedAt)
 
         var response = BriarAPI_GetDashboardResponse()
-        response.project = projectMessage
+        response.team = projectMessage
         response.settings = settings
         response.runs = [runMessage]
         response.cursor = cursor

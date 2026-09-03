@@ -12,13 +12,13 @@ import packageJson from "../../../package.json";
 import { whoami } from "./auth-commands";
 import { login } from "./command-support";
 import {
-  configureProject,
-  connectProject,
-  createProject,
-  listProjectsCommand,
-  projectDoctor,
+  configureTeam,
+  connectTeam,
+  createTeam,
+  listTeamsCommand,
+  teamDoctor,
   showWorkflow,
-} from "./project-commands";
+} from "./team-commands";
 import {
   claimWork,
   worktreeList,
@@ -167,16 +167,16 @@ const projectCommand = Command.make("project").pipe(
     leaf(
       "list",
       switches("json"),
-      listProjectsCommand,
+      listTeamsCommand,
       "List projects available to the signed-in user",
     ),
     leaf(
       "create",
       optionalStrings("name"),
-      createProject,
+      createTeam,
       "Create and connect a project",
     ),
-    leaf("doctor", {}, projectDoctor, "Inspect project readiness"),
+    leaf("doctor", {}, teamDoctor, "Inspect project readiness"),
     leaf(
       "configure",
       {
@@ -200,7 +200,7 @@ const projectCommand = Command.make("project").pipe(
           "i-understand-the-risk",
         ),
       },
-      configureProject,
+      configureTeam,
       "Configure project integrations and execution policy",
     ),
   ]),
@@ -212,16 +212,16 @@ const teamCommand = Command.make("team").pipe(
     leaf(
       "list",
       switches("json"),
-      listProjectsCommand,
+      listTeamsCommand,
       "List Teams available to the signed-in user",
     ),
     leaf(
       "create",
       optionalStrings("name"),
-      createProject,
+      createTeam,
       "Create and connect a Team",
     ),
-    leaf("doctor", {}, projectDoctor, "Inspect Team readiness"),
+    leaf("doctor", {}, teamDoctor, "Inspect Team readiness"),
     leaf(
       "configure",
       {
@@ -245,7 +245,7 @@ const teamCommand = Command.make("team").pipe(
           "i-understand-the-risk",
         ),
       },
-      configureProject,
+      configureTeam,
       "Configure Team integrations and execution policy",
     ),
   ]),
@@ -254,7 +254,7 @@ const teamCommand = Command.make("team").pipe(
 const connectCommand = leaf(
   "connect",
   requiredStrings("project-id", "agent-token"),
-  connectProject,
+  connectTeam,
   "Connect the current repository to an existing project",
 );
 

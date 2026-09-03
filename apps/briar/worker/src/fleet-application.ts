@@ -33,7 +33,7 @@ import {
 } from "./managed-computer-setup-relay-service";
 import { hasOrganizationCapability } from "./organization-access";
 import { getOrganizationRole } from "./organization-repository";
-import { getProject } from "./project-command-repository";
+import { getTeam } from "./team-command-repository";
 import { readLatestVersion } from "./releases";
 import { sha256 } from "./crypto-digest";
 import {
@@ -90,7 +90,7 @@ const projectManagement = async (input: {
   projectId: string;
   userId: string;
 }) => {
-  const project = await getProject(input.db, input.projectId, input.userId);
+  const project = await getTeam(input.db, input.projectId, input.userId);
   if (!project) return applicationError("project_not_found", "Project not found");
   requireDevelopmentManagement(project.member_role);
   return project;

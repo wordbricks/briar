@@ -596,7 +596,7 @@ struct TaskListView: View {
         _mutations = StateObject(wrappedValue: IssueMutationStore(
             preparedUploadClient: services.preparedUploadClient,
             issueService: services.issue,
-            projectService: services.project,
+            teamService: services.team,
             projectID: project.id,
             planningProjectID: selectedPlanningProjectID
         ))
@@ -1383,7 +1383,7 @@ struct RunDetailView: View {
         _mutations = StateObject(wrappedValue: IssueMutationStore(
             preparedUploadClient: services.preparedUploadClient,
             issueService: services.issue,
-            projectService: services.project,
+            teamService: services.team,
             projectID: projectID
         ))
         _localStatus = State(initialValue: run.status)

@@ -31,7 +31,7 @@ import type {
   AgentExecutionCostEstimate,
   AgentUsagePricing,
 } from "../../src/lib/agent-usage-pricing";
-import type { ProjectUsageSummary } from "../../src/lib/project-usage-summary";
+import type { TeamUsageSummary } from "../../src/lib/team-usage-summary";
 import { appAgentProvider } from "./app-connect-mappers";
 import type {
   listOrganizationUsageRunsApplication,
@@ -247,9 +247,9 @@ const projectUsagePeriod = {
   day: ProjectUsagePeriod.DAY,
   week: ProjectUsagePeriod.WEEK,
   month: ProjectUsagePeriod.MONTH,
-} as const satisfies Record<ProjectUsageSummary["period"], ProjectUsagePeriod>;
+} as const satisfies Record<TeamUsageSummary["period"], ProjectUsagePeriod>;
 
-export const appProjectUsageSummary = (summary: ProjectUsageSummary) =>
+export const appProjectUsageSummary = (summary: TeamUsageSummary) =>
   create(GetProjectUsageSummaryResponseSchema, {
     period: projectUsagePeriod[summary.period],
     rangeStart: appReportingTimestamp(summary.rangeStart),

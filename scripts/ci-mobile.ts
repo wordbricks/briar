@@ -14,6 +14,9 @@ import { withCiWorktreeLockAt } from "./ci-worktree-lock";
 
 const workspaceRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const fallbackJavaHome = "/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home";
+const MobileCiJobs = Schema.Int.check(
+  Schema.isBetween({ minimum: 1, maximum: 3 }),
+);
 
 export class MobileCiCommandError extends Schema.TaggedError<MobileCiCommandError>()(
   "MobileCiCommandError",
@@ -212,11 +215,6 @@ const prepareMobileBuildCopy = Effect.fn("mobileCi.prepareBuildCopy")(
 
 const mobileCi = Effect.fn("mobileCi")(
   function* mobileCiEffect(jobs: number) {
-    if (!Number.isInteger(jobs) || jobs < 1 || jobs > 3) {
-      return yield* new MobileCiInvariantError({
-        message: "--jobs must be an integer from 1 through 3.",
-      });
-    }
     yield* Effect.all([
       requireCommand("bun", "Install the repository-pinned Bun version."),
       requireCommand("rg", "Install ripgrep for the mobile security checks."),
@@ -302,8 +300,8 @@ const mobileCi = Effect.fn("mobileCi")(
   },
 );
 
-const withMobileCiLock = <A, E, R>(program: Effect.Effect<A, E, R>) =>
-  Effect.gen(function* mobileCiLockEffect() {
+const withMobileCiLock = Effect.fn("withMobileCiLock")(
+  function* withMobileCiLockEffect<A, E, R>(program: Effect.Effect<A, E, R>) {
     const lockPath = yield* run("resolve worktree CI lock", {
       argv: ["git", "rev-parse", "--git-path", "briar-ci.lock"],
       output: "capture",
@@ -317,13 +315,15 @@ const withMobileCiLock = <A, E, R>(program: Effect.Effect<A, E, R>) =>
       head.output.trim(),
       program,
     );
-  });
+  },
+);
 
 const mobileCiCommand = Command.make(
   "ci-mobile",
   {
     jobs: Flag.integer("jobs").pipe(
       Flag.withDefault(2),
+      Flag.withSchema(MobileCiJobs),
       Flag.withDescription("Maximum concurrent iOS builds (1-3)"),
     ),
   },
@@ -332,12 +332,6 @@ const mobileCiCommand = Command.make(
   }),
 ).pipe(Command.withDescription("Run Briar native iOS and Android CI"));
 
-const errorMessage = (error: unknown) =>
-  typeof error === "object" && error !== null && "message" in error &&
-      typeof error.message === "string"
-    ? error.message
-    : String(error);
-
 export const runMobileCiMain = () => {
   mobileCiCommand.pipe(
     Command.run({ version: process.env.npm_package_version ?? "0.0.0" }),
@@ -345,7 +339,7 @@ export const runMobileCiMain = () => {
     Effect.tapError((error) =>
       CliError.isCliError(error)
         ? Effect.void
-        : Effect.sync(() => process.stderr.write(`[mobile-ci] ${errorMessage(error)}\n`))
+        : Effect.sync(() => process.stderr.write(`[mobile-ci] ${String(error)}\n`))
     ),
     Effect.provide(BunServices.layer),
     BunRuntime.runMain({ disableErrorReporting: true }),

@@ -18,6 +18,7 @@ pub(super) fn run() {
     #[cfg(desktop)]
     let builder = builder
         .manage(ExitConfirmationState::default())
+        .manage(LaunchIntroState::default())
         .on_menu_event(|app, event| {
             if event.id() == APP_QUIT_MENU_ID {
                 request_exit_confirmation(app);
@@ -63,6 +64,13 @@ pub(super) fn run() {
     let app = builder
         .setup(move |_app| {
             ipc_builder.mount_events(_app);
+            // Before anything else in setup: the intro has to be on screen
+            // while the frontend bundle is still downloading, not after it
+            // mounted and asked for one.
+            #[cfg(target_os = "macos")]
+            start_launch_intro_if_needed(_app.handle());
+            #[cfg(desktop)]
+            start_main_window_visibility_watchdog(_app.handle());
             #[cfg(target_os = "macos")]
             if let Err(error) = macos_inbox_notifications::install(_app.handle()) {
                 eprintln!("Inbox notification install skipped: {error}");
@@ -99,27 +107,69 @@ pub(super) fn run() {
                 let resource_directory = _app.path().resource_dir()?;
                 let home = _app.path().home_dir()?;
                 let app_data_directory = _app.path().app_data_dir()?;
+                // Kept synchronous: both are plain directory scans over a
+                // handful of small local JSON files, so they finish long
+                // before the webview can load and call any command — they
+                // are not the source of the multi-second setup freeze.
+                // `cleanup_unprepared` also has a real (if narrow) ordering
+                // hazard if it were deferred: when no fresh marker is
+                // present it deletes *every* file in the active-recovery
+                // directory, including ones a resumed session's `begin()`
+                // may have just written after the frontend called
+                // `take_planned_update_agent_recoveries` (see
+                // project_execution.rs). Running it here, before the event
+                // loop starts and before any command can run, guarantees it
+                // never races that write.
                 if let Err(error) =
                     planned_update_recovery::PlannedUpdateRecoveryStore::new(&app_data_directory)
                         .and_then(|store| store.cleanup_unprepared())
                 {
                     eprintln!("Planned update recovery cleanup failed: {error}");
                 }
+                // `interrupt_orphaned_groups` flips any dispatch group left
+                // "running" by a previous process to "interrupted". The
+                // frontend's one-shot recovery effect (`useAutoHuntSessions`,
+                // empty dependency array) reads dispatch status once on
+                // mount and never re-polls it afterwards, so a group this
+                // hasn't reached yet would show "running" indefinitely
+                // instead of self-correcting. Kept synchronous so that
+                // one-shot read always sees the reconciled state.
                 if let Err(error) =
                     auto_hunt_dispatch::AutoHuntDispatchStore::new(&app_data_directory)
                         .and_then(|store| store.interrupt_orphaned_groups())
                 {
                     eprintln!("Auto Hunt dispatch recovery failed: {error}");
                 }
-                if let Err(error) = sync_auto_hunt_assets_and_restart_workers(
-                    &resource_directory,
-                    &home,
-                    ExecutionWorkerRestartPolicy::WhenRuntimeIsStale,
-                ) {
-                    eprintln!(
-                        "Briar CLI and Auto Hunt skill automatic synchronization failed: {error}"
-                    );
-                }
+                // This copies skill bundles into several destinations under
+                // `home` and then blocks on a `bun ... worker
+                // restart-services` subprocess. On the setup thread that
+                // freezes the already-visible, still-blank window for
+                // seconds on the first launch after every app update.
+                // Running it on a background thread lets `setup` return and
+                // the event loop (and window paint) start immediately.
+                //
+                // `auto_hunt_health` and `repair_auto_hunt` read the same
+                // CLI/skill VERSION files this writes, and the frontend
+                // calls `auto_hunt_health` once on mount, so there is a
+                // narrow window where a health check can observe a
+                // partially-synced install and report a stale/misleading
+                // issue. That is judged acceptable here: the dashboard
+                // polls and re-runs the health check periodically, so the
+                // status self-corrects on the next pass once the
+                // background sync finishes.
+                let background_resource_directory = resource_directory.clone();
+                let background_home = home.clone();
+                std::thread::spawn(move || {
+                    if let Err(error) = sync_auto_hunt_assets_and_restart_workers(
+                        &background_resource_directory,
+                        &background_home,
+                        ExecutionWorkerRestartPolicy::WhenRuntimeIsStale,
+                    ) {
+                        eprintln!(
+                            "Briar CLI and Auto Hunt skill automatic synchronization failed: {error}"
+                        );
+                    }
+                });
                 #[cfg(not(dev))]
                 {
                     let worktree_sweep_config = cli_config_path(_app.handle())?;

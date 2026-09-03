@@ -50,20 +50,126 @@ the miniflare-backed Worker suites). Set `VITEST_MAX_WORKERS` to pin a lower
 value on constrained machines; it is in `globalPassThroughEnv`, so it never
 changes a Turborepo cache key.
 
+### The app test suites
+
+`bun run test` at the repository root is `turbo run test:all //#test:repo-tools`.
+`test:all` owns no script anywhere; it is a Turborepo fan-out node. Every package
+except `@briar/app` resolves it to that package's own `test` task, and
+`@briar/app` overrides it in `apps/briar/turbo.json` with three independently
+cached leaf tasks:
+
+| Task | Script | Covers |
+| --- | --- | --- |
+| `test:unit` | `vitest run` | `src/`, `src-agent/`, `src-cli/` plus `worker/src/html-artifact-preview-shell.test.ts` (the Node-only suite), driven by `vite.config.ts` |
+| `test:worker:unit` | `vitest run --config vitest.worker.config.ts` | the `worker-unit` Vitest project: every Worker test that never touches D1 |
+| `test:worker:d1` | `vitest run --config vitest.worker-d1.config.ts` | the `worker-d1` Vitest project: the files listed in `vitest.worker.test-files.ts`, on the schema snapshot |
+
+Previously `@briar/app#test` was one task that ran all three behind
+`$TURBO_DEFAULT$` inputs and a `transit` dependency, so it hashed the whole
+package: editing a single React component reran the Worker suites, and editing a
+single Worker test reran the app suite. The three leaf tasks declare their inputs
+explicitly instead (no `$TURBO_DEFAULT$`, no `dependsOn: ["transit"]`, `outputs:
+[]`, `cache: true`), so each one reruns only when something it actually reads
+changes.
+
+The declared inputs were derived from the transitive import closure of each
+suite's test files and widened to whole directories, so they are supersets rather
+than exact lists. Two consequences are worth knowing:
+
+- `test:unit` hashes `worker/src/**/*.ts` minus the Worker test files, because
+  six Worker modules (`public-routes.ts`, `auth-origins.ts`, `releases.ts`, …)
+  are imported by app tests. Editing a Worker *test* therefore leaves `test:unit`
+  cached; editing Worker *source* reruns it.
+- Both Worker tasks hash all of `worker/src/**` except the migration suite and
+  the Node-only shell test, so editing any Worker test reruns both of them. The
+  alternative would be duplicating `vitest.worker.test-files.ts` into
+  `turbo.json`, which drifts silently.
+
+`test:unit` additionally hashes `src-tauri/*.json` and `src-tauri/capabilities/`,
+which several `src/lib` tests read from disk, and `$TURBO_ROOT$/.env*`, because
+Vite loads the repository root as its `envDir`.
+
+The two Worker tasks run in parallel under Turborepo, which makes
+`sequence.groupOrder` in `vitest.worker.config.ts` and `vitest.worker-d1.config.ts`
+inert: `groupOrder` only orders projects inside a single Vitest run, and the
+combined `vitest.worker-projects.config.ts` is now used only by the developer
+script `bun run --cwd apps/briar test:worker`. Both configs still cap their pools
+at 8 workers, so the parallel pair does not oversubscribe the machine.
+
+Developer entry points are unchanged in spirit:
+
+```sh
+bun run --cwd apps/briar test            # test:unit, then both Worker projects
+bun run --cwd apps/briar test:unit       # app/agent/CLI suite only
+bun run --cwd apps/briar test:worker     # both Worker projects in one Vitest run
+```
+
+To rerun a cached suite against an unchanged tree:
+
+```sh
+bunx turbo run test:unit test:worker:unit test:worker:d1 --filter=@briar/app --force
+```
+
+### Rust lint and test in one compile
+
+The `rust` context runs `cargo fmt --check` and then a single `cargo test` with
+`RUSTC_WORKSPACE_WRAPPER` pointed at `scripts/ci-rust-lint-wrapper.sh`. The
+wrapper compiles the workspace crate through the toolchain's `clippy-driver`
+and appends `-D warnings`, so the test build itself enforces everything the
+former separate `cargo clippy --all-targets -- -D warnings` step enforced:
+clippy lints and rustc warnings, across the lib, bin, and test targets.
+Dependencies still compile with plain rustc, exactly as under `cargo clippy`,
+and `briar-contracts` (a path dependency, not a workspace member) is compiled
+but not lint-gated, which matches the previous behaviour. The gain is one
+compilation of the app crate instead of a check-mode pass plus a codegen pass;
+on a change to `packages/contracts/rust` this removes roughly a third of the
+context's time. Locally, `cargo clippy --all-targets -- -D warnings` remains
+the way to lint without running the tests.
+
+The rust context deliberately runs in parallel with the Vitest contexts. On a
+12-core machine the contention costs cargo about three seconds on a warm
+incremental build, and lowering the Vitest processes' priority recovered only
+one of them, so no scheduling is applied. Two worktrees running local CI at the
+same time wait on Cargo's build-directory lock (`Blocking waiting for file lock
+on build directory`); that wait is expected and a Briar-level lock would not
+shorten it.
+
 ### Shared Cargo target directory
 
 The `rust` context builds into a shared Cargo target directory instead of
-`apps/briar/src-tauri/target`, so `cargo fmt`, `cargo clippy`, and `cargo test`
-stay incremental across git worktrees: a fresh Auto Hunt worktree reuses the
+`apps/briar/src-tauri/target`, so `cargo fmt` and `cargo test` stay
+incremental across git worktrees: a fresh Auto Hunt worktree reuses the
 artifacts of previous runs rather than rebuilding every crate. The default is
-`$(getconf DARWIN_USER_CACHE_DIR)/briar/ci/cargo-target` (falling back to
-`$TMPDIR` when that is unavailable). Override it with
-`BRIAR_CI_CARGO_TARGET_DIR`, which must be an absolute path ending in
-`/cargo-target`, or set `BRIAR_CI_CARGO_TARGET_DIR=local` to fall back to the
-per-worktree target directory when debugging a build. Unlike the release cache,
-the CI cache takes no exclusive lock: Cargo's own file lock serialises
-concurrent access, so several worktrees can run local CI at the same time and
-simply wait for each other.
+`${XDG_CACHE_HOME:-~/.cache}/briar/cargo-target`, and the release scripts use
+the same directory (Cargo keeps the `debug` and `release` profiles apart), so
+CI runs and release builds warm each other's dependencies. The directory is
+deliberately not under `DARWIN_USER_CACHE_DIR`: macOS treats that location as
+purgeable, and each eviction turned a ~20s incremental Rust check into a
+~10 minute cold build. Override it with `BRIAR_CI_CARGO_TARGET_DIR`, which must
+be an absolute path ending in `/cargo-target`, or set
+`BRIAR_CI_CARGO_TARGET_DIR=local` to fall back to the per-worktree target
+directory when debugging a build. Unlike the release cache, the CI cache takes
+no exclusive lock: Cargo's own file lock serialises concurrent access, so
+several worktrees can run local CI at the same time and simply wait for each
+other.
+
+To relocate an existing cache without a cold rebuild, `mv` the directory to the
+new path (or set the override to the old one), then delete every
+`<profile>/build/*` entry whose `output` file still names the old path: Tauri
+and its plugins record absolute `OUT_DIR` paths in their build-script output,
+and `tauri-build` fails with "failed to read plugin permissions" until those
+scripts rerun (about 30s). For example:
+
+```sh
+for o in ~/.cache/briar/cargo-target/*/build/*/output; do
+  grep -q "$OLD_CACHE_PATH" "$o" && rm -rf "$(dirname "$o")"
+done
+```
+
+The per-worktree
+`apps/briar/src-tauri/target` directories are not used by local CI and can be
+deleted to reclaim disk; only `bun run tauri dev` and similar development
+builds write there.
 
 Mobile contract validation is separate from the required pull request
 signoffs. On a macOS worker with Xcode, JDK 17, and Android SDK 36, install the
@@ -118,10 +224,11 @@ Local CI uses an Effect runner with `effect/unstable/cli`. The typed CLI runs
 the selected contexts with scoped child processes and temporary directories.
 The first failed context interrupts its still-running siblings, so a known
 failure does not leave expensive builds or Miniflare pools running. Local CI
-assumes the repository dependencies have already been installed. An atomic
-lock in the linked worktree's Git metadata rejects a second local, signoff, or
-mobile CI run in the same worktree while still allowing different worktrees to
-validate in parallel. Stale locks left by a killed process are reclaimed.
+assumes the repository dependencies have already been installed. A scoped
+SQLite write transaction in the linked worktree's Git metadata rejects a
+second local, signoff, or mobile CI run in the same worktree while still
+allowing different worktrees to validate in parallel. Interruption, failure,
+and process exit release the transaction without stale-lock recovery logic.
 
 Command output is written to per-context temporary logs while one-line start,
 finish, and timing events stream to the terminal. Successful logs disappear
@@ -129,10 +236,28 @@ with the Effect scope; on failure only the last 200 lines of the failed context
 are printed. Set `BRIAR_CI_TIMING_FILE` when a persistent TSV timing artifact is
 needed.
 
-All four contexts, `d1-migrations` included, run in parallel. The D1 migration
-suite pins itself to a single Vitest worker while `app-worker` runs so the
-combined Miniflare pool stays small. Set `BRIAR_CI_SERIAL_CONTEXTS=true` to run
-the contexts one at a time on constrained machines.
+All four contexts, `d1-migrations` included, run in parallel. While the
+`app-worker` context runs alongside it, `test:d1:migrations` is pinned to a
+single Vitest worker so the combined Miniflare pool stays small. The migration
+suite is cached by Turborepo; its inputs include the migrations, schema
+snapshot, Worker and shared library sources, Vitest configuration, generated
+contracts, manifests, and lockfile. `VITEST_MAX_WORKERS` is pass-through state
+and does not change the cache key. Set `BRIAR_CI_SERIAL_CONTEXTS=true` to run
+the contexts one at a time on constrained machines, or set
+`VITEST_MAX_WORKERS` explicitly to cap the pool.
+
+The 16 cutover regressions are loaded through four domain-grouped Vitest entry
+files. Each entry pays for one workerd boot and resets its D1 database between
+cutover cases. Local CI does not also run `d1:migrate:local`: the cutover suite
+already exercises the real migration files, and the extra Wrangler replay was
+redundant. The standalone task remains available for manual local migration
+checks and is independently cached.
+
+To rerun the migration suite against an unchanged tree:
+
+```sh
+bunx turbo run test:d1:migrations --filter=@briar/app --force
+```
 
 ## Production Worker serialization
 
@@ -153,9 +278,10 @@ Vitest project loads it in one batch instead of replaying ~190 migrations into
 each test file's isolated database.
 
 The migrations remain the source of truth. `d1:migrate:local`, `d1:migrate:remote`
-and the migration regression suite still use the real files. CI relies on the
-suite's two full-history replays plus four domain-grouped cutover entries; it no
-longer pays for a third, redundant Wrangler replay on every signoff.
+and the four domain-grouped migration entries still use the real files, so
+migration behaviour is never validated through the snapshot. `db.test.ts` and
+`workflow-v2.test.ts` are repository integration tests rather than cutover
+tests and run in the `worker-d1` project on the snapshot schema.
 
 After adding or editing a migration that changes the schema or seeds rows:
 

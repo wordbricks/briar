@@ -54,7 +54,7 @@ const emptyIssueMessageContract: Pick<
 };
 const dashboardAgent: ProjectAgent = {
   id: "agent-1",
-  projectId: demoDashboard.project.id,
+  teamId: demoDashboard.team.id,
   name: "Briar Agent",
   avatar: "data:image/png;base64,avatar",
   codexPet: null,
@@ -102,7 +102,7 @@ function dashboardAgentSession(run: HuntRun, status: AutoHuntSession["status"] =
   return {
     id: "session-1",
     dispatchGroupId: "dispatch-1",
-    projectId: demoDashboard.project.id,
+    projectId: demoDashboard.team.id,
     agentId: dashboardAgent.id,
     sessionType: "dispatch",
     status,
@@ -336,7 +336,7 @@ describe("IssueConversation", () => {
       replyJobId: replyJob.id,
       attempt: 1,
       sequence: 1,
-      projectId: demoDashboard.project.id,
+      projectId: demoDashboard.team.id,
       runId: run.id,
       triggerMessageId: trigger.id,
       parentMessageId: trigger.id,
@@ -353,7 +353,7 @@ describe("IssueConversation", () => {
     });
     const renderPage = (conversationInboxSyncSignal: string) => <RunPage conversationInboxSyncSignal={conversationInboxSyncSignal} error={null} isRecovering={false} isSidebarOpen onBack={() => undefined} onCancel={async () => undefined} onLoadAttachment={async () => new Blob()} onLoadIssueMessages={async () => []} onLoadRunEvidence={async () => []} onMove={async () => undefined} onRetry={async () => undefined} onSendIssueMessage={async () => {
       throw new Error("message should not be sent");
-    }} organizationId="organization-1" projectId={demoDashboard.project.id} run={run} token="token" />;
+    }} organizationId="organization-1" projectId={demoDashboard.team.id} run={run} token="token" />;
     await act(async () => {
       root.render(renderPage("baseline"));
       await Promise.resolve();
@@ -412,7 +412,7 @@ describe("IssueConversation", () => {
         id: "40404040-dddd-4ddd-8ddd-dddddddddddd",
         type: "request_issue_execute",
         status: "pending",
-        projectId: demoDashboard.project.id,
+        projectId: demoDashboard.team.id,
         runId: targetRun.id,
         title: targetRun.title,
         createdAt,
@@ -456,7 +456,7 @@ describe("IssueConversation", () => {
       id: "skill-issue-approval",
       type: "request_agent_skill_execute" as const,
       status: "pending" as const,
-      projectId: demoDashboard.project.id,
+      projectId: demoDashboard.team.id,
       agentId: dashboardAgent.id,
       agentName: dashboardAgent.name,
       skillId: "skill-release",
@@ -515,7 +515,7 @@ describe("IssueConversation", () => {
     await act(async () => {
       root.render(<RunPage availableRuns={[run]} error={null} executionWorkers={[skillWorker]} isRecovering={false} isSidebarOpen onAcceptSkillExecution={onAccept} onBack={() => undefined} onCancel={async () => undefined} onLoadAttachment={async () => new Blob()} onLoadIssueMessages={async () => [message]} onLoadRunEvidence={async () => []} onMove={async () => undefined} onRetry={async () => undefined} onSendIssueMessage={async () => {
         throw new Error("not implemented in this test");
-      }} projectId={demoDashboard.project.id} run={run} />);
+      }} projectId={demoDashboard.team.id} run={run} />);
       await Promise.resolve();
     });
     expect(container.querySelector(".skill-execution-proposal-card")).not.toBeNull();
@@ -568,7 +568,7 @@ describe("IssueConversation", () => {
         id: "51515151-dddd-4ddd-8ddd-dddddddddddd",
         type: "request_issue_execute",
         status: "pending",
-        projectId: demoDashboard.project.id,
+        projectId: demoDashboard.team.id,
         runId: targetRun.id,
         title: targetRun.title,
         createdAt,
@@ -633,7 +633,7 @@ describe("IssueConversation", () => {
         id: "62626262-dddd-4ddd-8ddd-dddddddddddd",
         type: "request_issue_execute",
         status: "accepted",
-        projectId: demoDashboard.project.id,
+        projectId: demoDashboard.team.id,
         runId: targetRun.id,
         title: targetRun.title,
         createdAt,
