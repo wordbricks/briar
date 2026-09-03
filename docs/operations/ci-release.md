@@ -122,13 +122,17 @@ machines, or `VITEST_MAX_WORKERS` to pin the pool size.
 `d1:migrate:local` and `test:d1:migrations` are cached by Turborepo, so a run
 that changes nothing under `apps/briar/migrations/` re-verifies nothing. Their
 inputs are declared explicitly in `apps/briar/turbo.json`: the migration files
-and the schema snapshot, the 16 `worker/src/**/*.migration.test.ts` files, every
-non-test module under `worker/src/` and `src/lib/` that they import, the Vitest
-configs they load (`vitest.worker-migrations.config.ts`,
+and the schema snapshot, every `.ts` file under `worker/src/` and `src/lib/`,
+the Vitest configs they load (`vitest.worker-migrations.config.ts`,
 `vitest.worker.shared.ts`, `vitest.max-workers.ts`), `wrangler.jsonc`, the
-generated contracts, and the root manifest and lockfile. Non-migration Worker
-tests are deliberately excluded, so editing them does not rerun the suite.
+generated contracts, and the root manifest and lockfile.
 `VITEST_MAX_WORKERS` is in `globalPassThroughEnv` and never enters the hash.
+
+The globs cover whole directories rather than the exact import closure of the
+16 migration tests. Editing an unrelated Worker test therefore reruns the
+migration suite (~60s), but such a change also reruns the much longer
+`app-worker` test step in parallel, so the critical path does not move — and no
+list has to be kept in sync when a migration test is added.
 
 Because Turborepo also hashes pass-through arguments, local CI applies the
 migrations into the fixed, git-ignored `apps/briar/.wrangler/ci-d1-state`
