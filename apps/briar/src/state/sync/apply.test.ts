@@ -1,0 +1,425 @@
+import { describe, expect, it } from "vitest";
+
+import { demoDashboard } from "../../lib/demo-data";
+import type {
+  DashboardDeltaPayload,
+  DashboardPayload,
+  Team,
+} from "../../types";
+import { membersByIdAtom, teamMembersAtom } from "../entities/members";
+import { retainedTeamIdsAtom, TEAM_RETENTION_LIMIT } from "../entities/retention";
+import { runsByIdAtom, teamRunIdsAtom } from "../entities/runs";
+import { teamEntityAtom } from "../entities/teams";
+import { createTestRegistry } from "../registry";
+import {
+  activeTeamIdAtom,
+  staleTeamIdAtom,
+  teamCursorAtom,
+  teamGeneratedAtAtom,
+  teamLoadedAtom,
+  teamPayloadCursorAtom,
+  teamSettingsAtom,
+} from "../team/atoms";
+import { applySyncEvent, markTeamStale } from "./apply";
+import { dashboardViewAtom, loadedDashboardTeamIdAtom } from "./view";
+
+const teamA = "team-a";
+const teamB = "team-b";
+
+const teamOf = (id: string, organizationId = "org-a"): Team => ({
+  ...demoDashboard.team,
+  id,
+  name: id,
+  organizationId,
+});
+
+const snapshotOf = (
+  id: string,
+  overrides: Partial<DashboardPayload> = {},
+): DashboardPayload => ({
+  ...demoDashboard,
+  team: teamOf(id),
+  cursor: 1,
+  generatedAt: "2026-09-01T00:00:00.000Z",
+  ...overrides,
+});
+
+const deltaOf = (
+  overrides: Partial<DashboardDeltaPayload> = {},
+): DashboardDeltaPayload => ({
+  reset: false,
+  cursor: 2,
+  hasMore: false,
+  runs: [],
+  deletedRunIds: [],
+  workers: demoDashboard.workers ?? [],
+  organizationProviders: demoDashboard.organizationProviders ?? [],
+  generatedAt: "2026-09-02T00:00:00.000Z",
+  ...overrides,
+});
+
+const loaded = (id = teamA, overrides: Partial<DashboardPayload> = {}) => {
+  const registry = createTestRegistry([[activeTeamIdAtom, id]]);
+  const payload = snapshotOf(id, overrides);
+  applySyncEvent(registry, { kind: "team-snapshot", teamId: id, payload });
+  return { registry, payload };
+};
+
+describe("team snapshots", () => {
+  it("unpacks a payload the view rebuilds identically", () => {
+    const { registry, payload } = loaded();
+
+    expect(registry.get(dashboardViewAtom(teamA))).toEqual(payload);
+    expect(registry.get(teamLoadedAtom(teamA))).toBe(true);
+    expect(registry.get(loadedDashboardTeamIdAtom)).toBe(teamA);
+    expect(registry.get(teamCursorAtom(teamA))).toBe(1);
+  });
+
+  it("renders the server's run order verbatim", () => {
+    const { registry, payload } = loaded();
+
+    expect(registry.get(teamRunIdsAtom(teamA))).toEqual(
+      payload.runs.map((run) => run.id),
+    );
+  });
+
+  it("leaves absent projections absent", () => {
+    const { registry } = loaded(teamA, {
+      workers: undefined,
+      members: undefined,
+      organizationProviders: undefined,
+      executionPolicy: undefined,
+    });
+    const view = registry.get(dashboardViewAtom(teamA));
+
+    expect(view?.workers).toBeUndefined();
+    expect(view?.members).toBeUndefined();
+    expect(view?.organizationProviders).toBeUndefined();
+    expect(view?.executionPolicy).toBeUndefined();
+  });
+
+  it("notifies the dashboard view once for the whole batch", () => {
+    const registry = createTestRegistry([[activeTeamIdAtom, teamA]]);
+    const seen: (DashboardPayload | null)[] = [];
+    registry.subscribe(
+      dashboardViewAtom(teamA),
+      (view) => {
+        seen.push(view);
+      },
+      { immediate: true },
+    );
+    seen.length = 0;
+
+    applySyncEvent(registry, {
+      kind: "team-snapshot",
+      teamId: teamA,
+      payload: snapshotOf(teamA),
+    });
+
+    expect(seen).toHaveLength(1);
+  });
+
+  it("keeps every team's payload while another team is loaded", () => {
+    const { registry, payload } = loaded();
+
+    applySyncEvent(registry, {
+      kind: "team-snapshot",
+      teamId: teamB,
+      payload: snapshotOf(teamB),
+    });
+
+    expect(registry.get(dashboardViewAtom(teamA))).toEqual(payload);
+    expect(registry.get(dashboardViewAtom(teamB))?.team.id).toBe(teamB);
+  });
+});
+
+describe("team deltas", () => {
+  it("keeps the exact dashboard reference when a sync has no changes", () => {
+    const { registry } = loaded();
+    const before = registry.get(dashboardViewAtom(teamA));
+    const seen: (DashboardPayload | null)[] = [];
+    registry.subscribe(dashboardViewAtom(teamA), (view) => {
+      seen.push(view);
+    }, { immediate: true });
+    seen.length = 0;
+
+    applySyncEvent(registry, {
+      kind: "team-delta",
+      teamId: teamA,
+      payload: deltaOf(),
+    });
+
+    expect(registry.get(dashboardViewAtom(teamA))).toBe(before);
+    expect(seen).toEqual([]);
+    // …but the resume cursor still advanced, so the next delta continues.
+    expect(registry.get(teamCursorAtom(teamA))).toBe(2);
+    expect(registry.get(teamPayloadCursorAtom(teamA))).toBe(1);
+  });
+
+  it("updates one run while preserving every unchanged run reference", () => {
+    const { registry, payload } = loaded();
+    const target = payload.runs[0]!;
+    const untouched = payload.runs[1]!;
+
+    applySyncEvent(registry, {
+      kind: "team-delta",
+      teamId: teamA,
+      payload: deltaOf({
+        runs: [
+          {
+            ...target,
+            detail: "Only this issue changed",
+            updatedAt: "2026-08-01T00:00:00.000Z",
+          },
+        ],
+      }),
+    });
+
+    const view = registry.get(dashboardViewAtom(teamA));
+    expect(view?.runs.find((run) => run.id === target.id)).not.toBe(target);
+    expect(view?.runs.find((run) => run.id === untouched.id)).toBe(untouched);
+    expect(view?.cursor).toBe(2);
+    expect(view?.generatedAt).toBe("2026-09-02T00:00:00.000Z");
+  });
+
+  it("applies run tombstones without rebuilding surviving entities", () => {
+    const { registry, payload } = loaded();
+    const removed = payload.runs[0]!;
+    const survivor = payload.runs[1]!;
+
+    applySyncEvent(registry, {
+      kind: "team-delta",
+      teamId: teamA,
+      payload: deltaOf({ deletedRunIds: [removed.id] }),
+    });
+
+    const view = registry.get(dashboardViewAtom(teamA));
+    expect(view?.runs.some((run) => run.id === removed.id)).toBe(false);
+    expect(view?.runs.find((run) => run.id === survivor.id)).toBe(survivor);
+    expect(registry.get(runsByIdAtom).has(removed.id)).toBe(false);
+  });
+
+  it("replaces conversation notifications only when that projection changes", () => {
+    const { registry, payload } = loaded();
+    const notification = {
+      id: "notification-1",
+      runId: payload.runs[0]!.id,
+      runTitle: payload.runs[0]!.title,
+      rootMessageId: "message-1",
+      body: "A reply arrived",
+      author: { id: null, name: "Briar", image: null, provider: "codex" as const },
+      reason: "thread_reply" as const,
+      createdAt: "2026-08-01T00:00:00.000Z",
+    };
+
+    applySyncEvent(registry, {
+      kind: "team-delta",
+      teamId: teamA,
+      payload: deltaOf({ conversationNotifications: [notification] }),
+    });
+
+    const view = registry.get(dashboardViewAtom(teamA));
+    expect(view?.conversationNotifications).toEqual([notification]);
+    expect(view?.runs[0]).toBe(payload.runs[0]);
+  });
+
+  it("replaces channel notifications from the organization projection", () => {
+    const { registry, payload } = loaded();
+    const notification = {
+      id: "channel-notification-1",
+      channelId: "channel-1",
+      channelName: "product",
+      rootMessageId: "channel-root-1",
+      body: "A channel reply arrived",
+      author: { id: "member", name: "Sam", image: null, provider: null },
+      reason: "thread_reply" as const,
+      createdAt: "2026-08-01T00:00:00.000Z",
+    };
+
+    applySyncEvent(registry, {
+      kind: "team-delta",
+      teamId: teamA,
+      payload: deltaOf({ channelNotifications: [notification] }),
+    });
+
+    const view = registry.get(dashboardViewAtom(teamA));
+    expect(view?.channelNotifications).toEqual([notification]);
+    expect(view?.runs[0]).toBe(payload.runs[0]);
+  });
+
+  it("mirrors a renamed team and changed settings", () => {
+    const { registry } = loaded();
+    const renamed = { ...teamOf(teamA), name: "Renamed" };
+    const settings = { ...demoDashboard.settings, velenOrg: "elsewhere" };
+
+    applySyncEvent(registry, {
+      kind: "team-delta",
+      teamId: teamA,
+      payload: deltaOf({ team: renamed, settings }),
+    });
+
+    const view = registry.get(dashboardViewAtom(teamA));
+    expect(view?.team).toBe(renamed);
+    expect(view?.settings).toBe(settings);
+    expect(registry.get(teamEntityAtom(teamA))).toBe(renamed);
+  });
+
+  it("ignores a delta for a team that was never loaded", () => {
+    const registry = createTestRegistry([[activeTeamIdAtom, teamA]]);
+
+    applySyncEvent(registry, {
+      kind: "team-delta",
+      teamId: teamA,
+      payload: deltaOf(),
+    });
+
+    expect(registry.get(dashboardViewAtom(teamA))).toBeNull();
+    expect(registry.get(teamCursorAtom(teamA))).toBeNull();
+  });
+});
+
+describe("run events", () => {
+  it("patches a run in place without reordering the team's list", () => {
+    const { registry, payload } = loaded();
+    const target = payload.runs[1]!;
+    const edited = { ...target, detail: "patched" };
+
+    applySyncEvent(registry, { kind: "run-changed", run: edited, teamId: teamA });
+
+    expect(registry.get(teamRunIdsAtom(teamA))).toEqual(
+      payload.runs.map((run) => run.id),
+    );
+    expect(registry.get(dashboardViewAtom(teamA))?.runs[1]).toBe(edited);
+  });
+
+  it("prepends a run the team did not list yet", () => {
+    const { registry, payload } = loaded();
+    const created = { ...payload.runs[0]!, id: "run-created" };
+
+    applySyncEvent(registry, {
+      kind: "run-changed",
+      run: created,
+      teamId: teamA,
+    });
+
+    expect(registry.get(teamRunIdsAtom(teamA))?.[0]).toBe("run-created");
+  });
+
+  it("drops a deleted run from the index and the store", () => {
+    const { registry, payload } = loaded();
+    const removed = payload.runs[0]!;
+
+    applySyncEvent(registry, {
+      kind: "run-deleted",
+      teamId: teamA,
+      runId: removed.id,
+    });
+
+    expect(registry.get(teamRunIdsAtom(teamA))).not.toContain(removed.id);
+    expect(registry.get(runsByIdAtom).has(removed.id)).toBe(false);
+  });
+});
+
+describe("clearing", () => {
+  it("drops one team and leaves the others alone", () => {
+    const { registry } = loaded();
+    applySyncEvent(registry, {
+      kind: "team-snapshot",
+      teamId: teamB,
+      payload: snapshotOf(teamB),
+    });
+
+    applySyncEvent(registry, { kind: "team-cleared", teamId: teamB });
+
+    expect(registry.get(dashboardViewAtom(teamB))).toBeNull();
+    expect(registry.get(dashboardViewAtom(teamA))).not.toBeNull();
+    expect(registry.get(retainedTeamIdsAtom)).toEqual([teamA]);
+  });
+
+  it("drops the teams of every organization but the retained one", () => {
+    const { registry } = loaded();
+    applySyncEvent(registry, {
+      kind: "team-snapshot",
+      teamId: teamB,
+      payload: snapshotOf(teamB, { team: teamOf(teamB, "org-b") }),
+    });
+
+    applySyncEvent(registry, {
+      kind: "organization-left",
+      retainedOrganizationId: "org-b",
+    });
+
+    expect(registry.get(dashboardViewAtom(teamA))).toBeNull();
+    expect(registry.get(dashboardViewAtom(teamB))).not.toBeNull();
+  });
+
+  it("drops everything when the session ends", () => {
+    const { registry } = loaded();
+    registry.set(staleTeamIdAtom, teamA);
+
+    applySyncEvent(registry, { kind: "session-cleared" });
+
+    expect(registry.get(dashboardViewAtom(teamA))).toBeNull();
+    expect(registry.get(runsByIdAtom).size).toBe(0);
+    expect(registry.get(membersByIdAtom).size).toBe(0);
+    expect(registry.get(retainedTeamIdsAtom)).toEqual([]);
+    expect(registry.get(staleTeamIdAtom)).toBeNull();
+  });
+
+  it("keeps a member another retained team still lists", () => {
+    const { registry, payload } = loaded();
+    applySyncEvent(registry, {
+      kind: "team-snapshot",
+      teamId: teamB,
+      payload: snapshotOf(teamB),
+    });
+    const shared = payload.members?.[0]!;
+
+    applySyncEvent(registry, { kind: "team-cleared", teamId: teamA });
+
+    expect(registry.get(membersByIdAtom).get(shared.userId)).toBe(shared);
+    expect(registry.get(teamMembersAtom(teamB))).toContain(shared);
+  });
+
+  it("evicts the least recently synced team past the retention limit", () => {
+    const registry = createTestRegistry();
+    const teamIds = Array.from(
+      { length: TEAM_RETENTION_LIMIT + 2 },
+      (_unused, index) => `team-${index}`,
+    );
+    for (const teamId of teamIds) {
+      registry.set(activeTeamIdAtom, teamId);
+      applySyncEvent(registry, {
+        kind: "team-snapshot",
+        teamId,
+        payload: snapshotOf(teamId),
+      });
+    }
+
+    expect(registry.get(retainedTeamIdsAtom)).toHaveLength(
+      TEAM_RETENTION_LIMIT,
+    );
+    expect(registry.get(dashboardViewAtom(teamIds[0]!))).toBeNull();
+    expect(registry.get(dashboardViewAtom(teamIds.at(-1)!))).not.toBeNull();
+  });
+});
+
+describe("staleness", () => {
+  it("marks a loaded team stale and clears the marker for an empty one", () => {
+    const { registry } = loaded();
+
+    expect(markTeamStale(registry, teamA)).toBe(true);
+    expect(registry.get(staleTeamIdAtom)).toBe(teamA);
+
+    expect(markTeamStale(registry, teamB)).toBe(false);
+    expect(registry.get(staleTeamIdAtom)).toBeNull();
+  });
+
+  it("keeps the store's settings reachable for the stale team", () => {
+    const { registry, payload } = loaded();
+    markTeamStale(registry, teamA);
+
+    expect(registry.get(teamSettingsAtom(teamA))).toBe(payload.settings);
+    expect(registry.get(teamGeneratedAtAtom(teamA))).toBe(payload.generatedAt);
+  });
+});
