@@ -14,22 +14,17 @@ import {
   MessageCircle,
 } from "lucide-react";
 import { AgentUsageStatusBar } from "./components/AgentUsageStatusBar";
+import { WindowNavigationControls } from "./components/WindowNavigationControls";
 import { AppVersionStatus } from "./components/AppVersionStatus";
-import { CompanionBottomNavigation } from "./components/CompanionBottomNavigation";
-import { CompanionEmptyState, CompanionHeader } from "./components/CompanionHeader";
-import { Inbox } from "./components/Inbox";
 import { HuntDashboardWithTeam } from "./components/app/HuntDashboardWithTeam";
-import { RunPageWithRun } from "./components/app/RunPageWithRun";
 import {
   TeamAgentsWithDashboard,
   TeamLobbyWithDashboard,
   TeamSettingsWithDashboard,
-  WorkerDispatchDialogWithTeam,
 } from "./components/app/TeamViewsWithDashboard";
 import {
   AppSettingsWithWorkspace,
   ConnectionHealthWithWorkspace,
-  TeamOnboardingWithWorkspace,
   TeamRepositorySetupDialogWithWorkspace,
   WorkerStatusBarWithTeam,
 } from "./components/app/WorkspaceViews";
@@ -38,35 +33,21 @@ import {
   InboxDetailTargetBoundary,
   InboxWithSelection,
 } from "./components/InboxSelectionBoundary";
-import type { CommandPaletteItem } from "./components/CommandPalette";
-import { KeyboardShortcutModeHint } from "./components/KeyboardShortcutModeHint";
 import {
   ChannelsWithCatalog,
-  CompanionChannelsWithCatalog,
   DirectMessagesWithCatalog,
 } from "./components/app/ChannelViews";
-import { CommandPaletteWithContext } from "./components/app/CommandPaletteWithContext";
-import {
-  KeyboardShortcutsDialogWithPreferences,
-  PlanningProjectDialogWithPlanning,
-  keyboardShortcutsModifierLabel,
-} from "./components/app/AppDialogViews";
+import { keyboardShortcutsModifierLabel } from "./components/app/AppDialogViews";
+import { AppDialogs } from "./components/app/AppDialogs";
 import { AppEffects } from "./components/app/AppEffects";
 import { AppSettingsSidebar } from "./components/app/AppSettingsSidebar";
+import { AuthGate } from "./components/app/AuthGate";
+import { CompanionShell } from "./components/app/CompanionShell";
 import { InboxDetailContent } from "./components/app/InboxDetailContent";
-import { LoginScreenWithSession } from "./components/app/LoginScreenWithSession";
 import { loadProjectMergeActivity } from "./lib/app-rpc/github";
-import { SessionLoadingScreen } from "./components/SessionLoadingScreen";
 import { EmptyState, MainContent, PageHeader } from "./components/layout";
-import { Button } from "./components/ui/button";
-import { LoadingState } from "./components/ui/loading-state";
 import { useToast } from "./components/ui/toast";
 import { SidebarWithSession } from "./components/app/SidebarWithSession";
-import {
-  WindowNavigationControls,
-  type WindowNavigationHistoryItem,
-} from "./components/WindowNavigationControls";
-import { appSettingsNavigationGroups } from "./components/app-settings-navigation";
 import { useBriar, type UseBriarOptions } from "./hooks/useBriar";
 import { useAutoHuntSessions } from "./hooks/useAutoHuntSessions";
 import { useAgentDispatch } from "./hooks/useAgentDispatch";
@@ -85,23 +66,18 @@ import {
   useInboxNotifications,
 } from "./hooks/useInboxNotifications";
 import { useHorizontalPaneResize } from "./hooks/useHorizontalPaneResize";
-import {
-  useMobileBackHandler,
-  useMobileNavigationGestures,
-} from "./hooks/useMobileNavigation";
 import { useNavigationHistory } from "./hooks/useNavigationHistory";
 import {
   useAppKeyboardCommandScope,
-  useAppKeyboardCommandState,
 } from "./hooks/appKeyboardCommands";
 import { isTeamScheduleTabEnabled } from "./lib/team-tabs";
 import {
   hasCompletedInitialOnboarding,
   markInitialOnboardingComplete,
 } from "./lib/initial-onboarding";
-import { leaveOrganizationInvitationRoute } from "./lib/organization-invitation";
 import { syncAppBadgeCount } from "./lib/app-badge";
 import { buildNavigationHistoryItems } from "./lib/navigation-history-items";
+import { loadKeybindings } from "./lib/keybindings";
 import { activeOrganizationTeams } from "./lib/team-window-scope";
 import { inboxDetailLabel } from "./lib/inbox-detail-label";
 import {
@@ -112,7 +88,6 @@ import {
   loadInboxPaneWidth,
   saveInboxPaneWidth,
 } from "./lib/inbox-pane-width";
-import type { MessageKey } from "./i18n/messages";
 import {
   inboxNotificationTarget,
   isInboxChannelTarget,
@@ -123,9 +98,7 @@ import { inboxDetailTargetAtom } from "./state/inbox-selection";
 import {
   activePlanningProjectIdAtom,
   commandPaletteInitialQueryAtom,
-  completedDispatchRunIdAtom,
   createIssueTeamIdAtom,
-  dispatchRunAtom,
   isCommandPaletteOpenAtom,
   isIssueDialogOpenAtom,
   isKeyboardShortcutsOpenAtom,
@@ -135,7 +108,6 @@ import {
   planningProjectTeamIdAtom,
   quickProcessErrorAtom,
   quickStartingRunIdAtom,
-  repositorySetupTeamIdAtom,
 } from "./state/dialogs/atoms";
 import {
   agentListRequestKeyAtom,
@@ -189,12 +161,8 @@ import {
 } from "./lib/api";
 import { createInboxRealtimeTransport } from "./lib/channel-realtime";
 import { startDesktopChannelTransition } from "./lib/channel-performance";
-import { directMessageDisplayName } from "./lib/direct-messages";
 import { cn } from "./lib/utils";
-import { formatShortcut, loadKeybindings } from "./lib/keybindings";
-import { appKeyboardShortcutSpecs } from "./lib/app-keyboard-shortcuts";
 import { hasOpenKeyboardShortcutOverlay } from "./lib/keyboard-shortcuts";
-import { formatIssueKey } from "./lib/issue-key";
 import { listenForAppMenuSettings } from "./lib/app-menu";
 import type { AppZoomCommands } from "./lib/app-zoom";
 import {
@@ -216,40 +184,19 @@ import {
   type ChannelNavigationPage,
 } from "./lib/app-navigation";
 import { useI18n } from "./i18n";
-import type { HuntRun, ProjectAgent } from "./types";
 
-// Views and overlays that never show on the first screen load from their own
-// chunk. Each is behind a `<Suspense>` boundary whose fallback is an empty
-// surface: a local chunk resolves in a few milliseconds, so a spinner would
-// flash rather than inform.
-const CompanionSettings = lazy(() =>
-  import("./components/CompanionSettings").then((m) => ({
-    default: m.CompanionSettings,
-  })),
-);
-const FirstOrganizationSetup = lazy(() =>
-  import("./components/FirstOrganizationSetup").then((m) => ({
-    default: m.FirstOrganizationSetup,
-  })),
-);
-const FirstRunTutorial = lazy(() =>
-  import("./components/FirstRunTutorial").then((m) => ({
-    default: m.FirstRunTutorial,
-  })),
-);
-const InitialOnboarding = lazy(() =>
-  import("./components/InitialOnboarding").then((m) => ({
-    default: m.InitialOnboarding,
-  })),
-);
-const InvitationOnboarding = lazy(() =>
-  import("./components/InvitationOnboarding").then((m) => ({
-    default: m.InvitationOnboarding,
-  })),
-);
-const LaunchIntro = lazy(() =>
-  import("./components/LaunchIntro").then((m) => ({ default: m.LaunchIntro })),
-);
+type AgentAutoHuntOptions = {
+  coordinatorConversationId?: string | null;
+  parentSessionId?: string;
+  maxIssues?: number;
+  targetRunIds?: string[];
+  retryReason?: string | null;
+};
+
+// Pages that never show on the first screen load come from their own chunk.
+// Each is behind a `<Suspense>` boundary whose fallback is an empty surface: a
+// local chunk resolves in a few milliseconds, so a spinner would flash rather
+// than inform.
 const MyIssues = lazy(() =>
   import("./components/MyIssues").then((m) => ({ default: m.MyIssues })),
 );
@@ -263,11 +210,6 @@ const OrganizationSettings = lazy(() =>
     default: m.OrganizationSettingsWithSession,
   })),
 );
-const TeamAgentSessionDetail = lazy(() =>
-  import("./components/TeamAgentSessionDetail").then((m) => ({
-    default: m.TeamAgentSessionDetail,
-  })),
-);
 const TeamSchedule = lazy(() =>
   import("./components/TeamSchedule").then((m) => ({
     default: m.TeamSchedule,
@@ -278,26 +220,9 @@ const Teams = lazy(() =>
     default: m.TeamsWithPlanningProjects,
   })),
 );
-const UnifiedSettingsSidebar = lazy(() =>
-  import("./components/UnifiedSettingsSidebar").then((m) => ({
-    default: m.UnifiedSettingsSidebar,
-  })),
-);
 
 /** Neutral placeholder that fills the slot a lazy view is about to occupy. */
 const lazyViewFallback = <div className="lazy-view-placeholder h-full w-full" />;
-
-const withLazyBoundary = (view: React.ReactNode) => (
-  <Suspense fallback={lazyViewFallback}>{view}</Suspense>
-);
-
-type AgentAutoHuntOptions = {
-  coordinatorConversationId?: string | null;
-  parentSessionId?: string;
-  maxIssues?: number;
-  targetRunIds?: string[];
-  retryReason?: string | null;
-};
 
 export function App({
   appZoomCommands = null,
@@ -1035,21 +960,6 @@ export function App({
       selectTeam: briar.setActiveProjectId,
     },
   });
-  useMobileNavigationGestures(briar.companionMode);
-  useMobileBackHandler(
-    () => {
-      if (briar.companionMode && requestedSessionId) {
-        setRequestedSessionId(null);
-        return true;
-      }
-      if (!briar.companionMode || companionPage === "issues") return false;
-      setCompanionPage(companionPage === "lobby" ? "home" : "issues");
-      setRequestedRunId(null);
-      setRequestedSessionId(null);
-      return true;
-    },
-    { enabled: briar.companionMode },
-  );
   const {
     beginTeamReconnect,
     clearTrigger: clearRepositorySetupTrigger,
@@ -1300,28 +1210,6 @@ export function App({
     openCommandPalette,
   });
 
-  const keyboardCommandState = useAppKeyboardCommandState();
-  const pendingShortcut = keyboardCommandState.pending;
-  const pendingShortcutSpec = pendingShortcut
-    ? appKeyboardShortcutSpecs.find(
-        ({ id }) => id === pendingShortcut.candidateIds[0],
-      )
-    : undefined;
-  const pendingShortcutPrefix = pendingShortcut
-    ? pendingShortcutSpec?.sequence.slice(0, pendingShortcut.sequence.length) ??
-      pendingShortcut.sequence
-    : [];
-  const pendingShortcutChoices = pendingShortcut
-    ? pendingShortcut.candidateIds.flatMap((id) => {
-        const shortcut = appKeyboardShortcutSpecs.find(
-          (candidate) => candidate.id === id,
-        );
-        const key = shortcut?.sequence[pendingShortcut.sequence.length];
-        return shortcut && key
-          ? [{ id, key: key.toUpperCase(), label: t(shortcut.labelKey) }]
-          : [];
-      })
-    : [];
   const commandPaletteItems = useCommandPaletteItems({
     activePage,
     canGoBack,
@@ -1368,84 +1256,38 @@ export function App({
     />
   );
 
-  let content: React.ReactNode;
-
-  if (briar.restoringSession) {
-    content = <SessionLoadingScreen />;
-  } else if (invitation.invitationToken) {
-    content = withLazyBoundary(
-      <InvitationOnboarding
-        accepting={invitation.acceptingInvitation}
-        error={briar.error}
-        loading={briar.loading}
-        loginCode={briar.loginCode}
-        onAccept={invitation.acceptCurrentInvitation}
-        onCancelLogin={briar.cancelLogin}
-        onLeave={() => {
-          leaveOrganizationInvitationRoute();
-          window.location.reload();
-        }}
-        onLogin={(method) => void briar.login({ method, locale })}
-        onSendEmailCode={(email) => briar.sendLoginEmailCode(email, locale)}
-        onSwitchAccount={async () => {
-          await briar.logout();
-          await briar.login({ locale, switchAccount: true });
-        }}
-        onVerifyEmailCode={(email, code) =>
-          briar.verifyLoginEmailCode(email, code, locale)}
-        token={invitation.invitationToken}
-        user={briar.user}
-        webMode={briar.webMode}
-      />
-    );
-  } else if (shouldShowInitialOnboarding) {
-    content = withLazyBoundary(
-      <InitialOnboarding
-        authenticated={Boolean(briar.user)}
-        error={briar.error}
-        loading={briar.loading}
-        loginCode={briar.loginCode}
-        onCancelLogin={briar.cancelLogin}
-        onComplete={() => {
-          markInitialOnboardingComplete();
-          setHasCompletedOnboarding(true);
-        }}
-        onLogin={(method) => void briar.login({ method, locale })}
-        onSendEmailCode={(email) => briar.sendLoginEmailCode(email, locale)}
-        onVerifyEmailCode={(email, code) =>
-          briar.verifyLoginEmailCode(email, code, locale)}
-        webMode={briar.webMode}
-      />
-    );
-  } else if (!briar.user) {
-    content = (
-      <LoginScreenWithSession
-        companionMode={briar.companionMode}
-        onCancel={briar.cancelLogin}
-        onLogin={(method) => void briar.login({ method, locale })}
-        onSendEmailCode={(email) => briar.sendLoginEmailCode(email, locale)}
-        onVerifyEmailCode={(email, code) =>
-          briar.verifyLoginEmailCode(email, code, locale)}
-        webMode={briar.webMode}
-      />
-    );
-  } else if (shouldShowFirstOrganizationSetup) {
-    content = withLazyBoundary(
-      <FirstOrganizationSetup
-        onCheckHandle={briar.checkOrganizationHandle}
-        onCreate={async (input) => {
-          await briar.addOrganization(input);
-          markFirstRunTutorialPending(briar.user!.id);
-          setPendingFirstRunTutorialUserId(briar.user!.id);
-          resetNavigation("lobby");
-        }}
-        onJoin={invitation.beginInvitation}
-        onLogout={() => void briar.logout()}
-        user={briar.user}
-      />
-    );
-  } else {
-    content = (
+  const shell = briar.companionMode ? (
+    <CompanionShell
+      activeTeam={activeProject}
+      agents={activeProjectAgents}
+      channelInboxSyncSignal={channelInboxSyncSignal}
+      conversationInboxSyncSignal={conversationInboxSyncSignal}
+      inbox={{
+        markAllRead: inbox.markAllRead,
+        markIssueRead: markInboxIssueRead,
+        markRead: inbox.markRead,
+        markUnread: inbox.markUnread,
+        messages: inbox.messages,
+        unreadCount: inbox.unreadCount,
+      }}
+      loadProjectHomeUsage={loadProjectHomeUsage}
+      processingIssueIds={processingIssueIds}
+      session={{
+        deleteAccount: briar.deleteAccount,
+        ensureTeamSelected: briar.ensureProjectSelected,
+        logout: briar.logout,
+        refresh: briar.refresh,
+        selectOrganization: briar.setActiveOrganizationId,
+        selectTeam: briar.setActiveProjectId,
+        updateAccountProfile: briar.updateAccountProfile,
+      }}
+      sessions={{
+        adoptRemoteSession: autoHunt.adoptRemoteSession,
+        list: autoHunt.sessions,
+        stopSession: autoHunt.stopSession,
+      }}
+    />
+  ) : (
       <div className="desktop-app-frame">
         <div className="app-shell">
           <WindowNavigationControls
@@ -2013,367 +1855,102 @@ export function App({
           />
         </div>
       </div>
-    );
-  }
-
-  if (briar.companionMode) {
-    if (!briar.user) return content;
-    if (briar.projects.length === 0) {
-      return <CompanionEmptyState onLogout={() => void briar.logout()} />;
-    }
-    return (
-      <div
-        className={`app-shell companion-shell platform-${mobilePlatform}`}
-      >
-        {/*
-          The companion shell returns before the desktop tree below, so it needs
-          its own mount for the domain effects — dashboard sync among them.
-        */}
-        <AppEffects />
-        <CompanionHeader
-          activeOrganizationId={briar.activeOrganizationId}
-          activeProjectId={briar.activeProjectId}
-          loading={briar.loading}
-          onLogout={() => void briar.logout()}
-          onMarkAllRead={
-            companionPage === "inbox" && inbox.unreadCount > 0
-              ? inbox.markAllRead
-              : undefined
-          }
-          onOrganizationChange={(organizationId) => {
-            briar.setActiveOrganizationId(organizationId);
-            setCompanionPage("issues");
-            setCompanionStatus("all");
-            setRequestedRunId(null);
-            setRequestedSessionId(null);
-          }}
-          onProjectChange={(projectId) => {
-            briar.setActiveProjectId(projectId);
-            setCompanionPage("issues");
-            setCompanionStatus("all");
-            setRequestedRunId(null);
-            setRequestedSessionId(null);
-          }}
-          onRefresh={() => void briar.refresh()}
-          onSettings={() => setCompanionPage("settings")}
-          organizations={briar.organizations}
-          pageTitle={
-            companionPage === "issues" && !requestedCompanionSession
-              ? t("companion.navTasks")
-              : companionPage === "inbox"
-                ? t("inbox.title")
-                : companionPage === "dms"
-                  ? t("sidebar.dms")
-                  : null
-          }
-          projects={briar.projects}
-          user={briar.user}
-        />
-        <Suspense fallback={lazyViewFallback}>
-        {requestedCompanionSession ? (
-          <TeamAgentSessionDetail
-            isSidebarOpen
-            issueKeyPrefix={
-              briar.projects.find(
-                (project) => project.id === requestedCompanionSession.projectId,
-              )?.issueKeyPrefix
-            }
-            onBack={() => setRequestedSessionId(null)}
-            onIssueOpen={(runId) => {
-              setRequestedSessionId(null);
-              setRequestedRunId(runId);
-              setCompanionStatus("all");
-              setCompanionPage("issues");
-            }}
-            onStop={() => autoHunt.stopSession(requestedCompanionSession.id)}
-            session={requestedCompanionSession}
-            token={briar.token}
-            workers={activeDashboard?.workers ?? []}
-          />
-        ) : companionPage === "settings" ? (
-          <CompanionSettings
-            onBack={() => setCompanionPage("issues")}
-            onAccountDelete={briar.deleteAccount}
-            onAccountSave={briar.updateAccountProfile}
-            user={briar.user}
-          />
-        ) : companionPage === "home" &&
-          briar.activeOrganizationId &&
-          (briar.token || briar.demoMode) ? (
-          <>
-            <CompanionChannelsWithCatalog
-              channelInboxSyncSignal={channelInboxSyncSignal}
-              onSkillSessionAccepted={autoHunt.adoptRemoteSession}
-              onIssueOpen={async (projectId, runId) => {
-                await briar.ensureProjectSelected(projectId);
-                setRequestedRunId(runId);
-                setIssueListRequestKey((key) => key + 1);
-                setCompanionStatus("all");
-                setCompanionPage("issues");
-              }}
-              onLobbyOpen={() => setCompanionPage("lobby")}
-            />
-            <CompanionBottomNavigation
-              activeDestination="home"
-              onDmsOpen={() => setCompanionPage("dms")}
-              onInboxOpen={() => setCompanionPage("inbox")}
-              onHomeOpen={() => {}}
-              onStatusChange={(status) => {
-                setCompanionStatus(status);
-                setCompanionPage("issues");
-              }}
-              unreadDmCount={unreadDirectMessageCount}
-              unreadInboxCount={inbox.unreadCount}
-            />
-          </>
-        ) : companionPage === "lobby" && activeProject ? (
-          <>
-            <TeamLobbyWithDashboard
-              companionMode
-              isSidebarOpen={false}
-              onBack={() => setCompanionPage("home")}
-              onLoadUsageSummary={loadProjectHomeUsage}
-              onOpenAgents={() => setCompanionPage("issues")}
-              onOpenIssue={(runId) => {
-                setRequestedRunId(runId);
-                setCompanionStatus("all");
-                setCompanionPage("issues");
-              }}
-              onOpenIssues={() => {
-                setRequestedRunId(null);
-                setCompanionStatus("all");
-                setCompanionPage("issues");
-              }}
-              onOpenRepository={() => undefined}
-              onOpenSettings={() => setCompanionPage("settings")}
-              project={activeProject}
-            />
-            <CompanionBottomNavigation
-              activeDestination="home"
-              onDmsOpen={() => setCompanionPage("dms")}
-              onInboxOpen={() => setCompanionPage("inbox")}
-              onHomeOpen={() => setCompanionPage("home")}
-              onStatusChange={(status) => {
-                setCompanionStatus(status);
-                setCompanionPage("issues");
-              }}
-              unreadDmCount={unreadDirectMessageCount}
-              unreadInboxCount={inbox.unreadCount}
-            />
-          </>
-        ) : companionPage === "inbox" ? (
-          <>
-            <Inbox
-              companionMode
-              isSidebarOpen
-              messages={inbox.messages}
-              onMarkAllRead={inbox.markAllRead}
-              onMarkRead={inbox.markRead}
-              onMarkUnread={inbox.markUnread}
-              onOpen={(message) =>
-                setPendingInboxNotificationTarget(
-                  inboxNotificationTarget(message),
-                )}
-              projects={activeOrganizationProjects}
-              unreadCount={inbox.unreadCount}
-            />
-            <CompanionBottomNavigation
-              activeDestination="inbox"
-              onDmsOpen={() => setCompanionPage("dms")}
-              onInboxOpen={() => {}}
-              onHomeOpen={() => setCompanionPage("home")}
-              onStatusChange={(status) => {
-                setCompanionStatus(status);
-                setCompanionPage("issues");
-              }}
-              unreadDmCount={unreadDirectMessageCount}
-              unreadInboxCount={inbox.unreadCount}
-            />
-          </>
-        ) : companionPage === "dms" && briar.activeOrganizationId && briar.token ? (
-          <>
-            <DirectMessagesWithCatalog
-              activeChannelId={activeChannelId}
-              channelInboxSyncSignal={channelInboxSyncSignal}
-              isSidebarOpen
-              onChannelSelect={selectChannel}
-              onIssueCreated={async (projectId, runId) => {
-                await briar.ensureProjectSelected(projectId);
-                setRequestedRunId(runId);
-                setCompanionStatus("all");
-                setCompanionPage("issues");
-              }}
-              onSkillSessionAccepted={autoHunt.adoptRemoteSession}
-            />
-            <CompanionBottomNavigation
-              activeDestination="dms"
-              onDmsOpen={() => {}}
-              onInboxOpen={() => setCompanionPage("inbox")}
-              onHomeOpen={() => setCompanionPage("home")}
-              onStatusChange={(status) => {
-                setCompanionStatus(status);
-                setCompanionPage("issues");
-              }}
-              unreadDmCount={unreadDirectMessageCount}
-              unreadInboxCount={inbox.unreadCount}
-            />
-          </>
-        ) : (
-          <HuntDashboardWithTeam
-            agents={activeProjectAgents}
-            conversationInboxSyncSignal={conversationInboxSyncSignal}
-            companionMode
-            companionStatus={companionStatus}
-            companionUnreadDmCount={unreadDirectMessageCount}
-            companionUnreadInboxCount={inbox.unreadCount}
-            error={quickProcessError ?? briar.error}
-            isIssueDialogOpen={isIssueDialogOpen}
-            requestedRunId={requestedRunId}
-            requestedRunMessageId={requestedRunMessageId}
-            requestedRunInitialTab={requestedRunInitialTab}
-            isSidebarOpen
-            onCompanionDmsOpen={() => setCompanionPage("dms")}
-            onCompanionInboxOpen={() => setCompanionPage("inbox")}
-            onCompanionHomeOpen={() => setCompanionPage("home")}
-            onCompanionStatusChange={(status) => {
-              setCompanionStatus(status);
-              setCompanionPage("issues");
-            }}
-            onIssueDialogOpenChange={(isOpen) => {
-              if (!isOpen) setCreateIssueProjectId(null);
-              setIsIssueDialogOpen(isOpen);
-            }}
-            onIssueViewed={markInboxIssueRead}
-            onViewingIssueConversationChange={setViewingIssueConversationRunId}
-            onDeleteIssue={briar.deleteIssue}
-            onTransferIssue={briar.transferIssue}
-            onRelatedMessageOpen={(relatedMessage) => {
-              setPendingBriarLink({ kind: "channel", ...relatedMessage });
-            }}
-            onProcessIssueNow={processIssueNow}
-            onRequestedRunOpen={() => {
-              setRequestedRunId(null);
-              setRequestedRunMessageId(null);
-              setRequestedRunInitialTab(null);
-            }}
-            onSendIssueMessage={sendIssueMessage}
-            processingIssueIds={processingIssueIds}
-            projects={activeOrganizationProjects}
-            activeIssueProjectId={activePlanningProjectId}
-            sessions={autoHunt.sessions}
-          />
-        )}
-        </Suspense>
-        <Suspense fallback={null}>
-        <WorkerDispatchDialogWithTeam
-          onSubmit={(input) => void submitWorkerDispatch(input)}
-        />
-        </Suspense>
-      </div>
-    );
-  }
+  );
 
   return (
     <>
       <AppEffects />
-      {content}
-      <Suspense fallback={null}>
-      <PlanningProjectDialogWithPlanning />
-      {commandPaletteAvailable && isCommandPaletteOpen ? (
-        <CommandPaletteWithContext
-          activePage={activePage}
-          initialQuery={commandPaletteInitialQuery}
-          items={commandPaletteItems}
-          onOpenChange={handleCommandPaletteOpenChange}
-          open={isCommandPaletteOpen}
-          selectedRunId={selectedRunId}
-          shortcutLabel={formatShortcut(configuredKeybindings.commandPalette)}
-        />
-      ) : null}
-      <KeyboardShortcutsDialogWithPreferences
-        available={commandPaletteAvailable}
-      />
-      {pendingShortcut ? (
-        <KeyboardShortcutModeHint
-          choices={pendingShortcutChoices}
-          label={t(
-            pendingShortcutPrefix[0] === "g"
-              ? "keyboardShortcuts.section.go"
-              : "keyboardShortcuts.section.open",
-          )}
-          prefix={pendingShortcutPrefix.join(" ").toUpperCase()}
-        />
-      ) : null}
-      <TeamOnboardingWithWorkspace
-        includeDeveloperTools={invitation.developerToolsSetupRequested}
-        onCancel={() => {
-          if (invitation.invitationProgress?.nextStep === "developer") {
-            invitation.clearInvitationProgress();
-            invitation.clearDeveloperSetupRequest();
-          }
-          invitation.setDeveloperToolsSetupRequested(false);
-          briar.cancelProjectCreation();
-          restoreRepositorySetupTrigger();
+      <AuthGate
+        acceptingInvitation={invitation.acceptingInvitation}
+        invitationToken={invitation.invitationToken}
+        onAcceptInvitation={invitation.acceptCurrentInvitation}
+        onInitialOnboardingComplete={() => {
+          markInitialOnboardingComplete();
+          setHasCompletedOnboarding(true);
         }}
-        onFinish={() => {
-          if (invitation.invitationProgress?.nextStep === "developer") {
-            invitation.clearInvitationProgress();
-            invitation.clearDeveloperSetupRequest();
-          }
-          clearRepositorySetupTrigger();
-          invitation.setDeveloperToolsSetupRequested(false);
-          briar.finishProjectCreation();
-          setRequestedRunId(null);
-          setRequestedSessionId(null);
+        onJoinOrganization={invitation.beginInvitation}
+        onOrganizationCreated={(userId) => {
+          markFirstRunTutorialPending(userId);
+          setPendingFirstRunTutorialUserId(userId);
           resetNavigation("lobby");
         }}
-        requireDeveloperAgent={
-          invitation.invitationProgress?.nextStep === "developer"
-        }
-        startWithDeveloperTools={Boolean(
-          invitation.invitationProgress?.nextStep === "developer" &&
-            invitation.invitationProgress.initialProjectId ===
-              briar.projectConnection?.project.id,
-        )}
-      />
-      <WorkerDispatchDialogWithTeam
-        onSubmit={(input) => void submitWorkerDispatch(input)}
-      />
-      <FirstRunTutorial
-        initialPhase={
-          invitation.showsCollaboratorTutorial
-            ? "collaborator-demo"
-            : "purpose"
-        }
-        onCollaboratorComplete={() => {
-          if (invitation.showsCollaboratorTutorial) {
-            invitation.clearInvitationProgress();
+        session={{
+          cancelLogin: briar.cancelLogin,
+          login: briar.login,
+          logout: briar.logout,
+          sendLoginEmailCode: briar.sendLoginEmailCode,
+          verifyLoginEmailCode: briar.verifyLoginEmailCode,
+        }}
+        showsFirstOrganizationSetup={shouldShowFirstOrganizationSetup}
+        showsInitialOnboarding={shouldShowInitialOnboarding}
+      >
+        {shell}
+      </AuthGate>
+      <AppDialogs
+        activePage={activePage}
+        commandPaletteAvailable={commandPaletteAvailable}
+        commandPaletteItems={commandPaletteItems}
+        firstRunTutorial={{
+          collaborator: invitation.showsCollaboratorTutorial,
+          onCollaboratorComplete: () => {
+            if (invitation.showsCollaboratorTutorial) {
+              invitation.clearInvitationProgress();
+              resetNavigation("lobby");
+              return;
+            }
+            if (!briar.user) return;
+            clearFirstRunTutorialPending(briar.user.id);
+            setPendingFirstRunTutorialUserId(null);
             resetNavigation("lobby");
-            return;
-          }
-          if (!briar.user) return;
-          clearFirstRunTutorialPending(briar.user.id);
-          setPendingFirstRunTutorialUserId(null);
-          resetNavigation("lobby");
+          },
+          onDeveloperSelect: () => {
+            if (!briar.user) return;
+            clearFirstRunTutorialPending(briar.user.id);
+            setPendingFirstRunTutorialUserId(null);
+            invitation.setDeveloperToolsSetupRequested(true);
+            briar.startProjectCreation();
+          },
+          open:
+            shouldShowFirstRunTutorial || invitation.showsCollaboratorTutorial,
         }}
-        onDeveloperSelect={() => {
-          if (!briar.user) return;
-          clearFirstRunTutorialPending(briar.user.id);
-          setPendingFirstRunTutorialUserId(null);
-          invitation.setDeveloperToolsSetupRequested(true);
-          briar.startProjectCreation();
+        launchIntro={{
+          onComplete: completeLaunchIntro,
+          preview: previewsLaunchIntro,
+          visible: isLaunchIntroVisible,
         }}
-        open={
-          shouldShowFirstRunTutorial || invitation.showsCollaboratorTutorial
-        }
+        selectedRunId={selectedRunId}
+        teamOnboarding={{
+          includeDeveloperTools: invitation.developerToolsSetupRequested,
+          onCancel: () => {
+            if (invitation.invitationProgress?.nextStep === "developer") {
+              invitation.clearInvitationProgress();
+              invitation.clearDeveloperSetupRequest();
+            }
+            invitation.setDeveloperToolsSetupRequested(false);
+            briar.cancelProjectCreation();
+            restoreRepositorySetupTrigger();
+          },
+          onFinish: () => {
+            if (invitation.invitationProgress?.nextStep === "developer") {
+              invitation.clearInvitationProgress();
+              invitation.clearDeveloperSetupRequest();
+            }
+            clearRepositorySetupTrigger();
+            invitation.setDeveloperToolsSetupRequested(false);
+            briar.finishProjectCreation();
+            setRequestedRunId(null);
+            setRequestedSessionId(null);
+            resetNavigation("lobby");
+          },
+          requireDeveloperAgent:
+            invitation.invitationProgress?.nextStep === "developer",
+          startWithDeveloperTools: Boolean(
+            invitation.invitationProgress?.nextStep === "developer" &&
+              invitation.invitationProgress.initialProjectId ===
+                briar.projectConnection?.project.id,
+          ),
+        }}
       />
-      {isLaunchIntroVisible ? (
-        <LaunchIntro
-          onComplete={completeLaunchIntro}
-          preview={previewsLaunchIntro}
-        />
-      ) : null}
-      </Suspense>
     </>
   );
 }
