@@ -67,9 +67,9 @@ import { ReplyGeneratedImageCollector } from "./reply-generated-images";
 import { validateReplyAttachments } from "./reply-attachments";
 import { providerStructuredOutputContract } from "./structured-output-contract";
 import {
-  channelReplyImageDirectory,
-  cleanupChannelReplyImages,
-  downloadChannelReplyImages,
+  channelReplyAttachmentDirectory,
+  cleanupChannelReplyAttachments,
+  downloadChannelReplyAttachments,
 } from "./channel-reply-images";
 import { cleanupChannelReplyResources } from "./channel-reply-cleanup";
 import { assertChannelReplyWorkspaceScope } from "./channel-reply-scope";
@@ -632,12 +632,12 @@ async function runClaimedChannelReply(
       retainedUntil: retainedUntil ?? undefined,
     });
   }
-  const imageDirectory = channelReplyImageDirectory(workspacePath);
+  const attachmentDirectory = channelReplyAttachmentDirectory(workspacePath);
   const memoryAbort = new AbortController();
   const invocationSignal = AbortSignal.any([signal, memoryAbort.signal]);
   let memoryInvocation: DmMemoryInvocation | null = null;
   let organizationContextCleaned = false;
-  let imagesCleaned = false;
+  let attachmentsCleaned = false;
   let workspaceCleaned = false;
   let lastActivityErrorAt = Number.NEGATIVE_INFINITY;
   const replyActivity = createReplyActivityClient(config.apiUrl);
@@ -695,11 +695,11 @@ async function runClaimedChannelReply(
           }]
         : []),
       {
-        label: "channel images",
+        label: "channel attachments",
         run: async () => {
-          if (imagesCleaned) return;
-          await cleanupChannelReplyImages(imageDirectory);
-          imagesCleaned = true;
+          if (attachmentsCleaned) return;
+          await cleanupChannelReplyAttachments(attachmentDirectory);
+          attachmentsCleaned = true;
         },
       },
       ...(!reply.session
@@ -745,7 +745,7 @@ async function runClaimedChannelReply(
           signal: invocationSignal,
         })
       : null;
-    const downloadedImages = await downloadChannelReplyImages({
+    const downloadedAttachments = await downloadChannelReplyAttachments({
       apiUrl: config.apiUrl,
       workerToken,
       organizationId: reply.organizationId,
@@ -781,7 +781,8 @@ async function runClaimedChannelReply(
       agent,
       snapshot: {
         ...reply.snapshot,
-        downloadedImagePaths: downloadedImages.paths,
+        downloadedImagePaths: downloadedAttachments.imagePaths,
+        downloadedFilePaths: downloadedAttachments.filePaths,
       },
       workspaceAvailable: Boolean(analysisWorktree),
       organizationContextAvailable: organizationContext !== null,
@@ -819,7 +820,7 @@ async function runClaimedChannelReply(
         fullAccess: project.autoHunt?.sandbox?.fullAccess ?? true,
         conversationId,
         attachments: lookupRounds === 0
-          ? downloadedImages.attachments
+          ? downloadedAttachments.attachments
           : undefined,
         outputSchema: outputContract.jsonSchema,
         organizationContextManifestPath:

@@ -4,6 +4,7 @@ import {
   createGithubAppJwt,
   createGithubInstallationToken,
   GithubAppApiError,
+  getProjectGithubMergeActivity,
 } from "./github-app-api";
 
 const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
@@ -19,6 +20,38 @@ const identity = {
 };
 
 describe("GitHub App API", () => {
+  it("paginates merge activity, deduplicates PRs, and filters by merge time rather than update time", async () => {
+    const now = Date.parse("2026-09-03T08:00:00Z");
+    const mergedAt = "2026-09-02T22:00:00Z";
+    const entry = (number: number, merged_at: string | null = mergedAt) => ({ number, title: `PR ${number}`, merged_at, updated_at: mergedAt });
+    const firstPage = Array.from({ length: 100 }, (_, index) => entry(index + 1));
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(Response.json({ token: "installation-token", expires_at: "2026-09-03T09:00:00Z" }))
+      .mockResolvedValueOnce(Response.json(firstPage))
+      .mockResolvedValueOnce(Response.json([
+        entry(100), entry(101), entry(102, null), entry(103, "2026-07-01T00:00:00Z"), entry(104, "2026-09-04T00:00:00Z"),
+      ]));
+    const result = await getProjectGithubMergeActivity(
+      { GITHUB_APP_ID: "12345", GITHUB_APP_PRIVATE_KEY: privateKeyPem }, identity, now, fetchImpl,
+    );
+    expect(result.pullRequests).toHaveLength(101);
+    expect(result.generatedAt).toBe("2026-09-03T08:00:00.000Z");
+    expect(result.pullRequests.at(-1)?.url).toBe("https://github.com/wordbricks/briar/pull/101");
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+    expect(fetchImpl.mock.calls[2][0]).toContain("page=2");
+  });
+
+  it("fails a complete activity load when a later GitHub page fails", async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(Response.json({ token: "installation-token", expires_at: "2026-09-03T09:00:00Z" }))
+      .mockResolvedValueOnce(Response.json(Array.from({ length: 100 }, (_, index) => ({
+        number: index + 1, title: "PR", merged_at: "2026-09-03T07:00:00Z", updated_at: "2026-09-03T07:00:00Z",
+      }))))
+      .mockResolvedValueOnce(Response.json({ message: "Rate limit exceeded" }, { status: 403 }));
+    await expect(getProjectGithubMergeActivity(
+      { GITHUB_APP_ID: "12345", GITHUB_APP_PRIVATE_KEY: privateKeyPem }, identity, Date.parse("2026-09-03T08:00:00Z"), fetchImpl,
+    )).rejects.toMatchObject({ status: 403 });
+  });
   it("signs a short-lived RS256 App JWT", async () => {
     const jwt = await createGithubAppJwt({
       appId: "12345",

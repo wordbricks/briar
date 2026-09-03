@@ -66,6 +66,7 @@ import { ProjectOnboarding } from "./components/ProjectOnboarding";
 import { PlanningProjectDialog } from "./components/PlanningProjectDialog";
 import { Projects } from "./components/Projects";
 import { ProjectLobby } from "./components/ProjectLobby";
+import { loadProjectMergeActivity } from "./lib/app-rpc/github";
 import { ProjectAgents } from "./components/ProjectAgents";
 import { ProjectIcon } from "./components/ProjectIcon";
 import { ProjectAgentSessionDetail } from "./components/ProjectAgentSessionDetail";
@@ -561,6 +562,13 @@ export function App({
       90,
     );
   }, [briar.activeOrganizationId, briar.token]);
+  const loadProjectHomeMerges = useCallback(
+    (projectId: string, signal: AbortSignal) => {
+      if (!briar.token) return Promise.reject(new Error("Sign in to load merge activity"));
+      return loadProjectMergeActivity(briar.token, projectId, signal);
+    },
+    [briar.token],
+  );
   const loadProjectHomeUsage = useMemo(
     () => createCachedProjectUsageSummaryLoader(async (projectId, period, range) => {
       if (!briar.token) return null;
@@ -3013,8 +3021,11 @@ export function App({
       icon: <Settings />,
       id: `action:project-settings:${activeProject.id}`,
       keywords: [
+        "team settings",
         "project settings",
+        "팀 설정",
         "프로젝트 설정",
+        "团队设置",
         "项目设置",
         activeProject.name,
       ],
@@ -3077,7 +3088,7 @@ export function App({
     addPaletteItem({
       icon: <FolderPlus />,
       id: "action:add-project",
-      keywords: ["new project", "add project", "프로젝트 추가", "新建项目"],
+      keywords: ["new team", "add team", "new project", "add project", "팀 추가", "프로젝트 추가", "新建团队", "新建项目"],
       label: t("sidebar.addProject"),
       onSelect: briar.startProjectCreation,
       priority: 60,
@@ -3275,8 +3286,11 @@ export function App({
       keywords: [
         project.name,
         organizationName,
+        "team",
         "project",
+        "팀",
         "프로젝트",
+        "团队",
         "项目",
       ],
       label: project.name,
@@ -3859,7 +3873,6 @@ export function App({
               setIssueListRequestKey((key) => key + 1);
               navigateToPage("issues");
             }}
-            onProjectsOpen={(teamId) => navigateToPage("projects", teamId)}
             onAgentSessionOpen={(sessionId) => {
               setRequestedRunId(null);
               setRequestedSessionId(sessionId);
@@ -4328,6 +4341,7 @@ export function App({
             dashboard={briar.dashboard}
             isSidebarOpen={isSidebarOpen}
             onLoadUsageSummary={loadProjectHomeUsage}
+            onLoadMergeActivity={loadProjectHomeMerges}
             onOpenAgents={() => {
               setRequestedSessionId(null);
               setAgentListRequestKey((key) => key + 1);

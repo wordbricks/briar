@@ -209,7 +209,7 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     )!;
     await typeInto(input, "@");
 
-    expect(container.textContent).toContain("Builder · Project agent");
+    expect(container.textContent).toContain("Builder · Team agent");
     expect(container.textContent).toContain("Helper · Organization agent");
     expect(container.textContent).toContain("Jay · You · jay@example.com");
     expect(
@@ -329,6 +329,7 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     Object.defineProperty(paste, "clipboardData", {
       value: {
         files: [image],
+        getData: () => "",
         items: [{ kind: "file", getAsFile: () => image }],
         types: ["Files"],
       },
@@ -345,6 +346,35 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
       expect.stringContaining("briar-attachment://"),
       [],
       [image],
+      [expect.any(String)],
+    );
+    await cleanup();
+  });
+
+  it("adds a dropped PDF and submits its prepared upload reference", async () => {
+    const onSend = vi.fn<OnSend>();
+    const { cleanup, container } = await renderHarness({ onSend });
+    const form = container.querySelector("form")!;
+    const pdf = new File(["%PDF-1.7"], "brief.pdf", {
+      type: "application/pdf",
+    });
+    const dataTransfer = {
+      files: [pdf],
+      items: [{ kind: "file", getAsFile: () => pdf }],
+      types: ["Files"],
+      dropEffect: "none",
+    };
+    const drop = new Event("drop", { bubbles: true, cancelable: true });
+    Object.defineProperty(drop, "dataTransfer", { value: dataTransfer });
+    await act(async () => form.dispatchEvent(drop));
+
+    expect(container.querySelector('[data-testid="images"]')?.textContent).toBe("1");
+    expect(container.querySelector('[data-testid="error"]')?.textContent).toBe("");
+    await act(async () => form.requestSubmit());
+    expect(onSend).toHaveBeenCalledWith(
+      expect.stringContaining("briar-attachment://"),
+      [],
+      [pdf],
       [expect.any(String)],
     );
     await cleanup();
@@ -374,7 +404,94 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     expect(drop.defaultPrevented).toBe(true);
     expect(form.className).toBe("");
     expect(container.querySelector('[data-testid="error"]')?.textContent).toBe(
-      "Only image files can be attached.",
+      "Only images and PDF files can be attached.",
+    );
+    await cleanup();
+  });
+
+  it("pastes HTML as markdown lists, bold, underline, and links", async () => {
+    const { cleanup, container } = await renderHarness({
+      onSend: vi.fn<OnSend>(),
+    });
+    const input = container.querySelector<HTMLInputElement>(
+      '[data-testid="composer"]',
+    )!;
+    const paste = new Event("paste", { bubbles: true, cancelable: true });
+    Object.defineProperty(paste, "clipboardData", {
+      value: {
+        files: [],
+        getData: (type: string) =>
+          type === "text/html"
+            ? `<ol><li><strong>bold</strong> <u>under</u> <a href="https://briar.ai">link</a></li></ol>`
+            : "bold under link",
+        items: [],
+        types: ["text/html", "text/plain"],
+      },
+    });
+
+    await act(async () => input.dispatchEvent(paste));
+    expect(paste.defaultPrevented).toBe(true);
+    expect(input.value).toBe("1. **bold** <u>under</u> [link](https://briar.ai)");
+    await cleanup();
+  });
+
+  it("keeps Command-Shift-V as plain text even when HTML is on the clipboard", async () => {
+    const { cleanup, container } = await renderHarness({
+      onSend: vi.fn<OnSend>(),
+    });
+    const input = container.querySelector<HTMLInputElement>(
+      '[data-testid="composer"]',
+    )!;
+    await act(async () =>
+      input.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          bubbles: true,
+          key: "v",
+          metaKey: true,
+          shiftKey: true,
+        }),
+      ),
+    );
+    const paste = new Event("paste", { bubbles: true, cancelable: true });
+    Object.defineProperty(paste, "clipboardData", {
+      value: {
+        files: [],
+        getData: (type: string) =>
+          type === "text/html" ? "<strong>bold</strong>" : "bold",
+        items: [],
+        types: ["text/html", "text/plain"],
+      },
+    });
+
+    await act(async () => input.dispatchEvent(paste));
+    expect(paste.defaultPrevented).toBe(false);
+    expect(input.value).toBe("");
+    await cleanup();
+  });
+
+  it("prefers formatted HTML over a screenshot that copied documents also put on the clipboard", async () => {
+    const { cleanup, container } = await renderHarness({
+      onSend: vi.fn<OnSend>(),
+    });
+    const input = container.querySelector<HTMLInputElement>(
+      '[data-testid="composer"]',
+    )!;
+    const image = new File(["image"], "pasted.png", { type: "image/png" });
+    const paste = new Event("paste", { bubbles: true, cancelable: true });
+    Object.defineProperty(paste, "clipboardData", {
+      value: {
+        files: [image],
+        getData: (type: string) =>
+          type === "text/html" ? "<p><strong>keep me</strong></p>" : "keep me",
+        items: [{ kind: "file", getAsFile: () => image }],
+        types: ["text/html", "text/plain", "Files"],
+      },
+    });
+
+    await act(async () => input.dispatchEvent(paste));
+    expect(input.value).toBe("**keep me**");
+    expect(container.querySelector('[data-testid="images"]')?.textContent).toBe(
+      "0",
     );
     await cleanup();
   });

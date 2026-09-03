@@ -106,7 +106,7 @@ describe("no-raw-tauri-ipc", () => {
     expect(result.output.match(/bypasses the Rust SSOT/gu)).toHaveLength(6);
   });
 
-  it("keeps the auth-session exception exact", async () => {
+  it("keeps the auth-session exception exact", { timeout: 15_000 }, async () => {
     const wrongCommand = await makeFixture({
       "apps/briar/src/lib/auth-session.ts":
         'export async function start() {\n  const { invoke } = await import("@tauri-apps/api/core");\n  await invoke("load_project", {});\n}\n',

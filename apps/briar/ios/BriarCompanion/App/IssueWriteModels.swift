@@ -525,7 +525,7 @@ enum IssueExecutionApprovalError: LocalizedError, Equatable, Sendable {
         case .stateChanged:
             L10n.text("이슈 상태가 변경되었습니다. 최신 상태를 확인해 다시 승인해 주세요.")
         case .providerUnavailable:
-            L10n.text("이 프로젝트에서 사용할 수 없는 프로바이더입니다.")
+            L10n.text("이 팀에서 사용할 수 없는 프로바이더입니다.")
         case .configurationUnavailable:
             L10n.text("선택한 모델 또는 Effort를 이 프로바이더에서 사용할 수 없습니다.")
         case .workerUnavailable:

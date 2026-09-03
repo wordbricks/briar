@@ -173,6 +173,7 @@ export {
   loadOrganizationExecutionWorkers,
   requestOrganizationExecutionWorkerUpdate,
   retireManagedComputer,
+  terminateManagedComputer,
   retryManagedComputer,
   updateOrganizationExecutionWorkerConcurrency,
   updateOrganizationExecutionWorkerIcon,

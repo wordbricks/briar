@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import * as Dialog from "@radix-ui/react-dialog";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useI18n } from "../i18n";
 import { channelShareUrl } from "../lib/issue-links";
 import { useToast } from "./ui/toast";
@@ -28,6 +28,80 @@ type SidebarChannelPage = string;
 type ChannelCreateStep = 1 | 2;
 
 type ChannelOpenHandler = (channelId: string) => void;
+
+export function SidebarCollapsibleSection({
+  active = false,
+  ariaLabel,
+  children,
+  contextMenuItems,
+  expanded,
+  icon,
+  label,
+  listId,
+  onToggle,
+  toggleClassName,
+}: {
+  active?: boolean;
+  ariaLabel: string;
+  children?: ReactNode;
+  contextMenuItems?: Array<{
+    icon: ReactNode;
+    label: string;
+    onSelect: () => void;
+  }> | null;
+  expanded: boolean;
+  icon: ReactNode;
+  label: string;
+  listId: string;
+  onToggle: () => void;
+  toggleClassName?: string;
+}) {
+  return (
+    <>
+      <ContextMenu.Root>
+        <ContextMenu.Trigger asChild>
+          <button
+            aria-controls={listId}
+            aria-expanded={expanded}
+            aria-label={ariaLabel}
+            className={`sidebar-channels-toggle${active ? " active" : ""}${
+              toggleClassName ? ` ${toggleClassName}` : ""
+            }`}
+            onClick={onToggle}
+            type="button"
+          >
+            {icon}
+            <span>{label}</span>
+            <ChevronRight
+              aria-hidden="true"
+              className={`sidebar-channels-chevron${expanded ? " open" : ""}`}
+              size={14}
+              strokeWidth={1.8}
+            />
+          </button>
+        </ContextMenu.Trigger>
+        {contextMenuItems && contextMenuItems.length > 0 ? (
+          <ContextMenu.Portal>
+            <ContextMenu.Content className="sidebar-channel-context-menu">
+              {contextMenuItems.map((item) => (
+                <ContextMenu.Item
+                  className="sidebar-channel-context-menu-item"
+                  key={item.label}
+                  onSelect={item.onSelect}
+                >
+                  {item.icon}
+                  <span>{item.label}</span>
+                </ContextMenu.Item>
+              ))}
+            </ContextMenu.Content>
+          </ContextMenu.Portal>
+        ) : null}
+      </ContextMenu.Root>
+      {expanded ? children : null}
+    </>
+  );
+}
+
 type ChannelCreateHandler = (
   name: string,
   visibility: ChannelVisibility,
@@ -259,50 +333,30 @@ export function SidebarOrganizationChannels({
 
   return (
     <div className="sidebar-channels">
-      <ContextMenu.Root>
-        <ContextMenu.Trigger asChild>
-          <button
-            aria-controls="sidebar-channel-list"
-            aria-expanded={expanded}
-            aria-label={
-              expanded
-                ? t("sidebar.collapseChannels")
-                : t("sidebar.expandChannels")
-            }
-            className={`sidebar-channels-toggle${
-              viewingUnlinkedChannel ? " active" : ""
-            }`}
-            onClick={() => setExpanded((current) => !current)}
-            type="button"
-          >
-            <Hash aria-hidden="true" size={16} strokeWidth={1.7} />
-            <span>{t("sidebar.channels")}</span>
-            <ChevronRight
-              aria-hidden="true"
-              className={`sidebar-channels-chevron${expanded ? " open" : ""}`}
-              size={14}
-              strokeWidth={1.8}
-            />
-          </button>
-        </ContextMenu.Trigger>
-        {onChannelCreate ? (
-          <ContextMenu.Portal>
-            <ContextMenu.Content className="sidebar-channel-context-menu">
-              <ContextMenu.Item
-                className="sidebar-channel-context-menu-item"
-                onSelect={() => {
-                  setIsCreateOpen(true);
-                }}
-              >
-                <Plus aria-hidden="true" size={15} strokeWidth={1.7} />
-                <span>{t("sidebar.addChannel")}</span>
-              </ContextMenu.Item>
-            </ContextMenu.Content>
-          </ContextMenu.Portal>
-        ) : null}
-      </ContextMenu.Root>
-
-      {expanded ? (
+      <SidebarCollapsibleSection
+        active={viewingUnlinkedChannel}
+        ariaLabel={
+          expanded
+            ? t("sidebar.collapseChannels")
+            : t("sidebar.expandChannels")
+        }
+        contextMenuItems={
+          onChannelCreate
+            ? [
+                {
+                  icon: <Plus aria-hidden="true" size={15} strokeWidth={1.7} />,
+                  label: t("sidebar.addChannel"),
+                  onSelect: () => setIsCreateOpen(true),
+                },
+              ]
+            : null
+        }
+        expanded={expanded}
+        icon={<Hash aria-hidden="true" size={16} strokeWidth={1.7} />}
+        label={t("sidebar.channels")}
+        listId="sidebar-channel-list"
+        onToggle={() => setExpanded((current) => !current)}
+      >
         <div className="sidebar-channel-list" id="sidebar-channel-list">
           {unlinkedChannels.map((channel) => (
             <SidebarChannelButton
@@ -321,7 +375,7 @@ export function SidebarOrganizationChannels({
             <p>{t("sidebar.noChannels")}</p>
           ) : null}
         </div>
-      ) : null}
+      </SidebarCollapsibleSection>
 
       <ChannelCreateDialog
         onChannelCreate={onChannelCreate}
@@ -383,47 +437,31 @@ export function SidebarProjectChannels({
         topLevel ? " sidebar-project-channels-top-level" : ""
       }`}
     >
-      <ContextMenu.Root>
-        <ContextMenu.Trigger asChild>
-          <button
-            aria-controls={listId}
-            aria-expanded={expanded}
-            aria-label={
-              expanded
-                ? t("sidebar.collapseProjectChannels", { name: projectName })
-                : t("sidebar.expandProjectChannels", { name: projectName })
-            }
-            className={`sidebar-channels-toggle sidebar-project-channels-toggle${
-              hasActiveChannel ? " active" : ""
-            }`}
-            onClick={() => setExpanded((current) => !current)}
-            type="button"
-          >
-            <Hash aria-hidden="true" size={14} strokeWidth={1.7} />
-            <span>{t("sidebar.channels")}</span>
-            <ChevronRight
-              aria-hidden="true"
-              className={`sidebar-channels-chevron${expanded ? " open" : ""}`}
-              size={14}
-              strokeWidth={1.8}
-            />
-          </button>
-        </ContextMenu.Trigger>
-        {onChannelCreate ? (
-          <ContextMenu.Portal>
-            <ContextMenu.Content className="sidebar-channel-context-menu">
-              <ContextMenu.Item
-                className="sidebar-channel-context-menu-item"
-                onSelect={() => setIsCreateOpen(true)}
-              >
-                <Plus aria-hidden="true" size={15} strokeWidth={1.7} />
-                <span>{t("sidebar.addChannel")}</span>
-              </ContextMenu.Item>
-            </ContextMenu.Content>
-          </ContextMenu.Portal>
-        ) : null}
-      </ContextMenu.Root>
-      {expanded ? (
+      <SidebarCollapsibleSection
+        active={hasActiveChannel}
+        ariaLabel={
+          expanded
+            ? t("sidebar.collapseProjectChannels", { name: projectName })
+            : t("sidebar.expandProjectChannels", { name: projectName })
+        }
+        contextMenuItems={
+          onChannelCreate
+            ? [
+                {
+                  icon: <Plus aria-hidden="true" size={15} strokeWidth={1.7} />,
+                  label: t("sidebar.addChannel"),
+                  onSelect: () => setIsCreateOpen(true),
+                },
+              ]
+            : null
+        }
+        expanded={expanded}
+        icon={<Hash aria-hidden="true" size={14} strokeWidth={1.7} />}
+        label={t("sidebar.channels")}
+        listId={listId}
+        onToggle={() => setExpanded((current) => !current)}
+        toggleClassName="sidebar-project-channels-toggle"
+      >
         <div className="sidebar-channel-list sidebar-project-channel-list" id={listId}>
           {projectChannels.map((channel) => (
             <SidebarChannelButton
@@ -442,7 +480,7 @@ export function SidebarProjectChannels({
             <p>{t("sidebar.noChannels")}</p>
           ) : null}
         </div>
-      ) : null}
+      </SidebarCollapsibleSection>
       <ChannelCreateDialog
         onChannelCreate={
           onChannelCreate

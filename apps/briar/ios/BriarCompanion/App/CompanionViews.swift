@@ -504,7 +504,7 @@ struct CompanionShellView: View {
                         }
                     }
                 }
-                .accessibilityLabel(L10n.format("프로젝트, %@", project.name))
+                .accessibilityLabel(L10n.format("팀, %@", project.name))
                 .accessibilityIdentifier("project-menu")
             }
         } else {
@@ -841,7 +841,7 @@ private struct HostStatusSheet: View {
                     ContentUnavailableView(
                         L10n.text("연결된 호스트 없음"),
                         systemImage: "desktopcomputer",
-                        description: Text(L10n.text("이 프로젝트에서 사용할 수 있는 Worker가 없습니다."))
+                        description: Text(L10n.text("이 팀에서 사용할 수 있는 Worker가 없습니다."))
                     )
                 } else {
                     List {

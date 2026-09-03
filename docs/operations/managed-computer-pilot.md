@@ -242,7 +242,7 @@ aws iam attach-user-policy \
 
 ## 3. D1 및 Cloudflare
 
-1. D1 migrations를 `0134_managed_computer_promotion_campaigns.sql`까지 순서대로 적용한다. `0131`은 setup bearer token 원문 대신 SHA-256만 저장하고, `0134`는 독립적으로 사용할 수 있는 추가 프로모션 캠페인을 등록한다.
+1. D1 migrations를 `0177_managed_computer_jay_promotion_campaigns.sql`까지 순서대로 적용한다. `0131`은 setup bearer token 원문 대신 SHA-256만 저장하고, `0134`와 `0177`은 독립적으로 사용할 수 있는 Jay 프로모션 캠페인을 등록한다. `0177`은 `getbriar-jay-6`부터 `getbriar-jay-10`까지의 슬롯을 추가한다.
 2. Wrangler 배포 dry-run에서 `MANAGED_COMPUTER_PROVISIONING` Workflow와 `MANAGED_COMPUTER_REMOTE` Durable Object binding을 확인한다.
 3. 일반 Worker 변수:
    - `MANAGED_COMPUTER_APPLICATIONS_ENABLED=true`

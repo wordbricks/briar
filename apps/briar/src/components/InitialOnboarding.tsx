@@ -1,12 +1,7 @@
-import {
-  ArrowRight,
-  BellRing,
-  Check,
-  ExternalLink,
-  LoaderCircle,
-} from "lucide-react";
+import { ArrowRight, BellRing, Check, ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { Typography } from "@/components/ui/typography";
 import onboardingEveIssueUrl from "../assets/onboarding-eve-issue.png";
 import { useI18n } from "../i18n";
@@ -277,7 +272,7 @@ export function InitialOnboarding({
                 {permissionStatus === "authorized" ? (
                   <Check strokeWidth={2.4} size={42} />
                 ) : checkingPermission ? (
-                  <LoaderCircle className="animate-spin" size={38} />
+                  <Spinner size={38} />
                 ) : (
                   <BellRing size={40} />
                 )}
@@ -336,7 +331,7 @@ export function InitialOnboarding({
                     type="button"
                   >
                     {requestingPermission ? (
-                      <LoaderCircle className="animate-spin" size={17} />
+                      <Spinner size={17} />
                     ) : (
                       <BellRing size={17} />
                     )}

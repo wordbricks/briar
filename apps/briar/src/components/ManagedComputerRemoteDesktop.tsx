@@ -10,6 +10,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import type RFB from "@novnc/novnc";
 
+import { useRemoteDesktopClipboard } from "../hooks/useRemoteDesktopClipboard";
 import { useI18n } from "../i18n";
 import {
   createManagedComputerRemoteSession,
@@ -22,6 +23,7 @@ import {
   isRemoteDesktopPasteShortcut,
 } from "../lib/remote-desktop-paste";
 import type { ManagedComputer } from "../types";
+import { RemoteDesktopClipboardButton } from "./RemoteDesktopClipboardButton";
 import { Button } from "./ui/button";
 import {
   Dialog,
@@ -88,6 +90,8 @@ export function ManagedComputerRemoteDesktop({
   const endingRef = useRef(false);
   const fitScreenRef = useRef(true);
   const generationRef = useRef(0);
+  const { controller: clipboardController, state: clipboardState } =
+    useRemoteDesktopClipboard();
   const [pasteController] = useState(() =>
     createRemoteDesktopPasteController({
       getTarget: () => rfbRef.current,
@@ -101,11 +105,12 @@ export function ManagedComputerRemoteDesktop({
   const storageKey = `briar.remoteDesktop.${computer.id}.${agentId ?? "primary"}`;
 
   const destroyRfb = useCallback(() => {
+    clipboardController.reset();
     pasteController.reset();
     const rfb = rfbRef.current;
     rfbRef.current = null;
     rfb?.disconnect();
-  }, [pasteController]);
+  }, [clipboardController, pasteController]);
 
   const connect = useCallback(async (reconnect: boolean) => {
     const generation = ++generationRef.current;
@@ -165,6 +170,7 @@ export function ManagedComputerRemoteDesktop({
         setError(t("managedComputer.remote.error.relay"));
       });
       rfbRef.current = rfb;
+      clipboardController.bind(rfb);
     } catch (caught) {
       if (generation !== generationRef.current) return;
       const messageKey = managedComputerRemoteErrorMessage(caught);
@@ -177,7 +183,7 @@ export function ManagedComputerRemoteDesktop({
             : String(caught),
       );
     }
-  }, [agentId, computer.id, destroyRfb, organizationId, storageKey, t, token]);
+  }, [agentId, clipboardController, computer.id, destroyRfb, organizationId, storageKey, t, token]);
 
   const endAndClose = useCallback(async () => {
     if (endingRef.current) return;
@@ -296,6 +302,10 @@ export function ManagedComputerRemoteDesktop({
             </div>
           </DialogHeader>
           <div className="flex flex-wrap items-center justify-end gap-2">
+            <RemoteDesktopClipboardButton
+              onCopy={clipboardController.copyToLocal}
+              state={clipboardState}
+            />
             <Button
               className="border-white/15 bg-white/5 text-white hover:bg-white/10"
               onClick={() => {

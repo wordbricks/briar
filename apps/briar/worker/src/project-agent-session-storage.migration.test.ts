@@ -31,7 +31,14 @@ describe("project Agent session storage cutover", () => {
       parentSessionId: null,
       request: "Historical request",
       status: "running",
-      issues: [],
+      issues: [{
+        runId: "legacy-run",
+        runNumber: 1,
+        sourceKey: "BR-1",
+        title: "Legacy issue",
+        outcome: "completed",
+        summary: "Legacy full issue summary",
+      }],
       startedAt: observedAt,
       completedAt: null,
       conversationId: null,
@@ -50,10 +57,16 @@ describe("project Agent session storage cutover", () => {
       scheduleId: null,
       scheduleRunId: null,
       parentSessionId: null,
-      requestedByUserId: "session-owner",
       request: "Historical request",
       status: "running",
-      issues: [],
+      issues: [{
+        runId: "legacy-run",
+        runNumber: 1,
+        sourceKey: "BR-1",
+        title: "Legacy issue",
+        outcome: "completed",
+        summary: "Legacy full issue summary",
+      }],
       startedAt: observedAt,
       completedAt: null,
       inboxVersion: "session:v1:running:2026-08-31T00:00:00.000Z",
@@ -71,10 +84,16 @@ describe("project Agent session storage cutover", () => {
       scheduleId: null,
       scheduleRunId: null,
       parentSessionId: null,
-      requestedByUserId: null,
       request: "Archived request",
       status: "completed",
-      issues: [],
+      issues: [{
+        runId: "archived-run",
+        runNumber: 2,
+        sourceKey: "BR-2",
+        title: "Archived issue",
+        outcome: "completed",
+        summary: "Archived full issue summary",
+      }],
       startedAt: observedAt,
       completedAt: observedAt,
       inboxVersion: "session:v1:completed:2026-08-31T00:00:00.000Z",
@@ -142,6 +161,32 @@ describe("project Agent session storage cutover", () => {
     await applyD1Migrations(db, {
       files: ["0169_canonical_project_agent_session_json.sql"],
     });
+    expect((await db.prepare(
+      `select session_id from briar_invalid_project_agent_session_summary
+       order by session_id`,
+    ).all()).results).toEqual([
+      { session_id: "archive-only" },
+      { session_id: "legacy-valid" },
+    ]);
+
+    await applyD1Migrations(db, {
+      files: ["0174_backfill_agent_session_summary_requester.sql"],
+    });
+
+    const legacyIssueSummaries = (await db.prepare(
+      `select json_extract(issue.value, '$.summary') as summary
+       from briar_project_agent_session_summaries stored,
+         json_each(stored.summary_json, '$.issues') issue
+       order by stored.session_id`,
+    ).all()).results;
+    expect(legacyIssueSummaries).toEqual([
+      { summary: "Archived full issue summary" },
+      { summary: "Legacy full issue summary" },
+    ]);
+
+    await applyD1Migrations(db, {
+      files: ["0175_canonical_agent_session_summary_issues.sql"],
+    });
 
     expect((await db.prepare(
       `select id from briar_project_agent_sessions`,
@@ -170,6 +215,9 @@ describe("project Agent session storage cutover", () => {
       dispatchGroupId: "legacy-valid",
       requestedByUserId: "session-owner",
       summary: "Historical summary",
+      issues: [expect.objectContaining({
+        summary: "Legacy full issue summary",
+      })],
     });
     const migratedSummaries = await listProjectAgentSessionSummaries(
       db,
@@ -183,15 +231,25 @@ describe("project Agent session storage cutover", () => {
       expect.objectContaining({
         id: "legacy-valid",
         value: expect.objectContaining({
+          requestedByUserId: "session-owner",
           summary: "Historical summary",
           error: null,
+          issues: [expect.objectContaining({ summary: null })],
         }),
       }),
       expect.objectContaining({
         id: "archive-only",
-        value: expect.objectContaining({ summary: null, error: null }),
+        value: expect.objectContaining({
+          requestedByUserId: null,
+          summary: null,
+          error: null,
+          issues: [expect.objectContaining({ summary: null })],
+        }),
       }),
     ]));
+    expect((await db.prepare(
+      `select session_id from briar_invalid_project_agent_session_summary`,
+    ).all()).results).toEqual([]);
     const changes = await listProjectAgentSessionChanges(db, projectId, 0);
     expect(changes.expired).toBe(false);
     expect(changes.changes).toEqual(expect.arrayContaining([

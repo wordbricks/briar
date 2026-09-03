@@ -6,10 +6,10 @@ import { QueuedAttachmentSchema } from "@briar/contracts/gen/briar/worker/v1/wor
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { channelReplyClaimTokenHeader } from "../src/lib/channels-contract";
 import {
-  channelReplyImageDirectory,
-  channelReplyImages,
-  cleanupChannelReplyImages,
-  downloadChannelReplyImages,
+  channelReplyAttachmentDirectory,
+  channelReplyAttachments,
+  cleanupChannelReplyAttachments,
+  downloadChannelReplyAttachments,
 } from "./channel-reply-images";
 
 const attachmentId = "22222222-2222-4222-8222-222222222222";
@@ -52,17 +52,20 @@ afterEach(async () => {
   );
 });
 
-describe("channel reply image inputs", () => {
-  it("enforces the bounded image policy on generated attachment metadata", () => {
+describe("channel reply attachment inputs", () => {
+  it("enforces the bounded image and PDF policy on generated attachment metadata", () => {
     const attachment = imageAttachment();
-    expect(channelReplyImages([attachment])).toEqual([attachment]);
-    expect(() => channelReplyImages([
+    expect(channelReplyAttachments([attachment])).toEqual([attachment]);
+    expect(channelReplyAttachments([
+      imageAttachment({ contentType: "application/pdf", filename: "brief.pdf" }),
+    ])).toHaveLength(1);
+    expect(() => channelReplyAttachments([
       imageAttachment({ contentType: "image/svg+xml" }),
     ])).toThrow("unsupported");
-    expect(() => channelReplyImages([
+    expect(() => channelReplyAttachments([
       imageAttachment({ byteSize: maxChannelReplyImageBytes + 1 }),
     ])).toThrow("20MB");
-    expect(() => channelReplyImages(Array.from(
+    expect(() => channelReplyAttachments(Array.from(
       { length: 6 },
       (_, index) => imageAttachment({
         id: `77777777-7777-4777-8777-${String(index).padStart(12, "0")}`,
@@ -87,7 +90,7 @@ describe("channel reply image inputs", () => {
       });
     });
 
-    const downloaded = await downloadChannelReplyImages({
+    const downloaded = await downloadChannelReplyAttachments({
       apiUrl: "https://api.example/",
       workerToken: "briar_worker_secret",
       organizationId,
@@ -100,7 +103,7 @@ describe("channel reply image inputs", () => {
 
     expect(fetcher).toHaveBeenCalledOnce();
     expect(downloaded.paths).toEqual([
-      join(channelReplyImageDirectory(workspacePath), `${attachmentId}.png`),
+      join(channelReplyAttachmentDirectory(workspacePath), `${attachmentId}.png`),
     ]);
     expect(downloaded.attachments).toEqual([
       {
@@ -114,10 +117,43 @@ describe("channel reply image inputs", () => {
     expect((await stat(downloaded.paths[0])).mode & 0o777).toBe(0o600);
   });
 
+  it("downloads a PDF into the isolated workspace without sending it as a provider image", async () => {
+    const workspacePath = await temporaryWorkspace();
+    const pdfBytes = new TextEncoder().encode("%PDF-1.7\nprivate brief");
+    const pdf = imageAttachment({
+      filename: "private brief.pdf",
+      contentType: "application/pdf",
+      byteSize: pdfBytes.byteLength,
+    });
+    const downloaded = await downloadChannelReplyAttachments({
+      apiUrl: "https://api.example/",
+      workerToken: "briar_worker_secret",
+      organizationId,
+      workId,
+      claimToken: "briar_channel_claim_secret",
+      triggerAttachments: [pdf],
+      workspacePath,
+      fetcher: async () => new Response(pdfBytes, {
+        headers: { "Content-Type": "application/pdf" },
+      }),
+    });
+
+    const expectedPath = join(
+      channelReplyAttachmentDirectory(workspacePath),
+      `${attachmentId}.pdf`,
+    );
+    expect(downloaded.paths).toEqual([expectedPath]);
+    expect(downloaded.imagePaths).toEqual([]);
+    expect(downloaded.filePaths).toEqual([expectedPath]);
+    expect(downloaded.attachments).toEqual([]);
+    expect(new Uint8Array(await readFile(expectedPath))).toEqual(pdfBytes);
+    expect((await stat(expectedPath)).mode & 0o777).toBe(0o600);
+  });
+
   it("does not send claim credentials to a server-issued URL outside the claim", async () => {
     const workspacePath = await temporaryWorkspace();
     const fetcher = vi.fn();
-    await expect(downloadChannelReplyImages({
+    await expect(downloadChannelReplyAttachments({
       apiUrl: "https://api.example",
       workerToken: "briar_worker_secret",
       organizationId,
@@ -128,13 +164,13 @@ describe("channel reply image inputs", () => {
       fetcher,
     })).rejects.toThrow("outside the active claim scope");
     expect(fetcher).not.toHaveBeenCalled();
-    await expect(access(channelReplyImageDirectory(workspacePath))).rejects.toThrow();
+    await expect(access(channelReplyAttachmentDirectory(workspacePath))).rejects.toThrow();
   });
 
   it("removes a partial private download when validation fails", async () => {
     const workspacePath = await temporaryWorkspace();
     await expect(
-      downloadChannelReplyImages({
+      downloadChannelReplyAttachments({
         apiUrl: "https://api.example",
         workerToken: "briar_worker_secret",
         organizationId,
@@ -148,14 +184,14 @@ describe("channel reply image inputs", () => {
           }),
       }),
     ).rejects.toThrow("size changed");
-    await expect(access(channelReplyImageDirectory(workspacePath))).rejects.toThrow();
+    await expect(access(channelReplyAttachmentDirectory(workspacePath))).rejects.toThrow();
   });
 
   it("deletes private images before removing the analysis worktree", async () => {
     const workspacePath = await temporaryWorkspace();
     const fetcher = async () =>
       new Response(imageBytes, { headers: { "Content-Type": "image/png" } });
-    const downloaded = await downloadChannelReplyImages({
+    const downloaded = await downloadChannelReplyAttachments({
       apiUrl: "https://api.example",
       workerToken: "briar_worker_secret",
       organizationId,
@@ -169,14 +205,14 @@ describe("channel reply image inputs", () => {
       await expect(access(downloaded.directory)).rejects.toThrow();
     });
 
-    await cleanupChannelReplyImages(downloaded.directory, removeWorkspace);
+    await cleanupChannelReplyAttachments(downloaded.directory, removeWorkspace);
 
     expect(removeWorkspace).toHaveBeenCalledOnce();
   });
 
   it("does not retain private images when analysis worktree removal fails", async () => {
     const workspacePath = await temporaryWorkspace();
-    const downloaded = await downloadChannelReplyImages({
+    const downloaded = await downloadChannelReplyAttachments({
       apiUrl: "https://api.example",
       workerToken: "briar_worker_secret",
       organizationId,
@@ -189,7 +225,7 @@ describe("channel reply image inputs", () => {
     });
 
     await expect(
-      cleanupChannelReplyImages(downloaded.directory, async () => {
+      cleanupChannelReplyAttachments(downloaded.directory, async () => {
         throw new Error("git worktree remove failed");
       }),
     ).rejects.toThrow("git worktree remove failed");

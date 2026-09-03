@@ -49,6 +49,8 @@ open class BriarAPI_FleetServiceClientMock: BriarAPI_FleetServiceClientInterface
     public var mockAsyncRetryManagedComputer = { (_: BriarAPI_RetryManagedComputerRequest) -> ResponseMessage<BriarAPI_RetryManagedComputerResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `retireManagedComputer()`.
     public var mockAsyncRetireManagedComputer = { (_: BriarAPI_RetireManagedComputerRequest) -> ResponseMessage<BriarAPI_RetireManagedComputerResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `terminateManagedComputer()`.
+    public var mockAsyncTerminateManagedComputer = { (_: BriarAPI_TerminateManagedComputerRequest) -> ResponseMessage<BriarAPI_TerminateManagedComputerResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `createManagedComputerRemoteSession()`.
     public var mockAsyncCreateManagedComputerRemoteSession = { (_: BriarAPI_CreateManagedComputerRemoteSessionRequest) -> ResponseMessage<BriarAPI_CreateManagedComputerRemoteSessionResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `endManagedComputerRemoteSession()`.
@@ -114,6 +116,10 @@ open class BriarAPI_FleetServiceClientMock: BriarAPI_FleetServiceClientInterface
 
     open func `retireManagedComputer`(request: BriarAPI_RetireManagedComputerRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_RetireManagedComputerResponse> {
         return self.mockAsyncRetireManagedComputer(request)
+    }
+
+    open func `terminateManagedComputer`(request: BriarAPI_TerminateManagedComputerRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_TerminateManagedComputerResponse> {
+        return self.mockAsyncTerminateManagedComputer(request)
     }
 
     open func `createManagedComputerRemoteSession`(request: BriarAPI_CreateManagedComputerRemoteSessionRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CreateManagedComputerRemoteSessionResponse> {

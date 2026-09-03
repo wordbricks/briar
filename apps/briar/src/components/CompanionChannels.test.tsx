@@ -105,7 +105,7 @@ describe("CompanionChannels", () => {
     const firstButton = container.querySelector<HTMLButtonElement>(
       ".companion-channels > button",
     );
-    expect(firstButton?.textContent).toContain("View project home");
+    expect(firstButton?.textContent).toContain("View team home");
     await act(async () => firstButton?.click());
     expect(onLobbyOpen).toHaveBeenCalledOnce();
     await cleanup();
