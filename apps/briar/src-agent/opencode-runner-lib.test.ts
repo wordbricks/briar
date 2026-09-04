@@ -19,6 +19,7 @@ import {
   buildOpenCodePrompt,
   completeOpenCodeMessages,
   createOpenCodeEventState,
+  createOpenCodeUnhandledRejectionGuard,
   installOpenCodeRunnerSignalHandlers,
   normalizeOpenCodeEvent,
   openCodeBlockedRetry,
@@ -824,5 +825,79 @@ describe("OpenCode runner signal handlers", () => {
     });
     expect(() => listeners.get("SIGTERM")?.()).not.toThrow();
     expect(calls).toEqual(["close:SIGTERM", "exit:143"]);
+  });
+});
+
+describe("OpenCode runner unhandled rejection guard", () => {
+  const create = () => {
+    const diagnostics: Array<{
+      phase: string;
+      detail?: Record<string, unknown>;
+    }> = [];
+    const failures: unknown[] = [];
+    const guard = createOpenCodeUnhandledRejectionGuard({
+      diagnose: (phase, detail) => diagnostics.push({ phase, detail }),
+      fail: (reason) => failures.push(reason),
+    });
+    return { guard, diagnostics, failures };
+  };
+
+  it("swallows the runner's own event-stream abort and says so", () => {
+    const { guard, diagnostics, failures } = create();
+    const reason = new DOMException("Briar closed the stream.", "AbortError");
+    guard.expect(reason);
+
+    guard.handle(reason);
+
+    expect(failures).toEqual([]);
+    expect(diagnostics).toEqual([
+      {
+        phase: "runner.event_stream_abort_ignored",
+        detail: { reason: "Briar closed the stream." },
+      },
+    ]);
+  });
+
+  it("fails on a look-alike AbortError the runner never raised", () => {
+    const { guard, diagnostics, failures } = create();
+    const ours = new DOMException("Briar closed the stream.", "AbortError");
+    const theirs = new DOMException("Briar closed the stream.", "AbortError");
+    guard.expect(ours);
+
+    guard.handle(theirs);
+
+    expect(failures).toEqual([theirs]);
+    expect(diagnostics).toEqual([]);
+  });
+
+  it("fails on every rejection while no abort is in flight", () => {
+    const { guard, failures } = create();
+    const boom = new Error("boom");
+
+    guard.handle(boom);
+    guard.handle("plain string");
+    guard.handle(undefined);
+
+    expect(failures).toEqual([boom, "plain string", undefined]);
+  });
+
+  it("only forgives the expected abort once", () => {
+    const { guard, failures } = create();
+    const reason = new DOMException("Briar closed the stream.", "AbortError");
+    guard.expect(reason);
+
+    guard.handle(reason);
+    guard.handle(reason);
+
+    expect(failures).toEqual([reason]);
+  });
+
+  it("never treats a primitive reason as expected", () => {
+    const { guard, failures } = create();
+    guard.expect("AbortError");
+
+    guard.handle("AbortError");
+
+    expect(failures).toEqual(["AbortError"]);
   });
 });

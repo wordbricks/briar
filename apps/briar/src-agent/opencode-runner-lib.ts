@@ -478,6 +478,57 @@ export function installOpenCodeRunnerSignalHandlers(
   }
 }
 
+export type OpenCodeUnhandledRejectionHandlers = {
+  /** Reports the swallowed abort so the host's stderr log explains itself. */
+  diagnose: (phase: string, detail?: Record<string, unknown>) => void;
+  /** Bun's default behaviour for a rejection the runner does not own. */
+  fail: (reason: unknown) => void;
+};
+
+export type OpenCodeUnhandledRejectionGuard = {
+  /**
+   * Declares an abort reason the runner is about to raise itself. Only the
+   * exact object registered here is ever swallowed.
+   */
+  expect: (reason: unknown) => void;
+  /** Listener for `process.on("unhandledRejection", ...)`. */
+  handle: (reason: unknown) => void;
+};
+
+/**
+ * Keep the runner alive through its own event-stream abort.
+ *
+ * The OpenCode SDK's SSE client reacts to an aborted signal with a bare
+ * `void reader.cancel()`. Under Bun that promise rejects with the signal's
+ * reason and nobody awaits it, so Bun kills the process with exit code 1 even
+ * though the turn already finished and its result frame is on stdout.
+ *
+ * The guard swallows only the reason object the runner registered through
+ * `expect` — identity, not "any AbortError" — so a genuine unhandled rejection
+ * (including an AbortError from anywhere else) still fails the runner.
+ */
+export function createOpenCodeUnhandledRejectionGuard(
+  handlers: OpenCodeUnhandledRejectionHandlers,
+): OpenCodeUnhandledRejectionGuard {
+  const expected = new Set<unknown>();
+  return {
+    expect: (reason) => {
+      if (reason === null || typeof reason !== "object") return;
+      expected.add(reason);
+    },
+    handle: (reason) => {
+      if (reason !== null && typeof reason === "object" && expected.has(reason)) {
+        expected.delete(reason);
+        handlers.diagnose("runner.event_stream_abort_ignored", {
+          reason: reason instanceof Error ? reason.message : String(reason),
+        });
+        return;
+      }
+      handlers.fail(reason);
+    },
+  };
+}
+
 function rememberMessagePart(state: OpenCodeEventState, messageId: string, partId: string) {
   const order = state.messagePartOrder.get(messageId) ?? [];
   if (!order.includes(partId)) {

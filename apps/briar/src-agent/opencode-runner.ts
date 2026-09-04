@@ -13,6 +13,7 @@ import {
   buildOpenCodeParts,
   completeOpenCodeMessages,
   createOpenCodeEventState,
+  createOpenCodeUnhandledRejectionGuard,
   installOpenCodeRunnerSignalHandlers,
   isOpenCodeWritePermission,
   mapEffortToOpenCode,
@@ -26,6 +27,7 @@ import {
   parseOpenCodeModel,
   shouldAutoApproveOpenCodePermission,
   type OpenCodeEventState,
+  type OpenCodeUnhandledRejectionGuard,
 } from "./opencode-runner-lib";
 import { normalizedTurnCompleted } from "./normalized-agent-event";
 import { ProviderBlockedError } from "./provider-block";
@@ -316,7 +318,10 @@ function closeOpenCodeRunnerResources() {
   void computerUseMcp?.cleanup().catch(() => undefined);
 }
 
-async function main(runnerIo: OpenCodeRunnerIo) {
+async function main(
+  runnerIo: OpenCodeRunnerIo,
+  rejectionGuard: OpenCodeUnhandledRejectionGuard,
+) {
   const { emit, request: requestPromise, waitForApproval } = runnerIo;
   emitRunnerDiagnostic("runner.request_waiting");
   const request = await requestPromise;
@@ -352,6 +357,15 @@ async function main(runnerIo: OpenCodeRunnerIo) {
     emit.session(sessionId);
     const eventState = createOpenCodeEventState();
     const controller = new AbortController();
+    // The SDK's SSE client answers an aborted signal with a bare
+    // `void reader.cancel()`, which rejects with the signal reason under Bun
+    // and would otherwise kill the runner after a successful turn. Owning the
+    // reason object lets the guard recognise exactly this rejection.
+    const eventStreamAbortReason = new DOMException(
+      "Briar closed the OpenCode event subscription.",
+      "AbortError",
+    );
+    rejectionGuard.expect(eventStreamAbortReason);
     const subscription = await client.event.subscribe(undefined, {
       signal: controller.signal,
     });
@@ -451,7 +465,7 @@ async function main(runnerIo: OpenCodeRunnerIo) {
       prompt,
       eventPump.then(() => new Promise<never>(() => undefined)),
     ]);
-    controller.abort();
+    controller.abort(eventStreamAbortReason);
     await eventPump.catch((caught) => {
       if (!controller.signal.aborted) throw caught;
     });
@@ -504,9 +518,22 @@ export async function runOpenCodeRunner() {
       runnerIo.close();
     },
   });
+  const rejectionGuard = createOpenCodeUnhandledRejectionGuard({
+    diagnose: emitRunnerDiagnostic,
+    fail: (reason) => {
+      // Bun's default is to dump the rejection and die; keep that visible
+      // failure for everything the runner did not raise on purpose.
+      emitRunnerDiagnostic("runner.unhandled_rejection", {
+        error: reason instanceof Error ? reason.message : String(reason),
+        stack: reason instanceof Error ? (reason.stack ?? null) : null,
+      });
+      process.exitCode = 1;
+    },
+  });
+  process.on("unhandledRejection", rejectionGuard.handle);
   const { emit } = runnerIo;
   try {
-    await main(runnerIo);
+    await main(runnerIo, rejectionGuard);
   } catch (caught) {
     emitRunnerDiagnostic("runner.failed", {
       error: caught instanceof Error ? caught.message : String(caught),
