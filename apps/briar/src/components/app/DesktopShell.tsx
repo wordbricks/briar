@@ -9,7 +9,16 @@ import {
   ConnectionHealthWithWorkspace,
   WorkerStatusBarWithTeam,
 } from "./WorkspaceViews";
+import { useHorizontalPaneResize } from "../../hooks/useHorizontalPaneResize";
 import { isDesktopTauri } from "../../lib/platform";
+import {
+  clampSidebarWidth,
+  loadSidebarWidth,
+  saveSidebarWidth,
+  sidebarWidthDefault,
+  sidebarWidthMax,
+  sidebarWidthMin,
+} from "../../lib/sidebar-width";
 import { useChannelActions } from "../../state/channels/actions";
 import {
   activeChannelIdAtom,
@@ -97,13 +106,34 @@ export function DesktopShell({
   const { selectTeam, startTeamCreation } = useTeamActions();
   const { logout } = useSessionActions();
   const { refreshActiveTeam } = useSyncActions();
+  const {
+    containerRef: appShellRef,
+    effectiveWidth: effectiveSidebarWidth,
+    isResizing: isResizingSidebar,
+    separatorProps: sidebarResizeProps,
+  } = useHorizontalPaneResize({
+    clamp: clampSidebarWidth,
+    cssVariable: "--sidebar-width",
+    defaultWidth: sidebarWidthDefault,
+    load: loadSidebarWidth,
+    max: sidebarWidthMax,
+    min: sidebarWidthMin,
+    save: saveSidebarWidth,
+    side: "left",
+    unit: "px",
+  });
 
   return (
     <div className="desktop-app-frame">
-      <div className="app-shell">
+      <div
+        className={`app-shell${isResizingSidebar ? " is-resizing-sidebar" : ""}`}
+        ref={appShellRef}
+      >
         <WindowNavigationControlsWithHistory />
         <SidebarWithSession
           agents={agents.all}
+          sidebarResizeProps={sidebarResizeProps}
+          sidebarWidth={effectiveSidebarWidth}
           onAddProject={startTeamCreation}
           onAddPlanningProject={(teamId) => {
             setPlanningProjectEditId(null);

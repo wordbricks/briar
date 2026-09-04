@@ -169,6 +169,7 @@ export const ko = {
   "session.restoring": "로그인 정보를 확인하는 중입니다",
   "sidebar.close": "왼쪽 패널 닫기",
   "sidebar.open": "왼쪽 패널 열기",
+  "sidebar.resizeSidebar": "사이드바 크기 조절",
   "sidebar.mainMenu": "주요 메뉴",
   "sidebar.organizationSwitcher": "조직 메뉴 열기",
   "sidebar.organizationMenu": "조직 메뉴",

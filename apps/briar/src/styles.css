@@ -195,7 +195,7 @@ body { overflow: hidden; font-synthesis: none; }
    Only compositor-friendly properties (opacity/transform) animate on the
    sidebar itself; width/flex-basis transitions are zero-duration and merely
    delayed so they fire after (collapse) or before (expand) the fade. */
-.sidebar { width: 252px; flex: 0 0 252px; height: 100%; position:relative; z-index:10; overflow:visible; display: flex; flex-direction: column; border-right: 1px solid var(--sidebar-border); color:var(--sidebar-foreground); background:var(--sidebar-fallback); box-shadow:var(--sidebar-shadow); opacity:1; visibility:visible; transform:translateX(0); transition: border-color .2s ease; }
+.sidebar { width: var(--sidebar-width, 252px); flex: 0 0 var(--sidebar-width, 252px); height: 100%; position:relative; z-index:10; overflow:visible; display: flex; flex-direction: column; border-right: 1px solid var(--sidebar-border); color:var(--sidebar-foreground); background:var(--sidebar-fallback); box-shadow:var(--sidebar-shadow); opacity:1; visibility:visible; transform:translateX(0); transition: border-color .2s ease; }
 .sidebar:not(.sidebar-collapsed) {
   transition:
     width 0s linear,
@@ -237,6 +237,68 @@ body { overflow: hidden; font-synthesis: none; }
     flex-basis 0s linear .16s,
     visibility 0s linear .16s,
     border-color .2s ease;
+}
+.app-shell.is-resizing-sidebar {
+  cursor: col-resize;
+  user-select: none;
+}
+.sidebar-resizer {
+  width: 8px;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: -4px;
+  z-index: 50;
+  cursor: col-resize;
+  touch-action: none;
+  outline: none;
+  background: transparent;
+}
+.sidebar-resizer::before {
+  content: "";
+  width: 1px;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  background: var(--border);
+  opacity: 0;
+  transform: translateX(-50%);
+  transition: opacity .12s ease-out, background-color .12s ease-out, box-shadow .12s ease-out;
+}
+.sidebar-resizer::after {
+  content: "";
+  width: 5px;
+  height: 34px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  transition: opacity .12s ease-out, border-color .12s ease-out, background-color .12s ease-out;
+}
+.sidebar-resizer:hover::before,
+.sidebar-resizer:focus-visible::before,
+.app-shell.is-resizing-sidebar .sidebar-resizer::before {
+  opacity: 1;
+  background: #a997df;
+  box-shadow: 0 0 0 1px rgba(128, 104, 206, .08);
+}
+.sidebar-resizer:hover::after,
+.sidebar-resizer:focus-visible::after,
+.app-shell.is-resizing-sidebar .sidebar-resizer::after {
+  opacity: 1;
+  border-color: #a997df;
+  background: #f1edfc;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-resizer::before,
+  .sidebar-resizer::after {
+    transition: none;
+  }
 }
 .sidebar-toolbar { height: 46px; flex: 0 0 46px; padding-left: var(--traffic-light-safe-inset); display: flex; align-items: center; }
 .window-navigation-controls { height:46px; position:absolute; z-index:30; top:0; left:0; padding-left:var(--traffic-light-safe-inset); display:flex; align-items:center; gap:2px; }
