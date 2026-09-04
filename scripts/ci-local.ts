@@ -22,6 +22,10 @@ import {
 } from "./ci-local-arguments";
 import { withCiWorktreeLockAt } from "./ci-worktree-lock";
 import {
+  changelogPath,
+  evaluateReleaseBumpFastPath,
+} from "./release-bump-fast-path";
+import {
   type SignoffTarget,
   verifySignoffReady,
   verifySignoffTargetUnchanged,
@@ -739,12 +743,13 @@ const publishSignoffStatus = Effect.fn("publishSignoffStatus")(
     target: SignoffTarget,
     context: CiContextName,
     state: SignoffState,
+    descriptionOverride?: string,
   ) {
-    const description = state === "pending"
+    const description = descriptionOverride ?? (state === "pending"
       ? "Local signoff is running"
       : state === "success"
         ? "Local signoff passed"
-        : "Local signoff failed or became stale";
+        : "Local signoff failed or became stale");
     yield* executeCheckedCommand("signoff", `${context}-${state}`, {
       argv: [
         "gh",
@@ -769,8 +774,11 @@ const publishSignoffStatuses = (
   target: SignoffTarget,
   contexts: ReadonlyArray<CiContextName>,
   state: SignoffState,
+  descriptionOverride?: string,
 ) => Effect.all(
-  contexts.map((context) => publishSignoffStatus(target, context, state)),
+  contexts.map((context) =>
+    publishSignoffStatus(target, context, state, descriptionOverride)
+  ),
   { concurrency: 4, discard: true },
 );
 
@@ -928,6 +936,71 @@ const signoffPreflight = Effect.fn("signoffPreflight")(
   },
 );
 
+const shortSha = (sha: string) => sha.slice(0, 7);
+
+/**
+ * A release version bump is mechanically restricted to version fields and the
+ * changelog, and it sits directly on a commit that branch protection already
+ * gated. Running the full CI suite for it only guarantees the signoff goes
+ * stale, so publish it directly instead. Returns whether the signoff was
+ * handled; `false` means the caller must run the full flow.
+ */
+const tryReleaseBumpFastPath = Effect.fn("tryReleaseBumpFastPath")(
+  function* tryReleaseBumpFastPathEffect(
+    target: SignoffTarget,
+    contexts: ReadonlyArray<CiContextName>,
+  ) {
+    if (process.env.BRIAR_CI_SIGNOFF_FULL === "true") {
+      yield* Effect.sync(() => process.stdout.write(
+        "[local-ci] Release bump fast path disabled by BRIAR_CI_SIGNOFF_FULL=true.\n",
+      ));
+      return false;
+    }
+    const decision = yield* Effect.try({
+      try: () => evaluateReleaseBumpFastPath(target, workspaceRoot),
+      catch: (cause) => new CiInvariantError({
+        message: `Release bump fast path could not evaluate HEAD: ${String(cause)}`,
+      }),
+    });
+    if (!decision.eligible) {
+      yield* Effect.sync(() => process.stdout.write(
+        `[local-ci] Release bump fast path not applicable: ${decision.reason}\n`,
+      ));
+      return false;
+    }
+
+    if (decision.changedPaths.includes(changelogPath)) {
+      yield* Effect.sync(() => process.stdout.write(
+        "[local-ci] ▶ signoff/landing-changelog-check\n",
+      ));
+      yield* executeCheckedCommand("signoff", "landing-changelog-check", {
+        argv: [
+          "bun",
+          "x",
+          "turbo",
+          "run",
+          "lint",
+          "typecheck",
+          "--filter=@briar/landing",
+        ],
+        output: { _tag: "inherit" },
+      });
+    }
+
+    yield* checkSignoffTarget(target);
+    yield* Effect.sync(() => process.stdout.write(
+      `[local-ci] Release bump fast path: HEAD ${shortSha(target.head)} is a version-only change (v${decision.version}) on origin/main parent ${shortSha(decision.parentSha)}; publishing signoff without full CI.\n`,
+    ));
+    yield* publishSignoffStatuses(
+      target,
+      contexts,
+      "success",
+      `Release bump fast path: version-only change on main parent ${shortSha(decision.parentSha)}`,
+    );
+    return true;
+  },
+);
+
 const withWorktreeCiLock = Effect.fn("withWorktreeCiLock")(
   function* withWorktreeCiLockEffect<A, E, R>(program: Effect.Effect<A, E, R>) {
     const lockPathResult = yield* capture(
@@ -978,6 +1051,7 @@ const ciCommand = Command.make(
     const selected = selectedContexts(contexts);
     yield* withWorktreeCiLock(Effect.gen(function* lockedCiEffect() {
       const target = signoff ? yield* signoffPreflight() : undefined;
+      if (target && (yield* tryReleaseBumpFastPath(target, selected))) return;
       yield* runCi({ contexts: selected, signoff }, target);
     }));
   }),

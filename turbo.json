@@ -51,6 +51,9 @@
         "scripts/verify-encrypted-env.test.ts",
         "scripts/verify-signoff-ready.ts",
         "scripts/verify-signoff-ready.test.ts",
+        "scripts/release-bump-fast-path.ts",
+        "scripts/release-bump-fast-path.test.ts",
+        "apps/briar/src-cli/release-impact.ts",
         "package.json",
         "bun.lock"
       ],
