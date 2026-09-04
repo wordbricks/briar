@@ -14,6 +14,8 @@ import {
   statusTrayApiAtom,
   statusTrayPollAtom,
   statusTrayRunsAtom,
+  statusTraySnapshotAtom,
+  statusTrayTeamRunsAtom,
   STATUS_TRAY_POLL_IDLE_TTL_MS,
   type StatusTrayApi,
 } from "./atoms";
@@ -72,11 +74,22 @@ function Mounted() {
   return null;
 }
 
-const mount = async (registry: AtomRegistry) => {
+/** All three subscriptions, in the order `useStatusTray` mounts them. */
+function MountedTray() {
+  useAtomMount(statusTrayPollAtom);
+  useAtomMount(statusTrayTeamRunsAtom);
+  useAtomMount(statusTraySnapshotAtom);
+  return null;
+}
+
+const renderMounted = async (
+  registry: AtomRegistry,
+  element: React.ReactElement,
+) => {
   const view = createReactTestRoot();
   await view.render(
     <RegistryContext.Provider value={registry}>
-      <Mounted />
+      {element}
     </RegistryContext.Provider>,
   );
   await act(async () => {
@@ -84,6 +97,12 @@ const mount = async (registry: AtomRegistry) => {
   });
   return view;
 };
+
+const mount = (registry: AtomRegistry) =>
+  renderMounted(registry, <Mounted />);
+
+const mountAll = (registry: AtomRegistry) =>
+  renderMounted(registry, <MountedTray />);
 
 const harness = (server: TrayServer, overrides: Partial<StatusTrayApi> = {}) =>
   createTestRegistry([
@@ -144,6 +163,37 @@ describe("statusTrayPollAtom", () => {
     expect(server.requests).toEqual([]);
     expect(registry.get(statusTrayRunsAtom)).toEqual([]);
     await view.cleanup();
+  });
+
+  it("stops pushing snapshots once the last observer is gone", async () => {
+    const server = new TrayServer();
+    const pushes: unknown[] = [];
+    const registry = harness(server, {
+      syncStatusTray: async (snapshot: unknown) => {
+        pushes.push(snapshot);
+      },
+    } as Partial<StatusTrayApi>);
+
+    const view = await mountAll(registry);
+    const pushesWhileMounted = pushes.length;
+    expect(pushesWhileMounted).toBeGreaterThan(0);
+
+    await view.cleanup();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(STATUS_TRAY_POLL_IDLE_TTL_MS + 2_000);
+    });
+
+    /*
+      The idle TTL has passed, so the three subscriptions are gone with the
+      component that observed them. A tray list that changes now reaches Rust
+      through nobody — which is the whole point of these being subscriptions
+      rather than effects that outlive their reason to run.
+    */
+    await act(async () => {
+      registry.set(statusTrayRunsAtom, [trayRun("run-late")]);
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(pushes).toHaveLength(pushesWhileMounted);
   });
 
   it("empties the tray and stops when the account signs out", async () => {

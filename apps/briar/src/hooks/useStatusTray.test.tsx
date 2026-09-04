@@ -4,7 +4,7 @@ import { RegistryContext } from "@effect/atom-react";
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { I18nProvider } from "../i18n";
+import { I18nProvider, useI18n } from "../i18n";
 import { demoDashboard } from "../lib/demo-data";
 import type { StatusTraySnapshot } from "../generated/tauri";
 import { activeOrganizationIdAtom } from "../state/organization/atoms";
@@ -89,11 +89,19 @@ function Effects() {
   return null;
 }
 
+/** Lets a case drive the locale the way the settings screen does. */
+let setLocale: ((locale: "ko" | "en" | "zh") => void) | null = null;
+function LocaleControl() {
+  setLocale = useI18n().setLocale;
+  return null;
+}
+
 const mount = async (registry: AtomRegistry) => {
   const view = createReactTestRoot();
   await view.render(
     <RegistryContext.Provider value={registry}>
       <I18nProvider>
+        <LocaleControl />
         <Effects />
       </I18nProvider>
     </RegistryContext.Provider>,
@@ -132,7 +140,8 @@ describe("useStatusTray", () => {
 
     const view = await mount(registry);
     await flush();
-    // The organization poll starts from an empty tray, so nothing is on it yet.
+    // Nothing has been synced for any team, so the tray is empty — the poll
+    // seeds from the open team, and there is no open team's board yet.
     expect(trayTitles(bridge.snapshots.at(-1))).toEqual([]);
 
     await act(async () => {
@@ -211,6 +220,51 @@ describe("useStatusTray", () => {
     expect(bridge.pollRequests).toEqual([]);
     // Worker labels are refreshed on any desktop build, tray or not.
     expect(bridge.workerLabelRefreshes).toHaveLength(1);
+
+    await view.cleanup();
+  });
+
+  it("never pushes an empty tray when the dashboard is already loaded", async () => {
+    const bridge = new TrayBridge();
+    const registry = harness(bridge);
+    // The cold boot a stored snapshot produces: the board is in the store
+    // before anything mounts.
+    applySyncEvent(registry, {
+      kind: "team-snapshot",
+      teamId: team.id,
+      payload: payload([runningRun("run-1")]),
+    });
+
+    const view = await mount(registry);
+    await flush();
+
+    /*
+      Every snapshot that reached Rust listed the run. The poll used to clear
+      the list as it started, one pass before the merge refilled it, so the
+      first thing the tray showed on a hydrated boot was "nothing running".
+    */
+    expect(bridge.snapshots.length).toBeGreaterThan(0);
+    for (const snapshot of bridge.snapshots) {
+      expect(trayTitles(snapshot)).toEqual(["Run run-1"]);
+    }
+
+    await view.cleanup();
+  });
+
+  it("re-syncs the snapshot when the locale changes", async () => {
+    const bridge = new TrayBridge();
+    const registry = harness(bridge);
+
+    const view = await mount(registry);
+    await flush();
+    expect(bridge.snapshots.at(-1)?.runningLabel).toBe("Running");
+
+    await act(async () => setLocale?.("ko"));
+    await flush();
+
+    // The tray is pushed to Rust with no view in between, so the locale reaches
+    // it through `state/i18n` rather than through a render.
+    expect(bridge.snapshots.at(-1)?.runningLabel).toBe("실행 중");
 
     await view.cleanup();
   });
