@@ -88,7 +88,7 @@ export function useDeepLinks({
 }: UseDeepLinksInput = {}): void {
   const { t } = useI18n();
   const { toast } = useToast();
-  const listeners: DeepLinkResolvers = { ...liveResolvers, ...resolverOverrides };
+  const resolvers: DeepLinkResolvers = { ...liveResolvers, ...resolverOverrides };
 
   /*
     The four native listeners. Mounting is all this hook does with them: each
@@ -207,7 +207,7 @@ export function useDeepLinks({
         let resolvedTarget = target;
         if (token) {
           try {
-            const location = await listeners.resolveIssueHierarchyLocation(
+            const location = await resolvers.resolveIssueHierarchyLocation(
               token,
               target.projectId,
               target.runId,
@@ -222,7 +222,7 @@ export function useDeepLinks({
             // Compatibility with servers that predate hierarchy resolution.
           }
         }
-        return listeners.navigateToIssueLink({
+        return resolvers.navigateToIssueLink({
           target: resolvedTarget,
           activeProjectId: activeTeamId,
           availableProjectIds: teams.map((team) => team.id),
@@ -265,7 +265,7 @@ export function useDeepLinks({
     if (companionMode) setCompanionPage("dms");
     else navigateToPage("agents", pendingBriarLink.projectId);
     setPendingBriarLink(null);
-    // `listeners` is rebuilt every render; the two calls it carries are read
+    // `resolvers` is rebuilt every render; the two calls it carries are read
     // when the effect runs, so it is deliberately not a dependency.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
