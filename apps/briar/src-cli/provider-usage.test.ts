@@ -9,17 +9,20 @@ import {
   parseGeminiOauthAccess,
   parseGrokAuthSession,
   parseOpencodeAuthLabel,
+  parseOpencodeGoKey,
 } from "./provider-credentials";
 import {
   claudeUsageErrorForStatus,
   loadOpenrouterUsage,
   loadProviderUsage,
+  opencodeUsageErrorForStatus,
   parseAgyCliQuota,
   parseAgyQuota,
   parseClaudeUsageResponse,
   parseCliResetTime,
   parseCodexRateLimits,
   parseGrokBilling,
+  parseOpencodeUsageResponse,
   providerUsageProbe,
   type ProviderUsageResult,
 } from "./provider-usage";
@@ -377,6 +380,185 @@ describe("provider usage probes", () => {
     expect(parseCliResetTime(1_800_000_000)).toBe(1_800_000_000_000);
     expect(parseCliResetTime("1800000000")).toBe(1_800_000_000_000);
     expect(parseCliResetTime("not-a-date")).toBeNull();
+  });
+
+  it("maps OpenCode Go windows to the shared quota shape", () => {
+    const result = parseOpencodeUsageResponse({
+      usage: {
+        rolling: { status: "rate-limited", percent: 104, resetsAt: "2026-09-04T13:50:47Z" },
+        weekly: { status: "ok", percent: 12.5, resetsAt: "2026-09-07T00:00:00Z" },
+        monthly: { status: "ok", percent: 0, resetsAt: "2026-10-04T08:48:47Z" },
+      },
+    });
+    const usage = usageOf(result);
+    expect(usage.status).toBe("ok");
+    expect(usage.session?.windowMinutes).toBe(300);
+    expect(usage.session?.usedPercent).toBe(100);
+    expect(usage.session?.resetsAt).toBe(Date.parse("2026-09-04T13:50:47Z"));
+    expect(usage.weekly?.windowMinutes).toBe(10_080);
+    expect(usage.weekly?.usedPercent).toBe(12.5);
+    expect(usage.monthly?.windowMinutes).toBe(43_200);
+    expect(usage.monthly?.usedPercent).toBe(0);
+    expect(probeOf(result)).toMatchObject({ exhausted: true, maxUsedPercent: 100 });
+
+    expect(parseOpencodeUsageResponse({}).error).toBe(
+      "OpenCode usage 응답을 읽지 못했습니다.",
+    );
+    expect(parseOpencodeUsageResponse({ usage: {} }).error).toBe(
+      "OpenCode 계정에 usage 정보가 없습니다.",
+    );
+  });
+
+  it("reads the OpenCode Go key from auth.json only", () => {
+    expect(
+      parseOpencodeGoKey('{"opencode-go":{"type":"api","key":" go-secret "}}'),
+    ).toBe("go-secret");
+    expect(parseOpencodeGoKey('{"google":{"type":"oauth","key":"x"}}')).toBeNull();
+    expect(parseOpencodeGoKey("not-json")).toBeNull();
+    expect(
+      parseOpencodeGoKey('{"opencode-go":{"type":"api","key":"   "}}'),
+    ).toBeNull();
+  });
+
+  it("flags reauthentication only when OpenCode rejects the Go key", () => {
+    expect(opencodeUsageErrorForStatus(401).reauthenticationRequired).toBe(true);
+    expect(opencodeUsageErrorForStatus(403).message).toContain("opencode auth login");
+    expect(opencodeUsageErrorForStatus(500).reauthenticationRequired).toBe(false);
+    expect(opencodeUsageErrorForStatus(500).message).toContain("HTTP 500");
+  });
+});
+
+describe("OpenCode usage over the Go API", () => {
+  const usagePayload = {
+    usage: {
+      rolling: { status: "ok", percent: 1, resetsAt: "2026-09-04T13:50:47Z" },
+      weekly: { status: "ok", percent: 0, resetsAt: "2026-09-07T00:00:00Z" },
+      monthly: { status: "ok", percent: 0, resetsAt: "2026-10-04T08:48:47Z" },
+    },
+  };
+
+  const withMockOpencode = async (
+    auth: string,
+    response: Response | Error,
+    run: (
+      home: string,
+      requests: RequestInfo[],
+      fetchImpl: typeof fetch,
+    ) => Promise<void>,
+  ) => {
+    const home = await mkdtemp(join(tmpdir(), "briar-opencode-usage-"));
+    const requests: RequestInfo[] = [];
+    try {
+      await mkdir(
+        join(home, ".local", "share", "opencode"),
+        { recursive: true },
+      );
+      await writeFile(
+        join(home, ".local", "share", "opencode", "auth.json"),
+        auth,
+      );
+      const fetchImpl = Object.assign(
+        (input: RequestInfo) => {
+          requests.push(input);
+          return response instanceof Error
+            ? Promise.reject(response)
+            : Promise.resolve(response);
+        },
+        { preconnect: () => undefined },
+      ) as unknown as typeof fetch;
+      await run(home, requests, fetchImpl);
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  };
+
+  it("reports Go usage windows for an account with a Go key", async () => {
+    await withMockOpencode(
+      '{"opencode-go":{"type":"api","key":"go-secret"}}',
+      Response.json(usagePayload),
+      async (home, requests, fetchImpl) => {
+        const usage = await loadProviderUsage("opencode", {
+          home,
+          which: () => "/usr/local/bin/opencode",
+          fetchImpl,
+        });
+        expect(usage.status).toBe("ok");
+        expect(usage.authenticated).toBe(true);
+        expect(usage.session?.windowMinutes).toBe(300);
+        expect(usage.session?.usedPercent).toBe(1);
+        expect(usage.weekly?.usedPercent).toBe(0);
+        expect(usage.monthly?.windowMinutes).toBe(43_200);
+        expect(usage.error).toBeNull();
+        expect(requests).toHaveLength(1);
+        expect(String(requests[0])).toBe("https://opencode.ai/zen/go/v1/usage");
+      },
+    );
+  });
+
+  it("keeps a Go-keyless account connected without windows", async () => {
+    await withMockOpencode(
+      '{"google":{"type":"oauth","email":"agy@example.com"}}',
+      Response.json(usagePayload),
+      async (home, requests, fetchImpl) => {
+        const usage = await loadProviderUsage("opencode", {
+          home,
+          which: () => "/usr/local/bin/opencode",
+          fetchImpl,
+        });
+        expect(usage.status).toBe("ok");
+        expect(usage.authenticated).toBe(true);
+        expect(usage.accountLabel).toBe("agy@example.com");
+        expect(usage.session).toBeNull();
+        expect(usage.weekly).toBeNull();
+        expect(usage.monthly).toBeNull();
+        expect(requests).toHaveLength(0);
+      },
+    );
+  });
+
+  it("asks for a fresh login when the Go key is rejected", async () => {
+    await withMockOpencode(
+      '{"opencode-go":{"type":"api","key":"revoked"}}',
+      new Response(null, { status: 401 }),
+      async (home, _requests, fetchImpl) => {
+        const usage = await loadProviderUsage("opencode", {
+          home,
+          which: () => "/usr/local/bin/opencode",
+          fetchImpl,
+        });
+        expect(usage.status).toBe("error");
+        expect(usage.authenticated).toBe(false);
+        expect(usage.reauthenticationRequired).toBe(true);
+        expect(usage.error).toContain("다시 로그인하세요");
+      },
+    );
+  });
+
+  it("reports network failures without dropping the account", async () => {
+    await withMockOpencode(
+      '{"opencode-go":{"type":"api","key":"go-secret"}}',
+      new Error("offline"),
+      async (home, _requests, fetchImpl) => {
+        const usage = await loadProviderUsage("opencode", {
+          home,
+          which: () => "/usr/local/bin/opencode",
+          fetchImpl,
+        });
+        expect(usage.status).toBe("error");
+        expect(usage.authenticated).toBe(true);
+        expect(usage.reauthenticationRequired).toBe(false);
+        expect(usage.error).toContain("offline");
+      },
+    );
+  });
+
+  it("reports a missing OpenCode login the way the app always has", async () => {
+    const usage = await loadProviderUsage("opencode", {
+      home: "/nonexistent",
+      which: () => null,
+    });
+    expect(usage.status).toBe("unavailable");
+    expect(usage.error).toBe("OpenCode CLI가 필요합니다.");
   });
 });
 
