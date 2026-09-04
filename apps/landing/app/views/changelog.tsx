@@ -30,6 +30,18 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.196",
+        date: "2026년 9월 4일",
+        title: "화면을 오갈 때 목록을 그대로 유지하고, 웹훅 채널의 상세 내용을 에이전트에게 전달합니다",
+        summary:
+          "보드와 인박스, 채널을 오갈 때 목록과 스크롤 위치가 그대로 남아 다시 만들어지지 않고, Slack 호환 웹훅이 보낸 상세 내용이 에이전트 답변 컨텍스트에 들어갑니다.",
+        items: [
+          "데스크톱과 폰 셸 모두 무거운 페이지(태스크 보드, 채널, DM, 인박스, 내 이슈)를 최대 네 개까지 살려 둡니다. 인박스에 갔다 보드로 돌아와도 수백 개의 행과 그 측정값, 스크롤 위치를 처음부터 다시 만들지 않습니다. 숨은 페이지는 키보드 단축키와 구독, 타이머를 놓으므로 보이지 않는 화면이 일하지 않습니다.",
+          "Slack 호환 웹훅이 짧은 요약과 함께 블록으로 보낸 상세 내용이 에이전트 답변 컨텍스트에 들어갑니다. 에러 알림 채널에서 에이전트를 부르면 이제 요약 한 줄이 아니라 프로바이더, 모델, 발생 경로, 에러 전문을 보고 답합니다.",
+          "팀 셋업의 워크플로 분석이 Grok, Cursor, Antigravity, OpenCode, Claude에서 실패하던 문제를 고쳤습니다. 읽기 전용 실행이 프로바이더 상태를 제대로 격리하고, 분석 대상 저장소의 설정 파일 때문에 실행 파일을 잘못 고르지 않습니다.",
+        ],
+      },
+      {
         version: "1.2.195",
         date: "2026년 9월 4일",
         title: "이슈와 채널 대화의 대기·오류 상태를 액션 상태 기계로 옮깁니다",
@@ -1644,6 +1656,18 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.196",
+        date: "September 4, 2026",
+        title: "Keep lists alive across navigation and give Agents the detail webhook channels carry",
+        summary:
+          "Moving between the board, inbox, and channels keeps each list and its scroll position instead of rebuilding it, and the detail a Slack-compatible webhook posts in blocks now reaches the Agent reply context.",
+        items: [
+          "The desktop and phone shells keep up to four heavy pages alive (task board, channels, DMs, inbox, and my issues). Returning to the board after a trip to the inbox no longer rebuilds hundreds of rows, their measurements, and the scroll position from scratch. A hidden page drops its keyboard scopes, subscriptions, and timers, so an off-screen view does no work.",
+          "Detail that a Slack-compatible webhook posts in blocks alongside a short summary now reaches the Agent reply context. Mentioning an Agent in an error-report channel answers from the provider, model, originating path, and full error text rather than the one-line summary.",
+          "Fixed team setup workflow analysis failing on Grok, Cursor, Antigravity, OpenCode, and Claude. Read-only runs now isolate provider state properly and no longer resolve the wrong binary because of a configuration file in the repository being analyzed.",
+        ],
+      },
       {
         version: "1.2.195",
         date: "September 4, 2026",
