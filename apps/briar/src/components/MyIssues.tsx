@@ -1,6 +1,7 @@
+import { useAtomValue } from "@effect/atom-react";
 import { Check, ChevronDown, FolderGit2, ListTodo, RefreshCw } from "lucide-react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { EmptyState, MainContent } from "./layout";
 import { Button } from "./ui/button";
 import {
@@ -9,42 +10,56 @@ import {
   type IssueWorkflowContext,
 } from "./hunt/board/IssueCollection";
 import { IssuePropertyFilterMenu } from "./hunt/board/IssuePropertyFilterMenu";
-import {
-  MyIssuesList,
-  type MyIssue,
-  type MyIssueScope,
-} from "./MyIssuesList";
+import { MyIssuesList } from "./MyIssuesList";
 import { TeamIcon } from "./TeamIcon";
 import { useI18n } from "../i18n";
 import { formatIssueKey } from "../lib/issue-key";
-import type { DashboardPayload, HuntRun, OrganizationMember, Project } from "../types";
+import type { HuntRun, Project } from "../types";
+import { teamSettingsAtom } from "../state/team/atoms";
 import {
-  emptyIssuePropertyFilters,
-  runMatchesIssuePropertyFilters,
-} from "../state/board/filters";
+  myIssuesCountAtom,
+  myIssuesQueryAtom,
+  myIssuesFailedTeamIdsAtom,
+  myIssuesGroupedRunIdsAtom,
+  myIssuesLoadedKeyAtom,
+  myIssuesLoadingAtom,
+  myIssuesMembersAtom,
+  myIssuesPropertyFiltersAtom,
+  myIssuesRetryAtom,
+  myIssuesRunProjectIdsAtom,
+  myIssuesRunProjectsAtom,
+  myIssuesScopedRunIdsAtom,
+  myIssuesScopedRunsAtom,
+  myIssuesScopeAtom,
+  myIssuesSelectedProjectIdsAtom,
+  myIssuesSourceAtom,
+  myIssuesStatusAtom,
+  myIssuesViewAtom,
+  resetMyIssuesViewState,
+} from "../state/my-issues/atoms";
+import {
+  myIssuesCompositionKey,
+  useMyIssuesSync,
+  type MyIssuesDashboardLoader,
+} from "../state/my-issues/useMyIssuesSync";
+import { useRegistry } from "../state/registry";
 
-/**
- * What this page reads of a team's board.
- *
- * "내 이슈" reaches across every team of the organization, including ones this
- * window has never selected, so it loads their boards itself instead of reading
- * the store. These four projections are all it renders — the runs it filters,
- * the members it resolves assignees against, and the team and settings each
- * row's workflow context is built from — so a `loadDashboard` response and the
- * store's own copy of the open team both satisfy it.
- */
-export type MyIssuesTeamBoard = Pick<
-  DashboardPayload,
-  "team" | "settings" | "runs" | "members"
->;
+/*
+  "내 이슈", drawn from the store.
+
+  The page used to load a `DashboardPayload` per project of the organization
+  into a `useState` record and render run objects out of it. Those responses go
+  through `applySyncEvent` now (`state/my-issues/useMyIssuesSync.ts`), and what
+  is left here is the page's chrome: the project filter, the scope tabs and the
+  choice between the two views. The list below renders ids, so a realtime edit
+  to one issue reaches its own row and nothing else; the kanban is
+  `IssueCollection`, which still takes runs, and is mounted only while it is the
+  selected view.
+*/
 
 export type MyIssuesProps = {
-  currentUserId: string | null;
   isSidebarOpen: boolean;
-  loadProjectDashboard: (
-    projectId: string,
-    signal: AbortSignal,
-  ) => Promise<MyIssuesTeamBoard | null>;
+  loadProjectDashboard: MyIssuesDashboardLoader;
   onOpenIssue: (projectId: string, runId: string) => void;
   organizationId: string | null;
   organizationName?: string | null;
@@ -55,7 +70,7 @@ type ProjectFilterProps = {
   compact?: boolean;
   projects: Project[];
   selectedProjectIds: ReadonlySet<string>;
-  onChange: (projectIds: Set<string>) => void;
+  onChange: (projectIds: string[]) => void;
 };
 
 function ProjectFilter({
@@ -77,14 +92,14 @@ function ProjectFilter({
       : t("myIssues.selectedProjects", { count: selectedCount }));
 
   const toggleProject = (projectId: string) => {
-    const next = new Set(selectedProjectIds);
     if (selectedCount === 0) {
-      onChange(new Set([projectId]));
+      onChange([projectId]);
       return;
     }
+    const next = new Set(selectedProjectIds);
     if (next.has(projectId)) next.delete(projectId);
     else next.add(projectId);
-    onChange(next);
+    onChange([...next]);
   };
 
   return (
@@ -117,7 +132,7 @@ function ProjectFilter({
             className="issue-property-filter-choice"
             onSelect={(event) => {
               event.preventDefault();
-              onChange(new Set());
+              onChange([]);
             }}
           >
             <DropdownMenu.ItemIndicator className="issue-property-filter-check">
@@ -142,11 +157,9 @@ function ProjectFilter({
               <DropdownMenu.ItemIndicator className="issue-property-filter-check">
                 <Check aria-hidden="true" size={13} />
               </DropdownMenu.ItemIndicator>
-              <span className="my-issues-project-option">
-                <TeamIcon className="my-issues-project-icon" project={project} />
-                <span className="issue-property-filter-choice-label">
-                  {project.name}
-                </span>
+              <span className="issue-property-filter-choice-label">
+                <TeamIcon className="my-issues-project-menu-icon" project={project} />
+                {project.name}
               </span>
             </DropdownMenu.CheckboxItem>
           ))}
@@ -156,18 +169,117 @@ function ProjectFilter({
   );
 }
 
-function statusMatchesMyIssues(
-  run: HuntRun,
-  status: IssueCollectionState["status"],
-) {
-  if (status === "active") return !["completed", "cancelled"].includes(run.status);
-  if (status === "attention") return ["paused", "blocked", "failed"].includes(run.status);
-  if (status === "completed") return ["completed", "cancelled"].includes(run.status);
-  return true;
+/**
+ * The kanban view, which is `IssueCollection` across several workflows. It is
+ * the one place on the page that still subscribes to run objects, and it is
+ * mounted only while the kanban is selected.
+ */
+function MyIssuesKanban({
+  bodyBefore,
+  emptyContent,
+  filteredEmptyContent,
+  headerTrailing,
+  isLoading,
+  isSidebarOpen,
+  onOpenIssue,
+  organizationId,
+  organizationName,
+  state,
+  toolbarAfterSearch,
+}: {
+  bodyBefore: React.ReactNode;
+  emptyContent: React.ReactNode;
+  filteredEmptyContent: React.ReactNode;
+  headerTrailing: React.ReactNode;
+  isLoading: boolean;
+  isSidebarOpen: boolean;
+  onOpenIssue: (projectId: string, runId: string) => void;
+  organizationId: string | null;
+  organizationName?: string | null;
+  state: IssueCollectionState;
+  toolbarAfterSearch: React.ReactNode;
+}) {
+  const { t } = useI18n();
+  const runs = useAtomValue(myIssuesScopedRunsAtom);
+  const projectByRunId = useAtomValue(myIssuesRunProjectsAtom);
+  const members = useAtomValue(myIssuesMembersAtom);
+  const workflowProjectIds = useAtomValue(myIssuesRunProjectIdsAtom);
+  const registry = useRegistry();
+  const workflowContexts = useMemo(
+    () =>
+      workflowProjectIds.flatMap((teamId): IssueWorkflowContext[] => {
+        const settings = registry.get(teamSettingsAtom(teamId));
+        if (!settings) return [];
+        return [{ id: teamId, label: undefined, settings }];
+      }),
+    [registry, workflowProjectIds],
+  );
+  const workflowForRun = useCallback(
+    (run: HuntRun): IssueWorkflowContext | undefined => {
+      const project = projectByRunId.get(run.id);
+      if (!project) return undefined;
+      const settings = registry.get(teamSettingsAtom(project.id));
+      if (!settings) return undefined;
+      return { id: project.id, label: project.name, settings };
+    },
+    [projectByRunId, registry],
+  );
+  const emptyProcessingIds = useMemo(() => new Set<string>(), []);
+
+  return (
+    <IssueCollection
+      agents={[]}
+      availableProviders={[]}
+      bodyBefore={bodyBefore}
+      countLabel={(count) => t("myIssues.count", { count })}
+      currentUserId={null}
+      deletingIssueId={null}
+      emptyContent={emptyContent}
+      filteredEmptyContent={filteredEmptyContent}
+      getSearchText={(run) => {
+        const project = projectByRunId.get(run.id);
+        return [
+          project?.name,
+          formatIssueKey(project?.issueKeyPrefix, run.runNumber),
+          run.title,
+          run.detail,
+          run.issueDescription,
+          run.sourceKey,
+        ]
+          .filter(Boolean)
+          .join(" ");
+      }}
+      headerDescription={t("myIssues.description")}
+      headerEyebrow={organizationName}
+      headerTrailing={headerTrailing}
+      isLoading={isLoading}
+      isSidebarOpen={isSidebarOpen}
+      issueKeyPrefixForRun={(run) => projectByRunId.get(run.id)?.issueKeyPrefix}
+      loadingLabel={t("myIssues.loading")}
+      members={members}
+      onOpen={(run) => {
+        const project = projectByRunId.get(run.id);
+        if (project) onOpenIssue(project.id, run.id);
+      }}
+      processingIssueIds={emptyProcessingIds}
+      projectForRun={(run) => projectByRunId.get(run.id)}
+      readOnly
+      recoveringRunId={null}
+      runs={runs}
+      scrollClassName="my-issues-scroll"
+      searchPlaceholder={t("myIssues.search")}
+      state={state}
+      storageScopeId={organizationId ? `my-issues:${organizationId}` : null}
+      title={t("myIssues.title")}
+      toolbarAfterSearch={toolbarAfterSearch}
+      updatingIssueId={null}
+      workflowForRun={workflowForRun}
+      workflowContexts={workflowContexts}
+    />
+  );
 }
 
 export function MyIssues({
-  currentUserId,
   isSidebarOpen,
   loadProjectDashboard,
   onOpenIssue,
@@ -176,6 +288,7 @@ export function MyIssues({
   projects,
 }: MyIssuesProps) {
   const { t } = useI18n();
+  const registry = useRegistry();
   const scopedProjects = useMemo(
     () =>
       projects.filter(
@@ -184,250 +297,80 @@ export function MyIssues({
       ),
     [organizationId, projects],
   );
-  const [selectedProjectIds, setSelectedProjectIds] = useState<Set<string>>(
-    () => new Set(),
-  );
-  const [dashboards, setDashboards] = useState<
-    Record<string, MyIssuesTeamBoard>
-  >({});
-  const [failedProjectIds, setFailedProjectIds] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [loadedConfigurationKey, setLoadedConfigurationKey] = useState<string | null>(null);
-  const [retryToken, setRetryToken] = useState(0);
-  const [query, setQuery] = useState("");
-  const [source, setSource] = useState<IssueCollectionState["source"]>("all");
-  const [status, setStatus] = useState<IssueCollectionState["status"]>("all");
-  const [view, setView] = useState<IssueCollectionState["view"]>("list");
-  const [scope, setScope] = useState<MyIssueScope>("assigned");
-  const [propertyFilters, setPropertyFilters] = useState(emptyIssuePropertyFilters);
-  const loadProjectDashboardRef = useRef(loadProjectDashboard);
-  loadProjectDashboardRef.current = loadProjectDashboard;
-  const projectConfigurationKey = useMemo(
-    () =>
-      JSON.stringify({
-        organizationId,
-        projectIds: scopedProjects.map((project) => project.id).sort(),
-      }),
-    [organizationId, scopedProjects],
-  );
-
-  useEffect(() => {
-    const projectIds = new Set(scopedProjects.map((project) => project.id));
-    setSelectedProjectIds((current) => {
-      const next = new Set(
-        [...current].filter((projectId) => projectIds.has(projectId)),
-      );
-      return next.size === current.size ? current : next;
-    });
-  }, [scopedProjects]);
-
-  useEffect(() => {
-    const projectIds = (
-      JSON.parse(projectConfigurationKey) as { projectIds: string[] }
-    ).projectIds;
-    const controller = new AbortController();
-    let cancelled = false;
-    setIsLoading(true);
-    setFailedProjectIds([]);
-
-    if (projectIds.length === 0) {
-      setDashboards({});
-      setLoadedConfigurationKey(projectConfigurationKey);
-      setIsLoading(false);
-      return () => controller.abort();
-    }
-
-    void Promise.all(
-      projectIds.map(async (projectId) => {
-        try {
-          return {
-            dashboard: await loadProjectDashboardRef.current(projectId, controller.signal),
-            failed: false,
-            projectId,
-          };
-        } catch {
-          return { dashboard: null, failed: true, projectId };
-        }
-      }),
-    ).then((results) => {
-      if (cancelled || controller.signal.aborted) return;
-      const nextFailedProjectIds: string[] = [];
-      setDashboards((current) => {
-        const nextDashboards: Record<string, MyIssuesTeamBoard> = {};
-        for (const projectId of projectIds) {
-          const dashboard = current[projectId];
-          if (dashboard) nextDashboards[projectId] = dashboard;
-        }
-        for (const result of results) {
-          if (result.dashboard) nextDashboards[result.projectId] = result.dashboard;
-        }
-        return nextDashboards;
-      });
-      for (const result of results) {
-        if (result.failed) nextFailedProjectIds.push(result.projectId);
-      }
-      setFailedProjectIds(nextFailedProjectIds);
-      setLoadedConfigurationKey(projectConfigurationKey);
-      setIsLoading(false);
-    });
-
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
-  }, [projectConfigurationKey, retryToken]);
-
-  const projectById = useMemo(
-    () => new Map(scopedProjects.map((project) => [project.id, project])),
+  const scopedProjectIds = useMemo(
+    () => scopedProjects.map((project) => project.id),
     [scopedProjects],
   );
-  const issues = useMemo(() => {
-    const next: MyIssue[] = [];
-    for (const [projectId, dashboard] of Object.entries(dashboards)) {
-      const project = projectById.get(projectId);
-      if (!project) continue;
-      for (const run of dashboard.runs) {
-        if (
-          currentUserId &&
-          (run.createdByUserId === currentUserId ||
-            run.assigneeUserId === currentUserId)
-        ) {
-          next.push({ project, run });
-        }
-      }
-    }
-    return next.sort((left, right) =>
-      right.run.updatedAt.localeCompare(left.run.updatedAt),
-    );
-  }, [currentUserId, dashboards, projectById]);
-  const selectedIssues = useMemo(
-    () =>
-      selectedProjectIds.size === 0
-        ? issues
-        : issues.filter((issue) => selectedProjectIds.has(issue.project.id)),
-    [issues, selectedProjectIds],
+  useMyIssuesSync({
+    load: loadProjectDashboard,
+    organizationId,
+    teamIds: scopedProjectIds,
+  });
+  /*
+    The page's view state is in atoms now, and this page is what scopes it:
+    mounting puts it back to its defaults, which is what unmounting the page did
+    to the `useState` it replaced.
+  */
+  useEffect(() => {
+    resetMyIssuesViewState(registry);
+  }, [registry]);
+
+  const view = useAtomValue(myIssuesViewAtom);
+  const scope = useAtomValue(myIssuesScopeAtom);
+  const query = useAtomValue(myIssuesQueryAtom);
+  const source = useAtomValue(myIssuesSourceAtom);
+  const status = useAtomValue(myIssuesStatusAtom);
+  const propertyFilters = useAtomValue(myIssuesPropertyFiltersAtom);
+  const selectedProjectIdList = useAtomValue(myIssuesSelectedProjectIdsAtom);
+  const members = useAtomValue(myIssuesMembersAtom);
+  const groups = useAtomValue(myIssuesGroupedRunIdsAtom);
+  const filteredCount = useAtomValue(myIssuesCountAtom);
+  const scopedRunIds = useAtomValue(myIssuesScopedRunIdsAtom);
+  const failedProjectIds = useAtomValue(myIssuesFailedTeamIdsAtom);
+  const isLoading = useAtomValue(myIssuesLoadingAtom);
+  const loadedKey = useAtomValue(myIssuesLoadedKeyAtom);
+
+  const selectedProjectIds = useMemo(
+    () => new Set(selectedProjectIdList),
+    [selectedProjectIdList],
   );
-  const scopedIssues = useMemo(() => {
-    if (scope === "created") {
-      return selectedIssues.filter(
-        (issue) => issue.run.createdByUserId === currentUserId,
-      );
-    }
-    if (scope === "subscribed") {
-      return selectedIssues.filter((issue) =>
-        issue.run.subscribers?.some((subscriber) => subscriber.userId === currentUserId),
-      );
-    }
-    return selectedIssues;
-  }, [currentUserId, scope, selectedIssues]);
-  const filteredListIssues = useMemo(() => {
-    const normalizedQuery = query.trim().toLocaleLowerCase();
-    return scopedIssues.filter(({ project, run }) => {
-      if (source !== "all" && run.source !== source) return false;
-      if (!runMatchesIssuePropertyFilters(run, propertyFilters)) return false;
-      if (!statusMatchesMyIssues(run, status)) return false;
-      if (!normalizedQuery) return true;
-      return [
-        project.name,
-        formatIssueKey(project.issueKeyPrefix, run.runNumber),
-        run.title,
-        run.detail,
-        run.issueDescription,
-        run.sourceKey,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLocaleLowerCase()
-        .includes(normalizedQuery);
-    });
-  }, [propertyFilters, query, scopedIssues, source, status]);
-  const projectByRunId = useMemo(
-    () => new Map(selectedIssues.map((issue) => [issue.run.id, issue.project])),
-    [selectedIssues],
+  const retry = useCallback(
+    () => registry.update(myIssuesRetryAtom, (token) => token + 1),
+    [registry],
   );
-  const dashboardByRunId = useMemo(() => {
-    const result = new Map<string, MyIssuesTeamBoard>();
-    for (const issue of selectedIssues) {
-      const dashboard = dashboards[issue.project.id];
-      if (dashboard) result.set(issue.run.id, dashboard);
-    }
-    return result;
-  }, [dashboards, selectedIssues]);
-  const members = useMemo(() => {
-    const byUserId = new Map<string, OrganizationMember>();
-    for (const dashboard of Object.values(dashboards)) {
-      for (const member of dashboard.members ?? []) byUserId.set(member.userId, member);
-    }
-    return [...byUserId.values()];
-  }, [dashboards]);
-  const emptyProcessingIds = useMemo(() => new Set<string>(), []);
   const collectionState = useMemo<IssueCollectionState>(
     () => ({
       propertyFilters,
       query,
-      setPropertyFilters,
-      setQuery,
-      setSource,
-      setStatus,
-      setView,
+      setPropertyFilters: (next) =>
+        registry.set(myIssuesPropertyFiltersAtom, next),
+      setQuery: (next) => registry.set(myIssuesQueryAtom, next),
+      setSource: (next) => registry.set(myIssuesSourceAtom, next),
+      setStatus: (next) => registry.set(myIssuesStatusAtom, next),
+      setView: (next) => registry.set(myIssuesViewAtom, next),
       source,
       status,
       view,
     }),
-    [propertyFilters, query, source, status, view],
+    [propertyFilters, query, registry, source, status, view],
   );
-  const workflowForRun = useCallback(
-    (run: HuntRun): IssueWorkflowContext | undefined => {
-      const dashboard = dashboardByRunId.get(run.id);
-      if (!dashboard) return undefined;
-      return {
-        id: dashboard.team.id,
-        label: dashboard.team.name,
-        settings: dashboard.settings,
-      };
-    },
-    [dashboardByRunId],
-  );
-  const workflowContexts = useMemo(() => {
-    const result = new Map<string, IssueWorkflowContext>();
-    for (const issue of selectedIssues) {
-      const dashboard = dashboards[issue.project.id];
-      if (!dashboard) continue;
-      result.set(dashboard.team.id, {
-        id: dashboard.team.id,
-        label: dashboard.team.name,
-        settings: dashboard.settings,
-      });
-    }
-    return [...result.values()];
-  }, [dashboards, selectedIssues]);
   const isInitialLoading =
     isLoading &&
-    loadedConfigurationKey !== projectConfigurationKey &&
-    selectedIssues.length === 0;
+    loadedKey !== myIssuesCompositionKey(organizationId, scopedProjectIds) &&
+    scopedRunIds.length === 0;
 
   const bodyBefore = failedProjectIds.length > 0 ? (
     <div className="my-issues-load-error" role="alert">
       <span>{t("myIssues.loadError")}</span>
-      <Button
-        onClick={() => setRetryToken((current) => current + 1)}
-        size="sm"
-        type="button"
-        variant="outline"
-      >
+      <Button onClick={retry} size="sm" type="button" variant="outline">
         {t("myIssues.retry")}
       </Button>
     </div>
   ) : null;
-  const emptyContent = failedProjectIds.length > 0 && issues.length === 0 ? (
+  const emptyContent = failedProjectIds.length > 0 && scopedRunIds.length === 0 ? (
     <EmptyState
       action={
-        <Button
-          onClick={() => setRetryToken((current) => current + 1)}
-          size="sm"
-          type="button"
-          variant="outline"
-        >
+        <Button onClick={retry} size="sm" type="button" variant="outline">
           {t("myIssues.retry")}
         </Button>
       }
@@ -449,38 +392,24 @@ export function MyIssues({
       title={t("myIssues.filterEmptyTitle")}
     />
   );
+  const setSelectedProjectIds = useCallback(
+    (next: string[]) => registry.set(myIssuesSelectedProjectIdsAtom, next),
+    [registry],
+  );
 
   if (view === "kanban") {
     return (
       <MainContent id="my-issues">
-        <IssueCollection
-          agents={[]}
-          availableProviders={[]}
+        <MyIssuesKanban
           bodyBefore={bodyBefore}
-          countLabel={(count) => t("myIssues.count", { count })}
-          currentUserId={currentUserId}
-          deletingIssueId={null}
           emptyContent={emptyContent}
           filteredEmptyContent={filteredEmptyContent}
-          getSearchText={(run) => {
-            const project = projectByRunId.get(run.id);
-            return [
-              project?.name,
-              formatIssueKey(project?.issueKeyPrefix, run.runNumber),
-              run.title,
-              run.detail,
-              run.issueDescription,
-              run.sourceKey,
-            ].filter(Boolean).join(" ");
-          }}
-          headerDescription={t("myIssues.description")}
-          headerEyebrow={organizationName}
           headerTrailing={
             <Button
               aria-label={t("myIssues.retry")}
               className="my-issues-refresh-button"
               disabled={isLoading}
-              onClick={() => setRetryToken((current) => current + 1)}
+              onClick={retry}
               size="icon-sm"
               title={t("myIssues.retry")}
               type="button"
@@ -491,23 +420,10 @@ export function MyIssues({
           }
           isLoading={isInitialLoading}
           isSidebarOpen={isSidebarOpen}
-          issueKeyPrefixForRun={(run) => projectByRunId.get(run.id)?.issueKeyPrefix}
-          loadingLabel={t("myIssues.loading")}
-          members={members}
-          onOpen={(run) => {
-            const project = projectByRunId.get(run.id);
-            if (project) onOpenIssue(project.id, run.id);
-          }}
-          processingIssueIds={emptyProcessingIds}
-          projectForRun={(run) => projectByRunId.get(run.id)}
-          readOnly
-          recoveringRunId={null}
-          runs={selectedIssues.map((issue) => issue.run)}
-          scrollClassName="my-issues-scroll"
-          searchPlaceholder={t("myIssues.search")}
+          onOpenIssue={onOpenIssue}
+          organizationId={organizationId}
+          organizationName={organizationName}
           state={collectionState}
-          storageScopeId={organizationId ? `my-issues:${organizationId}` : null}
-          title={t("myIssues.title")}
           toolbarAfterSearch={
             <ProjectFilter
               onChange={setSelectedProjectIds}
@@ -515,9 +431,6 @@ export function MyIssues({
               selectedProjectIds={selectedProjectIds}
             />
           }
-          updatingIssueId={null}
-          workflowForRun={workflowForRun}
-          workflowContexts={workflowContexts}
         />
       </MainContent>
     );
@@ -527,17 +440,19 @@ export function MyIssues({
     <MainContent id="my-issues">
       <MyIssuesList
         bodyBefore={bodyBefore}
+        count={filteredCount}
         emptyContent={emptyContent}
         filteredEmptyContent={filteredEmptyContent}
-        hasUnfilteredIssues={selectedIssues.length > 0}
+        groups={groups}
+        hasUnfilteredIssues={scopedRunIds.length > 0}
         isLoading={isInitialLoading}
         loadingLabel={t("myIssues.loading")}
         members={members}
-        onOpen={(issue) => onOpenIssue(issue.project.id, issue.run.id)}
-        onQueryChange={setQuery}
-        onRetry={() => setRetryToken((current) => current + 1)}
-        onScopeChange={setScope}
-        onViewChange={setView}
+        onOpen={onOpenIssue}
+        onQueryChange={(next) => registry.set(myIssuesQueryAtom, next)}
+        onRetry={retry}
+        onScopeChange={(next) => registry.set(myIssuesScopeAtom, next)}
+        onViewChange={(next) => registry.set(myIssuesViewAtom, next)}
         projectFilter={
           <ProjectFilter
             compact
@@ -551,11 +466,10 @@ export function MyIssues({
             agents={[]}
             filters={propertyFilters}
             members={members}
-            onChange={setPropertyFilters}
+            onChange={(next) => registry.set(myIssuesPropertyFiltersAtom, next)}
           />
         }
         query={query}
-        runs={filteredListIssues}
         scope={scope}
         searchPlaceholder={t("myIssues.search")}
         sidebarClosed={!isSidebarOpen}

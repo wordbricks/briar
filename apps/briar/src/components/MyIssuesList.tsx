@@ -1,3 +1,4 @@
+import { useAtomValue } from "@effect/atom-react";
 import {
   AlertCircle,
   BarChart3,
@@ -10,7 +11,7 @@ import {
   Search,
   TriangleAlert,
 } from "lucide-react";
-import { useMemo, useState, type ReactNode } from "react";
+import { memo, useMemo, useState, type ReactNode } from "react";
 
 import { Input } from "./ui/input";
 import { Typography } from "./ui/typography";
@@ -21,35 +22,25 @@ import { relativeTime, localizeStatus } from "./hunt/model/formatters";
 import { useI18n } from "../i18n";
 import { formatIssueKey } from "../lib/issue-key";
 import type { DashboardView } from "../state/board/filters";
-import type { HuntRun, OrganizationMember, Project } from "../types";
+import { runAtom } from "../state/entities/runs";
+import {
+  myIssuesRunProjectAtom,
+  type MyIssuesGroup,
+} from "../state/my-issues/atoms";
+import type { MyIssueScope, MyIssuesGroupKey } from "../state/my-issues/model";
+import type { HuntRun, OrganizationMember } from "../types";
 
-export type MyIssue = {
-  project: Project;
-  run: HuntRun;
-};
+export type { MyIssueScope } from "../state/my-issues/model";
 
-export type MyIssueScope = "assigned" | "created" | "subscribed" | "activity";
+/*
+  The "내 이슈" list, drawn from ids.
 
-type MyIssuesGroupKey = "urgent" | "triage" | "backlog" | "completed";
-
-const groupOrder: MyIssuesGroupKey[] = [
-  "urgent",
-  "triage",
-  "backlog",
-  "completed",
-];
-
-function groupForRun(run: HuntRun): MyIssuesGroupKey {
-  if (
-    ["blocked", "failed", "paused"].includes(run.status) ||
-    run.priority === 1
-  ) {
-    return "urgent";
-  }
-  if (run.status === "backlog") return "backlog";
-  if (["completed", "cancelled"].includes(run.status)) return "completed";
-  return "triage";
-}
+  The page handed this component `{ project, run }` pairs, so an edit to one
+  issue re-rendered every row on the page. It takes the grouped id lists now and
+  each row subscribes to its own run and to the project that run is listed
+  under: a `run-changed` for one issue rebuilds the derived groups, they come
+  back element-wise identical, and the only component that commits is that row.
+*/
 
 function providerLabel(provider: string) {
   return provider.length === 0
@@ -80,10 +71,92 @@ function issueGroupLabel(
   return t(`myIssues.group.${group}` as Parameters<typeof t>[0]);
 }
 
+/** One row, subscribed to its own run. */
+const MyIssuesRow = memo(function MyIssuesRow({
+  members,
+  onOpen,
+  runId,
+}: {
+  members: readonly OrganizationMember[];
+  onOpen: (projectId: string, runId: string) => void;
+  runId: string;
+}) {
+  const { t } = useI18n();
+  const run = useAtomValue(runAtom(runId));
+  const project = useAtomValue(myIssuesRunProjectAtom(runId));
+  if (!run || !project) return null;
+  const statusLabel = localizeStatus(
+    t,
+    run.status,
+    run.workflowStage,
+    t(`status.${run.status}` as Parameters<typeof t>[0]),
+  );
+  const projectKey = formatIssueKey(project.issueKeyPrefix, run.runNumber);
+  const assignee = run.assigneeUserId
+    ? members.find((member) => member.userId === run.assigneeUserId)?.name ??
+      run.assigneeUserId
+    : null;
+  const open = () => onOpen(project.id, run.id);
+  return (
+    <div
+      aria-label={t("run.details", { title: run.title })}
+      className="my-issues-reference-row issue-list-row"
+      data-keyboard-list-item=""
+      data-run-id={run.id}
+      onClick={open}
+      onKeyDown={(event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        open();
+      }}
+      role="row"
+      tabIndex={0}
+    >
+      <span className={`my-issues-reference-status status-${run.status}`} role="cell">
+        <StatusIcon run={run} />
+      </span>
+      <span className="my-issues-reference-key" role="cell">
+        <TeamIcon className="issue-list-project-icon" project={project} />
+        {projectKey}
+      </span>
+      <span className="my-issues-reference-copy" role="cell">
+        <span className="my-issues-reference-kicker">
+          <i className={`source-dot ${run.source}`} />
+          {statusLabel}
+        </span>
+        <strong>{run.title}</strong>
+        {run.detail || run.issueDescription ? (
+          <small>{run.detail || run.issueDescription}</small>
+        ) : null}
+      </span>
+      <span className="my-issues-reference-badges" role="cell">
+        {run.preferredProvider ? (
+          <span className="my-issues-reference-badge provider">
+            {providerLabel(run.preferredProvider)}
+          </span>
+        ) : null}
+        {assignee ? (
+          <span className="my-issues-reference-badge assignee">{assignee}</span>
+        ) : null}
+        <span className={`my-issues-reference-badge source ${run.source}`}>
+          {t(`source.${run.source}` as Parameters<typeof t>[0])}
+        </span>
+        <PullRequestIconLink urls={run.pullRequestUrls} />
+      </span>
+      <span className="my-issues-reference-updated" role="cell">
+        {relativeTime(run.updatedAt, t)}
+      </span>
+      <ChevronRight aria-hidden="true" className="my-issues-reference-arrow" size={17} />
+    </div>
+  );
+});
+
 export function MyIssuesList({
   bodyBefore,
+  count,
   emptyContent,
   filteredEmptyContent,
+  groups,
   hasUnfilteredIssues,
   isLoading,
   loadingLabel,
@@ -96,7 +169,6 @@ export function MyIssuesList({
   projectFilter,
   propertyFilter,
   query,
-  runs,
   scope,
   searchPlaceholder,
   sidebarClosed,
@@ -104,13 +176,15 @@ export function MyIssuesList({
   view,
 }: {
   bodyBefore?: ReactNode;
+  count: number;
   emptyContent: ReactNode;
   filteredEmptyContent: ReactNode;
+  groups: readonly MyIssuesGroup[];
   hasUnfilteredIssues: boolean;
   isLoading: boolean;
   loadingLabel: string;
   members: readonly OrganizationMember[];
-  onOpen: (issue: MyIssue) => void;
+  onOpen: (projectId: string, runId: string) => void;
   onQueryChange: (query: string) => void;
   onRetry: () => void;
   onScopeChange: (scope: MyIssueScope) => void;
@@ -118,7 +192,6 @@ export function MyIssuesList({
   projectFilter: ReactNode;
   propertyFilter: ReactNode;
   query: string;
-  runs: readonly MyIssue[];
   scope: MyIssueScope;
   searchPlaceholder: string;
   sidebarClosed: boolean;
@@ -130,15 +203,6 @@ export function MyIssuesList({
   const [collapsedGroups, setCollapsedGroups] = useState<Set<MyIssuesGroupKey>>(
     () => new Set(),
   );
-  const groupedRuns = useMemo(() => {
-    const groups = new Map<MyIssuesGroupKey, MyIssue[]>();
-    for (const group of groupOrder) groups.set(group, []);
-    for (const issue of runs) groups.get(groupForRun(issue.run))?.push(issue);
-    return groupOrder.flatMap((group) => {
-      const groupRuns = groups.get(group) ?? [];
-      return groupRuns.length > 0 ? [{ group, runs: groupRuns }] : [];
-    });
-  }, [runs]);
 
   const toggleGroup = (group: MyIssuesGroupKey) => {
     setCollapsedGroups((current) => {
@@ -149,12 +213,15 @@ export function MyIssuesList({
     });
   };
 
-  const scopeTabs: Array<{ label: string; value: MyIssueScope }> = [
-    { label: t("myIssues.scope.assigned"), value: "assigned" },
-    { label: t("myIssues.scope.created"), value: "created" },
-    { label: t("myIssues.scope.subscribed"), value: "subscribed" },
-    { label: t("myIssues.scope.activity"), value: "activity" },
-  ];
+  const scopeTabs: Array<{ label: string; value: MyIssueScope }> = useMemo(
+    () => [
+      { label: t("myIssues.scope.assigned"), value: "assigned" },
+      { label: t("myIssues.scope.created"), value: "created" },
+      { label: t("myIssues.scope.subscribed"), value: "subscribed" },
+      { label: t("myIssues.scope.activity"), value: "activity" },
+    ],
+    [t],
+  );
 
   return (
     <div
@@ -173,13 +240,13 @@ export function MyIssuesList({
               tone="muted"
               variant="caption"
             >
-              {t("myIssues.count", { count: runs.length })}
+              {t("myIssues.count", { count })}
             </Typography>
           </span>
         }
       />
       <span className="visually-hidden" aria-live="polite">
-        {t("myIssues.count", { count: runs.length })}
+        {t("myIssues.count", { count })}
       </span>
       <div className="my-issues-reference-scroll">
         <div className="my-issues-reference-toolbar">
@@ -255,11 +322,11 @@ export function MyIssuesList({
           <div aria-busy="true" aria-live="polite" className="issues-loading-overlay" role="status">
             {loadingLabel}
           </div>
-        ) : runs.length === 0 ? (
+        ) : count === 0 ? (
           hasUnfilteredIssues ? filteredEmptyContent : emptyContent
         ) : (
           <div aria-label={t("myIssues.listLabel")} className="my-issues-reference-list" role="table">
-            {groupedRuns.map(({ group, runs: groupRuns }) => {
+            {groups.map(({ group, runIds }) => {
               const isCollapsed = collapsedGroups.has(group);
               const groupId = `my-issues-group-${group}`;
               return (
@@ -274,7 +341,7 @@ export function MyIssuesList({
                     >
                       {isCollapsed ? <ChevronRight aria-hidden="true" size={17} /> : <ChevronDown aria-hidden="true" size={17} />}
                       <strong id={groupId}>{issueGroupLabel(t, group)}</strong>
-                      <span>{groupRuns.length}</span>
+                      <span>{runIds.length}</span>
                     </button>
                     <button
                       aria-label={t("myIssues.addToGroup", { group: issueGroupLabel(t, group) })}
@@ -288,75 +355,14 @@ export function MyIssuesList({
                   </div>
                   {!isCollapsed ? (
                     <div className="my-issues-reference-group-rows" id={`${groupId}-rows`} role="rowgroup">
-                      {groupRuns.map((issue) => {
-                        const { project, run } = issue;
-                        const statusLabel = localizeStatus(
-                          t,
-                          run.status,
-                          run.workflowStage,
-                          t(`status.${run.status}` as Parameters<typeof t>[0]),
-                        );
-                        const projectKey = formatIssueKey(project.issueKeyPrefix, run.runNumber);
-                        const assignee = run.assigneeUserId
-                          ? members.find((member) => member.userId === run.assigneeUserId)?.name ??
-                            run.assigneeUserId
-                          : null;
-                        return (
-                          <div
-                            aria-label={t("run.details", { title: run.title })}
-                            className="my-issues-reference-row issue-list-row"
-                            data-keyboard-list-item=""
-                            data-run-id={run.id}
-                            key={run.id}
-                            onClick={() => onOpen(issue)}
-                            onKeyDown={(event) => {
-                              if (event.key !== "Enter" && event.key !== " ") return;
-                              event.preventDefault();
-                              onOpen(issue);
-                            }}
-                            role="row"
-                            tabIndex={0}
-                          >
-                            <span className={`my-issues-reference-status status-${run.status}`} role="cell">
-                              <StatusIcon run={run} />
-                            </span>
-                            <span className="my-issues-reference-key" role="cell">
-                              <TeamIcon className="issue-list-project-icon" project={project} />
-                              {projectKey}
-                            </span>
-                            <span className="my-issues-reference-copy" role="cell">
-                              <span className="my-issues-reference-kicker">
-                                <i className={`source-dot ${run.source}`} />
-                                {statusLabel}
-                              </span>
-                              <strong>{run.title}</strong>
-                              {run.detail || run.issueDescription ? (
-                                <small>{run.detail || run.issueDescription}</small>
-                              ) : null}
-                            </span>
-                            <span className="my-issues-reference-badges" role="cell">
-                              {run.preferredProvider ? (
-                                <span className="my-issues-reference-badge provider">
-                                  {providerLabel(run.preferredProvider)}
-                                </span>
-                              ) : null}
-                              {assignee ? (
-                                <span className="my-issues-reference-badge assignee">
-                                  {assignee}
-                                </span>
-                              ) : null}
-                              <span className={`my-issues-reference-badge source ${run.source}`}>
-                                {t(`source.${run.source}` as Parameters<typeof t>[0])}
-                              </span>
-                              <PullRequestIconLink urls={run.pullRequestUrls} />
-                            </span>
-                            <span className="my-issues-reference-updated" role="cell">
-                              {relativeTime(run.updatedAt, t)}
-                            </span>
-                            <ChevronRight aria-hidden="true" className="my-issues-reference-arrow" size={17} />
-                          </div>
-                        );
-                      })}
+                      {runIds.map((runId) => (
+                        <MyIssuesRow
+                          key={runId}
+                          members={members}
+                          onOpen={onOpen}
+                          runId={runId}
+                        />
+                      ))}
                     </div>
                   ) : null}
                 </section>

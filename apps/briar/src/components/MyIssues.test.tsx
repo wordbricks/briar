@@ -1,13 +1,30 @@
 /** @vitest-environment jsdom */
 
+import { RegistryContext, useAtomValue } from "@effect/atom-react";
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AppKeyboardCommandProvider } from "../hooks/appKeyboardCommands";
 import { I18nProvider } from "../i18n";
 import { demoDashboard } from "../lib/demo-data";
-import type { DashboardPayload, Project } from "../types";
+import { runAtom } from "../state/entities/runs";
+import { pinnedTeamIdsAtom } from "../state/entities/retention";
+import {
+  myIssuesCountAtom,
+  myIssuesGroupedRunIdsAtom,
+} from "../state/my-issues/atoms";
+import { createTestRegistry, type AtomRegistry } from "../state/registry";
+import { userAtom } from "../state/session/atoms";
+import { applySyncEvent } from "../state/sync/apply";
+import type { DashboardPayload, Project, SessionUser } from "../types";
 import { createReactTestRoot, renderReactTestRoot } from "../test/react";
+import { createRenderCounter, type RenderCounter } from "../test/render-count";
 import { MyIssues } from "./MyIssues";
+
+const user: SessionUser = {
+  id: "user-1",
+  name: "Tester",
+  email: "tester@briar.local",
+};
 
 const projectOne: Project = {
   ...demoDashboard.team,
@@ -28,6 +45,8 @@ const dashboardFor = (project: Project, runs: DashboardPayload["runs"]): Dashboa
   ...demoDashboard,
   team: project,
   runs,
+  cursor: 1,
+  generatedAt: "2026-09-01T00:00:00.000Z",
 });
 
 const myCreatedIssue = {
@@ -38,6 +57,7 @@ const myCreatedIssue = {
   createdByUserId: "user-1",
   assigneeUserId: null,
   source: "issue" as const,
+  updatedAt: "2026-09-01T00:00:00.000Z",
 };
 const myAssignedIssue = {
   ...demoDashboard.runs[1]!,
@@ -47,6 +67,7 @@ const myAssignedIssue = {
   createdByUserId: "someone-else",
   assigneeUserId: "user-1",
   source: "feedback" as const,
+  updatedAt: "2026-09-01T00:00:00.000Z",
 };
 const unrelatedIssue = {
   ...demoDashboard.runs[2]!,
@@ -61,10 +82,12 @@ describe("MyIssues", () => {
   let cleanup: () => Promise<void>;
   let container: HTMLDivElement;
   let root: ReturnType<typeof createReactTestRoot>["root"];
+  let registry: AtomRegistry;
 
   beforeEach(() => {
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     window.localStorage.setItem("briar.locale.v1", "en");
+    registry = createTestRegistry([[userAtom, user]]);
     ({ cleanup, container, root } = createReactTestRoot({
       attachToDocument: true,
     }));
@@ -76,29 +99,44 @@ describe("MyIssues", () => {
     vi.restoreAllMocks();
   });
 
+  const page = (
+    loadProjectDashboard: (
+      projectId: string,
+      signal: AbortSignal,
+    ) => Promise<DashboardPayload | null>,
+    projects: Project[],
+    onOpenIssue: (projectId: string, runId: string) => void,
+    extra?: React.ReactNode,
+  ) => (
+    <RegistryContext.Provider value={registry}>
+      <I18nProvider>
+        <AppKeyboardCommandProvider>
+          <MyIssues
+            isSidebarOpen
+            loadProjectDashboard={loadProjectDashboard}
+            onOpenIssue={onOpenIssue}
+            organizationId="demo-organization"
+            organizationName="Briar"
+            projects={projects}
+          />
+          {extra}
+        </AppKeyboardCommandProvider>
+      </I18nProvider>
+    </RegistryContext.Provider>
+  );
+
   async function renderPage(
     onOpenIssue = vi.fn(),
     dashboards: Record<string, DashboardPayload> = {
       [projectOne.id]: dashboardFor(projectOne, [myCreatedIssue, unrelatedIssue]),
       [projectTwo.id]: dashboardFor(projectTwo, [myAssignedIssue]),
     },
+    extra?: React.ReactNode,
   ) {
     const loadProjectDashboard = vi.fn(async (projectId: string) => dashboards[projectId] ?? null);
     await renderReactTestRoot(
       root,
-      <I18nProvider>
-        <AppKeyboardCommandProvider>
-          <MyIssues
-            currentUserId="user-1"
-            isSidebarOpen
-            loadProjectDashboard={loadProjectDashboard}
-            onOpenIssue={onOpenIssue}
-            organizationId="demo-organization"
-            organizationName="Briar"
-            projects={[projectOne, projectTwo]}
-          />
-        </AppKeyboardCommandProvider>
-      </I18nProvider>,
+      page(loadProjectDashboard, [projectOne, projectTwo], onOpenIssue, extra),
     );
     return { loadProjectDashboard, onOpenIssue };
   }
@@ -113,6 +151,22 @@ describe("MyIssues", () => {
     expect(container.querySelectorAll(".issue-list-project-icon")).toHaveLength(2);
     expect(container.querySelector('img[src="data:image/png;base64,project-one"]')).not.toBeNull();
     expect(container.querySelector('img[src="data:image/png;base64,project-two"]')).not.toBeNull();
+  });
+
+  it("puts the loaded boards in the entity store and pins them against the LRU", async () => {
+    await renderPage();
+
+    // The rows are entities now, not a record this page keeps for itself.
+    expect(registry.get(runAtom("my-created"))?.title).toBe("Created issue");
+    expect(registry.get(runAtom("my-assigned"))?.title).toBe("Assigned issue");
+    expect(registry.get(pinnedTeamIdsAtom).sort()).toEqual([
+      "project-one",
+      "project-two",
+    ]);
+
+    await cleanup();
+    // The pin is the page's, and it ends with the page.
+    expect(registry.get(pinnedTeamIdsAtom)).toEqual([]);
   });
 
   it("supports selecting one project from the multi-select project menu", async () => {
@@ -158,22 +212,7 @@ describe("MyIssues", () => {
     const firstLoader = vi.fn(async (projectId: string) => dashboards[projectId] ?? null);
     const replacementLoader = vi.fn(async (projectId: string) => dashboards[projectId] ?? null);
     const render = (projects: Project[], loadProjectDashboard = firstLoader) =>
-      renderReactTestRoot(
-        root,
-        <I18nProvider>
-          <AppKeyboardCommandProvider>
-            <MyIssues
-              currentUserId="user-1"
-              isSidebarOpen
-              loadProjectDashboard={loadProjectDashboard}
-              onOpenIssue={vi.fn()}
-              organizationId="demo-organization"
-              organizationName="Briar"
-              projects={projects}
-            />
-          </AppKeyboardCommandProvider>
-        </I18nProvider>,
-      );
+      renderReactTestRoot(root, page(loadProjectDashboard, projects, vi.fn()));
 
     await render([projectOne, projectTwo]);
     await render([{ ...projectOne }, { ...projectTwo }], replacementLoader);
@@ -196,22 +235,8 @@ describe("MyIssues", () => {
       [projectTwo.id]: dashboardFor(projectTwo, [myAssignedIssue]),
     };
     const loadProjectDashboard = vi.fn(async (projectId: string) => dashboards[projectId] ?? null);
-    const render = (projects: Project[]) => renderReactTestRoot(
-      root,
-      <I18nProvider>
-        <AppKeyboardCommandProvider>
-          <MyIssues
-            currentUserId="user-1"
-            isSidebarOpen
-            loadProjectDashboard={loadProjectDashboard}
-            onOpenIssue={vi.fn()}
-            organizationId="demo-organization"
-            organizationName="Briar"
-            projects={projects}
-          />
-        </AppKeyboardCommandProvider>
-      </I18nProvider>,
-    );
+    const render = (projects: Project[]) =>
+      renderReactTestRoot(root, page(loadProjectDashboard, projects, vi.fn()));
 
     await render([projectOne]);
     expect(loadProjectDashboard).toHaveBeenCalledTimes(1);
@@ -238,19 +263,7 @@ describe("MyIssues", () => {
     });
     await renderReactTestRoot(
       root,
-      <I18nProvider>
-        <AppKeyboardCommandProvider>
-          <MyIssues
-            currentUserId="user-1"
-            isSidebarOpen
-            loadProjectDashboard={loadProjectDashboard}
-            onOpenIssue={vi.fn()}
-            organizationId="demo-organization"
-            organizationName="Briar"
-            projects={[projectOne, projectTwo]}
-          />
-        </AppKeyboardCommandProvider>
-      </I18nProvider>,
+      page(loadProjectDashboard, [projectOne, projectTwo], vi.fn()),
     );
 
     await act(async () => {
@@ -316,5 +329,58 @@ describe("MyIssues", () => {
     );
     expect(mobileColumn?.textContent).toContain("Assigned issue");
     expect(mobileColumn?.querySelector('img[src="data:image/png;base64,project-two"]')).not.toBeNull();
+  });
+
+  /*
+    The promise the entity store makes this page, counted rather than argued.
+    Each probe subscribes to the very atom the component it stands for reads —
+    `runAtom` for a row, the grouped ids for the list, the count for the header
+    — so a probe renders exactly when that component does.
+  */
+  it("reaches only the changed run's row on a realtime edit", async () => {
+    const renders = createRenderCounter();
+
+    function RunRow({ name, runId }: { name: string; runId: string }) {
+      renders.useRenderCount(name);
+      const run = useAtomValue(runAtom(runId));
+      return <output>{run?.title ?? ""}</output>;
+    }
+    function ListProbe() {
+      renders.useRenderCount("list");
+      useAtomValue(myIssuesGroupedRunIdsAtom);
+      return null;
+    }
+    function CountProbe() {
+      renders.useRenderCount("count");
+      useAtomValue(myIssuesCountAtom);
+      return null;
+    }
+
+    await renderPage(vi.fn(), undefined, (
+      <>
+        <RunRow name="row-created" runId="my-created" />
+        <RunRow name="row-assigned" runId="my-assigned" />
+        <ListProbe />
+        <CountProbe />
+      </>
+    ));
+    expect(container.textContent).toContain("Assigned issue");
+    renders.reset();
+
+    await act(async () => {
+      applySyncEvent(registry, {
+        kind: "run-changed",
+        run: { ...myAssignedIssue, title: "고친 이슈" },
+        teamId: projectTwo.id,
+      });
+    });
+
+    // The edited run's row and nothing else: not the other row, not the
+    // grouped list the sections are drawn from, not the header count.
+    renders.expectRenderCounts({ "row-assigned": 1 });
+    expect(
+      container.querySelector('.issue-list-row[data-run-id="my-assigned"] strong')
+        ?.textContent,
+    ).toBe("고친 이슈");
   });
 });
