@@ -52,6 +52,7 @@ import type {
   IssueDependencyReference,
   UpdateIssueInput,
 } from "../../types";
+import { runTask, type TaskAction } from "../actions";
 import { createAgentSessionActions } from "../agent-sessions/actions";
 import { demoOrganization, demoUser, emptyDashboard } from "../demo-fixtures";
 import { runAtom, teamRunIdsAtom, teamRunsAtom } from "../entities/runs";
@@ -76,9 +77,11 @@ import {
   teamsAtom,
 } from "../team/atoms";
 import {
-  beginIssueMutation,
-  pendingIssueMutationAtom,
-  recoveryErrorAtom,
+  createIssueAction,
+  deleteIssueAction,
+  isCreatingIssueAtom,
+  recoverRunAction,
+  updateIssueAction,
 } from "./atoms";
 
 /*
@@ -277,9 +280,44 @@ export function createIssueActions(
     registry.update(runEventsAtom(runId), (events) => [event, ...events]);
   };
 
+  /**
+   * Runs one write under the action atom that owns its request state, naming
+   * the run it is about so the views can disable that row.
+   *
+   * The action atom is what marks the write in flight and remembers how it
+   * failed; the only thing left here is where the failure is *reported*, which
+   * for an edit is the session error the shell renders. The clear-first write
+   * stays outside the run for the same reason it was there: the banner from the
+   * previous attempt goes as soon as this one is asked for.
+   */
+  const mutate = <A>(
+    action: TaskAction,
+    target: string | null,
+    body: () => Promise<A>,
+  ): Promise<A> => {
+    setError(null);
+    return runTask(registry, action, target, async () => {
+      try {
+        return await body();
+      } catch (caught) {
+        setError(messageOf(caught));
+        throw caught;
+      }
+    });
+  };
+
+  /**
+   * {@link mutate} for a recovery, whose failure belongs next to the run rather
+   * than in the shell. There is nothing to report by hand: the run detail view
+   * reads `runRecoveryFailureAtom`, which is this action's own `Failure` and is
+   * empty again the moment the next attempt starts.
+   */
+  const recover = <A>(runId: string, body: () => Promise<A>): Promise<A> =>
+    runTask(registry, recoverRunAction, runId, body);
+
   return {
     async addIssue(projectId: string, input: CreateIssueInput) {
-      if (registry.get(pendingIssueMutationAtom)?.kind === "creating") {
+      if (registry.get(isCreatingIssueAtom)) {
         throw new Error("이슈 생성이 이미 진행 중입니다.");
       }
       const planningProjects = registry.get(planningProjectsAtom);
@@ -295,9 +333,7 @@ export function createIssueActions(
       }
       const clientIssueId =
         input.clientIssueId ?? crypto.randomUUID().toLowerCase();
-      const endMutation = beginIssueMutation(registry, { kind: "creating" });
-      setError(null);
-      try {
+      return mutate(createIssueAction, null, async () => {
         if (demoMode) {
           // The board the new issue lands on, when it is the one on screen:
           // its settings decide the workflow and repository the run inherits,
@@ -460,12 +496,7 @@ export function createIssueActions(
           getTeamActions(registry).selectTeam(teamId);
         }
         return result;
-      } catch (caught) {
-        setError(messageOf(caught));
-        throw caught;
-      } finally {
-        endMutation();
-      }
+      });
     },
 
     async moveIssueProject(
@@ -518,12 +549,7 @@ export function createIssueActions(
       const { teamId, boardRun } = requireBoard(
         "이슈를 수정할 프로젝트가 없습니다.",
       );
-      const endMutation = beginIssueMutation(registry, {
-        kind: "updating",
-        runId,
-      });
-      setError(null);
-      try {
+      return mutate(updateIssueAction, runId, async () => {
         if (demoMode) {
           const updatedAt = new Date().toISOString();
           const addedAttachments: IssueAttachment[] = input.attachments.map(
@@ -579,12 +605,7 @@ export function createIssueActions(
         const result = await api.updateIssue(token, teamId, runId, input);
         await refresh();
         return result;
-      } catch (caught) {
-        setError(messageOf(caught));
-        throw caught;
-      } finally {
-        endMutation();
-      }
+      });
     },
 
     async editIssueSubscription(runId: string, subscribed: boolean) {
@@ -638,12 +659,7 @@ export function createIssueActions(
       input: IssueExecutionPreferences,
     ) {
       const { teamId } = requireBoard("이슈를 수정할 프로젝트가 없습니다.");
-      const endMutation = beginIssueMutation(registry, {
-        kind: "updating",
-        runId,
-      });
-      setError(null);
-      try {
+      return mutate(updateIssueAction, runId, async () => {
         if (demoMode) {
           applyRunPatch(registry, runId, (run) => ({
             ...run,
@@ -663,12 +679,7 @@ export function createIssueActions(
         );
         await refresh();
         return result;
-      } catch (caught) {
-        setError(messageOf(caught));
-        throw caught;
-      } finally {
-        endMutation();
-      }
+      });
     },
 
     async editIssueCheckpoints(
@@ -676,12 +687,7 @@ export function createIssueActions(
       checkpoints: AutoHuntWorkflowCheckpoint[],
     ) {
       const { teamId } = requireBoard("이슈를 수정할 프로젝트가 없습니다.");
-      const endMutation = beginIssueMutation(registry, {
-        kind: "updating",
-        runId,
-      });
-      setError(null);
-      try {
+      return mutate(updateIssueAction, runId, async () => {
         if (demoMode) {
           const updatedAt = new Date().toISOString();
           applyRunPatch(registry, runId, (run) => {
@@ -722,12 +728,7 @@ export function createIssueActions(
         );
         await refresh();
         return result;
-      } catch (caught) {
-        setError(messageOf(caught));
-        throw caught;
-      } finally {
-        endMutation();
-      }
+      });
     },
 
     async completeResultReview(runId: string): Promise<IssueResultReview> {
@@ -784,12 +785,7 @@ export function createIssueActions(
       const { teamId, boardRun } = requireBoard(
         "의존성을 수정할 프로젝트가 없습니다.",
       );
-      const endMutation = beginIssueMutation(registry, {
-        kind: "updating",
-        runId: dependentRunId,
-      });
-      setError(null);
-      try {
+      return mutate(updateIssueAction, dependentRunId, async () => {
         if (demoMode) {
           const prerequisite = boardRun(prerequisiteRunId);
           const dependent = boardRun(dependentRunId);
@@ -843,24 +839,14 @@ export function createIssueActions(
           );
         }
         await refresh();
-      } catch (caught) {
-        setError(messageOf(caught));
-        throw caught;
-      } finally {
-        endMutation();
-      }
+      });
     },
 
     async changeIssueParent(childRunId: string, parentRunId: string | null) {
       const { teamId, boardRun } = requireBoard(
         "계층을 수정할 프로젝트가 없습니다.",
       );
-      const endMutation = beginIssueMutation(registry, {
-        kind: "updating",
-        runId: childRunId,
-      });
-      setError(null);
-      try {
+      return mutate(updateIssueAction, childRunId, async () => {
         if (!demoMode) {
           const token = requireToken();
           if (parentRunId) {
@@ -893,12 +879,7 @@ export function createIssueActions(
             ? run
             : { ...run, subIssues: withoutChild };
         });
-      } catch (caught) {
-        setError(messageOf(caught));
-        throw caught;
-      } finally {
-        endMutation();
-      }
+      });
     },
 
     async changeRelatedIssue(
@@ -909,12 +890,7 @@ export function createIssueActions(
       const { teamId, boardRun } = requireBoard(
         "관련 이슈를 수정할 프로젝트가 없습니다.",
       );
-      const endMutation = beginIssueMutation(registry, {
-        kind: "updating",
-        runId,
-      });
-      setError(null);
-      try {
+      return mutate(updateIssueAction, runId, async () => {
         if (!demoMode) {
           const token = requireToken();
           if (action === "add") {
@@ -941,22 +917,12 @@ export function createIssueActions(
                 : remaining,
           };
         });
-      } catch (caught) {
-        setError(messageOf(caught));
-        throw caught;
-      } finally {
-        endMutation();
-      }
+      });
     },
 
     async removeIssue(runId: string) {
       const { teamId } = requireBoard("이슈를 삭제할 프로젝트가 없습니다.");
-      const endMutation = beginIssueMutation(registry, {
-        kind: "deleting",
-        runId,
-      });
-      setError(null);
-      try {
+      return mutate(deleteIssueAction, runId, async () => {
         if (!demoMode) {
           const token = requireToken();
           await api.deleteIssue(token, teamId, runId);
@@ -970,12 +936,7 @@ export function createIssueActions(
           applySyncEvent(registry, { kind: "run-deleted", teamId, runId });
           clearRunDetail(registry, runId);
         });
-      } catch (caught) {
-        setError(messageOf(caught));
-        throw caught;
-      } finally {
-        endMutation();
-      }
+      });
     },
 
     async transferIssue(runId: string, targetProjectId: string) {
@@ -983,12 +944,7 @@ export function createIssueActions(
       if (targetProjectId === teamId) {
         throw new Error("같은 프로젝트로는 옮길 수 없습니다.");
       }
-      const endMutation = beginIssueMutation(registry, {
-        kind: "deleting",
-        runId,
-      });
-      setError(null);
-      try {
+      return mutate(deleteIssueAction, runId, async () => {
         if (!demoMode) {
           const token = requireToken();
           await api.transferIssue(token, teamId, runId, targetProjectId);
@@ -1002,12 +958,7 @@ export function createIssueActions(
           applySyncEvent(registry, { kind: "run-deleted", teamId, runId });
           clearRunDetail(registry, runId);
         });
-      } catch (caught) {
-        setError(messageOf(caught));
-        throw caught;
-      } finally {
-        endMutation();
-      }
+      });
     },
 
     async acceptConversationIssueAction(
@@ -1112,12 +1063,7 @@ export function createIssueActions(
 
     async recoverRun(runId: string, action: "retry" | "cancel") {
       const { teamId } = requireBoard("복구할 이슈 처리 작업이 없습니다.");
-      const endMutation = beginIssueMutation(registry, {
-        kind: "recovering",
-        runId,
-      });
-      registry.set(recoveryErrorAtom, null);
-      try {
+      return recover(runId, async () => {
         if (demoMode) {
           const occurredAt = new Date().toISOString();
           Atom.batch(() => {
@@ -1173,24 +1119,14 @@ export function createIssueActions(
           await api.cancelHuntRun(token, teamId, runId);
         }
         await refresh();
-      } catch (caught) {
-        registry.set(recoveryErrorAtom, messageOf(caught));
-        throw caught;
-      } finally {
-        endMutation();
-      }
+      });
     },
 
     async resumeRun(runId: string) {
       const { teamId, boardRun } = requireBoard(
         "재개할 이슈 처리 작업이 없습니다.",
       );
-      const endMutation = beginIssueMutation(registry, {
-        kind: "recovering",
-        runId,
-      });
-      registry.set(recoveryErrorAtom, null);
-      try {
+      return recover(runId, async () => {
         if (demoMode) {
           const occurredAt = new Date().toISOString();
           applyRunPatch(registry, runId, (run) => {
@@ -1272,12 +1208,7 @@ export function createIssueActions(
           throw caught;
         }
         await refresh();
-      } catch (caught) {
-        registry.set(recoveryErrorAtom, messageOf(caught));
-        throw caught;
-      } finally {
-        endMutation();
-      }
+      });
     },
 
     async reworkRun(
@@ -1289,12 +1220,7 @@ export function createIssueActions(
       );
       const reason = input.reason.trim();
       if (!reason) throw new Error("수정할 내용을 입력해 주세요.");
-      const endMutation = beginIssueMutation(registry, {
-        kind: "recovering",
-        runId,
-      });
-      registry.set(recoveryErrorAtom, null);
-      try {
+      return recover(runId, async () => {
         const run = boardRun(runId);
         const checkpoint = run?.checkpoint;
         if (!run || !checkpoint) {
@@ -1388,22 +1314,12 @@ export function createIssueActions(
           throw caught;
         }
         await refresh();
-      } catch (caught) {
-        registry.set(recoveryErrorAtom, messageOf(caught));
-        throw caught;
-      } finally {
-        endMutation();
-      }
+      });
     },
 
     async moveRun(runId: string, placement: HuntRunPlacement) {
       const { teamId } = requireBoard("이동할 이슈 처리 작업이 없습니다.");
-      const endMutation = beginIssueMutation(registry, {
-        kind: "recovering",
-        runId,
-      });
-      registry.set(recoveryErrorAtom, null);
-      try {
+      return recover(runId, async () => {
         if (demoMode) {
           const occurredAt = new Date().toISOString();
           applyRunPatch(registry, runId, (run) => {
@@ -1494,12 +1410,7 @@ export function createIssueActions(
         const token = requireToken();
         await api.moveHuntRun(token, teamId, runId, placement);
         await refresh();
-      } catch (caught) {
-        registry.set(recoveryErrorAtom, messageOf(caught));
-        throw caught;
-      } finally {
-        endMutation();
-      }
+      });
     },
 
     async unassignRun(projectId: string, runId: string) {

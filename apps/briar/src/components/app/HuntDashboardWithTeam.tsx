@@ -6,7 +6,7 @@ import {
   deletingIssueIdAtom,
   isCreatingIssueAtom,
   recoveringRunIdAtom,
-  recoveryErrorAtom,
+  runRecoveryFailureAtom,
   updatingIssueIdAtom,
 } from "../../state/issues/atoms";
 import { planningProjectsAtom } from "../../state/planning/atoms";
@@ -79,7 +79,7 @@ export function HuntDashboardWithTeam(props: HuntDashboardWithTeamProps) {
   const updatingIssueId = useAtomValue(updatingIssueIdAtom);
   const deletingIssueId = useAtomValue(deletingIssueIdAtom);
   const recoveringRunId = useAtomValue(recoveringRunIdAtom);
-  const recoveryError = useAtomValue(recoveryErrorAtom);
+  const recoveryError = useAtomValue(runRecoveryFailureAtom);
   const issueActions = useIssueActions();
   const runDetailActions = useRunDetailActions();
 
