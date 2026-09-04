@@ -11,7 +11,7 @@ import { createTestRegistry, type AtomRegistry } from "../../state/registry";
 import { tokenAtom, userAtom } from "../../state/session/atoms";
 import { applySyncEvent } from "../../state/sync/apply";
 import { activeTeamIdAtom, teamsAtom } from "../../state/team/atoms";
-import { createReactTestRoot } from "../../test/react";
+import { createReactTestRoot, settle } from "../../test/react";
 import { createRenderCounter } from "../../test/render-count";
 import type {
   DashboardPayload,
@@ -115,9 +115,6 @@ describe("RunPageWithRun", () => {
   });
 
   it("follows its own run without re-rendering the shell", async () => {
-    // Warms the page's own code split chunk so the `Suspense` boundary below
-    // resolves within the test's act() flushes.
-    await import("../hunt/detail/RunPage");
     const registry = harness();
     const renders = createRenderCounter();
     const view = createReactTestRoot({ attachToDocument: true });
@@ -142,9 +139,10 @@ describe("RunPageWithRun", () => {
         </ToastProvider>
       </RegistryContext.Provider>,
     );
-    await act(async () => undefined);
-    await act(async () => undefined);
-    expect(renderedText(view.container)).toContain("열린 이슈");
+    await settle(
+      () => renderedText(view.container).includes("열린 이슈"),
+      { description: "the run page to come out of its lazy boundary" },
+    );
     renders.reset();
 
     await act(async () => {

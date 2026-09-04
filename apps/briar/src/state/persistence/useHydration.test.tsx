@@ -1,12 +1,11 @@
 /** @vitest-environment jsdom */
 
 import { RegistryContext } from "@effect/atom-react";
-import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type { ChannelSummary } from "../../lib/channels-contract";
 import { demoDashboard } from "../../lib/demo-data";
-import { createReactTestRoot, type ReactTestRoot } from "../../test/react";
+import { createReactTestRoot, flush, type ReactTestRoot } from "../../test/react";
 import type {
   DashboardDeltaPayload,
   DashboardPayload,
@@ -205,14 +204,6 @@ let view: ReactTestRoot;
 let registry: AtomRegistry;
 let store: MemorySnapshotStore;
 let server: BootServer;
-
-const flush = async (attempts = 6) => {
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
-  }
-};
 
 interface MountOptions {
   readonly record?: ClientSnapshot | null;

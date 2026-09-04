@@ -8,7 +8,7 @@ import { I18nProvider } from "../i18n";
 import { demoDashboard } from "../lib/demo-data";
 import { createTestRegistry, type AtomRegistry } from "../state/registry";
 import { tokenAtom } from "../state/session/atoms";
-import { createReactTestRoot } from "../test/react";
+import { createReactTestRoot, flush } from "../test/react";
 import type { Project, ProjectAgent } from "../types";
 import { useIssueAgents, type IssueAgents } from "./useIssueAgents";
 
@@ -70,14 +70,6 @@ function Harness({
   latest = useIssueAgents({ activeTeam, deps: { loadTeamAgents: load } });
   return null;
 }
-
-const flush = async () => {
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
-  }
-};
 
 const mount = async (
   registry: AtomRegistry,

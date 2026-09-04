@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { vi } from "vitest";
 
 export interface ReactTestRoot {
   readonly container: HTMLDivElement;
@@ -55,4 +56,74 @@ export function createReactTestRoot({
     },
     unmount,
   };
+}
+
+/*
+  Waiting for work a render left behind.
+
+  A render can leave three kinds of work: React's own passive effects, a promise
+  an effect awaited, and the module a `lazy()` boundary asked for. The first two
+  settle within a few `act` turns. The third finishes when the module loader
+  does, which is disk- and CPU-bound, so it has no fixed cost in turns.
+
+  That is why counting turns makes a wait whose budget depends on how busy the
+  machine is: the same test passes on an idle host and fails on a loaded one.
+  `settle` counts wall-clock instead, so a loaded host is slow rather than red.
+  It also throws when the deadline passes — the bounded-turn helpers these
+  replace returned silently when the condition never held, so the test failed
+  further down on an unrelated assertion and said nothing about the real cause.
+
+  Prefer `settleLazy` over either one when the wait is specifically for a
+  `lazy()` chunk: it waits for the loader itself instead of guessing.
+*/
+
+/** Drains `attempts` macrotask turns, letting effects and their promises run. */
+export async function flush(attempts = 6): Promise<void> {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+  }
+}
+
+export interface SettleOptions {
+  /** Named in the timeout message, so a failure says what never happened. */
+  readonly description?: string;
+  readonly timeoutMs?: number;
+}
+
+/**
+ * Waits for every pending dynamic import, then lets React commit what the
+ * resolved `lazy()` boundaries render. Deterministic where a turn count is not.
+ */
+export async function settleLazy(): Promise<void> {
+  await act(async () => {
+    await vi.dynamicImportSettled();
+  });
+  await flush(1);
+}
+
+/**
+ * Settles pending imports and effects until `check` holds. Throws once
+ * `timeoutMs` of wall-clock passes, rather than returning and letting a later
+ * assertion report the confusion.
+ *
+ * Each pass waits on the module loader before draining a turn, so a caller
+ * waiting on content behind a `lazy()` boundary does not have to know that it
+ * is behind one.
+ */
+export async function settle(
+  check: () => boolean,
+  { description = "the condition to hold", timeoutMs = 10_000 }: SettleOptions = {},
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    if (check()) return;
+    if (Date.now() >= deadline) {
+      throw new Error(
+        `Timed out after ${timeoutMs}ms waiting for ${description}.`,
+      );
+    }
+    await settleLazy();
+  }
 }

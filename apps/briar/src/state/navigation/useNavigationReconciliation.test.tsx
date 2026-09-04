@@ -40,7 +40,7 @@ import {
   userAtom,
 } from "../session/atoms";
 import { activeTeamIdAtom, teamsAtom } from "../team/atoms";
-import { createReactTestRoot } from "../../test/react";
+import { createReactTestRoot, flush } from "../../test/react";
 import type { ChannelSummary } from "../../lib/channels-contract";
 import type { Organization, Project, SessionUser } from "../../types";
 import { createNavigationActions, type NavigationActions } from "./actions";
@@ -122,14 +122,6 @@ function Harness() {
   useNavigationReconciliation();
   return null;
 }
-
-const flush = async (attempts = 4) => {
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
-  }
-};
 
 const harness = (
   teams: Project[] = [teamA, teamB],

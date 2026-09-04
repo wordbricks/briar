@@ -117,7 +117,10 @@ export default defineConfig({
     exclude: [...configDefaults.exclude, "**/.claude/worktrees/**"],
     maxWorkers: resolveMaxWorkers(),
     setupFiles: ["./src/test/setup.ts"],
-    testTimeout: 15_000,
+    // Headroom for a loaded host, not for slow tests: a healthy case finishes
+    // in milliseconds, and `settle` fails with its own message at 10s. This
+    // ceiling only decides whether contention reads as a timeout or as a wait.
+    testTimeout: 30_000,
     env: {
       // api.ts reads this at module load; tests expect a configured Worker URL.
       VITE_BRIAR_API_URL: "http://127.0.0.1:8787",

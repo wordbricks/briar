@@ -12,7 +12,7 @@ import { createTestRegistry, type AtomRegistry } from "../../state/registry";
 import { tokenAtom, userAtom } from "../../state/session/atoms";
 import { applySyncEvent } from "../../state/sync/apply";
 import { activeChannelIdAtom } from "../../state/channels/atoms";
-import { createReactTestRoot } from "../../test/react";
+import { createReactTestRoot, flush } from "../../test/react";
 import { createRenderCounter } from "../../test/render-count";
 import type { Organization, SessionUser } from "../../types";
 import { ChannelsWithCatalog } from "./ChannelViews";
@@ -99,14 +99,6 @@ const harness = (): AtomRegistry => {
   });
   registry.set(activeChannelIdAtom, general.id);
   return registry;
-};
-
-const flush = async (attempts = 5) => {
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
-  }
 };
 
 beforeEach(() => {

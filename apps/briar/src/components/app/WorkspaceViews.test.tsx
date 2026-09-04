@@ -15,7 +15,7 @@ import {
   healthAtom,
   teamReadinessAtom,
 } from "../../state/workspace/atoms";
-import { createReactTestRoot, type ReactTestRoot } from "../../test/react";
+import { createReactTestRoot, flush, type ReactTestRoot } from "../../test/react";
 import { createRenderCounter } from "../../test/render-count";
 import type { DashboardPayload, Project, SessionUser } from "../../types";
 import {
@@ -71,13 +71,6 @@ const harness = () => {
 };
 
 /** Settles React's work and whatever promises it is waiting on. */
-const flush = async (attempts = 5) => {
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
-  }
-};
 
 /**
  * Waits for the `lazy()` boundaries these wrappers hold: a first paint waits on

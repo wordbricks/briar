@@ -13,7 +13,7 @@ import {
   userAtom,
 } from "../../state/session/atoms";
 import { teamsAtom } from "../../state/team/atoms";
-import { createReactTestRoot } from "../../test/react";
+import { createReactTestRoot, flush } from "../../test/react";
 import { createRenderCounter } from "../../test/render-count";
 import { applySyncEvent } from "../../state/sync/apply";
 import { activeTeamIdAtom } from "../../state/team/atoms";
@@ -85,14 +85,6 @@ function Shell() {
   renderCounter.useRenderCount("shell");
   return <div data-testid="shell">shell</div>;
 }
-
-const flush = async (attempts = 4) => {
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
-  }
-};
 
 const mount = async (
   registry: AtomRegistry,

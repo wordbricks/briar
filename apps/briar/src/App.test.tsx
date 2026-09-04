@@ -23,7 +23,7 @@ import {
 import { applySyncEvent } from "./state/sync/apply";
 import { teamSyncApiAtom } from "./state/sync/loader";
 import { activeTeamIdAtom, teamsAtom } from "./state/team/atoms";
-import { createReactTestRoot } from "./test/react";
+import { createReactTestRoot, settle, settleLazy } from "./test/react";
 import { createRenderCounter } from "./test/render-count";
 import type {
   DashboardPayload,
@@ -81,21 +81,6 @@ const payload: DashboardPayload = {
 const renderCounter = createRenderCounter();
 const TrackedApp = renderCounter.track("app", App);
 
-const flush = async (attempts = 6) => {
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
-  }
-};
-
-const settle = async (check: () => boolean) => {
-  for (let attempt = 0; attempt < 25; attempt += 1) {
-    if (check()) return;
-    await flush(1);
-  }
-};
-
 const harness = (): AtomRegistry => {
   const registry = createTestRegistry([
     [userAtom, user],
@@ -141,7 +126,7 @@ const mount = async (registry: AtomRegistry) => {
       </I18nProvider>
     </RegistryContext.Provider>,
   );
-  await flush();
+  await settleLazy();
   return view;
 };
 

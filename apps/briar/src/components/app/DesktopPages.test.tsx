@@ -26,7 +26,7 @@ import {
   teamsAtom,
 } from "../../state/team/atoms";
 import { healthAtom } from "../../state/workspace/atoms";
-import { createReactTestRoot } from "../../test/react";
+import { createReactTestRoot, settle } from "../../test/react";
 import {
   createRenderCounter,
   type RenderCounter,
@@ -134,21 +134,6 @@ const sidebarProps = {
   unreadInboxCount: 0,
 };
 
-const flush = async (attempts = 6) => {
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
-  }
-};
-
-const settle = async (check: () => boolean) => {
-  for (let attempt = 0; attempt < 25; attempt += 1) {
-    if (check()) return;
-    await flush(1);
-  }
-};
-
 const currentSidebarPages = (container: HTMLElement) =>
   [...container.querySelectorAll('[aria-current="page"]')].map(
     (element) => element.textContent?.trim() ?? "",
@@ -216,9 +201,6 @@ const mountInboxPage = async () => {
 beforeEach(async () => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   window.localStorage.setItem("briar.locale.v1", "en");
-  // The agents page is behind a `lazy()` boundary; importing it up front lets
-  // the visit below resolve inside an `act` flush.
-  await import("../TeamAgents");
 });
 
 describe("desktop page slot", () => {

@@ -19,7 +19,7 @@ import { createTestRegistry, type AtomRegistry } from "../../state/registry";
 import { tokenAtom, userAtom } from "../../state/session/atoms";
 import { applySyncEvent } from "../../state/sync/apply";
 import { activeTeamIdAtom, teamsAtom } from "../../state/team/atoms";
-import { createReactTestRoot } from "../../test/react";
+import { createReactTestRoot, flush, settle } from "../../test/react";
 import type {
   DashboardPayload,
   HuntRun,
@@ -80,21 +80,6 @@ const props: AppDialogsProps = {
     requireDeveloperAgent: false,
     startWithDeveloperTools: false,
   },
-};
-
-const flush = async (attempts = 6) => {
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
-  }
-};
-
-const settle = async (check: () => boolean) => {
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    if (check()) return;
-    await flush(1);
-  }
 };
 
 const mount = async (

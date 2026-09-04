@@ -24,7 +24,7 @@ import {
   connectedTeamIdsAtom,
   teamReadinessAtom,
 } from "../state/workspace/atoms";
-import { createReactTestRoot } from "../test/react";
+import { createReactTestRoot, flush } from "../test/react";
 import type { Project } from "../types";
 import { useRepositorySetup, type RepositorySetup } from "./useRepositorySetup";
 
@@ -51,14 +51,6 @@ function Harness() {
   latest = useRepositorySetup();
   return null;
 }
-
-const flush = async () => {
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
-  }
-};
 
 const mount = async (registry: AtomRegistry) => {
   const view = createReactTestRoot();

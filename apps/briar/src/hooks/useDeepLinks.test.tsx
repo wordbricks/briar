@@ -37,7 +37,7 @@ import {
   requestedRunMessageIdAtom,
   requestedSessionIdAtom,
 } from "../state/navigation/atoms";
-import { createReactTestRoot } from "../test/react";
+import { createReactTestRoot, flush } from "../test/react";
 import type { Organization, Project, SessionUser } from "../types";
 import { setInboxCallbacks } from "../state/inbox/actions";
 import {
@@ -149,14 +149,6 @@ const mount = async (registry: AtomRegistry, input: UseDeepLinksInput) => {
     </RegistryContext.Provider>,
   );
   return view;
-};
-
-const flush = async () => {
-  for (let attempt = 0; attempt < 5; attempt += 1) {
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
-  }
 };
 
 const harness = (
