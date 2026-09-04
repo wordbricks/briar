@@ -52,7 +52,6 @@ const payload: DashboardPayload = {
 };
 
 const props: DesktopShellProps = {
-  activeProject: team,
   agents: {
     activeTeamAgents: [],
     all: [],

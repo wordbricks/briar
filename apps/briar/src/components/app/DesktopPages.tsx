@@ -16,6 +16,7 @@ import {
 } from "./ChannelViews";
 import { HuntDashboardWithTeam } from "./HuntDashboardWithTeam";
 import { InboxDetailContent } from "./InboxDetailContent";
+import { KeepAliveSlot } from "./KeepAliveSlot";
 import {
   TeamAgentsWithDashboard,
   TeamLobbyWithDashboard,
@@ -87,6 +88,12 @@ import {
   requestedSessionIdAtom,
   settingsTargetAtom,
 } from "../../state/navigation/atoms";
+import {
+  desktopKeptPageAtom,
+  keptPageKey,
+  keptPageKeysAtom,
+  type KeptPage,
+} from "../../state/navigation/keep-alive";
 import { useOrganizationActions } from "../../state/organization/actions";
 import {
   activeOrganizationIdAtom,
@@ -100,6 +107,7 @@ import { tokenAtom, userAtom } from "../../state/session/atoms";
 import { useSyncActions } from "../../state/sync/actions";
 import { useTeamActions } from "../../state/team/actions";
 import {
+  activeTeamAtom,
   activeTeamIdAtom,
   deletingTeamIdAtom,
   loadedTeamIdAtom,
@@ -117,9 +125,7 @@ import type { InboxNotificationTarget } from "../../generated/tauri";
 import type { MyIssuesDashboardLoader } from "../../state/my-issues/useMyIssuesSync";
 import type {
   AgentUsageReport,
-  DashboardPayload,
   HuntRun,
-  Project,
   ProjectAgent,
 } from "../../types";
 
@@ -131,6 +137,14 @@ import type {
   chrome, the sidebar's callbacks, the status bar — subscribes to no navigation
   atom, so walking from one page to another commits this subtree and the sidebar
   and nothing else.
+
+  The chain below is in two halves. The heavy pages — the board and the
+  organization lists — are rendered by key into `KeepAliveSlot`s and stay in the
+  DOM after the user walks away from them, so walking back is a reveal rather
+  than a rebuild. Everything else is the `if`/`else` chain it always was and
+  unmounts on leave. `state/navigation/keep-alive.ts` decides which of the two a
+  page is, in the same order as this chain; the two must agree, and the page
+  test walks every page to say so.
 
   The lazy boundaries of the five pages only the desktop renders live here with
   them.
@@ -207,8 +221,6 @@ function InboxDetailPane({
 }
 
 export interface DesktopPagesProps {
-  /** The selected team, as the app resolved it for its hooks. */
-  readonly activeProject: Project | undefined;
   readonly agents: DesktopShellAgents;
   readonly repositorySetup: DesktopShellRepositorySetup;
   readonly loadUsageReport: () => Promise<AgentUsageReport>;
@@ -230,7 +242,6 @@ export interface DesktopPagesProps {
 }
 
 export function DesktopPages({
-  activeProject,
   agents,
   loadOrganizationProjectDashboard,
   loadProjectHomeMerges,
@@ -252,6 +263,8 @@ export function DesktopPages({
   const desktopActiveChannelId = useAtomValue(desktopActiveChannelIdAtom);
   const navigationProjectId = useAtomValue(navigationTeamIdAtom);
   const selectedRunId = useAtomValue(activeRunIdAtom);
+  const keptPage = useAtomValue(desktopKeptPageAtom);
+  const keptPageKeys = useAtomValue(keptPageKeysAtom);
   const {
     closeSettings,
     goBack,
@@ -278,6 +291,7 @@ export function DesktopPages({
   const token = useAtomValue(tokenAtom);
   const projects = useAtomValue(teamsAtom);
   const organizations = useAtomValue(organizationsAtom);
+  const activeProject = useAtomValue(activeTeamAtom) ?? undefined;
   const activeProjectId = useAtomValue(activeTeamIdAtom);
   const activeOrganizationId = useAtomValue(activeOrganizationIdAtom);
   const lockedTeamId = useAtomValue(lockedTeamIdAtom);
@@ -394,6 +408,225 @@ export function DesktopPages({
     />
   );
 
+  /*
+    The kept page on screen. Only this one is built: a hidden slot draws the
+    element it was last given while it was visible, so a board kept under
+    another team never redraws with this team's props.
+  */
+  const renderKeptPage = ({ kind, scopeId }: KeptPage): ReactNode => {
+    switch (kind) {
+      case "channels":
+        return (
+          <ChannelsWithCatalog
+            activeChannelId={desktopActiveChannelId}
+            onChannelFallback={(channelId) =>
+              handleDesktopChannelFallback(channelId, "channels")
+            }
+            onChannelSelect={(channelId) => {
+              if (channelId) navigateToChannel(channelId, "channels");
+              else {
+                selectChannel(null);
+                navigateToPage("channels");
+              }
+            }}
+            onSkillSessionAccepted={agentSessions.adoptRemoteSession}
+            onCreateAgent={() => {
+              setSettingsTarget({
+                scope: "organization",
+                organizationId: scopeId,
+                section: "agents",
+              });
+              setIsSidebarOpen(true);
+              navigateToPage("settings");
+            }}
+            onIssueCreated={async (projectId, runId) => {
+              await ensureTeamSelected(projectId);
+              setRequestedRunId(runId);
+              navigateToIssue(runId, projectId);
+            }}
+          />
+        );
+      case "dms":
+        return (
+          <DirectMessagesWithCatalog
+            activeChannelId={desktopActiveChannelId}
+            isSidebarOpen={isSidebarOpen}
+            onChannelFallback={(channelId) =>
+              handleDesktopChannelFallback(channelId, "dms")
+            }
+            onChannelSelect={(channelId) => {
+              if (channelId) navigateToChannel(channelId, "dms");
+              else {
+                selectChannel(null);
+                navigateToPage("dms");
+              }
+            }}
+            onCreateAgent={() => {
+              setSettingsTarget({
+                scope: "organization",
+                organizationId: scopeId,
+                section: "agents",
+              });
+              setIsSidebarOpen(true);
+              navigateToPage("settings");
+            }}
+            onIssueCreated={async (projectId, runId) => {
+              await ensureTeamSelected(projectId);
+              setRequestedRunId(runId);
+              navigateToIssue(runId, projectId);
+            }}
+            onSkillSessionAccepted={agentSessions.adoptRemoteSession}
+          />
+        );
+      case "inbox":
+        return (
+          <main
+            aria-label={`${t("inbox.title")} · ${t("inbox.messages")}`}
+            className={cn(
+              "inbox-layout grid min-h-0 min-w-0 flex-1 grid-cols-[minmax(280px,1fr)_var(--inbox-resizer-width,6px)_minmax(320px,var(--inbox-detail-pane-width,50%))] grid-rows-[minmax(0,1fr)] bg-card",
+              isResizingInbox &&
+                "is-resizing-inbox cursor-col-resize select-none",
+            )}
+            ref={inboxLayoutRef}
+          >
+            <InboxWithSelection
+              desktopEmbedded
+              isSidebarOpen={isSidebarOpen}
+              onOpen={(message) => {
+                const target = inboxNotificationTarget(message);
+                inbox.markRead(message.id);
+                if (target.projectId !== activeProjectId) {
+                  selectTeam(target.projectId);
+                }
+                if (isInboxChannelTarget(target)) {
+                  setRequestedRunId(null);
+                  setRequestedSessionId(null);
+                  setRequestedChannelMessage({
+                    channelId: target.targetId,
+                    messageId: target.channelMessageId,
+                    rootMessageId: target.rootMessageId,
+                  });
+                  selectChannel(target.targetId);
+                  markOrganizationChannelRead(target.targetId);
+                } else {
+                  setRequestedChannelMessage(null);
+                }
+                setInboxDetailTarget(target);
+              }}
+              projects={activeOrganizationProjects}
+            />
+            <div
+              aria-label={t("inbox.resizeDetailPane")}
+              aria-orientation="vertical"
+              aria-valuemax={inboxPaneWidthMax}
+              aria-valuemin={inboxPaneWidthMin}
+              aria-valuenow={inboxDetailPaneWidth}
+              className={cn(
+                "inbox-pane-resizer relative z-[1] h-full min-h-0 min-w-0 cursor-col-resize touch-none bg-transparent outline-none before:absolute before:bottom-0 before:left-1/2 before:top-0 before:w-px before:-translate-x-1/2 before:bg-border before:opacity-0 before:shadow-none before:transition-[opacity,background-color,box-shadow] before:duration-150 after:absolute after:left-1/2 after:top-1/2 after:h-[34px] after:w-[5px] after:-translate-x-1/2 after:-translate-y-1/2 after:rounded-full after:border after:border-border after:bg-card after:opacity-0 after:transition-[opacity,border-color,background-color] after:duration-150 motion-reduce:before:transition-none motion-reduce:after:transition-none hover:before:bg-primary/60 hover:before:opacity-100 hover:before:shadow-[0_0_0_1px_color-mix(in_srgb,var(--primary)_8%,transparent)] hover:after:border-primary/60 hover:after:bg-accent hover:after:opacity-100 focus-visible:before:bg-primary/60 focus-visible:before:opacity-100 focus-visible:before:shadow-[0_0_0_1px_color-mix(in_srgb,var(--primary)_8%,transparent)] focus-visible:after:border-primary/60 focus-visible:after:bg-accent focus-visible:after:opacity-100",
+                isResizingInbox &&
+                  "before:bg-primary/60 before:opacity-100 before:shadow-[0_0_0_1px_color-mix(in_srgb,var(--primary)_8%,transparent)] after:border-primary/60 after:bg-accent after:opacity-100",
+              )}
+              role="separator"
+              tabIndex={0}
+              {...inboxResizeProps}
+            />
+            <InboxDetailTargetBoundary>
+              {(target) => (
+                <InboxDetailPane target={target}>
+                  {target ? renderInboxDetailContent(target) : (
+                    <div
+                      className="inbox-detail-empty flex h-full w-full flex-col items-center justify-center gap-[18px] bg-card text-center text-muted-foreground [&>svg]:text-muted-foreground/60 [&>p]:m-0 [&>p]:text-sm"
+                      role="status"
+                    >
+                      <InboxIcon aria-hidden="true" size={56} strokeWidth={1.2} />
+                      <p>{t("inbox.noNotificationSelected")}</p>
+                    </div>
+                  )}
+                </InboxDetailPane>
+              )}
+            </InboxDetailTargetBoundary>
+          </main>
+        );
+      case "my-issues":
+        return (
+          <MyIssues
+            isSidebarOpen={isSidebarOpen}
+            loadProjectDashboard={loadOrganizationProjectDashboard}
+            onOpenIssue={openOrganizationIssue}
+            organizationId={scopeId}
+            organizationName={activeOrganization?.name}
+            projects={activeOrganizationProjects}
+          />
+        );
+      default:
+        return (
+          <HuntDashboardWithTeam
+            agents={activeProjectAgents}
+            conversationInboxSyncSignal={conversationInboxSyncSignal}
+            error={quickProcessError ?? error}
+            isIssueDialogOpen={isIssueDialogOpen}
+            createIssueDefaultProjectId={createIssueProjectId}
+            noProject={!activeProject}
+            requestedRunId={requestedRunId}
+            requestedRunMessageId={requestedRunMessageId}
+            requestedRunInitialTab={requestedRunInitialTab}
+            selectedRunId={selectedRunId}
+            issueListRequestKey={issueListRequestKey}
+            isSidebarOpen={isSidebarOpen}
+            onAddProject={startTeamCreation}
+            onIssueDialogOpenChange={(isOpen) => {
+              if (!isOpen) setCreateIssueProjectId(null);
+              setIsIssueDialogOpen(isOpen);
+            }}
+            onIssueViewed={inbox.markIssueRead}
+            onViewingIssueConversationChange={setViewingIssueConversationRunId}
+            onSelectedRunChange={(runId) => {
+              if (runId) navigateToIssue(runId);
+              else navigateToPage("issues");
+            }}
+            onDeleteIssue={async (runId) => {
+              await removeIssue(runId);
+              if (runId === selectedRunId && navigationProjectId) {
+                replaceNavigationLocation(
+                  projectNavigationLocation("issues", navigationProjectId),
+                );
+              }
+            }}
+            onTransferIssue={async (runId, targetProjectId) => {
+              await transferIssue(runId, targetProjectId);
+              if (runId === selectedRunId && navigationProjectId) {
+                replaceNavigationLocation(
+                  projectNavigationLocation("issues", navigationProjectId),
+                );
+              }
+            }}
+            onRelatedMessageOpen={(relatedMessage) => {
+              setPendingBriarLink({ kind: "channel", ...relatedMessage });
+            }}
+            onProcessIssueNow={processIssueNow}
+            onRequestedRunOpen={() => {
+              setRequestedRunId(null);
+              setRequestedRunMessageId(null);
+              setRequestedRunInitialTab(null);
+            }}
+            onSendIssueMessage={addIssueMessage}
+            projects={activeOrganizationProjects}
+          />
+        );
+    }
+  };
+
+  const activeKeptKey = keptPage === null ? null : keptPageKey(keptPage);
+  /*
+    The derivation already contains the key on screen; the union is a guard
+    against a page that is somehow not in its own history, whose cost is a stale
+    slot and whose alternative is a blank window.
+  */
+  const slotKeys =
+    activeKeptKey !== null && !keptPageKeys.includes(activeKeptKey)
+      ? [...keptPageKeys, activeKeptKey]
+      : keptPageKeys;
+
   return (
     <div className="app-content-surface">
     <Suspense fallback={null}>
@@ -402,6 +635,20 @@ export function DesktopPages({
       teamId={repositorySetupTeamId}
     />
     </Suspense>
+    {slotKeys.map((slotKey) => (
+      <KeepAliveSlot
+        key={slotKey}
+        pageKey={slotKey}
+        visible={slotKey === activeKeptKey}
+      >
+        <Suspense fallback={lazyViewFallback}>
+          {slotKey === activeKeptKey && keptPage !== null
+            ? renderKeptPage(keptPage)
+            : null}
+        </Suspense>
+      </KeepAliveSlot>
+    ))}
+    {activeKeptKey !== null ? null : (
     <Suspense fallback={lazyViewFallback}>
     {activePage === "organization-create" ? (
       <OrganizationCreate
@@ -442,40 +689,6 @@ export function DesktopPages({
       />
     ) : activePage === "dms" &&
       !lockedTeamId &&
-      activeOrganizationId &&
-      token ? (
-      <DirectMessagesWithCatalog
-        activeChannelId={desktopActiveChannelId}
-        isSidebarOpen={isSidebarOpen}
-        key={`desktop-dms:${activeOrganizationId}`}
-        onChannelFallback={(channelId) =>
-          handleDesktopChannelFallback(channelId, "dms")
-        }
-        onChannelSelect={(channelId) => {
-          if (channelId) navigateToChannel(channelId, "dms");
-          else {
-            selectChannel(null);
-            navigateToPage("dms");
-          }
-        }}
-        onCreateAgent={() => {
-          setSettingsTarget({
-            scope: "organization",
-            organizationId: activeOrganizationId!,
-            section: "agents",
-          });
-          setIsSidebarOpen(true);
-          navigateToPage("settings");
-        }}
-        onIssueCreated={async (projectId, runId) => {
-          await ensureTeamSelected(projectId);
-          setRequestedRunId(runId);
-          navigateToIssue(runId, projectId);
-        }}
-        onSkillSessionAccepted={agentSessions.adoptRemoteSession}
-      />
-    ) : activePage === "dms" &&
-      !lockedTeamId &&
       activeOrganizationId ? (
       <MainContent id="dms">
         <PageHeader title={t("sidebar.dms")} />
@@ -506,81 +719,6 @@ export function DesktopPages({
         teamId={activeProjectForTabs.id}
         teamName={activeProjectForTabs.name}
       />
-    ) : activePage === "my-issues" && activeOrganizationId ? (
-      <MyIssues
-        isSidebarOpen={isSidebarOpen}
-        loadProjectDashboard={loadOrganizationProjectDashboard}
-        onOpenIssue={openOrganizationIssue}
-        organizationId={activeOrganizationId}
-        organizationName={activeOrganization?.name}
-        projects={activeOrganizationProjects}
-      />
-    ) : activePage === "inbox" ? (
-      <main
-        aria-label={`${t("inbox.title")} · ${t("inbox.messages")}`}
-        className={cn(
-          "inbox-layout grid min-h-0 min-w-0 flex-1 grid-cols-[minmax(280px,1fr)_var(--inbox-resizer-width,6px)_minmax(320px,var(--inbox-detail-pane-width,50%))] grid-rows-[minmax(0,1fr)] bg-card",
-          isResizingInbox && "is-resizing-inbox cursor-col-resize select-none",
-        )}
-        ref={inboxLayoutRef}
-      >
-        <InboxWithSelection
-          desktopEmbedded
-          isSidebarOpen={isSidebarOpen}
-          onOpen={(message) => {
-            const target = inboxNotificationTarget(message);
-            inbox.markRead(message.id);
-            if (target.projectId !== activeProjectId) {
-              selectTeam(target.projectId);
-            }
-            if (isInboxChannelTarget(target)) {
-              setRequestedRunId(null);
-              setRequestedSessionId(null);
-              setRequestedChannelMessage({
-                channelId: target.targetId,
-                messageId: target.channelMessageId,
-                rootMessageId: target.rootMessageId,
-              });
-              selectChannel(target.targetId);
-              markOrganizationChannelRead(target.targetId);
-            } else {
-              setRequestedChannelMessage(null);
-            }
-            setInboxDetailTarget(target);
-          }}
-          projects={activeOrganizationProjects}
-        />
-        <div
-          aria-label={t("inbox.resizeDetailPane")}
-          aria-orientation="vertical"
-          aria-valuemax={inboxPaneWidthMax}
-          aria-valuemin={inboxPaneWidthMin}
-          aria-valuenow={inboxDetailPaneWidth}
-          className={cn(
-            "inbox-pane-resizer relative z-[1] h-full min-h-0 min-w-0 cursor-col-resize touch-none bg-transparent outline-none before:absolute before:bottom-0 before:left-1/2 before:top-0 before:w-px before:-translate-x-1/2 before:bg-border before:opacity-0 before:shadow-none before:transition-[opacity,background-color,box-shadow] before:duration-150 after:absolute after:left-1/2 after:top-1/2 after:h-[34px] after:w-[5px] after:-translate-x-1/2 after:-translate-y-1/2 after:rounded-full after:border after:border-border after:bg-card after:opacity-0 after:transition-[opacity,border-color,background-color] after:duration-150 motion-reduce:before:transition-none motion-reduce:after:transition-none hover:before:bg-primary/60 hover:before:opacity-100 hover:before:shadow-[0_0_0_1px_color-mix(in_srgb,var(--primary)_8%,transparent)] hover:after:border-primary/60 hover:after:bg-accent hover:after:opacity-100 focus-visible:before:bg-primary/60 focus-visible:before:opacity-100 focus-visible:before:shadow-[0_0_0_1px_color-mix(in_srgb,var(--primary)_8%,transparent)] focus-visible:after:border-primary/60 focus-visible:after:bg-accent focus-visible:after:opacity-100",
-            isResizingInbox &&
-              "before:bg-primary/60 before:opacity-100 before:shadow-[0_0_0_1px_color-mix(in_srgb,var(--primary)_8%,transparent)] after:border-primary/60 after:bg-accent after:opacity-100",
-          )}
-          role="separator"
-          tabIndex={0}
-          {...inboxResizeProps}
-        />
-        <InboxDetailTargetBoundary>
-          {(target) => (
-            <InboxDetailPane target={target}>
-              {target ? renderInboxDetailContent(target) : (
-                <div
-                  className="inbox-detail-empty flex h-full w-full flex-col items-center justify-center gap-[18px] bg-card text-center text-muted-foreground [&>svg]:text-muted-foreground/60 [&>p]:m-0 [&>p]:text-sm"
-                  role="status"
-                >
-                  <InboxIcon aria-hidden="true" size={56} strokeWidth={1.2} />
-                  <p>{t("inbox.noNotificationSelected")}</p>
-                </div>
-              )}
-            </InboxDetailPane>
-          )}
-        </InboxDetailTargetBoundary>
-      </main>
     ) : activePage === "settings" &&
       settingsTarget.scope === "project" &&
       activeProject ? (
@@ -671,94 +809,9 @@ export function DesktopPages({
         project={activeProject}
         token={token}
       />
-    ) : activePage === "channels" &&
-      activeOrganizationId &&
-      token ? (
-      <ChannelsWithCatalog
-        activeChannelId={desktopActiveChannelId}
-        key={`desktop-channels:${activeOrganizationId}`}
-        onChannelFallback={(channelId) =>
-          handleDesktopChannelFallback(channelId, "channels")
-        }
-        onChannelSelect={(channelId) => {
-          if (channelId) navigateToChannel(channelId, "channels");
-          else {
-            selectChannel(null);
-            navigateToPage("channels");
-          }
-        }}
-        onSkillSessionAccepted={agentSessions.adoptRemoteSession}
-        onCreateAgent={() => {
-          setSettingsTarget({
-            scope: "organization",
-            organizationId: activeOrganizationId!,
-            section: "agents",
-          });
-          setIsSidebarOpen(true);
-          navigateToPage("settings");
-        }}
-        onIssueCreated={async (projectId, runId) => {
-          await ensureTeamSelected(projectId);
-          setRequestedRunId(runId);
-          navigateToIssue(runId, projectId);
-        }}
-      />
-
-    ) : (
-      <HuntDashboardWithTeam
-        agents={activeProjectAgents}
-        conversationInboxSyncSignal={conversationInboxSyncSignal}
-        error={quickProcessError ?? error}
-        isIssueDialogOpen={isIssueDialogOpen}
-        createIssueDefaultProjectId={createIssueProjectId}
-        noProject={!activeProject}
-        requestedRunId={requestedRunId}
-        requestedRunMessageId={requestedRunMessageId}
-        requestedRunInitialTab={requestedRunInitialTab}
-        selectedRunId={selectedRunId}
-        issueListRequestKey={issueListRequestKey}
-        isSidebarOpen={isSidebarOpen}
-        onAddProject={startTeamCreation}
-        onIssueDialogOpenChange={(isOpen) => {
-          if (!isOpen) setCreateIssueProjectId(null);
-          setIsIssueDialogOpen(isOpen);
-        }}
-        onIssueViewed={inbox.markIssueRead}
-        onViewingIssueConversationChange={setViewingIssueConversationRunId}
-        onSelectedRunChange={(runId) => {
-          if (runId) navigateToIssue(runId);
-          else navigateToPage("issues");
-        }}
-        onDeleteIssue={async (runId) => {
-          await removeIssue(runId);
-          if (runId === selectedRunId && navigationProjectId) {
-            replaceNavigationLocation(
-              projectNavigationLocation("issues", navigationProjectId),
-            );
-          }
-        }}
-        onTransferIssue={async (runId, targetProjectId) => {
-          await transferIssue(runId, targetProjectId);
-          if (runId === selectedRunId && navigationProjectId) {
-            replaceNavigationLocation(
-              projectNavigationLocation("issues", navigationProjectId),
-            );
-          }
-        }}
-        onRelatedMessageOpen={(relatedMessage) => {
-          setPendingBriarLink({ kind: "channel", ...relatedMessage });
-        }}
-        onProcessIssueNow={processIssueNow}
-        onRequestedRunOpen={() => {
-          setRequestedRunId(null);
-          setRequestedRunMessageId(null);
-          setRequestedRunInitialTab(null);
-        }}
-        onSendIssueMessage={addIssueMessage}
-        projects={activeOrganizationProjects}
-      />
-      )}
+    ) : null}
     </Suspense>
+    )}
     </div>
   );
 }
