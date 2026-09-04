@@ -115,7 +115,7 @@ import type { createCachedTeamUsageSummaryLoader } from "../../lib/team-usage-su
 import type { AgentAutoHuntOptions } from "../../hooks/useAgentDispatch";
 import type { TeamMergeActivityLoader } from "../../lib/team-merge-activity";
 import type { InboxNotificationTarget } from "../../generated/tauri";
-import type { MyIssuesTeamBoard } from "../MyIssues";
+import type { MyIssuesDashboardLoader } from "../../state/my-issues/useMyIssuesSync";
 import type {
   AgentUsageReport,
   DashboardPayload,
@@ -217,10 +217,7 @@ export interface DesktopPagesProps {
     typeof createCachedTeamUsageSummaryLoader
   >;
   readonly loadProjectHomeMerges: TeamMergeActivityLoader;
-  readonly loadOrganizationProjectDashboard: (
-    teamId: string,
-    signal: AbortSignal,
-  ) => Promise<MyIssuesTeamBoard | null>;
+  readonly loadOrganizationProjectDashboard: MyIssuesDashboardLoader;
   readonly openOrganizationIssue: (teamId: string, runId: string) => void;
   readonly startAgentAutoHunt: (
     agent: ProjectAgent,
@@ -515,7 +512,6 @@ export function DesktopPages({
       />
     ) : activePage === "my-issues" && activeOrganizationId ? (
       <MyIssues
-        currentUserId={user?.id ?? null}
         isSidebarOpen={isSidebarOpen}
         loadProjectDashboard={loadOrganizationProjectDashboard}
         onOpenIssue={openOrganizationIssue}

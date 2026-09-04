@@ -9,7 +9,7 @@ import {
   loadProjectUsageSummary,
 } from "../lib/api";
 import { createCachedTeamUsageSummaryLoader } from "../lib/team-usage-summary";
-import type { MyIssuesTeamBoard } from "../components/MyIssues";
+import type { MyIssuesDashboardLoader } from "../state/my-issues/useMyIssuesSync";
 import type { AgentUsageReport } from "../types";
 import { useNavigationActions } from "../state/navigation/actions";
 import {
@@ -23,14 +23,7 @@ import { activeOrganizationIdAtom } from "../state/organization/atoms";
 import { useRegistry } from "../state/registry";
 import { tokenAtom } from "../state/session/atoms";
 import { useTeamActions } from "../state/team/actions";
-import { teamMembersAtom } from "../state/entities/members";
-import { teamRunsAtom } from "../state/entities/runs";
-import { teamEntityAtom } from "../state/entities/teams";
-import {
-  activeTeamIdAtom,
-  loadedTeamIdAtom,
-  teamSettingsAtom,
-} from "../state/team/atoms";
+import { activeTeamIdAtom, loadedTeamIdAtom } from "../state/team/atoms";
 
 /*
   The reads the organization-wide views make, and the one navigation they need.
@@ -49,11 +42,11 @@ export interface OrganizationViewData {
   readonly loadTeamHomeUsage: ReturnType<
     typeof createCachedTeamUsageSummaryLoader
   >;
-  /** Another team's board, without selecting it. */
-  readonly loadOrganizationTeamDashboard: (
-    teamId: string,
-    signal: AbortSignal,
-  ) => Promise<MyIssuesTeamBoard | null>;
+  /**
+   * Another team's board, without selecting it. `null` means "there is nothing
+   * to apply" — the store already holds this team, or there is no session.
+   */
+  readonly loadOrganizationTeamDashboard: MyIssuesDashboardLoader;
   /** Selects the issue's team if needed, then opens the issue. */
   readonly openOrganizationIssue: (teamId: string, runId: string) => void;
 }
@@ -99,26 +92,15 @@ export function useOrganizationViewData(): OrganizationViewData {
   const loadOrganizationTeamDashboard = useCallback(
     (teamId: string, signal: AbortSignal) => {
       /*
-        The team on screen is already in the store, down to the four
-        projections this page reads, so it is answered from there rather than
-        fetched again — which is also what keeps demo mode, where there is no
-        server to ask, showing its own board here. Everything else is a
-        `loadDashboard` response, read at call time from the registry the way
-        the render phase ref assignment this replaced was working around.
+        The team on screen is already in the store, so there is nothing to
+        apply for it — which is also what keeps demo mode, where there is no
+        server to ask, showing its own board on the organization pages.
+        Everything else is a `loadDashboard` response, which the caller applies
+        through `applySyncEvent`; the check reads the registry at call time, the
+        way the render phase ref assignment this replaced was working around.
       */
-      const settings =
-        registry.get(loadedTeamIdAtom) === teamId
-          ? registry.get(teamSettingsAtom(teamId))
-          : null;
-      const team = settings ? registry.get(teamEntityAtom(teamId)) : null;
-      const runs = team ? registry.get(teamRunsAtom(teamId)) : null;
-      if (settings && team && runs) {
-        return Promise.resolve({
-          team,
-          settings,
-          runs,
-          members: registry.get(teamMembersAtom(teamId)) ?? undefined,
-        });
+      if (registry.get(loadedTeamIdAtom) === teamId) {
+        return Promise.resolve(null);
       }
       if (!token) return Promise.resolve(null);
       return loadDashboard(token, teamId, signal);

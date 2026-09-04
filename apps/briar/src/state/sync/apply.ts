@@ -47,7 +47,11 @@ import {
   teamMembersAtom,
 } from "../entities/members";
 import { teamOrganizationProvidersAtom } from "../entities/providers";
-import { retainedTeamIdsAtom, touchRetainedTeam } from "../entities/retention";
+import {
+  pinnedTeamIdsAtom,
+  retainedTeamIdsAtom,
+  touchRetainedTeam,
+} from "../entities/retention";
 import { runsByIdAtom, teamRunIdsAtom, teamRunsAtom } from "../entities/runs";
 import { teamEntityAtom, teamsByIdAtom } from "../entities/teams";
 import {
@@ -192,21 +196,21 @@ const syncCursorOf = (cursor: number | undefined) =>
 /**
  * Marks `teamId` as the most recently synced team and drops whatever that
  * pushes past the retention limit. The active team is never evicted: unlike the
- * payload cache it replaces, dropping it would blank the screen.
+ * payload cache it replaces, dropping it would blank the screen. Neither are
+ * the teams a view has pinned, which is how "내 이슈" reads more teams at once
+ * than the LRU is sized for.
  */
 function touchTeam(registry: AtomRegistry, teamId: string) {
   const current = registry.get(retainedTeamIdsAtom);
-  const { retained, evicted } = touchRetainedTeam(current, teamId);
-  if (retained === current && evicted.length === 0) return;
   const activeTeamId = registry.get(activeTeamIdAtom);
-  const dropped = evicted.filter((candidate) => candidate !== activeTeamId);
-  registry.set(
-    retainedTeamIdsAtom,
-    dropped.length === evicted.length || activeTeamId === null
-      ? retained
-      : [activeTeamId, ...retained],
-  );
-  for (const candidate of dropped) clearTeamState(registry, candidate);
+  const protectedIds = new Set(registry.get(pinnedTeamIdsAtom));
+  if (activeTeamId !== null) protectedIds.add(activeTeamId);
+  const { retained, evicted } = touchRetainedTeam(current, teamId, {
+    protectedIds,
+  });
+  if (retained === current && evicted.length === 0) return;
+  registry.set(retainedTeamIdsAtom, retained);
+  for (const candidate of evicted) clearTeamState(registry, candidate);
 }
 
 /**

@@ -23,7 +23,10 @@ import {
 } from "../entities/channels";
 import { membersByIdAtom, teamMemberIdsAtom } from "../entities/members";
 import { teamOrganizationProvidersAtom } from "../entities/providers";
-import { retainedTeamIdsAtom } from "../entities/retention";
+import {
+  retainedTeamIdsAtom,
+  TEAM_RETENTION_LIMIT,
+} from "../entities/retention";
 import { runsByIdAtom, teamRunIdsAtom } from "../entities/runs";
 import { teamsByIdAtom } from "../entities/teams";
 import { teamWorkerIdsAtom, workersByIdAtom } from "../entities/workers";
@@ -267,9 +270,16 @@ export function collectSnapshot(registry: AtomRegistry): ClientSnapshot | null {
       .filter((team) => team.organizationId === organizationId)
       .map((team) => team.id),
   );
+  /*
+    The most recently synced teams, never more than the retention limit. The
+    retained list can hold more while a view has pinned teams across it ("내
+    이슈" reads every team of the organization), and those extra boards are a
+    live memory decision, not one to write to disk on every debounce.
+  */
   const teamIds = registry
     .get(retainedTeamIdsAtom)
-    .filter((teamId) => organizationTeamIds.has(teamId));
+    .filter((teamId) => organizationTeamIds.has(teamId))
+    .slice(-TEAM_RETENTION_LIMIT);
 
   const runIds = new Set<string>();
   const workerIds = new Set<string>();
