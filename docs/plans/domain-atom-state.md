@@ -1,6 +1,6 @@
 # 도메인 atom 상태 분리와 App / useBriar 모듈화
 
-Status: implemented. Updated 2026-09-04.
+Status: implemented. Updated 2026-09-05.
 
 기준 커밋 `66dd07b1`(분석 시점). 아래 줄 번호는 이 커밋 기준이며 두 파일 모두 변경이
 잦으므로, 각 단계 착수 시 심볼 이름으로 다시 찾는다.
@@ -549,23 +549,30 @@ workspace / workflow / integrations를 옮기며 확인한, 이후 단계에 영
 5. 모든 단계는 동작 변화 없이 독립 PR로 머지 가능해야 한다. 두 파일은 최근 두 달간
    각각 42회, 24회 커밋된 고변경 파일이므로 장기 브랜치를 피한다.
 
-비목표: 라우팅 방식 변경(뷰 언마운트 정책), `useInbox` / `useAutoHuntSessions` /
+비목표: 라우팅 방식 변경(뷰 언마운트 정책 — 후속 F10이 뒤집었다. 이 계획이 끝나야
+가능한 일이었으므로 비목표였던 것이 맞다), `useInbox` / `useAutoHuntSessions` /
 `useChannelConversation`의 전환(후속 F3 / F4 / F5가 전부 끝냈다), 서버 API 변경,
 오프라인 우선과 멀티 디바이스 충돌 해결.
 
 ## 결과
 
-계획대로 끝났다. 2026-09-04 기준 `main`의 숫자다.
+계획대로 끝났다. 2026-09-05 기준 `main`의 숫자다.
 
 - **`useBriar.ts`는 삭제되었다.** 기준 커밋에서 4,668줄이었고, `apps/briar/src`에
-  `useBriar` 참조와 `briar.` 멤버 접근이 0개다.
-- **`App.tsx`는 5,116줄 → 419줄이다.** 목표였던 "500줄 이하"를 지켰고, 남은 것은
+  `useBriar` 참조와 `briar.` 멤버 접근이 0개다(남은 것은 "그때 이랬다"를 적은 주석
+  뿐이다).
+- **`App.tsx`는 5,116줄 → 348줄이다.** 목표였던 "500줄 이하"를 지켰고, 남은 것은
   `AppEffects` + `AuthGate` + 셸 선택 + `AppDialogs` 조립이다.
-- **`apps/briar/src/state/`가 25개 도메인, 소스 95개와 테스트 64개다.** 엔티티 맵과
-  동기화 진입점, 도메인 액션, 부수효과 훅, 영속화가 전부 여기에 있다(후속 F3~F5-4가
-  에이전트 세션·인박스·채널 대화를 더한 뒤의 숫자다).
-- **PR 24개(#1581–#1605)로 나눠 머지했다.** 가장 긴 것도 하루 안에 머지 가능한
-  크기였고, 두 고변경 파일과의 충돌로 되돌린 PR은 없다.
+- **`apps/briar/src/state/`가 23개 도메인 디렉터리, 소스 101개와 테스트 70개다.**
+  엔티티 맵과 동기화 진입점, 도메인 액션, 부수효과 훅, 영속화, 액션 헬퍼, 그리고
+  keep-alive 정책이 전부 여기에 있다.
+- **PR 48개(#1581–#1672)로 나눠 머지했다.** 계획 본체가 24개(#1581–#1605),
+  후속 F1–F10이 24개다. 가장 긴 것도 하루 안에 머지 가능한 크기였고, 두 고변경
+  파일과의 충돌로 되돌린 PR은 없다.
+- **뷰가 이동에 살아남는다.** 무거운 다섯 페이지(보드·채널·DM·인박스·내 이슈)는
+  후속 F10 이후 `<Activity>` 슬롯 안에서 살아 있고, 보드로 돌아오는 것은 **같은 DOM
+  노드를 다시 보여 주는 일**이다 — 리팩터 전 같은 걸음은 그 자리에서 약 350개
+  엘리먼트를 버리고 다시 만들었다. 상태가 `state/`에 있어야만 가능한 거래다.
 - **렌더 카운트로 고정된 보장 8가지.** 5·6은 후속 F2가, 7·8은 후속 F5가 더했고, 그것은
   `renderCounter.profile`(React `Profiler`)로 센다 — 구독이 컴포넌트 안으로 밀어
   넣은 렌더는 `track`이 볼 수 없다.
@@ -596,6 +603,13 @@ workspace / workflow / integrations를 옮기며 확인한, 이후 단계에 영
   **행동하는** 것은 후속 F1이 갈라 두었다. 디스크에서 올라온 값으로 서버 작업을
   시작하는 effect는 `teamSyncedSinceBootAtom`이 설 때까지 기다리므로, 하이드레이션된
   "pending" 워크플로 때문에 LLM 자동 생성이 한 번 더 도는 문제는 남아 있지 않다.
+- **살아 있는 페이지의 계약도 테스트가 고정한다.** 후속 F10이 더한 것들이다: 숨은
+  페이지는 키보드 명령을 받지 않고(스코프 등록이 layout effect이므로 `<Activity>`가
+  내린다), `display:none` + `inert`로 포커스에 잡히지 않으며, 위에서 프롭이 바뀌어도
+  0회 렌더하고, 스크롤 위치를 갖고 돌아온다. 살아 있는 집합은 화면 하나 + 최근 3개로
+  묶이고 조직 전환·로그아웃·고정 창 스코프 변경에서 통째로 비워진다
+  (`state/navigation/keep-alive.test.ts`, `components/app/KeepAliveSlot.test.tsx`,
+  `DesktopPages.test.tsx`, `CompanionShell.test.tsx`).
 
 ## 현재 구조 요약
 
@@ -1233,10 +1247,18 @@ Phase 2 이후 언제든 착수 가능하며 Phase 3–7과 병행할 수 있다
   `defineTaskActionFamily` / `runAction` / `runTask` / `useAction`)를 두고 이슈
   변이 13종, 팀 삭제, 채널 대화 쓰기 다섯을 옮겼다. 남은 것은 요청 상태가 **아닌**
   것들이다(아래 기준 갱신에 목록과 이유).
+- **뷰 keep-alive 라우팅은 후속 F10이 했다.** 계획의 비목표였던 것이 마지막에
+  가능해졌다 — 데이터가 뷰 밖에 있으니 언마운트가 더 이상 "낡은 대시보드를 잊는"
+  방법이 아니고, 뷰를 살려 두는 값이 DOM과 effect뿐이 되었기 때문이다. 정책은
+  `state/navigation/keep-alive.ts`, 메커니즘은 `components/app/KeepAliveSlot.tsx`,
+  적용은 데스크톱과 컴패니언 두 셸이다.
 - 오프라인 우선과 멀티 디바이스 충돌 해결이 목표가 되면 서버 측 SyncAction 로그를
   가진 전용 sync engine(Replicache, Zero 등)을 검토한다. 그 전까지는 이 계획으로
   충분하다.
-- 뷰 keep-alive 라우팅.
+- 남은 것은 사람이 직접 봐야 하는 확인뿐이다: 후속 F8이 화면 제어 권한 거부로
+  미검증으로 남긴 데스크톱 트레이 네 가지(콜드 부팅 트레이, 트레이 클릭 딥링크,
+  트레이 로케일 relabel, 앱 메뉴 설정)와, 데모에서 `token` 게이트 때문에 열리지 않아
+  확인하지 못한 컴패니언 DM·채널 페이지다.
 
 ## 실행 기록
 
@@ -1277,6 +1299,8 @@ Phase 2 이후 언제든 착수 가능하며 Phase 3–7과 병행할 수 있다
 | F9-1 `Atom.fn` 액션 헬퍼와 이슈 변이 | #1667 | 머지됨 | `state/actions.ts`가 이 저장소의 쓰기 흐름이 요청 상태를 선언하는 자리다. `defineAction(label, body, options?)`은 `Atom.fn` 위의 `AtomResultFn<Arg, A, Error>`이고, 본문은 `(arg, { registry }) => Promise<A>` — `registry`는 **읽기 전용 이음매**다(atom 그래프로 읽으면 액션이 자기가 읽은 것에 구독된다). `defineActionFamily`는 키별, `runAction` / `useAction`은 레지스트리 코드와 컴포넌트에서의 실행이다. 일이 `createXxxActions(registry, deps)` 안에서 주입된 api·데모 플래그를 닫고 있어 모듈 스코프에 적을 수 없는 흐름은 `defineTaskAction` / `runTask`가 받는다: atom이 상태 기계를, 팩터리가 호출을 갖고, 대상 id가 인자와 함께 실려 `pendingTarget`이 파생된다. **이슈**: `pendingIssueMutationAtom` / `beginIssueMutation` / `recoveryErrorAtom`이 사라지고 유니온의 네 갈래가 네 태스크 액션(`createIssueAction` / `updateIssueAction` / `deleteIssueAction` / `recoverRunAction`)이 됐다. 뷰가 읽던 네 플래그는 이름과 모양 그대로 파생이고 복구 실패는 `runRecoveryFailureAtom`이다. 13개 액션이 팩터리의 `mutate` / `recover`를 통과하며 복구 계열은 `try/catch`가 통째로 없어졌다. 런별 `runIsUpdatingAtom(runId)` / `runIsDeletingAtom` / `runIsRecoveringAtom`을 더하고 `RunPageWithRun`이 그것을 구독한다(`RunPageWithRun.test.tsx`가 "다른 런의 수정 → 이 페이지 0회"를 `profile`로 고정). |
 | F9-2 팀 삭제와 채널 대화 쓰기 플래그 | #1668 | 머지됨 | `deletingTeamIdAtom`은 `deleteTeamAction.pendingTarget`이 되고 `removeProject`가 workspace의 `mutate`를 통과한다. 채널 대화는 채널별 태스크 액션 다섯(`channelSendAction` / `channelDeleteMessageAction` / `channelAcceptProposalAction` / `channelDeclineProposalAction` / `channelThreadSubscriptionAction`)을 얻고 플래그 넷이 파생이 됐다: `busy`는 앞의 네 액션의 `isWaiting` OR, 승인·거절 id는 각 `pendingTarget`, 스레드 구독 대기는 그 액션의 `isWaiting`(본문의 "이미 도는 중이면 무시" 가드가 그 파생을 읽는다). 전송과 메시지 삭제만 `concurrent: true`다. 다섯 액션의 `finally`와, `resetChannelConversationViewState` / `clearPendingFlags`의 중복 클리어가 사라졌다. `defineTaskActionFamily`(강한 `Map`)를 헬퍼에 더했고, F5-4 이후 아무도 읽지 않던 `channelConversationLoadingAtom`을 지웠다. |
 | F9-3 계획 문서 | #1669 | 머지됨 | 이 문서의 F9 기준 갱신과 "후속" 항목 갱신. |
+| F10-1 데스크톱 페이지 keep-alive 슬롯 | #1671 | 머지됨 | 계획의 비목표였던 "뷰 언마운트 정책"을 마지막에 뒤집었다. **정책**은 `state/navigation/keep-alive.ts`: 무엇을 살릴지(`KeepAlivePageKind` 다섯 — 보드·채널·DM·인박스·내 이슈), 몇 개나(`KEPT_PAGE_LIMIT` 3 + 화면의 하나), 무엇이 전체를 무효화하는지(계정 · 조직 · 고정 창의 팀). 전부 파생 atom이라 렌더 없이 단언된다. `keptPageKeysAtom`은 `get.self()`로 자기 이전 값을 읽는 LRU이고, `pageVisibleAtom(key)`은 페이지 안쪽에서 "지금 보이는가"를 묻는 자리다. 스코프는 키에 들어간다 — 보드는 팀별, 나머지는 조직별. **메커니즘**은 `components/app/KeepAliveSlot.tsx`: React 19.2의 `<Activity>` + 숨은 동안 프롭을 얼리는 것 + 스크롤 기록·복원, 그리고 `display:contents` 래퍼. `DesktopPages`는 무거운 다섯을 키로 슬롯에 렌더하고 나머지 아홉 갈래는 원래의 체인 그대로 언마운트한다. `DesktopPagesProps.activeProject`를 지워 체인과 정책이 같은 atom(`activeTeamAtom`)을 본다. 측정: `issues → agents → issues`가 전에는 커밋 8회에 보드 루트가 **다른 노드**(약 356 엘리먼트 재생성), 지금은 복귀 구간 2회 · 왕복 5회에 **같은 노드**. |
+| F10-2 컴패니언 keep-alive와 계획 문서 | #1672 | 머지됨 | 같은 슬롯을 폰 셸에 적용했다. 살아 있는 것은 태스크 보드 · Home 채널 목록 · 인박스 · DM 넷이고, 설정 · 팀 로비 · 열린 에이전트 세션은 체인의 갈래로 남아 언마운트한다. 하단 바가 엄지 하나 거리의 네 목적지라 이 셸에서 가장 자주 치르는 전환 비용이 바로 탭당 언마운트였다. `CompanionShellProps.activeTeam`도 지웠다. 두 셸 모두 자기 리졸버가 아니라 `activeKeptPageAtom`을 읽는다 — 셸이 그리는 페이지와 그 아래 히스토리가 서로 다른 것을 가리킬 수 없게 하는 유일한 방법이고, `activeShellAtom`이 어느 리졸버인지를 고른다(`companionMode` 상수에서 오고, 테스트만 바꾼다). 이 문서의 결과·후속·기준 갱신. |
 
 ### 기준 갱신 (2026-09-04, 후속 F3 이후)
 
@@ -1543,3 +1567,62 @@ Phase 2 이후 언제든 착수 가능하며 Phase 3–7과 병행할 수 있다
   `lazy()` 청크가 늦게 도착한 커밋도 세므로, 부하가 걸린 머신에서는 "0회" 단언이
   깜빡인다. 세기 전에 **카운터가 한 턴 동안 0으로 남을 때까지** 기다리는 루프를
   두면 그 뒤의 숫자는 "이 쓰기가 만든 것"이 된다.
+
+### 기준 갱신 (2026-09-05, 후속 F10 이후)
+
+뷰를 이동에 살려 두며 확인한, 이 저장소에서 앞으로도 쓸 사실이다.
+
+- **`<Activity>`가 keep-alive를 안전하게 만드는 것은 상태를 지켜서가 아니라
+  effect를 버려서다.** 숨은 서브트리는 DOM과 `useState`를 지키고 layout effect와
+  passive effect를 **내린다**. 그래서 "이 effect를 가시성으로 게이트한다"를 페이지
+  마다 배선할 필요가 없다 — 키보드 스코프 등록(layout effect), atom 구독
+  (`useSyncExternalStore`), 타이머, 리스너가 전부 언마운트와 같은 길로 사라지고
+  복귀할 때 다시 선다. 반대로 **effect가 다시 도는 것은 계약이다**: 살아 있는
+  페이지는 "마운트가 한 번"이 아니라 "인스턴스가 하나"이고, 마운트 횟수를 세는
+  테스트는 `useState`의 lazy 초기화를 세야 한다.
+- **`<Activity mode="hidden">`은 렌더를 막지 않는다.** 부모가 렌더하면 숨은 자식도
+  렌더한다. 살아 있는 페이지가 다른 팀의 프롭으로 조용히 다시 그려지는 것을 막는
+  것은 슬롯이 **마지막으로 보였을 때 받은 엘리먼트를 얼려 두는 것**이고, 그것이
+  듣는 이유는 React가 `oldProps === newProps`인 서브트리를 통째로 건너뛰기
+  때문이다. keep-alive에서 "무엇을 그릴지"와 "무엇을 그리지 않을지"는 둘 다 슬롯의
+  일이다.
+- **숨기기는 스크롤을 지운다.** `display:none`은 레이아웃 박스를 없애고 그 안의
+  스크롤 오프셋도 같이 없앤다. 숨겨진 **뒤에** 읽어서 저장할 방법은 없다 — 커밋의
+  mutation 단계가 layout effect보다 먼저 돌기 때문이다. 답은 **일어나는 대로
+  기록**하는 것이다: 슬롯 위의 캡처 리스너 하나가 서브트리의 모든 스크롤러를 듣고
+  (`scroll`은 버블하지 않지만 캡처는 된다), 복귀 시 `Element` 키 맵을 되돌린다.
+  숨어 있는 동안 DOM 노드가 그대로이므로 키가 엘리먼트 자신이어도 된다.
+- **레이아웃을 건드리지 않는 래퍼는 `display:contents`다.** 슬롯이 DOM 핸들
+  (`inert`, 스크롤 캡처, 테스트 셀렉터)을 가지려면 노드가 필요한데, flex/grid
+  컨테이너의 직계 자식을 하나 더 끼우면 페이지의 `flex-1`이 엉킨다.
+  `display:contents`면 페이지가 그대로 셸의 직계 항목이고, React가 숨길 때 쓰는
+  인라인 `display:none`이 클래스를 이기며, 보일 때 인라인 값을 지우면 클래스가
+  돌아온다. `.app-content-surface`와 `.companion-shell` 아래에 자식 결합자
+  셀렉터가 없다는 것을 확인한 뒤에 쓸 수 있는 수법이다.
+- **파생 LRU는 다이아몬드에서 중간값을 기록한다.** "화면의 페이지"와 "그 페이지가
+  속한 스코프"를 각각 파생 atom으로 두면 조직 전환 한 번이 LRU에 **두 번** 도착하고,
+  그 사이의 값 — 옛 조직의 페이지를 새 조직의 스코프에 적은 것 — 이 히스토리에
+  남는다. 실제로 그렇게 깨졌다. 규칙은 **히스토리를 만드는 atom의 입력은 하나여야
+  하고, 그 하나는 내부적으로 일관되어야 한다**는 것이다: 같은 뿌리 위에서 둘을 한
+  번에 푸는 atom을 두고 LRU는 그것만 읽는다.
+- **`get.self()`가 파생을 상태로 만든다.** `Atom.make`의 읽기 함수는 자기 이전
+  값을 `Option`으로 볼 수 있으므로, "방문을 기록하는" 쓰기 없이도 LRU가 파생으로
+  성립한다 — 화면의 페이지를 **읽는 것**이 방문을 기록하는 것이 된다. 대가는
+  `Atom.keepAlive`가 선택이 아니라는 것(이전 값이 곧 노드의 수명이다)과, 구독자가
+  없는 동안의 변화는 합쳐진다는 것이다. 후자는 문제가 되지 않는다 — 이 atom을 읽지
+  않는 순간은 그것을 그리는 셸이 없는 순간이다.
+- **"이 페이지가 사라졌다"는 단언은 `textContent`로 쓸 수 없게 됐다.**
+  `textContent`는 숨은 슬롯도 읽으므로, 살아 있는 페이지가 있는 트리에서는
+  `test/react.tsx`의 `visibleText`(숨은 슬롯을 지운 복제본)를 쓴다. 그 함수가
+  `[data-page-slot][inert]`를 고르는 것 자체가 "숨은 것은 읽히지도 포커스되지도
+  않는다"를 두 번 적는 셈이기도 하다.
+- **전환 비용은 커밋 수가 아니라 노드 아이덴티티로 재야 한다.** `profile`이 세는
+  커밋 수는 React가 배치하는 방식과 머신 부하에 따라 흔들린다(같은 걸음이 한가한
+  머신에서 5, 바쁜 머신에서 7이었다). 흔들리지 않는 것은 **복귀 후의 루트 노드가
+  같은 인스턴스인가**이고, 그것이 곧 "약 350개 엘리먼트를 다시 만들지 않았다"이다.
+  커밋 수를 단언할 때는 걸음을 반으로 갈라 **복귀 구간만** 세고, 그 앞에서 카운터가
+  잠잠해질 때까지 기다린다.
+- **키의 스코프는 화면이 실제로 무엇으로 갈라지는지를 따른다.** 채널 페이지를 채널
+  id로 키잉하고 싶어지지만, 채널 뷰는 이미 "조직당 하나, 채널은 프롭으로 전환"이다.
+  채널 id로 키잉하면 열어 본 채널마다 살아 있는 DOM 트리가 생기고 그중 화면에 있는
+  것은 없다. 컴포넌트가 이미 갖고 있는 `key`가 무엇인지가 답을 알려 준다.
