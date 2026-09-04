@@ -75,7 +75,11 @@ import {
   renderedTeamSettingsAtom,
   teamsAtom,
 } from "../team/atoms";
-import { beginIssueMutation, recoveryErrorAtom } from "./atoms";
+import {
+  beginIssueMutation,
+  pendingIssueMutationAtom,
+  recoveryErrorAtom,
+} from "./atoms";
 
 /*
   Every user triggered write to an issue or a run.
@@ -275,6 +279,9 @@ export function createIssueActions(
 
   return {
     async addIssue(projectId: string, input: CreateIssueInput) {
+      if (registry.get(pendingIssueMutationAtom)?.kind === "creating") {
+        throw new Error("이슈 생성이 이미 진행 중입니다.");
+      }
       const planningProjects = registry.get(planningProjectsAtom);
       const planningProject = planningProjects.find(
         (candidate) => candidate.id === projectId,
@@ -286,6 +293,8 @@ export function createIssueActions(
       if (!project || (!demoMode && !planningProject)) {
         throw new Error("이슈를 추가할 프로젝트가 없습니다.");
       }
+      const clientIssueId =
+        input.clientIssueId ?? crypto.randomUUID().toLowerCase();
       const endMutation = beginIssueMutation(registry, { kind: "creating" });
       setError(null);
       try {
@@ -443,7 +452,7 @@ export function createIssueActions(
         const result = await api.createIssue(
           token,
           { teamId, planningProjectId: planningProject.id },
-          input,
+          { ...input, clientIssueId },
         );
         if (teamId === registry.get(activeTeamIdAtom)) {
           await refresh();
