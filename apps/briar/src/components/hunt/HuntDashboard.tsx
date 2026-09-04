@@ -36,7 +36,7 @@ import { KanbanCard } from "./board/KanbanCard";
 import { KanbanColumnMenu } from "./board/KanbanColumnMenu";
 import { CreateIssueDialog } from "./editor/CreateIssueDialog";
 import { EditIssueDialog } from "./editor/EditIssueDialog";
-import { DashboardView, IssuePropertyFilters, SourceFilter, StatusFilter, emptyIssuePropertyFilters, runMatchesIssuePropertyFilters } from "./model/filters";
+import { DashboardView, IssuePropertyFilters, SourceFilter, StatusFilter, emptyIssuePropertyFilters, runMatchesIssuePropertyFilters } from "@/state/board/filters";
 import { localizeWorkflowStage } from "./model/formatters";
 import { KanbanColumn, KanbanPointerDrag, kanbanAutoScrollEdge, kanbanAutoScrollInterval, kanbanColumnForRun, kanbanPointerDragThreshold, placementMatchesRun } from "./model/kanban";
 // The issue detail page pulls the whole markdown rendering stack, so it loads

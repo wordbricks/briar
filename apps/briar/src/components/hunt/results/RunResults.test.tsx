@@ -15,7 +15,7 @@ import { IssueAgentActivityPanel } from "@/components/hunt/detail/IssueAgentActi
 import { RunPage } from "@/components/hunt/detail/RunPage";
 import { CreateIssueDialog } from "@/components/hunt/editor/CreateIssueDialog";
 import { EditIssueDialog } from "@/components/hunt/editor/EditIssueDialog";
-import { runMatchesIssuePropertyFilters, type IssuePropertyFilters } from "@/components/hunt/model/filters";
+import { runMatchesIssuePropertyFilters, type IssuePropertyFilters } from "@/state/board/filters";
 import { ToastProvider } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 const dashboardProps = {
