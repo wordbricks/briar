@@ -6,6 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../i18n";
 import { RegistryContext } from "@effect/atom-react";
 import { createTestRegistry } from "../state/registry";
+import { channelCatalogCursorAtom } from "../state/channels/atoms";
+import { activeOrganizationIdAtom } from "../state/organization/atoms";
+import { applySyncEvent } from "../state/sync/apply";
 import type { ChannelSummary } from "../lib/channels-contract";
 import { CompanionChannels } from "./CompanionChannels";
 
@@ -117,9 +120,20 @@ describe("CompanionChannels", () => {
 
   it("preserves the mobile channel stack and accessible back navigation", async () => {
     const { cleanup, container, root } = createReactTestRoot();
+    // The list is the shared catalog's, not a fetch this screen makes, so the
+    // case seeds the catalog the way `useChannelCatalogSync` would have.
+    const registry = createTestRegistry([
+      [activeOrganizationIdAtom, "org-1"],
+      [channelCatalogCursorAtom, 1],
+    ]);
+    applySyncEvent(registry, {
+      kind: "channel-catalog-snapshot",
+      organizationId: "org-1",
+      channels: [selectedChannel],
+    });
     await renderReactTestRoot(
       root,
-      <RegistryContext.Provider value={createTestRegistry()}>
+      <RegistryContext.Provider value={registry}>
       <I18nProvider>
         <CompanionChannels
           activeProjectId={null}
@@ -157,6 +171,61 @@ describe("CompanionChannels", () => {
 
     await act(async () => back?.click());
     expect(container.textContent).toContain("General");
+    await cleanup();
+  });
+
+  it("groups the shared catalog without asking for it again", async () => {
+    const { cleanup, container, root } = createReactTestRoot();
+    const registry = createTestRegistry([
+      [activeOrganizationIdAtom, "org-1"],
+      [channelCatalogCursorAtom, 1],
+    ]);
+    applySyncEvent(registry, {
+      kind: "channel-catalog-snapshot",
+      organizationId: "org-1",
+      channels: [
+        selectedChannel,
+        { ...selectedChannel, id: "channel-2", name: "Web", defaultProjectId: "project-1" },
+        { ...selectedChannel, id: "channel-dm", name: "Direct", kind: "dm" },
+      ],
+    });
+    await renderReactTestRoot(
+      root,
+      <RegistryContext.Provider value={registry}>
+        <I18nProvider>
+          <CompanionChannels
+            activeProjectId="project-1"
+            currentUserId="user-1"
+            organizationId="org-1"
+            projects={[{ id: "project-1", name: "Briar web" }]}
+            token="token"
+          />
+        </I18nProvider>
+      </RegistryContext.Provider>,
+    );
+    await act(async () => Promise.resolve());
+
+    // Common channels first, then the active project's, and direct messages
+    // stay on their own page.
+    const dividers = [
+      ...container.querySelectorAll(".companion-channel-divider"),
+    ].map((node) => node.textContent);
+    expect(dividers).toEqual(["Common channels", "Briar web"]);
+    expect(container.textContent).toContain("Web");
+    expect(container.textContent).toContain("General");
+    expect(container.textContent).not.toContain("Direct");
+
+    const requested = (
+      globalThis.fetch as unknown as ReturnType<typeof vi.fn>
+    ).mock.calls.map(([input]) =>
+      String(input instanceof Request ? input.url : input),
+    );
+    expect(
+      requested.filter((url) =>
+        url.endsWith("/briar.app.v1.ChannelService/ListChannels"),
+      ),
+    ).toEqual([]);
+
     await cleanup();
   });
 });

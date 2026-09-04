@@ -5,7 +5,7 @@ import { useI18n } from "../../i18n";
 import { isInboxRunDetailTarget } from "../../lib/inbox-notifications";
 import {
   agentSessionAtom,
-  processingIssueIdsAtom,
+  runIsProcessingAtom,
 } from "../../state/agent-sessions/atoms";
 import { inboxDetailTargetAtom } from "../../state/inbox-selection";
 import { isSidebarOpenAtom } from "../../state/dialogs/atoms";
@@ -131,7 +131,7 @@ export function InboxDetailContent({
   const session = useAtomValue(
     agentSessionAtom(target.kind === "session" ? target.targetId : ""),
   );
-  const processingIssueIds = useAtomValue(processingIssueIdsAtom);
+  const isProcessing = useAtomValue(runIsProcessingAtom(run?.id ?? ""));
   const isLoading = Boolean(
     isInboxRunDetailTarget(target) && !isTargetTeamLoaded,
   );
@@ -149,7 +149,7 @@ export function InboxDetailContent({
           initialDetailTab={
             target.kind === "conversation" ? "conversation" : undefined
           }
-          isProcessing={processingIssueIds.has(run.id)}
+          isProcessing={isProcessing}
           isSidebarOpen
           mentionAgents={agents.filter(
             (agent) => agent.teamId === target.projectId,

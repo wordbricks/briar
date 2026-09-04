@@ -25,10 +25,6 @@ import {
   type ReactNode,
 } from "react";
 import {
-  listChannels,
-  markChannelRead,
-} from "../lib/api";
-import {
   groupChannels,
   type ChannelGroupProject,
 } from "../lib/channel-grouping";
@@ -36,17 +32,11 @@ import {
   channelQuickReactionEmojis,
   type ChannelAgentReply,
   type ChannelAgentSummary,
-  type ChannelDelta,
   type ChannelExecutionProposal,
   type ChannelMember,
   type ChannelMessage,
   type ChannelSummary,
 } from "../lib/channels-contract";
-import {
-  laterTimestamp,
-  markChannelCatalogRead,
-  markChannelSummaryRead,
-} from "../lib/channel-unread";
 import type {
   AgentSkillExecutionApprovalInput,
   AgentSkillExecutionProposal,
@@ -111,10 +101,15 @@ import {
   copyChannelMessageText,
   copyChannelShareLink,
 } from "../lib/issue-links";
-import { channelConversationError } from "../state/channel-conversation/model";
 import { useRegistry } from "../state/registry";
 import { useAtomValue } from "@effect/atom-react";
 import { applySyncEvent } from "../state/sync/apply";
+import { useChannelActions } from "../state/channels/actions";
+import {
+  channelCatalogCursorAtom,
+  visibleOrganizationChannelsAtom,
+} from "../state/channels/atoms";
+import { channelAtom } from "../state/entities/channels";
 import {
   channelAcceptingProposalIdAtom,
   channelConversationBusyAtom,
@@ -140,23 +135,6 @@ import {
   writeChannelAgentReplies,
   writeChannelOpenThreadId,
 } from "../state/channel-conversation/write";
-
-const mergeChannels = (
-  current: ChannelSummary[],
-  incoming: ChannelSummary[],
-  removedIds: string[],
-) => {
-  const removed = new Set(removedIds);
-  const byId = new Map(
-    current
-      .filter((item) => !removed.has(item.id))
-      .map((item) => [item.id, item]),
-  );
-  for (const item of incoming) {
-    if (!removed.has(item.id)) byId.set(item.id, item);
-  }
-  return [...byId.values()];
-};
 
 type CompanionChannelsProps = {
   organizationId: string;
@@ -206,11 +184,19 @@ export function CompanionChannels({
   onRequestedMessageOpen,
 }: CompanionChannelsProps) {
   const { t } = useI18n();
-  const { toast } = useToast();
   const registry = useRegistry();
   const imageCache = useChannelMessageImageCache(`${organizationId}\0${token}`);
-  const [channels, setChannels] = useState<ChannelSummary[]>([]);
-  const [channel, setChannel] = useState<ChannelSummary | null>(null);
+  /*
+    The catalog is `state/channels`', kept current by the one loop in
+    `useChannelCatalogSync`. This screen used to fetch its own first
+    `listChannels` snapshot into a `useState` array and merge the delta pages
+    into it a second time; what is left is which channel it has open.
+  */
+  const channels = useAtomValue(visibleOrganizationChannelsAtom);
+  const channelListReady = useAtomValue(channelCatalogCursorAtom) !== null;
+  const { markOrganizationChannelRead } = useChannelActions();
+  const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
+  const channel = useAtomValue(channelAtom(activeChannelId ?? ""));
   /*
     The conversation is `state/channel-conversation`'s store, shared with the
     desktop view. This screen used to hold it in six `useState` values with a
@@ -232,6 +218,12 @@ export function CompanionChannels({
     messageId: string;
   } | null>(null);
   const [loading, setLoading] = useState(true);
+  /*
+    The channel list is busy while the shared catalog loop has not answered for
+    this organization yet — a cursor read rather than a fetch of its own. A
+    conversation load keeps `loading` for the screens below it.
+  */
+  const listLoading = loading || !channelListReady;
   const [threadIsAwayFromBottom, setThreadIsAwayFromBottom] = useState(false);
   const channelSelectionVersion = useRef(0);
   const channelMessagesScrollRef = useRef<HTMLDivElement | null>(null);
@@ -260,38 +252,11 @@ export function CompanionChannels({
     observeRows: true,
   });
 
-  const markSelectedChannelRead = useCallback(
-    (summary: ChannelSummary) => {
-      if (!summary.hasUnread) return summary;
-      const lastReadAt = laterTimestamp(
-        summary.lastMessageAt,
-        new Date().toISOString(),
-      );
-      const next = markChannelSummaryRead(summary, lastReadAt);
-      setChannels((current) =>
-        markChannelCatalogRead(current, summary.id, lastReadAt)
-      );
-      void markChannelRead(token, organizationId, summary.id, { lastReadAt })
-        .catch(() => {
-          // The next catalog snapshot restores unread if the write failed.
-        });
-      return next;
-    },
-    [organizationId, token],
-  );
-
-  const applyChannelCatalogDelta = useCallback(
-    (delta: ChannelDelta) => {
-      setChannels((current) =>
-        mergeChannels(
-          delta.reset ? [] : current,
-          delta.channels,
-          delta.removedChannelIds,
-        )
-      );
-    },
-    [],
-  );
+  /*
+    Reading a channel is the catalog's write, not this screen's: the store marks
+    the summary read and confirms it with the server, and the list and the open
+    channel both read that one copy.
+  */
   const handleSelectedChannelRemoved = useCallback(() => {
     channelSelectionVersion.current += 1;
     const removed = channelRef.current;
@@ -301,14 +266,21 @@ export function CompanionChannels({
         channelId: removed.id,
       });
     }
-    setChannel(null);
+    setActiveChannelId(null);
     setLoading(false);
   }, [registry]);
   const handleSelectedChannelSummary = useCallback(
-    (summary: ChannelSummary) => {
-      setChannel(markSelectedChannelRead(summary));
-    },
-    [markSelectedChannelRead],
+    (summary: ChannelSummary) => markOrganizationChannelRead(summary.id),
+    [markOrganizationChannelRead],
+  );
+  /**
+   * A channel the conversation loaded, which the catalog may not list yet — a
+   * deep link can name one that arrived after the last snapshot.
+   */
+  const applyLoadedChannel = useCallback(
+    (loaded: ChannelSummary) =>
+      applySyncEvent(registry, { kind: "channel-changed", channel: loaded }),
+    [registry],
   );
   const handleIncomingRootMessages = useCallback(() => {
     requestStickToBottomIfAtBottom();
@@ -342,7 +314,7 @@ export function CompanionChannels({
     defaultProjectId: channel?.defaultProjectId ?? null,
     pageSize: mobileChannelMessagePageSize,
     imageCache,
-    onChannelLoaded: setChannel,
+    onChannelLoaded: applyLoadedChannel,
     onIssueOpen,
     onSkillSessionAccepted,
     onRootMessagePending: requestStickToBottomIfAtBottom,
@@ -377,11 +349,8 @@ export function CompanionChannels({
   } = conversationLoader;
   const loadChannelConversation = conversationLoader.loadConversation;
   useChannelConversationSync({
-    // The catalog delta reaches this screen even with no channel open: its own
-    // list is what it draws, and it is the only view that still keeps one.
     enabled: true,
     channelId: channel?.id ?? null,
-    onCatalogDelta: applyChannelCatalogDelta,
     onSelectedChannelRemoved: handleSelectedChannelRemoved,
     onSelectedChannelSummary: handleSelectedChannelSummary,
     onIncomingRootMessages: handleIncomingRootMessages,
@@ -429,34 +398,18 @@ export function CompanionChannels({
   const activeHighlightedMessageId =
     requestedMessage?.messageId ?? highlightedMessage?.messageId ?? null;
 
+  /*
+    Switching organizations closes whatever this screen had open. The catalog
+    itself is the shared loop's — this used to fetch its own `listChannels`
+    snapshot here, a second round trip for a list the store already had.
+  */
   useEffect(() => {
-    let cancelled = false;
     channelSelectionVersion.current += 1;
     conversationLoader.invalidateSurface(null, null);
     conversationLoader.clearProposalHistory(channelRef.current?.id ?? null);
-    setChannels([]);
-    setChannel(null);
-    if (!token) {
-      setLoading(false);
-      return () => {
-        cancelled = true;
-      };
-    }
-    setLoading(true);
-    void (async () => {
-      try {
-        const result = await listChannels(token, organizationId);
-        if (!cancelled) setChannels(result.channels);
-      } catch (cause) {
-        if (!cancelled) toast(channelConversationError(cause), { tone: "error" });
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [conversationLoader, organizationId, toast, token]);
+    setActiveChannelId(null);
+    setLoading(false);
+  }, [conversationLoader, organizationId, token]);
 
   const groups = useMemo(
     () =>
@@ -479,7 +432,8 @@ export function CompanionChannels({
       conversationLoader.invalidateSurface(summary.id, null);
       requestStickToBottom();
       const selectionVersion = ++channelSelectionVersion.current;
-      setChannel(markSelectedChannelRead(summary));
+      setActiveChannelId(summary.id);
+      markOrganizationChannelRead(summary.id);
       resetChannelConversationViewState(registry, summary.id);
       // Reply jobs are live execution state. A stored running job can finish
       // while another screen is open, so restoring it would replay a stale
@@ -490,13 +444,13 @@ export function CompanionChannels({
         const result = await loadChannelConversation(summary.id, {
           messageLimit: mobileChannelMessagePageSize,
           mergeWithCurrentMessages: false,
-          onChannelLoaded: setChannel,
+          onChannelLoaded: applyLoadedChannel,
         });
         if (
           !result ||
           selectionVersion !== channelSelectionVersion.current
         ) return;
-        setChannel(markSelectedChannelRead(result.channel));
+        markOrganizationChannelRead(result.channel.id);
         requestStickToBottom();
       } finally {
         if (selectionVersion === channelSelectionVersion.current) {
@@ -507,7 +461,7 @@ export function CompanionChannels({
     [
       conversationLoader,
       loadChannelConversation,
-      markSelectedChannelRead,
+      markOrganizationChannelRead,
       registry,
       requestStickToBottom,
     ],
@@ -574,7 +528,7 @@ export function CompanionChannels({
     conversationLoader.invalidateSurface(summary.id, null);
     const selectionVersion = ++channelSelectionVersion.current;
     let cancelled = false;
-    setChannel(summary);
+    setActiveChannelId(summary.id);
     resetChannelConversationViewState(registry, summary.id);
     writeChannelAgentReplies(registry, summary.id, []);
     setStickToBottom(false);
@@ -585,14 +539,14 @@ export function CompanionChannels({
           messageLimit: mobileChannelMessagePageSize,
           mergeWithCurrentMessages: false,
           requestedMessage,
-          onChannelLoaded: setChannel,
+          onChannelLoaded: applyLoadedChannel,
         });
         if (
           !result ||
           cancelled ||
           selectionVersion !== channelSelectionVersion.current
         ) return;
-        setChannel(markSelectedChannelRead(result.channel));
+        markOrganizationChannelRead(result.channel.id);
         if (requestedMessage.rootMessageId === requestedMessage.messageId) {
           writeChannelOpenThreadId(registry, summary.id, null);
         }
@@ -628,7 +582,7 @@ export function CompanionChannels({
     channels,
     conversationLoader,
     loadChannelConversation,
-    markSelectedChannelRead,
+    markOrganizationChannelRead,
     onRequestedMessageOpen,
     organizationId,
     registry,
@@ -669,7 +623,7 @@ export function CompanionChannels({
     channelSelectionVersion.current += 1;
     conversationLoader.invalidateSurface(null, null);
     writeChannelAgentReplies(registry, channel.id, []);
-    setChannel(null);
+    setActiveChannelId(null);
     setLoading(false);
     return true;
   }, [channel, conversationLoader, registry]);
@@ -682,8 +636,7 @@ export function CompanionChannels({
   if (channel && threadParentId) {
     return (
       <ChannelMessageImageCacheProvider cache={imageCache}>
-      <ChannelActivityPublisher channelId={channel?.id ?? null} />
-        <ChannelActivityPublisher channelId={channel?.id ?? null} />
+        <ChannelActivityPublisher channelId={channel.id} />
         <section
           aria-busy={threadLoading}
           className="companion-channels companion-channel-detail"
@@ -799,8 +752,7 @@ export function CompanionChannels({
   if (channel) {
     return (
       <ChannelMessageImageCacheProvider cache={imageCache}>
-      <ChannelActivityPublisher channelId={channel?.id ?? null} />
-        <ChannelActivityPublisher channelId={channel?.id ?? null} />
+        <ChannelActivityPublisher channelId={channel.id} />
         <section
           aria-busy={loading}
           className="companion-channels companion-channel-detail"
@@ -900,7 +852,7 @@ export function CompanionChannels({
 
   return (
     <ChannelMessageImageCacheProvider cache={imageCache}>
-      <section aria-busy={loading} className="companion-channels">
+      <section aria-busy={listLoading} className="companion-channels">
         {onLobbyOpen ? (
           <button
             className="mx-3 mt-3 mb-1 flex min-h-[72px] w-[calc(100%_-_24px)] items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 text-left text-foreground shadow-xs active:scale-[.99]"
@@ -921,7 +873,7 @@ export function CompanionChannels({
             <ChevronRight aria-hidden className="text-muted-foreground" size={18} />
           </button>
         ) : null}
-        {loading && channels.length === 0 ? <CompanionChannelLoadingSpinner /> : null}
+        {listLoading && channels.length === 0 ? <CompanionChannelLoadingSpinner /> : null}
         {groups.map((group) => (
         <div className="companion-channel-group" key={group.key}>
           <h2 className="companion-channel-divider">{group.label}</h2>
@@ -951,7 +903,7 @@ export function CompanionChannels({
           </ul>
         </div>
         ))}
-        {!loading && groups.length === 0 ? (
+        {!listLoading && groups.length === 0 ? (
           <p className="companion-channel-empty">{t("companion.channelsEmpty")}</p>
         ) : null}
       </section>

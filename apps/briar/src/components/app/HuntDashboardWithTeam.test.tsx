@@ -7,6 +7,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { ToastProvider } from "../ui/toast";
 import { TooltipProvider } from "../ui/tooltip";
 import { demoDashboard } from "../../lib/demo-data";
+import { runIsProcessingAtom } from "../../state/agent-sessions/atoms";
+import { testAgentSession } from "../../test/agent-sessions";
 import {
   boardColumnKey,
   boardColumnRunIdsAtom,
@@ -117,6 +119,21 @@ function RunRow({
   return <output>{run?.title ?? ""}</output>;
 }
 
+/** A card's "an agent is on this issue" subscription, which is per run. */
+function ProcessingProbe({
+  name,
+  renders,
+  runId,
+}: {
+  name: string;
+  renders: RenderCounter;
+  runId: string;
+}) {
+  renders.useRenderCount(name);
+  useAtomValue(runIsProcessingAtom(runId));
+  return null;
+}
+
 /** One kanban column: it subscribes to the ids it draws. */
 function ColumnProbe({
   columnId,
@@ -180,6 +197,8 @@ const mount = async (registry: AtomRegistry, renders: RenderCounter) => {
         <Board {...boardProps} projects={[team]} />
         <RunRow name="row-a" renders={renders} runId={runA.id} />
         <RunRow name="row-b" renders={renders} runId={runB.id} />
+        <ProcessingProbe name="processing-a" renders={renders} runId={runA.id} />
+        <ProcessingProbe name="processing-b" renders={renders} runId={runB.id} />
         <ColumnProbe columnId="status:backlog" renders={renders} />
         <ColumnProbe columnId="status:queued" renders={renders} />
         <ColumnProbe columnId="status:blocked" renders={renders} />
@@ -298,6 +317,45 @@ describe("HuntDashboardWithTeam", () => {
     });
     expect(columnCount(view.container, "status:queued")).toBe("0");
     expect(columnCount(view.container, "status:blocked")).toBe("1");
+
+    await view.cleanup();
+  });
+
+  it("reaches only the card an agent session started on", async () => {
+    const registry = harness();
+    const renders = createRenderCounter();
+    const view = await mount(registry, renders);
+    renders.reset();
+
+    await act(async () => {
+      applySyncEvent(registry, {
+        kind: "agent-sessions-changed",
+        sessions: [
+          testAgentSession("session-1", {
+            projectId: team.id,
+            issues: [
+              {
+                runId: runB.id,
+                runNumber: 2,
+                sourceKey: runB.id,
+                title: runB.title,
+                outcome: "pending",
+                summary: null,
+              },
+            ],
+          }),
+        ],
+      });
+    });
+
+    /*
+      The set of processing runs was a prop threaded through the card context,
+      so a session starting anywhere gave every card a new context object. Each
+      card asks about its own run now: the card of the issue the session took
+      re-renders, and nothing else on the board does — not the other card, not a
+      column, not the counts, not the board, not the shell.
+    */
+    renders.expectRenderCounts({ "processing-b": 1 });
 
     await view.cleanup();
   });
