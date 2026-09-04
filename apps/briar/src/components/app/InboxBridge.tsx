@@ -1,6 +1,6 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import * as Atom from "effect/unstable/reactivity/Atom";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 
 import { useInbox } from "../../hooks/useInbox";
 import {
@@ -15,7 +15,6 @@ import {
   viewingChannelThreadRootMessageIdAtom,
   viewingIssueConversationRunIdAtom,
 } from "../../state/channels/atoms";
-import { teamRunsAtom } from "../../state/entities/runs";
 import { setInboxCallbacks } from "../../state/inbox/actions";
 import {
   inboxMessagesAtom,
@@ -27,60 +26,44 @@ import { activeOrganizationIdAtom } from "../../state/organization/atoms";
 import { lockedTeamIdAtom } from "../../state/platform";
 import { useRegistry } from "../../state/registry";
 import { tokenAtom, userAtom } from "../../state/session/atoms";
-import { activeTeamIdAtom, teamsAtom } from "../../state/team/atoms";
-import type { AutoHuntSession, HuntRun } from "../../types";
+import { teamsAtom } from "../../state/team/atoms";
+import type { AutoHuntSession } from "../../types";
 
 /*
   Everything below `App` that still reads a whole team's board.
 
-  `useInbox` derives a team's issue notifications from its runs, and the auto
-  hunt sessions reconcile their worker dispatches against the same runs. Both
-  were `App`'s, which is why every polling tick that changed one run re-rendered
-  the entire tree on its way to the inbox.
+  `useInbox` derives a team's issue notifications from its runs. It was `App`'s,
+  which is why every polling tick that changed one run re-rendered the entire
+  tree on its way to the inbox.
 
-  They live here instead, in a component that renders nothing: the inbox result
+  It lives here instead, in a component that renders nothing: the inbox result
   is published to `state/inbox`, and the shells subscribe to what they actually
   read. `App` itself subscribes to no run.
 
-  Neither of the two reads the board the same way, so neither takes it the same
-  way:
+  `useInbox` takes a payload-shaped argument, which `inboxSourceAtom` builds out
+  of the store: the team, the runs that can actually become a message, and the
+  two notification feeds, each keeping the reference the store holds. A tick
+  that touched none of them therefore does not render this component. Follow-up
+  F4 replaces the argument with the atoms themselves and this bridge with
+  nothing.
 
-  - `useInbox` takes a payload-shaped argument, which `inboxSourceAtom` builds
-    out of the store: the team, the runs that can actually become a message,
-    and the two notification feeds, each keeping the reference the store holds.
-    A tick that touched none of them therefore does not render this component.
-    Follow-up F4 replaces the argument with the atoms themselves and this
-    bridge with nothing.
-  - the dispatch reconciliation needs *every* run of the team, and needs it
-    only to call a callback. So it subscribes in an effect rather than during
-    render: the callback runs on every board change, and this component does
-    not render for any of them.
-
-  What still arrives as props is `useAutoHuntSessions`'s, which is not atom
-  state yet and whose owner is `App`.
+  The worker dispatch reconciliation subscribed here for the same reason. It
+  moved to `state/agent-sessions/useAgentSessionSync` with the rest of that
+  domain, so the open board has one reader here now instead of two.
 */
 
 export interface InboxBridgeProps {
   /** Agent sessions, whose completions become inbox messages. */
   readonly sessions: AutoHuntSession[];
-  /** Re-points in-flight worker dispatches at the runs that are on the board. */
-  readonly reconcileWorkerDispatches: (
-    teamId: string,
-    runs: readonly HuntRun[],
-  ) => void;
 }
 
-export function InboxBridge({
-  reconcileWorkerDispatches,
-  sessions,
-}: InboxBridgeProps) {
+export function InboxBridge({ sessions }: InboxBridgeProps) {
   const registry = useRegistry();
   const user = useAtomValue(userAtom);
   const token = useAtomValue(tokenAtom);
   const teams = useAtomValue(teamsAtom);
   const activeOrganizationId = useAtomValue(activeOrganizationIdAtom);
   const lockedTeamId = useAtomValue(lockedTeamIdAtom);
-  const activeTeamId = useAtomValue(activeTeamIdAtom);
   const inboxSource = useAtomValue(inboxSourceAtom);
   const viewingChannelId = useAtomValue(viewingChannelIdAtom);
   const viewingChannelThreadRootMessageId = useAtomValue(
@@ -92,23 +75,6 @@ export function InboxBridge({
   const setPendingInboxNotificationTarget = useAtomSet(
     pendingInboxNotificationTargetAtom,
   );
-
-  const reconcileRef = useRef(reconcileWorkerDispatches);
-  reconcileRef.current = reconcileWorkerDispatches;
-
-  useEffect(() => {
-    if (!activeTeamId) return;
-    // `immediate` both delivers the board this team already has — the mount
-    // pass the effect it replaced performed — and is what builds the derived
-    // atom's dependency graph, without which nothing would arrive later.
-    return registry.subscribe(
-      teamRunsAtom(activeTeamId),
-      (runs) => {
-        if (runs) reconcileRef.current(activeTeamId, runs);
-      },
-      { immediate: true },
-    );
-  }, [activeTeamId, registry]);
 
   const inboxRealtime = useMemo(
     () =>

@@ -1,12 +1,22 @@
 import * as Atom from "effect/unstable/reactivity/Atom";
 
 import type {
+  AutoHuntSession,
   DashboardDeltaPayload,
   DashboardPayload,
   ExecutionWorker,
   HuntRun,
   OrganizationMember,
 } from "../../types";
+import {
+  agentSessionIdsAtom,
+  agentSessionsAtom,
+  agentSessionsByIdAtom,
+} from "../agent-sessions/atoms";
+import {
+  applyProjectAgentSessionSync,
+  mergeSynchronizedSessions,
+} from "../agent-sessions/model";
 import {
   channelCatalogOrganizationIdsAtom,
   channelsByIdAtom,
@@ -515,6 +525,45 @@ function applySessionCleared(registry: AtomRegistry) {
   registry.set(staleTeamIdAtom, null);
 }
 
+/*
+  Agent sessions.
+
+  Both halves are written together: the map keeps the reference of every session
+  that did not change, and the id array is compared element-wise, so a pass that
+  reconciled nothing notifies neither. The list order is the array's — the map
+  is only a lookup.
+*/
+function writeAgentSessions(
+  registry: AtomRegistry,
+  next: readonly AutoHuntSession[],
+): void {
+  const current = registry.get(agentSessionsByIdAtom);
+  const nextIds = new Set(next.map((session) => session.id));
+  const removedIds = [...current.keys()].filter((id) => !nextIds.has(id));
+  registry.set(agentSessionsByIdAtom, upsertMany(current, next, removedIds));
+  registry.set(
+    agentSessionIdsAtom,
+    next.map((session) => session.id),
+  );
+}
+
+/** Upserts local sessions, prepending the ones the store has never seen. */
+function applyAgentSessionsChanged(
+  registry: AtomRegistry,
+  sessions: readonly AutoHuntSession[],
+): void {
+  const current = registry.get(agentSessionsAtom);
+  const incoming = new Map(
+    sessions.map((session) => [session.id, session] as const),
+  );
+  const known = new Set(current.map((session) => session.id));
+  const added = sessions.filter((session) => !known.has(session.id));
+  writeAgentSessions(registry, [
+    ...added,
+    ...current.map((session) => incoming.get(session.id) ?? session),
+  ]);
+}
+
 /**
  * Applies one sync event to the normalized store. The only function that writes
  * entity maps and per-team families from a server payload.
@@ -563,6 +612,38 @@ export function applySyncEvent(registry: AtomRegistry, event: SyncEvent): void {
         registry.set(teamSettingsAtom(event.teamId), event.settings);
         return;
       }
+      case "agent-sessions-changed":
+        applyAgentSessionsChanged(registry, event.sessions);
+        return;
+      case "agent-sessions-merged":
+        writeAgentSessions(
+          registry,
+          mergeSynchronizedSessions(
+            registry.get(agentSessionsAtom),
+            event.sessions,
+          ),
+        );
+        return;
+      case "agent-sessions-synced":
+        writeAgentSessions(
+          registry,
+          applyProjectAgentSessionSync(
+            registry.get(agentSessionsAtom),
+            event.teamId,
+            event.sessions,
+            event.deletedSessionIds,
+            event.reset,
+          ),
+        );
+        return;
+      case "agent-sessions-removed":
+        writeAgentSessions(
+          registry,
+          registry
+            .get(agentSessionsAtom)
+            .filter((session) => session.projectId !== event.teamId),
+        );
+        return;
       case "team-cleared":
         clearTeamState(registry, event.teamId);
         return;
