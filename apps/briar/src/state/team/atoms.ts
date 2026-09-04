@@ -217,6 +217,24 @@ export const teamLoadedAtom = Atom.family((teamId: string) =>
 );
 
 /**
+ * The server has answered for this team since the app started: a `team-snapshot`
+ * or a `team-delta` that `state/sync/apply.ts` actually applied.
+ *
+ * Hydration deliberately does not set it. A record read from disk is enough to
+ * *render* the last screen, but it carries no authority — the work it describes
+ * may have moved on while the app was closed. So an effect that would **act** on
+ * a team's stored state rather than display it waits here until the server has
+ * confirmed that state, and `false` on a hydrated boot means exactly "this is
+ * still the disk's copy".
+ */
+export const teamSyncedSinceBootAtom = Atom.family((teamId: string) =>
+  Atom.make(false).pipe(
+    Atom.keepAlive,
+    Atom.withLabel(`team/${teamId}/syncedSinceBoot`),
+  ),
+);
+
+/**
  * The team whose stored payload is on screen waiting to be replaced by fresh
  * data, or `null`. It forces the next fetch for that team to be a snapshot
  * rather than a delta from a possibly ancient cursor.

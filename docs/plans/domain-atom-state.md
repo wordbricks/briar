@@ -476,6 +476,24 @@ workspace / workflow / integrations를 옮기며 확인한, 이후 단계에 영
   atom을 읽는 프로브 컴포넌트를 형제로 두고 세며, 실제 보드는 옆에서 같은
   레지스트리로 렌더해 DOM으로 검증한다.
 
+### 기준 갱신 (2026-09-04, 후속 F1 이후)
+
+하이드레이션 가드를 붙이며 확인한, 부팅 시점 상태를 다루는 후속 작업에 필요한 사실:
+
+- **하이드레이션은 `applySyncEvent`를 거치지 않는다.** `applySnapshot`이 같은 atom을
+  직접 쓰므로, "서버가 답했다"를 나타내는 표시는 진입점 쪽에만 세워야 디스크 복원과
+  구별된다. `teamSyncedSinceBootAtom`은 `applySyncEvent`의 `team-snapshot` /
+  `team-delta`가 세우고 `clearTeamState`가 되돌린다.
+- **부팅 시점 상태의 소비자는 두 종류다.** 저장된 값을 *그리는* 뷰는 그대로 두면
+  되지만, 저장된 값을 보고 *서버 작업을 시작하는* effect는 확인을 기다려야 한다.
+  같은 형태의 effect를 추가할 때 이 구분을 먼저 한다.
+- **아무것도 바꾸지 않은 델타도 확인이다.** 재개 커서가 빈 페이지를 물고 와도 그것은
+  저장된 상태가 최신이라는 서버의 답이므로 플래그를 세운다. 레지스트리가 같은 값의
+  쓰기를 버리므로 조용한 폴링 틱의 알림 0회는 그대로다.
+- **`hydratedAccountAtom`은 세션 내내 유지된다.** 하이드레이션된 부팅에서는 팀
+  전환으로 새로 여는 팀도 같은 규칙을 받지만, 그 팀의 설정은 어차피 첫 동기화가
+  채우므로 동작 차이는 없다.
+
 ## 목표
 
 1. `apps/briar/src/hooks/useBriar.ts`(4,668줄)와 `apps/briar/src/App.tsx`(5,116줄)가
@@ -517,7 +535,10 @@ workspace / workflow / integrations를 옮기며 확인한, 이후 단계에 영
   4. 열린 런이 바뀔 때 셸 리렌더 0회(`RunPageWithRun.test.tsx`), 페이지 이동 시
      크롬·상태 표시줄 리렌더 0회(`DesktopPages` 렌더 카운트 테스트).
 - **콜드 부팅은 네트워크 응답 전에 마지막 대시보드를 그린다**
-  (`state/persistence/cold-boot.test.tsx`).
+  (`state/persistence/cold-boot.test.tsx`). 그 화면을 **그리는** 것과 그 화면으로
+  **행동하는** 것은 후속 F1이 갈라 두었다. 디스크에서 올라온 값으로 서버 작업을
+  시작하는 effect는 `teamSyncedSinceBootAtom`이 설 때까지 기다리므로, 하이드레이션된
+  "pending" 워크플로 때문에 LLM 자동 생성이 한 번 더 도는 문제는 남아 있지 않다.
 
 ## 현재 구조 요약
 
@@ -1166,3 +1187,12 @@ Phase 2 이후 언제든 착수 가능하며 Phase 3–7과 병행할 수 있다
 | 7 | #1599, #1600, #1601 | 머지됨 | #1599: `state/session`의 `api` / `useSessionBootstrap` / `useAuthReturnListener`와 로그인 액션 6종(폴링 상태는 registry `WeakMap`), `state/team`의 `selectTeam` / `ensureTeamSelected`와 `getTeamActions`, `state/sync/actions`의 `refreshActiveTeam`, `state/planning/usePlanningProjectsSync`, `state/action-bridges`. `IssueActionBridge.selectTeam`과 `AppEffects` / `useNavigationReconciliation`의 `selectTeam` 프롭 제거, 데모 선택 시드를 모듈 상수로, `lib/default-organization` 삭제. #1600: `useBriar.ts` 삭제, `components/app/InboxBridge`와 `state/inbox`(atoms / actions), `state/app-error`, `hooks/useOrganizationViewData`. 훅 6종과 게이트·셸·페이지가 프롭 대신 액션 훅을 쓴다. App.tsx 661줄 → 421줄, `briar.` 키 28개 → 0개. #1601: `state/status-tray`와 `state/deep-links`의 구독형 atom 5종(`addFinalizer` + `setIdleTTL`), `MessageRow` memo 복구와 렌더 카운트 테스트. |
 | 8 | #1602, #1603 | 머지됨 | #1602: `state/persistence`의 `snapshot`(조직 단위 `ClientSnapshot` + Effect Schema 검증 + `collectSnapshot` / `applySnapshot`), `store`(`SnapshotStore`와 IndexedDB / 인메모리 / no-op 구현, `snapshotStoreAtom` 이음매, 예외를 삼키는 접근 래퍼), `account`(부팅 포인터), `useSnapshotWriter`(1초 창 디바운스, hidden·pagehide 즉시 기록, 조직 이탈 시 삭제). `clearSessionState`가 저장소 전체를 함께 비운다. #1603: `hydration`(게이트와 `hydratedAccountAtom`)과 `useHydration`, `AppEffects`의 첫 훅. 부트스트랩이 커밋 직전에 게이트를 기다리고 계정이 다르면 폐기하며, `useTeamSync`와 `useChannelCatalogSync`가 부팅 시점의 초기화를 건너뛴다. 저장된 커서에서 델타로 따라잡고 410이면 스냅샷으로 대체한다. |
 | 2C | #1604, #1605 | 머지됨 | Phase 2 완료 조건 2를 닫는다. #1604: `components/hunt/model/filters.ts`를 `state/board/filters.ts`로 옮기고 검색 텍스트·상태 탭·목록 필터·컴패니언 정렬을 순수 함수로 뽑음. `state/board`의 `columns`(컬럼 정의와 런 배정, 체크포인트 경계), `atoms`(보드 뷰 상태와 `boardScopedRunIds` / `boardRunIds` / `boardStatusCounts` / `boardColumnDefinitions` / `boardGroupedRunIds` / `boardColumnRunIds` / `boardVisibleColumnIds` / `companionRunIds` / `boardRun`), `run-facts`(`runAgentAssociation` / `runAssignedWorker` / `runAssignee`와 게시 훅 `useBoardSources`). #1605: `HuntDashboard`에서 `dashboard` / `activeIssueProjectId` 프롭 제거, `board`의 `HuntBoard` / `BoardKanban` / `BoardColumn` / `BoardCard` / `BoardIssueList` / `BoardFilterBar` / `CompanionTaskBoard`와 공용 행 `IssueListRow` / `IssueListHeader`, `test/board-harness`. `HuntDashboardWithTeam`이 `activeDashboardAtom` 구독을 끊었다. `HuntDashboard.tsx` 1,279줄 → 737줄. |
+
+## 후속 실행 기록
+
+계획 범위 밖에서 뒤늦게 드러난 항목이다. 같은 규칙으로 PR 하나씩 머지하고 여기에
+기록한다.
+
+| 항목 | PR | 상태 | 비고 |
+|---|---|---|---|
+| F1 워크플로 자동 생성 하이드레이션 가드 + `useDeepLinks` 이름 정리 | #1607 | 머지됨 | `state/team/atoms.ts`에 팀별 `teamSyncedSinceBootAtom`을 두고 `applySyncEvent`의 `team-snapshot` / `team-delta`가 세운다(`clearTeamState`가 되돌리고, 같은 값의 쓰기는 레지스트리가 버리므로 조용한 틱의 알림은 그대로 0회다). `useWorkflowAutoGeneration`은 하이드레이션된 부팅에서 이 플래그가 서기 전까지 조건을 보지 않으므로, 디스크에서 올라온 pending 플레이스홀더로 LLM 자동 생성이 한 번 더 도는 일이 없다. 스냅샷을 읽지 않은 부팅과 팀 전환은 그대로다. `useWorkflowAutoGeneration.test.tsx`에 하이드레이션 케이스 3종 추가. `useDeepLinks`의 지역 변수 `listeners`는 실제로 리졸버를 담고 있어 `resolvers`로 고쳤다(네이티브 리스너 4종을 가리키는 주석은 그대로 둔다). |

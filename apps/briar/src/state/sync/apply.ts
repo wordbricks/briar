@@ -47,6 +47,7 @@ import {
   teamNotificationsAtom,
   teamPayloadCursorAtom,
   teamSettingsAtom,
+  teamSyncedSinceBootAtom,
 } from "../team/atoms";
 import type { SyncEvent } from "./events";
 import { dashboardViewAtom } from "./view";
@@ -180,6 +181,15 @@ function touchTeam(registry: AtomRegistry, teamId: string) {
   for (const candidate of dropped) clearTeamState(registry, candidate);
 }
 
+/**
+ * Records that the server has answered for this team in this session, which is
+ * what separates a payload from the copy hydration read off the disk. The
+ * registry drops a write of the value it already holds, so the deltas of a quiet
+ * polling tick still notify nobody.
+ */
+const markTeamSynced = (registry: AtomRegistry, teamId: string) =>
+  registry.set(teamSyncedSinceBootAtom(teamId), true);
+
 /** Drops everything the store knows about one team. */
 function clearTeamState(registry: AtomRegistry, teamId: string) {
   writeTeamRuns(registry, teamId, null);
@@ -196,6 +206,9 @@ function clearTeamState(registry: AtomRegistry, teamId: string) {
   registry.set(teamCursorAtom(teamId), null);
   registry.set(teamPayloadCursorAtom(teamId), null);
   registry.set(teamGeneratedAtAtom(teamId), null);
+  // Nothing of the server's answer is left, so the next payload for this team is
+  // its first again.
+  registry.set(teamSyncedSinceBootAtom(teamId), false);
   registry.update(retainedTeamIdsAtom, (retained) =>
     retained.includes(teamId)
       ? retained.filter((candidate) => candidate !== teamId)
@@ -233,6 +246,7 @@ function applyTeamSnapshot(
   registry.set(teamCursorAtom(teamId), syncCursorOf(payload.cursor));
   registry.set(teamPayloadCursorAtom(teamId), payload.cursor ?? null);
   registry.set(teamGeneratedAtAtom(teamId), payload.generatedAt);
+  markTeamSynced(registry, teamId);
   touchTeam(registry, teamId);
 }
 
@@ -344,6 +358,9 @@ function applyTeamDelta(
     registry.set(teamPayloadCursorAtom(teamId), delta.cursor);
     registry.set(teamGeneratedAtAtom(teamId), delta.generatedAt);
   }
+  // A page that moved nothing is still the server answering: it confirms that
+  // the stored state is current, which is exactly what a hydrated boot waits on.
+  markTeamSynced(registry, teamId);
   touchTeam(registry, teamId);
 }
 
