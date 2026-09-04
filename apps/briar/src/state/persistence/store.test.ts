@@ -106,9 +106,21 @@ class FakeObjectStore {
   }
 }
 
+/** One open connection, so a test can close it the way the browser would. */
+type FakeDatabase = {
+  onversionchange: Handler;
+  closed: boolean;
+  objectStoreNames: { contains: (name: string) => boolean };
+  createObjectStore: (name: string) => void;
+  transaction: () => { objectStore: () => FakeObjectStore };
+  close: () => void;
+};
+
 class FakeIndexedDb {
   readonly records = new Map<string, unknown>();
   readonly opens: string[] = [];
+  /** Every connection handed out, so a test can reach the live one. */
+  readonly connections: FakeDatabase[] = [];
   private stores = new Set<string>();
   failOpen = false;
 
@@ -131,8 +143,10 @@ class FakeIndexedDb {
     return request as unknown as IDBOpenDBRequest;
   }
 
-  private database() {
-    return {
+  private database(): FakeDatabase {
+    const database: FakeDatabase = {
+      onversionchange: null,
+      closed: false,
       objectStoreNames: { contains: (name: string) => this.stores.has(name) },
       createObjectStore: (name: string) => {
         this.stores.add(name);
@@ -140,7 +154,12 @@ class FakeIndexedDb {
       transaction: () => ({
         objectStore: () => new FakeObjectStore(this.records),
       }),
+      close: () => {
+        database.closed = true;
+      },
     };
+    this.connections.push(database);
+    return database;
   }
 
   asFactory() {
@@ -203,6 +222,24 @@ describe("indexeddb snapshot store", () => {
     indexedDb.records.set(key, "{ truncated");
 
     expect(await store.read(key)).toBeNull();
+  });
+
+  it("lets go of the connection when another client upgrades the database", async () => {
+    const indexedDb = new FakeIndexedDb();
+    const store = createIndexedDbSnapshotStore(indexedDb.asFactory());
+    await store.write(key, snapshot);
+    expect(indexedDb.opens).toHaveLength(1);
+    const held = indexedDb.connections.at(-1)!;
+
+    // A newer build asks for a version this one does not have. Holding the
+    // connection open is what would leave that upgrade blocked forever.
+    held.onversionchange?.();
+    expect(held.closed).toBe(true);
+
+    // The closed connection is not reused: the next access opens a fresh one.
+    expect(await store.read(key)).toEqual(snapshot);
+    expect(indexedDb.opens).toHaveLength(2);
+    expect(indexedDb.connections.at(-1)!.closed).toBe(false);
   });
 
   it("retries an open that failed instead of caching the failure", async () => {
