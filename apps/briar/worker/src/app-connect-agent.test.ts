@@ -20,6 +20,8 @@ const repositoryMocks = {
   getTeam: vi.fn<AppConnectAgentServices["getTeam"]>(),
   getCursor: vi.fn<AppConnectAgentServices["getSessionCursor"]>(),
   getTranscript: vi.fn<AppConnectAgentServices["getTranscript"]>(),
+  listTranscriptSessions:
+    vi.fn<AppConnectAgentServices["listTranscriptSessions"]>(),
   listSummaries: vi.fn<AppConnectAgentServices["listSessionSummaries"]>(),
   requireSession: vi.fn<AppConnectAgentServices["requireSession"]>(),
 };
@@ -28,6 +30,7 @@ const projectId = "11111111-1111-4111-8111-111111111111";
 const agentId = "22222222-2222-4222-8222-222222222222";
 const userId = "33333333-3333-4333-8333-333333333333";
 const sessionId = "agent-session-1";
+const runId = "44444444-4444-4444-8444-444444444444";
 
 const connectRequest = () => new Request(
   createMethodUrl(
@@ -162,6 +165,7 @@ describe("app Agent Connect adapter", () => {
         getTeam: repositoryMocks.getTeam,
         getSessionCursor: repositoryMocks.getCursor,
         getTranscript: repositoryMocks.getTranscript,
+        listTranscriptSessions: repositoryMocks.listTranscriptSessions,
         listSessionSummaries: repositoryMocks.listSummaries,
       },
     );
@@ -248,6 +252,127 @@ describe("app Agent Connect adapter", () => {
         completedAt: "2026-08-30T02:03:02Z",
         message: { phase: "analysis", text: "Contract migrated" },
       }],
+    });
+  });
+
+  it("lists every transcript session recorded for one run", async () => {
+    repositoryMocks.requireSession.mockResolvedValue({
+      session: {
+        id: "session-1",
+        userId,
+        token: "session-token",
+        expiresAt: new Date("2027-08-30T00:00:00.000Z"),
+        createdAt: new Date("2026-08-30T00:00:00.000Z"),
+        updatedAt: new Date("2026-08-30T00:00:00.000Z"),
+      },
+      user: {
+        id: userId,
+        name: "Owner",
+        email: "owner@example.com",
+        emailVerified: true,
+        createdAt: new Date("2026-08-30T00:00:00.000Z"),
+        updatedAt: new Date("2026-08-30T00:00:00.000Z"),
+      },
+    });
+    repositoryMocks.getTeam.mockResolvedValue({
+      id: projectId,
+      name: "Briar",
+      issue_key_prefix: "BR",
+      schedule_tab_enabled: 1,
+      icon: null,
+      icon_name: null,
+      icon_color: null,
+      organization_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      organization_name: "Briar Org",
+      member_role: "owner",
+      created_at: "2026-08-30T00:00:00.000Z",
+    });
+    repositoryMocks.listTranscriptSessions.mockResolvedValue([
+      {
+        session_id: "detached-run-claim-2",
+        worker_id: "worker-1",
+        agent_provider: "codex",
+        started_at: "2026-08-30T04:00:00.000Z",
+        last_event_at: "2026-08-30T04:30:00.000Z",
+        archived: false,
+      },
+      {
+        session_id: "detached-run-claim-1",
+        worker_id: null,
+        agent_provider: null,
+        started_at: "2026-08-29T04:00:00.000Z",
+        last_event_at: "2026-08-29T05:00:00.000Z",
+        archived: true,
+      },
+    ]);
+
+    const router = createConnectRouter({
+      connect: true,
+      grpc: false,
+      grpcWeb: false,
+      interceptors: [connectErrorInterceptor],
+    });
+    registerAppAgentService(
+      router,
+      {
+        request: connectRequest(),
+        auth: {} as BriarAuth,
+        db: {} as D1Database,
+        env: { ARCHIVES: {} } as Env,
+      },
+      {
+        requireSession: repositoryMocks.requireSession,
+        getTeam: repositoryMocks.getTeam,
+        getSessionCursor: repositoryMocks.getCursor,
+        getTranscript: repositoryMocks.getTranscript,
+        listTranscriptSessions: repositoryMocks.listTranscriptSessions,
+        listSessionSummaries: repositoryMocks.listSummaries,
+      },
+    );
+
+    const handler = requireConnectHandler(
+      router.handlers,
+      AgentService.method.listProjectAgentTranscriptSessions,
+    );
+    const response = await createFetchHandler(handler)(
+      new Request(
+        createMethodUrl(
+          "https://api.example.test",
+          AgentService.method.listProjectAgentTranscriptSessions,
+        ),
+        {
+          method: "POST",
+          headers: {
+            "connect-protocol-version": "1",
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ projectId, runId }),
+        },
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(repositoryMocks.listTranscriptSessions).toHaveBeenCalledWith({
+      db: {},
+      projectId,
+      runId,
+    });
+    expect(await response.json()).toEqual({
+      sessions: [
+        {
+          sessionId: "detached-run-claim-2",
+          workerId: "worker-1",
+          agentProvider: "AGENT_PROVIDER_CODEX",
+          startedAt: "2026-08-30T04:00:00Z",
+          lastEventAt: "2026-08-30T04:30:00Z",
+        },
+        {
+          sessionId: "detached-run-claim-1",
+          startedAt: "2026-08-29T04:00:00Z",
+          lastEventAt: "2026-08-29T05:00:00Z",
+          archived: true,
+        },
+      ],
     });
   });
 });

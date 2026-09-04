@@ -146,6 +146,78 @@ describe("agentMessagesFromAppServerEvents", () => {
       isComplete: false,
     }]);
   });
+
+  it("keeps activities so a turn without any message still shows its work", () => {
+    expect(
+      agentMessagesFromAppServerEvents([
+        {
+          ...event(1, "codex/stream"),
+          direction: "server",
+          event: {
+            type: "activityStarted",
+            id: "exec-1",
+            kind: "command",
+            title: "bun test",
+            text: "",
+          },
+        },
+        {
+          ...event(2, "codex/stream"),
+          direction: "server",
+          event: { type: "activityDelta", id: "exec-1", delta: "1 failed" },
+        },
+        {
+          ...event(3, "codex/stream"),
+          direction: "server",
+          event: {
+            type: "activityCompleted",
+            id: "exec-1",
+            kind: "command",
+            title: "bun test",
+            text: "1 failed",
+            status: "failed",
+          },
+        },
+        {
+          ...event(4, "codex/stream"),
+          direction: "server",
+          event: {
+            type: "activityCompleted",
+            id: "mcp-startup:figma",
+            kind: "tool",
+            title: "figma MCP unavailable",
+            text: "",
+            status: "failed",
+          },
+        },
+      ]),
+    ).toEqual([
+      {
+        id: "exec-1",
+        phase: null,
+        text: "1 failed",
+        startedAtMs: 1,
+        updatedAtMs: 3,
+        isComplete: true,
+        activity: { kind: "command", title: "bun test", status: "failed" },
+      },
+      // A headline with no output is the only trace of a failed startup, so it
+      // survives the blank-row filter that hides silent messages.
+      {
+        id: "mcp-startup:figma",
+        phase: null,
+        text: "",
+        startedAtMs: 4,
+        updatedAtMs: 4,
+        isComplete: true,
+        activity: {
+          kind: "tool",
+          title: "figma MCP unavailable",
+          status: "failed",
+        },
+      },
+    ]);
+  });
 });
 
 describe("naturalLanguageFromAgentMessage", () => {

@@ -3,8 +3,10 @@ import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   ingestAgentTranscript,
   listAgentTranscriptSegments,
+  listAgentTranscriptSessionsForRun,
   recalculateAgentTranscriptSessionTotals,
   readAgentWorkLog,
+  readLatestAgentWorkLogForRun,
   retainedRawTranscriptEvents,
 } from "./agent-worklog";
 import { MAX_TRANSCRIPT_PAYLOAD_BYTES } from "./transcript-limits";
@@ -660,5 +662,90 @@ describe("provider-independent agent work log", () => {
     await recalculateAgentTranscriptSessionTotals(db, sessionId);
     expect(await expectSessionTotalsToMatchSegments(sessionId))
       .toEqual(afterUpsert);
+  });
+
+  it("keeps every claim's session selectable after a run is reclaimed", async () => {
+    const runId = "55555555-5555-4555-8555-555555555555";
+    const now = "2026-08-13T00:00:00.000Z";
+    await executeD1Sql(
+      db,
+      `insert into briar_hunt_runs (
+         id, project_id, source, source_key, title, stage, status,
+         workflow_stage, workflow_snapshot_json, issue_checkpoints_json,
+         repository, started_at, last_event_at, created_at, updated_at
+       ) values (
+         '${runId}', '${projectId}', 'issue', 'reclaimed-run', 'Reclaimed run',
+         'implementing', 'running', 'implementing', '{}', '[]',
+         'briar/worklog', '${now}', '${now}', '${now}', '${now}'
+       );`,
+    );
+    const claim = async (
+      sessionId: string,
+      sequence: number,
+      text: string,
+      observed: string,
+    ) =>
+      ingestAgentTranscript(db, bucket, projectId, {
+        sessionId,
+        runId,
+        workerId: null,
+        agentProvider: "codex",
+        events: [{
+          sequence,
+          direction: "server" as const,
+          payload: {
+            type: "event",
+            event: {
+              type: "messageCompleted",
+              id: `assistant-${sequence}`,
+              phase: "final",
+              text,
+            },
+          },
+        }],
+        observedAt: observed,
+      });
+    await claim(
+      `detached-${runId}-claim-1`,
+      1,
+      "First claim finished the pull request",
+      "2026-08-13T00:00:01.000Z",
+    );
+    await claim(
+      `detached-${runId}-claim-2`,
+      1_000_001,
+      "Second claim only reported a failed MCP startup",
+      "2026-08-13T02:00:00.000Z",
+    );
+
+    const sessions = await listAgentTranscriptSessionsForRun(
+      db,
+      projectId,
+      runId,
+    );
+    expect(sessions).toEqual([
+      expect.objectContaining({
+        session_id: `detached-${runId}-claim-2`,
+        agent_provider: "codex",
+        archived: false,
+      }),
+      expect.objectContaining({
+        session_id: `detached-${runId}-claim-1`,
+        archived: false,
+      }),
+    ]);
+
+    // The run-scoped read still follows the newest claim, so the earlier work
+    // log is only reachable through its own session id.
+    expect((await readLatestAgentWorkLogForRun(db, projectId, runId))?.session)
+      .toMatchObject({ session_id: `detached-${runId}-claim-2` });
+    expect(
+      (await readAgentWorkLog(db, projectId, `detached-${runId}-claim-1`))
+        ?.entries,
+    ).toEqual([
+      expect.objectContaining({
+        body: "First claim finished the pull request",
+      }),
+    ]);
   });
 });

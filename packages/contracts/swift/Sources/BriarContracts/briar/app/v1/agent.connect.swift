@@ -79,6 +79,9 @@ public protocol BriarAPI_AgentServiceClientInterface: Sendable {
 
     @available(iOS 13, *)
     func `getProjectAgentTranscript`(request: BriarAPI_GetProjectAgentTranscriptRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_GetProjectAgentTranscriptResponse>
+
+    @available(iOS 13, *)
+    func `listProjectAgentTranscriptSessions`(request: BriarAPI_ListProjectAgentTranscriptSessionsRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_ListProjectAgentTranscriptSessionsResponse>
 }
 
 /// Concrete implementation of `BriarAPI_AgentServiceClientInterface`.
@@ -204,6 +207,11 @@ public final class BriarAPI_AgentServiceClient: BriarAPI_AgentServiceClientInter
         return await self.client.unary(path: "/briar.app.v1.AgentService/GetProjectAgentTranscript", idempotencyLevel: .unknown, request: request, headers: headers)
     }
 
+    @available(iOS 13, *)
+    public func `listProjectAgentTranscriptSessions`(request: BriarAPI_ListProjectAgentTranscriptSessionsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ListProjectAgentTranscriptSessionsResponse> {
+        return await self.client.unary(path: "/briar.app.v1.AgentService/ListProjectAgentTranscriptSessions", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
     public enum Metadata {
         public enum Methods {
             public static let listOrganizationAgents = Connect.MethodSpec(name: "ListOrganizationAgents", service: "briar.app.v1.AgentService", type: .unary)
@@ -229,6 +237,7 @@ public final class BriarAPI_AgentServiceClient: BriarAPI_AgentServiceClientInter
             public static let runProjectAgentTask = Connect.MethodSpec(name: "RunProjectAgentTask", service: "briar.app.v1.AgentService", type: .unary)
             public static let cancelProjectAgentTask = Connect.MethodSpec(name: "CancelProjectAgentTask", service: "briar.app.v1.AgentService", type: .unary)
             public static let getProjectAgentTranscript = Connect.MethodSpec(name: "GetProjectAgentTranscript", service: "briar.app.v1.AgentService", type: .unary)
+            public static let listProjectAgentTranscriptSessions = Connect.MethodSpec(name: "ListProjectAgentTranscriptSessions", service: "briar.app.v1.AgentService", type: .unary)
         }
     }
 }

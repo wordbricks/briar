@@ -22,6 +22,29 @@ message GetProjectAgentTranscriptResponse {
   repeated ProjectAgentWorkLogEntry entries = 2;
 }
 
+message ListProjectAgentTranscriptSessionsRequest {
+  string project_id = 1;
+  string run_id = 2;
+}
+
+message ListProjectAgentTranscriptSessionsResponse {
+  // Newest session first. Every claim of a run starts its own session, so a
+  // reclaimed run keeps the earlier sessions selectable instead of hiding them
+  // behind the newest one.
+  repeated ProjectAgentTranscriptSessionSummary sessions = 1;
+}
+
+message ProjectAgentTranscriptSessionSummary {
+  string session_id = 1;
+  // Cold-storage sessions no longer carry their worker or provider, so both
+  // stay unset once a session has been archived.
+  optional string worker_id = 2;
+  optional briar.types.v1.AgentProvider agent_provider = 3;
+  google.protobuf.Timestamp started_at = 4;
+  google.protobuf.Timestamp last_event_at = 5;
+  bool archived = 6;
+}
+
 message ProjectAgentTranscriptSession {
   string session_id = 1;
   optional string run_id = 2;

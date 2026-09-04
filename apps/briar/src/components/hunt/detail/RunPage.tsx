@@ -14,6 +14,7 @@ import { MarkdownContent, defaultMarkdownUrlTransform } from "@/components/Markd
 import { WorkerIcon } from "@/components/WorkerIcon";
 import { useMobileBackHandler } from "@/hooks/useMobileNavigation";
 import { useProjectAgentWorkerEvents } from "@/hooks/useProjectAgentWorkerEvents";
+import { useProjectAgentTranscriptSessions } from "@/hooks/useProjectAgentTranscriptSessions";
 import { useHorizontalPaneResize } from "@/hooks/useHorizontalPaneResize";
 import { errorDiagnosticOccurrenceKey, errorDiagnosticsForMessage } from "@/lib/error-diagnostics";
 import { agentMessagesFromAppServerEvents } from "@/lib/auto-hunt-agent";
@@ -357,7 +358,14 @@ export function RunPage({
   };
   const hasWorkerExecution = Boolean(run.workerId);
   const workerExecutionIsLive = !["completed", "cancelled", "paused", "blocked", "failed"].includes(run.status);
-  const workerEvents = useProjectAgentWorkerEvents(token, projectId, hasWorkerExecution ? [run.id] : [], workerExecutionIsLive);
+  // Each claim of the run writes its own transcript session, so the earlier
+  // work logs stay reachable instead of being hidden behind the newest claim.
+  const transcriptSessions = useProjectAgentTranscriptSessions(token, projectId, run.id, workerExecutionIsLive);
+  const [selectedTranscriptSessionId, setSelectedTranscriptSessionId] = useState<string | null>(null);
+  useEffect(() => setSelectedTranscriptSessionId(null), [run.id]);
+  const followsLatestSession = selectedTranscriptSessionId === null;
+  const hasTranscript = hasWorkerExecution || transcriptSessions.sessions.length > 0;
+  const workerEvents = useProjectAgentWorkerEvents(token, projectId, followsLatestSession && hasTranscript ? [run.id] : [], workerExecutionIsLive && followsLatestSession, followsLatestSession ? [] : [selectedTranscriptSessionId]);
   const agentActivity = useMemo(() => agentMessagesFromAppServerEvents(workerEvents.events), [workerEvents.events]);
   const activityProvider = workerEvents.events.find(event => event.provider)?.provider ?? run.requestedProvider ?? run.preferredProvider ?? null;
   const [runEvents, setRunEvents] = useState<HuntEvent[]>([]);
@@ -1421,7 +1429,7 @@ export function RunPage({
                           {executionMetricsPanel}
                         </div>}
                       {run.status !== "paused" && !completionSummary ? <RunResultScreenshots onLoad={onLoadRunEvidence} onLoadImage={onLoadRunEvidenceImage} runId={run.id} /> : null}
-                    </div> : activeDetailTab === "agentActivity" ? <IssueAgentActivityPanel activity={agentActivity} error={workerEvents.error} id={`${detailTabsId}-agent-activity-panel`} isLive={workerExecutionIsLive && hasWorkerExecution} labelledBy={`${detailTabsId}-agent-activity-tab`} loading={workerEvents.isLoading} provider={activityProvider} /> : activeDetailTab === "statusHistory" ? <IssueStatusHistoryPanel events={runEvents} id={`${detailTabsId}-status-history-panel`} labelledBy={`${detailTabsId}-status-history-tab`} loadError={runEventsLoadError} loading={runEventsLoading} onRetry={() => void loadRunEvents()} workflow={run.workflow} /> : <RunEvidencePanel id={`${detailTabsId}-evidence-panel`} labelledBy={`${detailTabsId}-evidence-tab`} onLoad={onLoadRunEvidence} onLoadImage={onLoadRunEvidenceImage} run={run} />}
+                    </div> : activeDetailTab === "agentActivity" ? <IssueAgentActivityPanel activity={agentActivity} error={workerEvents.error} id={`${detailTabsId}-agent-activity-panel`} isLive={workerExecutionIsLive && hasWorkerExecution && followsLatestSession} labelledBy={`${detailTabsId}-agent-activity-tab`} loading={workerEvents.isLoading || transcriptSessions.isLoading && agentActivity.length === 0} onSelectSession={setSelectedTranscriptSessionId} provider={activityProvider} selectedSessionId={selectedTranscriptSessionId} sessions={transcriptSessions.sessions} /> : activeDetailTab === "statusHistory" ? <IssueStatusHistoryPanel events={runEvents} id={`${detailTabsId}-status-history-panel`} labelledBy={`${detailTabsId}-status-history-tab`} loadError={runEventsLoadError} loading={runEventsLoading} onRetry={() => void loadRunEvents()} workflow={run.workflow} /> : <RunEvidencePanel id={`${detailTabsId}-evidence-panel`} labelledBy={`${detailTabsId}-evidence-tab`} onLoad={onLoadRunEvidence} onLoadImage={onLoadRunEvidenceImage} run={run} />}
                 </section>
                 {usesConversationTab ? <div aria-labelledby={`${detailTabsId}-conversation-tab`} className="issue-conversation-tab-panel" hidden={activeDetailTab !== "conversation"} id={`${detailTabsId}-conversation-panel`} role="tabpanel">
                     <IssueConversation currentUserId={currentUserId} executionRuns={availableRuns} highlightedMessageId={highlightedMessageId} inboxSyncSignal={conversationInboxSyncSignal} mentionMembers={mentionMembers} mentionAgents={mentionAgents} onAcceptIssueAction={onAcceptIssueAction} onAcceptIssueExecution={onAcceptIssueExecution} onAcceptSkillExecution={onAcceptSkillExecution} executionPolicy={executionPolicy} executionWorkers={executionWorkers} onDelete={onDeleteIssueMessage} onEdit={onEditIssueMessage} onIssueOpen={onDependencyOpen} onLoadAttachment={onLoadAttachment} onLoad={onLoadIssueMessages} onSend={onSendIssueMessage} onUpdateSubscription={onUpdateIssueSubscription} organizationId={organizationId} run={run} projectId={projectId} token={token} showsScrollToLatest={companionMode} />
