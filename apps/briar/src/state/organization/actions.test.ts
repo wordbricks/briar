@@ -7,7 +7,7 @@ import { reconnectRequestGeneration } from "../workspace/api";
 import { healthAtom } from "../workspace/atoms";
 import { sessionErrorAtom, tokenAtom } from "../session/atoms";
 import { applySyncEvent } from "../sync/apply";
-import { dashboardViewAtom } from "../sync/view";
+import { readTeamView } from "../../test/team-view";
 import { activeTeamIdAtom, staleTeamIdAtom, teamsAtom } from "../team/atoms";
 import { lockedTeamIdAtom } from "../platform";
 import {
@@ -214,7 +214,7 @@ describe("createOrganizationActions", () => {
       registry.get(teamsAtom).map((team) => team.organizationName),
     ).toEqual(["Org A renamed", "Org B"]);
     // …and so does the team entity the dashboard renders.
-    expect(registry.get(dashboardViewAtom(teamA.id))?.team.organizationName)
+    expect(readTeamView(registry, teamA.id)?.team.organizationName)
       .toBe("Org A renamed");
   });
 
@@ -271,7 +271,7 @@ describe("createOrganizationActions", () => {
 
     actions.selectOrganization(organizationB.id);
 
-    expect(registry.get(dashboardViewAtom(teamB.id))?.team.id).toBe(teamB.id);
+    expect(readTeamView(registry, teamB.id)?.team.id).toBe(teamB.id);
     expect(registry.get(staleTeamIdAtom)).toBe(teamB.id);
   });
 

@@ -11,6 +11,7 @@ import {
   isCreatingTeamAtom,
   loadedTeamIdAtom,
   renderedTeamSettingsAtom,
+  teamAgentBoardAtom,
   teamConnectionAtom,
   teamsAtom,
 } from "./atoms";
@@ -114,6 +115,59 @@ describe("team atoms", () => {
     registry.set(activeTeamIdAtom, teamB.id);
     expect(registry.get(loadedTeamIdAtom)).toBeNull();
     expect(registry.get(renderedTeamSettingsAtom(teamA.id))).toBeNull();
+  });
+
+  it("keeps the agent board identical across a run edit it does not show", () => {
+    const registry = createTestRegistry([
+      [teamsAtom, [teamA]],
+      [activeTeamIdAtom, teamA.id],
+    ]);
+    applySyncEvent(registry, {
+      kind: "team-snapshot",
+      teamId: teamA.id,
+      payload: { ...demoDashboard, team: teamA },
+    });
+    const board = teamAgentBoardAtom(teamA.id);
+    const seen: unknown[] = [];
+    registry.subscribe(board, (value) => seen.push(value), { immediate: true });
+    seen.length = 0;
+    const before = registry.get(board);
+
+    // A delta that moves the cursor and nothing else: every projection keeps
+    // its reference, so the composite keeps its own.
+    applySyncEvent(registry, {
+      kind: "team-delta",
+      teamId: teamA.id,
+      payload: {
+        reset: false,
+        cursor: 99,
+        hasMore: false,
+        runs: [],
+        deletedRunIds: [],
+        workers: demoDashboard.workers ?? [],
+        organizationProviders: demoDashboard.organizationProviders ?? [],
+        generatedAt: "2026-09-04T00:00:00.000Z",
+      },
+    });
+
+    expect(registry.get(board)).toBe(before);
+    expect(seen).toEqual([]);
+
+    const target = demoDashboard.runs[0]!;
+    applySyncEvent(registry, {
+      kind: "run-changed",
+      teamId: teamA.id,
+      run: { ...target, title: "고친 이슈" },
+    });
+
+    // The runs are what the Agents page dispatches over, so a run edit does
+    // reach it — and the three projections it did not touch do not move.
+    const after = registry.get(board);
+    expect(seen).toHaveLength(1);
+    expect(after?.runs).not.toBe(before?.runs);
+    expect(after?.team).toBe(before?.team);
+    expect(after?.workers).toBe(before?.workers);
+    expect(after?.executionPolicy).toBe(before?.executionPolicy);
   });
 
   it("keeps the selection when the last subscriber leaves", () => {

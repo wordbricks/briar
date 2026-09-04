@@ -14,7 +14,7 @@ import {
   localInventoryErrorAtom,
 } from "../workspace/atoms";
 import { applySyncEvent } from "../sync/apply";
-import { dashboardViewAtom } from "../sync/view";
+import { readTeamView } from "../../test/team-view";
 import {
   activeTeamIdAtom,
   isCreatingTeamAtom,
@@ -137,7 +137,7 @@ const expectSignedOut = (registry: AtomRegistry) => {
   expect(registry.get(teamConnectionAtom)).toBeNull();
   expect(registry.get(isCreatingTeamAtom)).toBe(false);
   // Nothing the previous account loaded may outlive its token.
-  expect(registry.get(dashboardViewAtom(teamA.id))).toBeNull();
+  expect(readTeamView(registry, teamA.id)).toBeNull();
   expect(registry.get(runsByIdAtom).size).toBe(0);
 };
 

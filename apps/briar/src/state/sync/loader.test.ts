@@ -12,7 +12,7 @@ import {
 } from "../team/atoms";
 import { applySyncEvent } from "./apply";
 import { createTeamSyncLoader, type TeamSyncApi } from "./loader";
-import { dashboardViewAtom } from "./view";
+import { readTeamView } from "../../test/team-view";
 
 const teamA = "team-a";
 const teamB = "team-b";
@@ -111,7 +111,7 @@ describe("team sync loader", () => {
 
     expect(server.snapshotRequests).toEqual([teamA]);
     expect(server.deltaRequests).toEqual([]);
-    expect(registry.get(dashboardViewAtom(teamA))?.team.id).toBe(teamA);
+    expect(readTeamView(registry, teamA)?.team.id).toBe(teamA);
   });
 
   it("resumes from the stored cursor once a payload exists", async () => {
@@ -196,7 +196,7 @@ describe("team sync loader", () => {
       resolve(snapshotOf(teamA, 1));
     }
     await Promise.all([first, second]);
-    expect(registry.get(dashboardViewAtom(teamA))).not.toBeNull();
+    expect(readTeamView(registry, teamA)).not.toBeNull();
   });
 
   it("drops a response a newer request for the same team superseded", async () => {
@@ -210,11 +210,11 @@ describe("team sync loader", () => {
 
     resolveStale?.(snapshotOf(teamA, 42));
     await stale;
-    expect(registry.get(dashboardViewAtom(teamA))).toBeNull();
+    expect(readTeamView(registry, teamA)).toBeNull();
 
     resolveFresh?.(snapshotOf(teamA, 43));
     await fresh;
-    expect(registry.get(dashboardViewAtom(teamA))?.cursor).toBe(43);
+    expect(readTeamView(registry, teamA)?.cursor).toBe(43);
   });
 
   it("drops a response for a team that is no longer selected", async () => {
@@ -228,7 +228,7 @@ describe("team sync loader", () => {
     }
     await inFlight;
 
-    expect(registry.get(dashboardViewAtom(teamA))).toBeNull();
+    expect(readTeamView(registry, teamA)).toBeNull();
   });
 
   it("drops a response the caller cancelled", async () => {
@@ -242,7 +242,7 @@ describe("team sync loader", () => {
     }
     await inFlight;
 
-    expect(registry.get(dashboardViewAtom(teamA))).toBeNull();
+    expect(readTeamView(registry, teamA)).toBeNull();
     expect(registry.get(sessionErrorAtom)).toBeNull();
   });
 
@@ -258,7 +258,7 @@ describe("team sync loader", () => {
     }
     await inFlight;
 
-    expect(registry.get(dashboardViewAtom(teamB))).toBeNull();
+    expect(readTeamView(registry, teamB)).toBeNull();
   });
 
   it("does nothing without a session or a team", async () => {

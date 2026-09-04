@@ -10,7 +10,7 @@ import { setSessionDataSources } from "../session/api";
 import { reconnectRequestGeneration } from "../workspace/api";
 import { sessionErrorAtom, tokenAtom } from "../session/atoms";
 import { applySyncEvent } from "../sync/apply";
-import { dashboardViewAtom } from "../sync/view";
+import { readTeamView } from "../../test/team-view";
 import {
   createTeamActions,
   type TeamActionApi,
@@ -115,7 +115,7 @@ describe("createTeamActions", () => {
     expect(server.iconUpdates).toEqual([teamA.id]);
     expect(team.icon).toBe("data:image/png;base64,");
     expect(registry.get(teamsAtom)).toEqual([team, teamB]);
-    expect(registry.get(dashboardViewAtom(teamA.id))?.team).toBe(team);
+    expect(readTeamView(registry, teamA.id)?.team).toBe(team);
   });
 
   it("leaves a team the store never loaded out of the entity map", async () => {

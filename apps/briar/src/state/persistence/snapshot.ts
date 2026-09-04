@@ -49,9 +49,15 @@ import {
 
   The store is normalized and the views read it through per-team families, so a
   snapshot is that store written out: the entity maps, the per-team projections
-  a `DashboardPayload` is reassembled from, the organization's channel index,
-  and the account those belong to. Nothing else — the snapshot exists to put the
-  last screen back on the display, not to be a second source of truth.
+  those families hold, the organization's channel index, and the account they
+  belong to. Nothing else — the snapshot exists to put the last screen back on
+  the display, not to be a second source of truth.
+
+  It is written from the atoms and read back into them one by one, so it never
+  passes through a payload: `collectSnapshot` reads each family and
+  `applySnapshot` writes the same ones `applySyncEvent` would. The serialized
+  shape is therefore the store's, not the wire's, and did not change when the
+  reassembled `DashboardPayload` view was removed.
 
   Deliberately absent, and it has to stay that way:
 
@@ -74,7 +80,7 @@ import {
 /** Bumped whenever a stored snapshot can no longer be read into the store. */
 export const SNAPSHOT_SCHEMA_VERSION = 1;
 
-/** One team's slice of the store, in the shape `dashboardViewAtom` reads. */
+/** One team's slice of the store: the projections its views read, by team. */
 export interface PersistedTeamState {
   readonly teamId: string;
   readonly settings: TeamSettings | null;
