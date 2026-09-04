@@ -30,6 +30,18 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.194",
+        date: "2026년 9월 4일",
+        title: "프로바이더 턴 판정과 OpenCode 러너 종료, 스냅샷 저장소 연결 문제를 고칩니다",
+        summary:
+          "결과 프레임을 받은 에이전트 턴이 종료 코드 때문에 실패로 처리되지 않게 하고, OpenCode 러너가 완료 후 비정상 종료되지 않게 하며, 오래 열린 창이 스냅샷 저장소 업그레이드를 막지 않게 했습니다.",
+        items: [
+          "결과 프레임을 받은 프로바이더 턴은 러너 종료 코드와 무관하게 성공으로 판정합니다. 결과를 전달한 뒤 프로세스가 비정상 종료해도 이슈 답장·DM 학습 처리가 실패로 취급되지 않고, 서버가 같은 턴을 다시 실행하지 않습니다.",
+          "OpenCode 러너가 스스로 닫는 이벤트 스트림의 AbortError를 무시하는 unhandled rejection 가드를 설치해, 턴이 끝난 뒤 exit 1로 죽지 않습니다. 러너가 모르는 rejection은 여전히 실패로 보고합니다.",
+          "며칠 동안 열린 데스크탑 창이 IndexedDB 스냅샷 저장소 연결을 놓지 않아 다른 창·새 빌드의 스키마 업그레이드가 막히던 문제를 고쳤습니다. versionchange가 오면 연결을 놓고 다음 접근 때 다시 열어, 업그레이드가 막혀도 스냅샷 없이 정상 부팅합니다.",
+        ],
+      },
+      {
         version: "1.2.193",
         date: "2026년 9월 4일",
         title: "macOS 상태 트레이 깜빡임을 고치고 새 관리형 컴퓨터에 부팅 자동 갱신 이미지를 적용합니다",
@@ -1621,6 +1633,18 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.194",
+        date: "September 4, 2026",
+        title: "Judge provider turns by their result frame and stop the OpenCode runner from dying after completion",
+        summary:
+          "A provider turn that delivered its terminal result now succeeds regardless of the runner exit code, the OpenCode runner no longer crashes on its own event-stream abort, and long-lived windows no longer pin the snapshot store open.",
+        items: [
+          "Judge a detached provider turn by the result frame it delivered instead of the runner exit code, so a process that dies after handing over the terminal result no longer fails issue replies or DM learning, and the server no longer re-executes the same turn.",
+          "Install an unhandled-rejection guard in the OpenCode runner that swallows the AbortError raised by closing its own event stream, so a finished turn no longer exits 1 after the fact; rejections the runner did not expect still fail loudly.",
+          "Stop long-lived desktop windows from holding the IndexedDB snapshot connection open and blocking another window's schema upgrade; the connection now closes on versionchange and reopens on the next access, so boot degrades to running without a snapshot instead of hanging.",
+        ],
+      },
       {
         version: "1.2.193",
         date: "September 4, 2026",
