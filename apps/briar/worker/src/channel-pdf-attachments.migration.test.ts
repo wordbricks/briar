@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
-import { createChannel, createChannelMessage } from "./channels";
+import { createChannel } from "./channels";
 import { applyD1Migrations } from "./test-helpers/d1";
 import { executeD1Sql } from "./test-helpers/d1-sql";
 
@@ -41,27 +41,23 @@ describe("channel PDF attachment migration", () => {
       createdByUserId: "pdf-owner",
       createdAt: now,
     });
-    await createChannelMessage(db, {
-      id: "image-message",
-      channelId: "pdf-channel",
-      parentMessageId: null,
-      authorUserId: "pdf-owner",
-      authorAgentId: null,
-      authorAgentName: null,
-      authorAgentProvider: null,
-      body: "Existing image",
-      mentionedUserIds: [],
-      mentionedAgentIds: [],
-      attachments: [{
-        id: "image-attachment",
-        organization_id: "pdf-org",
-        object_key: "channel-attachments/pdf-org/pdf-channel/image-message/image-attachment",
-        filename: "screen.png",
-        content_type: "image/png",
-        byte_size: 4,
-      }],
-      createdAt: now,
-    });
+    await executeD1Sql(db, `
+      insert into briar_channel_messages (
+        id, channel_id, parent_message_id, author_user_id, body,
+        created_at, updated_at
+      ) values (
+        'image-message', 'pdf-channel', null, 'pdf-owner', 'Existing image',
+        '${now}', '${now}'
+      );
+      insert into briar_channel_message_attachments (
+        id, organization_id, channel_id, message_id, object_key,
+        filename, content_type, byte_size, created_at
+      ) values (
+        'image-attachment', 'pdf-org', 'pdf-channel', 'image-message',
+        'channel-attachments/pdf-org/pdf-channel/image-message/image-attachment',
+        'screen.png', 'image/png', 4, '${now}'
+      );
+    `);
 
     await applyD1Migrations(db, {
       files: ["0176_channel_pdf_attachments.sql"],
@@ -72,27 +68,23 @@ describe("channel PDF attachment migration", () => {
        where id = 'image-attachment'`,
     ).first()).toEqual({ filename: "screen.png", content_type: "image/png" });
 
-    await createChannelMessage(db, {
-      id: "pdf-message",
-      channelId: "pdf-channel",
-      parentMessageId: null,
-      authorUserId: "pdf-owner",
-      authorAgentId: null,
-      authorAgentName: null,
-      authorAgentProvider: null,
-      body: "PDF attachment",
-      mentionedUserIds: [],
-      mentionedAgentIds: [],
-      attachments: [{
-        id: "pdf-attachment",
-        organization_id: "pdf-org",
-        object_key: "channel-attachments/pdf-org/pdf-channel/pdf-message/pdf-attachment",
-        filename: "brief.pdf",
-        content_type: "application/pdf",
-        byte_size: 8,
-      }],
-      createdAt: now,
-    });
+    await executeD1Sql(db, `
+      insert into briar_channel_messages (
+        id, channel_id, parent_message_id, author_user_id, body,
+        created_at, updated_at
+      ) values (
+        'pdf-message', 'pdf-channel', null, 'pdf-owner', 'PDF attachment',
+        '${now}', '${now}'
+      );
+      insert into briar_channel_message_attachments (
+        id, organization_id, channel_id, message_id, object_key,
+        filename, content_type, byte_size, created_at
+      ) values (
+        'pdf-attachment', 'pdf-org', 'pdf-channel', 'pdf-message',
+        'channel-attachments/pdf-org/pdf-channel/pdf-message/pdf-attachment',
+        'brief.pdf', 'application/pdf', 8, '${now}'
+      );
+    `);
     expect(await db.prepare(
       `select filename, content_type from briar_channel_message_attachments
        where id = 'pdf-attachment'`,

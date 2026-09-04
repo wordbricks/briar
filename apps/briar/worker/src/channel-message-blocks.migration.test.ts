@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
-import { getChannelMessage } from "./channels";
+import { decodeStoredChannelMessageBlocks } from "./channels";
 import { applyD1Migrations } from "./test-helpers/d1";
 
 describe("channel message block cutover", () => {
@@ -20,16 +20,21 @@ describe("channel message block cutover", () => {
       files: ["0164_canonical_channel_message_blocks.sql"],
     });
 
-    expect(await getChannelMessage(
-      db,
-      historical!.channel_id,
-      historical!.id,
-    )).toEqual(expect.objectContaining({
-      body: historical!.body,
-      blocks: expect.arrayContaining([
+    const migrated = await db.prepare(
+      `select body, blocks_json from briar_channel_messages
+       where id = ?`,
+    ).bind(historical!.id).first<{
+      body: string;
+      blocks_json: string | null;
+    }>();
+    expect(migrated).not.toBeNull();
+    expect(migrated!.body).toBe(historical!.body);
+    expect(migrated!.blocks_json).not.toBeNull();
+    expect(decodeStoredChannelMessageBlocks(migrated!.blocks_json!)).toEqual(
+      expect.arrayContaining([
         expect.objectContaining({ type: expect.any(String) }),
       ]),
-    }));
+    );
 
     await expect(db.prepare(
       `update briar_channel_messages set blocks_json = '{}' where id = ?`,
