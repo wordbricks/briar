@@ -7,6 +7,8 @@ import {
   type Messages,
 } from "./messages";
 import { localeTags, type Locale } from "./locale";
+import { useRegistry } from "../state/registry";
+import { publishLocaleCatalog } from "../state/i18n/atoms";
 
 export { localeTags, type Locale } from "./locale";
 export { loadLocaleMessages } from "./messages";
@@ -57,6 +59,7 @@ export function I18nProvider({
   /** Locale resolved before the first render, with its messages already loaded. */
   initial?: LoadedMessages;
 }) {
+  const registry = useRegistry();
   const [locale, setLocale] = useState<Locale>(() => initial?.locale ?? detectLocale());
   const [loaded, setLoaded] = useState<LoadedMessages>(() => {
     if (initial) return initial;
@@ -89,6 +92,17 @@ export function I18nProvider({
       active = false;
     };
   }, [locale, loaded.locale]);
+
+  /*
+    Registry bound code has no React context, and the macOS tray's snapshot is
+    localized with no view in between. The loaded catalog is published to
+    `state/i18n` so a subscription atom can build the same `t`; the locale it
+    carries is the settled one, so the tray and the screen never disagree while
+    a chunk is still loading.
+  */
+  useEffect(() => {
+    publishLocaleCatalog(registry, loaded);
+  }, [loaded, registry]);
 
   const value = useMemo(
     () => ({ locale, localeTag: localeTags[locale], setLocale, t: translate(loaded.messages) }),

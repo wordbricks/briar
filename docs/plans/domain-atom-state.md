@@ -588,7 +588,9 @@ workspace / workflow / integrations를 옮기며 확인한, 이후 단계에 영
 - **훅이 소유한 도메인이 남아 있지 않다.** `hooks/`에 있던 `useBriar` /
   `useAutoHuntSessions` / `useInbox` / `useChannelConversation` 넷이 전부
   `state/<domain>`이 되었고, 마지막 하나(1,892줄)는 후속 F5-4가 지웠다.
-  `apps/briar/src`에 `useChannelConversation` 참조가 0개다.
+  `apps/briar/src`에 `useChannelConversation` 참조가 0개다. 훅에 남아 있던 마지막
+  **로직**은 `useStatusTray`의 i18n 의존 effect 둘이었고, 후속 F7이 `state/i18n`을
+  두어 그것도 구독형 atom으로 옮겼다 — `useStatusTray`는 `useAtomMount` 네 줄이다.
 - **콜드 부팅은 네트워크 응답 전에 마지막 대시보드를 그린다**
   (`state/persistence/cold-boot.test.tsx`). 그 화면을 **그리는** 것과 그 화면으로
   **행동하는** 것은 후속 F1이 갈라 두었다. 디스크에서 올라온 값으로 서버 작업을
@@ -1221,8 +1223,9 @@ Phase 2 이후 언제든 착수 가능하며 Phase 3–7과 병행할 수 있다
   `useInbox`는 후속 F4가(둘 다 localStorage 상태는 `Atom.kvs`가 아니라 atom의 lazy
   read가 됐다 — 이유는 아래 기준 갱신에 있다), `useChannelConversation`은 후속 F5가
   저장소를(#1631 / #1633 / #1638), 후속 F5-4가 나머지 절반 — 요청 순서, 로더, 실시간,
-  액션, 답장 버전 부기 — 을 옮기고 훅을 지웠다. 남은 훅 소유 로직은 `useStatusTray`의
-  i18n 의존 effect뿐이다.
+  액션, 답장 버전 부기 — 을 옮기고 훅을 지웠다. 마지막으로 남아 있던
+  `useStatusTray`의 i18n 의존 effect 둘은 후속 F7이 구독형 atom으로 바꿨다:
+  **훅이 소유한 로직은 이제 하나도 없다.**
 - `Atom.fn` + `AsyncResult`로 pending / 에러 상태 자동화.
 - 오프라인 우선과 멀티 디바이스 충돌 해결이 목표가 되면 서버 측 SyncAction 로그를
   가진 전용 sync engine(Replicache, Zero 등)을 검토한다. 그 전까지는 이 계획으로
@@ -1263,6 +1266,7 @@ Phase 2 이후 언제든 착수 가능하며 Phase 3–7과 병행할 수 있다
 | F6-1 My issues 엔티티화 | #1655 | 머지됨 | "내 이슈"가 조직의 모든 프로젝트 대시보드를 자기 `useState` 레코드에 담고 런 객체를 그리던 것을 저장소로 옮겼다. `state/my-issues`의 `model`(그룹 분류·소유·스코프·검색 텍스트의 순수 함수), `atoms`(뷰 상태 7종과 로드 상태 5종, 파생 `myIssuesVisibleTeamIds` / `myIssuesRunTeamIds` / `myIssuesRunProject(runId)` / `myIssuesScopedRunIds` / `myIssuesFilteredRunIds` / `myIssuesCount` / `myIssuesGroupedRunIds` / `myIssuesMembers`, 칸반 전용 `myIssuesScopedRuns` / `myIssuesRunProjects` / `myIssuesRunProjectIds`), `useMyIssuesSync`(프로젝트별 응답을 `applySyncEvent`의 `team-snapshot`으로 적용하고 로드·실패·재시도 상태를 쓴다). `MyIssuesList`는 그룹별 id를 받고 각 행(`MyIssuesRow`)이 `runAtom(runId)`과 `myIssuesRunProjectAtom(runId)`을 구독한다. 칸반은 여전히 런 객체를 받는 `IssueCollection`이라 선택됐을 때만 마운트되는 `MyIssuesKanban`으로 갈랐다. `MyIssues.test.tsx`가 `run-changed` 하나에 "그 행만 1회, 목록도 헤더 카운트도 0회"를 렌더 카운트로 고정한다. **보존 규칙**: 이 화면은 LRU(8팀)보다 많은 팀을 동시에 읽으므로 `entities/retention.ts`에 `pinnedTeamIdsAtom`을 두고 `touchRetainedTeam(current, teamId, { protectedIds })`이 그것을 절대 축출하지 않는다. 핀은 화면이 살아 있는 동안만이고(언마운트 시 해제) 메모리 상한은 이 화면이 이미 갖고 있던 것과 같다. 디스크는 별개라 `collectSnapshot`은 여전히 최근 `TEAM_RETENTION_LIMIT`개만 쓴다. `useOrganizationViewData.loadOrganizationTeamDashboard`는 이제 "적용할 것이 없으면 `null`"이고 `MyIssuesTeamBoard` 타입은 사라졌다. |
 | F6-2 컴패니언 채널 카탈로그 + 보드 `processingIssueIds` | #1656 | 머지됨 | F5-4가 남긴 마지막 중복 두 개를 지웠다. **컴패니언 카탈로그**: `CompanionChannels`가 자기 `listChannels` 스냅샷과 `useState` 채널 배열, 그리고 델타를 두 번째로 병합하던 `applyChannelCatalogDelta`를 갖고 있었다. 이제 `visibleOrganizationChannelsAtom`(목록) / `channelAtom(id)`(열린 채널) / `channelCatalogCursorAtom`(로딩)을 읽고, 읽음 처리는 `markOrganizationChannelRead`, 로더가 돌려준 채널은 `channel-changed`로 저장소에 들어간다. 남은 뷰 상태는 열린 채널 id 하나뿐이다. `useChannelConversationSync`의 `onCatalogDelta` 옵션(유일한 사용처였다)이 사라졌고, 데스크톱과 같은 필터를 쓰게 되면서 컴패니언 홈 목록에 섞여 나오던 DM이 빠졌다(DM은 자기 페이지가 있다). 스레드/채널 분기에 두 번 렌더되던 `ChannelActivityPublisher`도 하나로 합쳤다. **보드**: `processingIssueIds`가 `HuntDashboardWithTeam` → `HuntDashboard` → `HuntBoard` / `CompanionTaskBoard` → 카드 컨텍스트로 내려가던 프롭이었다. 런별 `runIsProcessingAtom(runId)`으로 바꿔 `BoardCard` / `BoardIssueRow` / `CompanionTaskRow`가 각자 구독하고, 런 하나짜리 소비자(`HuntDashboard`의 열린 이슈, `InboxDetailContent`)도 같은 family를 쓴다. `BoardCardContext.processingIssueIds`가 사라져 세션 하나가 시작돼도 카드 컨텍스트 객체가 새로 만들어지지 않는다. `HuntDashboardWithTeam.test.tsx`에 렌더 카운트 케이스 추가: 에이전트 세션 시작 → 그 이슈의 카드만 1회. |
 | F6-3 중복 읽음 처리, 대화 쓰기 정리, 죽은 코드 | #1659 | 머지됨 | F6의 나머지 정리 셋. **중복 `markRead`**: 다른 팀의 알림은 두 패스로 라우팅되고(첫 패스가 팀을 고르고 반환, 둘째가 라우팅) 읽음 영수증은 팀 검사 **앞**에 있어 `markRead`가 알림 하나에 두 번 불렸다. 다만 서버 쓰기는 이미 한 번이었다 — 읽음 버전 비교가 두 번째를 걸렀고 푸시 큐도 같은 버전을 버렸다 — 이므로 실제 중복은 호출뿐이었다. 이제 `markRead`가 "이 알림은 읽힌 상태인가"를 boolean으로 답하고 `useDeepLinks`가 영수증이 안착한 메시지 id를 기억해 둘째 패스는 묻지 않는다. 실패(인박스가 아직 그 메시지를 갖고 있지 않음)는 기억하지 않으므로 다음 패스가 다시 시도한다. `actions.test.ts`가 "두 번 불러도 쓰기는 한 번, 모르는 메시지는 `false`"를 고정한다. **`write.ts`**: updater 모양이었던 것은 `write.ts`가 아니라 `actions.ts`의 지역 헬퍼 `updateRoot` / `updateThread`였다(주석이 스스로 "훅이 뷰의 `useState` setter에 주던 모양"이라고 적고 있었다). 하는 일을 이름으로 옮겨 `patchChannelMessages` / `patchChannelRootMessage` / `mergeIntoChannelSurface` / `removeOptimisticChannelMessages` / `applyChannelMessageDeletionToChannel` 다섯 직접 writer를 `write.ts`에 두고 두 헬퍼를 지웠다. 이들이 인코딩하는 규칙은 "두 표면 동시에"다 — 메시지는 루트 행과 열린 스레드 행으로 동시에 그려질 수 있고, 한쪽만 닿은 낙관 패치는 한 화면에 같은 메시지의 두 판본을 보여 준다. `write.test.ts`에 4 케이스 추가. **죽은 코드**: F5-4가 델타 루프를 합친 뒤 아무도 읽지 않게 된 `channelInboxSyncSignal` 프롭 체인(셸 두 곳 → `InboxDetailContent` → `Channels` / `CompanionChannels` / `DirectMessages`)과, 두 채널 뷰에 남아 있던 죽은 import·지역 함수(`ChannelTypingState`, `ChannelDelta`, `mergeChannelMessages`, `relativeTime`, 쓰이지 않던 `toast`)를 지웠다. `state/agent-sessions` / `state/inbox` / `state/channel-conversation` / `hooks/useChannelComposer`의 export는 전수 조사했고 **죽은 것이 없다** — 자기 모듈 밖에서 쓰이지 않는 것들은 전부 모듈 계약을 적는 타입이다. |
+| F6-5 트레이 플래시 + F7 남은 hook형 effect | #1660 | 머지됨 | 훅이 소유한 마지막 로직을 옮기고, 그러면서 드러난 트레이 플래시를 고쳤다. **`state/i18n`**: `localeCatalogAtom`(로케일 + 실제로 로드된 카탈로그)과 파생 `localeAtom` / `localeTagAtom` / `translatorAtom`, 그리고 `publishLocaleCatalog`. 문자열은 로케일당 청크라 "로케일 X의 번역기"는 그 청크가 평가되기 전까지 X의 순수 함수가 아니다 — 그래서 카탈로그를 **소유한 쪽**(`I18nProvider`)이 effect로 발행하고 atom이 그 위에서 파생된다(F5-4의 타이핑 퍼블리셔와 같은 모양: 도는 곳과 읽는 곳을 가른다). 뷰는 그대로 `useI18n()`을 쓴다. **트레이**: `useStatusTray`의 effect 셋이 `statusTrayTeamRunsAtom` / `statusTraySnapshotAtom` / `statusTrayWorkerLabelsAtom`이 되어 훅은 `useAtomMount` 네 줄이다. 마운트 순서가 곧 쓰기 순서다 — 폴이 씨앗을 놓고, 병합이 열린 팀을 접고, 스냅샷이 결과를 읽는다. **플래시(F6-5)는 여전히 재현됐고 원인이 둘이었다**: 폴 atom 본문이 시작하며 목록을 비웠고(하이드레이션된 부팅이나 리마운트에서 병합보다 먼저 돌아 한 패스 동안 빈 트레이가 Rust로 갔다), 폴의 **첫 응답**이 병합이 방금 넣은 런을 통째로 덮었다(그 뒤 아무것도 다시 돌지 않는다). 앞의 것은 열린 팀에서 씨앗을 놓는 것으로, 뒤의 것은 조직 응답이 열린 팀의 몫만 남기고 나머지를 대체하도록 고쳤다. `statusTrayRunsAtom`에 아홉 필드 비교 동등성을 달아 같은 목록의 두 번째 쓰기가 알림을 내지 않는다. **테스트**: `useStatusTray.test.tsx`에 "대시보드가 이미 있는 부팅에서 빈 트레이를 한 번도 밀지 않는다"와 "로케일이 바뀌면 스냅샷이 다시 동기화된다", `state/status-tray/atoms.test.tsx`에 "마지막 관측자가 사라지면 스냅샷을 더 밀지 않는다"(idle TTL 경과), `state/i18n/atoms.test.ts` 4 케이스. |
 
 ### 기준 갱신 (2026-09-04, 후속 F3 이후)
 
@@ -1427,3 +1431,48 @@ Phase 2 이후 언제든 착수 가능하며 Phase 3–7과 병행할 수 있다
   메시지 수만큼 WebSocket이 열린다. 프레임을 채널별 atom에 싣는 퍼블리셔 훅을 한 번
   마운트하고 스트립이 그것을 읽는다. "훅이 도는 곳"과 "값을 읽는 곳"을 갈라야 하는
   구독형 파생의 일반형이다.
+
+### 기준 갱신 (2026-09-04, 후속 F6·F7 이후)
+
+잔여 정리와 마지막 훅형 effect를 옮기며 확인한, 이 저장소에서 앞으로도 쓸 사실이다.
+
+- **보존 한도를 넘어 읽는 화면은 핀을 갖는다.** 엔티티 LRU(8팀)는 "한 번에 한 팀을
+  본다"를 전제하는데 "내 이슈"는 조직의 모든 팀을 동시에 읽는다. 답은 한도를 늘리는
+  것이 아니라 `pinnedTeamIdsAtom`이다 — 화면이 그리는 동안 축출을 막고 언마운트에서
+  푼다. 상한이 사라지는 것이 아니라 **그 화면이 이미 갖고 있던 상한**(자기 `useState`
+  레코드)이 되고, 화면이 닫히면 LRU가 다시 지배한다. 디스크는 별개의 결정이라
+  `collectSnapshot`은 여전히 최근 `TEAM_RETENTION_LIMIT`개만 쓴다.
+- **런의 팀 소속은 런이 아니라 저장 인덱스가 안다.** `HuntRun.teamId`는 옵셔널이므로
+  여러 팀에 걸친 목록은 `teamRunIdsAtom(teamId)`을 역인덱스로 뒤집어야 한다
+  (`myIssuesRunTeamIdsAtom`). 2A가 인덱스를 파생이 아니라 저장으로 둔 이유가 여기서
+  두 번째로 값을 한다.
+- **"두 표면 동시에"가 낙관 갱신의 규칙이다.** 채널 메시지는 루트 행과 열린 스레드
+  행으로 **동시에** 그려질 수 있다. 낙관 패치를 호출부가 직접 쓰면 한쪽만 닿기
+  쉽고, 그러면 한 화면에 같은 메시지의 두 판본이 남는다. `write.ts`의 직접 writer들이
+  그 규칙을 이름 안에 넣어 호출부에서 뺐다.
+- **"두 번 부른다"와 "두 번 쓴다"는 다르다.** 알림 라우팅의 중복 `markRead`는 호출만
+  둘이고 서버 쓰기는 이미 하나였다 — 읽음 버전 비교와 푸시 큐의 버전 비교가 각각
+  걸렀다. 중복을 없앨 때 먼저 확인할 것은 "관측되는 결과가 둘인가"이고, 아니라면
+  고치는 이유는 성능이 아니라 **그 하나가 우연에 기대고 있다**는 것이다. 그래서 액션이
+  결과를 boolean으로 답하고 호출부가 그것을 기억하는 계약으로 바꿨다.
+- **씨앗 없는 구독형 atom은 한 패스짜리 빈 화면을 만든다.** 트레이 폴은 시작하며
+  목록을 비우고 있었는데, 저장소가 이미 값을 갖고 부팅하는 세상(Phase 8의
+  하이드레이션)에서는 그 한 패스가 사용자에게 보인다. 구독이 시작할 때 지우는 대신
+  **이미 알고 있는 것에서 씨앗을 놓아야** 한다. 그리고 첫 응답이 다른 쓰기가 넣은
+  것을 덮지 않는지도 함께 본다 — 같은 목록에 두 writer가 있으면 "덮기"는 두 번째
+  플래시다.
+- **여러 writer가 있는 atom에는 동등성이 필요하다.** `statusTrayRunsAtom`은 폴과
+  병합이 함께 쓴다. 둘이 같은 값에 도달하는 것은 정상이므로, 필드 비교 동등성이
+  없으면 두 번째 쓰기가 스냅샷을 한 번 더 Rust로 민다.
+- **`useAtomMount`의 순서는 쓰기 순서다.** 각 호출이 선언 순서대로 도는 `useEffect`
+  이므로, 서로의 결과를 읽는 구독형 atom 셋은 마운트 순서로 조율된다. 그것을
+  주석으로 적어 두지 않으면 다음 사람이 줄을 바꾼다.
+- **React context 값을 registry 코드에 주려면 소유자가 발행한다.** i18n의 `t`는
+  로케일당 청크가 평가된 뒤에야 존재하므로 로케일만으로 만들 수 없다. 카탈로그를
+  가진 `I18nProvider`가 effect로 `state/i18n`에 발행하고 atom이 그 위에서
+  파생된다. F5-4의 타이핑 퍼블리셔와 같은 모양 — 도는 곳과 읽는 곳을 가르는 것 —
+  이고, 뷰는 그대로 context를 쓴다(그 리렌더는 뷰가 원하는 것이다).
+- **모듈 밖에서 안 쓰이는 export가 전부 죽은 것은 아니다.** `state/*`의 미참조
+  export를 전수 조사한 결과 남은 것은 모듈 계약을 적는 타입뿐이었다. 실제로 죽어
+  있던 것은 export가 아니라 **아무도 읽지 않는 프롭 체인**(`channelInboxSyncSignal`)
+  이었다. 죽은 코드를 찾을 때는 `tsc --noUnusedLocals`가 export 스캔보다 정확하다.
