@@ -8,14 +8,20 @@ import {
   testChannelMember,
   testChannelMessage,
 } from "../../test/channel-conversation";
+import { runTask } from "../actions";
 import { createTestRegistry, type AtomRegistry } from "../registry";
 import { applySyncEvent } from "../sync/apply";
 import {
   CHANNEL_CONVERSATION_RETENTION_LIMIT,
   CHANNEL_THREAD_RETENTION_LIMIT,
+  channelAcceptingProposalIdAtom,
+  channelAcceptProposalAction,
   channelAgentRepliesAtom,
   channelAgentsAtom,
+  channelConversationBusyAtom,
   channelConversationLoadedAtom,
+  channelDecliningProposalIdAtom,
+  channelDeclineProposalAction,
   channelMembersAtom,
   channelMessageAtom,
   channelMessageCursorAtom,
@@ -611,5 +617,59 @@ describe("channel agent replies", () => {
     });
 
     expect(registry.get(channelAgentRepliesAtom(channelId))).toEqual([]);
+  });
+});
+
+describe("write flags", () => {
+  const deferred = () => {
+    let resolve!: () => void;
+    const promise = new Promise<void>((onResolve) => {
+      resolve = () => onResolve();
+    });
+    return { promise, resolve };
+  };
+
+  it("is busy while any of the channel's writes runs, and names the proposal", async () => {
+    const registry = createTestRegistry();
+    const gate = deferred();
+
+    const accepting = runTask(
+      registry,
+      channelAcceptProposalAction(channelId),
+      "proposal-1",
+      () => gate.promise,
+    );
+
+    expect(registry.get(channelConversationBusyAtom(channelId))).toBe(true);
+    expect(registry.get(channelAcceptingProposalIdAtom(channelId))).toBe(
+      "proposal-1",
+    );
+    // A decline is a different request, so its own flag is untouched.
+    expect(registry.get(channelDecliningProposalIdAtom(channelId))).toBeNull();
+
+    gate.resolve();
+    await accepting;
+
+    expect(registry.get(channelConversationBusyAtom(channelId))).toBe(false);
+    expect(registry.get(channelAcceptingProposalIdAtom(channelId))).toBeNull();
+  });
+
+  it("keeps one channel's writes out of another channel's flags", async () => {
+    const registry = createTestRegistry();
+    const gate = deferred();
+
+    const declining = runTask(
+      registry,
+      channelDeclineProposalAction(channelId),
+      "proposal-1",
+      () => gate.promise,
+    );
+
+    expect(registry.get(channelConversationBusyAtom(channelId))).toBe(true);
+    expect(registry.get(channelConversationBusyAtom("channel-2"))).toBe(false);
+
+    gate.resolve();
+    await declining;
+    expect(registry.get(channelConversationBusyAtom(channelId))).toBe(false);
   });
 });

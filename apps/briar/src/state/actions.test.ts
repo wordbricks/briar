@@ -11,6 +11,7 @@ import {
   defineAction,
   defineActionFamily,
   defineTaskAction,
+  defineTaskActionFamily,
   resetAction,
   runAction,
   runTask,
@@ -266,6 +267,45 @@ describe("defineTaskAction", () => {
     ).rejects.toBe(thrown);
     expect(registry.get(action.pendingTarget)).toBeNull();
     expect(actionErrorMessage(registry.get(action.result))).toBe("작업 실패");
+  });
+
+  it("keeps the same bundle for a key and a separate one per key", async () => {
+    const family = defineTaskActionFamily("test/perChannel");
+    expect(family("a")).toBe(family("a"));
+    expect(family("a").result).not.toBe(family("b").result);
+
+    const registry = createTestRegistry();
+    const gate = deferred<string>();
+    const run = runTask(registry, family("a"), "target-a", () => gate.promise);
+
+    expect(registry.get(family("a").pendingTarget)).toBe("target-a");
+    expect(registry.get(family("b").pendingTarget)).toBeNull();
+
+    gate.resolve("완료");
+    await expect(run).resolves.toBe("완료");
+    expect(registry.get(family("a").pendingTarget)).toBeNull();
+  });
+
+  it("lets overlapping concurrent runs both count as in flight", async () => {
+    const action = defineTaskAction("test/concurrent", { concurrent: true });
+    const registry = createTestRegistry();
+    const unsubscribe = registry.mount(action.result);
+    const first = deferred<void>();
+    const second = deferred<void>();
+
+    const earlier = runTask(registry, action, null, () => first.promise);
+    const later = runTask(registry, action, null, () => second.promise);
+
+    first.resolve();
+    await Promise.resolve();
+    // The second run is still going, so the flag stays up.
+    expect(actionIsWaiting(registry.get(action.result))).toBe(true);
+
+    second.resolve();
+    await earlier;
+    await later;
+    expect(actionIsWaiting(registry.get(action.result))).toBe(false);
+    unsubscribe();
   });
 
   it("lets a later run replace an earlier one, as the flag it replaces did", async () => {

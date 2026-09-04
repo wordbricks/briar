@@ -20,6 +20,7 @@ import { applySyncEvent } from "../sync/apply";
 import { readActiveTeamView } from "../../test/team-view";
 import {
   activeTeamIdAtom,
+  deletingTeamIdAtom,
   teamConnectionAtom,
   teamSettingsAtom,
   teamsAtom,
@@ -424,6 +425,21 @@ describe("createWorkspaceActions", () => {
     expect(registry.get(connectedTeamIdsAtom)).toEqual([teamB.id]);
     expect(registry.get(teamReadinessAtom(teamA.id)).readiness).toBeNull();
     expect(registry.get(healthAtom).status).toBe("idle");
+  });
+
+  it("names the team while the deletion runs and forgets it when it settles", async () => {
+    const { actions, registry } = harness();
+    const seen: (string | null)[] = [];
+    const unsubscribe = registry.subscribe(
+      deletingTeamIdAtom,
+      (value) => seen.push(value),
+      { immediate: true },
+    );
+
+    await actions.removeProject(teamA.id);
+
+    expect(seen).toEqual([null, teamA.id, null]);
+    unsubscribe();
   });
 
   it("keeps the team deleted when only the local cleanup failed", async () => {

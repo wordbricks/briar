@@ -34,10 +34,11 @@ import { useRegistry, type AtomRegistry } from "../registry";
 import { loadingAtom, sessionErrorAtom, tokenAtom } from "../session/atoms";
 import { applySyncEvent } from "../sync/apply";
 import { commitTeamSettings, commitTeamSnapshot } from "../sync/commit";
+import { runTask, type TaskAction } from "../actions";
 import { getTeamSyncLoader } from "../sync/loader";
 import {
   activeTeamIdAtom,
-  deletingTeamIdAtom,
+  deleteTeamAction,
   isCreatingTeamAtom,
   loadedTeamIdAtom,
   renderedTeamSettingsAtom,
@@ -119,6 +120,27 @@ export function createWorkspaceActions(
 
   const refreshReadiness = (teamId: string) =>
     refreshTeamReadiness(registry, teamId);
+
+  /**
+   * Runs one write under the action atom that owns its request state, naming
+   * the team it is about. Failures are reported as the session error the shell
+   * renders; whether the write is in flight is the atom's own business.
+   */
+  const mutate = <A>(
+    action: TaskAction,
+    target: string | null,
+    body: () => Promise<A>,
+  ): Promise<A> => {
+    setError(null);
+    return runTask(registry, action, target, async () => {
+      try {
+        return await body();
+      } catch (caught) {
+        setError(messageOf(caught));
+        throw caught;
+      }
+    });
+  };
 
   return {
     /* — the local inventory and the probes over it — */
@@ -311,9 +333,7 @@ export function createWorkspaceActions(
       const team = teams.find((candidate) => candidate.id === teamId);
       if (!team) throw new Error("삭제할 프로젝트가 없습니다.");
       const { demoMode } = modes();
-      registry.set(deletingTeamIdAtom, teamId);
-      setError(null);
-      try {
+      return mutate(deleteTeamAction, teamId, async () => {
         let localCleanupWarning: string | null = null;
         if (!demoMode) {
           const token = requireToken();
@@ -391,12 +411,7 @@ export function createWorkspaceActions(
             `프로젝트는 삭제했지만 로컬 연결 정리에 실패했습니다: ${localCleanupWarning}`,
           );
         }
-      } catch (caught) {
-        setError(messageOf(caught));
-        throw caught;
-      } finally {
-        registry.set(deletingTeamIdAtom, null);
-      }
+      });
     },
 
     /* — connecting a repository to this device — */

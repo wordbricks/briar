@@ -268,19 +268,52 @@ export function defineTaskAction(
   label: string,
   options: ActionOptions = {},
 ): TaskAction {
+  const keepAlive = options.keepAlive !== false;
+  const alive = <A extends Atom.Atom<any>>(atom: A): A =>
+    keepAlive ? Atom.keepAlive(atom) : atom;
   const result: TaskActionAtom = defineAction<ActionTask<unknown>, unknown>(
     label,
     (task) => task.run(),
     options,
   );
-  const lastTarget = Atom.make<string | null>(null).pipe(
-    Atom.keepAlive,
+  const lastTarget = alive(Atom.make<string | null>(null)).pipe(
     Atom.withLabel(`${label}/lastTarget`),
   );
-  const pendingTarget = Atom.make((get): string | null =>
-    AsyncResult.isWaiting(get(result)) ? get(lastTarget) : null,
-  ).pipe(Atom.keepAlive, Atom.withLabel(`${label}/pendingTarget`));
+  const pendingTarget = alive(
+    Atom.make((get): string | null =>
+      AsyncResult.isWaiting(get(result)) ? get(lastTarget) : null,
+    ),
+  ).pipe(Atom.withLabel(`${label}/pendingTarget`));
   return { result, pendingTarget, lastTarget };
+}
+
+/**
+ * {@link defineTaskAction} once per key.
+ *
+ * The per-key atoms are not kept alive, so a key nobody is watching keeps no
+ * registry node — that is where the memory is. The *bundles*, though, are held
+ * strongly rather than through `Atom.family`: a family holds its values weakly,
+ * and a node only ever references the atom it belongs to, so a collected bundle
+ * would hand the next caller a **different** set of atoms from the ones the
+ * views are already subscribed to. Three atom objects per key is the price of
+ * not having that race.
+ */
+export function defineTaskActionFamily(
+  label: string,
+  options: ActionOptions = {},
+): (key: string) => TaskAction {
+  const actions = new Map<string, TaskAction>();
+  return (key: string) => {
+    let action = actions.get(key);
+    if (!action) {
+      action = defineTaskAction(`${label}/${key}`, {
+        ...options,
+        keepAlive: options.keepAlive ?? false,
+      });
+      actions.set(key, action);
+    }
+    return action;
+  };
 }
 
 /**

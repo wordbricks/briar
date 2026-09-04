@@ -15,10 +15,7 @@ import { useRegistry, type AtomRegistry } from "../registry";
 import { tokenAtom } from "../session/atoms";
 import { applySyncEvent } from "../sync/apply";
 import {
-  channelAcceptingProposalIdAtom,
   channelAgentRepliesAtom,
-  channelConversationBusyAtom,
-  channelDecliningProposalIdAtom,
   channelEarlierMessagesLoadingAtom,
   channelMessageCursorAtom,
   channelProposalProjectsAtom,
@@ -248,12 +245,16 @@ export function createChannelConversationLoader(
     context.channelId === surfaceChannelId &&
     context.threadParentId === surfaceThreadParentId;
 
-  /** Drops the spinners a request that is no longer wanted would have cleared. */
+  /**
+   * Drops the loader's own spinners for a surface that is no longer wanted.
+   *
+   * The write flags used to be dropped here too, to keep an old request's
+   * `finally` from clearing a newer one's. Each write owns its `AsyncResult`
+   * now, so an old request can only ever settle its own, and the clearing this
+   * did would be a lie about a request that is still running.
+   */
   const clearPendingFlags = (channelId: string | null) => {
     if (!channelId) return;
-    registry.set(channelConversationBusyAtom(channelId), false);
-    registry.set(channelAcceptingProposalIdAtom(channelId), null);
-    registry.set(channelDecliningProposalIdAtom(channelId), null);
     registry.set(channelThreadLoadingAtom(channelId), false);
     registry.set(channelEarlierMessagesLoadingAtom(channelId), false);
   };

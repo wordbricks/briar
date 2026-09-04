@@ -13,7 +13,7 @@ import { createTestRegistry, type AtomRegistry } from "../../state/registry";
 import { tokenAtom, userAtom } from "../../state/session/atoms";
 import { applySyncEvent } from "../../state/sync/apply";
 import { activeTeamIdAtom, teamsAtom } from "../../state/team/atoms";
-import { createReactTestRoot, settle } from "../../test/react";
+import { createReactTestRoot, flush, settle } from "../../test/react";
 import { createRenderCounter } from "../../test/render-count";
 import type {
   DashboardPayload,
@@ -192,9 +192,20 @@ describe("RunPageWithRun", () => {
     await settle(() => renderedText(view.container).includes("열린 이슈"), {
       description: "the run page to come out of its lazy boundary",
     });
+    /*
+      The counter is over the whole subtree, so it also sees work the *first*
+      render left behind — a `lazy()` chunk still arriving, an effect's promise.
+      Waiting for that to stop is what makes a later count mean "this write did
+      it" rather than "the machine was busy".
+    */
+    for (let attempt = 0; ; attempt += 1) {
+      renders.reset();
+      await flush(2);
+      if (renders.count("page") === 0) break;
+      if (attempt >= 20) throw new Error("the run page never went quiet");
+    }
 
     const other = deferred<void>();
-    renders.reset();
     await act(async () => {
       void runTask(registry, updateIssueAction, runB.id, () => other.promise);
     });
