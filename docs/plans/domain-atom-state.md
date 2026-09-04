@@ -550,8 +550,8 @@ workspace / workflow / integrations를 옮기며 확인한, 이후 단계에 영
    각각 42회, 24회 커밋된 고변경 파일이므로 장기 브랜치를 피한다.
 
 비목표: 라우팅 방식 변경(뷰 언마운트 정책), `useInbox` / `useAutoHuntSessions` /
-`useChannelConversation`의 전환(후속 F5가 저장소를 옮겼다), 서버 API 변경, 오프라인
-우선과 멀티 디바이스 충돌 해결.
+`useChannelConversation`의 전환(후속 F3 / F4 / F5가 전부 끝냈다), 서버 API 변경,
+오프라인 우선과 멀티 디바이스 충돌 해결.
 
 ## 결과
 
@@ -561,11 +561,12 @@ workspace / workflow / integrations를 옮기며 확인한, 이후 단계에 영
   `useBriar` 참조와 `briar.` 멤버 접근이 0개다.
 - **`App.tsx`는 5,116줄 → 419줄이다.** 목표였던 "500줄 이하"를 지켰고, 남은 것은
   `AppEffects` + `AuthGate` + 셸 선택 + `AppDialogs` 조립이다.
-- **`apps/briar/src/state/`가 19개 도메인, 소스 73개와 테스트 45개다.** 엔티티 맵과
-  동기화 진입점, 도메인 액션, 부수효과 훅, 영속화가 전부 여기에 있다.
+- **`apps/briar/src/state/`가 25개 도메인, 소스 95개와 테스트 64개다.** 엔티티 맵과
+  동기화 진입점, 도메인 액션, 부수효과 훅, 영속화가 전부 여기에 있다(후속 F3~F5-4가
+  에이전트 세션·인박스·채널 대화를 더한 뒤의 숫자다).
 - **PR 24개(#1581–#1605)로 나눠 머지했다.** 가장 긴 것도 하루 안에 머지 가능한
   크기였고, 두 고변경 파일과의 충돌로 되돌린 PR은 없다.
-- **렌더 카운트로 고정된 보장 6가지.** 마지막 둘은 후속 F2가 더했고, 그것은
+- **렌더 카운트로 고정된 보장 8가지.** 5·6은 후속 F2가, 7·8은 후속 F5가 더했고, 그것은
   `renderCounter.profile`(React `Profiler`)로 센다 — 구독이 컴포넌트 안으로 밀어
   넣은 렌더는 `track`이 볼 수 없다.
   1. 변경 없는 폴링 틱: 셸·보드·행 모두 리렌더 0회
@@ -580,6 +581,14 @@ workspace / workflow / integrations를 옮기며 확인한, 이후 단계에 영
      창 내비게이션 컨트롤, 인박스 브리지 모두 리렌더 0회
      (`DesktopPages.test.tsx`, `CompanionShell.test.tsx`).
   6. 팀 설정 변경: 설정을 읽는 구독만 리렌더된다(`DesktopPages.test.tsx`).
+  7. 채널 메시지 하나 변경: 그 행만 리렌더되고 목록은 깨어나지 않는다
+     (`Channels.message-row.test.tsx`).
+  8. 에이전트 답장 틱: 그 메시지의 타이핑 스트립만 리렌더된다 — 메시지 본문도, 다른
+     스트립도, 목록도 아니다(`Channels.typing-strip.test.tsx`).
+- **훅이 소유한 도메인이 남아 있지 않다.** `hooks/`에 있던 `useBriar` /
+  `useAutoHuntSessions` / `useInbox` / `useChannelConversation` 넷이 전부
+  `state/<domain>`이 되었고, 마지막 하나(1,892줄)는 후속 F5-4가 지웠다.
+  `apps/briar/src`에 `useChannelConversation` 참조가 0개다.
 - **콜드 부팅은 네트워크 응답 전에 마지막 대시보드를 그린다**
   (`state/persistence/cold-boot.test.tsx`). 그 화면을 **그리는** 것과 그 화면으로
   **행동하는** 것은 후속 F1이 갈라 두었다. 디스크에서 올라온 값으로 서버 작업을
@@ -1208,13 +1217,15 @@ Phase 2 이후 언제든 착수 가능하며 Phase 3–7과 병행할 수 있다
 
 ## 후속 (범위 밖)
 
-- `useChannelConversation`의 **남은 절반**: 요청 순서(생성 카운터와 표면 무효화),
-  로더와 실시간 전송 수명, 액션(전송·반응·삭제·제안·스레드 구독), 답장 버전 부기를
-  `state/channel-conversation`의 `loader` / `actions` / `useChannelConversationSync`
-  로 옮기고 훅을 지운다. 메시지를 채널별 엔티티 family로 옮기는 절반은 후속 F5가
-  끝냈다(#1631 / #1633 / #1638). `useAutoHuntSessions`는 후속 F3이, `useInbox`는
-  후속 F4가 끝냈다(둘 다 localStorage 상태는 `Atom.kvs`가 아니라 atom의 lazy read가
-  됐다 — 이유는 아래 기준 갱신에 있다).
+- **훅이 소유한 도메인은 전부 옮겨졌다.** `useAutoHuntSessions`는 후속 F3이,
+  `useInbox`는 후속 F4가(둘 다 localStorage 상태는 `Atom.kvs`가 아니라 atom의 lazy
+  read가 됐다 — 이유는 아래 기준 갱신에 있다), `useChannelConversation`은 후속 F5가
+  저장소를(#1631 / #1633 / #1638), 후속 F5-4가 나머지 절반 — 요청 순서, 로더, 실시간,
+  액션, 답장 버전 부기 — 을 옮기고 훅을 지웠다. 남은 훅 소유 로직은 `useStatusTray`의
+  i18n 의존 effect뿐이다.
+- **컴패니언 화면은 아직 자기 채널 목록을 갖는다.** 델타는 이제 공용 루프의 페이지를
+  구독하지만, 첫 스냅샷(`listChannels`)은 여전히 스스로 부른다.
+  `state/channels`의 카탈로그로 옮기면 그 왕복도 사라진다.
 - `Atom.fn` + `AsyncResult`로 pending / 에러 상태 자동화.
 - 오프라인 우선과 멀티 디바이스 충돌 해결이 목표가 되면 서버 측 SyncAction 로그를
   가진 전용 sync engine(Replicache, Zero 등)을 검토한다. 그 전까지는 이 계획으로
@@ -1251,6 +1262,7 @@ Phase 2 이후 언제든 착수 가능하며 Phase 3–7과 병행할 수 있다
 | F3 `useAutoHuntSessions` 전환 | #1621, #1626 | 머지됨 | 에이전트 세션을 `state/agent-sessions`로 옮기고 훅을 지웠다. #1621: `model`(순수 헬퍼 6종과 `reconcileDispatchSession`), `atoms`(`agentSessionsByIdAtom` + 저장 순서 `agentSessionIdsAtom`, `agentSessionAtom(id)` / `teamAgentSessionIdsAtom(teamId)` / `agentSessionsAtom` / `agentSessionSyncContextAtom` / `synchronizedTeamIdsAtom`), `persistence`(레거시 `briar.auto-hunt-sessions.v1` 키와 중단 세션 마이그레이션), `useAgentSessionPersistence`(250ms 디바운스 + `pagehide` flush), `sync/events`·`apply`의 `agent-sessions-changed` / `-merged` / `-synced` / `-removed`, `actions`(`createAgentSessionActions` + `agentSessionApiAtom` 이음매), `useAgentSessionSync`(configureSync·실시간 새로고침·업로드·네이티브 복구·디스패치 리스너, 그리고 `InboxBridge`에서 가져온 `reconcileWorkerDispatches` 구독). #1626: 소비자 전환. `agentSessionRowIdsAtom` / `teamRunningAgentIdsAtom` / `agentDispatchSessionIdAtom` / `runningAgentSessionsAtom` / `processingIssueIdsAtom`을 더하고 Agents 뷰 3종·사이드바·커맨드 팔레트·인박스·보드가 직접 구독한다. `state/action-bridges.ts`와 `IssueActionBridge` / `WorkspaceScheduleBridge`, `boardSessionsAtom`, `hooks/useAutoHuntSessions.ts`가 사라졌고 `App.tsx`는 세션을 구독하지 않는다. |
 | F4 `useInbox` 전환 | #1629, #1630 | 머지됨 | 인박스를 `state/inbox`로 옮기고 마지막 레지스트리 콜백 브리지를 지웠다. #1629: `model`(순수 함수 13종과 타입 — `hooks/useInboxNotifications`의 순수 헬퍼 3종 포함), `persistence`(레거시 키 `briar.inbox.v1:<userId>`와 `{ messages, readVersions }` 형식 그대로), `atoms`(`inboxStateAtom`의 lazy read + 저장 키 의존, `currentInboxMessagesAtom` / `inboxMergeSourcesAtom`, 파생 `inboxMessagesAtom` / `inboxMessagesByIdAtom` / `inboxMessageAtom(id)` / `inboxUnreadCountAtom` / `visibleInboxMessagesAtom` / `visibleInboxUnreadCountAtom`, 두 동기화 신원과 그 위의 `inboxInitialSyncCompleteAtom` / `inboxNotificationBaselineIdAtom`), `api`(`inboxApiAtom` 이음매), `read-sync`(읽음 버전 왕복의 세대 객체), `actions`(네 액션이 호출 시점 레지스트리 읽기로), `useInboxSync`(읽음 왕복 · 보드→저장소 병합 구독 · 조직 피드와 실시간), `useInboxNotifications`(시스템 알림 · 앱 배지 · 클릭 라우팅, 셋 다 구독). `hooks/useInbox.ts`(1,416줄) / `hooks/useInboxNotifications.ts` / `components/app/InboxBridge.tsx`와 `setInboxCallbacks` 삭제, `AppEffects`가 두 훅을 마지막에 마운트해 브리지가 형제로 렌더되던 effect 순서를 유지한다. 테스트 헬퍼 `src/test/inbox.ts`. #1630: `visibleInboxMessageSummariesAtom`을 더하고 `Inbox`의 `messages` 프롭을 요약으로 좁혀 각 행이 `inboxMessageAtom(id)`를 구독한다. `InboxSelectionBoundary`가 연결 경계가 되고(`InboxWithSelection` / `CompanionInbox`) `DesktopPages` / `CompanionShell`이 인박스 메시지 구독을 끊었다. |
 | F5 `useChannelConversation` 저장소 전환 | #1631, #1633, #1638 | 머지됨 | 채널 대화를 `state/channel-conversation`으로 옮겼다. #1631: `model`(훅 안에 있어 테스트가 없던 순수 함수 — 에이전트 답장 병합과 우선순위, 답장 요약 증감과 되돌림, 타이핑 이름과 활동 프레임, 작성자 신원, 목록 요약), `atoms`(채널별 `channelMessagesByIdAtom`과 루트·스레드 저장 인덱스, 행 단위 `channelMessageAtom(key)`, 참여자·에이전트 답장·커서·정착 답장, 목록 전용 `channelRootMessageSummariesAtom`, 채널 5개 / 채널당 스레드 5개 LRU), `sync/events`·`apply`의 대화 이벤트 8종, `entities/upsert`의 `replaceEntitiesBy`. #1633: 소비자 전환. `Channels`의 `useState` 7개와 상한 없는 `channelCache`, `CompanionChannels`의 `useState` 6개와 `CompanionChannelCache` 전체(상한 상수 3개와 캐시 함수 5개)가 사라지고 두 뷰가 같은 저장소를 읽는다. 모든 쓰기를 모은 `write.ts`와 뷰 어댑터 `useChannelConversationStore.ts`를 더했고, 레지스트리 `WeakMap` 캐시 홀더와 `channelCache` 프롭도 없앴다. #1638: 훅에서 `messages` / `messageNextCursor` 프롭을 없애 호출 시점 레지스트리 읽기로 바꾸고, 목록이 요약을 읽고 행이 `channelMessageAtom`을 구독하는 `ChannelMessageRow`를 더했다. `Channels.message-row.test.tsx`가 `profile`로 "메시지 하나 변경 → 그 행만"을 고정한다. |
+| F5-4 `useChannelConversation` 삭제 | #1642, #1648, #1649 | 머지됨 | 훅에 남아 있던 요청 순서·로더·실시간·액션을 `state/channel-conversation`으로 옮기고 지웠다. **#1642**: `loader`(표면 생성 카운터·요청 버전·AbortController와 네 읽기 — 채널 상세, 이전 페이지, 스레드 스냅샷, 승인 재조회 — 를 전부 `applySyncEvent`로, 제안 이력과 승인된 제안의 대시보드 캐시 포함), `reply-ledger`(답장 관측 버전 — id 집합으로는 요청 중 종료 상태로 바뀐 답장을 지킬 수 없다), `errors`(실패 발행 atom과 구독형 토스트). `channel-conversation-snapshot`의 `members` / `agents`를 옵셔널로 만들어 이전 페이지 응답이 같은 이벤트를 쓴다. **#1648**: `actions`(쓰기 13종 + 호출 시점 컨텍스트 접근자로 받는 이미지 캐시·셸 콜백·번역), `useChannelConversationSync`(실시간 전송 수명), `incoming`(서버가 밀어 넣은 페이지의 단일 진입점, "이 실패가 새 실패인가"만 호출자에게 돌려준다), `useChannelConversationTyping`. 훅(1,387줄)과 `useChannelConversationStore`(204줄)가 사라지고 두 뷰가 뷰 상태 8종을 채널별 atom으로 구독한다. 옛 훅 테스트 20 케이스를 `actions` / `useChannelConversationSync` / `incoming` / `loader` 테스트로 옮겼다. **#1649**: 델타 루프를 하나로 합쳤다 — `useChannelCatalogSync`가 커서를 갖고 페이지를 `publishChannelDelta`로 나르면 대화가 구독한다(`state/channels/delta.ts`). `isBlocked` 가드와 `Channels`의 자체 `listChannels` 폴백, 두 뷰의 커서 ref가 사라졌다. 타이핑 스트립을 잎으로 격리했다: `channelAgentActivityAtom`과 `ChannelActivityPublisher`, 메시지별 `channelMessagePendingRepliesAtom` / `channelMessageActivityAtom`, `ChannelMessageTypingStrip` / `ChannelThreadTypingStrip`. `Channels.typing-strip.test.tsx`가 `profile`로 "답장 틱 → 그 메시지의 스트립만"을 고정한다. |
 
 ### 기준 갱신 (2026-09-04, 후속 F3 이후)
 
@@ -1370,3 +1382,48 @@ Phase 2 이후 언제든 착수 가능하며 Phase 3–7과 병행할 수 있다
   옮기고 나면 `messages` / `replies` / `threadMessages` 프롭이 사라지고, 그때 비로소
   "메시지 하나 변경 → 그 행만" 과 "타이핑 변경 → 타이핑 스트립만"이 컴포넌트 단위로
   성립한다. 지금은 저장소 단위로만 성립한다(`atoms.test.ts`가 고정).
+
+### 기준 갱신 (2026-09-04, 후속 F5-4 이후)
+
+`useChannelConversation`의 남은 절반을 옮기며 확인한, 훅이 소유한 마지막 도메인(F7의
+`useStatusTray`)과 F6의 정리에 필요한 사실이다.
+
+- **훅이 상태가 아니라 순서를 갖고 있었다.** F5-1/2가 저장소를 옮긴 뒤 남은 1,892줄은
+  `requestVersion` / `channelSurfaceGeneration` / `renderedSurface` 세 ref와 그 위의
+  네 읽기·열세 쓰기였다. 셋 다 **훅 인스턴스별**이라 "이 응답을 아직 커밋해도 되는가"는
+  요청을 시작한 뷰가 살아 있는 동안에만 답할 수 있는 질문이었다. 로더로 옮기고 나서야
+  두 뷰가 같은 요청을 나눠 쓸 수 있게 됐다.
+- **표면은 렌더가 알리고, 무효화는 액션이 한다.** `syncSurface`(렌더가 그리는 채널·
+  스레드)와 `invalidateSurface`(요청을 버리며 옮겨 가는 쪽)를 나눠야 한다. 앞의 것을
+  effect로 하면 레이아웃 effect에서 시작하는 요청이 한 렌더 늦은 표면을 보고,
+  뒤의 것을 렌더에서 하면 스피너 atom을 렌더 중에 쓰게 된다.
+- **저장소의 진입점은 "무엇을 남길지"를 받고, "언제 봤는지"는 밖에서 센다.**
+  `channel-agent-replies-authoritative`는 `retainedReplyIds`를 받는데, 그 목록은 id
+  집합으로 만들 수 없다 — 요청 중에 **종료 상태로 바뀐** 기존 답장도 남아야 하고
+  그것은 관측 **횟수**로만 표현된다. `reply-ledger.ts`가 그 카운터이고, 뷰가 버전을
+  그리지 않으므로 atom이 아니다.
+- **레지스트리 바인딩 코드는 토스트를 띄울 수 없다.** 로더와 액션은 실패를
+  `channelConversationFailureAtom`에 **발행**하고, 마운트된 훅이 그것을
+  `registry.subscribe`로 받아 토스트한다. 읽지 않고 구독하므로 실패가 대화를
+  리렌더하지 않는다. 같은 메시지가 두 번 오면 두 번 보여야 해서 값은 번호가 붙은
+  봉투다(레지스트리가 같은 값의 쓰기를 버린다).
+- **액션이 필요로 하는 "저장소에 없는 것"은 호출 시점 컨텍스트로 넘긴다.** 뷰의 이미지
+  캐시, 셸 콜백(이슈 열기·Skill 세션 입양), 렌더에서만 얻는 번역 문자열 셋이 그것이다.
+  ref가 들고 있는 접근자를 팩토리에 주면 액션 객체의 아이덴티티가 레지스트리 수명
+  내내 고정되고, 행의 `MessageRowHandlers` memo가 그 위에서 성립한다. F3이 브리지를
+  지웠던 것과 같은 문제이고, 여기서는 방향이 반대라(액션이 뷰의 것을 필요로 한다)
+  브리지 대신 접근자가 됐다.
+- **옵셔널 프로젝션은 이벤트에도 필요하다.** `channel-conversation-snapshot`의
+  `members` / `agents`를 옵셔널로 만들어야 이전 페이지 응답이 같은 이벤트를 쓸 수
+  있다. 빈 배열은 "이 채널에 멤버가 없다"이지 "이 응답은 멤버를 모른다"가 아니다.
+  (2A가 팀 프로젝션에서 배운 것과 같은 구분이다.)
+- **델타 루프는 하나면 된다.** 카탈로그 동기화와 대화 동기화가 같은
+  `loadChannelDelta` 엔드포인트를 각자의 커서로 폴링하고 있었다(컴패니언에서는 세
+  벌이었다). 커서를 가진 쪽이 페이지를 나르고, 대화는 그 페이지를 **구독**한다.
+  `isBlocked` 가드는 사라졌다 — 저장소의 병합 규칙(재방문 병합, 첫 로드에서 루트
+  인덱스를 만들지 않는 것)이 그것이 막던 덮어쓰기를 이미 막는다.
+- **타이핑은 활동 소켓 때문에 atom이어야 한다.** 스트립을 잎으로 내리려면 각 행이
+  자기 타이핑 상태를 구독해야 하는데, `useChannelAgentActivity`를 행마다 부르면
+  메시지 수만큼 WebSocket이 열린다. 프레임을 채널별 atom에 싣는 퍼블리셔 훅을 한 번
+  마운트하고 스트립이 그것을 읽는다. "훅이 도는 곳"과 "값을 읽는 곳"을 갈라야 하는
+  구독형 파생의 일반형이다.

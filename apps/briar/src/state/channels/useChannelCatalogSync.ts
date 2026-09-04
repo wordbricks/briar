@@ -6,12 +6,14 @@ import {
   CHANNEL_REALTIME_FALLBACK_MS,
   MAX_CHANNEL_DELTA_PAGES_PER_SYNC,
 } from "../../lib/channel-realtime";
+import { channelInboxSyncSignalAtom } from "../inbox/atoms";
 import { activeOrganizationIdAtom } from "../organization/atoms";
 import { adoptsHydratedCatalog } from "../persistence/hydration";
 import { useRegistry } from "../registry";
 import { tokenAtom } from "../session/atoms";
 import { applySyncEvent } from "../sync/apply";
 import { resolveChannelApi } from "./api";
+import { publishChannelDelta } from "./delta";
 import {
   channelCatalogCursorAtom,
   channelCatalogRetryAtom,
@@ -32,6 +34,12 @@ export const CHANNEL_CATALOG_RETRY_MS = 3_000;
  * catalog change re-rendered the whole tree in order to hand a new array to the
  * channel list. They write through `applySyncEvent` now, so the store notifies
  * only the views that read the channels that actually moved.
+ *
+ * The loop below is the *only* one against `loadChannelDelta`. The conversation
+ * had its own, with its own cursor, and the companion shell a third; a page one
+ * consumed advanced only that cursor, so the others asked for it again. Each
+ * page is handed to `publishChannelDelta` once the catalog has taken it, and
+ * `state/channel-conversation/useChannelConversationSync.ts` subscribes.
  */
 export function useChannelCatalogSync(): void {
   const registry = useRegistry();
@@ -39,6 +47,12 @@ export function useChannelCatalogSync(): void {
   const token = useAtomValue(tokenAtom);
   const retry = useAtomValue(channelCatalogRetryAtom);
   const catalogLoaded = useAtomValue(channelCatalogCursorAtom) !== null;
+  /*
+    The inbox learning about a channel message this window has not fetched is
+    the cue to pull a page. It was a prop the conversation view put in its own
+    loop's dependency array; the loop is here now, so the signal is read here.
+  */
+  const inboxSyncSignal = useAtomValue(channelInboxSyncSignalAtom);
 
   /*
     The cursor the delta loop resumes from.
@@ -158,6 +172,9 @@ export function useChannelCatalogSync(): void {
               removedChannelIds: delta.removedChannelIds,
               reset: delta.reset,
             });
+            // The catalog is applied first, so a listener sees the channel list
+            // the page produced rather than the one before it.
+            publishChannelDelta(registry, delta);
             if (!delta.hasMore || delta.cursor <= requestedCursor) break;
           }
         }
@@ -198,5 +215,5 @@ export function useChannelCatalogSync(): void {
       document.removeEventListener("visibilitychange", updateVisibility);
       window.clearInterval(interval);
     };
-  }, [catalogLoaded, organizationId, registry, token]);
+  }, [catalogLoaded, inboxSyncSignal, organizationId, registry, token]);
 }

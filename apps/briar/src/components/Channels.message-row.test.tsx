@@ -83,9 +83,6 @@ const handlers: MessageRowHandlers = {
   toggleReaction: unusedHandler,
 };
 
-const noTyping: string[] = [];
-const noActivity = {};
-
 const rowContext: ChannelMessageRowContext = {
   acceptingProposalId: null,
   agents: [],
@@ -103,8 +100,6 @@ const rowContext: ChannelMessageRowContext = {
   proposalProjects: {},
   threadParentId: null,
   token: "token",
-  typingActivityByAgentName: () => noActivity,
-  typingAgentNames: () => noTyping,
 };
 
 const renderCounter = createRenderCounter();

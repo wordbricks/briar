@@ -64,7 +64,7 @@ type DirectMessagesProps = {
   channels: ChannelSummary[];
   projects?: readonly Pick<Project, "id" | "name" | "organizationId">[];
   activeChannelId: string | null;
-  channelCatalogCursor?: number | null;
+  channelCatalogCursor: number | null;
   channelInboxSyncSignal?: string;
   onChannelSelect: (channelId: string | null) => void;
   onChannelFallback?: (channelId: string | null) => void;

@@ -10,10 +10,6 @@ import {
   type ChannelAgentReply,
   type ChannelDelta,
 } from "../../lib/channels-contract";
-import type {
-  RealtimeNotification,
-  RealtimeTransport,
-} from "../../lib/realtime-transport";
 import { ToastProvider } from "../../components/ui/toast";
 import { I18nProvider } from "../../i18n";
 import {
@@ -22,7 +18,7 @@ import {
   testChannelSummary,
 } from "../../test/channel-conversation";
 import { createReactTestRoot, renderReactTestRoot } from "../../test/react";
-import { channelApiAtom } from "../channels/api";
+import { publishChannelDelta } from "../channels/delta";
 import { activeOrganizationIdAtom } from "../organization/atoms";
 import { createTestRegistry, type AtomRegistry } from "../registry";
 import { tokenAtom } from "../session/atoms";
@@ -35,35 +31,19 @@ import { useChannelConversationSync } from "./useChannelConversationSync";
 import { writeChannelAgentReplies, writeChannelTimeline } from "./write";
 
 /*
-  The realtime delta loop, exercised where it now lives.
+  What the open conversation does with a page the catalog loop pulled.
 
   Everything these cases assert came from `use-channel-conversation.test.tsx`:
-  a cursor notification drains one page, a reset replaces the timeline and the
-  replies, a terminal reply survives an older answer arriving after it, and a
-  reply that *became* failed raises a toast while one that was already failed
-  does not. The pages land in the store rather than in a component's setters,
-  so the assertions read the store.
+  a page reaches the timeline, a reset replaces the timeline and the replies, a
+  terminal reply survives an older answer arriving after it, and a reply that
+  *became* failed raises a toast while one that was already failed does not.
+  The pages land in the store rather than in a component's setters, so the
+  assertions read the store — and they arrive through `publishChannelDelta`,
+  because the loop that calls it belongs to `state/channels` now
+  (`useChannelCatalogSync.test.tsx` covers the loop itself).
 */
 
 const channelId = "channel-1";
-
-class FakeRealtimeTransport implements RealtimeTransport {
-  listener: ((notification: RealtimeNotification) => void) | null = null;
-  start = vi.fn();
-  stop = vi.fn();
-
-  subscribe(listener: (notification: RealtimeNotification) => void) {
-    this.listener = listener;
-    return vi.fn();
-  }
-
-  emit(notification: RealtimeNotification) {
-    this.listener?.(notification);
-  }
-}
-
-const transport = new FakeRealtimeTransport();
-const loadChannelDelta = vi.fn();
 
 const delta = (overrides: Partial<ChannelDelta> = {}): ChannelDelta => ({
   cursor: 1,
@@ -78,15 +58,10 @@ const delta = (overrides: Partial<ChannelDelta> = {}): ChannelDelta => ({
 });
 
 function Harness({ channel = channelId }: { channel?: string | null }) {
-  const cursor = React.useRef(0);
   useChannelConversationSync({
     enabled: true,
     channelId: channel,
-    catalogCursor: cursor,
-    catalogReady: true,
-    onCatalogDelta: () => undefined,
     onSelectedChannelRemoved: () => undefined,
-    warningLabel: "test delta failed",
   });
   return null;
 }
@@ -96,13 +71,6 @@ async function renderHarness(seed?: (registry: AtomRegistry) => void) {
   const registry = createTestRegistry([
     [tokenAtom, "token"],
     [activeOrganizationIdAtom, "org-1"],
-    [
-      channelApiAtom,
-      {
-        loadChannelDelta,
-        createChannelRealtimeTransport: () => transport,
-      },
-    ],
   ]);
   seed?.(registry);
   await renderReactTestRoot(
@@ -118,12 +86,10 @@ async function renderHarness(seed?: (registry: AtomRegistry) => void) {
   return { cleanup, registry };
 }
 
-/** Emits a cursor notification and lets the loop drain one page. */
-async function emitCursor(cursor: number) {
+/** Hands one page to the subscribers, the way the catalog loop does. */
+async function publish(registry: AtomRegistry, page: ChannelDelta) {
   await act(async () => {
-    transport.emit({ topic: "channels", cursor });
-    await Promise.resolve();
-    await Promise.resolve();
+    publishChannelDelta(registry, page);
   });
 }
 
@@ -133,7 +99,6 @@ describe("channel conversation realtime sync", () => {
   beforeEach(() => {
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     cleanup = null;
-    transport.listener = null;
     vi.clearAllMocks();
   });
 
@@ -143,23 +108,14 @@ describe("channel conversation realtime sync", () => {
     vi.restoreAllMocks();
   });
 
-  it("drains a realtime cursor notification through the shared delta loop", async () => {
-    loadChannelDelta.mockResolvedValueOnce(
-      delta({ messages: [testChannelMessage("realtime")] }),
-    );
+  it("applies a page of the shared delta loop to the open channel", async () => {
     let registry!: AtomRegistry;
     ({ cleanup, registry } = await renderHarness((target) =>
       writeChannelTimeline(target, channelId, []),
     ));
 
-    await emitCursor(1);
+    await publish(registry, delta({ messages: [testChannelMessage("realtime")] }));
 
-    expect(loadChannelDelta).toHaveBeenCalledWith(
-      "token",
-      "org-1",
-      0,
-      expect.any(AbortSignal),
-    );
     expect(
       registry.get(channelRootMessagesAtom(channelId)).map((item) => item.id),
     ).toEqual(["realtime"]);
@@ -167,15 +123,6 @@ describe("channel conversation realtime sync", () => {
 
   it("replaces stale messages and replies on a reset delta", async () => {
     const fresh = testChannelAgentReply("reply-fresh", { status: "running" });
-    loadChannelDelta.mockResolvedValueOnce(
-      delta({
-        cursor: 8,
-        reset: true,
-        channels: [testChannelSummary(channelId)],
-        messages: [testChannelMessage("fresh")],
-        agentReplies: [fresh],
-      }),
-    );
     let registry!: AtomRegistry;
     ({ cleanup, registry } = await renderHarness((target) => {
       writeChannelTimeline(target, channelId, [testChannelMessage("stale")]);
@@ -184,7 +131,16 @@ describe("channel conversation realtime sync", () => {
       ]);
     }));
 
-    await emitCursor(8);
+    await publish(
+      registry,
+      delta({
+        cursor: 8,
+        reset: true,
+        channels: [testChannelSummary(channelId)],
+        messages: [testChannelMessage("fresh")],
+        agentReplies: [fresh],
+      }),
+    );
 
     expect(
       registry.get(channelRootMessagesAtom(channelId)).map((item) => item.id),
@@ -197,15 +153,12 @@ describe("channel conversation realtime sync", () => {
       status: "completed",
       updatedAt: "2026-08-01T02:00:00.000Z",
     });
-    loadChannelDelta.mockResolvedValueOnce(
-      delta({ agentReplies: [completed] }),
-    );
     let registry!: AtomRegistry;
     ({ cleanup, registry } = await renderHarness((target) =>
       writeChannelTimeline(target, channelId, []),
     ));
 
-    await emitCursor(1);
+    await publish(registry, delta({ agentReplies: [completed] }));
     expect(registry.get(channelAgentRepliesAtom(channelId))).toEqual([
       completed,
     ]);
@@ -271,7 +224,15 @@ describe("channel conversation realtime sync", () => {
   });
 
   it("toasts a newly failed Agent reply instead of setting a banner error", async () => {
-    loadChannelDelta.mockResolvedValueOnce(
+    let registry!: AtomRegistry;
+    ({ cleanup, registry } = await renderHarness((target) =>
+      writeChannelAgentReplies(target, channelId, [
+        testChannelAgentReply("reply-a", { status: "running" }),
+      ]),
+    ));
+
+    await publish(
+      registry,
       delta({
         agentReplies: [
           testChannelAgentReply("reply-a", {
@@ -282,13 +243,6 @@ describe("channel conversation realtime sync", () => {
         ],
       }),
     );
-    ({ cleanup } = await renderHarness((target) =>
-      writeChannelAgentReplies(target, channelId, [
-        testChannelAgentReply("reply-a", { status: "running" }),
-      ]),
-    ));
-
-    await emitCursor(1);
 
     const toast = document.body.querySelector('[data-testid="app-toast"]');
     expect(toast?.className).toContain("error");
@@ -301,12 +255,12 @@ describe("channel conversation realtime sync", () => {
       status: "failed",
       error: channelReplyProviderUsageExhaustedError,
     });
-    loadChannelDelta.mockResolvedValueOnce(delta({ agentReplies: [failed] }));
-    ({ cleanup } = await renderHarness((target) =>
+    let registry!: AtomRegistry;
+    ({ cleanup, registry } = await renderHarness((target) =>
       writeChannelAgentReplies(target, channelId, [failed]),
     ));
 
-    await emitCursor(1);
+    await publish(registry, delta({ agentReplies: [failed] }));
 
     expect(document.body.querySelector('[data-testid="app-toast"]')).toBeNull();
   });
