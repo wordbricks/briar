@@ -30,6 +30,25 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.190",
+        date: "2026년 9월 4일",
+        title: "원격 워커의 에이전트 작업을 취소하고 채널 답변·GitHub 저장소 인식을 고칩니다",
+        summary:
+          "원격 워커에서 도는 에이전트 세션을 앱에서 취소할 수 있게 하고, 계약 디코드 실패로 버려지던 채널·이슈 답변과 조직 GitHub App의 저장소 범위 오인식을 고쳤습니다. 프로젝트 설정에서 아이콘도 고를 수 있습니다.",
+        items: [
+          "프로젝트 설정 다이얼로그에 Lucide 아이콘과 색상 선택기를 추가해 프로젝트마다 아이콘을 지정할 수 있습니다.",
+          "원격 워커에서 실행 중인 에이전트 태스크 세션도 앱에서 취소할 수 있습니다. 버튼이 보이고, 누르면 서버가 작업을 취소합니다.",
+          "프로바이더 사용량과 모델 목록을 CLI 한 구현으로만 조회해 데스크톱 화면과 워커가 같은 값을 보여줍니다.",
+          "Codex를 나머지 여섯 프로바이더와 같은 번들 사이드카로 실행합니다.",
+          "화면이 구독하는 상태를 더 좁은 atom으로 옮기고 렌더 횟수로 고정해 대시보드와 이슈 화면의 리렌더를 더 줄였습니다.",
+          "모델이 주변 데이터의 필드를 따라 쓰는 바람에 채널·이슈 에이전트 답변이 통째로 버려지던 문제를 고칩니다. 이제 같은 대화에서 자가 교정 턴으로 복구합니다.",
+          "조직 GitHub App을 전체 저장소에 설치했는데도 그 뒤에 만든 저장소가 접근 범위 밖으로 보이던 문제를 고칩니다. 저장소 목록을 설치에서 직접 읽어 갱신합니다.",
+          "모델 호출이 중간에 실패했을 때 프로젝트 에이전트 세션이 계속 실행 중으로 남던 문제를 고치고, 하루 넘게 방치된 작업을 정리합니다.",
+          "이슈 상세 헤더에서 상태·우선순위 칩이 겹치고 담당자 아바타가 찌그러지던 문제를 고칩니다. 아바타와 액션 버튼을 같은 크기의 원형으로 맞췄습니다.",
+          "이슈 상세의 작업 로그가 비어 보이던 문제를 고칩니다. 명령 실행·파일 변경·도구 호출 같은 activity도 함께 렌더하고, 다시 클레임된 런에서 이전 실행 세션을 골라 볼 수 있습니다.",
+        ],
+      },
+      {
         version: "1.2.189",
         date: "2026년 9월 4일",
         title: "앱을 열자마자 지난 화면을 보여주고 이슈 보드 반응 속도를 높입니다",
@@ -1548,6 +1567,25 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.190",
+        date: "September 4, 2026",
+        title: "Cancel agent work on remote workers and fix channel replies and GitHub repository scope",
+        summary:
+          "Cancel an agent session running on a remote worker from the app, and fix channel and issue replies that were discarded on a contract decode failure along with the organization GitHub App reading a stale repository scope. Projects can also carry their own icon now.",
+        items: [
+          "Add a Lucide icon and color picker to the project settings dialog so each project can carry its own icon.",
+          "Allow cancelling an agent task session that runs on a remote worker: the button now appears there and the server cancels the task.",
+          "Read provider usage and model lists through a single CLI implementation so the desktop app and workers report the same numbers.",
+          "Run Codex through the same bundled sidecar as the other six providers instead of a separate native client.",
+          "Move more view subscriptions onto narrower atoms and pin them with render counts, cutting re-renders in the dashboard and issue views.",
+          "Fix channel and issue agent replies being discarded whole when the model copied an extra field from the surrounding data; the reply now recovers with a self-correcting turn in the same conversation.",
+          "Fix repositories created after an organization GitHub App was installed for all repositories being seen as outside its access scope, by reading the list from the installation itself.",
+          "Fix project agent sessions sitting in running after a model call failed mid-turn, and reap tasks whose lease has been expired for more than a day.",
+          "Fix the issue detail header overlapping its status and priority chips and squishing assignee avatars; avatars and the action buttons are now the same size circle.",
+          "Fix the issue work log looking empty by rendering activity events — command runs, file changes, tool calls — and let a re-claimed run switch back to its earlier execution sessions.",
+        ],
+      },
       {
         version: "1.2.189",
         date: "September 4, 2026",

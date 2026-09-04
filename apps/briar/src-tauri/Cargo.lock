@@ -353,7 +353,7 @@ dependencies = [
 
 [[package]]
 name = "briar"
-version = "1.2.189"
+version = "1.2.190"
 dependencies = [
  "base64 0.23.1",
  "block2",
