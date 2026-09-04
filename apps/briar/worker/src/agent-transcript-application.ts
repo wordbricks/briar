@@ -1,8 +1,11 @@
 import {
+  listAgentTranscriptSessionsForRun,
   readAgentWorkLog,
   readLatestAgentWorkLogForRun,
+  type AgentTranscriptSessionSummary,
 } from "./agent-worklog";
 import {
+  listArchivedTranscriptSessionsForRun,
   readArchivedWorkLog,
   readLatestArchivedWorkLogForRun,
 } from "./archive";
@@ -48,4 +51,31 @@ export async function getProjectAgentTranscriptApplication(input: {
     throw new HttpError(404, "Transcript not found");
   }
   return workLog;
+}
+
+/**
+ * Sessions for one run, newest first. A session that is still hot wins over its
+ * archive metadata so the live worker and provider stay visible.
+ */
+export async function listProjectAgentTranscriptSessionsApplication(input: {
+  readonly db: D1Database;
+  readonly projectId: string;
+  readonly runId: string;
+}): Promise<AgentTranscriptSessionSummary[]> {
+  const [hot, archived] = await Promise.all([
+    listAgentTranscriptSessionsForRun(input.db, input.projectId, input.runId),
+    listArchivedTranscriptSessionsForRun(
+      input.db,
+      input.projectId,
+      input.runId,
+    ),
+  ]);
+  const sessions = new Map(
+    [...archived, ...hot].map((session) => [session.session_id, session]),
+  );
+  return [...sessions.values()].sort((left, right) =>
+    right.last_event_at.localeCompare(left.last_event_at) ||
+    right.started_at.localeCompare(left.started_at) ||
+    right.session_id.localeCompare(left.session_id)
+  );
 }

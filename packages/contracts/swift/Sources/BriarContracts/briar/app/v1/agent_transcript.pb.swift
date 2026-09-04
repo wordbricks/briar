@@ -129,6 +129,92 @@ public nonisolated struct BriarAPI_GetProjectAgentTranscriptResponse: Sendable {
   fileprivate var _session: BriarAPI_ProjectAgentTranscriptSession? = nil
 }
 
+public nonisolated struct BriarAPI_ListProjectAgentTranscriptSessionsRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var projectID: String = String()
+
+  public var runID: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_ListProjectAgentTranscriptSessionsResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Newest session first. Every claim of a run starts its own session, so a
+  /// reclaimed run keeps the earlier sessions selectable instead of hiding them
+  /// behind the newest one.
+  public var sessions: [BriarAPI_ProjectAgentTranscriptSessionSummary] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_ProjectAgentTranscriptSessionSummary: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var sessionID: String = String()
+
+  /// Cold-storage sessions no longer carry their worker or provider, so both
+  /// stay unset once a session has been archived.
+  public var workerID: String {
+    get {_workerID ?? String()}
+    set {_workerID = newValue}
+  }
+  /// Returns true if `workerID` has been explicitly set.
+  public var hasWorkerID: Bool {self._workerID != nil}
+  /// Clears the value of `workerID`. Subsequent reads from it will return its default value.
+  public mutating func clearWorkerID() {self._workerID = nil}
+
+  public var agentProvider: BriarTypes_AgentProvider {
+    get {_agentProvider ?? .unspecified}
+    set {_agentProvider = newValue}
+  }
+  /// Returns true if `agentProvider` has been explicitly set.
+  public var hasAgentProvider: Bool {self._agentProvider != nil}
+  /// Clears the value of `agentProvider`. Subsequent reads from it will return its default value.
+  public mutating func clearAgentProvider() {self._agentProvider = nil}
+
+  public var startedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_startedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_startedAt = newValue}
+  }
+  /// Returns true if `startedAt` has been explicitly set.
+  public var hasStartedAt: Bool {self._startedAt != nil}
+  /// Clears the value of `startedAt`. Subsequent reads from it will return its default value.
+  public mutating func clearStartedAt() {self._startedAt = nil}
+
+  public var lastEventAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_lastEventAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_lastEventAt = newValue}
+  }
+  /// Returns true if `lastEventAt` has been explicitly set.
+  public var hasLastEventAt: Bool {self._lastEventAt != nil}
+  /// Clears the value of `lastEventAt`. Subsequent reads from it will return its default value.
+  public mutating func clearLastEventAt() {self._lastEventAt = nil}
+
+  public var archived: Bool = false
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _workerID: String? = nil
+  fileprivate var _agentProvider: BriarTypes_AgentProvider? = nil
+  fileprivate var _startedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+  fileprivate var _lastEventAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+}
+
 public nonisolated struct BriarAPI_ProjectAgentTranscriptSession: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -400,6 +486,130 @@ nonisolated extension BriarAPI_GetProjectAgentTranscriptResponse: SwiftProtobuf.
   public static func ==(lhs: BriarAPI_GetProjectAgentTranscriptResponse, rhs: BriarAPI_GetProjectAgentTranscriptResponse) -> Bool {
     if lhs._session != rhs._session {return false}
     if lhs.entries != rhs.entries {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_ListProjectAgentTranscriptSessionsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ListProjectAgentTranscriptSessionsRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}run_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.projectID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.runID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.projectID.isEmpty {
+      try visitor.visitSingularStringField(value: self.projectID, fieldNumber: 1)
+    }
+    if !self.runID.isEmpty {
+      try visitor.visitSingularStringField(value: self.runID, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_ListProjectAgentTranscriptSessionsRequest, rhs: BriarAPI_ListProjectAgentTranscriptSessionsRequest) -> Bool {
+    if lhs.projectID != rhs.projectID {return false}
+    if lhs.runID != rhs.runID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_ListProjectAgentTranscriptSessionsResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ListProjectAgentTranscriptSessionsResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}sessions\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.sessions) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.sessions.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.sessions, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_ListProjectAgentTranscriptSessionsResponse, rhs: BriarAPI_ListProjectAgentTranscriptSessionsResponse) -> Bool {
+    if lhs.sessions != rhs.sessions {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_ProjectAgentTranscriptSessionSummary: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ProjectAgentTranscriptSessionSummary"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}session_id\0\u{3}worker_id\0\u{3}agent_provider\0\u{3}started_at\0\u{3}last_event_at\0\u{1}archived\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.sessionID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self._workerID) }()
+      case 3: try { try decoder.decodeSingularEnumField(value: &self._agentProvider) }()
+      case 4: try { try decoder.decodeSingularMessageField(value: &self._startedAt) }()
+      case 5: try { try decoder.decodeSingularMessageField(value: &self._lastEventAt) }()
+      case 6: try { try decoder.decodeSingularBoolField(value: &self.archived) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.sessionID.isEmpty {
+      try visitor.visitSingularStringField(value: self.sessionID, fieldNumber: 1)
+    }
+    try { if let v = self._workerID {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
+    } }()
+    try { if let v = self._agentProvider {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 3)
+    } }()
+    try { if let v = self._startedAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
+    } }()
+    try { if let v = self._lastEventAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+    } }()
+    if self.archived != false {
+      try visitor.visitSingularBoolField(value: self.archived, fieldNumber: 6)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_ProjectAgentTranscriptSessionSummary, rhs: BriarAPI_ProjectAgentTranscriptSessionSummary) -> Bool {
+    if lhs.sessionID != rhs.sessionID {return false}
+    if lhs._workerID != rhs._workerID {return false}
+    if lhs._agentProvider != rhs._agentProvider {return false}
+    if lhs._startedAt != rhs._startedAt {return false}
+    if lhs._lastEventAt != rhs._lastEventAt {return false}
+    if lhs.archived != rhs.archived {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

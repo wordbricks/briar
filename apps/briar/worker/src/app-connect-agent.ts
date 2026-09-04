@@ -53,8 +53,14 @@ import * as Schema from "effect/Schema";
 import type { AgentProvider as DomainAgentProvider } from "../../src/lib/agent-provider";
 import type { ComputerUsePolicy as DomainComputerUsePolicy } from "../../src/lib/computer-use-contract";
 import { getAgentSkill } from "./agent-skills";
-import type { AgentWorkLogEntryRow } from "./agent-worklog";
-import { getProjectAgentTranscriptApplication } from "./agent-transcript-application";
+import type {
+  AgentTranscriptSessionSummary,
+  AgentWorkLogEntryRow,
+} from "./agent-worklog";
+import {
+  getProjectAgentTranscriptApplication,
+  listProjectAgentTranscriptSessionsApplication,
+} from "./agent-transcript-application";
 import {
   getArchivedProjectAgentSession,
   listArchivedProjectAgentSessions,
@@ -152,6 +158,8 @@ export type AppConnectAgentServices = {
   readonly getSessionCursor: typeof getTeamAgentSessionSyncCursor;
   readonly listSessionSummaries: typeof listTeamAgentSessionSummaries;
   readonly getTranscript: typeof getProjectAgentTranscriptApplication;
+  readonly listTranscriptSessions:
+    typeof listProjectAgentTranscriptSessionsApplication;
 };
 
 const appConnectAgentServices: AppConnectAgentServices = {
@@ -160,6 +168,7 @@ const appConnectAgentServices: AppConnectAgentServices = {
   getSessionCursor: getTeamAgentSessionSyncCursor,
   listSessionSummaries: listTeamAgentSessionSummaries,
   getTranscript: getProjectAgentTranscriptApplication,
+  listTranscriptSessions: listProjectAgentTranscriptSessionsApplication,
 };
 
 const requiredTimestamp = (value: string, field: string): Timestamp => {
@@ -249,6 +258,22 @@ const appWorkLogEntry = (entry: AgentWorkLogEntryRow) => ({
         text: entry.body,
       },
     },
+});
+
+const appTranscriptSessionSummary = (
+  session: AgentTranscriptSessionSummary,
+) => ({
+  sessionId: session.session_id,
+  workerId: session.worker_id ?? undefined,
+  agentProvider: session.agent_provider
+    ? agentProvider[session.agent_provider]
+    : undefined,
+  startedAt: requiredTimestamp(session.started_at, "transcript startedAt"),
+  lastEventAt: requiredTimestamp(
+    session.last_event_at,
+    "transcript lastEventAt",
+  ),
+  archived: session.archived,
 });
 
 const domainAgentProvider = (value: AgentProvider): DomainAgentProvider => {
@@ -1593,6 +1618,22 @@ export const createAppAgentService = (
       },
       entries: workLog.entries.map(appWorkLogEntry),
     };
+  },
+
+  listProjectAgentTranscriptSessions: async (input) => {
+    const session = await services.requireSession(auth, request);
+    const project = await requireProject(
+      db,
+      input.projectId,
+      session.user.id,
+      services.getTeam,
+    );
+    const sessions = await services.listTranscriptSessions({
+      db,
+      projectId: project.id,
+      runId: decodeUuid(input.runId),
+    });
+    return { sessions: sessions.map(appTranscriptSessionSummary) };
   },
 
   putProjectAgentSession: async (input) => {

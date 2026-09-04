@@ -726,6 +726,19 @@ export async function loadProjectAgentTranscript(
   );
 }
 
+export async function loadProjectAgentTranscriptSessions(
+  token: string,
+  projectId: string,
+  runId: string,
+  signal?: AbortSignal,
+) {
+  const client = requireAgentClient();
+  return client.listProjectAgentTranscriptSessions(
+    { projectId, runId },
+    appCallOptions(token, signal),
+  );
+}
+
 export async function createProjectAgent(
   token: string,
   projectId: string,

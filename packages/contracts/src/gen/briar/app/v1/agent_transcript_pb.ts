@@ -16,7 +16,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file briar/app/v1/agent_transcript.proto.
  */
 export const file_briar_app_v1_agent_transcript: GenFile = /*@__PURE__*/
-  fileDesc("CiNicmlhci9hcHAvdjEvYWdlbnRfdHJhbnNjcmlwdC5wcm90bxIMYnJpYXIuYXBwLnYxInUKIEdldFByb2plY3RBZ2VudFRyYW5zY3JpcHRSZXF1ZXN0EhIKCnByb2plY3RfaWQYASABKAkSFAoKc2Vzc2lvbl9pZBgCIAEoCUgAEhsKEWxhdGVzdF9mb3JfcnVuX2lkGAMgASgJSABCCgoIc2VsZWN0b3IimgEKIUdldFByb2plY3RBZ2VudFRyYW5zY3JpcHRSZXNwb25zZRI8CgdzZXNzaW9uGAEgASgLMisuYnJpYXIuYXBwLnYxLlByb2plY3RBZ2VudFRyYW5zY3JpcHRTZXNzaW9uEjcKB2VudHJpZXMYAiADKAsyJi5icmlhci5hcHAudjEuUHJvamVjdEFnZW50V29ya0xvZ0VudHJ5IpMCCh1Qcm9qZWN0QWdlbnRUcmFuc2NyaXB0U2Vzc2lvbhISCgpzZXNzaW9uX2lkGAEgASgJEhMKBnJ1bl9pZBgCIAEoCUgAiAEBEhYKCXdvcmtlcl9pZBgDIAEoCUgBiAEBEjUKDmFnZW50X3Byb3ZpZGVyGAQgASgOMh0uYnJpYXIudHlwZXMudjEuQWdlbnRQcm92aWRlchIuCgpzdGFydGVkX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIxCg1sYXN0X2V2ZW50X2F0GAYgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEIJCgdfcnVuX2lkQgwKCl93b3JrZXJfaWQiwwMKGFByb2plY3RBZ2VudFdvcmtMb2dFbnRyeRIQCghlbnRyeV9pZBgBIAEoCRIQCghzZXF1ZW5jZRgCIAEoBBIYChB1cGRhdGVkX3NlcXVlbmNlGAMgASgEEjwKBnN0YXR1cxgEIAEoDjIsLmJyaWFyLmFwcC52MS5Qcm9qZWN0QWdlbnRXb3JrTG9nRW50cnlTdGF0dXMSLgoKc3RhcnRlZF9hdBgFIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASNQoMY29tcGxldGVkX2F0GAcgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEgBiAEBEjsKB21lc3NhZ2UYCiABKAsyKC5icmlhci5hcHAudjEuUHJvamVjdEFnZW50V29ya0xvZ01lc3NhZ2VIABI9CghhY3Rpdml0eRgLIAEoCzIpLmJyaWFyLmFwcC52MS5Qcm9qZWN0QWdlbnRXb3JrTG9nQWN0aXZpdHlIAEIHCgVlbnRyeUIPCg1fY29tcGxldGVkX2F0IkgKGlByb2plY3RBZ2VudFdvcmtMb2dNZXNzYWdlEhIKBXBoYXNlGAEgASgJSACIAQESDAoEdGV4dBgCIAEoCUIICgZfcGhhc2UiawobUHJvamVjdEFnZW50V29ya0xvZ0FjdGl2aXR5Ei8KBGtpbmQYASABKA4yIS5icmlhci50eXBlcy52MS5BZ2VudEFjdGl2aXR5S2luZBINCgV0aXRsZRgCIAEoCRIMCgR0ZXh0GAMgASgJKtECCh5Qcm9qZWN0QWdlbnRXb3JrTG9nRW50cnlTdGF0dXMSMwovUFJPSkVDVF9BR0VOVF9XT1JLX0xPR19FTlRSWV9TVEFUVVNfVU5TUEVDSUZJRUQQABIvCitQUk9KRUNUX0FHRU5UX1dPUktfTE9HX0VOVFJZX1NUQVRVU19XUklUSU5HEAESMQotUFJPSkVDVF9BR0VOVF9XT1JLX0xPR19FTlRSWV9TVEFUVVNfQ09NUExFVEVEEAISLgoqUFJPSkVDVF9BR0VOVF9XT1JLX0xPR19FTlRSWV9TVEFUVVNfRkFJTEVEEAMSMQotUFJPSkVDVF9BR0VOVF9XT1JLX0xPR19FTlRSWV9TVEFUVVNfQ0FOQ0VMTEVEEAQSMwovUFJPSkVDVF9BR0VOVF9XT1JLX0xPR19FTlRSWV9TVEFUVVNfSU5URVJSVVBURUQQBUIMugIJQnJpYXJBUElfYgZwcm90bzM", [file_briar_types_v1_agent_event, file_briar_types_v1_provider, file_google_protobuf_timestamp]);
+  fileDesc("CiNicmlhci9hcHAvdjEvYWdlbnRfdHJhbnNjcmlwdC5wcm90bxIMYnJpYXIuYXBwLnYxInUKIEdldFByb2plY3RBZ2VudFRyYW5zY3JpcHRSZXF1ZXN0EhIKCnByb2plY3RfaWQYASABKAkSFAoKc2Vzc2lvbl9pZBgCIAEoCUgAEhsKEWxhdGVzdF9mb3JfcnVuX2lkGAMgASgJSABCCgoIc2VsZWN0b3IimgEKIUdldFByb2plY3RBZ2VudFRyYW5zY3JpcHRSZXNwb25zZRI8CgdzZXNzaW9uGAEgASgLMisuYnJpYXIuYXBwLnYxLlByb2plY3RBZ2VudFRyYW5zY3JpcHRTZXNzaW9uEjcKB2VudHJpZXMYAiADKAsyJi5icmlhci5hcHAudjEuUHJvamVjdEFnZW50V29ya0xvZ0VudHJ5Ik8KKUxpc3RQcm9qZWN0QWdlbnRUcmFuc2NyaXB0U2Vzc2lvbnNSZXF1ZXN0EhIKCnByb2plY3RfaWQYASABKAkSDgoGcnVuX2lkGAIgASgJInIKKkxpc3RQcm9qZWN0QWdlbnRUcmFuc2NyaXB0U2Vzc2lvbnNSZXNwb25zZRJECghzZXNzaW9ucxgBIAMoCzIyLmJyaWFyLmFwcC52MS5Qcm9qZWN0QWdlbnRUcmFuc2NyaXB0U2Vzc2lvblN1bW1hcnkipAIKJFByb2plY3RBZ2VudFRyYW5zY3JpcHRTZXNzaW9uU3VtbWFyeRISCgpzZXNzaW9uX2lkGAEgASgJEhYKCXdvcmtlcl9pZBgCIAEoCUgAiAEBEjoKDmFnZW50X3Byb3ZpZGVyGAMgASgOMh0uYnJpYXIudHlwZXMudjEuQWdlbnRQcm92aWRlckgBiAEBEi4KCnN0YXJ0ZWRfYXQYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjEKDWxhc3RfZXZlbnRfYXQYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhAKCGFyY2hpdmVkGAYgASgIQgwKCl93b3JrZXJfaWRCEQoPX2FnZW50X3Byb3ZpZGVyIpMCCh1Qcm9qZWN0QWdlbnRUcmFuc2NyaXB0U2Vzc2lvbhISCgpzZXNzaW9uX2lkGAEgASgJEhMKBnJ1bl9pZBgCIAEoCUgAiAEBEhYKCXdvcmtlcl9pZBgDIAEoCUgBiAEBEjUKDmFnZW50X3Byb3ZpZGVyGAQgASgOMh0uYnJpYXIudHlwZXMudjEuQWdlbnRQcm92aWRlchIuCgpzdGFydGVkX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIxCg1sYXN0X2V2ZW50X2F0GAYgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEIJCgdfcnVuX2lkQgwKCl93b3JrZXJfaWQiwwMKGFByb2plY3RBZ2VudFdvcmtMb2dFbnRyeRIQCghlbnRyeV9pZBgBIAEoCRIQCghzZXF1ZW5jZRgCIAEoBBIYChB1cGRhdGVkX3NlcXVlbmNlGAMgASgEEjwKBnN0YXR1cxgEIAEoDjIsLmJyaWFyLmFwcC52MS5Qcm9qZWN0QWdlbnRXb3JrTG9nRW50cnlTdGF0dXMSLgoKc3RhcnRlZF9hdBgFIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASNQoMY29tcGxldGVkX2F0GAcgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEgBiAEBEjsKB21lc3NhZ2UYCiABKAsyKC5icmlhci5hcHAudjEuUHJvamVjdEFnZW50V29ya0xvZ01lc3NhZ2VIABI9CghhY3Rpdml0eRgLIAEoCzIpLmJyaWFyLmFwcC52MS5Qcm9qZWN0QWdlbnRXb3JrTG9nQWN0aXZpdHlIAEIHCgVlbnRyeUIPCg1fY29tcGxldGVkX2F0IkgKGlByb2plY3RBZ2VudFdvcmtMb2dNZXNzYWdlEhIKBXBoYXNlGAEgASgJSACIAQESDAoEdGV4dBgCIAEoCUIICgZfcGhhc2UiawobUHJvamVjdEFnZW50V29ya0xvZ0FjdGl2aXR5Ei8KBGtpbmQYASABKA4yIS5icmlhci50eXBlcy52MS5BZ2VudEFjdGl2aXR5S2luZBINCgV0aXRsZRgCIAEoCRIMCgR0ZXh0GAMgASgJKtECCh5Qcm9qZWN0QWdlbnRXb3JrTG9nRW50cnlTdGF0dXMSMwovUFJPSkVDVF9BR0VOVF9XT1JLX0xPR19FTlRSWV9TVEFUVVNfVU5TUEVDSUZJRUQQABIvCitQUk9KRUNUX0FHRU5UX1dPUktfTE9HX0VOVFJZX1NUQVRVU19XUklUSU5HEAESMQotUFJPSkVDVF9BR0VOVF9XT1JLX0xPR19FTlRSWV9TVEFUVVNfQ09NUExFVEVEEAISLgoqUFJPSkVDVF9BR0VOVF9XT1JLX0xPR19FTlRSWV9TVEFUVVNfRkFJTEVEEAMSMQotUFJPSkVDVF9BR0VOVF9XT1JLX0xPR19FTlRSWV9TVEFUVVNfQ0FOQ0VMTEVEEAQSMwovUFJPSkVDVF9BR0VOVF9XT1JLX0xPR19FTlRSWV9TVEFUVVNfSU5URVJSVVBURUQQBUIMugIJQnJpYXJBUElfYgZwcm90bzM", [file_briar_types_v1_agent_event, file_briar_types_v1_provider, file_google_protobuf_timestamp]);
 
 /**
  * @generated from message briar.app.v1.GetProjectAgentTranscriptRequest
@@ -75,6 +75,94 @@ export const GetProjectAgentTranscriptResponseSchema: GenMessage<GetProjectAgent
   messageDesc(file_briar_app_v1_agent_transcript, 1);
 
 /**
+ * @generated from message briar.app.v1.ListProjectAgentTranscriptSessionsRequest
+ */
+export type ListProjectAgentTranscriptSessionsRequest = Message<"briar.app.v1.ListProjectAgentTranscriptSessionsRequest"> & {
+  /**
+   * @generated from field: string project_id = 1;
+   */
+  projectId: string;
+
+  /**
+   * @generated from field: string run_id = 2;
+   */
+  runId: string;
+};
+
+/**
+ * Describes the message briar.app.v1.ListProjectAgentTranscriptSessionsRequest.
+ * Use `create(ListProjectAgentTranscriptSessionsRequestSchema)` to create a new message.
+ */
+export const ListProjectAgentTranscriptSessionsRequestSchema: GenMessage<ListProjectAgentTranscriptSessionsRequest> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_agent_transcript, 2);
+
+/**
+ * @generated from message briar.app.v1.ListProjectAgentTranscriptSessionsResponse
+ */
+export type ListProjectAgentTranscriptSessionsResponse = Message<"briar.app.v1.ListProjectAgentTranscriptSessionsResponse"> & {
+  /**
+   * Newest session first. Every claim of a run starts its own session, so a
+   * reclaimed run keeps the earlier sessions selectable instead of hiding them
+   * behind the newest one.
+   *
+   * @generated from field: repeated briar.app.v1.ProjectAgentTranscriptSessionSummary sessions = 1;
+   */
+  sessions: ProjectAgentTranscriptSessionSummary[];
+};
+
+/**
+ * Describes the message briar.app.v1.ListProjectAgentTranscriptSessionsResponse.
+ * Use `create(ListProjectAgentTranscriptSessionsResponseSchema)` to create a new message.
+ */
+export const ListProjectAgentTranscriptSessionsResponseSchema: GenMessage<ListProjectAgentTranscriptSessionsResponse> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_agent_transcript, 3);
+
+/**
+ * @generated from message briar.app.v1.ProjectAgentTranscriptSessionSummary
+ */
+export type ProjectAgentTranscriptSessionSummary = Message<"briar.app.v1.ProjectAgentTranscriptSessionSummary"> & {
+  /**
+   * @generated from field: string session_id = 1;
+   */
+  sessionId: string;
+
+  /**
+   * Cold-storage sessions no longer carry their worker or provider, so both
+   * stay unset once a session has been archived.
+   *
+   * @generated from field: optional string worker_id = 2;
+   */
+  workerId?: string | undefined;
+
+  /**
+   * @generated from field: optional briar.types.v1.AgentProvider agent_provider = 3;
+   */
+  agentProvider?: AgentProvider | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp started_at = 4;
+   */
+  startedAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp last_event_at = 5;
+   */
+  lastEventAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: bool archived = 6;
+   */
+  archived: boolean;
+};
+
+/**
+ * Describes the message briar.app.v1.ProjectAgentTranscriptSessionSummary.
+ * Use `create(ProjectAgentTranscriptSessionSummarySchema)` to create a new message.
+ */
+export const ProjectAgentTranscriptSessionSummarySchema: GenMessage<ProjectAgentTranscriptSessionSummary> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_agent_transcript, 4);
+
+/**
  * @generated from message briar.app.v1.ProjectAgentTranscriptSession
  */
 export type ProjectAgentTranscriptSession = Message<"briar.app.v1.ProjectAgentTranscriptSession"> & {
@@ -114,7 +202,7 @@ export type ProjectAgentTranscriptSession = Message<"briar.app.v1.ProjectAgentTr
  * Use `create(ProjectAgentTranscriptSessionSchema)` to create a new message.
  */
 export const ProjectAgentTranscriptSessionSchema: GenMessage<ProjectAgentTranscriptSession> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_agent_transcript, 2);
+  messageDesc(file_briar_app_v1_agent_transcript, 5);
 
 /**
  * @generated from message briar.app.v1.ProjectAgentWorkLogEntry
@@ -178,7 +266,7 @@ export type ProjectAgentWorkLogEntry = Message<"briar.app.v1.ProjectAgentWorkLog
  * Use `create(ProjectAgentWorkLogEntrySchema)` to create a new message.
  */
 export const ProjectAgentWorkLogEntrySchema: GenMessage<ProjectAgentWorkLogEntry> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_agent_transcript, 3);
+  messageDesc(file_briar_app_v1_agent_transcript, 6);
 
 /**
  * @generated from message briar.app.v1.ProjectAgentWorkLogMessage
@@ -200,7 +288,7 @@ export type ProjectAgentWorkLogMessage = Message<"briar.app.v1.ProjectAgentWorkL
  * Use `create(ProjectAgentWorkLogMessageSchema)` to create a new message.
  */
 export const ProjectAgentWorkLogMessageSchema: GenMessage<ProjectAgentWorkLogMessage> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_agent_transcript, 4);
+  messageDesc(file_briar_app_v1_agent_transcript, 7);
 
 /**
  * @generated from message briar.app.v1.ProjectAgentWorkLogActivity
@@ -227,7 +315,7 @@ export type ProjectAgentWorkLogActivity = Message<"briar.app.v1.ProjectAgentWork
  * Use `create(ProjectAgentWorkLogActivitySchema)` to create a new message.
  */
 export const ProjectAgentWorkLogActivitySchema: GenMessage<ProjectAgentWorkLogActivity> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_agent_transcript, 5);
+  messageDesc(file_briar_app_v1_agent_transcript, 8);
 
 /**
  * @generated from enum briar.app.v1.ProjectAgentWorkLogEntryStatus

@@ -35,6 +35,7 @@ service AgentService {
   rpc RunProjectAgentTask(RunProjectAgentTaskRequest) returns (RunProjectAgentTaskResponse);
   rpc CancelProjectAgentTask(CancelProjectAgentTaskRequest) returns (CancelProjectAgentTaskResponse);
   rpc GetProjectAgentTranscript(GetProjectAgentTranscriptRequest) returns (GetProjectAgentTranscriptResponse);
+  rpc ListProjectAgentTranscriptSessions(ListProjectAgentTranscriptSessionsRequest) returns (ListProjectAgentTranscriptSessionsResponse);
 }
 
 message ListOrganizationAgentsRequest {

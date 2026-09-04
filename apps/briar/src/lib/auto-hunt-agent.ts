@@ -1,6 +1,8 @@
 import {
   commands,
   events,
+  type AgentActivityKind,
+  type AgentActivityStatus,
   type AgentEvent,
   type AppServerEventRecord_Deserialize,
   type AutoHuntDispatchEvent_Deserialize,
@@ -15,6 +17,17 @@ export type AutoHuntAppServerEvent = Omit<
   event?: AgentEvent;
 };
 
+/**
+ * Commands, file changes, searches and tool calls the agent ran. They carry the
+ * only trace of a turn that never produced a message, so the work log renders
+ * them next to the messages instead of dropping them.
+ */
+export type AutoHuntAgentActivity = {
+  kind: AgentActivityKind;
+  title: string;
+  status: "running" | AgentActivityStatus;
+};
+
 export type AutoHuntAgentMessage = {
   id: string;
   phase: string | null;
@@ -22,6 +35,7 @@ export type AutoHuntAgentMessage = {
   startedAtMs: number;
   updatedAtMs: number;
   isComplete: boolean;
+  activity?: AutoHuntAgentActivity;
 };
 
 export type AutoHuntWorkerResult = {
@@ -162,6 +176,53 @@ export function agentMessagesFromAppServerEvents(
       });
       continue;
     }
+    if (
+      normalized?.type === "activityStarted" ||
+      normalized?.type === "activityCompleted"
+    ) {
+      const id = turnSequence > 1
+        ? `turn:${turnSequence}:${normalized.id}`
+        : normalized.id;
+      const existing = messages.get(id);
+      if (!existing) order.push(id);
+      const isComplete = normalized.type === "activityCompleted";
+      messages.set(id, {
+        id,
+        phase: existing?.phase ?? null,
+        text: normalized.text || existing?.text || "",
+        startedAtMs: existing?.startedAtMs ?? event.occurredAtMs,
+        updatedAtMs: event.occurredAtMs,
+        isComplete,
+        activity: {
+          kind: normalized.kind,
+          title: normalized.title || existing?.activity?.title || "",
+          status: isComplete ? normalized.status : "running",
+        },
+      });
+      continue;
+    }
+    if (normalized?.type === "activityDelta") {
+      const id = turnSequence > 1
+        ? `turn:${turnSequence}:${normalized.id}`
+        : normalized.id;
+      const existing = messages.get(id);
+      if (existing?.isComplete) continue;
+      if (!existing) order.push(id);
+      messages.set(id, {
+        id,
+        phase: existing?.phase ?? null,
+        text: `${existing?.text ?? ""}${normalized.delta}`,
+        startedAtMs: existing?.startedAtMs ?? event.occurredAtMs,
+        updatedAtMs: event.occurredAtMs,
+        isComplete: false,
+        activity: existing?.activity ?? {
+          kind: "tool",
+          title: "",
+          status: "running",
+        },
+      });
+      continue;
+    }
   }
 
   return order
@@ -169,8 +230,12 @@ export function agentMessagesFromAppServerEvents(
     .filter((message): message is AutoHuntAgentMessage => Boolean(message))
     // Empty bodies only produce the "writing…" placeholder. Hide them so
     // providers that stream via ephemeral deltas cannot flood the work log
-    // with blank incomplete rows.
-    .filter((message) => message.text.trim().length > 0);
+    // with blank incomplete rows. An activity headline stands on its own, so a
+    // command that printed nothing still stays visible.
+    .filter((message) =>
+      message.text.trim().length > 0 ||
+      (message.activity?.title.trim().length ?? 0) > 0
+    );
 }
 
 export function naturalLanguageFromAgentMessage(text: string): string {

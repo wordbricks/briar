@@ -35,6 +35,20 @@ export type AgentWorkLogEntryRow = {
   completed_at: string | null;
 };
 
+/**
+ * One claim of a run streams into its own transcript session, so a run that was
+ * reclaimed keeps several sessions. Summaries let the app list them without
+ * reading every work log.
+ */
+export type AgentTranscriptSessionSummary = {
+  session_id: string;
+  worker_id: string | null;
+  agent_provider: AgentProvider | null;
+  started_at: string;
+  last_event_at: string;
+  archived: boolean;
+};
+
 export type AgentTranscriptSegmentRow = {
   session_id: string;
   first_sequence: number;
@@ -762,6 +776,30 @@ export async function readLatestAgentWorkLogForRun(
   return latest
     ? readAgentWorkLog(db, projectId, latest.session_id)
     : null;
+}
+
+export async function listAgentTranscriptSessionsForRun(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+): Promise<AgentTranscriptSessionSummary[]> {
+  const result = await db
+    .prepare(
+      `select session.session_id, session.worker_id, session.agent_provider,
+              session.started_at, session.last_event_at
+       from briar_agent_transcript_sessions session
+       join briar_hunt_runs run
+         on run.id = session.run_id and run.project_id = session.project_id
+       where session.project_id = ? and session.run_id = ?
+       order by session.last_event_at desc, session.started_at desc,
+                session.session_id desc limit 50`,
+    )
+    .bind(projectId, runId)
+    .all<Omit<AgentTranscriptSessionSummary, "archived">>();
+  return (result.results ?? []).map((session) => ({
+    ...session,
+    archived: false,
+  }));
 }
 
 export async function listAgentTranscriptSegments(

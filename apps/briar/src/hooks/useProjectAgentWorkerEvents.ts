@@ -6,6 +6,7 @@ import type {
 import { ProjectAgentWorkLogEntryStatus } from "@briar/contracts/gen/briar/app/v1/agent_transcript_pb";
 import { AgentActivityKind } from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
 import { loadProjectAgentTranscript } from "../lib/app-rpc/agent";
+import { isApiErrorStatus } from "../lib/api/errors";
 import {
   agentProviderFromProto,
   requiredMessage,
@@ -83,7 +84,12 @@ export function useProjectAgentWorkerEvents(
           mergeAutoHuntAppServerEvents(current, incoming)
         );
       }
-      const failures = loaded.filter((result) => result.status === "rejected");
+      // A session that has recorded nothing yet answers 404. That is an empty
+      // work log, not a failure, so it must not hide the session picker behind
+      // an error state.
+      const failures = loaded.filter((result) =>
+        result.status === "rejected" && !isApiErrorStatus(result.reason, 404)
+      );
       if (failures.length === loaded.length && !live && !hasLoadedEvents) {
         const reason = failures[0];
         setError(
