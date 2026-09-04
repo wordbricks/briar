@@ -467,7 +467,7 @@ function DmComputerScreen({
               <div className="grid max-w-xs justify-items-center gap-2.5">
                 {connectionState === "connecting" ||
                     connectionState === "reconnect" ? (
-                  <Spinner className="text-white" size={22} />
+                  <Spinner className="size-[22px] text-white" />
                 ) : null}
                 <span className="text-sm font-medium">{t(statusKey)}</span>
                 {error ? (

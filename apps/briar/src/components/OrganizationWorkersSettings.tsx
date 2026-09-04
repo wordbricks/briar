@@ -336,7 +336,7 @@ export function OrganizationWorkersSettings({
             type="button"
             variant="ghost"
           >
-            <Spinner icon={RefreshCw} size={16} spinning={loading} />
+            <RefreshCw className={loading ? "animate-spin" : undefined} size={16} />
           </Button>
         </header>
         <div className="divide-y divide-border">
@@ -396,7 +396,7 @@ export function OrganizationWorkersSettings({
         </div>
         {loading && workers.length === 0 ? (
           <div className="grid min-h-32 place-items-center rounded-xl border border-border bg-card">
-            <Spinner size={20} />
+            <Spinner className="size-[20px]" />
           </div>
         ) : workers.length === 0 ? (
           <div className="rounded-xl border border-dashed border-border p-8 text-center">
@@ -803,7 +803,7 @@ export function OrganizationWorkersSettings({
               type="button"
               variant="destructive"
             >
-              {savingDeviceId ? <Spinner size={15} /> : <Trash2 size={15} />}
+              {savingDeviceId ? <Spinner className="size-[15px]" /> : <Trash2 size={15} />}
               {t("organization.workersDeleteAction")}
             </Button>
           </DialogFooter>

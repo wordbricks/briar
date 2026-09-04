@@ -225,7 +225,7 @@ export function HtmlArtifactPreview({
             ) : null}
             {status === "loading" ? (
               <div className="html-artifact-state" role="status">
-                <Spinner aria-hidden="true" size={20} />
+                <Spinner aria-hidden="true" className="size-[20px]" />
                 {t("htmlArtifact.loading")}
               </div>
             ) : status === "error" ? (

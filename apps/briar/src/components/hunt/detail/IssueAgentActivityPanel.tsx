@@ -94,7 +94,7 @@ export function IssueAgentActivityPanel({
           <CircleAlert size={14} />
           {t("run.agentActivityLoadFailed")}
         </div> : loading ? <div className="auto-hunt-event-state">
-          <Spinner size={14} />
+          <Spinner className="size-[14px]" />
           {t("run.agentActivityLoading")}
         </div> : activity.length === 0 ? <div className="auto-hunt-event-state">
           {t("run.agentActivityEmpty")}

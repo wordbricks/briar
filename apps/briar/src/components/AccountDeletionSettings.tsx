@@ -153,7 +153,7 @@ export function AccountDeletionSettings({
               variant="destructive"
             >
               {deleting ? (
-                <Spinner aria-hidden="true" size={15} />
+                <Spinner aria-hidden="true" className="size-[15px]" />
               ) : (
                 <Trash2 aria-hidden="true" size={15} />
               )}

@@ -14,7 +14,6 @@ import {
   Settings,
   Sparkles,
 } from "lucide-react";
-import { Spinner } from "./ui/spinner";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { MainContent, PageHeader } from "./layout";
@@ -390,7 +389,7 @@ export function TeamLobby({
                 onClick={() => void refreshUsage(true)}
                 type="button"
               >
-                <Spinner aria-hidden icon={RefreshCw} size={17} spinning={usageLoading} />
+                <RefreshCw aria-hidden className={usageLoading ? "animate-spin" : undefined} size={17} />
               </button>
             </header>
 
@@ -535,11 +534,10 @@ export function TeamLobby({
               onClick={() => void refreshUsage(true)}
               type="button"
             >
-              <Spinner
+              <RefreshCw
                 aria-hidden
-                icon={RefreshCw}
+                className={usageLoading ? "animate-spin" : undefined}
                 size={15}
-                spinning={usageLoading}
               />
               <span>{t("lobby.refresh")}</span>
             </button>

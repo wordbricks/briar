@@ -491,7 +491,7 @@ export function TeamSchedule({
               type="button"
             >
               {isScheduleDataLoading ? (
-                <Spinner size={16} />
+                <Spinner className="size-[16px]" />
               ) : (
                 <Plus size={16} />
               )}
@@ -1088,7 +1088,7 @@ export function DeleteTeamAgentScheduleDialog({
             }}
             type="button"
           >
-            {isDeleting ? <Spinner size={14} /> : <Trash2 size={14} />}
+            {isDeleting ? <Spinner className="size-[14px]" /> : <Trash2 size={14} />}
             {isDeleting ? t("schedule.deleting") : t("schedule.delete")}
           </button>
         </footer>
@@ -1520,7 +1520,7 @@ export function CreateTeamAgentScheduleDialog({
             type="submit"
           >
             {isSubmitting ? (
-              <Spinner size={15} />
+              <Spinner className="size-[15px]" />
             ) : isEditing ? (
               <Pencil size={15} />
             ) : (

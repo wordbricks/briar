@@ -640,7 +640,7 @@ export function AppSettings({
                       title={t("appSettings.refreshProviders")}
                     >
                       {providersLoading ? (
-                        <Spinner size={16} />
+                        <Spinner className="size-[16px]" />
                       ) : (
                         <RefreshCw size={16} />
                       )}
@@ -719,7 +719,7 @@ export function AppSettings({
                         type="button"
                         variant="outline"
                       >
-                        <Spinner />
+                        <Spinner className="size-[24px]" />
                         {t("appSettings.installing")}
                       </Button>
                     ) : providerStatuses?.codex.installed === false ? (
@@ -738,7 +738,7 @@ export function AppSettings({
                     ) : providerSaving === "codex" ? (
                       <Spinner
                         aria-label={t("common.saving")}
-                        size={16}
+                        className="size-[16px]"
                       />
                     ) : null
                   }
@@ -805,7 +805,7 @@ export function AppSettings({
                         type="button"
                         variant="outline"
                       >
-                        <Spinner />
+                        <Spinner className="size-[24px]" />
                         {t("appSettings.installing")}
                       </Button>
                     ) : providerStatuses?.claude.installed === false ? (
@@ -824,7 +824,7 @@ export function AppSettings({
                     ) : providerSaving === "claude" ? (
                       <Spinner
                         aria-label={t("common.saving")}
-                        size={16}
+                        className="size-[16px]"
                       />
                     ) : null
                   }
@@ -891,7 +891,7 @@ export function AppSettings({
                         type="button"
                         variant="outline"
                       >
-                        <Spinner />
+                        <Spinner className="size-[24px]" />
                         {t("appSettings.installing")}
                       </Button>
                     ) : providerStatuses?.cursor.installed === false ? (
@@ -910,7 +910,7 @@ export function AppSettings({
                     ) : providerSaving === "cursor" ? (
                       <Spinner
                         aria-label={t("common.saving")}
-                        size={16}
+                        className="size-[16px]"
                       />
                     ) : null
                   }
@@ -977,7 +977,7 @@ export function AppSettings({
                         type="button"
                         variant="outline"
                       >
-                        <Spinner />
+                        <Spinner className="size-[24px]" />
                         {t("appSettings.installing")}
                       </Button>
                     ) : providerStatuses?.grok.installed === false ? (
@@ -996,7 +996,7 @@ export function AppSettings({
                     ) : providerSaving === "grok" ? (
                       <Spinner
                         aria-label={t("common.saving")}
-                        size={16}
+                        className="size-[16px]"
                       />
                     ) : null
                   }
@@ -1065,7 +1065,7 @@ export function AppSettings({
                         type="button"
                         variant="outline"
                       >
-                        <Spinner />
+                        <Spinner className="size-[24px]" />
                         {t("appSettings.installing")}
                       </Button>
                     ) : providerStatuses?.agy.installed === false ? (
@@ -1084,7 +1084,7 @@ export function AppSettings({
                     ) : providerSaving === "agy" ? (
                       <Spinner
                         aria-label={t("common.saving")}
-                        size={16}
+                        className="size-[16px]"
                       />
                     ) : null
                   }
@@ -1161,7 +1161,7 @@ export function AppSettings({
                         type="button"
                         variant="outline"
                       >
-                        <Spinner />
+                        <Spinner className="size-[24px]" />
                         {t("appSettings.installing")}
                       </Button>
                     ) : providerStatuses?.opencode.installed === false ? (
@@ -1188,7 +1188,7 @@ export function AppSettings({
                         variant="outline"
                       >
                         {terminalPathSaving ? (
-                          <Spinner />
+                          <Spinner className="size-[24px]" />
                         ) : (
                           <SquareTerminal />
                         )}
@@ -1201,7 +1201,7 @@ export function AppSettings({
                     ) : providerSaving === "opencode" ? (
                       <Spinner
                         aria-label={t("common.saving")}
-                        size={16}
+                        className="size-[16px]"
                       />
                     ) : null
                   }
@@ -1267,7 +1267,7 @@ export function AppSettings({
                   trailing={
                     providerInstalling === "openrouter" ? (
                       <Button disabled size="sm" type="button" variant="outline">
-                        <Spinner />
+                        <Spinner className="size-[24px]" />
                         {t("appSettings.installing")}
                       </Button>
                     ) : providerStatuses?.openrouter.installed === false ? (
@@ -1286,7 +1286,7 @@ export function AppSettings({
                     ) : providerSaving === "openrouter" || openRouterKeySaving ? (
                       <Spinner
                         aria-label={t("common.saving")}
-                        size={16}
+                        className="size-[16px]"
                       />
                     ) : null
                   }
@@ -1310,7 +1310,7 @@ export function AppSettings({
                       title={t("appSettings.refresh")}
                     >
                       {loading ? (
-                        <Spinner size={16} />
+                        <Spinner className="size-[16px]" />
                       ) : (
                         <RefreshCw size={16} />
                       )}
@@ -1684,7 +1684,7 @@ function OpenRouterDetails({
             size="sm"
             type="button"
           >
-            {saving ? <Spinner /> : null}
+            {saving ? <Spinner className="size-[24px]" /> : null}
             {t("common.save")}
           </Button>
           {configured ? (
@@ -1763,7 +1763,7 @@ function ProviderDetails({
         </div>
         <div className="flex min-w-0 items-center gap-3 rounded-lg border border-border/80 bg-card px-3 py-3">
           {loading ? (
-            <Spinner aria-hidden="true" className="shrink-0 text-muted-foreground" size={18} />
+            <Spinner aria-hidden="true" className="size-[18px] shrink-0 text-muted-foreground" />
           ) : (
             <CircleCheck
               aria-hidden="true"
@@ -1790,7 +1790,7 @@ function ProviderDetails({
             type="button"
             variant="outline"
           >
-            {loginOpening ? <Spinner /> : null}
+            {loginOpening ? <Spinner className="size-[24px]" /> : null}
             {connected ? t("usage.reauthenticate") : t("usage.signInAction")}
           </Button>
         </div>

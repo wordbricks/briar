@@ -96,7 +96,7 @@ export function AgentWorkLog({
               </strong>
               {!isComplete ? (
                 <small className="auto-hunt-message-streaming">
-                  <Spinner size={11} />
+                  <Spinner className="size-[11px]" />
                   {entryActivity
                     ? t("autoHunt.agentActivity.running")
                     : t("autoHunt.agentMessage.streaming")}

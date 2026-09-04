@@ -225,7 +225,7 @@ export function AccountProfileSettings({
           type="submit"
         >
           {saving ? (
-            <Spinner aria-hidden="true" size={15} />
+            <Spinner aria-hidden="true" className="size-[15px]" />
           ) : !changed ? (
             <Check aria-hidden="true" size={15} />
           ) : (

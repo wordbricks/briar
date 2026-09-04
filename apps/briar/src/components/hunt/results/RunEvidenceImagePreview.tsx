@@ -24,7 +24,7 @@ export function RunEvidenceImagePreview({
       {source ? <ImageLightbox alt={image.filename} className="run-evidence-image-trigger" filename={image.filename} loading="eager" source={source} /> : <button aria-label={t("run.enlargeScreenshot", {
       name: image.filename
     })} className="run-evidence-image-trigger" disabled type="button">
-          {!failed ? <Spinner size={20} /> : null}
+          {!failed ? <Spinner className="size-[20px]" /> : null}
           {failed ? <CircleAlert size={20} /> : null}
         </button>}
       <figcaption>

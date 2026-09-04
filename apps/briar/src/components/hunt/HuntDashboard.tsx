@@ -652,7 +652,7 @@ function HuntDashboardContent({
               setContextDeleteError(caught instanceof Error ? caught.message : String(caught));
             });
           }} type="button" variant="destructive">
-              {deletingIssueId ? <Spinner size={15} /> : <Trash2 size={15} />}
+              {deletingIssueId ? <Spinner className="size-[15px]" /> : <Trash2 size={15} />}
               {deletingIssueId ? t("issue.deleting") : t("issue.delete")}
             </Button>
           </DialogFooter>
@@ -714,7 +714,7 @@ function HuntDashboardContent({
               setContextTransferError(caught instanceof Error ? caught.message : String(caught));
             });
           }} type="button">
-              {deletingIssueId ? <Spinner size={15} /> : <FolderInput size={15} />}
+              {deletingIssueId ? <Spinner className="size-[15px]" /> : <FolderInput size={15} />}
               {deletingIssueId ? t("issue.transferring") : t("issue.transferConfirm")}
             </Button>
           </DialogFooter>

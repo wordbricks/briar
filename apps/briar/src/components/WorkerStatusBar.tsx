@@ -335,11 +335,10 @@ export function WorkerStatusBar({
                 title={t("worker.refresh")}
                 type="button"
               >
-                <Spinner
+                <RefreshCw
                   aria-hidden
-                  icon={RefreshCw}
+                  className={isRefreshing ? "animate-spin" : undefined}
                   size={14}
-                  spinning={isRefreshing}
                   strokeWidth={1.8}
                 />
               </button>
@@ -559,7 +558,7 @@ export function WorkerStatusBar({
                         type="button"
                       >
                         {isUpdating || isPending ? (
-                          <Spinner aria-hidden size={13} strokeWidth={1.8} />
+                          <Spinner aria-hidden className="size-[13px]" strokeWidth={1.8} />
                         ) : (
                           <Download aria-hidden size={13} strokeWidth={1.8} />
                         )}

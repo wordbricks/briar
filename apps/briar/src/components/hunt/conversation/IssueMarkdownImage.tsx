@@ -50,7 +50,7 @@ export function IssueMarkdownImage({
   }
   if (!source) {
     return <span className="issue-markdown-image-state" role="img" aria-label={alt}>
-        <Spinner aria-hidden="true" size={16} />
+        <Spinner aria-hidden="true" className="size-[16px]" />
         {alt}
       </span>;
   }

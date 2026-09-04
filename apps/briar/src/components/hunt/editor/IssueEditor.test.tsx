@@ -132,7 +132,7 @@ function expectPendingAgentReplyLoader(scope: ParentNode | null | undefined) {
   expect(loader?.dataset.size).toBe("compact");
   expect(pending?.textContent).toContain("에이전트가 답변을 작성하고 있습니다");
   expect(pending?.textContent).toContain("0.0s");
-  expect(pending?.querySelector(".spin")).toBeNull();
+  expect(pending?.querySelector(".animate-spin")).toBeNull();
   return pending;
 }
 describe("IssueEditor", () => {
@@ -184,7 +184,7 @@ describe("IssueEditor", () => {
         }));
       });
       expect(container.querySelector(".run-page-save-status")?.textContent).toContain("저장 중");
-      expect(container.querySelector(".run-page-save-status .spin")).not.toBeNull();
+      expect(container.querySelector(".run-page-save-status .animate-spin")).not.toBeNull();
       expect(onUpdateIssue).not.toHaveBeenCalled();
       await act(async () => {
         await vi.advanceTimersByTimeAsync(600);

@@ -329,7 +329,7 @@ export function TeamAgentDetail({
             type="button"
           >
             {isTaskStarting ? (
-              <Spinner size={17} />
+              <Spinner className="size-[17px]" />
             ) : (
               <Play fill="currentColor" size={17} />
             )}

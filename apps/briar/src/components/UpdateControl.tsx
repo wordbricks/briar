@@ -36,7 +36,7 @@ export function UpdateControl() {
         type="button"
       >
         {isInstalling
-          ? <Spinner aria-hidden="true" size={14} />
+          ? <Spinner aria-hidden="true" className="size-[14px]" />
           : <Download aria-hidden="true" size={14} />}
       </button>
     </div>

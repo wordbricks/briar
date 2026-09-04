@@ -117,7 +117,7 @@ export function IssueContextMenu({
       <ContextMenu.Portal>
         <ContextMenu.Content aria-label={t("issue.actions")} className="issue-context-menu" collisionPadding={10}>
           <ContextMenu.Item className="issue-context-item" disabled={processNowDisabled} onSelect={() => onProcessNow?.()}>
-            {isProcessing ? <Spinner aria-hidden="true" size={17} /> : <Bot aria-hidden="true" size={17} />}
+            {isProcessing ? <Spinner aria-hidden="true" className="size-[17px]" /> : <Bot aria-hidden="true" size={17} />}
             <span>{t(canReassign ? "worker.reassign" : "issue.processNow")}</span>
             {isProcessing ? <small>{t("issue.processNowRunning")}</small> : run.executionReadiness === "waiting" ? <small>{t("issue.waitingOnPrerequisites", {
               count: run.waitingOnPrerequisiteCount ?? 0

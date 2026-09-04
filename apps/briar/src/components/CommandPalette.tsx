@@ -412,7 +412,7 @@ export function CommandPalette({
             >
               {loading ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Spinner aria-hidden="true" size={17} />
+                  <Spinner aria-hidden="true" className="size-[17px]" />
                   {t("commandPalette.loading")}
                 </div>
               ) : (

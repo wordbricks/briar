@@ -185,7 +185,7 @@ export function BrowserSettings() {
             title={t("browser.refresh")}
           >
             {loading ? (
-              <Spinner size={16} />
+              <Spinner className="size-[16px]" />
             ) : (
               <RefreshCw size={16} />
             )}
@@ -319,7 +319,7 @@ export function BrowserSettings() {
               variant="outline"
             >
               {installing ? (
-                <Spinner />
+                <Spinner className="size-[24px]" />
               ) : (
                 <Download />
               )}
@@ -410,7 +410,7 @@ export function BrowserSettings() {
               variant="outline"
             >
               {settingUpAside ? (
-                <Spinner />
+                <Spinner className="size-[24px]" />
               ) : (
                 <Download />
               )}

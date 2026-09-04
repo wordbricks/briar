@@ -981,7 +981,7 @@ export function TeamOnboarding({
                   >
                     {githubImporting ? (
                       <>
-                        <Spinner size={17} />
+                        <Spinner className="size-[17px]" />
                         {t("onboarding.githubCloning")}
                       </>
                     ) : (
@@ -1089,7 +1089,7 @@ export function TeamOnboarding({
                     type="submit"
                   >
                     {lovableImporting ? (
-                      <><Spinner size={17} />{t("onboarding.lovableCloning")}</>
+                      <><Spinner className="size-[17px]" />{t("onboarding.lovableCloning")}</>
                     ) : (
                       <>{t("onboarding.confirm")}<ArrowRight size={17} /></>
                     )}
@@ -1137,7 +1137,7 @@ export function TeamOnboarding({
                         onClick={() => void selectRepository()}
                         type="button"
                       >
-                        {selectingRepository ? <Spinner size={14} /> : <FolderOpen size={14} />}
+                        {selectingRepository ? <Spinner className="size-[14px]" /> : <FolderOpen size={14} />}
                         {selectingRepository
                           ? t("onboarding.repositorySelecting")
                           : repositoryPath
@@ -1237,7 +1237,7 @@ export function TeamOnboarding({
                   </>
                 ) : (
                   <>
-                    <span className="onboarding-process-icon"><Spinner size={27} /></span>
+                    <span className="onboarding-process-icon"><Spinner className="size-[27px]" /></span>
                     <h1>
                       {lovablePreset
                         ? t("onboarding.lovablePresetTitle")
@@ -1277,7 +1277,7 @@ export function TeamOnboarding({
                     value={workflowRevision}
                   />
                   <button disabled={revisingWorkflow || !workflowRevision.trim()} type="submit">
-                    {revisingWorkflow ? <Spinner size={14} /> : <Sparkles size={14} />}
+                    {revisingWorkflow ? <Spinner className="size-[14px]" /> : <Sparkles size={14} />}
                     {revisingWorkflow ? t("onboarding.workflowRevising") : t("onboarding.workflowRevise")}
                   </button>
                 </form>

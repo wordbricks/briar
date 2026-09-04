@@ -264,7 +264,7 @@ export function MessageComposer({
         }} ref={attachmentInputRef} type="file" />
           </> : null}
         <button aria-label={sending ? t("run.sendingMessage") : t("run.sendMessage")} className="issue-message-send" disabled={!body.trim() && attachments.length === 0 || sending} type="submit">
-          {sending ? <Spinner size={16} /> : <Send aria-hidden="true" size={19} strokeWidth={2.2} />}
+          {sending ? <Spinner className="size-[16px]" /> : <Send aria-hidden="true" size={19} strokeWidth={2.2} />}
         </button>
       </footer>
       {error && <p className="issue-composer-error">

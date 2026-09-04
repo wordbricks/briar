@@ -57,7 +57,7 @@ export function IssueWorkflowProgress({
             setSavingBoundary(boundary);
             void onCheckpointsChange(toggleIssueCheckpoint(issueCheckpoints, stage.id, position)).catch(error => setCheckpointError(error instanceof Error ? error.message : String(error))).finally(() => setSavingBoundary(null));
           }} title={inherited ? t("issue.checkpointRequired") : action} type="button">
-                {savingBoundary === boundary ? <Spinner aria-hidden="true" size={10} /> : <Clock3 aria-hidden="true" size={10} />}
+                {savingBoundary === boundary ? <Spinner aria-hidden="true" className="size-[10px]" /> : <Clock3 aria-hidden="true" size={10} />}
               </button>;
         };
         return <li aria-current={isCurrent ? "step" : undefined} aria-label={`${label}: ${stateLabels[state]}`} data-reached={state !== "upcoming"} data-state={state} key={stage.id}>

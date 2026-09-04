@@ -163,7 +163,7 @@ export function TeamRepositorySetupDialog({
             onClick={() => void onRefresh()}
             type="button"
           >
-            <Spinner icon={RefreshCw} size={15} spinning={loading} />
+            <RefreshCw className={loading ? "animate-spin" : undefined} size={15} />
             {t("repositorySetup.recheck")}
           </button>
           {connectionState === "disconnected" ? (
@@ -173,7 +173,7 @@ export function TeamRepositorySetupDialog({
               onClick={() => void onStartWorking()}
               type="button"
             >
-              {loading ? <Spinner size={15} /> : <FolderGit2 size={15} />}
+              {loading ? <Spinner className="size-[15px]" /> : <FolderGit2 size={15} />}
               {t("repositorySetup.startWorking")}
             </button>
           ) : repositoryReady ? (

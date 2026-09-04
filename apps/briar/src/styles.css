@@ -171,15 +171,6 @@ body { overflow: hidden; font-synthesis: none; }
 .document-workspace { display: flex; min-height: 0; flex: 1; flex-direction: column; }
 
 .detail-error { position: fixed; z-index: 40; top: 66px; right: 12px; max-width: 420px; }
-.spin {
-  display: inline-block;
-  flex: none;
-  overflow: visible;
-  vertical-align: middle;
-  transform-origin: center;
-  animation: briar-spin .8s linear infinite;
-}
-@keyframes briar-spin { to { transform: rotate(360deg); } }
 
 @media (max-width: 800px) {
   .document-workspace { display: flex; }

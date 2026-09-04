@@ -383,7 +383,7 @@ export function ManagedComputerRemoteDesktop({
             <div className="absolute inset-0 grid place-items-center bg-black/80 p-6 text-center">
               <div className="grid max-w-md justify-items-center gap-3">
                 {connectionState === "connecting" || connectionState === "reconnect" ? (
-                  <Spinner className="text-white" size={24} />
+                  <Spinner className="size-[24px] text-white" />
                 ) : null}
                 <Typography className="text-white" variant="bodyLg">
                   {t(connectionState === "connecting"

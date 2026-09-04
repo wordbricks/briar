@@ -7,7 +7,6 @@ import {
   Terminal,
   Wrench,
 } from "lucide-react";
-import { Spinner } from "./ui/spinner";
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "../i18n";
 import type { AutoHuntHealth } from "../generated/tauri";
@@ -137,7 +136,7 @@ export function ConnectionHealth({
                 onClick={onRefresh}
                 type="button"
               >
-                <Spinner icon={RefreshCw} size={13} spinning={loading} />
+                <RefreshCw className={loading ? "animate-spin" : undefined} size={13} />
               </button>
             </div>
           </div>
