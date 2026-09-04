@@ -316,6 +316,7 @@ pub(super) struct OnboardingPrerequisites {
     pub(super) opencode: OnboardingPrerequisiteStatus,
     pub(super) openrouter: OnboardingPrerequisiteStatus,
     pub(super) vertex: OnboardingPrerequisiteStatus,
+    pub(super) pi: OnboardingPrerequisiteStatus,
 }
 
 impl OnboardingPrerequisites {
@@ -334,6 +335,7 @@ impl OnboardingPrerequisites {
             agent::AgentProviderKind::Opencode => &self.opencode,
             agent::AgentProviderKind::Openrouter => &self.openrouter,
             agent::AgentProviderKind::Vertex => &self.vertex,
+            agent::AgentProviderKind::Pi => &self.pi,
         }
     }
 }
@@ -376,6 +378,7 @@ pub(super) struct AgentProviderModelCatalog {
     pub(super) opencode: AgentProviderModelCatalogEntry,
     pub(super) openrouter: AgentProviderModelCatalogEntry,
     pub(super) vertex: AgentProviderModelCatalogEntry,
+    pub(super) pi: AgentProviderModelCatalogEntry,
 }
 
 #[derive(Serialize, specta::Type)]
@@ -764,6 +767,7 @@ pub(super) struct AppProviderSettings {
     pub(super) opencode: bool,
     pub(super) openrouter: bool,
     pub(super) vertex: bool,
+    pub(super) pi: bool,
 }
 
 impl From<LocalAgentProviderSettings> for AppProviderSettings {
@@ -777,6 +781,7 @@ impl From<LocalAgentProviderSettings> for AppProviderSettings {
             opencode: settings.opencode,
             openrouter: settings.openrouter,
             vertex: settings.vertex,
+            pi: settings.pi,
         }
     }
 }
@@ -792,6 +797,7 @@ impl From<AppProviderSettings> for LocalAgentProviderSettings {
             opencode: settings.opencode,
             openrouter: settings.openrouter,
             vertex: settings.vertex,
+            pi: settings.pi,
             ..Default::default()
         }
     }

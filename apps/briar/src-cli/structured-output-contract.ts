@@ -78,6 +78,7 @@ const providerCodecTransformers = {
   opencode: OpenAiStructuredOutput.toCodecOpenAI,
   openrouter: OpenAiStructuredOutput.toCodecOpenAI,
   vertex: OpenAiStructuredOutput.toCodecOpenAI,
+  pi: OpenAiStructuredOutput.toCodecOpenAI,
 } satisfies Record<AgentProvider, CodecTransformer>;
 
 const strictSchemaOptions = {

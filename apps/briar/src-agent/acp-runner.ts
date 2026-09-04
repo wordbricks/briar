@@ -505,6 +505,15 @@ export async function runAcpTurn(
  * `data`, where agents put HTTP statuses and provider error tags; anything
  * else is judged by its text. Null means the turn simply failed.
  */
+/**
+ * ACP's reserved JSON-RPC code for "authenticate before this request".
+ *
+ * It sits in the generic server-error range that agents also use for their own
+ * failures, so the code alone does not identify an auth error; it counts only
+ * alongside the `authMethods` list `RequestError.authRequired` carries.
+ */
+export const ACP_AUTH_REQUIRED_CODE = -32000;
+
 export function acpFailureBlock(
   profile: Pick<AcpProviderProfile, "providerId">,
   error: unknown,
@@ -529,7 +538,16 @@ export function acpFailureBlock(
       message: [error.message, typeof error.data === "string" ? error.data : null]
         .filter(Boolean)
         .join(" "),
-      code: dataCode,
+      // An agent that raises ACP's authenticate-first error carries its auth
+      // methods in `data` and no error tag of its own, so this pairing is
+      // what makes the turn a sign-in block rather than the wording the agent
+      // happened to choose. The code alone is not enough: agents also report
+      // rate limits under it.
+      code: dataCode ??
+        (error.code === ACP_AUTH_REQUIRED_CODE &&
+            Array.isArray(data?.authMethods)
+          ? "auth_required"
+          : undefined),
       statusCode: dataStatus ?? null,
     });
   }

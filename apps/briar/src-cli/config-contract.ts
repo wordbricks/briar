@@ -275,6 +275,7 @@ const AgentProviderSettings = strict(Schema.Struct({
   opencode: Schema.mutableKey(Schema.Boolean),
   openrouter: Schema.mutableKey(Schema.Boolean),
   vertex: Schema.mutableKey(Schema.Boolean),
+  pi: Schema.mutableKey(Schema.Boolean),
 }));
 
 /**
@@ -599,6 +600,7 @@ const configFromProto = (value: LocalConfig): Config => {
     opencode: agentProviderSettings.opencode,
     openrouter: agentProviderSettings.openrouter,
     vertex: agentProviderSettings.vertex,
+    pi: agentProviderSettings.pi,
   };
   const openrouterApiKey = value.openrouterApiKey;
   const vertexAi = value.vertexAi === undefined ? undefined : {

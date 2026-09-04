@@ -11,6 +11,7 @@ pub(super) const CONFIG: SidecarProviderConfig = SidecarProviderConfig {
         name: "cursor-agent",
         home_candidates: &[".local/bin/cursor-agent", ".cursor/bin/cursor-agent"],
         absolute_candidates: &["/opt/homebrew/bin/cursor-agent", "/usr/local/bin/cursor-agent"],
+        companion_executables: &[],
         missing_error:
             "Cursor CLI가 필요합니다. Cursor CLI를 설치하고 `agent login`을 실행한 뒤 다시 시도하세요.",
     },

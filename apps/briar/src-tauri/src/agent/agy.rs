@@ -11,6 +11,7 @@ pub(super) const CONFIG: SidecarProviderConfig = SidecarProviderConfig {
         name: "agy",
         home_candidates: &[".local/bin/agy", ".gemini/antigravity-cli/bin/agy"],
         absolute_candidates: &["/opt/homebrew/bin/agy", "/usr/local/bin/agy"],
+        companion_executables: &[],
         missing_error:
             "Google Antigravity CLI가 필요합니다. `agy`를 설치하고 로그인한 뒤 다시 시도하세요.",
     },

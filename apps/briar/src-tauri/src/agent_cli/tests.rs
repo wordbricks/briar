@@ -47,6 +47,7 @@ fn provider_prerequisites(
         opencode: provider_prerequisite(opencode.0, opencode.1),
         openrouter: provider_prerequisite(false, false),
         vertex: provider_prerequisite(false, false),
+        pi: provider_prerequisite(false, false),
     }
 }
 

@@ -1240,6 +1240,10 @@ pub(super) fn install_auto_hunt_assets(
                 .join("opencode")
                 .join("skills")
                 .join(skill_name),
+            home.join(".pi")
+                .join("agent")
+                .join("skills")
+                .join(skill_name),
         ] {
             let stale_references = skill_destination.join("references");
             if stale_references.exists() {
@@ -1287,6 +1291,11 @@ pub(super) fn install_auto_hunt_assets(
         "agent/opencode-runner.js",
         "dist-agent/opencode-runner.js",
     );
+    let pi_runner_source = bundled_path(
+        resource_directory,
+        "agent/pi-runner.js",
+        "dist-agent/pi-runner.js",
+    );
     if !cli_source.is_file() || !launcher_source.is_file() {
         return Err("Briar CLI 번들을 찾지 못했습니다.".to_string());
     }
@@ -1296,6 +1305,7 @@ pub(super) fn install_auto_hunt_assets(
         || !grok_runner_source.is_file()
         || !agy_runner_source.is_file()
         || !opencode_runner_source.is_file()
+        || !pi_runner_source.is_file()
     {
         return Err("Briar Agent runner 번들을 찾지 못했습니다.".to_string());
     }
@@ -1328,6 +1338,8 @@ pub(super) fn install_auto_hunt_assets(
         agent_directory.join("opencode-runner.js"),
     )
     .map_err(|error| format!("OpenCode runner를 설치하지 못했습니다: {error}"))?;
+    fs::copy(pi_runner_source, agent_directory.join("pi-runner.js"))
+        .map_err(|error| format!("Pi runner를 설치하지 못했습니다: {error}"))?;
     fs::write(
         library_directory.join("VERSION"),
         format!("{}\n", env!("CARGO_PKG_VERSION")),
@@ -1369,6 +1381,7 @@ pub(super) fn auto_hunt_assets_are_current(resource_directory: &Path, home: &Pat
         && cli_directory.join("agent/grok-runner.js").is_file()
         && cli_directory.join("agent/agy-runner.js").is_file()
         && cli_directory.join("agent/opencode-runner.js").is_file()
+        && cli_directory.join("agent/pi-runner.js").is_file()
         && read_trimmed_file(&cli_directory.join("VERSION")).as_deref()
             == Some(env!("CARGO_PKG_VERSION"));
     if !cli_current {

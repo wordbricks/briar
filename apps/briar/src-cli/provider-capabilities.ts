@@ -522,6 +522,146 @@ export async function cursorModels(
   });
 }
 
+/**
+ * Pi's models come from the same `session/new` response `pi-acp` builds for a
+ * turn, so the catalog cannot drift from what the runner can actually select.
+ * The adapter needs a real working directory to open a session, and it reads
+ * pi's own credential store, so discovery runs in a throwaway directory and
+ * never prompts.
+ */
+export type PiSessionCapabilities = {
+  models: AgentModelCapability[];
+  defaultEfforts: AgentEffortCapability[];
+};
+
+export function parsePiSessionModels(result: unknown): PiSessionCapabilities {
+  const setup = result as {
+    models?: { availableModels?: unknown; currentModelId?: unknown };
+    configOptions?: Array<
+      { id?: unknown; options?: Array<{ value?: unknown; name?: unknown }> }
+    >;
+  } | null;
+  const currentModelId = typeof setup?.models?.currentModelId === "string"
+    ? setup.models.currentModelId
+    : null;
+  const advertised = Array.isArray(setup?.models?.availableModels)
+    ? setup.models.availableModels
+    : [];
+  const models = advertised
+    .flatMap((entry) => {
+      const model = entry as { modelId?: unknown; name?: unknown };
+      const id = typeof model.modelId === "string" ? model.modelId.trim() : "";
+      if (!id) return [];
+      const label = typeof model.name === "string" && model.name.trim()
+        ? model.name.trim()
+        : id;
+      return [{ id, label, isDefault: id === currentModelId }];
+    })
+    .slice(0, MAX_MODELS);
+  const thoughtLevel = (setup?.configOptions ?? []).find(
+    (option) => option.id === "thought_level",
+  );
+  const defaultEfforts = (thoughtLevel?.options ?? [])
+    .flatMap((option) => {
+      const id = typeof option.value === "string" ? option.value.trim() : "";
+      if (!id) return [];
+      return [effort(id, {
+        label: typeof option.name === "string" && option.name.trim()
+          ? option.name.trim()
+          : id,
+      })];
+    })
+    .slice(0, MAX_EFFORTS);
+  return { models, defaultEfforts };
+}
+
+export async function piModels(
+  binary: string,
+  cwd: string,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<PiSessionCapabilities> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(binary, [], {
+      cwd,
+      env: { ...env, PI_TELEMETRY: "0" },
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    let settled = false;
+    let buffer = "";
+    let stderr = "";
+    const finish = (
+      error?: Error,
+      value: PiSessionCapabilities = { models: [], defaultEfforts: [] },
+    ) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      child.kill();
+      if (error) reject(error);
+      else resolve(value);
+    };
+    const timer = setTimeout(
+      () => finish(new Error("Pi model discovery timed out")),
+      15_000,
+    );
+    const send = (value: Record<string, unknown>) =>
+      child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", ...value })}\n`);
+    child.stderr.on("data", (chunk) => {
+      stderr = `${stderr}${String(chunk)}`.slice(-8_000);
+    });
+    child.on("error", finish);
+    child.on("exit", (code) => {
+      if (!settled) {
+        finish(new Error(stderr.trim() || `pi-acp exited (${code})`));
+      }
+    });
+    child.stdout.on("data", (chunk) => {
+      buffer += String(chunk);
+      while (buffer.includes("\n")) {
+        const newline = buffer.indexOf("\n");
+        const line = buffer.slice(0, newline).trim();
+        buffer = buffer.slice(newline + 1);
+        let message: {
+          id?: unknown;
+          result?: unknown;
+          error?: { message?: unknown };
+        };
+        try {
+          message = JSON.parse(line);
+        } catch {
+          continue;
+        }
+        if (message.error) {
+          // A signed-out pi reports "authentication required" here rather
+          // than an empty catalog; surface it as the discovery error.
+          finish(new Error(
+            typeof message.error.message === "string"
+              ? message.error.message
+              : "pi-acp request failed",
+          ));
+          continue;
+        }
+        if (message.id === 1) {
+          send({ id: 2, method: "session/new", params: { cwd, mcpServers: [] } });
+          continue;
+        }
+        if (message.id === 2) {
+          finish(undefined, parsePiSessionModels(message.result));
+        }
+      }
+    });
+    send({
+      id: 1,
+      method: "initialize",
+      params: {
+        protocolVersion: 1,
+        clientCapabilities: { fs: { readTextFile: false, writeTextFile: false } },
+        clientInfo: { name: "briar-worker", version: "1" },
+      },
+    });
+  });
+}
+
 async function codexModels(binary: string): Promise<AgentModelCapability[]> {
   return new Promise((resolve, reject) => {
     const child = spawn(binary, ["app-server"], { env: process.env, stdio: ["pipe", "pipe", "pipe"] });
@@ -637,6 +777,11 @@ export async function discoverWorkerProviderCapabilities(
       const env = environment(provider);
       if (provider === "codex") catalog.codex.models = await codexModels(binary);
       if (provider === "cursor") catalog.cursor.models = await cursorModels(binary);
+      if (provider === "pi") {
+        const discovered = await piModels(binary, home, env);
+        catalog.pi.models = discovered.models;
+        catalog.pi.defaultEfforts = discovered.defaultEfforts;
+      }
       if (provider === "grok") catalog.grok.models = await grokModels(binary, home, env);
       if (provider === "agy") {
         const agyEnv = withoutGoogleCredentials(env);

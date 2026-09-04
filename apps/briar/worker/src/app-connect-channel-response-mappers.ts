@@ -133,6 +133,7 @@ const agentProvider = {
   opencode: AgentProvider.OPENCODE,
   openrouter: AgentProvider.OPENROUTER,
   vertex: AgentProvider.VERTEX,
+  pi: AgentProvider.PI,
 } as const satisfies Record<DomainAgentProvider, AgentProvider>;
 
 const proposalStatus = {

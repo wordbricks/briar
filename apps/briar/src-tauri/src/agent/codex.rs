@@ -17,6 +17,7 @@ pub(super) const CONFIG: SidecarProviderConfig = SidecarProviderConfig {
         name: "codex",
         home_candidates: &[".local/bin/codex", ".bun/bin/codex", ".cargo/bin/codex"],
         absolute_candidates: &["/opt/homebrew/bin/codex", "/usr/local/bin/codex"],
+        companion_executables: &[],
         missing_error: "Codex CLI가 필요합니다. Codex를 설치하고 로그인한 뒤 Briar를 다시 여세요.",
     },
     missing_bun_error: "Codex App Server 실행에 필요한 Bun을 로컬 환경에서 찾지 못했습니다.",

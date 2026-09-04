@@ -80,6 +80,7 @@ describe("agent usage presentation", () => {
       opencode: { ...provider, provider: "opencode" as const },
       openrouter: { ...provider, provider: "openrouter" as const },
       vertex: { ...provider, provider: "vertex" as const },
+      pi: { ...provider, provider: "pi" as const },
       cursor: { ...provider, provider: "cursor" as const },
     };
     recordAgentUsageSnapshot(snapshot);

@@ -131,6 +131,7 @@ function parseUsageSnapshot(value: unknown): AgentUsageSnapshot | null {
   const openrouter = usageProviderFrom(snapshot.openrouter, "openrouter");
   const vertex = usageProviderFrom(snapshot.vertex, "vertex");
   const cursor = usageProviderFrom(snapshot.cursor, "cursor");
+  const pi = usageProviderFrom(snapshot.pi, "pi");
   if (
     typeof snapshot.updatedAt !== "number" ||
     !claude ||
@@ -140,7 +141,8 @@ function parseUsageSnapshot(value: unknown): AgentUsageSnapshot | null {
     !opencode ||
     !openrouter ||
     !vertex ||
-    !cursor
+    !cursor ||
+    !pi
   ) {
     return null;
   }
@@ -153,6 +155,7 @@ function parseUsageSnapshot(value: unknown): AgentUsageSnapshot | null {
     openrouter,
     vertex,
     cursor,
+    pi,
     updatedAt: snapshot.updatedAt,
   };
 }

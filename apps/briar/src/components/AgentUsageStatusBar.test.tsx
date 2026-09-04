@@ -150,6 +150,19 @@ const snapshot: AgentUsageSnapshot = {
     updatedAt: 1,
     error: null,
   },
+  pi: {
+    provider: "pi",
+    status: "unavailable",
+    session: null,
+    weekly: null,
+    monthly: null,
+    planType: null,
+    accountLabel: null,
+    authenticated: false,
+    reauthenticationRequired: false,
+    updatedAt: 1,
+    error: null,
+  },
 };
 
 describe("AgentUsageStatusBar", () => {

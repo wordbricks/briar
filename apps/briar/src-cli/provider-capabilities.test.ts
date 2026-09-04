@@ -153,6 +153,7 @@ fi
         opencode: false,
         openrouter: false,
         vertex: false,
+        pi: false,
       }, {
         refresh: true,
         home: directory,
@@ -325,6 +326,7 @@ openai/gpt-5
         opencode: false,
         openrouter: true,
         vertex: true,
+        pi: true,
       }, {
         refresh: true,
         home: directory,
@@ -349,6 +351,7 @@ describe("desktop provider model catalog", () => {
     opencode: true,
     openrouter: false,
     vertex: false,
+    pi: false,
   };
 
   it("falls back to the active free OpenCode models from the local cache", async () => {
@@ -427,6 +430,7 @@ printf '%s\\n' 'openrouter/test-model' '{' '  "name": "Test model"' '}'
         opencode: false,
         openrouter: true,
         vertex: true,
+        pi: true,
       }, {
         refresh: true,
         home: directory,

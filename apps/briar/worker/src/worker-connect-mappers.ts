@@ -146,6 +146,7 @@ const provider = (value: string): AgentProvider => {
     case "opencode": return AgentProvider.OPENCODE;
     case "openrouter": return AgentProvider.OPENROUTER;
     case "vertex": return AgentProvider.VERTEX;
+    case "pi": return AgentProvider.PI;
     default: throw new Error(`Worker claim has unknown Agent provider: ${value}`);
   }
 };

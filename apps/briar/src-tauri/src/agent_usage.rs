@@ -57,6 +57,7 @@ pub(crate) struct AgentUsageSnapshot {
     opencode: ProviderUsage,
     openrouter: ProviderUsage,
     vertex: ProviderUsage,
+    pi: ProviderUsage,
     cursor: ProviderUsage,
     updated_at: u64,
 }
@@ -84,6 +85,7 @@ pub(crate) struct ProviderQuotas {
     opencode: ProviderQuota,
     openrouter: ProviderQuota,
     vertex: ProviderQuota,
+    pi: ProviderQuota,
 }
 
 impl ProviderQuotas {
@@ -100,6 +102,7 @@ impl ProviderQuotas {
             agent::AgentProviderKind::Opencode => self.opencode = quota,
             agent::AgentProviderKind::Openrouter => self.openrouter = quota,
             agent::AgentProviderKind::Vertex => self.vertex = quota,
+            agent::AgentProviderKind::Pi => self.pi = quota,
         }
         self
     }
@@ -114,6 +117,7 @@ impl ProviderQuotas {
             agent::AgentProviderKind::Opencode => self.opencode,
             agent::AgentProviderKind::Openrouter => self.openrouter,
             agent::AgentProviderKind::Vertex => self.vertex,
+            agent::AgentProviderKind::Pi => self.pi,
         }
     }
 }
@@ -150,6 +154,7 @@ pub(crate) fn local_quotas(
         opencode: provider_quota(&snapshot.opencode),
         openrouter: provider_quota(&snapshot.openrouter),
         vertex: provider_quota(&snapshot.vertex),
+        pi: provider_quota(&snapshot.pi),
     };
     if let Ok(mut cache) = QUOTA_CACHE.lock() {
         *cache = Some((
@@ -211,6 +216,7 @@ pub(crate) struct ProviderAuthentication {
     pub(crate) cursor: bool,
     pub(crate) grok: bool,
     pub(crate) agy: bool,
+    pub(crate) pi: bool,
 }
 
 pub(crate) async fn load(
@@ -249,6 +255,7 @@ fn load_sync(home: &Path, configured_upstreams: &agent::ConfiguredUpstreams) -> 
                 agent::AgentProviderKind::Vertex,
                 snapshot.vertex.into_option(),
             ),
+            pi: provider_usage(agent::AgentProviderKind::Pi, snapshot.pi.into_option()),
             cursor: provider_usage(
                 agent::AgentProviderKind::Cursor,
                 snapshot.cursor.into_option(),
@@ -277,6 +284,7 @@ pub(crate) fn local_authentication(home: &Path) -> ProviderAuthentication {
         cursor: read(|snapshot| snapshot.cursor),
         grok: read(|snapshot| snapshot.grok),
         agy: read(|snapshot| snapshot.agy),
+        pi: read(|snapshot| snapshot.pi),
     }
 }
 
@@ -356,6 +364,7 @@ fn unavailable_snapshot(error: String) -> AgentUsageSnapshot {
         opencode: provider(agent::AgentProviderKind::Opencode),
         openrouter: provider(agent::AgentProviderKind::Openrouter),
         vertex: provider(agent::AgentProviderKind::Vertex),
+        pi: provider(agent::AgentProviderKind::Pi),
         cursor: provider(agent::AgentProviderKind::Cursor),
         updated_at: now_millis(),
     }

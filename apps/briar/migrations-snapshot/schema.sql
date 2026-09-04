@@ -5,8 +5,8 @@
 -- Whenever a migration changes the schema or seeds rows, run
 -- `bun run d1:snapshot` and commit the result; `bun run d1:snapshot:check`
 -- fails in CI otherwise.
--- migrations-digest: fb227ab9b656912156746395c24d7df91311587a8679cd8fd437331e5d00e990
--- snapshot-digest: bd19a6c2945fb4959793b7323fe304a826724236a344d3caf852812f2dff00c6
+-- migrations-digest: 504b153fcb44ce2a20b24a3bc229182e224623e3735ca964bb664a6400f8b957
+-- snapshot-digest: f68dbd149402dd21c7302f94b5532c385e90d81b5044c6d60be286d6968fb082
 -- @statement
 CREATE TABLE IF NOT EXISTS "d1_migrations"(
 		id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1888,7 +1888,7 @@ CREATE TABLE briar_agent_skill_execution_approval_audit (
   skill_instructions text not null,
   skill_kind text not null check (skill_kind in ('issue_processing', 'custom')),
   provider text not null
-    check (provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex')),
+    check (provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex', 'pi')),
   model text,
   effort text check (
     effort is null or effort in ('low', 'medium', 'high', 'xhigh', 'max', 'ultra')
@@ -1932,7 +1932,7 @@ CREATE TABLE briar_agent_skill_execution_proposals (
   skill_instructions text not null check (length(skill_instructions) <= 20000),
   skill_kind text not null check (skill_kind in ('issue_processing', 'custom')),
   provider text not null
-    check (provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex')),
+    check (provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex', 'pi')),
   model text check (
     model is null or length(trim(model)) between 1 and 100
   ),
@@ -1992,7 +1992,7 @@ CREATE TABLE IF NOT EXISTS "briar_project_agents" (
   ),
   name text not null check (length(trim(name)) between 1 and 100),
   provider text not null
-    check (provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex')),
+    check (provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex', 'pi')),
   model text check (
     model is null or (model = trim(model) and length(model) between 1 and 100)
   ),
@@ -2048,7 +2048,7 @@ CREATE TABLE briar_agent_skills (
   ),
   body text not null default '' check (length(body) <= 20000),
   provider text not null
-    check (provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex')),
+    check (provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex', 'pi')),
   model text check (
     model is null or (model = trim(model) and length(model) between 1 and 100)
   ),
@@ -2164,11 +2164,11 @@ CREATE TABLE IF NOT EXISTS "briar_hunt_runs" (
   dispatched_at text,
   requested_agent_provider text check (
     requested_agent_provider is null
-    or requested_agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex')
+    or requested_agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex', 'pi')
   ),
   preferred_agent_provider text check (
     preferred_agent_provider is null
-    or preferred_agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex')
+    or preferred_agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex', 'pi')
   ),
   preferred_agent_model text check (
     preferred_agent_model is null
@@ -2215,7 +2215,7 @@ CREATE TABLE IF NOT EXISTS "briar_agent_transcript_sessions" (
   run_id text references briar_hunt_runs (id) on delete cascade,
   worker_id text references briar_execution_workers (id) on delete set null,
   agent_provider text not null
-    check (agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex')),
+    check (agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex', 'pi')),
   started_at text not null,
   last_event_at text not null,
   event_count integer not null default 0 check (event_count >= 0),
@@ -2313,7 +2313,7 @@ CREATE TABLE IF NOT EXISTS "briar_channel_messages" (
   ),
   author_agent_provider text check (
     author_agent_provider is null
-    or author_agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex')
+    or author_agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex', 'pi')
   ),
   author_webhook_id text
     references briar_channel_webhooks (id) on delete set null,
@@ -2363,7 +2363,7 @@ CREATE TABLE briar_channel_reply_sessions (
     references briar_project_agents (id) on delete cascade,
   provider text not null check (
     provider in (
-      'codex', 'claude', 'cursor', 'grok', 'agy', 'opencode', 'openrouter', 'vertex'
+      'codex', 'claude', 'cursor', 'grok', 'agy', 'opencode', 'openrouter', 'vertex', 'pi'
     )
   ),
   model text,
@@ -2408,7 +2408,7 @@ CREATE TABLE briar_channel_agent_reply_jobs (
     check (status in ('queued', 'running', 'completed', 'failed')),
   agent_provider text check (
     agent_provider is null
-    or agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex')
+    or agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex', 'pi')
   ),
   claimed_device_id text
     references briar_execution_worker_devices (id) on delete set null,
@@ -2716,7 +2716,7 @@ CREATE TABLE IF NOT EXISTS "briar_issue_messages" (
   author_user_id text references "user" (id) on delete set null,
   author_agent_provider text check (
     author_agent_provider is null
-    or author_agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex')
+    or author_agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex', 'pi')
   ),
   body text not null check (
     body = trim(body) and length(body) between 1 and 10000
@@ -2748,9 +2748,9 @@ CREATE TABLE briar_issue_agent_reply_jobs (
   claimed_worker_id text
     references briar_execution_workers (id) on delete set null,
   preferred_provider text
-    check (preferred_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex')),
+    check (preferred_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex', 'pi')),
   agent_provider text
-    check (agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex')),
+    check (agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex', 'pi')),
   claim_token_hash text,
   claimed_at text,
   lease_expires_at text,
@@ -2847,7 +2847,7 @@ CREATE TABLE briar_issue_execution_approval_audit (
   approved_by_user_id text references "user" (id) on delete set null,
   approved_at text not null,
   provider text not null
-    check (provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex')),
+    check (provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex', 'pi')),
   model text,
   effort text check (
     effort is null or effort in ('low', 'medium', 'high', 'xhigh', 'max', 'ultra')
@@ -2890,7 +2890,7 @@ CREATE TABLE briar_issue_execution_proposals (
   approval_reserved_at text,
   requested_provider text check (
     requested_provider is null
-    or requested_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex')
+    or requested_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex', 'pi')
   ),
   requested_model text check (
     requested_model is null
@@ -3335,7 +3335,7 @@ CREATE TABLE briar_run_cost_records (
     scope_id is null or length(trim(scope_id)) between 1 and 512
   ),
   agent_provider text not null check (
-    agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex')
+    agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex', 'pi')
   ),
   model_provider text check (
     model_provider is null or length(trim(model_provider)) between 1 and 256
@@ -3528,7 +3528,7 @@ CREATE TABLE briar_run_usage_records (
   turn_id text,
   scope_id text,
   agent_provider text not null check (
-    agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex')
+    agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex', 'pi')
   ),
   model_provider text,
   model text,
@@ -3813,6 +3813,7 @@ select worker.id as worker_id,
          when 'AGENT_PROVIDER_OPENCODE' then 'opencode'
          when 'AGENT_PROVIDER_OPENROUTER' then 'openrouter'
          when 'AGENT_PROVIDER_VERTEX' then 'vertex'
+         when 'AGENT_PROVIDER_PI' then 'pi'
        end as provider,
        case json_extract(worker.runtime_proto_json, '$.agentProvider')
          when 'AGENT_PROVIDER_CODEX' then 'codex'
@@ -3823,6 +3824,7 @@ select worker.id as worker_id,
          when 'AGENT_PROVIDER_OPENCODE' then 'opencode'
          when 'AGENT_PROVIDER_OPENROUTER' then 'openrouter'
          when 'AGENT_PROVIDER_VERTEX' then 'vertex'
+         when 'AGENT_PROVIDER_PI' then 'pi'
        end as agent_provider
 from briar_execution_workers worker,
      json_each(worker.runtime_proto_json, '$.providerHealth') health
@@ -3830,7 +3832,7 @@ where json_extract(health.value, '$.healthy') = 1
   and json_extract(health.value, '$.provider') in (
     'AGENT_PROVIDER_CODEX', 'AGENT_PROVIDER_CLAUDE',
     'AGENT_PROVIDER_CURSOR', 'AGENT_PROVIDER_GROK', 'AGENT_PROVIDER_AGY',
-    'AGENT_PROVIDER_OPENCODE', 'AGENT_PROVIDER_OPENROUTER', 'AGENT_PROVIDER_VERTEX'
+    'AGENT_PROVIDER_OPENCODE', 'AGENT_PROVIDER_OPENROUTER', 'AGENT_PROVIDER_VERTEX', 'AGENT_PROVIDER_PI'
   );
 -- @statement
 CREATE VIEW briar_invalid_execution_worker_runtime as
@@ -3843,10 +3845,10 @@ where not (
   and json_extract(worker.runtime_proto_json, '$.agentProvider') in (
     'AGENT_PROVIDER_CODEX', 'AGENT_PROVIDER_CLAUDE',
     'AGENT_PROVIDER_CURSOR', 'AGENT_PROVIDER_GROK', 'AGENT_PROVIDER_AGY',
-    'AGENT_PROVIDER_OPENCODE', 'AGENT_PROVIDER_OPENROUTER', 'AGENT_PROVIDER_VERTEX'
+    'AGENT_PROVIDER_OPENCODE', 'AGENT_PROVIDER_OPENROUTER', 'AGENT_PROVIDER_VERTEX', 'AGENT_PROVIDER_PI'
   )
   and json_type(worker.runtime_proto_json, '$.providerHealth') = 'array'
-  and json_array_length(worker.runtime_proto_json, '$.providerHealth') = 8
+  and json_array_length(worker.runtime_proto_json, '$.providerHealth') = 9
   and (
     select count(distinct json_extract(health.value, '$.provider'))
     from json_each(worker.runtime_proto_json, '$.providerHealth') health
@@ -3854,16 +3856,16 @@ where not (
       and json_extract(health.value, '$.provider') in (
         'AGENT_PROVIDER_CODEX', 'AGENT_PROVIDER_CLAUDE',
         'AGENT_PROVIDER_CURSOR', 'AGENT_PROVIDER_GROK', 'AGENT_PROVIDER_AGY',
-        'AGENT_PROVIDER_OPENCODE', 'AGENT_PROVIDER_OPENROUTER', 'AGENT_PROVIDER_VERTEX'
+        'AGENT_PROVIDER_OPENCODE', 'AGENT_PROVIDER_OPENROUTER', 'AGENT_PROVIDER_VERTEX', 'AGENT_PROVIDER_PI'
       )
-  ) = 8
+  ) = 9
   and json_type(worker.runtime_proto_json, '$.capabilities') = 'object'
   and json_type(
     worker.runtime_proto_json, '$.capabilities.providerCapabilities'
   ) = 'array'
   and json_array_length(
     worker.runtime_proto_json, '$.capabilities.providerCapabilities'
-  ) = 8
+  ) = 9
   and (
     select count(distinct json_extract(capability.value, '$.provider'))
     from json_each(
@@ -3873,9 +3875,9 @@ where not (
       and json_extract(capability.value, '$.provider') in (
         'AGENT_PROVIDER_CODEX', 'AGENT_PROVIDER_CLAUDE',
         'AGENT_PROVIDER_CURSOR', 'AGENT_PROVIDER_GROK', 'AGENT_PROVIDER_AGY',
-        'AGENT_PROVIDER_OPENCODE', 'AGENT_PROVIDER_OPENROUTER', 'AGENT_PROVIDER_VERTEX'
+        'AGENT_PROVIDER_OPENCODE', 'AGENT_PROVIDER_OPENROUTER', 'AGENT_PROVIDER_VERTEX', 'AGENT_PROVIDER_PI'
       )
-  ) = 8
+  ) = 9
   and (
     json_type(worker.runtime_proto_json, '$.versions') is null
     or json_type(worker.runtime_proto_json, '$.versions') = 'object'

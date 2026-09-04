@@ -11,6 +11,7 @@ pub(super) const CONFIG: SidecarProviderConfig = SidecarProviderConfig {
         name: "claude",
         home_candidates: &[".local/bin/claude", ".bun/bin/claude"],
         absolute_candidates: &["/opt/homebrew/bin/claude", "/usr/local/bin/claude"],
+        companion_executables: &[],
         missing_error:
             "Claude Code가 필요합니다. Claude를 설치하고 `claude auth login`을 실행한 뒤 다시 시도하세요.",
     },

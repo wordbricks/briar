@@ -19,6 +19,7 @@ pub(super) const CONFIG: SidecarProviderConfig = SidecarProviderConfig {
             ".bun/bin/opencode",
         ],
         absolute_candidates: &["/opt/homebrew/bin/opencode", "/usr/local/bin/opencode"],
+        companion_executables: &[],
         missing_error: "Vertex AI 실행에 필요한 OpenCode CLI가 설치되어 있지 않습니다.",
     },
     missing_bun_error: "Vertex AI runner 실행에 필요한 Bun을 로컬 환경에서 찾지 못했습니다.",

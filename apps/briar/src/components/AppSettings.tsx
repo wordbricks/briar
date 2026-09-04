@@ -208,6 +208,14 @@ const providerPresentation = {
     installName: "Vertex AI runtime",
     descriptionKey: "providers.vertex.description",
   },
+  pi: {
+    details: "account",
+    loginProvider: "pi",
+    iconSize: 18,
+    cliName: "Pi CLI",
+    installName: "Pi",
+    descriptionKey: "providers.pi.description",
+  },
 } as const satisfies Record<AgentProvider, ProviderPresentation>;
 
 type NavItem = {

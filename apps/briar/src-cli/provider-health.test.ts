@@ -24,6 +24,7 @@ const enabled = {
   opencode: true,
   openrouter: true,
   vertex: true,
+  pi: true,
 };
 
 describe("inspectWorkerProviderHealth", () => {
@@ -131,6 +132,12 @@ describe("inspectWorkerProviderHealth", () => {
         healthy: false,
         reason: "not_authenticated",
       },
+      pi: {
+        installed: true,
+        authenticated: false,
+        healthy: false,
+        reason: "not_authenticated",
+      },
     });
     expect(healthyWorkerProviders(health)).toEqual(["codex"]);
   });
@@ -162,6 +169,7 @@ describe("inspectWorkerProviderHealth", () => {
       "opencode",
       "openrouter",
       "vertex",
+      "pi",
     ]);
     expect(usage).toHaveBeenCalled();
   });
@@ -192,6 +200,7 @@ describe("inspectWorkerProviderHealth", () => {
       "opencode",
       "openrouter",
       "vertex",
+      "pi",
     ]);
   });
 
@@ -212,6 +221,7 @@ describe("inspectWorkerProviderHealth", () => {
         opencode: false,
         openrouter: false,
         vertex: false,
+        pi: false,
       },
       {
         which: (provider) => `/usr/local/bin/${provider}`,
@@ -250,6 +260,7 @@ describe("inspectWorkerProviderHealth", () => {
       opencode: false,
       openrouter: true,
       vertex: false,
+      pi: false,
     } satisfies Record<WorkerProvider, boolean>;
     const withoutKey = await inspectWorkerProviderHealth(onlyOpenRouter, {
       which: (provider) => provider === "openrouter" ? "/usr/local/bin/opencode" : null,
@@ -324,6 +335,12 @@ describe("inspectWorkerProviderHealth", () => {
         reason: "disabled",
       },
       vertex: {
+        installed: false,
+        authenticated: false,
+        healthy: false,
+        reason: "disabled",
+      },
+      pi: {
         installed: false,
         authenticated: false,
         healthy: false,
