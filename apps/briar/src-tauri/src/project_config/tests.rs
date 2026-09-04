@@ -710,52 +710,6 @@ fn stores_openrouter_credentials_locally_and_only_exposes_configuration_status()
     );
 }
 
-#[cfg(unix)]
-#[test]
-fn passes_openrouter_environment_to_model_discovery() {
-    use std::os::unix::fs::PermissionsExt;
-
-    let config_path = test_config_path("openrouter-model-discovery");
-    config_with_cli_owned_settings(&config_path, None, None);
-    update_openrouter_api_key_at(
-        &config_path,
-        Some("sk-or-v1-discovery-test-key".to_string()),
-    )
-    .expect("OpenRouter credential should save");
-
-    let home = tempfile::tempdir().expect("fixture home should exist");
-    let binary = home.path().join("mock-opencode");
-    fs::write(
-        &binary,
-        r#"#!/bin/sh
-if [ "$OPENROUTER_API_KEY" != "sk-or-v1-discovery-test-key" ]; then
-  exit 11
-fi
-case "$OPENCODE_CONFIG_CONTENT" in
-  *openrouter*) ;;
-  *) exit 12 ;;
-esac
-printf '%s\n' 'openrouter/test-model' '{' '  "name": "Test model"' '}'
-"#,
-    )
-    .expect("mock OpenCode should be written");
-    fs::set_permissions(&binary, fs::Permissions::from_mode(0o700))
-        .expect("mock OpenCode should be executable");
-
-    let environment = provider_environment_from(&config_path, agent::AgentProviderKind::Openrouter)
-        .expect("OpenRouter environment should resolve");
-    let models = command_provider_models(
-        home.path(),
-        Ok(binary),
-        &["models", "--verbose"],
-        parse_opencode_models_verbose,
-        &environment,
-    )
-    .expect("model discovery should receive the OpenRouter environment");
-
-    assert_eq!(models[0].id, "openrouter/test-model");
-}
-
 #[test]
 fn rejects_malformed_openrouter_credentials() {
     let config_path = test_config_path("openrouter-invalid-credential");

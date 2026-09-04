@@ -9,7 +9,7 @@ import {
   inspectWorkerProviderHealth,
   opencodeAuthenticated,
   parseClaudeAuthStatus,
-  parseCursorAuthStatus,
+  parseCursorAboutEmail,
   providerHealthReadinessDetail,
   type WorkerProvider,
   type WorkerProviderHealthMap,
@@ -27,9 +27,13 @@ const enabled = {
 
 describe("inspectWorkerProviderHealth", () => {
   it("parses Cursor's JSON and human-readable account status", () => {
-    expect(parseCursorAuthStatus('{"userEmail":"jay@example.com"}')).toBe(true);
-    expect(parseCursorAuthStatus('{"userEmail":"Not logged in"}')).toBe(false);
-    expect(parseCursorAuthStatus("User Email  jay@example.com\n")).toBe(true);
+    expect(parseCursorAboutEmail('{"userEmail":"jay@example.com"}')).toBe(
+      "jay@example.com",
+    );
+    expect(parseCursorAboutEmail('{"userEmail":"Not logged in"}')).toBeNull();
+    expect(parseCursorAboutEmail("User Email  jay@example.com\n")).toBe(
+      "jay@example.com",
+    );
   });
 
   it("uses Claude's loggedIn response even when its CLI exit code is unreliable", async () => {

@@ -66,6 +66,11 @@ import {
 } from "./managed-computer-commands";
 import { managedComputerEnrollCommand } from "./managed-computer-enrollment";
 import {
+  providerAuthCommand,
+  providerModelsCommand,
+  providerUsageCommand,
+} from "./provider-commands";
+import {
   githubCommitStatusCommand,
   githubCredentialCommand,
   githubPullRequestCreateCommand,
@@ -798,6 +803,39 @@ const githubCommand = Command.make("github").pipe(
   ]),
 );
 
+const providerFlags = {
+  ...optionalStrings("home", "execution-path"),
+  ...optionalIntegers("timeout-ms"),
+  ...repeatedStrings("provider"),
+  ...switches("json"),
+};
+
+const providerCommand = Command.make("provider").pipe(
+  Command.withDescription(
+    "Inspect locally installed coding agent providers",
+  ),
+  Command.withSubcommands([
+    leaf(
+      "usage",
+      { ...providerFlags, ...switches("openrouter-configured") },
+      providerUsageCommand,
+      "Report provider quota usage as briar.local.v1 ProtoJSON",
+    ),
+    leaf(
+      "models",
+      providerFlags,
+      providerModelsCommand,
+      "Report the provider model and effort catalog as briar.local.v1 ProtoJSON",
+    ),
+    leaf(
+      "auth",
+      { ...providerFlags, ...switches("openrouter-configured") },
+      providerAuthCommand,
+      "Report which providers are signed in on this machine",
+    ),
+  ]),
+);
+
 export const briarCommand = Command.make("briar").pipe(
   Command.withDescription("Briar project and worker command-line interface"),
   Command.withSubcommands([
@@ -812,6 +850,7 @@ export const briarCommand = Command.make("briar").pipe(
     channelCommand,
     workflowCommand,
     queueCommand,
+    providerCommand,
     worktreeCommand,
     runCommand,
     workerCommandTree,

@@ -1,4 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -13,7 +14,8 @@ import {
   agentProviders,
   type AgentProvider,
 } from "../src/lib/agent-provider";
-import { cursorAuthenticated } from "./provider-health";
+import { cursorAuthenticated } from "./provider-credentials";
+import { providerMissingBinaryMessage } from "./provider-usage";
 
 const MAX_MODELS = 500;
 const MAX_EFFORTS = 20;
@@ -41,20 +43,32 @@ const commandWithEnv = (
   return result.stdout;
 };
 
-const command = (binary: string, args: string[]) =>
-  commandWithEnv(binary, args, process.env);
+/**
+ * `--help` is a capability listing, not a command that has to succeed: a CLI
+ * that prints its usage on stderr and exits non-zero still describes itself.
+ */
+const helpOutput = (binary: string, env: NodeJS.ProcessEnv) => {
+  const result = spawnSync(binary, ["--help"], {
+    encoding: "utf8",
+    env,
+    timeout: 15_000,
+    maxBuffer: 10 * 1024 * 1024,
+  });
+  if (result.error) throw result.error;
+  return `${result.stdout}${result.stderr}`;
+};
 
-const agyCommand = (binary: string, args: string[]) => {
-  const env = { ...process.env };
+const withoutGoogleCredentials = (env: NodeJS.ProcessEnv) => {
+  const cleaned = { ...env };
   for (const key of [
     "AGY_ADC_AUTH",
     "GEMINI_API_KEY",
     "GOOGLE_API_KEY",
     "GOOGLE_APPLICATION_CREDENTIALS",
   ]) {
-    delete env[key];
+    delete cleaned[key];
   }
-  return commandWithEnv(binary, args, env);
+  return cleaned;
 };
 
 export function parseGrokModelList(output: string) {
@@ -65,8 +79,12 @@ export function parseGrokModelList(output: string) {
   });
 }
 
-async function grokModels(binary: string, home: string): Promise<AgentModelCapability[]> {
-  const listed = parseGrokModelList(command(binary, ["models"]));
+async function grokModels(
+  binary: string,
+  home: string,
+  env: NodeJS.ProcessEnv,
+): Promise<AgentModelCapability[]> {
+  const listed = parseGrokModelList(commandWithEnv(binary, ["models"], env));
   let cached: unknown;
   try {
     cached = JSON.parse(await readFile(join(process.env.GROK_HOME?.trim() || join(home, ".grok"), "models_cache.json"), "utf8"));
@@ -492,17 +510,25 @@ let cached: {
   value: AgentProviderCapabilityCatalog;
 } | null = null;
 
+export type ProviderCapabilityOptions = {
+  refresh?: boolean;
+  home?: string;
+  which?: (provider: AgentProvider) => string | null;
+  /**
+   * Provider execution environment. Throwing records the reason on the
+   * provider entry, which is how a missing OpenRouter API key is reported.
+   */
+  environment?: (provider: AgentProvider) => NodeJS.ProcessEnv;
+};
+
 export async function discoverWorkerProviderCapabilities(
   enabled: Record<AgentProvider, boolean>,
   {
     refresh = false,
     home = homedir(),
     which = (provider) => Bun.which(agentProviderBinaryName(provider)),
-  }: {
-    refresh?: boolean;
-    home?: string;
-    which?: (provider: AgentProvider) => string | null;
-  } = {},
+    environment = () => process.env,
+  }: ProviderCapabilityOptions = {},
 ): Promise<AgentProviderCapabilityCatalog> {
   const cacheKey = JSON.stringify({ enabled, home });
   if (
@@ -514,27 +540,33 @@ export async function discoverWorkerProviderCapabilities(
   await Promise.all(agentProviders.map(async (provider) => {
     const binary = which(provider);
     if (!enabled[provider] || !binary) {
-      catalog[provider].error = enabled[provider] ? `${provider} is not installed` : `${provider} is disabled`;
+      catalog[provider].error = enabled[provider]
+        ? providerMissingBinaryMessage[provider]
+        : `${provider} is disabled`;
       return;
     }
     try {
+      const env = environment(provider);
       if (provider === "codex") catalog.codex.models = await codexModels(binary);
       if (provider === "cursor") catalog.cursor.models = await cursorModels(binary);
-      if (provider === "grok") catalog.grok.models = await grokModels(binary, home);
+      if (provider === "grok") catalog.grok.models = await grokModels(binary, home, env);
       if (provider === "agy") {
+        const agyEnv = withoutGoogleCredentials(env);
         catalog.agy.models = parseAgyModels(
-          agyCommand(binary, ["--output-format", "json", "models"]),
+          commandWithEnv(binary, ["--output-format", "json", "models"], agyEnv),
         );
-        catalog.agy.defaultEfforts = parseAgyEfforts(command(binary, ["--help"]));
+        catalog.agy.defaultEfforts = parseAgyEfforts(helpOutput(binary, env));
       }
-      if (provider === "opencode") catalog.opencode.models = parseOpenCodeVerbose(command(binary, ["models", "--verbose"]));
+      if (provider === "opencode") {
+        catalog.opencode.models = openCodeModels(binary, home, env, catalog);
+      }
       if (provider === "openrouter") {
         catalog.openrouter.models = parseOpenCodeVerbose(
-          command(binary, ["models", "--verbose"]),
+          commandWithEnv(binary, ["models", "--verbose"], env),
         ).filter((model) => model.id.startsWith("openrouter/"));
       }
       if (provider === "claude") {
-        const help = command(binary, ["--help"]);
+        const help = helpOutput(binary, env);
         catalog.claude.models = parseClaudeModels(help);
         catalog.claude.defaultEfforts = parseClaudeEfforts(help);
       }
@@ -544,4 +576,96 @@ export async function discoverWorkerProviderCapabilities(
   }));
   cached = { expiresAt: Date.now() + CACHE_MS, key: cacheKey, value: catalog };
   return catalog;
+}
+
+/**
+ * OpenCode only lists models while its model server is reachable. Its own
+ * on-disk catalog keeps the free models selectable meanwhile.
+ */
+function openCodeModels(
+  binary: string,
+  home: string,
+  env: NodeJS.ProcessEnv,
+  catalog: AgentProviderCapabilityCatalog,
+): AgentModelCapability[] {
+  try {
+    return parseOpenCodeVerbose(
+      commandWithEnv(binary, ["models", "--verbose"], env),
+    );
+  } catch (error) {
+    const cachedModels = openCodeCachedModels(home);
+    if (cachedModels.length === 0) throw error;
+    catalog.opencode.error = error instanceof Error
+      ? error.message
+      : String(error);
+    return cachedModels;
+  }
+}
+
+export function parseOpenCodeCachedModels(
+  contents: string,
+): AgentModelCapability[] {
+  let models: unknown;
+  try {
+    models = (JSON.parse(contents) as { opencode?: { models?: unknown } })
+      ?.opencode?.models;
+  } catch {
+    return [];
+  }
+  if (!models || typeof models !== "object" || Array.isArray(models)) return [];
+  return Object.entries(models as Record<string, unknown>)
+    .flatMap(([key, raw]) => {
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) return [];
+      const value = raw as Record<string, unknown>;
+      if (typeof value.status === "string" && value.status !== "active") {
+        return [];
+      }
+      const cost = value.cost;
+      if (!cost || typeof cost !== "object" || Array.isArray(cost)) return [];
+      const { input, output } = cost as Record<string, unknown>;
+      if (input !== 0 || output !== 0) return [];
+      const id = (typeof value.id === "string" ? value.id : key).trim();
+      if (!id || id.length > 200 || /\s/u.test(id)) return [];
+      const efforts: AgentEffortCapability[] = [];
+      const options = Array.isArray(value.reasoning_options)
+        ? value.reasoning_options
+        : [];
+      for (const rawOption of options) {
+        if (efforts.length >= MAX_EFFORTS) break;
+        if (!rawOption || typeof rawOption !== "object") continue;
+        const option = rawOption as Record<string, unknown>;
+        if (option.type !== "effort" || !Array.isArray(option.values)) continue;
+        for (const candidate of option.values) {
+          if (efforts.length >= MAX_EFFORTS) break;
+          if (
+            typeof candidate !== "string" || !candidate ||
+            candidate.length > 50 ||
+            efforts.some((existing) => existing.id === candidate)
+          ) continue;
+          efforts.push(effort(candidate));
+        }
+      }
+      return [{
+        id: `opencode/${id}`,
+        label: typeof value.name === "string" ? value.name : id,
+        isDefault: false,
+        defaultEffortId: null,
+        efforts,
+      }];
+    })
+    .sort((left, right) =>
+      left.label.localeCompare(right.label) || left.id.localeCompare(right.id)
+    )
+    .slice(0, MAX_MODELS);
+}
+
+function openCodeCachedModels(home: string): AgentModelCapability[] {
+  const cacheRoot = process.env.XDG_CACHE_HOME?.trim() || join(home, ".cache");
+  try {
+    return parseOpenCodeCachedModels(
+      readFileSync(join(cacheRoot, "opencode", "models.json"), "utf8"),
+    );
+  } catch {
+    return [];
+  }
 }

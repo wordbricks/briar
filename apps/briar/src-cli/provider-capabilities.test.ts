@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -248,5 +248,120 @@ openai/gpt-5
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
+  });
+});
+
+describe("desktop provider model catalog", () => {
+  const onlyOpencode = {
+    codex: false,
+    claude: false,
+    cursor: false,
+    grok: false,
+    agy: false,
+    opencode: true,
+    openrouter: false,
+  };
+
+  it("falls back to the active free OpenCode models from the local cache", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "briar-opencode-cache-"));
+    const binary = join(directory, "opencode");
+    try {
+      await writeFile(
+        binary,
+        "#!/bin/sh\necho 'catalog offline' >&2\nexit 1\n",
+        { mode: 0o755 },
+      );
+      await mkdir(join(directory, ".cache", "opencode"), { recursive: true });
+      await writeFile(
+        join(directory, ".cache", "opencode", "models.json"),
+        JSON.stringify({
+          opencode: {
+            models: {
+              "free-model": {
+                id: "free-model",
+                name: "Free model",
+                cost: { input: 0, output: 0 },
+                reasoning_options: [{ type: "effort", values: ["low", "high"] }],
+              },
+              "paid-model": {
+                name: "Paid model",
+                cost: { input: 1, output: 2 },
+              },
+              "retired-model": {
+                name: "Retired model",
+                status: "deprecated",
+                cost: { input: 0, output: 0 },
+              },
+            },
+          },
+        }),
+      );
+
+      const catalog = await discoverWorkerProviderCapabilities(onlyOpencode, {
+        refresh: true,
+        home: directory,
+        which: (provider) => (provider === "opencode" ? binary : null),
+      });
+
+      expect(catalog.opencode.error).toContain("catalog offline");
+      expect(catalog.opencode.models.map((model) => model.id)).toEqual([
+        "opencode/free-model",
+      ]);
+      expect(catalog.opencode.models[0]?.label).toBe("Free model");
+      expect(catalog.opencode.models[0]?.efforts?.map((effort) => effort.id))
+        .toEqual(["low", "high"]);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("discovers OpenRouter models with the configured environment", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "briar-openrouter-env-"));
+    const binary = join(directory, "opencode");
+    try {
+      await writeFile(
+        binary,
+        `#!/bin/sh
+if [ "$OPENROUTER_API_KEY" != "sk-or-v1-discovery-test-key" ]; then
+  exit 11
+fi
+case "$OPENCODE_CONFIG_CONTENT" in
+  *openrouter*) ;;
+  *) exit 12 ;;
+esac
+printf '%s\\n' 'openrouter/test-model' '{' '  "name": "Test model"' '}'
+`,
+        { mode: 0o755 },
+      );
+      const catalog = await discoverWorkerProviderCapabilities({
+        ...onlyOpencode,
+        opencode: false,
+        openrouter: true,
+      }, {
+        refresh: true,
+        home: directory,
+        which: (provider) => (provider === "openrouter" ? binary : null),
+        environment: () => ({
+          ...process.env,
+          OPENROUTER_API_KEY: "sk-or-v1-discovery-test-key",
+          OPENCODE_CONFIG_CONTENT: '{"provider":{"openrouter":{}}}',
+        }),
+      });
+      expect(catalog.openrouter.models.map((model) => model.id)).toEqual([
+        "openrouter/test-model",
+      ]);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("reports a missing provider CLI with the app's own copy", async () => {
+    const catalog = await discoverWorkerProviderCapabilities(onlyOpencode, {
+      refresh: true,
+      home: "/nonexistent",
+      which: () => null,
+    });
+    expect(catalog.opencode.error).toContain("OpenCode CLI가 필요합니다");
+    expect(catalog.codex.error).toBe("codex is disabled");
   });
 });
