@@ -12,8 +12,7 @@ import { upsertMany } from "../entities/upsert";
 import { demoMode } from "../platform";
 import { useRegistry, type AtomRegistry } from "../registry";
 import { tokenAtom } from "../session/atoms";
-import { loadedDashboardTeamIdAtom } from "../sync/view";
-import { teamsAtom } from "../team/atoms";
+import { loadedTeamIdAtom, teamsAtom } from "../team/atoms";
 import { planningProjectsAtom } from "./atoms";
 
 /** Remote writes the planning project actions perform. */
@@ -76,7 +75,7 @@ export function createPlanningActions(
 
   /** Demo mode has no server to report a moved-issue count, so it counts here. */
   const countTeamIssues = (planningProjectId: string) => {
-    const teamId = registry.get(loadedDashboardTeamIdAtom);
+    const teamId = registry.get(loadedTeamIdAtom);
     if (!teamId) return 0;
     return (registry.get(teamRunsAtom(teamId)) ?? []).filter(
       (run) => run.projectId === planningProjectId,

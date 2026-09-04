@@ -59,9 +59,9 @@ import {
   activeOrganizationIdAtom,
   organizationsAtom,
 } from "../state/organization/atoms";
+import { teamRunsAtom } from "../state/entities/runs";
 import { lockedTeamIdAtom } from "../state/platform";
 import { tokenAtom, userAtom } from "../state/session/atoms";
-import { activeDashboardAtom } from "../state/sync/view";
 import { visibleInboxUnreadCountAtom } from "../state/inbox/atoms";
 import { useTeamActions } from "../state/team/actions";
 import {
@@ -125,7 +125,6 @@ export function useCommandPaletteItems({
   const activeTeamId = useAtomValue(activeTeamIdAtom);
   const activeOrganizationTeams = useAtomValue(activeOrganizationTeamsAtom);
   const lockedTeamId = useAtomValue(lockedTeamIdAtom);
-  const dashboard = useAtomValue(activeDashboardAtom);
   const channels = useAtomValue(visibleOrganizationChannelsAtom);
   const directMessages = useAtomValue(organizationDirectMessagesAtom);
   const activeChannelId = useAtomValue(activeChannelIdAtom);
@@ -134,6 +133,15 @@ export function useCommandPaletteItems({
   const isSidebarOpen = useAtomValue(isSidebarOpenAtom);
   const setIsSidebarOpen = useAtomSet(isSidebarOpenAtom);
   const isCommandPaletteOpen = useAtomValue(isCommandPaletteOpenAtom);
+  /*
+    The issue rows, and only while the palette is open: a closed palette lists
+    nothing, so it subscribes to no run at all. Reading the family under the
+    empty id is how "not subscribed right now" is spelled without a
+    conditional hook.
+  */
+  const paletteRuns = useAtomValue(
+    teamRunsAtom(isCommandPaletteOpen && activeTeamId ? activeTeamId : ""),
+  );
   const setIsKeyboardShortcutsOpen = useAtomSet(isKeyboardShortcutsOpenAtom);
   const setIsIssueDialogOpen = useAtomSet(isIssueDialogOpenAtom);
   const setCreateIssueProjectId = useAtomSet(createIssueTeamIdAtom);
@@ -635,9 +643,8 @@ export function useCommandPaletteItems({
     }
   }
 
-  const paletteDashboard = isCommandPaletteOpen ? dashboard : null;
-  if (paletteDashboard && activeTeam && paletteDashboard.team.id === activeTeam.id) {
-    const runs = [...paletteDashboard.runs].sort((left, right) => {
+  if (paletteRuns && activeTeam) {
+    const runs = [...paletteRuns].sort((left, right) => {
       if (left.id === selectedRunId) return -1;
       if (right.id === selectedRunId) return 1;
       return right.updatedAt.localeCompare(left.updatedAt);

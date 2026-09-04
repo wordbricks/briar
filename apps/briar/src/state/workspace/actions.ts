@@ -34,11 +34,12 @@ import { loadingAtom, sessionErrorAtom, tokenAtom } from "../session/atoms";
 import { applySyncEvent } from "../sync/apply";
 import { commitTeamSettings, commitTeamSnapshot } from "../sync/commit";
 import { getTeamSyncLoader } from "../sync/loader";
-import { activeDashboardAtom, dashboardViewAtom } from "../sync/view";
 import {
   activeTeamIdAtom,
   deletingTeamIdAtom,
   isCreatingTeamAtom,
+  loadedTeamIdAtom,
+  renderedTeamSettingsAtom,
   teamConnectionAtom,
   teamsAtom,
 } from "../team/atoms";
@@ -113,12 +114,7 @@ export function createWorkspaceActions(
     registry.get(teamsAtom).find((candidate) => candidate.id === teamId) ?? null;
 
   /** The selected team, when its payload is the one on screen. */
-  const renderedTeamId = () => {
-    const teamId = registry.get(activeTeamIdAtom);
-    return teamId !== null && registry.get(dashboardViewAtom(teamId))
-      ? teamId
-      : null;
-  };
+  const renderedTeamId = () => registry.get(loadedTeamIdAtom);
 
   const refreshReadiness = (teamId: string) =>
     refreshTeamReadiness(registry, teamId);
@@ -580,12 +576,9 @@ export function createWorkspaceActions(
       setTeamReadinessLoading(registry, teamId, true);
       clearTeamReadinessError(registry, teamId);
       try {
-        const dashboard = registry.get(activeDashboardAtom);
-        const teamDashboard =
-          dashboard?.team.id === teamId
-            ? dashboard
-            : await remote.loadDashboard(token, teamId);
-        const settings = teamDashboard.settings;
+        const settings =
+          registry.get(renderedTeamSettingsAtom(teamId)) ??
+          (await remote.loadDashboard(token, teamId)).settings;
         const { credential, prepared } = await prepareConfiguredTeamRepository(
           settings,
           () => remote.createProjectGithubCredential(token, teamId),
@@ -654,14 +647,16 @@ export function createWorkspaceActions(
         const automaticGeneration = getAutomaticWorkflowGenerations(
           registry,
         ).get(team.id);
-        const dashboard = registry.get(activeDashboardAtom);
+        const renderedSettings = registry.get(
+          renderedTeamSettingsAtom(team.id),
+        );
         if (automaticGeneration) {
           // Reuse the repository analysis already in flight. Opening reconnect
           // must not launch a second LLM generation from the same pending
           // workflow snapshot.
           workflow = await automaticGeneration;
-        } else if (dashboard?.team.id === team.id) {
-          workflow = dashboard.settings.workflow;
+        } else if (renderedSettings) {
+          workflow = renderedSettings.workflow;
         } else {
           const token = requireToken();
           workflow = (await api().loadDashboard(token, team.id)).settings

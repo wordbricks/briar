@@ -19,6 +19,7 @@ import { teamEntityAtom } from "../entities/teams";
 import { createTestRegistry } from "../registry";
 import {
   activeTeamIdAtom,
+  loadedTeamIdAtom,
   staleTeamIdAtom,
   teamCursorAtom,
   teamGeneratedAtAtom,
@@ -27,7 +28,7 @@ import {
   teamSettingsAtom,
 } from "../team/atoms";
 import { applySyncEvent, markTeamStale } from "./apply";
-import { dashboardViewAtom, loadedDashboardTeamIdAtom } from "./view";
+import { dashboardViewAtom } from "./view";
 
 const teamA = "team-a";
 const teamB = "team-b";
@@ -77,7 +78,7 @@ describe("team snapshots", () => {
 
     expect(registry.get(dashboardViewAtom(teamA))).toEqual(payload);
     expect(registry.get(teamLoadedAtom(teamA))).toBe(true);
-    expect(registry.get(loadedDashboardTeamIdAtom)).toBe(teamA);
+    expect(registry.get(loadedTeamIdAtom)).toBe(teamA);
     expect(registry.get(teamCursorAtom(teamA))).toBe(1);
   });
 

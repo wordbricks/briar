@@ -10,13 +10,12 @@ import {
 import { activeOrganizationIdAtom } from "../state/organization/atoms";
 import { lockedTeamIdAtom } from "../state/platform";
 import {
+  activeTeamTrayRunsAtom,
   statusTrayApiAtom,
   statusTrayPollAtom,
   statusTrayRunsAtom,
 } from "../state/status-tray/atoms";
-import { activeDashboardAtom } from "../state/sync/view";
 import { useRegistry } from "../state/registry";
-import type { StatusTrayRun } from "../types";
 
 /*
   The macOS menu bar tray.
@@ -37,7 +36,7 @@ export function useStatusTray(): void {
   const registry = useRegistry();
   const api = useAtomValue(statusTrayApiAtom);
   const organizationId = useAtomValue(activeOrganizationIdAtom);
-  const dashboard = useAtomValue(activeDashboardAtom);
+  const teamTrayRuns = useAtomValue(activeTeamTrayRunsAtom);
   const lockedTeamId = useAtomValue(lockedTeamIdAtom);
   const statusTrayRuns = useAtomValue(statusTrayRunsAtom);
   const { desktop, macDesktop } = api;
@@ -47,28 +46,12 @@ export function useStatusTray(): void {
 
   useEffect(() => {
     if (!macDesktop || lockedTeamId) return;
-    if (!dashboard) return;
-    const teamRuns: StatusTrayRun[] = dashboard.runs
-      .filter((run) => run.status === "running")
-      .map((run) => ({
-        teamId: dashboard.team.id,
-        teamName: dashboard.team.name,
-        id: run.id,
-        title: run.title,
-        status: "running",
-        workflowStage: run.workflowStage,
-        workflowStageLabel:
-          run.workflow.stages.find((stage) => stage.id === run.workflowStage)
-            ?.label ?? null,
-        startedAt: run.startedAt,
-        updatedAt: run.updatedAt,
-        lastEventAt: run.lastEventAt,
-      }));
+    if (!teamTrayRuns) return;
     registry.update(statusTrayRunsAtom, (current) => [
-      ...current.filter((run) => run.teamId !== dashboard.team.id),
-      ...teamRuns,
+      ...current.filter((run) => run.teamId !== teamTrayRuns.teamId),
+      ...teamTrayRuns.runs,
     ]);
-  }, [dashboard, lockedTeamId, macDesktop, registry]);
+  }, [lockedTeamId, macDesktop, registry, teamTrayRuns]);
 
   useEffect(() => {
     if (!macDesktop || lockedTeamId) return;

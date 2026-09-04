@@ -21,8 +21,13 @@ import { sessionErrorAtom, tokenAtom } from "../session/atoms";
 import { markTeamStale } from "../sync/apply";
 import { commitTeamSnapshot } from "../sync/commit";
 import { getTeamSyncLoader } from "../sync/loader";
-import { loadedDashboardTeamIdAtom } from "../sync/view";
-import { activeTeamIdAtom, isCreatingTeamAtom, teamConnectionAtom, teamsAtom } from "./atoms";
+import {
+  activeTeamIdAtom,
+  isCreatingTeamAtom,
+  loadedTeamIdAtom,
+  teamConnectionAtom,
+  teamsAtom,
+} from "./atoms";
 
 /** Remote writes the team metadata actions perform. */
 export interface TeamActionApi {
@@ -113,7 +118,7 @@ export function createTeamActions(
 
     The board for a team the store already holds is on screen before this
     returns — that is the whole point of the entity store — so the only question
-    left is what the next fetch may do with it. `loadedDashboardTeamId` answers
+    left is what the next fetch may do with it. `loadedTeamId` answers
     it: when the payload on screen belongs to another team, this team's stored
     copy is marked stale so the next fetch replaces it wholesale instead of
     patching an arbitrarily old cursor.
@@ -126,7 +131,7 @@ export function createTeamActions(
   const commitSelection = (team: Project) => {
     const activeTeamId = registry.get(activeTeamIdAtom);
     const dashboardMatchesTeam =
-      registry.get(loadedDashboardTeamIdAtom) === team.id;
+      registry.get(loadedTeamIdAtom) === team.id;
     if (activeTeamId === team.id && dashboardMatchesTeam) {
       Atom.batch(() => {
         registry.set(activeOrganizationIdAtom, team.organizationId);

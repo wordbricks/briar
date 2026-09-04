@@ -5,7 +5,7 @@ import type { TeamSettings } from "../../types";
 import { useRegistry, type AtomRegistry } from "../registry";
 import { sessionErrorAtom, tokenAtom } from "../session/atoms";
 import { commitTeamSettings } from "../sync/commit";
-import { activeDashboardAtom } from "../sync/view";
+import { renderedTeamSettingsAtom } from "../team/atoms";
 import {
   resolveWorkspaceApi,
   workspaceModes,
@@ -117,10 +117,8 @@ export function createWorkflowActions(
   const api = () => resolveWorkspaceApi(registry, deps.api);
 
   /** The rendered team's settings, or `null` when another team is on screen. */
-  const renderedSettings = (teamId: string): TeamSettings | null => {
-    const dashboard = registry.get(activeDashboardAtom);
-    return dashboard && dashboard.team.id === teamId ? dashboard.settings : null;
-  };
+  const renderedSettings = (teamId: string): TeamSettings | null =>
+    registry.get(renderedTeamSettingsAtom(teamId));
 
   const requireSettings = (teamId: string, message: string) => {
     const settings = renderedSettings(teamId);

@@ -2,8 +2,11 @@ import type { AutoHuntHealth } from "../../generated/tauri";
 import { isTeamConnectedLocally } from "../../lib/local-team-connection";
 import { shouldSyncSharedWorkflow } from "../../lib/shared-workflow-sync";
 import type { AtomRegistry } from "../registry";
-import { loadedDashboardTeamIdAtom } from "../sync/view";
-import { activeTeamIdAtom, teamSettingsAtom } from "../team/atoms";
+import {
+  activeTeamIdAtom,
+  loadedTeamIdAtom,
+  teamSettingsAtom,
+} from "../team/atoms";
 import {
   beginHealthRequest,
   getSharedWorkflowKeys,
@@ -64,7 +67,7 @@ export async function refreshTeamHealth(
     // Team workflow tools are shared via team settings. Mirror them into the
     // local config so this worker machine can probe readiness.
     const sharedWorkflow =
-      registry.get(loadedDashboardTeamIdAtom) === teamId
+      registry.get(loadedTeamIdAtom) === teamId
         ? (registry.get(teamSettingsAtom(teamId))?.workflow ?? null)
         : null;
     const syncPlan = shouldSyncSharedWorkflow({

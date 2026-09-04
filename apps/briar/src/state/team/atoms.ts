@@ -217,6 +217,29 @@ export const teamLoadedAtom = Atom.family((teamId: string) =>
 );
 
 /**
+ * The team whose payload is the one on screen, or `null` when none is.
+ *
+ * An action that writes a team's projections asks this first: a write aimed at
+ * a team the window is not showing would install itself under a cursor nobody
+ * is following, so it is dropped instead.
+ */
+export const loadedTeamIdAtom = Atom.make((get): string | null => {
+  const teamId = get(activeTeamIdAtom);
+  return teamId !== null && get(teamLoadedAtom(teamId)) ? teamId : null;
+}).pipe(Atom.keepAlive, Atom.withLabel("team/loadedId"));
+
+/**
+ * A team's settings while that team is the one on screen, and `null` otherwise
+ * — the `dashboard && dashboard.team.id === teamId ? dashboard.settings : null`
+ * check every settings write used to open with.
+ */
+export const renderedTeamSettingsAtom = Atom.family((teamId: string) =>
+  Atom.make((get): TeamSettings | null =>
+    get(loadedTeamIdAtom) === teamId ? get(teamSettingsAtom(teamId)) : null,
+  ).pipe(Atom.withLabel(`team/${teamId}/renderedSettings`)),
+);
+
+/**
  * The server has answered for this team since the app started: a `team-snapshot`
  * or a `team-delta` that `state/sync/apply.ts` actually applied.
  *
