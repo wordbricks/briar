@@ -18,12 +18,42 @@ import {
   mergeSynchronizedSessions,
 } from "../agent-sessions/model";
 import {
+  CHANNEL_CONVERSATION_RETENTION_LIMIT,
+  CHANNEL_THREAD_RETENTION_LIMIT,
+  channelAgentRepliesAtom,
+  channelAgentsAtom,
+  channelMembersAtom,
+  channelMessageCursorAtom,
+  channelMessagesByIdAtom,
+  channelRootMessageIdsAtom,
+  channelRootMessagesAtom,
+  channelSettledAgentReplyIdsAtom,
+  channelThreadKey,
+  channelThreadMessageIdsAtom,
+  channelThreadMessagesAtom,
+  channelThreadRootIdsAtom,
+  retainedConversationChannelIdsAtom,
+  touchRetained,
+} from "../channel-conversation/atoms";
+import {
+  channelReplyIsTerminal,
+  mergeChannelMessages,
+  mergeChannelMessageSnapshot,
+  mergeChannelReplies,
+} from "../channel-conversation/model";
+import {
   channelCatalogOrganizationIdsAtom,
   channelsByIdAtom,
   organizationChannelIdsAtom,
   organizationChannelsAtom,
 } from "../entities/channels";
-import type { ChannelSummary } from "../../lib/channels-contract";
+import type {
+  ChannelAgentReply,
+  ChannelAgentSummary,
+  ChannelMember,
+  ChannelMessage,
+  ChannelSummary,
+} from "../../lib/channels-contract";
 import {
   membersByIdAtom,
   teamMemberIdsAtom,
@@ -37,6 +67,7 @@ import {
   mergeTeamRuns,
   removeMany,
   replaceEntities,
+  replaceEntitiesBy,
   sameValue,
   upsertMany,
   upsertManyBy,
@@ -492,17 +523,370 @@ function applyChannelRemoved(
   registry.update(channelsByIdAtom, (stored) => removeMany(stored, [channelId]));
 }
 
-/** Forgets an organization's catalog entirely, summaries included. */
+/** Forgets an organization's catalog entirely, summaries and messages included. */
 function clearChannelCatalog(registry: AtomRegistry, organizationId: string) {
   const ids = registry.get(organizationChannelIdsAtom(organizationId));
   registry.set(organizationChannelIdsAtom(organizationId), null);
   if (ids && ids.length > 0) {
     registry.update(channelsByIdAtom, (stored) => removeMany(stored, ids));
+    for (const channelId of ids) clearChannelConversation(registry, channelId);
   }
   registry.update(channelCatalogOrganizationIdsAtom, (organizationIds) =>
     organizationIds.includes(organizationId)
       ? organizationIds.filter((candidate) => candidate !== organizationId)
       : organizationIds,
+  );
+}
+
+/*
+  Channel conversations.
+
+  The timeline is stored twice on purpose: a map keyed by message id, which is
+  what a row subscribes to, and an ordered array of ids, which is what the list
+  subscribes to. `upsertMany` keeps the stored object of every message a page
+  re-sent unchanged, so a delta that touched one message reaches one row.
+
+  Every write below goes through `touchChannelConversation`, so the channels
+  holding messages stay an LRU rather than growing with every channel an account
+  ever opens.
+*/
+
+/** Drops from the map every message no index of the channel points at. */
+function pruneChannelMessages(registry: AtomRegistry, channelId: string) {
+  const reachable = new Set(registry.get(channelRootMessageIdsAtom(channelId)) ?? []);
+  for (const rootId of registry.get(channelThreadRootIdsAtom(channelId))) {
+    for (const id of registry.get(
+      channelThreadMessageIdsAtom(channelThreadKey(channelId, rootId)),
+    ) ?? []) {
+      reachable.add(id);
+    }
+  }
+  registry.update(channelMessagesByIdAtom(channelId), (stored) =>
+    removeMany(
+      stored,
+      [...stored.keys()].filter((id) => !reachable.has(id)),
+    ),
+  );
+}
+
+/** Forgets one channel's conversation entirely. */
+function clearChannelConversation(registry: AtomRegistry, channelId: string) {
+  for (const rootId of registry.get(channelThreadRootIdsAtom(channelId))) {
+    registry.set(
+      channelThreadMessageIdsAtom(channelThreadKey(channelId, rootId)),
+      null,
+    );
+  }
+  registry.set(channelThreadRootIdsAtom(channelId), []);
+  registry.set(channelRootMessageIdsAtom(channelId), null);
+  if (registry.get(channelMessagesByIdAtom(channelId)).size > 0) {
+    registry.set(channelMessagesByIdAtom(channelId), new Map());
+  }
+  registry.set(channelMembersAtom(channelId), []);
+  registry.set(channelAgentsAtom(channelId), []);
+  registry.set(channelAgentRepliesAtom(channelId), []);
+  registry.set(channelSettledAgentReplyIdsAtom(channelId), []);
+  registry.set(channelMessageCursorAtom(channelId), null);
+  registry.update(retainedConversationChannelIdsAtom, (retained) =>
+    retained.includes(channelId)
+      ? retained.filter((candidate) => candidate !== channelId)
+      : retained,
+  );
+}
+
+/** Marks `channelId` most recently used and evicts whatever that pushed out. */
+function touchChannelConversation(registry: AtomRegistry, channelId: string) {
+  const { retained, evicted } = touchRetained(
+    registry.get(retainedConversationChannelIdsAtom),
+    channelId,
+    CHANNEL_CONVERSATION_RETENTION_LIMIT,
+  );
+  registry.set(retainedConversationChannelIdsAtom, retained);
+  for (const dropped of evicted) clearChannelConversation(registry, dropped);
+}
+
+/** Writes one channel's root timeline: the messages and their order. */
+function writeChannelRootMessages(
+  registry: AtomRegistry,
+  channelId: string,
+  messages: readonly ChannelMessage[],
+  removedMessageIds: readonly string[] = [],
+) {
+  registry.update(channelMessagesByIdAtom(channelId), (stored) =>
+    upsertMany(stored, messages, removedMessageIds),
+  );
+  registry.set(
+    channelRootMessageIdsAtom(channelId),
+    messages.map((message) => message.id),
+  );
+}
+
+/** Writes one thread and keeps the channel's thread list within its bound. */
+function writeChannelThread(
+  registry: AtomRegistry,
+  channelId: string,
+  rootMessageId: string,
+  messages: readonly ChannelMessage[],
+) {
+  registry.update(channelMessagesByIdAtom(channelId), (stored) =>
+    upsertMany(stored, messages),
+  );
+  registry.set(
+    channelThreadMessageIdsAtom(channelThreadKey(channelId, rootMessageId)),
+    messages.map((message) => message.id),
+  );
+  const { retained, evicted } = touchRetained(
+    registry.get(channelThreadRootIdsAtom(channelId)),
+    rootMessageId,
+    CHANNEL_THREAD_RETENTION_LIMIT,
+  );
+  registry.set(channelThreadRootIdsAtom(channelId), retained);
+  for (const dropped of evicted) {
+    registry.set(
+      channelThreadMessageIdsAtom(channelThreadKey(channelId, dropped)),
+      null,
+    );
+  }
+  if (evicted.length > 0) pruneChannelMessages(registry, channelId);
+}
+
+/**
+ * Applies a page to every thread the channel holds. The desktop view only ever
+ * updated the thread that was open; the companion cache walked all of them so a
+ * thread reopened from cache was not stale, and that is the rule kept here.
+ */
+function applyChannelPageToThreads(
+  registry: AtomRegistry,
+  channelId: string,
+  messages: readonly ChannelMessage[],
+  removedMessageIds: readonly string[],
+  reset: boolean,
+) {
+  const rootIds = registry.get(channelThreadRootIdsAtom(channelId));
+  if (rootIds.length === 0) return;
+  const removed = new Set(removedMessageIds);
+  const survivors = rootIds.filter((rootId) => !removed.has(rootId));
+  for (const rootId of survivors) {
+    const key = channelThreadKey(channelId, rootId);
+    const current = registry.get(channelThreadMessagesAtom(key));
+    const relevant = messages.filter(
+      (message) =>
+        message.id === rootId || message.parentMessageId === rootId,
+    );
+    if (!reset && relevant.length === 0 && removedMessageIds.length === 0) {
+      continue;
+    }
+    const next = reset
+      ? [...relevant]
+      : mergeChannelMessages(current, relevant, removedMessageIds);
+    registry.update(channelMessagesByIdAtom(channelId), (stored) =>
+      upsertMany(stored, next),
+    );
+    registry.set(
+      channelThreadMessageIdsAtom(key),
+      next.map((message) => message.id),
+    );
+  }
+  if (survivors.length !== rootIds.length) {
+    for (const rootId of rootIds) {
+      if (survivors.includes(rootId)) continue;
+      registry.set(
+        channelThreadMessageIdsAtom(channelThreadKey(channelId, rootId)),
+        null,
+      );
+    }
+    registry.set(channelThreadRootIdsAtom(channelId), survivors);
+  }
+  pruneChannelMessages(registry, channelId);
+}
+
+function applyChannelConversationSnapshot(
+  registry: AtomRegistry,
+  channelId: string,
+  members: readonly ChannelMember[],
+  agents: readonly ChannelAgentSummary[],
+  messages: readonly ChannelMessage[],
+  nextCursor: string | null,
+  merge: boolean,
+) {
+  touchChannelConversation(registry, channelId);
+  registry.update(channelMembersAtom(channelId), (stored) =>
+    replaceEntitiesBy(stored, members, (member) => member.userId),
+  );
+  registry.update(channelAgentsAtom(channelId), (stored) =>
+    replaceEntitiesBy(stored, agents, (agent) => agent.agentId),
+  );
+  const current = registry.get(channelRootMessagesAtom(channelId));
+  writeChannelRootMessages(
+    registry,
+    channelId,
+    merge ? mergeChannelMessages(current, messages, []) : [...messages],
+  );
+  registry.set(channelMessageCursorAtom(channelId), nextCursor);
+  pruneChannelMessages(registry, channelId);
+}
+
+function applyChannelMessagesPage(
+  registry: AtomRegistry,
+  channelId: string,
+  incoming: readonly ChannelMessage[],
+  removedMessageIds: readonly string[],
+  reset: boolean,
+  includeRepliesInRoot: boolean,
+) {
+  const relevant = incoming.filter((item) => item.channelId === channelId);
+  if (!reset && relevant.length === 0 && removedMessageIds.length === 0) {
+    // A delta page that carried nothing for this channel leaves every atom
+    // alone, so a quiet realtime tick notifies nobody.
+    return;
+  }
+  /*
+    A page for a channel whose timeline has never been loaded reaches only the
+    threads it already holds. Building a root index out of one delta page would
+    mark the channel loaded while holding a hole in the middle of its history,
+    and the detail response that is already in flight replaces it a moment
+    later anyway.
+  */
+  const rootIds = registry.get(channelRootMessageIdsAtom(channelId));
+  if (
+    rootIds === null &&
+    registry.get(channelThreadRootIdsAtom(channelId)).length === 0
+  ) {
+    return;
+  }
+  touchChannelConversation(registry, channelId);
+  const rootUpdates = includeRepliesInRoot
+    ? relevant
+    : relevant.filter((item) => item.parentMessageId === null);
+  if (rootIds !== null && (reset || rootUpdates.length > 0 || removedMessageIds.length > 0)) {
+    writeChannelRootMessages(
+      registry,
+      channelId,
+      reset
+        ? [...rootUpdates]
+        : mergeChannelMessages(
+            registry.get(channelRootMessagesAtom(channelId)),
+            rootUpdates,
+            removedMessageIds,
+          ),
+      removedMessageIds,
+    );
+  }
+  applyChannelPageToThreads(
+    registry,
+    channelId,
+    relevant,
+    removedMessageIds,
+    reset,
+  );
+}
+
+function applyChannelMessageChanged(
+  registry: AtomRegistry,
+  channelId: string,
+  message: ChannelMessage,
+  includeRepliesInRoot: boolean,
+) {
+  applyChannelMessagesPage(
+    registry,
+    channelId,
+    [message],
+    [],
+    false,
+    includeRepliesInRoot,
+  );
+}
+
+function applyChannelMessageRemoved(
+  registry: AtomRegistry,
+  channelId: string,
+  messageId: string,
+) {
+  const rootIds = registry.get(channelRootMessageIdsAtom(channelId));
+  if (rootIds?.includes(messageId)) {
+    registry.set(
+      channelRootMessageIdsAtom(channelId),
+      rootIds.filter((candidate) => candidate !== messageId),
+    );
+  }
+  for (const rootId of registry.get(channelThreadRootIdsAtom(channelId))) {
+    const key = channelThreadKey(channelId, rootId);
+    const ids = registry.get(channelThreadMessageIdsAtom(key));
+    if (!ids?.includes(messageId)) continue;
+    registry.set(
+      channelThreadMessageIdsAtom(key),
+      ids.filter((candidate) => candidate !== messageId),
+    );
+  }
+  pruneChannelMessages(registry, channelId);
+}
+
+/**
+ * Merges replies under the store's rules, with the settled ids as tombstones so
+ * a page that started before an authoritative answer cannot resurrect one.
+ */
+function applyChannelAgentReplies(
+  registry: AtomRegistry,
+  channelId: string,
+  incoming: readonly ChannelAgentReply[],
+  reset: boolean,
+) {
+  if (incoming.length === 0 && !reset) return;
+  const settled = new Set(registry.get(channelSettledAgentReplyIdsAtom(channelId)));
+  const relevant = incoming.filter((reply) => reply.channelId === channelId);
+  const next = reset
+    ? [...relevant]
+    : mergeChannelReplies(
+        registry.get(channelAgentRepliesAtom(channelId)),
+        relevant,
+        settled,
+      );
+  for (const reply of relevant) {
+    if (channelReplyIsTerminal(reply)) settled.add(reply.id);
+  }
+  registry.set(channelSettledAgentReplyIdsAtom(channelId), [...settled]);
+  registry.set(
+    channelAgentRepliesAtom(channelId),
+    replaceEntities(registry.get(channelAgentRepliesAtom(channelId)), next),
+  );
+}
+
+/**
+ * Replaces the channel's replies with a detail response. Everything it omits is
+ * settled — unless it arrived after the request started, which is what
+ * `retainedReplyIds` names.
+ */
+function applyAuthoritativeChannelAgentReplies(
+  registry: AtomRegistry,
+  channelId: string,
+  incoming: readonly ChannelAgentReply[],
+  retainedReplyIds: readonly string[],
+) {
+  const authoritative = incoming.filter((reply) => reply.channelId === channelId);
+  const incomingIds = new Set(authoritative.map((reply) => reply.id));
+  const retained = new Set(retainedReplyIds);
+  const current = registry.get(channelAgentRepliesAtom(channelId));
+  const settled = new Set(registry.get(channelSettledAgentReplyIdsAtom(channelId)));
+  for (const reply of current) {
+    if (!incomingIds.has(reply.id) && !retained.has(reply.id)) {
+      settled.add(reply.id);
+    }
+  }
+  for (const reply of authoritative) {
+    if (channelReplyIsTerminal(reply)) settled.add(reply.id);
+  }
+  registry.set(channelSettledAgentReplyIdsAtom(channelId), [...settled]);
+  const concurrent = current.filter((reply) => retained.has(reply.id));
+  registry.set(
+    channelAgentRepliesAtom(channelId),
+    replaceEntities(
+      current,
+      mergeChannelReplies(
+        mergeChannelReplies([], authoritative, settled),
+        concurrent,
+        settled,
+      ),
+    ),
   );
 }
 
@@ -521,6 +905,11 @@ function applySessionCleared(registry: AtomRegistry) {
   }
   registry.set(channelCatalogOrganizationIdsAtom, []);
   registry.set(channelsByIdAtom, new Map());
+  for (const channelId of [
+    ...registry.get(retainedConversationChannelIdsAtom),
+  ]) {
+    clearChannelConversation(registry, channelId);
+  }
   registry.set(retainedTeamIdsAtom, []);
   registry.set(staleTeamIdAtom, null);
 }
@@ -603,6 +992,71 @@ export function applySyncEvent(registry: AtomRegistry, event: SyncEvent): void {
         return;
       case "channel-catalog-cleared":
         clearChannelCatalog(registry, event.organizationId);
+        return;
+      case "channel-conversation-snapshot":
+        applyChannelConversationSnapshot(
+          registry,
+          event.channelId,
+          event.members,
+          event.agents,
+          event.messages,
+          event.nextCursor,
+          event.merge,
+        );
+        return;
+      case "channel-messages-page":
+        applyChannelMessagesPage(
+          registry,
+          event.channelId,
+          event.messages,
+          event.removedMessageIds,
+          event.reset,
+          event.includeRepliesInRoot,
+        );
+        return;
+      case "channel-message-changed":
+        applyChannelMessageChanged(
+          registry,
+          event.channelId,
+          event.message,
+          event.includeRepliesInRoot,
+        );
+        return;
+      case "channel-message-removed":
+        applyChannelMessageRemoved(registry, event.channelId, event.messageId);
+        return;
+      case "channel-thread-snapshot": {
+        touchChannelConversation(registry, event.channelId);
+        const key = channelThreadKey(event.channelId, event.rootMessageId);
+        writeChannelThread(
+          registry,
+          event.channelId,
+          event.rootMessageId,
+          mergeChannelMessageSnapshot(
+            registry.get(channelThreadMessagesAtom(key)),
+            event.messages,
+          ),
+        );
+        return;
+      }
+      case "channel-agent-replies-changed":
+        applyChannelAgentReplies(
+          registry,
+          event.channelId,
+          event.replies,
+          event.reset,
+        );
+        return;
+      case "channel-agent-replies-authoritative":
+        applyAuthoritativeChannelAgentReplies(
+          registry,
+          event.channelId,
+          event.replies,
+          event.retainedReplyIds,
+        );
+        return;
+      case "channel-conversation-cleared":
+        clearChannelConversation(registry, event.channelId);
         return;
       case "team-settings-changed": {
         // The guard the payload level commit had: settings replace a payload
