@@ -30,6 +30,22 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.189",
+        date: "2026년 9월 4일",
+        title: "앱을 열자마자 지난 화면을 보여주고 이슈 보드 반응 속도를 높입니다",
+        summary:
+          "마지막으로 본 팀 데이터를 기기에 저장해 로그인 상태에서 앱을 열면 즉시 보여주고, 이슈 보드와 화면 전반의 불필요한 리렌더를 줄였습니다.",
+        items: [
+          "로그인 상태에서 앱을 다시 열면 마지막으로 본 이슈·런·채널을 기기에 저장된 스냅샷으로 즉시 그리고, 서버 응답이 도착하면 조용히 갱신합니다.",
+          "스냅샷을 계정과 조직별로 나누어 저장하고, 로그아웃하거나 계정을 지우면 함께 삭제합니다. 저장 공간이 부족하거나 브라우저가 저장을 막으면 이전과 같은 방식으로 부팅합니다.",
+          "이슈 보드를 런 id 기준으로 그려, 런 하나가 바뀔 때 보드 전체 대신 해당 카드만 다시 그립니다.",
+          "대시보드·인박스·채널·설정·내비게이션 상태를 도메인별 저장소로 옮겨 화면 전환과 목록 갱신에서 생기던 불필요한 리렌더를 줄였습니다.",
+          "채널 메시지 목록과 상태 트레이, 딥링크 처리가 각자 필요한 상태만 구독하도록 정리했습니다.",
+          "릴리즈 승격을 서버에서 버전 순서대로만 받아들여, 늦게 끝난 예전 빌드가 최신 업데이트를 덮어쓰지 못하게 합니다.",
+          "프로덕션 워커 배포와 원격 D1 마이그레이션을 하나의 임대(lease)로 직렬화해 두 배포가 동시에 진행되지 않게 합니다.",
+        ],
+      },
+      {
         version: "1.2.188",
         date: "2026년 9월 4일",
         title: "앱 시작을 빠르게 하고 프로젝트 아이콘과 에이전트 답변을 다듬습니다",
@@ -1531,6 +1547,22 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.189",
+        date: "September 4, 2026",
+        title: "Show your last screen the moment the app opens and speed up the issue board",
+        summary:
+          "Store the team data you last saw on the device so a signed-in launch draws instantly, and cut unnecessary re-renders across the issue board and the rest of the app.",
+        items: [
+          "Reopening the app while signed in draws the issues, runs, and channels you last saw immediately from a snapshot on the device, then refreshes quietly once the server responds.",
+          "Keep snapshots separated per account and organization, and delete them on sign-out or account deletion. The app boots exactly as it did before when storage is full or the browser blocks it.",
+          "Draw the issue board by run id so changing one run repaints only that card instead of the whole board.",
+          "Move dashboard, inbox, channel, settings, and navigation state into per-domain stores, cutting the re-renders that view switches and list updates used to trigger.",
+          "Subscribe the channel message list, status tray, and deep-link handling to only the state each one needs.",
+          "Accept release promotion on the server only in version order, so a newer update always wins over a slower older build.",
+          "Serialize production Worker deploys and remote D1 migrations behind a single lease so two deployments cannot run at the same time.",
+        ],
+      },
       {
         version: "1.2.188",
         date: "September 4, 2026",
