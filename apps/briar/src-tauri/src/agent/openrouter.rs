@@ -7,7 +7,6 @@ use super::{
 /// only through the child process environment, never through event payloads.
 pub(super) const CONFIG: SidecarProviderConfig = SidecarProviderConfig {
     provider: AgentProviderKind::Openrouter,
-    conversation_namespace: "openrouter",
     runner_name: "OpenRouter runner",
     request_name: "OpenRouter",
     executable: SidecarExecutableConfig {

@@ -5,7 +5,6 @@ use super::{
 
 pub(super) const CONFIG: SidecarProviderConfig = SidecarProviderConfig {
     provider: AgentProviderKind::Opencode,
-    conversation_namespace: "opencode",
     runner_name: "OpenCode runner",
     request_name: "OpenCode",
     executable: SidecarExecutableConfig {

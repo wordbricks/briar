@@ -43,54 +43,48 @@ pub(crate) enum AgentProviderKind {
     Openrouter,
 }
 
+/// 대화 ID 네임스페이스의 단일 출처.
+///
+/// 여기 등록된 provider는 대화 ID를 `briar:<네임스페이스>:<프로젝트 id>:<세션 id>`
+/// 형태로 주고받는다. 표에 없는 provider는
+/// [`AgentProviderKind::conversation_namespace`]가 `None`을 돌려주며, 네임스페이스가
+/// 없던 시절의 레거시 형식만 사용한다(현재 Codex). provider가 네임스페이스를 갖게
+/// 되면 이 표에 한 줄만 추가하면 되고, [`AgentProviderKind::for_conversation_id`]의
+/// 레거시 폴백은 표와 무관하게 남아 있으므로 기존 대화 ID도 계속 인식된다.
+const CONVERSATION_NAMESPACES: &[(AgentProviderKind, &str)] = &[
+    (AgentProviderKind::Claude, "claude"),
+    (AgentProviderKind::Grok, "grok"),
+    (AgentProviderKind::Cursor, "cursor"),
+    (AgentProviderKind::Opencode, "opencode"),
+    (AgentProviderKind::Agy, "agy"),
+    (AgentProviderKind::Openrouter, "openrouter"),
+];
+
 impl AgentProviderKind {
+    /// provider가 대화 ID에 사용하는 네임스페이스. 레거시 형식만 쓰면 `None`.
+    pub(crate) fn conversation_namespace(self) -> Option<&'static str> {
+        CONVERSATION_NAMESPACES
+            .iter()
+            .find(|(kind, _)| *kind == self)
+            .map(|(_, namespace)| *namespace)
+    }
+
     pub(crate) fn for_conversation_id(project_id: &str, conversation_id: &str) -> Option<Self> {
-        let claude_prefix = format!("briar:claude:{project_id}:");
-        if conversation_id
-            .strip_prefix(&claude_prefix)
-            .is_some_and(|id| !id.is_empty())
-        {
-            return Some(Self::Claude);
+        for (kind, namespace) in CONVERSATION_NAMESPACES {
+            let prefix = format!("briar:{namespace}:{project_id}:");
+            if conversation_id
+                .strip_prefix(&prefix)
+                .is_some_and(|session_id| !session_id.is_empty())
+            {
+                return Some(*kind);
+            }
         }
-        let grok_prefix = format!("briar:grok:{project_id}:");
-        if conversation_id
-            .strip_prefix(&grok_prefix)
-            .is_some_and(|id| !id.is_empty())
-        {
-            return Some(Self::Grok);
-        }
-        let cursor_prefix = format!("briar:cursor:{project_id}:");
-        if conversation_id
-            .strip_prefix(&cursor_prefix)
-            .is_some_and(|id| !id.is_empty())
-        {
-            return Some(Self::Cursor);
-        }
-        let opencode_prefix = format!("briar:opencode:{project_id}:");
-        if conversation_id
-            .strip_prefix(&opencode_prefix)
-            .is_some_and(|id| !id.is_empty())
-        {
-            return Some(Self::Opencode);
-        }
-        let agy_prefix = format!("briar:agy:{project_id}:");
-        if conversation_id
-            .strip_prefix(&agy_prefix)
-            .is_some_and(|id| !id.is_empty())
-        {
-            return Some(Self::Agy);
-        }
-        let openrouter_prefix = format!("briar:openrouter:{project_id}:");
-        if conversation_id
-            .strip_prefix(&openrouter_prefix)
-            .is_some_and(|id| !id.is_empty())
-        {
-            return Some(Self::Openrouter);
-        }
-        let codex_prefix = format!("briar:{project_id}:");
+        // 네임스페이스가 없던 시절의 Codex 대화 ID. Codex가 네임스페이스를 갖게
+        // 되더라도 이미 저장된 대화를 계속 이어갈 수 있도록 남겨 둔다.
+        let legacy_codex_prefix = format!("briar:{project_id}:");
         conversation_id
-            .strip_prefix(&codex_prefix)
-            .filter(|id| !id.is_empty())
+            .strip_prefix(&legacy_codex_prefix)
+            .filter(|session_id| !session_id.is_empty())
             .map(|_| Self::Codex)
     }
 
@@ -617,7 +611,7 @@ pub(crate) fn summarize_auto_hunt_dispatch(
 mod tests {
     use super::{
         AgentActivityKind, AgentActivityStatus, AgentEvent, AgentProviderKind, BundledRunnerFile,
-        ProjectLlmRequest, BRIAR_SKILL_INSTRUCTION,
+        ProjectLlmRequest, BRIAR_SKILL_INSTRUCTION, CONVERSATION_NAMESPACES,
     };
     #[test]
     fn resolves_the_original_provider_from_a_project_conversation() {
@@ -658,6 +652,97 @@ mod tests {
         assert_eq!(
             AgentProviderKind::for_conversation_id("project-2", "briar:project-1:thread-1"),
             None
+        );
+    }
+
+    #[test]
+    fn resolves_every_registered_conversation_namespace() {
+        for (kind, namespace) in CONVERSATION_NAMESPACES {
+            assert_eq!(
+                AgentProviderKind::for_conversation_id(
+                    "project-1",
+                    &format!("briar:{namespace}:project-1:session-1"),
+                ),
+                Some(*kind),
+                "{namespace} 네임스페이스가 provider로 해석되지 않았습니다."
+            );
+            assert_eq!(kind.conversation_namespace(), Some(*namespace));
+        }
+    }
+
+    #[test]
+    fn rejects_conversation_ids_without_a_session_id() {
+        for (_, namespace) in CONVERSATION_NAMESPACES {
+            assert_eq!(
+                AgentProviderKind::for_conversation_id(
+                    "project-1",
+                    &format!("briar:{namespace}:project-1:"),
+                ),
+                None,
+                "{namespace} 네임스페이스의 빈 세션 ID가 거절되지 않았습니다."
+            );
+        }
+        // 레거시 Codex 형식도 세션 ID가 비어 있으면 인식하지 않는다.
+        assert_eq!(
+            AgentProviderKind::for_conversation_id("project-1", "briar:project-1:"),
+            None
+        );
+    }
+
+    #[test]
+    fn rejects_conversation_ids_from_another_project() {
+        for (_, namespace) in CONVERSATION_NAMESPACES {
+            assert_eq!(
+                AgentProviderKind::for_conversation_id(
+                    "project-1",
+                    &format!("briar:{namespace}:project-2:session-1"),
+                ),
+                None,
+                "{namespace} 네임스페이스가 다른 프로젝트의 대화를 받아들였습니다."
+            );
+        }
+        assert_eq!(
+            AgentProviderKind::for_conversation_id("project-1", "briar:project-2:thread-1"),
+            None
+        );
+    }
+
+    #[test]
+    fn does_not_treat_an_unknown_namespace_as_the_legacy_codex_format() {
+        assert_eq!(
+            AgentProviderKind::for_conversation_id("project-1", "briar:foo:project-1:session-1"),
+            None
+        );
+        // Codex는 아직 네임스페이스를 등록하지 않았으므로 레거시 형식만 인식한다.
+        assert_eq!(AgentProviderKind::Codex.conversation_namespace(), None);
+        assert_eq!(
+            AgentProviderKind::for_conversation_id("project-1", "briar:project-1:thread-1"),
+            Some(AgentProviderKind::Codex)
+        );
+    }
+
+    #[test]
+    fn treats_a_colon_in_the_project_id_as_part_of_the_prefix() {
+        // 현재 동작을 그대로 기록해 둔다: 프로젝트 ID에 `:`가 들어 있으면 레거시
+        // Codex 접두사(`briar:<project>:`)가 네임스페이스 자리까지 삼킬 수 있다.
+        assert_eq!(
+            AgentProviderKind::for_conversation_id(
+                "claude:project-1",
+                "briar:claude:project-1:session-1"
+            ),
+            Some(AgentProviderKind::Codex)
+        );
+        // 반대로 네임스페이스가 붙은 대화 ID는 세션 ID에 `:`가 있어도 그대로 해석된다.
+        assert_eq!(
+            AgentProviderKind::for_conversation_id("project-1", "briar:claude:project-1:session:1"),
+            Some(AgentProviderKind::Claude)
+        );
+        assert_eq!(
+            AgentProviderKind::for_conversation_id(
+                "claude:project-1",
+                "briar:claude:claude:project-1:session-1"
+            ),
+            Some(AgentProviderKind::Claude)
         );
     }
 
