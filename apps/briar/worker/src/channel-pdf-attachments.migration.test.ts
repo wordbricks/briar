@@ -41,27 +41,22 @@ describe("channel PDF attachment migration", () => {
       createdByUserId: "pdf-owner",
       createdAt: now,
     });
-    await createChannelMessage(db, {
-      id: "image-message",
-      channelId: "pdf-channel",
-      parentMessageId: null,
-      authorUserId: "pdf-owner",
-      authorAgentId: null,
-      authorAgentName: null,
-      authorAgentProvider: null,
-      body: "Existing image",
-      mentionedUserIds: [],
-      mentionedAgentIds: [],
-      attachments: [{
-        id: "image-attachment",
-        organization_id: "pdf-org",
-        object_key: "channel-attachments/pdf-org/pdf-channel/image-message/image-attachment",
-        filename: "screen.png",
-        content_type: "image/png",
-        byte_size: 4,
-      }],
-      createdAt: now,
-    });
+    await executeD1Sql(db, `
+      insert into briar_channel_messages (
+        id, channel_id, author_user_id, body, created_at, updated_at
+      ) values (
+        'image-message', 'pdf-channel', 'pdf-owner',
+        'Existing image', '${now}', '${now}'
+      );
+      insert into briar_channel_message_attachments (
+        id, organization_id, channel_id, message_id, object_key,
+        filename, content_type, byte_size, created_at
+      ) values (
+        'image-attachment', 'pdf-org', 'pdf-channel', 'image-message',
+        'channel-attachments/pdf-org/pdf-channel/image-message/image-attachment',
+        'screen.png', 'image/png', 4, '${now}'
+      );
+    `);
 
     await applyD1Migrations(db, {
       files: ["0176_channel_pdf_attachments.sql"],
@@ -71,6 +66,10 @@ describe("channel PDF attachment migration", () => {
       `select filename, content_type from briar_channel_message_attachments
        where id = 'image-attachment'`,
     ).first()).toEqual({ filename: "screen.png", content_type: "image/png" });
+
+    await applyD1Migrations(db, {
+      files: ["0181_channel_image_dimensions.sql"],
+    });
 
     await createChannelMessage(db, {
       id: "pdf-message",

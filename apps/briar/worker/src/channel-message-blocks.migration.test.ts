@@ -17,7 +17,10 @@ describe("channel message block cutover", () => {
     expect(historical).not.toBeNull();
 
     await applyD1Migrations(db, {
-      files: ["0164_canonical_channel_message_blocks.sql"],
+      files: [
+        "0164_canonical_channel_message_blocks.sql",
+        "0181_channel_image_dimensions.sql",
+      ],
     });
 
     expect(await getChannelMessage(

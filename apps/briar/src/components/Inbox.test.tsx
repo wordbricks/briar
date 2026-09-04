@@ -405,6 +405,42 @@ describe("Inbox", () => {
     expect(container.querySelectorAll(".inbox-message")).toHaveLength(1);
   });
 
+  it("shows a persistent unread dot on unread non-activity rows only", async () => {
+    const messages = [
+      issue("dot-unread", "Unread failure", {
+        status: "failed",
+        priority: 1,
+      }),
+      issue("dot-read", "Read failure", {
+        isUnread: false,
+        status: "failed",
+        priority: 1,
+      }),
+      issue("dot-activity", "Unread activity", {
+        priority: 4,
+      }),
+    ];
+
+    await renderReactTestRoot(
+      root,
+      <TestProviders>
+        <Inbox
+          isSidebarOpen
+          messages={seed(messages)}
+          onMarkAllRead={vi.fn()}
+          onMarkRead={vi.fn()}
+          onOpen={vi.fn()}
+          projects={projects}
+          unreadCount={2}
+        />
+      </TestProviders>,
+    );
+
+    const dots = container.querySelectorAll(".inbox-unread-dot");
+    expect(dots).toHaveLength(1);
+    expect(dots[0]?.getAttribute("aria-label")).toBe("읽지 않음");
+  });
+
   it("marks one read message as unread without opening its destination", async () => {
     const message = issue("read", "Revisit this update", {
       isUnread: false,

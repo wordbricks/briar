@@ -1002,6 +1002,8 @@ describe("organization channels", () => {
       filename: "screen.png",
       contentType: "image/png",
       byteSize: 5,
+      imageWidth: null,
+      imageHeight: null,
       url: `/organizations/${organizationId}/channels/${channelId}/messages/${messageId}/attachments/${attachmentId}`,
     }]);
     await expect(
@@ -2000,6 +2002,8 @@ describe("organization channels", () => {
       filename: "screenshot.png",
       contentType: "image/png",
       byteSize: 4,
+      imageWidth: null,
+      imageHeight: null,
       url:
         `/organizations/${organizationId}/channels/${channelId}/messages/${claimed!.reply_message_id}/attachments/${attachmentId}`,
     }]);
