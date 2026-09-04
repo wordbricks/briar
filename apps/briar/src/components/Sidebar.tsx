@@ -40,7 +40,7 @@ import type {
   SessionUser,
 } from "../types";
 import { TeamAgentAvatar } from "./TeamAgentAvatar";
-import { TeamIcon } from "./TeamIcon";
+import { TeamIcon, teamIconComponent } from "./TeamIcon";
 import {
   SidebarCollapsibleSection,
   SidebarOrganizationChannels,
@@ -998,11 +998,23 @@ export function Sidebar({
                                 }
                                 type="button"
                               >
-                                <FolderKanban
-                                  aria-hidden="true"
-                                  size={14}
-                                  strokeWidth={1.7}
-                                />
+                                {(() => {
+                                  const PlanningProjectIcon = planningProject.icon
+                                    ? teamIconComponent(planningProject.icon)
+                                    : FolderKanban;
+                                  return (
+                                    <PlanningProjectIcon
+                                      aria-hidden="true"
+                                      size={14}
+                                      strokeWidth={1.7}
+                                      style={
+                                        planningProject.color
+                                          ? { color: planningProject.color }
+                                          : undefined
+                                      }
+                                    />
+                                  );
+                                })()}
                                 <span>{planningProject.name}</span>
                               </button>
                               {onPlanningProjectEdit ? (

@@ -70,7 +70,7 @@ const StoredChannelMessageBlocksJson = Schema.fromJsonString(
     Schema.isLengthBetween(1, 50),
   ),
 );
-const decodeStoredChannelMessageBlocks = Schema.decodeUnknownSync(
+export const decodeStoredChannelMessageBlocks = Schema.decodeUnknownSync(
   StoredChannelMessageBlocksJson,
   strictStoredChannelMessageBlockOptions,
 );
