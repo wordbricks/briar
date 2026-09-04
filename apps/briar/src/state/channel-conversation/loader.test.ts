@@ -349,6 +349,110 @@ describe("channel conversation loader", () => {
     expect(loader.latestProposal("proposal-1")?.status).toBe("accepted");
   });
 
+  it("pages from the cursor the newest refresh installed", async () => {
+    const pages: string[] = [];
+    const { loader, registry } = harness({
+      loadChannel: async () =>
+        detail([testChannelMessage("current")], { nextCursor: "cursor-2" }),
+      listChannelMessages: async (
+        _token,
+        _organizationId,
+        _channelId,
+        _parentMessageId,
+        page = {},
+      ) => {
+        pages.push(page.cursor ?? "");
+        return { messages: [], nextCursor: null };
+      },
+    });
+    writeChannelTimeline(registry, channelId, [testChannelMessage("current")]);
+    registry.set(channelMessageCursorAtom(channelId), "cursor-1");
+
+    /*
+      The scroll handler captured before the refresh is the same function, and
+      it reads the cursor at call time — so it resumes from where the refresh
+      left off rather than from the page it was created with.
+    */
+    const scrollCallback = () => loader.loadEarlier(channelId, 20);
+    await loader.loadConversation(channelId, {
+      messageLimit: 20,
+      mergeWithCurrentMessages: false,
+    });
+    await scrollCallback();
+
+    expect(pages).toEqual(["cursor-2"]);
+  });
+
+  it("loads root history while a thread surface is open", async () => {
+    const { loader, registry } = harness({
+      listChannelMessages: async () => ({
+        messages: [
+          testChannelMessage("old", { createdAt: "2026-08-01T00:00:00.000Z" }),
+        ],
+        nextCursor: null,
+      }),
+    });
+    writeChannelTimeline(registry, channelId, [testChannelMessage("current")]);
+    registry.set(channelMessageCursorAtom(channelId), "cursor-1");
+    loader.syncSurface(channelId, "root");
+
+    expect(await loader.loadEarlier(channelId, 20)).toEqual({
+      applied: true,
+      nextCursor: null,
+    });
+    expect(
+      registry
+        .get(channelRootMessagesAtom(channelId))
+        .map((message) => message.id),
+    ).toEqual(["old", "current"]);
+  });
+
+  it("resolves a requested reply deep-link through its missing root", async () => {
+    const requestedRoot = testChannelMessage("requested-root", {
+      createdAt: "2026-08-01T00:00:00.000Z",
+    });
+    const requestedReply = testChannelMessage("requested-reply", {
+      parentMessageId: "requested-root",
+      createdAt: "2026-08-01T02:00:00.000Z",
+    });
+    const { loader, registry } = harness({
+      loadChannel: async () =>
+        detail([testChannelMessage("recent")], { nextCursor: "older" }),
+      listChannelMessages: async () => ({
+        messages: [requestedRoot, requestedReply],
+        nextCursor: null,
+      }),
+    });
+
+    await loader.loadConversation(channelId, {
+      messageLimit: 20,
+      mergeWithCurrentMessages: false,
+      requestedMessage: {
+        channelId,
+        messageId: "requested-reply",
+        rootMessageId: "requested-root",
+      },
+    });
+
+    expect(
+      registry
+        .get(channelRootMessagesAtom(channelId))
+        .map((message) => message.id),
+    ).toContain("requested-root");
+    expect(registry.get(channelOpenThreadIdAtom(channelId))).toBe(
+      "requested-root",
+    );
+    expect(
+      registry
+        .get(
+          channelThreadMessagesAtom(
+            channelThreadKey(channelId, "requested-root"),
+          ),
+        )
+        .map((message) => message.id),
+    ).toEqual(["requested-root", "requested-reply"]);
+  });
+
   it("refetches the thread an approval raced", async () => {
     const { loader, registry } = harness({
       listChannelMessages: async () => ({

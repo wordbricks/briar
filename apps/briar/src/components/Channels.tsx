@@ -156,25 +156,40 @@ import {
   type DesktopChannelDisplaySource,
 } from "../lib/channel-performance";
 import type { ChannelAgentActivityDescriptor } from "../lib/channel-agent-activity";
-import { useChannelConversation } from "../hooks/use-channel-conversation";
 import { useAtomValue } from "@effect/atom-react";
 import { useRegistry } from "../state/registry";
 import {
+  channelAcceptingProposalIdAtom,
+  channelConversationBusyAtom,
+  channelDecliningProposalIdAtom,
+  channelEarlierMessagesLoadingAtom,
   channelMessageAtom,
   channelMessageKey,
+  channelProposalProjectsAtom,
   channelRootMessageIdsAtom,
   channelRootMessageSummariesAtom,
   channelRootMessagesAtom,
   channelThreadKey,
   channelThreadMessagesAtom,
+  channelThreadSubscriptionPendingAtom,
 } from "../state/channel-conversation/atoms";
 import type { ChannelMessageSummary } from "../state/channel-conversation/model";
-import { useChannelConversationLoader } from "../state/channel-conversation/loader";
-import { writeChannelParticipants } from "../state/channel-conversation/write";
 import {
-  useChannelConversationStore,
-  useChannelConversationView,
-} from "../state/channel-conversation/useChannelConversationStore";
+  useChannelConversationActions,
+  type BoundChannelConversationActions,
+} from "../state/channel-conversation/actions";
+import {
+  useChannelConversationLoader,
+  type ChannelConversationLoader,
+} from "../state/channel-conversation/loader";
+import { useChannelConversationSync } from "../state/channel-conversation/useChannelConversationSync";
+import { useChannelConversationTyping } from "../state/channel-conversation/useChannelConversationTyping";
+import {
+  resetChannelConversationViewState,
+  writeChannelAgentReplies,
+  writeChannelParticipants,
+} from "../state/channel-conversation/write";
+import { useChannelConversationView } from "../state/channel-conversation/useChannelConversationView";
 
 type ChannelsProps = {
   organizationId: string;
@@ -371,7 +386,6 @@ export function Channels({
     both now, shared with the companion view and bounded in one place.
   */
   const registry = useRegistry();
-  const conversationStore = useChannelConversationStore(activeChannelId);
   const conversationLoader = useChannelConversationLoader();
   const {
     agents,
@@ -492,77 +506,82 @@ export function Channels({
     () => authoritativeLoadVersion.current != null,
     [],
   );
+  /*
+    The conversation's writes, its realtime transport and its typing strips are
+    `state/channel-conversation`'s. What this view still decides is what the
+    shell asked it to: where an accepted proposal navigates, which catalog the
+    delta belongs to, and where the timeline scrolls.
+  */
   const {
     acceptExecutionProposal,
     acceptProposal,
     acceptSkillExecutionProposal,
-    acceptingProposalId,
     applyAcceptedExecutionProposal,
     applyAcceptedSkillExecutionProposal,
-    applyAgentReplies,
-    applyIncomingMessages,
-    busy,
-    captureChannelSurface,
-    channelSurfaceIsCurrent,
-    clearProposalHistory,
     closeThread,
     declineProposal,
-    decliningProposalId,
-    invalidateChannelSurface,
-    loadCreateExecutionProposalContext,
-    loadChannelConversation,
-    loadEarlierChannelMessages: loadEarlierConversationMessages,
-    loadExecutionProposalContext,
-    loadSkillExecutionProposalContext,
-    loadingEarlierMessages,
+    loadEarlierMessages: loadEarlierConversationMessages,
     openIssue,
     openThread: openConversationThread,
-    proposalProjects,
     removeMessage,
     send,
-    setError,
-    setProposalProjects,
-    threadActivityByAgentName,
-    threadSubscriptionPending,
-    threadTypingAgentNames,
+    setProposalProject,
     toggleReaction,
     toggleThreadSubscription,
-    typingActivityByAgentName,
-    typingAgentNames,
-  } = useChannelConversation({
-    token,
-    organizationId,
-    imageCache,
+  } = useChannelConversationActions(activeChannelId, {
     currentUserId,
-    channel: activeChannel,
-    members,
-    agents,
-    replies,
-    threadParentId,
-    threadMessages,
+    channelKind: activeChannel?.kind,
+    defaultProjectId: activeChannel?.defaultProjectId ?? null,
+    includeRepliesInRoot: surface === "dm",
     pageSize: desktopChannelMessagePageSize,
-    updateRootMessages: conversationStore.updateRootMessages,
-    updateThreadMessages: conversationStore.updateThreadMessages,
-    setThreadParentId: conversationStore.setThreadParentId,
+    imageCache,
     onChannelLoaded: applyLoadedChannel,
     onIssueOpen: onIssueCreated,
     onSkillSessionAccepted,
-    onRootMessagePending: () => {
-      requestStickToBottomIfAtBottom();
-    },
-    realtime: {
-      enabled: true,
-      catalogCursor: cursor,
-      catalogReady: channelListReady,
-      syncSignal: channelInboxSyncSignal,
-      includeRepliesInRoot: surface === "dm",
-      isBlocked: channelDeltaIsBlocked,
-      onCatalogDelta: applyChannelCatalogDelta,
-      onSelectedChannelRemoved: handleSelectedChannelRemoved,
-      onIncomingRootMessages: handleIncomingRootMessages,
-      warningLabel: "Channel delta refresh failed",
-    },
+    onRootMessagePending: requestStickToBottomIfAtBottom,
   });
+  const busy = useAtomValue(channelConversationBusyAtom(activeChannelId ?? ""));
+  const acceptingProposalId = useAtomValue(
+    channelAcceptingProposalIdAtom(activeChannelId ?? ""),
+  );
+  const decliningProposalId = useAtomValue(
+    channelDecliningProposalIdAtom(activeChannelId ?? ""),
+  );
+  const threadSubscriptionPending = useAtomValue(
+    channelThreadSubscriptionPendingAtom(activeChannelId ?? ""),
+  );
+  const loadingEarlierMessages = useAtomValue(
+    channelEarlierMessagesLoadingAtom(activeChannelId ?? ""),
+  );
+  const proposalProjects = useAtomValue(
+    channelProposalProjectsAtom(activeChannelId ?? ""),
+  );
+  const {
+    threadActivityByAgentName,
+    threadTypingAgentNames,
+    typingActivityByAgentName,
+    typingAgentNames,
+  } = useChannelConversationTyping(activeChannelId);
+  const {
+    loadCreateExecutionProposalContext,
+    loadExecutionProposalContext,
+    loadSkillExecutionProposalContext,
+  } = conversationLoader;
+  const loadChannelConversation = conversationLoader.loadConversation;
+  useChannelConversationSync({
+    enabled: true,
+    channelId: activeChannelId,
+    catalogCursor: cursor,
+    catalogReady: channelListReady,
+    syncSignal: channelInboxSyncSignal,
+    includeRepliesInRoot: surface === "dm",
+    isBlocked: channelDeltaIsBlocked,
+    onCatalogDelta: applyChannelCatalogDelta,
+    onSelectedChannelRemoved: handleSelectedChannelRemoved,
+    onIncomingRootMessages: handleIncomingRootMessages,
+    warningLabel: "Channel delta refresh failed",
+  });
+
   const activeChannelName = activeChannel && surface === "dm"
     ? directMessageDisplayName(activeChannel, currentUserId)
     : activeChannel?.name ?? "";
@@ -878,7 +897,7 @@ export function Channels({
     let cancelled = false;
     cursor.current = 0;
     setChannelListReady(false);
-    clearProposalHistory();
+    conversationLoader.clearProposalHistory(activeChannelIdRef.current);
     void (async () => {
       try {
         const result = await listChannels(token, organizationId);
@@ -903,7 +922,7 @@ export function Channels({
     };
   }, [
     channelCatalogCursor,
-    clearProposalHistory,
+    conversationLoader,
     onChannelFallback,
     onChannelsChange,
     organizationId,
@@ -928,25 +947,23 @@ export function Channels({
     recordDesktopChannelHeader(activeChannelId);
     if (preparedChannelId.current === activeChannelId) return;
     preparedChannelId.current = activeChannelId;
-    invalidateChannelSurface(activeChannelId, null);
+    conversationLoader.invalidateSurface(activeChannelId, null);
     conversationLoader.cancel(activeChannelId);
     const stored = registry.get(channelRootMessageIdsAtom(activeChannelId));
     displaySource.current = stored ? "cache" : "network";
     requestStickToBottom();
     setChannelLoading(!stored);
-    setProposalProjects({});
-    conversationStore.setThreadParentId(null);
-    conversationStore.setReplies([]);
-    setError(null);
+    resetChannelConversationViewState(registry, activeChannelId);
+    // Reply jobs are live execution state: a stored running job can finish
+    // while another channel is open, so keeping it would replay a stale typing
+    // indicator until the authoritative load lands.
+    writeChannelAgentReplies(registry, activeChannelId, []);
   }, [
     activeChannelId,
     channelListReady,
-    conversationStore,
-    invalidateChannelSurface,
+    conversationLoader,
     registry,
     requestStickToBottom,
-    setError,
-    setProposalProjects,
   ]);
 
   useEffect(() => {
@@ -957,11 +974,11 @@ export function Channels({
     void (async () => {
       try {
         const stored = registry.get(channelRootMessageIdsAtom(activeChannelId));
-        const loaded = await loadChannelConversation({
-          channelId: activeChannelId,
+        const loaded = await loadChannelConversation(activeChannelId, {
           messageLimit: desktopChannelMessagePageSize,
           mergeWithCurrentMessages: stored !== null,
           requestedMessage,
+          onChannelLoaded: applyLoadedChannel,
         });
         if (
           !loaded ||
@@ -1044,6 +1061,7 @@ export function Channels({
     };
   }, [
     activeChannelId,
+    applyLoadedChannel,
     channelListReady,
     conversationLoader,
     loadChannelConversation,
@@ -1195,12 +1213,7 @@ export function Channels({
     loadSkillExecutionProposalContext,
     openThread: (messageId) => void openThread(messageId),
     removeMessage,
-    selectProposalProject: (proposalId, projectId) => {
-      setProposalProjects((current) => ({
-        ...current,
-        [proposalId]: projectId,
-      }));
-    },
+    selectProposalProject: setProposalProject,
     toggleReaction,
   };
   const messageHandlers = useMemo<MessageRowHandlers>(
@@ -2935,18 +2948,20 @@ function ChannelInviteDialog({
 */
 export interface MessageRowHandlers
   extends Pick<
-    ReturnType<typeof useChannelConversation>,
+    BoundChannelConversationActions,
     | "acceptExecutionProposal"
     | "acceptProposal"
     | "acceptSkillExecutionProposal"
     | "applyAcceptedExecutionProposal"
     | "applyAcceptedSkillExecutionProposal"
     | "declineProposal"
-    | "loadExecutionProposalContext"
-    | "loadSkillExecutionProposalContext"
     | "removeMessage"
     | "toggleReaction"
-  > {
+  >,
+    Pick<
+      ChannelConversationLoader,
+      "loadExecutionProposalContext" | "loadSkillExecutionProposalContext"
+    > {
   readonly openThread: (messageId: string) => void;
   readonly selectProposalProject: (
     proposalId: string,
