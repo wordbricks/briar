@@ -89,7 +89,7 @@ import {
   settingsTargetAtom,
 } from "../../state/navigation/atoms";
 import {
-  desktopKeptPageAtom,
+  activeKeptPageAtom,
   keptPageKey,
   keptPageKeysAtom,
   type KeptPage,
@@ -263,7 +263,7 @@ export function DesktopPages({
   const desktopActiveChannelId = useAtomValue(desktopActiveChannelIdAtom);
   const navigationProjectId = useAtomValue(navigationTeamIdAtom);
   const selectedRunId = useAtomValue(activeRunIdAtom);
-  const keptPage = useAtomValue(desktopKeptPageAtom);
+  const keptPage = useAtomValue(activeKeptPageAtom);
   const keptPageKeys = useAtomValue(keptPageKeysAtom);
   const {
     closeSettings,

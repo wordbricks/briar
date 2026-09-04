@@ -280,7 +280,13 @@ const activeKeptPageContextAtom = Atom.make((get): KeptPageContext =>
   Atom.withLabel("navigation/activeKeptPageContext"),
 );
 
-/** The kept page on screen, whichever shell is drawing it. */
+/**
+ * The kept page on screen, whichever shell is drawing it.
+ *
+ * Both shells read this rather than their own resolver, so the page a shell
+ * draws and the history below can never name different things: they are the
+ * same derivation.
+ */
 export const activeKeptPageAtom = Atom.map(
   activeKeptPageContextAtom,
   (context) => context.page,

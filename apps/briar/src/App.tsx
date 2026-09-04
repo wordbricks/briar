@@ -231,7 +231,6 @@ export function App({
 
   const shell = companionMode ? (
     <CompanionShell
-      activeTeam={activeTeam}
       agents={activeTeamAgents}
       loadTeamHomeUsage={loadTeamHomeUsage}
     />

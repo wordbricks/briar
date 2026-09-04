@@ -12,6 +12,10 @@ import { demoDashboard } from "../../lib/demo-data";
 import { createCachedTeamUsageSummaryLoader } from "../../lib/team-usage-summary";
 import { companionPageAtom } from "../../state/navigation/atoms";
 import {
+  activeShellAtom,
+  keptPageKeysAtom,
+} from "../../state/navigation/keep-alive";
+import {
   activeOrganizationIdAtom,
   organizationsAtom,
 } from "../../state/organization/atoms";
@@ -19,7 +23,12 @@ import { createTestRegistry, type AtomRegistry } from "../../state/registry";
 import { tokenAtom, userAtom } from "../../state/session/atoms";
 import { applySyncEvent } from "../../state/sync/apply";
 import { activeTeamIdAtom, teamsAtom } from "../../state/team/atoms";
-import { createReactTestRoot, flush, settle } from "../../test/react";
+import {
+  createReactTestRoot,
+  flush,
+  settle,
+  visibleText,
+} from "../../test/react";
 import { createRenderCounter } from "../../test/render-count";
 import {
   demoOrganization,
@@ -63,7 +72,6 @@ const payload: DashboardPayload = {
 };
 
 const props: CompanionShellProps = {
-  activeTeam: team,
   agents: [],
   loadTeamHomeUsage: createCachedTeamUsageSummaryLoader(async () => null),
 };
@@ -79,6 +87,9 @@ const harness = (): AtomRegistry => {
     [activeTeamIdAtom, team.id],
     [organizationsAtom, [demoOrganization]],
     [activeOrganizationIdAtom, demoOrganization.id],
+    // A vitest run is not a companion build, so the shell constant says
+    // "desktop". The phone chain is what these cases are about.
+    [activeShellAtom, "companion"],
   ]);
   applySyncEvent(registry, {
     kind: "team-snapshot",
@@ -131,14 +142,53 @@ describe("CompanionShell", () => {
     const registry = harness();
     const view = await mount(registry);
     await settle(() => view.container.textContent?.includes(run.title) === true);
+    const board = view.container.querySelector<HTMLElement>(
+      '[data-page-slot^="board:"]',
+    )?.firstElementChild;
+    expect(board).toBeTruthy();
 
     await act(async () => {
       registry.set(companionPageAtom, "inbox");
     });
-    await settle(
-      () => view.container.textContent?.includes(run.title) !== true,
-    );
-    expect(view.container.textContent).not.toContain(run.title);
+    await settle(() => visibleText(view.container).includes(run.title) !== true);
+    // The board went off screen rather than away: the phone keeps it, so the
+    // task list is where it was when the user comes back to it.
+    expect(visibleText(view.container)).not.toContain(run.title);
+    expect(view.container.textContent).toContain(run.title);
+
+    await act(async () => {
+      registry.set(companionPageAtom, "issues");
+    });
+    await settle(() => visibleText(view.container).includes(run.title));
+    expect(
+      view.container.querySelector<HTMLElement>('[data-page-slot^="board:"]')
+        ?.firstElementChild,
+    ).toBe(board);
+    expect(registry.get(keptPageKeysAtom)).toEqual([
+      `inbox:${demoOrganization.id}`,
+      `board:${team.id}`,
+    ]);
+
+    await view.cleanup();
+  });
+
+  it("hides every kept page while a page that is not kept is open", async () => {
+    const registry = harness();
+    const view = await mount(registry);
+    await settle(() => view.container.textContent?.includes(run.title) === true);
+
+    await act(async () => {
+      registry.set(companionPageAtom, "settings");
+    });
+    await settle(() => visibleText(view.container).includes(run.title) !== true);
+
+    // Settings unmounts on leave and is drawn by the chain, not a slot, so
+    // every slot is off screen — and the board is still one of them.
+    const slots = [...view.container.querySelectorAll("[data-page-slot]")];
+    expect(slots).toHaveLength(1);
+    expect(slots.every((slot) => slot.hasAttribute("inert"))).toBe(true);
+    expect(registry.get(keptPageKeysAtom)).toEqual([`board:${team.id}`]);
+
     await view.cleanup();
   });
 
