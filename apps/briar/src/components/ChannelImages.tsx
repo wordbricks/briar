@@ -46,13 +46,33 @@ export function useChannelMessageImageCache(identity: string) {
 
   useEffect(() => () => {
     cache.disposed = true;
+    const revoked = new Set<string>();
     for (const entry of cache.entries.values()) {
-      if (entry.source) URL.revokeObjectURL(entry.source);
+      if (entry.source && !revoked.has(entry.source)) {
+        revoked.add(entry.source);
+        URL.revokeObjectURL(entry.source);
+      }
     }
     cache.entries.clear();
   }, [cache]);
 
   return cache;
+}
+
+export function registerChannelMessageImageSource(
+  cache: ChannelMessageImageCache | null | undefined,
+  key: string,
+  source: string,
+) {
+  if (!cache || cache.disposed) return;
+  const existing = cache.entries.get(key);
+  if (existing?.source && existing.source !== source) {
+    URL.revokeObjectURL(existing.source);
+  }
+  cache.entries.set(key, {
+    promise: null,
+    source,
+  });
 }
 
 export function ChannelMessageImageCacheProvider({
@@ -105,8 +125,12 @@ function useChannelMessageImageSource(
   cache: ChannelMessageImageCache | null,
   key: string,
   loader: (() => Blob | Promise<Blob>) | null,
+  attachment?: ChannelMessageAttachment,
 ) {
-  const cachedSource = cache?.entries.get(key)?.source ?? null;
+  const cachedSource = cache?.entries.get(key)?.source
+    ?? (attachment ? cache?.entries.get(attachment.id)?.source : null)
+    ?? (attachment ? cache?.entries.get(attachment.url)?.source : null)
+    ?? null;
   const [state, setState] = useState({
     failed: false,
     key,
@@ -126,7 +150,10 @@ function useChannelMessageImageSource(
       if (active) setState({ failed: true, key, source: null });
     };
 
-    const existing = cache?.entries.get(key)?.source ?? null;
+    const existing = cache?.entries.get(key)?.source
+      ?? (attachment ? cache?.entries.get(attachment.id)?.source : null)
+      ?? (attachment ? cache?.entries.get(attachment.url)?.source : null)
+      ?? null;
     if (existing) {
       setSource(existing);
       return () => {
@@ -320,6 +347,7 @@ function ChannelMessagePdfAttachment({
   token: string;
 }) {
   const { t } = useI18n();
+  const localSource = attachment.url.startsWith("blob:") ? attachment.url : null;
   const loadAttachment = useCallback(async () => {
     const blob = await loadChannelMessageAttachment(token, attachment);
     if (blob.type !== channelPdfContentType) {
@@ -327,7 +355,10 @@ function ChannelMessagePdfAttachment({
     }
     return blob;
   }, [attachment.url, token]);
-  const { failed, source } = useObjectUrl(interactive ? loadAttachment : null);
+  const { failed, source: loadedSource } = useObjectUrl(
+    interactive && !localSource ? loadAttachment : null,
+  );
+  const source = localSource ?? loadedSource;
 
   return (
     <article className="channel-message-file-card">
@@ -416,6 +447,7 @@ function ChannelMessageMediaAttachment({
     imageCache,
     `${attachment.id}:${attachment.url}`,
     loadImage,
+    attachment,
   );
   const source = localSource ?? loadedSource;
 
@@ -438,11 +470,12 @@ function ChannelMessageMediaAttachment({
         alt={attachment.filename}
         className="channel-message-image-trigger"
         filename={attachment.filename}
+        loading="eager"
         source={source}
       />
     ) : (
       <span className="channel-message-image-static">
-        <img alt={attachment.filename} loading="lazy" src={source} />
+        <img alt={attachment.filename} loading="eager" src={source} />
       </span>
     );
   }

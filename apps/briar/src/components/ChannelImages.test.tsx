@@ -7,8 +7,10 @@ import { createReactTestRoot, renderReactTestRoot } from "@/test/react";
 import { I18nProvider } from "@/i18n";
 import {
   ChannelDraftImages,
+  ChannelMessageImageCacheProvider,
   ChannelMessageImages,
   draftChannelImage,
+  registerChannelMessageImageSource,
 } from "./ChannelImages";
 
 describe("channel message attachments", () => {
@@ -116,5 +118,68 @@ describe("channel message attachments", () => {
     expect(container.textContent).toContain("8B");
     await act(async () => container.querySelector("button")?.click());
     expect(onRemove).toHaveBeenCalledOnce();
+  });
+
+  it("renders a local blob image attachment immediately with eager loading without network fetch", async () => {
+    const load = vi.spyOn(api, "loadChannelMessageAttachment");
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <ChannelMessageImages
+          attachments={[{
+            id: "local-img-1",
+            filename: "screenshot.png",
+            contentType: "image/png",
+            byteSize: 4096,
+            url: "blob:http://localhost/local-screenshot",
+          }]}
+          token="token"
+        />
+      </I18nProvider>,
+    );
+
+    const img = container.querySelector<HTMLImageElement>("img");
+    expect(img).not.toBeNull();
+    expect(img?.src).toBe("blob:http://localhost/local-screenshot");
+    expect(img?.getAttribute("loading")).toBe("eager");
+    expect(container.querySelector('[aria-label="churning"]')).toBeNull();
+    expect(load).not.toHaveBeenCalled();
+  });
+
+  it("renders a server image attachment immediately from seeded cache without loading spinner", async () => {
+    const load = vi.spyOn(api, "loadChannelMessageAttachment");
+    const cache = {
+      disposed: false,
+      entries: new Map(),
+    };
+    registerChannelMessageImageSource(
+      cache,
+      "server-img-1:/attachments/server-img-1",
+      "blob:http://localhost/cached-source",
+    );
+
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <ChannelMessageImageCacheProvider cache={cache}>
+          <ChannelMessageImages
+            attachments={[{
+              id: "server-img-1",
+              filename: "server-pic.png",
+              contentType: "image/png",
+              byteSize: 8192,
+              url: "/attachments/server-img-1",
+            }]}
+            token="token"
+          />
+        </ChannelMessageImageCacheProvider>
+      </I18nProvider>,
+    );
+
+    const img = container.querySelector<HTMLImageElement>("img");
+    expect(img).not.toBeNull();
+    expect(img?.src).toBe("blob:http://localhost/cached-source");
+    expect(container.querySelector('[aria-label="churning"]')).toBeNull();
+    expect(load).not.toHaveBeenCalled();
   });
 });

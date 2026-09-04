@@ -544,6 +544,7 @@ export function Channels({
   } = useChannelConversation({
     token,
     organizationId,
+    imageCache,
     currentUserId,
     channel: activeChannel,
     members,

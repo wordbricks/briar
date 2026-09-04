@@ -30,9 +30,28 @@ export function mergeChannelMessages(
       message.skillExecutionProposal?.id === acceptedSkillExecution.id &&
       message.skillExecutionProposal.status === "pending",
     );
-    const merged = keepsAcceptedExecution
-      ? { ...message, executionProposal: acceptedExecution }
+    const attachments = previous?.attachments &&
+      previous.attachments.length === message.attachments.length
+        ? message.attachments.map((attachment, index) => {
+            const previousAttachment = previous.attachments[index];
+            if (
+              previousAttachment?.url.startsWith("blob:") &&
+              previousAttachment.filename === attachment.filename
+            ) {
+              return {
+                ...attachment,
+                url: previousAttachment.url,
+              };
+            }
+            return attachment;
+          })
+        : message.attachments;
+    const withAttachments = attachments !== message.attachments
+      ? { ...message, attachments }
       : message;
+    const merged = keepsAcceptedExecution
+      ? { ...withAttachments, executionProposal: acceptedExecution }
+      : withAttachments;
     byId.set(
       message.id,
       keepsAcceptedSkillExecution

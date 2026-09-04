@@ -475,6 +475,7 @@ export function CompanionChannels({
   } = useChannelConversation({
     token,
     organizationId,
+    imageCache,
     currentUserId,
     channel,
     members,
