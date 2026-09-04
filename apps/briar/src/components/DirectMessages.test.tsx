@@ -3,6 +3,8 @@
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../i18n";
+import { RegistryContext } from "@effect/atom-react";
+import { createTestRegistry } from "../state/registry";
 import * as api from "../lib/api";
 import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { DirectMessages } from "./DirectMessages";
@@ -33,6 +35,7 @@ describe("DirectMessages", () => {
     const { cleanup, container, root } = createReactTestRoot();
     await renderReactTestRoot(
       root,
+      <RegistryContext.Provider value={createTestRegistry()}>
       <I18nProvider>
         <DirectMessages
           activeChannelId={null}
@@ -44,7 +47,8 @@ describe("DirectMessages", () => {
           organizationId="org-1"
           token="token"
         />
-      </I18nProvider>,
+      </I18nProvider>
+      </RegistryContext.Provider>,
     );
     let selfCandidate: HTMLButtonElement | undefined;
     await vi.waitFor(() => {
@@ -70,6 +74,7 @@ describe("DirectMessages", () => {
     const { cleanup, container, root } = createReactTestRoot();
     await renderReactTestRoot(
       root,
+      <RegistryContext.Provider value={createTestRegistry()}>
       <I18nProvider>
         <DirectMessages
           activeChannelId={null}
@@ -81,7 +86,8 @@ describe("DirectMessages", () => {
           organizationId="org-1"
           token="token"
         />
-      </I18nProvider>,
+      </I18nProvider>
+      </RegistryContext.Provider>,
     );
 
     expect(

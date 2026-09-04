@@ -318,3 +318,95 @@ export function touchRetained(current: string[], id: string, limit: number) {
   const overflow = Math.max(0, next.length - limit);
   return { retained: next.slice(overflow), evicted: next.slice(0, overflow) };
 }
+/**
+ * The channel this window is showing, or `null` when none is open. The views
+ * set it as they mount a channel, and the loader reads it to decide whether a
+ * failure is worth a toast: a request that outlived the channel it belongs to
+ * still writes its data, but must not interrupt whatever is on screen now.
+ */
+export const openConversationChannelIdAtom = Atom.make<string | null>(null).pipe(
+  Atom.keepAlive,
+  Atom.withLabel("channelConversation/openChannelId"),
+);
+
+/**
+ * The thread open inside one channel. Per channel rather than global because
+ * the store keeps several channels, but the views reset it when they open a
+ * channel — leaving a channel and coming back has always shown its root
+ * timeline, and the messages arriving instantly should not change that.
+ */
+export const channelOpenThreadIdAtom = Atom.family((channelId: string) =>
+  Atom.make<string | null>(null).pipe(
+    Atom.keepAlive,
+    Atom.withLabel(`channelConversation/${channelId}/openThreadId`),
+  ),
+);
+
+/** A write for this channel is in flight: the composer and the row actions wait. */
+export const channelConversationBusyAtom = Atom.family((channelId: string) =>
+  Atom.make(false).pipe(
+    Atom.keepAlive,
+    Atom.withLabel(`channelConversation/${channelId}/busy`),
+  ),
+);
+
+/** The channel's first page is loading and nothing stored is being shown. */
+export const channelConversationLoadingAtom = Atom.family((channelId: string) =>
+  Atom.make(false).pipe(
+    Atom.keepAlive,
+    Atom.withLabel(`channelConversation/${channelId}/loading`),
+  ),
+);
+
+/** An older page is being fetched, which the timeline shows as a spinner. */
+export const channelEarlierMessagesLoadingAtom = Atom.family(
+  (channelId: string) =>
+    Atom.make(false).pipe(
+      Atom.keepAlive,
+      Atom.withLabel(`channelConversation/${channelId}/loadingEarlier`),
+    ),
+);
+
+/** A thread is being opened and has nothing cached to show meanwhile. */
+export const channelThreadLoadingAtom = Atom.family((channelId: string) =>
+  Atom.make(false).pipe(
+    Atom.keepAlive,
+    Atom.withLabel(`channelConversation/${channelId}/threadLoading`),
+  ),
+);
+
+/** The thread subscribe toggle is waiting for its response. */
+export const channelThreadSubscriptionPendingAtom = Atom.family(
+  (channelId: string) =>
+    Atom.make(false).pipe(
+      Atom.keepAlive,
+      Atom.withLabel(`channelConversation/${channelId}/threadSubscriptionPending`),
+    ),
+);
+
+/** The proposal whose approval is in flight, so its card shows a spinner. */
+export const channelAcceptingProposalIdAtom = Atom.family((channelId: string) =>
+  Atom.make<string | null>(null).pipe(
+    Atom.keepAlive,
+    Atom.withLabel(`channelConversation/${channelId}/acceptingProposalId`),
+  ),
+);
+
+/** The proposal whose decline is in flight. */
+export const channelDecliningProposalIdAtom = Atom.family((channelId: string) =>
+  Atom.make<string | null>(null).pipe(
+    Atom.keepAlive,
+    Atom.withLabel(`channelConversation/${channelId}/decliningProposalId`),
+  ),
+);
+
+/**
+ * The project a reader picked for a proposal that does not name one. Keyed by
+ * proposal id within the channel; the views reset it when the channel opens.
+ */
+export const channelProposalProjectsAtom = Atom.family((channelId: string) =>
+  Atom.make<Readonly<Record<string, string>>>({}).pipe(
+    Atom.keepAlive,
+    Atom.withLabel(`channelConversation/${channelId}/proposalProjects`),
+  ),
+);
