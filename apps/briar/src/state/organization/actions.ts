@@ -18,8 +18,7 @@ import { bumpReconnectRequest } from "../workspace/api";
 import { resetHealth } from "../workspace/atoms";
 import { sessionErrorAtom, tokenAtom } from "../session/atoms";
 import { applySyncEvent, markTeamStale } from "../sync/apply";
-import { loadedDashboardTeamIdAtom } from "../sync/view";
-import { activeTeamIdAtom, teamsAtom } from "../team/atoms";
+import { activeTeamIdAtom, loadedTeamIdAtom, teamsAtom } from "../team/atoms";
 import { activeOrganizationIdAtom, organizationsAtom } from "./atoms";
 
 /** Remote writes and reads the organization actions perform. */
@@ -226,7 +225,7 @@ export function createOrganizationActions(
         null;
       const teamId = team?.id ?? null;
       const dashboardMatchesTeam =
-        registry.get(loadedDashboardTeamIdAtom) === teamId;
+        registry.get(loadedTeamIdAtom) === teamId;
       if (
         registry.get(activeOrganizationIdAtom) === organizationId &&
         registry.get(activeTeamIdAtom) === teamId &&

@@ -3,13 +3,9 @@ import { describe, expect, it } from "vitest";
 import { demoDashboard } from "../../lib/demo-data";
 import type { DashboardDeltaPayload, DashboardPayload } from "../../types";
 import { createTestRegistry } from "../registry";
-import { activeTeamIdAtom } from "../team/atoms";
+import { activeTeamIdAtom, loadedTeamIdAtom } from "../team/atoms";
 import { applySyncEvent } from "./apply";
-import {
-  activeDashboardAtom,
-  dashboardViewAtom,
-  loadedDashboardTeamIdAtom,
-} from "./view";
+import { activeDashboardAtom, dashboardViewAtom } from "./view";
 
 const teamId = "team-a";
 
@@ -46,7 +42,7 @@ describe("dashboard view", () => {
 
     expect(registry.get(dashboardViewAtom(teamId))).toBeNull();
     expect(registry.get(activeDashboardAtom)).toBeNull();
-    expect(registry.get(loadedDashboardTeamIdAtom)).toBeNull();
+    expect(registry.get(loadedTeamIdAtom)).toBeNull();
   });
 
   it("reassembles the payload the snapshot carried", () => {

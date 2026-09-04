@@ -29,9 +29,13 @@ import {
 } from "../state/dialogs/atoms";
 import { useRegistry } from "../state/registry";
 import { tokenAtom } from "../state/session/atoms";
-import { activeTeamIdAtom } from "../state/team/atoms";
+import { teamWorkersAtom } from "../state/entities/workers";
+import {
+  activeTeamIdAtom,
+  loadedTeamIdAtom,
+  teamExecutionPolicyAtom,
+} from "../state/team/atoms";
 import { useSyncActions } from "../state/sync/actions";
-import { activeDashboardAtom } from "../state/sync/view";
 import type { AutoHuntSession, HuntRun, Project, ProjectAgent } from "../types";
 
 /*
@@ -141,7 +145,6 @@ export function useAgentDispatch({
   const { refreshActiveTeam: refresh } = useSyncActions();
   const token = useAtomValue(tokenAtom);
   const activeTeamId = useAtomValue(activeTeamIdAtom);
-  const activeDashboard = useAtomValue(activeDashboardAtom);
   const recoveryRef = useRef<Promise<void> | null>(null);
   const dispatchRun = deps?.dispatchRun ?? dispatchHuntRun;
   const loadTeamDashboard = deps?.loadTeamDashboard ?? loadDashboard;
@@ -159,10 +162,18 @@ export function useAgentDispatch({
     options?: AgentAutoHuntOptions,
   ) => {
     if (!token) throw new Error("로그인이 필요합니다.");
-    const executionDashboard =
-      activeDashboard?.team.id === teamId
-        ? activeDashboard
-        : await loadTeamDashboard(token, teamId);
+    /*
+      What a dispatch needs from the team it targets is the two execution
+      projections, and only for the team it is dispatching to. The store has
+      them for the team on screen; any other team is fetched, exactly as before.
+    */
+    const onScreen = registry.get(loadedTeamIdAtom) === teamId;
+    const execution = onScreen
+      ? {
+          workers: registry.get(teamWorkersAtom(teamId)),
+          executionPolicy: registry.get(teamExecutionPolicyAtom(teamId)),
+        }
+      : await loadTeamDashboard(token, teamId);
     const result = await dispatchAutoHuntToWorkers(
       {
         dispatch: (run, input) => dispatchRun(token, teamId, run.id, input),
@@ -172,13 +183,13 @@ export function useAgentDispatch({
         agent,
         runs,
         providerModels: teamWorkerCapabilityCatalog(
-          executionDashboard.workers ?? [],
-          executionDashboard.executionPolicy,
+          execution.workers ?? [],
+          execution.executionPolicy ?? undefined,
         ),
         selectionAvailable: (selection) =>
           teamSupportsExecutionSelection(
-            executionDashboard.workers ?? [],
-            executionDashboard.executionPolicy,
+            execution.workers ?? [],
+            execution.executionPolicy ?? undefined,
             selection.provider,
             selection.model,
             selection.effort,
@@ -198,9 +209,9 @@ export function useAgentDispatch({
     return result.dispatchId;
   }, [
     activeTeam?.id,
+    registry,
     sessions.startWorkerDispatchSession,
-    activeDashboard,
-      token,
+    token,
   ]);
 
   const startAgentAutoHunt = useCallback(async (

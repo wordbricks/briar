@@ -39,6 +39,7 @@ import {
 import type { AtomRegistry } from "../registry";
 import {
   activeTeamIdAtom,
+  loadedTeamIdAtom,
   staleTeamIdAtom,
   teamCursorAtom,
   teamExecutionPolicyAtom,
@@ -50,7 +51,6 @@ import {
   teamSyncedSinceBootAtom,
 } from "../team/atoms";
 import type { SyncEvent } from "./events";
-import { dashboardViewAtom } from "./view";
 
 /*
   The one place server payloads become client state.
@@ -559,8 +559,7 @@ export function applySyncEvent(registry: AtomRegistry, event: SyncEvent): void {
         // The guard the payload level commit had: settings replace a payload
         // that is actually rendered, and a write for a team that is not on
         // screen is dropped rather than installed under a stale cursor.
-        if (registry.get(activeTeamIdAtom) !== event.teamId) return;
-        if (registry.get(dashboardViewAtom(event.teamId)) === null) return;
+        if (registry.get(loadedTeamIdAtom) !== event.teamId) return;
         registry.set(teamSettingsAtom(event.teamId), event.settings);
         return;
       }

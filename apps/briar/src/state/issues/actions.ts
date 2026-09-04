@@ -54,7 +54,7 @@ import type {
   UpdateIssueInput,
 } from "../../types";
 import { demoOrganization, demoUser, emptyDashboard } from "../demo-fixtures";
-import { teamRunIdsAtom } from "../entities/runs";
+import { runAtom, teamRunIdsAtom, teamRunsAtom } from "../entities/runs";
 import { activeOrganizationIdAtom } from "../organization/atoms";
 import { demoMode as platformDemoMode } from "../platform";
 import { planningProjectsAtom } from "../planning/atoms";
@@ -68,9 +68,13 @@ import { sessionErrorAtom, tokenAtom, userAtom } from "../session/atoms";
 import { applySyncEvent } from "../sync/apply";
 import { getTeamSyncLoader } from "../sync/loader";
 import { applyRunPatch, applyRunPatches } from "../sync/optimistic";
-import { dashboardViewAtom } from "../sync/view";
 import { getTeamActions } from "../team/actions";
-import { activeTeamIdAtom, teamLoadedAtom, teamsAtom } from "../team/atoms";
+import {
+  activeTeamIdAtom,
+  loadedTeamIdAtom,
+  renderedTeamSettingsAtom,
+  teamsAtom,
+} from "../team/atoms";
 import { beginIssueMutation, recoveryErrorAtom } from "./atoms";
 
 /*
@@ -264,21 +268,30 @@ export function createIssueActions(
     return token;
   };
 
-  /**
-   * The selected team together with its rendered payload, which is the
-   * `!activeProjectId || !dashboard` guard every one of these actions opened
-   * with.
-   */
-  const requireBoard = (message: string) => {
-    const teamId = registry.get(activeTeamIdAtom);
-    const dashboard =
-      teamId === null ? null : registry.get(dashboardViewAtom(teamId));
-    if (teamId === null || !dashboard) throw new Error(message);
-    return { teamId, dashboard };
-  };
-
   const teamRunIds = (teamId: string) =>
     registry.get(teamRunIdsAtom(teamId)) ?? [];
+
+  /**
+   * One run of the board on screen, or `null` when that board does not list it.
+   * The store is organization wide, so the membership check is what keeps these
+   * actions reading the same list the `dashboard.runs.find` they replaced did.
+   */
+  const boardRun = (teamId: string, runId: string): HuntRun | null =>
+    teamRunIds(teamId).includes(runId) ? registry.get(runAtom(runId)) : null;
+
+  /**
+   * The selected team, when its board is the one on screen — the
+   * `!activeProjectId || !dashboard` guard every one of these actions opened
+   * with — together with a lookup into that board's runs.
+   */
+  const requireBoard = (message: string) => {
+    const teamId = registry.get(loadedTeamIdAtom);
+    if (teamId === null) throw new Error(message);
+    return {
+      teamId,
+      boardRun: (runId: string) => boardRun(teamId, runId),
+    };
+  };
 
   /** Prepends one locally generated event to a run's loaded history. */
   const recordRunEvent = (runId: string, event: HuntEvent) => {
@@ -302,13 +315,17 @@ export function createIssueActions(
       setError(null);
       try {
         if (demoMode) {
-          const activeTeamId = registry.get(activeTeamIdAtom);
-          const onActiveBoard =
-            activeTeamId === teamId && registry.get(teamLoadedAtom(teamId));
-          const targetDashboard = onActiveBoard
-            ? registry.get(dashboardViewAtom(teamId))
-            : null;
-          const base = targetDashboard ?? emptyDashboard(project);
+          // The board the new issue lands on, when it is the one on screen:
+          // its settings decide the workflow and repository the run inherits,
+          // and its runs decide the next issue number. A team that is not on
+          // screen starts from an empty board instead.
+          const onActiveBoard = registry.get(loadedTeamIdAtom) === teamId;
+          const emptyBoard = emptyDashboard(project);
+          const baseSettings =
+            registry.get(renderedTeamSettingsAtom(teamId)) ??
+            emptyBoard.settings;
+          const baseRuns =
+            (onActiveBoard ? registry.get(teamRunsAtom(teamId)) : null) ?? [];
           const occurredAt = new Date().toISOString();
           const issueId = crypto.randomUUID();
           const sourceKey = `briar-issue:${issueId}`;
@@ -345,14 +362,14 @@ export function createIssueActions(
             occurredAt,
             recordedAt: occurredAt,
           };
-          const baseWorkflow = base.settings.checkpointPolicy
+          const baseWorkflow = baseSettings.checkpointPolicy
             ? {
-                ...base.settings.workflow,
+                ...baseSettings.workflow,
                 execution: {
-                  checkpoints: base.settings.checkpointPolicy.effective,
+                  checkpoints: baseSettings.checkpointPolicy.effective,
                 },
               }
-            : base.settings.workflow;
+            : baseSettings.workflow;
           const user = registry.get(userAtom);
           const run: HuntRun = {
             id: crypto.randomUUID(),
@@ -363,7 +380,7 @@ export function createIssueActions(
             runNumber:
               Math.max(
                 0,
-                ...base.runs.map((candidate) => candidate.runNumber),
+                ...baseRuns.map((candidate) => candidate.runNumber),
               ) + 1,
             currentAttempt: 1,
             currentRevision: 1,
@@ -392,7 +409,7 @@ export function createIssueActions(
             preferredProvider: input.preferredProvider ?? null,
             preferredModel: input.preferredModel ?? null,
             preferredEffort: input.preferredEffort ?? null,
-            repository: base.settings.githubRepository ?? project.name,
+            repository: baseSettings.githubRepository ?? project.name,
             branch: null,
             commitSha: null,
             tracker: null,
@@ -427,13 +444,13 @@ export function createIssueActions(
             registry.set(runEventsAtom(run.id), [initialEvent]);
             registry.set(activeTeamIdAtom, teamId);
             registry.set(activeOrganizationIdAtom, project.organizationId);
-            if (targetDashboard) {
+            if (onActiveBoard) {
               applySyncEvent(registry, { kind: "run-changed", run, teamId });
             } else {
               applySyncEvent(registry, {
                 kind: "team-snapshot",
                 teamId,
-                payload: { ...base, runs: [run, ...base.runs] },
+                payload: { ...emptyBoard, runs: [run] },
               });
             }
           });
@@ -514,7 +531,7 @@ export function createIssueActions(
     },
 
     async editIssue(runId: string, input: UpdateIssueInput) {
-      const { teamId, dashboard } = requireBoard(
+      const { teamId, boardRun } = requireBoard(
         "이슈를 수정할 프로젝트가 없습니다.",
       );
       const endMutation = beginIssueMutation(registry, {
@@ -567,7 +584,7 @@ export function createIssueActions(
             assigneeUserId: input.assigneeUserId ?? null,
             attachments: [
               ...keptOf(
-                dashboard.runs.find((run) => run.id === runId)?.attachments ??
+                boardRun(runId)?.attachments ??
                   [],
               ),
               ...addedAttachments,
@@ -587,7 +604,7 @@ export function createIssueActions(
     },
 
     async editIssueSubscription(runId: string, subscribed: boolean) {
-      const { teamId, dashboard } = requireBoard(
+      const { teamId, boardRun } = requireBoard(
         "이슈 구독을 변경할 수 없습니다.",
       );
       const user = registry.get(userAtom);
@@ -595,7 +612,7 @@ export function createIssueActions(
       setError(null);
       try {
         if (demoMode) {
-          const run = dashboard.runs.find((candidate) => candidate.id === runId);
+          const run = boardRun(runId);
           if (!subscribed && run?.assigneeUserId === user.id) {
             throw new Error("담당자는 이슈 구독을 해제할 수 없습니다.");
           }
@@ -730,7 +747,7 @@ export function createIssueActions(
     },
 
     async completeResultReview(runId: string): Promise<IssueResultReview> {
-      const { teamId, dashboard } = requireBoard(
+      const { teamId, boardRun } = requireBoard(
         "검수를 기록할 이슈 또는 로그인 정보가 없습니다.",
       );
       const user = registry.get(userAtom);
@@ -739,9 +756,9 @@ export function createIssueActions(
       }
       setError(null);
       try {
-        const existing = dashboard.runs
-          .find((run) => run.id === runId)
-          ?.resultReviews?.find((review) => review.userId === user.id);
+        const existing = boardRun(runId)?.resultReviews?.find(
+          (review) => review.userId === user.id,
+        );
         let review = existing;
         if (!review) {
           if (demoMode) {
@@ -780,7 +797,7 @@ export function createIssueActions(
       prerequisiteRunId: string,
       action: "add" | "remove",
     ) {
-      const { teamId, dashboard } = requireBoard(
+      const { teamId, boardRun } = requireBoard(
         "의존성을 수정할 프로젝트가 없습니다.",
       );
       const endMutation = beginIssueMutation(registry, {
@@ -790,12 +807,8 @@ export function createIssueActions(
       setError(null);
       try {
         if (demoMode) {
-          const prerequisite = dashboard.runs.find(
-            (run) => run.id === prerequisiteRunId,
-          );
-          const dependent = dashboard.runs.find(
-            (run) => run.id === dependentRunId,
-          );
+          const prerequisite = boardRun(prerequisiteRunId);
+          const dependent = boardRun(dependentRunId);
           if (!prerequisite || !dependent) return;
           Atom.batch(() => {
             applyRunPatch(registry, dependentRunId, (run) => ({
@@ -855,7 +868,7 @@ export function createIssueActions(
     },
 
     async changeIssueParent(childRunId: string, parentRunId: string | null) {
-      const { teamId, dashboard } = requireBoard(
+      const { teamId, boardRun } = requireBoard(
         "계층을 수정할 프로젝트가 없습니다.",
       );
       const endMutation = beginIssueMutation(registry, {
@@ -874,9 +887,9 @@ export function createIssueActions(
           await refresh();
           return;
         }
-        const child = dashboard.runs.find((run) => run.id === childRunId);
+        const child = boardRun(childRunId);
         const parent = parentRunId
-          ? dashboard.runs.find((run) => run.id === parentRunId)
+          ? boardRun(parentRunId)
           : null;
         if (!child || (parentRunId && !parent)) return;
         applyRunPatches(registry, teamRunIds(teamId), (run) => {
@@ -909,7 +922,7 @@ export function createIssueActions(
       relatedRunId: string,
       action: "add" | "remove",
     ) {
-      const { teamId, dashboard } = requireBoard(
+      const { teamId, boardRun } = requireBoard(
         "관련 이슈를 수정할 프로젝트가 없습니다.",
       );
       const endMutation = beginIssueMutation(registry, {
@@ -928,8 +941,8 @@ export function createIssueActions(
           await refresh();
           return;
         }
-        const left = dashboard.runs.find((run) => run.id === runId);
-        const right = dashboard.runs.find((run) => run.id === relatedRunId);
+        const left = boardRun(runId);
+        const right = boardRun(relatedRunId);
         if (!left || !right) return;
         applyRunPatches(registry, [runId, relatedRunId], (run) => {
           const other = run.id === runId ? right : left;
@@ -1183,7 +1196,7 @@ export function createIssueActions(
     },
 
     async resumeRun(runId: string) {
-      const { teamId, dashboard } = requireBoard(
+      const { teamId, boardRun } = requireBoard(
         "재개할 이슈 처리 작업이 없습니다.",
       );
       const endMutation = beginIssueMutation(registry, {
@@ -1240,9 +1253,7 @@ export function createIssueActions(
           return;
         }
         const token = requireToken();
-        const checkpoint = dashboard.runs.find(
-          (candidate) => candidate.id === runId,
-        )?.checkpoint;
+        const checkpoint = boardRun(runId)?.checkpoint;
         if (!checkpoint) {
           throw new Error(
             "이 앱 버전에서는 현재 대기 지점을 안전하게 확인할 수 없습니다. 새로고침하거나 앱을 업데이트해 주세요.",
@@ -1287,7 +1298,7 @@ export function createIssueActions(
       runId: string,
       input: { workflowStage: string; reason: string },
     ) {
-      const { teamId, dashboard } = requireBoard(
+      const { teamId, boardRun } = requireBoard(
         "재작업할 이슈 처리 작업이 없습니다.",
       );
       const reason = input.reason.trim();
@@ -1298,7 +1309,7 @@ export function createIssueActions(
       });
       registry.set(recoveryErrorAtom, null);
       try {
-        const run = dashboard.runs.find((candidate) => candidate.id === runId);
+        const run = boardRun(runId);
         const checkpoint = run?.checkpoint;
         if (!run || !checkpoint) {
           throw new Error(

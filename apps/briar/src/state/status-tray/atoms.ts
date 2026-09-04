@@ -6,9 +6,12 @@ import { DASHBOARD_POLL_INTERVAL_MS } from "../../lib/dashboard-polling";
 import { isDesktopTauri, isMacDesktopTauri } from "../../lib/platform";
 import { syncStatusTray } from "../../lib/status-tray";
 import type { StatusTrayRun } from "../../types";
+import { teamRunsAtom } from "../entities/runs";
+import { teamEntityAtom } from "../entities/teams";
 import { activeOrganizationIdAtom } from "../organization/atoms";
 import { lockedTeamIdAtom } from "../platform";
 import { tokenAtom } from "../session/atoms";
+import { activeTeamIdAtom } from "../team/atoms";
 
 /*
   The macOS menu bar tray's own state.
@@ -54,6 +57,78 @@ export const statusTrayApiAtom = Atom.make<StatusTrayApi>(liveStatusTrayApi).pip
 export const statusTrayRunsAtom = Atom.make<StatusTrayRun[]>([]).pipe(
   Atom.keepAlive,
   Atom.withLabel("statusTray/runs"),
+);
+
+/** The tray's share of one team's board. */
+export interface ActiveTeamTrayRuns {
+  readonly teamId: string;
+  readonly runs: readonly StatusTrayRun[];
+}
+
+const sameTrayRuns = (
+  left: ActiveTeamTrayRuns | null,
+  right: ActiveTeamTrayRuns | null,
+) =>
+  left === right ||
+  (left !== null &&
+    right !== null &&
+    left.teamId === right.teamId &&
+    left.runs.length === right.runs.length &&
+    left.runs.every((run, index) => {
+      const other = right.runs[index]!;
+      return (
+        run.id === other.id &&
+        run.teamId === other.teamId &&
+        run.teamName === other.teamName &&
+        run.title === other.title &&
+        run.workflowStage === other.workflowStage &&
+        run.workflowStageLabel === other.workflowStageLabel &&
+        run.startedAt === other.startedAt &&
+        run.updatedAt === other.updatedAt &&
+        run.lastEventAt === other.lastEventAt
+      );
+    }));
+
+/**
+ * The selected team's running runs in the tray's own shape, or `null` before
+ * that team has a payload.
+ *
+ * It is a projection rather than a slice of the board because the tray prints
+ * nine fields of a running run and nothing else: an edit to a run that is not
+ * running, or to a field the tray does not print, produces an equal list and
+ * therefore no notification at all.
+ */
+export const activeTeamTrayRunsAtom = Atom.make(
+  (get): ActiveTeamTrayRuns | null => {
+    const teamId = get(activeTeamIdAtom);
+    if (teamId === null) return null;
+    const team = get(teamEntityAtom(teamId));
+    const runs = get(teamRunsAtom(teamId));
+    if (!team || !runs) return null;
+    return {
+      teamId: team.id,
+      runs: runs
+        .filter((run) => run.status === "running")
+        .map((run) => ({
+          teamId: team.id,
+          teamName: team.name,
+          id: run.id,
+          title: run.title,
+          status: "running" as const,
+          workflowStage: run.workflowStage,
+          workflowStageLabel:
+            run.workflow.stages.find((stage) => stage.id === run.workflowStage)
+              ?.label ?? null,
+          startedAt: run.startedAt,
+          updatedAt: run.updatedAt,
+          lastEventAt: run.lastEventAt,
+        })),
+    };
+  },
+).pipe(
+  Atom.keepAlive,
+  Atom.withEquality(sameTrayRuns),
+  Atom.withLabel("statusTray/activeTeamRuns"),
 );
 
 /**

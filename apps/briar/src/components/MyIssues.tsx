@@ -23,13 +23,28 @@ import {
   runMatchesIssuePropertyFilters,
 } from "../state/board/filters";
 
+/**
+ * What this page reads of a team's board.
+ *
+ * "내 이슈" reaches across every team of the organization, including ones this
+ * window has never selected, so it loads their boards itself instead of reading
+ * the store. These four projections are all it renders — the runs it filters,
+ * the members it resolves assignees against, and the team and settings each
+ * row's workflow context is built from — so a `loadDashboard` response and the
+ * store's own copy of the open team both satisfy it.
+ */
+export type MyIssuesTeamBoard = Pick<
+  DashboardPayload,
+  "team" | "settings" | "runs" | "members"
+>;
+
 export type MyIssuesProps = {
   currentUserId: string | null;
   isSidebarOpen: boolean;
   loadProjectDashboard: (
     projectId: string,
     signal: AbortSignal,
-  ) => Promise<DashboardPayload | null>;
+  ) => Promise<MyIssuesTeamBoard | null>;
   onOpenIssue: (projectId: string, runId: string) => void;
   organizationId: string | null;
   organizationName?: string | null;
@@ -172,9 +187,9 @@ export function MyIssues({
   const [selectedProjectIds, setSelectedProjectIds] = useState<Set<string>>(
     () => new Set(),
   );
-  const [dashboards, setDashboards] = useState<Record<string, DashboardPayload>>(
-    {},
-  );
+  const [dashboards, setDashboards] = useState<
+    Record<string, MyIssuesTeamBoard>
+  >({});
   const [failedProjectIds, setFailedProjectIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadedConfigurationKey, setLoadedConfigurationKey] = useState<string | null>(null);
@@ -238,7 +253,7 @@ export function MyIssues({
       if (cancelled || controller.signal.aborted) return;
       const nextFailedProjectIds: string[] = [];
       setDashboards((current) => {
-        const nextDashboards: Record<string, DashboardPayload> = {};
+        const nextDashboards: Record<string, MyIssuesTeamBoard> = {};
         for (const projectId of projectIds) {
           const dashboard = current[projectId];
           if (dashboard) nextDashboards[projectId] = dashboard;
@@ -331,7 +346,7 @@ export function MyIssues({
     [selectedIssues],
   );
   const dashboardByRunId = useMemo(() => {
-    const result = new Map<string, DashboardPayload>();
+    const result = new Map<string, MyIssuesTeamBoard>();
     for (const issue of selectedIssues) {
       const dashboard = dashboards[issue.project.id];
       if (dashboard) result.set(issue.run.id, dashboard);

@@ -10,7 +10,6 @@ import {
   activeTeamIdAtom,
   teamExecutionPolicyAtom,
   teamGeneratedAtAtom,
-  teamLoadedAtom,
   teamNotificationsAtom,
   teamPayloadCursorAtom,
   teamSettingsAtom,
@@ -87,12 +86,3 @@ export const activeDashboardAtom = Atom.make((get): DashboardPayload | null => {
   const teamId = get(activeTeamIdAtom);
   return teamId === null ? null : get(dashboardViewAtom(teamId));
 }).pipe(Atom.keepAlive, Atom.withLabel("sync/activeDashboard"));
-
-/**
- * The team the rendered dashboard belongs to, or `null` when none is on screen.
- * Replaces the `dashboardRef.current?.team.id` read the facade used to keep.
- */
-export const loadedDashboardTeamIdAtom = Atom.make((get): string | null => {
-  const teamId = get(activeTeamIdAtom);
-  return teamId !== null && get(teamLoadedAtom(teamId)) ? teamId : null;
-}).pipe(Atom.keepAlive, Atom.withLabel("sync/loadedDashboardTeamId"));

@@ -11,8 +11,7 @@ import { useRegistry, type AtomRegistry } from "../registry";
 import { sessionErrorAtom, tokenAtom } from "../session/atoms";
 import { commitTeamSettings } from "../sync/commit";
 import { getTeamSyncLoader } from "../sync/loader";
-import { activeDashboardAtom } from "../sync/view";
-import { activeTeamIdAtom } from "../team/atoms";
+import { activeTeamIdAtom, renderedTeamSettingsAtom } from "../team/atoms";
 import { resolveWorkspaceApi, workspaceModes, type WorkspaceApi } from "../workspace/api";
 import { connectedTeamIdsAtom, healthAtom } from "../workspace/atoms";
 import { velenAtom } from "./atoms";
@@ -74,10 +73,8 @@ export function createIntegrationActions(
   };
 
   /** The rendered team's settings, or `null` when another team is on screen. */
-  const renderedSettings = (teamId: string): TeamSettings | null => {
-    const dashboard = registry.get(activeDashboardAtom);
-    return dashboard && dashboard.team.id === teamId ? dashboard.settings : null;
-  };
+  const renderedSettings = (teamId: string): TeamSettings | null =>
+    registry.get(renderedTeamSettingsAtom(teamId));
 
   /**
    * Linear issues land in a repository, so there has to be one. Either the team

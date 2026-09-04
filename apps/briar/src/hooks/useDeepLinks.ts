@@ -48,9 +48,13 @@ import {
 import { useOrganizationActions } from "../state/organization/actions";
 import { companionMode, lockedTeamIdAtom } from "../state/platform";
 import { loadingAtom, tokenAtom, userAtom } from "../state/session/atoms";
-import { activeDashboardAtom } from "../state/sync/view";
 import { useTeamActions } from "../state/team/actions";
-import { activeTeamIdAtom, teamsAtom } from "../state/team/atoms";
+import { teamRunIdsAtom } from "../state/entities/runs";
+import {
+  activeTeamIdAtom,
+  loadedTeamIdAtom,
+  teamsAtom,
+} from "../state/team/atoms";
 
 /*
   Everything that opens something because the outside world asked.
@@ -108,7 +112,9 @@ export function useDeepLinks({
   const activeOrganizationId = useAtomValue(activeOrganizationIdAtom);
   const teams = useAtomValue(teamsAtom);
   const activeTeamId = useAtomValue(activeTeamIdAtom);
-  const dashboard = useAtomValue(activeDashboardAtom);
+  const loadedTeamId = useAtomValue(loadedTeamIdAtom);
+  // Only the id list: a run's own edits never move the fallback below.
+  const loadedRunIds = useAtomValue(teamRunIdsAtom(loadedTeamId ?? ""));
   const organizationChannels = useAtomValue(activeOrganizationChannelsAtom);
   const channelsLoading = useAtomValue(channelsLoadingAtom);
   const channelCatalogCursor = useAtomValue(channelCatalogCursorAtom);
@@ -315,8 +321,8 @@ export function useDeepLinks({
       navigationUserBoundaryChanged ||
       !selectedRunId ||
       !navigationTeamId ||
-      dashboard?.team.id !== navigationTeamId ||
-      dashboard.runs.some((run) => run.id === selectedRunId)
+      loadedTeamId !== navigationTeamId ||
+      (loadedRunIds ?? []).includes(selectedRunId)
     ) {
       return;
     }
@@ -330,7 +336,8 @@ export function useDeepLinks({
       projectNavigationLocation("issues", navigationTeamId),
     );
   }, [
-    dashboard,
+    loadedRunIds,
+    loadedTeamId,
     navigationTeamId,
     navigationUserBoundaryChanged,
     replaceNavigationLocation,

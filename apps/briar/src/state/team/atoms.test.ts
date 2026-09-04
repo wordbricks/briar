@@ -3,11 +3,14 @@ import { describe, expect, it } from "vitest";
 import { demoDashboard } from "../../lib/demo-data";
 import type { Project } from "../../types";
 import { createTestRegistry } from "../registry";
+import { applySyncEvent } from "../sync/apply";
 import {
   activeTeamAtom,
   activeTeamIdAtom,
   deletingTeamIdAtom,
   isCreatingTeamAtom,
+  loadedTeamIdAtom,
+  renderedTeamSettingsAtom,
   teamConnectionAtom,
   teamsAtom,
 } from "./atoms";
@@ -83,6 +86,34 @@ describe("team atoms", () => {
     registry.set(activeTeamIdAtom, null);
 
     expect(seen).toEqual([teamA.id, teamB.id, null]);
+  });
+
+  it("reports the team on screen only once its payload arrived", () => {
+    const registry = createTestRegistry([
+      [teamsAtom, [teamA, teamB]],
+      [activeTeamIdAtom, teamA.id],
+    ]);
+
+    // Selected, but nothing has been loaded for it yet.
+    expect(registry.get(loadedTeamIdAtom)).toBeNull();
+    expect(registry.get(renderedTeamSettingsAtom(teamA.id))).toBeNull();
+
+    applySyncEvent(registry, {
+      kind: "team-snapshot",
+      teamId: teamA.id,
+      payload: { ...demoDashboard, team: teamA },
+    });
+
+    expect(registry.get(loadedTeamIdAtom)).toBe(teamA.id);
+    expect(registry.get(renderedTeamSettingsAtom(teamA.id))).toBe(
+      demoDashboard.settings,
+    );
+
+    // A team whose payload is loaded but that is not the one on screen reads
+    // as absent: a write aimed at it would land under a cursor nobody follows.
+    registry.set(activeTeamIdAtom, teamB.id);
+    expect(registry.get(loadedTeamIdAtom)).toBeNull();
+    expect(registry.get(renderedTeamSettingsAtom(teamA.id))).toBeNull();
   });
 
   it("keeps the selection when the last subscriber leaves", () => {

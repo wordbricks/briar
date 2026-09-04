@@ -115,6 +115,7 @@ import type { createCachedTeamUsageSummaryLoader } from "../../lib/team-usage-su
 import type { AgentAutoHuntOptions } from "../../hooks/useAgentDispatch";
 import type { TeamMergeActivityLoader } from "../../lib/team-merge-activity";
 import type { InboxNotificationTarget } from "../../generated/tauri";
+import type { MyIssuesTeamBoard } from "../MyIssues";
 import type {
   AgentUsageReport,
   DashboardPayload,
@@ -175,7 +176,7 @@ export interface DesktopPagesProps {
   readonly loadOrganizationProjectDashboard: (
     teamId: string,
     signal: AbortSignal,
-  ) => Promise<DashboardPayload | null>;
+  ) => Promise<MyIssuesTeamBoard | null>;
   readonly openOrganizationIssue: (teamId: string, runId: string) => void;
   readonly startAgentAutoHunt: (
     agent: ProjectAgent,
