@@ -1208,9 +1208,10 @@ Phase 2 이후 언제든 착수 가능하며 Phase 3–7과 병행할 수 있다
 
 ## 후속 (범위 밖)
 
-- `useInbox`, `useChannelConversation`(메시지를 채널별 엔티티 family로)의 동일 패턴
-  전환. `useAutoHuntSessions`는 후속 F3이 끝냈다(localStorage 상태는 `Atom.kvs`가
-  아니라 atom의 lazy read가 됐다 — 이유는 아래 기준 갱신에 있다).
+- `useChannelConversation`(메시지를 채널별 엔티티 family로)의 동일 패턴 전환.
+  `useAutoHuntSessions`는 후속 F3이, `useInbox`는 후속 F4가 끝냈다(둘 다
+  localStorage 상태는 `Atom.kvs`가 아니라 atom의 lazy read가 됐다 — 이유는 아래
+  기준 갱신에 있다).
 - `Atom.fn` + `AsyncResult`로 pending / 에러 상태 자동화.
 - 오프라인 우선과 멀티 디바이스 충돌 해결이 목표가 되면 서버 측 SyncAction 로그를
   가진 전용 sync engine(Replicache, Zero 등)을 검토한다. 그 전까지는 이 계획으로
@@ -1245,6 +1246,7 @@ Phase 2 이후 언제든 착수 가능하며 Phase 3–7과 병행할 수 있다
 | F1 워크플로 자동 생성 하이드레이션 가드 + `useDeepLinks` 이름 정리 | #1607 | 머지됨 | `state/team/atoms.ts`에 팀별 `teamSyncedSinceBootAtom`을 두고 `applySyncEvent`의 `team-snapshot` / `team-delta`가 세운다(`clearTeamState`가 되돌리고, 같은 값의 쓰기는 레지스트리가 버리므로 조용한 틱의 알림은 그대로 0회다). `useWorkflowAutoGeneration`은 하이드레이션된 부팅에서 이 플래그가 서기 전까지 조건을 보지 않으므로, 디스크에서 올라온 pending 플레이스홀더로 LLM 자동 생성이 한 번 더 도는 일이 없다. 스냅샷을 읽지 않은 부팅과 팀 전환은 그대로다. `useWorkflowAutoGeneration.test.tsx`에 하이드레이션 케이스 3종 추가. `useDeepLinks`의 지역 변수 `listeners`는 실제로 리졸버를 담고 있어 `resolvers`로 고쳤다(네이티브 리스너 4종을 가리키는 주석은 그대로 둔다). |
 | F2 `dashboardViewAtom` 제거 | #1608, #1615, #1618 | 머지됨 | 통짜 `DashboardPayload`를 읽던 19개 모듈을 옮기고 `state/sync/view.ts`를 지웠다. #1608: `loadedTeamIdAtom` / `renderedTeamSettingsAtom`(`state/team`)과 `activeTeamTrayRunsAtom`(`state/status-tray`), 액션 여섯 곳과 훅 다섯 개. `useCommandPaletteItems`는 팔레트가 열렸을 때만, `useDeepLinks`는 id 목록만 구독하고 `useAgentDispatch`는 구독을 아예 끊었다. `MyIssues`는 자기가 읽는 네 프로젝션(`MyIssuesTeamBoard`)만 받는다. #1615: 뷰 일곱 개와 `inboxSourceAtom` / `navigationHistoryRunLabelsAtom` / `teamAgentBoardAtom`, `InboxBridge`의 디스패치 조정을 effect 구독으로, `TeamLobby` / `TeamSettings` / `TeamAgents` 계열과 `useInbox` / `inboxDetailLabel` / `executeTeamAgentTask`의 프롭·인자 좁히기, `test/render-count.tsx`의 `profile`(React `Profiler`)과 `run-changed` / `team-settings-changed` 렌더 카운트. #1618: `state/sync/view.ts`와 그 테스트 삭제, 페이로드 단위 단언은 테스트 전용 `test/team-view.ts`로, `dashboard-view.test.tsx` → `team-sync.test.tsx`. 스냅샷은 이미 엔티티 맵에서 모으고 있어 `SNAPSHOT_SCHEMA_VERSION`은 1 그대로다. |
 | F3 `useAutoHuntSessions` 전환 | #1621, #1626 | 머지됨 | 에이전트 세션을 `state/agent-sessions`로 옮기고 훅을 지웠다. #1621: `model`(순수 헬퍼 6종과 `reconcileDispatchSession`), `atoms`(`agentSessionsByIdAtom` + 저장 순서 `agentSessionIdsAtom`, `agentSessionAtom(id)` / `teamAgentSessionIdsAtom(teamId)` / `agentSessionsAtom` / `agentSessionSyncContextAtom` / `synchronizedTeamIdsAtom`), `persistence`(레거시 `briar.auto-hunt-sessions.v1` 키와 중단 세션 마이그레이션), `useAgentSessionPersistence`(250ms 디바운스 + `pagehide` flush), `sync/events`·`apply`의 `agent-sessions-changed` / `-merged` / `-synced` / `-removed`, `actions`(`createAgentSessionActions` + `agentSessionApiAtom` 이음매), `useAgentSessionSync`(configureSync·실시간 새로고침·업로드·네이티브 복구·디스패치 리스너, 그리고 `InboxBridge`에서 가져온 `reconcileWorkerDispatches` 구독). #1626: 소비자 전환. `agentSessionRowIdsAtom` / `teamRunningAgentIdsAtom` / `agentDispatchSessionIdAtom` / `runningAgentSessionsAtom` / `processingIssueIdsAtom`을 더하고 Agents 뷰 3종·사이드바·커맨드 팔레트·인박스·보드가 직접 구독한다. `state/action-bridges.ts`와 `IssueActionBridge` / `WorkspaceScheduleBridge`, `boardSessionsAtom`, `hooks/useAutoHuntSessions.ts`가 사라졌고 `App.tsx`는 세션을 구독하지 않는다. |
+| F4 `useInbox` 전환 | #1629, #1630 | 머지됨 | 인박스를 `state/inbox`로 옮기고 마지막 레지스트리 콜백 브리지를 지웠다. #1629: `model`(순수 함수 13종과 타입 — `hooks/useInboxNotifications`의 순수 헬퍼 3종 포함), `persistence`(레거시 키 `briar.inbox.v1:<userId>`와 `{ messages, readVersions }` 형식 그대로), `atoms`(`inboxStateAtom`의 lazy read + 저장 키 의존, `currentInboxMessagesAtom` / `inboxMergeSourcesAtom`, 파생 `inboxMessagesAtom` / `inboxMessagesByIdAtom` / `inboxMessageAtom(id)` / `inboxUnreadCountAtom` / `visibleInboxMessagesAtom` / `visibleInboxUnreadCountAtom`, 두 동기화 신원과 그 위의 `inboxInitialSyncCompleteAtom` / `inboxNotificationBaselineIdAtom`), `api`(`inboxApiAtom` 이음매), `read-sync`(읽음 버전 왕복의 세대 객체), `actions`(네 액션이 호출 시점 레지스트리 읽기로), `useInboxSync`(읽음 왕복 · 보드→저장소 병합 구독 · 조직 피드와 실시간), `useInboxNotifications`(시스템 알림 · 앱 배지 · 클릭 라우팅, 셋 다 구독). `hooks/useInbox.ts`(1,416줄) / `hooks/useInboxNotifications.ts` / `components/app/InboxBridge.tsx`와 `setInboxCallbacks` 삭제, `AppEffects`가 두 훅을 마지막에 마운트해 브리지가 형제로 렌더되던 effect 순서를 유지한다. 테스트 헬퍼 `src/test/inbox.ts`. #1630: `visibleInboxMessageSummariesAtom`을 더하고 `Inbox`의 `messages` 프롭을 요약으로 좁혀 각 행이 `inboxMessageAtom(id)`를 구독한다. `InboxSelectionBoundary`가 연결 경계가 되고(`InboxWithSelection` / `CompanionInbox`) `DesktopPages` / `CompanionShell`이 인박스 메시지 구독을 끊었다. |
 
 ### 기준 갱신 (2026-09-04, 후속 F3 이후)
 
@@ -1280,6 +1282,42 @@ Phase 2 이후 언제든 착수 가능하며 Phase 3–7과 병행할 수 있다
   각 행은 자기 세션을 구독한다. `profile`이 서브트리를 세므로 경계별 카운트는 같은
   atom을 읽는 형제 프로브로 재고, 실제 목록은 옆에서 DOM으로 확인한다
   (`TeamAgentSessions.test.tsx`).
-- **남은 통짜 세션 목록 소비자는 셋이다.** `useInbox`(F4), `Sidebar`의 프로젝트별
-  실행 중 목록, 커맨드 팔레트. 앞의 둘은 자기 경계에서 구독하고, 팔레트는 열렸을
-  때만 구독한다(빈 키 family 관용구).
+- **남은 통짜 세션 목록 소비자는 셋이다.** `useInbox`(F4가 `state/inbox`의
+  `currentInboxMessagesAtom`으로 가져갔다), `Sidebar`의 프로젝트별 실행 중 목록,
+  커맨드 팔레트. 앞의 둘은 자기 경계에서 구독하고, 팔레트는 열렸을 때만 구독한다
+  (빈 키 family 관용구).
+
+### 기준 갱신 (2026-09-04, 후속 F4 이후)
+
+인박스를 옮기며 확인한, 남은 훅 소유 도메인(F5의 `useChannelConversation`)에 쓸 사실:
+
+- **`Atom.writable`의 lazy read는 의존성을 가질 수 있다.** `inboxStateAtom`의 본문이
+  `inboxStorageKeyAtom`을 읽으므로, 계정이 바뀌면 본문이 다시 돌아 저장 레코드가
+  통째로 교체된다. `setSelf`로 쓴 값은 그 재계산이 덮고, 이전 계정의 쓰기는 자기
+  키에 남는다. F3의 `restoredAgentSessionsAtom`이 인자 없는 판이었고 이것이 인자가
+  있는 판이다.
+- **파생 목록의 아이덴티티는 `get.self()`로 보존한다.** `Atom.withEquality`는 배열
+  **인스턴스**를 지켜 주지만 원소는 지켜 주지 않는다. 행 atom이 참조로 비교하므로,
+  이전 값을 읽어 "똑같이 그려질" 메시지의 객체를 재사용하는 단계
+  (`reuseInboxMessageIdentities`)가 있어야 알림 하나가 행 하나만 깨운다.
+- **목록에는 통짜 값 대신 요약을 준다.** `visibleInboxMessageSummariesAtom`은 목록이
+  실제로 쓰는 네 값(`id` / `projectId` / `category` / `isUnread`)만 담고 항목 객체도
+  재사용한다. 그래서 알림 내용이 바뀌어도 분류와 읽음 상태가 그대로면 목록 컨테이너는
+  아예 깨어나지 않고, 그 행만 다시 그려진다
+  (`components/InboxSelectionBoundary.test.tsx`).
+- **서버 응답이 전부 `SyncEvent`가 되지는 않는다.** 인박스 실시간 발행은 버전만
+  나르고 메시지는 조직 피드의 응답으로만 존재하며, 그 응답은 로컬의 더 자세한
+  복사본과 병합해야 하는 compact summary다. 서버가 보내지 않는 페이로드를 지어내는
+  대신 **진입점 하나**(`startInboxFeedSync`의 `applyFeed`)를 유지했다. 단일 진입점이
+  사는 성질은 "이벤트 타입이 하나"가 아니라 "병합 규칙이 한 곳"이다.
+- **저장이 곧 캐시인 도메인이 있다.** 인박스 메시지는 파생이 아니라 저장이다: 보드가
+  더는 싣지 않는 알림도 계정 목록에는 남아야 하고, 조직 피드가 권위이며, 읽음 버전은
+  메시지보다 오래 산다. 그래서 `inboxMessagesAtom`은 `inboxStateAtom`(저장) 위의
+  파생이고, 보드→저장소 병합은 구독이 하는 **쓰기**다.
+- **콜백만 부르는 훅은 전부 구독으로 내릴 수 있다.** 시스템 알림·앱 배지·알림 클릭은
+  값을 그리지 않으므로 `registry.subscribe`로 옮겼고, 그래서 `AppEffects`는 메시지가
+  도착해도 커밋하지 않는다. i18n `t`처럼 렌더에서만 얻는 값은 ref로 넘긴다.
+- **테스트는 파생 atom에 쓸 수 없다.** `registry.set(inboxMessagesAtom, ...)`이
+  가능하던 자리는 저장 레코드를 심는 `src/test/inbox.ts`의 `seedInboxMessages`가
+  됐다. 계정 응답 둘이 도착했다는 표시까지 심어야 읽지 않음 표시가 켜진다 — 실재하는
+  게이트라서, 테스트가 그것을 매번 다시 발견하지 않도록 헬퍼가 안다.

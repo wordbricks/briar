@@ -6,7 +6,7 @@ import { getMobilePlatform } from "../../lib/platform";
 import { activeOrganizationTeams } from "../../lib/team-window-scope";
 import { CompanionBottomNavigation } from "../CompanionBottomNavigation";
 import { CompanionHeaderWithSession } from "./CompanionHeaderWithSession";
-import { Inbox } from "../Inbox";
+import { CompanionInbox } from "../InboxSelectionBoundary";
 import { inboxNotificationTarget } from "../../lib/inbox-notifications";
 import {
   createIssueTeamIdAtom,
@@ -34,7 +34,6 @@ import { useInboxActions } from "../../state/inbox/actions";
 import {
   channelInboxSyncSignalAtom,
   conversationInboxSyncSignalAtom,
-  visibleInboxMessagesAtom,
   visibleInboxUnreadCountAtom,
 } from "../../state/inbox/atoms";
 import { useIssueActions } from "../../state/issues/actions";
@@ -128,7 +127,6 @@ export function CompanionShell({
   const conversationInboxSyncSignal = useAtomValue(
     conversationInboxSyncSignalAtom,
   );
-  const inboxMessages = useAtomValue(visibleInboxMessagesAtom);
   const inboxUnreadCount = useAtomValue(visibleInboxUnreadCountAtom);
   const [companionPage, setCompanionPage] = useAtom(companionPageAtom);
   const setCompanionStatus = useAtomSet(companionStatusAtom);
@@ -324,19 +322,14 @@ export function CompanionShell({
         </>
       ) : companionPage === "inbox" ? (
         <>
-          <Inbox
+          <CompanionInbox
             companionMode
             isSidebarOpen
-            messages={inboxMessages}
-            onMarkAllRead={inbox.markAllRead}
-            onMarkRead={inbox.markRead}
-            onMarkUnread={inbox.markUnread}
             onOpen={(message) =>
               setPendingInboxNotificationTarget(
                 inboxNotificationTarget(message),
               )}
             projects={organizationTeams}
-            unreadCount={inboxUnreadCount}
           />
           <CompanionBottomNavigation
             activeDestination="inbox"

@@ -19,6 +19,7 @@ import {
   inboxSourceAtom,
   inboxStorageKeyAtom,
   inboxUnreadCountAtom,
+  visibleInboxMessageSummariesAtom,
 } from "./atoms";
 import { mergeCurrentInboxMessages } from "./useInboxSync";
 
@@ -279,6 +280,28 @@ describe("inbox messages", () => {
 
     expect(quiet).toEqual([]);
     expect(noisy).toHaveLength(1);
+  });
+
+  it("keeps the summary of a message whose class and read state held", () => {
+    const registry = settled();
+    const before = registry.get(visibleInboxMessageSummariesAtom);
+    const seen: unknown[] = [];
+    registry.subscribe(
+      visibleInboxMessageSummariesAtom,
+      (value) => seen.push(value),
+      { immediate: true },
+    );
+    seen.length = 0;
+
+    applySyncEvent(registry, {
+      kind: "run-changed",
+      teamId,
+      run: { ...failed, title: "제목이 바뀐 이슈", eventCount: 4 },
+    });
+
+    // The message changed; what the list reads of it did not.
+    expect(seen).toEqual([]);
+    expect(registry.get(visibleInboxMessageSummariesAtom)).toBe(before);
   });
 
   it("says nothing at all when a tick changed no message", () => {

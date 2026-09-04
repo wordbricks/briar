@@ -1,10 +1,24 @@
 /** @vitest-environment jsdom */
 
+import { RegistryContext } from "@effect/atom-react";
 import { act, useState, type ReactNode } from "react";
 import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AppKeyboardCommandProvider } from "../hooks/appKeyboardCommands";
-import type { InboxMessageWithReadState } from "../state/inbox/model";
+import {
+  visibleInboxMessageSummariesAtom,
+  type InboxMessageSummary,
+} from "../state/inbox/atoms";
+import {
+  classifyInboxMessage,
+  type InboxMessage,
+  type InboxMessageWithReadState,
+} from "../state/inbox/model";
+import { activeOrganizationIdAtom } from "../state/organization/atoms";
+import { createTestRegistry, type AtomRegistry } from "../state/registry";
+import { tokenAtom, userAtom } from "../state/session/atoms";
+import { teamsAtom } from "../state/team/atoms";
+import { seedInboxMessages } from "../test/inbox";
 import { I18nProvider } from "../i18n";
 import type { Project } from "../types";
 import {
@@ -65,11 +79,47 @@ const issue = (
   ...overrides,
 }) as InboxMessageWithReadState;
 
+/*
+  The list is fed summaries and the rows read the store, so every case puts its
+  messages in a registry and hands the list the four facts it filters on. The
+  fixtures stay whole rows because that is what a case is about — an unread
+  urgent failure, a read update — and `seed` splits them into the two halves the
+  store keeps: the messages, and the versions that have been read.
+*/
+
+let registry: AtomRegistry;
+
+const summaryOf = (
+  message: InboxMessageWithReadState,
+): InboxMessageSummary => ({
+  id: message.id,
+  projectId: message.projectId,
+  category: classifyInboxMessage(message),
+  isUnread: message.isUnread,
+});
+
+const seed = (
+  rows: readonly InboxMessageWithReadState[],
+): InboxMessageSummary[] => {
+  seedInboxMessages(
+    registry,
+    rows.map(({ isUnread: _isUnread, ...message }) => message as InboxMessage),
+    {
+      readVersions: Object.fromEntries(
+        rows.filter((row) => !row.isUnread).map((row) => [row.id, row.version]),
+      ),
+    },
+  );
+  return rows.map(summaryOf);
+};
+
 function TestProviders({ children }: { children: ReactNode }) {
   return (
-    <AppKeyboardCommandProvider>
-      <I18nProvider>{children}</I18nProvider>
-    </AppKeyboardCommandProvider>
+    <RegistryContext.Provider value={registry}>
+      <AppKeyboardCommandProvider>
+        <I18nProvider>{children}</I18nProvider>
+      </AppKeyboardCommandProvider>
+    </RegistryContext.Provider>
   );
 }
 
@@ -81,6 +131,13 @@ describe("Inbox", () => {
   beforeEach(() => {
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     localStorage.setItem("briar.locale.v1", "ko");
+    localStorage.removeItem("briar.inbox.v1:user-1");
+    registry = createTestRegistry([
+      [userAtom, { id: "user-1", name: "Tester", email: "tester@briar.local" }],
+      [tokenAtom, "token-1"],
+      [teamsAtom, projects],
+      [activeOrganizationIdAtom, "organization-1"],
+    ]);
     ({ cleanup, container, root } = createReactTestRoot({
       attachToDocument: true,
     }));
@@ -122,7 +179,7 @@ describe("Inbox", () => {
       <TestProviders>
         <Inbox
           isSidebarOpen
-          messages={messages}
+          messages={seed(messages)}
           onMarkAllRead={vi.fn()}
           onMarkRead={vi.fn()}
           onOpen={onOpen}
@@ -149,7 +206,9 @@ describe("Inbox", () => {
     });
     await act(async () => projectFilter.dispatchEvent(initialNavigationEvent));
     expect(initialNavigationEvent.defaultPrevented).toBe(true);
-    expect(onOpen).toHaveBeenLastCalledWith(messages[0]);
+    expect(onOpen).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: messages[0]!.id }),
+    );
 
     await act(async () => projectFilter.click());
     const sproutOption = document.querySelector<HTMLButtonElement>(
@@ -187,7 +246,9 @@ describe("Inbox", () => {
     await act(async () => projectFilter.dispatchEvent(navigationEvent));
     expect(navigationEvent.defaultPrevented).toBe(true);
     expect(document.activeElement).toBe(firstMessage);
-    expect(onOpen).toHaveBeenLastCalledWith(messages[1]);
+    expect(onOpen).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: messages[1]!.id }),
+    );
     expect(click).not.toHaveBeenCalled();
   });
 
@@ -218,7 +279,7 @@ describe("Inbox", () => {
       <TestProviders>
         <Inbox
           isSidebarOpen
-          messages={messages}
+          messages={seed(messages)}
           onMarkAllRead={vi.fn()}
           onMarkRead={vi.fn()}
           onOpen={vi.fn()}
@@ -279,7 +340,7 @@ describe("Inbox", () => {
       <TestProviders>
         <Inbox
           isSidebarOpen
-          messages={[message]}
+          messages={seed([message])}
           onMarkAllRead={vi.fn()}
           onMarkRead={onMarkRead}
           onOpen={onOpen}
@@ -305,24 +366,29 @@ describe("Inbox", () => {
   });
 
   it("shows one unread-count badge for a collapsed thread", async () => {
-    const message = issue("conversation:first", "Grouped thread", {
-      kind: "conversation",
-      targetId: "run-1",
-      messageId: "first",
-      rootMessageId: "root-1",
-      body: "Oldest unread reply",
-      authorName: "Member",
-      reason: "thread_reply",
-      threadMessageCount: 3,
-      threadUnreadCount: 3,
-    });
+    // The collapse is the store's, so this case seeds the three replies and
+    // reads back the one row they became.
+    const replies = [1, 2, 3].map((reply) =>
+      issue(`conversation:reply-${reply}`, "Grouped thread", {
+        kind: "conversation",
+        targetId: "run-1",
+        messageId: `reply-${reply}`,
+        rootMessageId: "root-1",
+        body: `Reply ${reply}`,
+        authorName: "Member",
+        reason: "thread_reply",
+        occurredAt: `2026-07-28T07:4${reply}:00.000Z`,
+        version: `reply-${reply}`,
+      })
+    );
+    seed(replies);
 
     await renderReactTestRoot(
       root,
       <TestProviders>
         <Inbox
           isSidebarOpen
-          messages={[message]}
+          messages={registry.get(visibleInboxMessageSummariesAtom)}
           onMarkAllRead={vi.fn()}
           onMarkRead={vi.fn()}
           onOpen={vi.fn()}
@@ -353,7 +419,7 @@ describe("Inbox", () => {
       <TestProviders>
         <Inbox
           isSidebarOpen
-          messages={[message]}
+          messages={seed([message])}
           onMarkAllRead={vi.fn()}
           onMarkRead={vi.fn()}
           onMarkUnread={onMarkUnread}
@@ -394,7 +460,7 @@ describe("Inbox", () => {
         <TestProviders>
           <Inbox
             isSidebarOpen
-            messages={messages}
+            messages={seed(messages)}
             onMarkAllRead={vi.fn()}
             onMarkRead={vi.fn()}
             onOpen={(message) => {
@@ -424,7 +490,9 @@ describe("Inbox", () => {
         new MouseEvent("click", { bubbles: true, detail: 1 }),
       );
     });
-    expect(onOpen).toHaveBeenLastCalledWith(messages[1]);
+    expect(onOpen).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: messages[1]!.id }),
+    );
     expect(buttons[1]?.hasAttribute("data-keyboard-list-current")).toBe(true);
 
     const enter = new KeyboardEvent("keydown", {
@@ -440,7 +508,9 @@ describe("Inbox", () => {
       );
     });
     expect(enter.defaultPrevented).toBe(false);
-    expect(onOpen).toHaveBeenLastCalledWith(messages[0]);
+    expect(onOpen).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: messages[0]!.id }),
+    );
     expect(buttons[0]?.getAttribute("aria-current")).toBe("true");
 
     const space = new KeyboardEvent("keydown", {
@@ -464,7 +534,9 @@ describe("Inbox", () => {
       );
     });
     expect(space.defaultPrevented).toBe(false);
-    expect(onOpen).toHaveBeenLastCalledWith(messages[2]);
+    expect(onOpen).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: messages[2]!.id }),
+    );
     expect(buttons[2]?.hasAttribute("data-keyboard-list-current")).toBe(true);
   });
 
@@ -479,7 +551,7 @@ describe("Inbox", () => {
         <Inbox
           companionMode
           isSidebarOpen
-          messages={[issue("message", "Companion message")]}
+          messages={seed([issue("message", "Companion message")])}
           onMarkAllRead={vi.fn()}
           onMarkRead={vi.fn()}
           onOpen={onOpen}
@@ -523,7 +595,7 @@ describe("Inbox", () => {
           <button data-testid="outside-inbox" type="button">Outside</button>
           <Inbox
             isSidebarOpen
-            messages={messages}
+            messages={seed(messages)}
             onMarkAllRead={vi.fn()}
             onMarkRead={vi.fn()}
             onOpen={(message) => {
@@ -576,13 +648,17 @@ describe("Inbox", () => {
 
     outside.focus();
     await navigate("j");
-    expect(onOpen).toHaveBeenLastCalledWith(messages[0]);
+    expect(onOpen).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: messages[0]!.id }),
+    );
     expect(document.activeElement).toBe(messageButtons[0]);
     expect(messageButtons[0]?.getAttribute("aria-current")).toBe("true");
 
     outside.focus();
     await navigate("j");
-    expect(onOpen).toHaveBeenLastCalledWith(messages[1]);
+    expect(onOpen).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: messages[1]!.id }),
+    );
     expect(document.activeElement).toBe(messageButtons[1]);
     expect(messageButtons[1]?.hasAttribute("data-keyboard-list-current")).toBe(
       true,
@@ -590,7 +666,9 @@ describe("Inbox", () => {
 
     outside.focus();
     await navigate("j", { repeat: true });
-    expect(onOpen).toHaveBeenLastCalledWith(messages[2]);
+    expect(onOpen).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: messages[2]!.id }),
+    );
     expect(document.activeElement).toBe(messageButtons[2]);
 
     const openCountAtBoundary = onOpen.mock.calls.length;
@@ -601,7 +679,9 @@ describe("Inbox", () => {
 
     outside.focus();
     await navigate("k");
-    expect(onOpen).toHaveBeenLastCalledWith(messages[1]);
+    expect(onOpen).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: messages[1]!.id }),
+    );
     expect(document.activeElement).toBe(messageButtons[1]);
     for (const clickSpy of clickSpies) expect(clickSpy).not.toHaveBeenCalled();
   });
@@ -626,7 +706,7 @@ describe("Inbox", () => {
       <TestProviders>
         <Inbox
           isSidebarOpen
-          messages={messages}
+          messages={seed(messages)}
           onMarkAllRead={vi.fn()}
           onMarkRead={vi.fn()}
           onOpen={vi.fn()}
@@ -726,7 +806,7 @@ describe("Inbox", () => {
       <TestProviders>
         <Inbox
           isSidebarOpen
-          messages={messages}
+          messages={seed(messages)}
           onMarkAllRead={vi.fn()}
           onMarkRead={vi.fn()}
           onOpen={vi.fn()}
