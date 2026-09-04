@@ -17,6 +17,9 @@ message UploadFileMetadata {
   uint64 byte_size = 4;
   // Exact 32-byte SHA-256 digest. File bytes never enter protobuf.
   bytes sha256 = 5;
+  // Optional image dimensions provided by the client for layout reservation.
+  optional int32 image_width = 6;
+  optional int32 image_height = 7;
 }
 
 message UploadReference {

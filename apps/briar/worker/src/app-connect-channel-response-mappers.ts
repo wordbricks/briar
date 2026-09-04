@@ -708,6 +708,8 @@ export const appChannelMessage = (message: ChannelMessage) =>
         contentType: attachment.contentType,
         byteSize: BigInt(attachment.byteSize),
         url: attachment.url,
+        imageWidth: attachment.imageWidth ?? undefined,
+        imageHeight: attachment.imageHeight ?? undefined,
       })
     ),
     reactions: message.reactions.map((reaction) =>

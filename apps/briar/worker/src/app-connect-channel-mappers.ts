@@ -83,6 +83,8 @@ export const appChannelLinkPreview = (preview: ChannelLinkPreview) =>
     imageUrl: preview.imageUrl ?? undefined,
     faviconUrl: preview.faviconUrl ?? undefined,
     siteName: preview.siteName ?? undefined,
+    imageWidth: preview.imageWidth ?? undefined,
+    imageHeight: preview.imageHeight ?? undefined,
   });
 
 /** Maps a channel repository row directly to the generated API DTO. */

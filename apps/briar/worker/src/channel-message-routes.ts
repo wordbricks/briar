@@ -374,6 +374,8 @@ export async function createOrganizationChannelMessage(
         filename: upload.filename,
         content_type: upload.content_type,
         byte_size: upload.byte_size,
+        image_width: upload.image_width ?? null,
+        image_height: upload.image_height ?? null,
       })),
       mutationCommit: {
         organizationId: input.organizationId,

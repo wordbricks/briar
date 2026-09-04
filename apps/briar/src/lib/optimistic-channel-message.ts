@@ -47,6 +47,8 @@ export function createOptimisticChannelMessage(input: {
       contentType: attachment.type,
       byteSize: attachment.size,
       url: input.attachmentUrls[index] ?? "",
+      imageWidth: null,
+      imageHeight: null,
     })),
     reactions: [],
     replyCount: 0,

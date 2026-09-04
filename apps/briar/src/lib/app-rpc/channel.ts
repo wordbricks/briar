@@ -83,7 +83,6 @@ import {
 import {
   agentProviderFromProto,
   agentProviderToProto,
-  issueAttachmentFromProto,
   optionalAgentProviderFromProto,
   optionalTimestamp,
   organizationMemberFromProto,
@@ -608,7 +607,15 @@ export const channelMessageFromMessage = (
   blocks: value.blocks.map(channelMessageBlockFromMessage),
   mentionedUserIds: [...value.mentionedUserIds],
   mentionedAgentIds: [...value.mentionedAgentIds],
-  attachments: value.attachments.map(issueAttachmentFromProto),
+  attachments: value.attachments.map((a) => ({
+    id: a.id,
+    filename: a.filename,
+    contentType: a.contentType,
+    byteSize: safeNumber(a.byteSize, "attachment.byteSize"),
+    url: a.url,
+    imageWidth: a.imageWidth ?? null,
+    imageHeight: a.imageHeight ?? null,
+  })),
   reactions: value.reactions.map((reaction) => ({
     emoji: reaction.emoji,
     count: reaction.count,
@@ -1091,6 +1098,27 @@ export async function listChannelMessages(
   };
 }
 
+function readImageDimensions(
+  file: File,
+): Promise<{ width: number; height: number } | null> {
+  if (!file.type.startsWith("image/")) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(img.naturalWidth > 0 && img.naturalHeight > 0
+        ? { width: img.naturalWidth, height: img.naturalHeight }
+        : null);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(null);
+    };
+    img.src = url;
+  });
+}
+
 export async function sendChannelMessage(
   token: string,
   organizationId: string,
@@ -1133,18 +1161,23 @@ export async function sendChannelMessage(
           channelId,
           clientMessageId,
           attachments: await Promise.all(
-            localFiles.map(async ({ clientId, file }) => ({
-              clientId,
-              filename: file.name,
-              contentType: file.type,
-              byteSize: BigInt(file.size),
-              sha256: new Uint8Array(
-                await crypto.subtle.digest(
-                  "SHA-256",
-                  await file.arrayBuffer(),
+            localFiles.map(async ({ clientId, file }) => {
+              const [bytes, dims] = await Promise.all([
+                file.arrayBuffer(),
+                readImageDimensions(file),
+              ]);
+              return {
+                clientId,
+                filename: file.name,
+                contentType: file.type,
+                byteSize: BigInt(file.size),
+                sha256: new Uint8Array(
+                  await crypto.subtle.digest("SHA-256", bytes),
                 ),
-              ),
-            })),
+                imageWidth: dims?.width ?? undefined,
+                imageHeight: dims?.height ?? undefined,
+              };
+            }),
           ),
         },
         appCallOptions(token),
@@ -1514,6 +1547,8 @@ export const channelLinkPreviewFromMessage = (
   imageUrl: value.imageUrl ?? null,
   faviconUrl: value.faviconUrl ?? null,
   siteName: value.siteName ?? null,
+  imageWidth: value.imageWidth ?? null,
+  imageHeight: value.imageHeight ?? null,
 });
 
 export async function loadChannelLinkPreview(

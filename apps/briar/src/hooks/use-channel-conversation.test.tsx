@@ -976,6 +976,8 @@ describe("useChannelConversation", () => {
             contentType: "image/png",
             byteSize: 15,
             url: `/organizations/org-1/channels/channel-a/messages/${optimisticId}/attachments/server-upload-1`,
+            imageWidth: null,
+            imageHeight: null,
           },
         ],
       },

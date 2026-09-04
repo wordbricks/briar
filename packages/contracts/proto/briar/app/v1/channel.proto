@@ -559,6 +559,8 @@ message ChannelLinkPreview {
   optional string image_url = 4;
   optional string favicon_url = 5;
   optional string site_name = 6;
+  optional int32 image_width = 7;
+  optional int32 image_height = 8;
 }
 
 message GetChannelLinkPreviewResponse {
