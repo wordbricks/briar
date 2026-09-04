@@ -550,7 +550,7 @@ workspace / workflow / integrations를 옮기며 확인한, 이후 단계에 영
    각각 42회, 24회 커밋된 고변경 파일이므로 장기 브랜치를 피한다.
 
 비목표: 라우팅 방식 변경(뷰 언마운트 정책), `useInbox` / `useAutoHuntSessions` /
-`useChannelConversation`의 전환(동일 패턴으로 후속 진행), 서버 API 변경, 오프라인
+`useChannelConversation`의 전환(후속 F5가 저장소를 옮겼다), 서버 API 변경, 오프라인
 우선과 멀티 디바이스 충돌 해결.
 
 ## 결과
@@ -1208,10 +1208,13 @@ Phase 2 이후 언제든 착수 가능하며 Phase 3–7과 병행할 수 있다
 
 ## 후속 (범위 밖)
 
-- `useChannelConversation`(메시지를 채널별 엔티티 family로)의 동일 패턴 전환.
-  `useAutoHuntSessions`는 후속 F3이, `useInbox`는 후속 F4가 끝냈다(둘 다
-  localStorage 상태는 `Atom.kvs`가 아니라 atom의 lazy read가 됐다 — 이유는 아래
-  기준 갱신에 있다).
+- `useChannelConversation`의 **남은 절반**: 요청 순서(생성 카운터와 표면 무효화),
+  로더와 실시간 전송 수명, 액션(전송·반응·삭제·제안·스레드 구독), 답장 버전 부기를
+  `state/channel-conversation`의 `loader` / `actions` / `useChannelConversationSync`
+  로 옮기고 훅을 지운다. 메시지를 채널별 엔티티 family로 옮기는 절반은 후속 F5가
+  끝냈다(#1631 / #1633 / #1638). `useAutoHuntSessions`는 후속 F3이, `useInbox`는
+  후속 F4가 끝냈다(둘 다 localStorage 상태는 `Atom.kvs`가 아니라 atom의 lazy read가
+  됐다 — 이유는 아래 기준 갱신에 있다).
 - `Atom.fn` + `AsyncResult`로 pending / 에러 상태 자동화.
 - 오프라인 우선과 멀티 디바이스 충돌 해결이 목표가 되면 서버 측 SyncAction 로그를
   가진 전용 sync engine(Replicache, Zero 등)을 검토한다. 그 전까지는 이 계획으로
@@ -1247,6 +1250,7 @@ Phase 2 이후 언제든 착수 가능하며 Phase 3–7과 병행할 수 있다
 | F2 `dashboardViewAtom` 제거 | #1608, #1615, #1618 | 머지됨 | 통짜 `DashboardPayload`를 읽던 19개 모듈을 옮기고 `state/sync/view.ts`를 지웠다. #1608: `loadedTeamIdAtom` / `renderedTeamSettingsAtom`(`state/team`)과 `activeTeamTrayRunsAtom`(`state/status-tray`), 액션 여섯 곳과 훅 다섯 개. `useCommandPaletteItems`는 팔레트가 열렸을 때만, `useDeepLinks`는 id 목록만 구독하고 `useAgentDispatch`는 구독을 아예 끊었다. `MyIssues`는 자기가 읽는 네 프로젝션(`MyIssuesTeamBoard`)만 받는다. #1615: 뷰 일곱 개와 `inboxSourceAtom` / `navigationHistoryRunLabelsAtom` / `teamAgentBoardAtom`, `InboxBridge`의 디스패치 조정을 effect 구독으로, `TeamLobby` / `TeamSettings` / `TeamAgents` 계열과 `useInbox` / `inboxDetailLabel` / `executeTeamAgentTask`의 프롭·인자 좁히기, `test/render-count.tsx`의 `profile`(React `Profiler`)과 `run-changed` / `team-settings-changed` 렌더 카운트. #1618: `state/sync/view.ts`와 그 테스트 삭제, 페이로드 단위 단언은 테스트 전용 `test/team-view.ts`로, `dashboard-view.test.tsx` → `team-sync.test.tsx`. 스냅샷은 이미 엔티티 맵에서 모으고 있어 `SNAPSHOT_SCHEMA_VERSION`은 1 그대로다. |
 | F3 `useAutoHuntSessions` 전환 | #1621, #1626 | 머지됨 | 에이전트 세션을 `state/agent-sessions`로 옮기고 훅을 지웠다. #1621: `model`(순수 헬퍼 6종과 `reconcileDispatchSession`), `atoms`(`agentSessionsByIdAtom` + 저장 순서 `agentSessionIdsAtom`, `agentSessionAtom(id)` / `teamAgentSessionIdsAtom(teamId)` / `agentSessionsAtom` / `agentSessionSyncContextAtom` / `synchronizedTeamIdsAtom`), `persistence`(레거시 `briar.auto-hunt-sessions.v1` 키와 중단 세션 마이그레이션), `useAgentSessionPersistence`(250ms 디바운스 + `pagehide` flush), `sync/events`·`apply`의 `agent-sessions-changed` / `-merged` / `-synced` / `-removed`, `actions`(`createAgentSessionActions` + `agentSessionApiAtom` 이음매), `useAgentSessionSync`(configureSync·실시간 새로고침·업로드·네이티브 복구·디스패치 리스너, 그리고 `InboxBridge`에서 가져온 `reconcileWorkerDispatches` 구독). #1626: 소비자 전환. `agentSessionRowIdsAtom` / `teamRunningAgentIdsAtom` / `agentDispatchSessionIdAtom` / `runningAgentSessionsAtom` / `processingIssueIdsAtom`을 더하고 Agents 뷰 3종·사이드바·커맨드 팔레트·인박스·보드가 직접 구독한다. `state/action-bridges.ts`와 `IssueActionBridge` / `WorkspaceScheduleBridge`, `boardSessionsAtom`, `hooks/useAutoHuntSessions.ts`가 사라졌고 `App.tsx`는 세션을 구독하지 않는다. |
 | F4 `useInbox` 전환 | #1629, #1630 | 머지됨 | 인박스를 `state/inbox`로 옮기고 마지막 레지스트리 콜백 브리지를 지웠다. #1629: `model`(순수 함수 13종과 타입 — `hooks/useInboxNotifications`의 순수 헬퍼 3종 포함), `persistence`(레거시 키 `briar.inbox.v1:<userId>`와 `{ messages, readVersions }` 형식 그대로), `atoms`(`inboxStateAtom`의 lazy read + 저장 키 의존, `currentInboxMessagesAtom` / `inboxMergeSourcesAtom`, 파생 `inboxMessagesAtom` / `inboxMessagesByIdAtom` / `inboxMessageAtom(id)` / `inboxUnreadCountAtom` / `visibleInboxMessagesAtom` / `visibleInboxUnreadCountAtom`, 두 동기화 신원과 그 위의 `inboxInitialSyncCompleteAtom` / `inboxNotificationBaselineIdAtom`), `api`(`inboxApiAtom` 이음매), `read-sync`(읽음 버전 왕복의 세대 객체), `actions`(네 액션이 호출 시점 레지스트리 읽기로), `useInboxSync`(읽음 왕복 · 보드→저장소 병합 구독 · 조직 피드와 실시간), `useInboxNotifications`(시스템 알림 · 앱 배지 · 클릭 라우팅, 셋 다 구독). `hooks/useInbox.ts`(1,416줄) / `hooks/useInboxNotifications.ts` / `components/app/InboxBridge.tsx`와 `setInboxCallbacks` 삭제, `AppEffects`가 두 훅을 마지막에 마운트해 브리지가 형제로 렌더되던 effect 순서를 유지한다. 테스트 헬퍼 `src/test/inbox.ts`. #1630: `visibleInboxMessageSummariesAtom`을 더하고 `Inbox`의 `messages` 프롭을 요약으로 좁혀 각 행이 `inboxMessageAtom(id)`를 구독한다. `InboxSelectionBoundary`가 연결 경계가 되고(`InboxWithSelection` / `CompanionInbox`) `DesktopPages` / `CompanionShell`이 인박스 메시지 구독을 끊었다. |
+| F5 `useChannelConversation` 저장소 전환 | #1631, #1633, #1638 | 머지됨 | 채널 대화를 `state/channel-conversation`으로 옮겼다. #1631: `model`(훅 안에 있어 테스트가 없던 순수 함수 — 에이전트 답장 병합과 우선순위, 답장 요약 증감과 되돌림, 타이핑 이름과 활동 프레임, 작성자 신원, 목록 요약), `atoms`(채널별 `channelMessagesByIdAtom`과 루트·스레드 저장 인덱스, 행 단위 `channelMessageAtom(key)`, 참여자·에이전트 답장·커서·정착 답장, 목록 전용 `channelRootMessageSummariesAtom`, 채널 5개 / 채널당 스레드 5개 LRU), `sync/events`·`apply`의 대화 이벤트 8종, `entities/upsert`의 `replaceEntitiesBy`. #1633: 소비자 전환. `Channels`의 `useState` 7개와 상한 없는 `channelCache`, `CompanionChannels`의 `useState` 6개와 `CompanionChannelCache` 전체(상한 상수 3개와 캐시 함수 5개)가 사라지고 두 뷰가 같은 저장소를 읽는다. 모든 쓰기를 모은 `write.ts`와 뷰 어댑터 `useChannelConversationStore.ts`를 더했고, 레지스트리 `WeakMap` 캐시 홀더와 `channelCache` 프롭도 없앴다. #1638: 훅에서 `messages` / `messageNextCursor` 프롭을 없애 호출 시점 레지스트리 읽기로 바꾸고, 목록이 요약을 읽고 행이 `channelMessageAtom`을 구독하는 `ChannelMessageRow`를 더했다. `Channels.message-row.test.tsx`가 `profile`로 "메시지 하나 변경 → 그 행만"을 고정한다. |
 
 ### 기준 갱신 (2026-09-04, 후속 F3 이후)
 
@@ -1321,3 +1325,48 @@ Phase 2 이후 언제든 착수 가능하며 Phase 3–7과 병행할 수 있다
   가능하던 자리는 저장 레코드를 심는 `src/test/inbox.ts`의 `seedInboxMessages`가
   됐다. 계정 응답 둘이 도착했다는 표시까지 심어야 읽지 않음 표시가 켜진다 — 실재하는
   게이트라서, 테스트가 그것을 매번 다시 발견하지 않도록 헬퍼가 안다.
+
+### 기준 갱신 (2026-09-04, 후속 F5 이후)
+
+채널 대화를 저장소로 옮기며 확인한, 남은 훅 소유 로직(F5의 뒷부분)과 F6·F7에
+필요한 사실이다.
+
+- **`useChannelConversation`은 상태를 갖고 있지 않았다.** 1,882줄이 전부 로직이고
+  메시지·스레드·참여자·답장·커서는 `Channels`와 `CompanionChannels`의 `useState`
+  였다. 훅은 `updateRootMessages` 같은 갱신 함수를 프롭으로 받아 부를 뿐이다.
+  그래서 "훅을 옮긴다"는 두 개의 독립된 작업이다 — **저장소를 만드는 일**(F5-1/2)과
+  **요청 순서 규칙을 옮기는 일**(남음). 앞의 것만으로 캐시 두 벌과 재요청이
+  사라졌다.
+- **캐시가 두 벌이었고 규칙이 서로 달랐다.** 데스크톱은 상한 없는 `useRef` 맵으로
+  컴포넌트와 함께 사라졌고, 컴패니언은 채널 5개 / 스레드 5개 / 채널당 메시지 40개를
+  스스로 자르는 100줄짜리 LRU였다. 하나로 합칠 때 메시지 상한은 **버려야 했다**:
+  같은 저장소를 쓰는 데스크톱의 "이전 메시지 더 보기"가 40개를 넘겨 쌓기 때문이다.
+  메모리는 채널 LRU가 묶는다. 두 뷰가 다른 상한을 갖고 있던 값은 합치기 전에
+  "어느 쪽이 왜 그 수를 골랐는지"를 먼저 본다.
+- **뷰 상태의 스코프는 여기서도 언마운트가 정하고 있었다.** 채널을 열 때 지워야
+  하는 것(열린 스레드, 제안별 프로젝트 선택, 에이전트 답장)과 남아야 하는 것
+  (메시지·참여자·커서·스레드)의 구분이 `useState` 초기화 순서에 암묵적으로 있었다.
+  `resetChannelConversationViewState`가 앞의 것을 명시한다. 답장은 실행 상태라
+  캐시에서 되살리면 이미 끝난 작업의 타이핑 표시가 남는다 — 컴패니언 코드의 주석이
+  그 이유를 이미 적어 두고 있었다.
+- **열린 스레드는 저장소에 있어야 한다.** `openThread`는 스레드 id를 쓰고 **같은
+  동기 스텝에서** 그 스레드의 메시지를 쓴다. `useState` 값은 한 렌더 뒤라 두 번째
+  쓰기가 이전 스레드로 간다. 레지스트리 쓰기는 동기이므로 이 순서가 성립한다.
+- **채널을 여는 쓰기는 "여는 채널"에 해야 한다.** 어댑터는 현재 선택에 묶여 있고
+  `openChannel`은 선택이 바뀌기 **전에** 돈다. 채널 id를 명시로 받는 writer
+  (`resetChannelConversationViewState(registry, id)`)를 따로 둔 이유다.
+- **updater 모양의 쓰기는 한시적 계약이다.** 훅이 아직 "다음 타임라인이 무엇인가"를
+  정하므로 저장소는 결과를 받는다. 그래도 정렬·아이덴티티 보존·보존 한도는
+  `state/channel-conversation/write.ts` 한 곳이며, 단일 진입점이 사는 성질은
+  (F4가 인박스에서 확인한 대로) "이벤트 타입이 하나"가 아니라 "병합 규칙이 한 곳"이다.
+- **컴포넌트 테스트에는 레지스트리가 필요해졌다.** `Channels` / `DirectMessages` /
+  `CompanionChannels` 테스트가 프로바이더 없이 모듈 전역 레지스트리로 떨어지면
+  케이스 사이로 대화가 샌다(실제로 한 케이스가 그렇게 깨졌다). 반대로 채널 전환을
+  검사하는 케이스는 레지스트리를 **공유해야** 한다 — 즉시 복귀가 검사 대상이므로.
+- **남은 것.** `hooks/use-channel-conversation.ts`는 아직 있다. 그 안에 남은 것은
+  요청 순서(생성 카운터와 표면 무효화), 로더·실시간 전송 수명, 액션(전송·반응·삭제·
+  제안·스레드 구독)과 답장 버전 부기다. 옮길 때의 이음매는 이미 있다
+  (`state/channel-conversation/write.ts`의 writer들과 F5-1이 만든 이벤트 8종).
+  옮기고 나면 `messages` / `replies` / `threadMessages` 프롭이 사라지고, 그때 비로소
+  "메시지 하나 변경 → 그 행만" 과 "타이핑 변경 → 타이핑 스트립만"이 컴포넌트 단위로
+  성립한다. 지금은 저장소 단위로만 성립한다(`atoms.test.ts`가 고정).
