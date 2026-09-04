@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { resolve } from "node:path";
 import { create, toBinary } from "@bufbuild/protobuf";
+import { timestampDate } from "@bufbuild/protobuf/wkt";
 import { sizeDelimitedDecodeStream } from "@bufbuild/protobuf/wire";
 import {
   type ComputerUseChildBinding,
@@ -15,7 +16,13 @@ import type { AgentAttachment } from "../src-agent/runner-attachments";
 import {
   encodeSidecarApprovalResponse,
   encodeSidecarRunRequest,
+  sidecarProviderBlock,
 } from "../src-agent/sidecar-protocol";
+import {
+  providerBlockReplyMessage,
+  type ProviderBlock,
+} from "../src/lib/provider-block";
+import { recordProviderBlock } from "./provider-block-registry";
 import type { JsonSchema } from "../src/lib/team-llm";
 import { agentProviderBinaryName } from "../src/lib/agent-provider";
 import { agentProviderToProto } from "../src/lib/agent-provider-proto";
@@ -40,7 +47,24 @@ export type DetachedProviderTurnResult = {
   completed: boolean;
   resultText: string | null;
   conversationId: string | null;
+  /** The provider stopped the turn for a reason a person or time can clear. */
+  block?: ProviderBlock | null;
 };
+
+/**
+ * Thrown by `assertDetachedProviderTurnSucceeded` for a blocked turn so every
+ * caller can report the structured block instead of a generic failure.
+ */
+export class DetachedProviderBlockedError extends Error {
+  constructor(readonly block: ProviderBlock) {
+    super(providerBlockReplyMessage(block));
+    this.name = "DetachedProviderBlockedError";
+  }
+}
+
+export function detachedProviderBlockOf(error: unknown): ProviderBlock | null {
+  return error instanceof DetachedProviderBlockedError ? error.block : null;
+}
 
 export type DetachedProviderTurnDiagnosticContext = {
   runId?: string;
@@ -365,6 +389,7 @@ async function executeDetachedProviderTurn(
   let runnerError: string | null = null;
   let completed = false;
   let terminalOutputSeen = false;
+  let block: ProviderBlock | null = null;
   let resultText: string | null = null;
   let conversationId = input.conversationId ?? null;
   let outputCount = 0;
@@ -448,6 +473,18 @@ async function executeDetachedProviderTurn(
               error: redactDiagnosticText(payload.value.message),
             }
           : {}),
+        ...(payloadType === "blocked"
+          ? {
+              blockReason: payload.value.block?.reason ?? null,
+              blockProvider: payload.value.block?.provider ?? null,
+              blockMessage: redactDiagnosticText(
+                payload.value.block?.message ?? "",
+              ),
+              nextRetryAt: payload.value.block?.nextRetryAt
+                ? timestampDate(payload.value.block.nextRetryAt).toISOString()
+                : null,
+            }
+          : {}),
       });
       if (
         payload.case === "sessionStarted" &&
@@ -476,7 +513,21 @@ async function executeDetachedProviderTurn(
         completed = true;
         terminalOutputSeen = true;
       }
-      if (payload.case === "blocked") terminalOutputSeen = true;
+      if (payload.case === "blocked") {
+        terminalOutputSeen = true;
+        block = sidecarProviderBlock(message);
+        if (block) {
+          const hold = recordProviderBlock(input.agent.provider, block);
+          diagnose("turn.provider_blocked", {
+            reason: block.reason,
+            provider: block.provider,
+            nextRetryAt: block.nextRetryAt,
+            providerHoldUntil: hold?.until ?? null,
+          });
+        } else {
+          runnerError = "Agent runner reported a block this Worker cannot interpret";
+        }
+      }
       await input.onPayload?.(message);
     }
     if (!terminalOutputSeen) {
@@ -512,6 +563,7 @@ async function executeDetachedProviderTurn(
       completed,
       resultText,
       conversationId,
+      block,
     };
   } finally {
     input.signal.removeEventListener("abort", terminate);
@@ -524,6 +576,7 @@ export function assertDetachedProviderTurnSucceeded(
   result: DetachedProviderTurnResult,
   options: { requireResult?: boolean } = {},
 ) {
+  if (result.block) throw new DetachedProviderBlockedError(result.block);
   const failure = detachedProviderTurnFailure(result, options);
   if (failure) throw new Error(failure);
 }
@@ -538,6 +591,7 @@ export function detachedProviderTurnFailure(
   result: DetachedProviderTurnResult,
   options: { requireResult?: boolean } = {},
 ): string | null {
+  if (result.block) return providerBlockReplyMessage(result.block);
   if (result.exitCode !== 0 || result.runnerError) {
     return result.runnerError ??
       (result.stderr.trim() || `Agent exited with ${result.exitCode}`);

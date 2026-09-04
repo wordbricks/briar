@@ -1,3 +1,11 @@
+import type { AgentProvider } from "../../src/lib/agent-provider";
+import type { ModelEffort } from "../../src/lib/agent-provider-contract";
+import {
+  providerBlockRecovery,
+  providerBlockReplyMessage,
+  type ProviderBlock,
+} from "../../src/lib/provider-block";
+import { replyFailureDisposition } from "./reply-failure-disposition";
 import { hydrateAgentSkills } from "./agent-skills";
 import {
   channelReplySessionRetentionUntil,
@@ -47,6 +55,7 @@ import type {
 import { dmLearningPolicy } from "./dm-memory-learning-policy";
 import { requireDmMemoryReplyFence } from "./dm-memory-reply-fence";
 import {
+  channelReplyWorkerAvailability,
   executionWorkerBindingById,
   executionWorkerRuntime,
 } from "./workers";
@@ -97,6 +106,7 @@ export type ReplyCompletionApplicationServices = {
   readonly scheduleChannelActivityClear: typeof scheduleChannelActivityClear;
   readonly executionWorkerBindingById: typeof executionWorkerBindingById;
   readonly requireDmMemoryReplyFence: typeof requireDmMemoryReplyFence;
+  readonly channelReplyWorkerAvailability: typeof channelReplyWorkerAvailability;
 };
 
 const applicationServices: ReplyCompletionApplicationServices = {
@@ -123,7 +133,55 @@ const applicationServices: ReplyCompletionApplicationServices = {
   scheduleChannelActivityClear,
   executionWorkerBindingById,
   requireDmMemoryReplyFence,
+  channelReplyWorkerAvailability,
 };
+
+/**
+ * Resolve how a failed attempt ends. A provider block asks whether any other
+ * live Worker could still serve the same Agent before the job is requeued;
+ * without one the requester learns the reason now instead of waiting on a
+ * queue nothing will drain.
+ */
+async function failureOutcome(
+  db: D1Database,
+  input: {
+    scope: ReplyClaimScope;
+    attempts: number;
+    error: string;
+    block: ProviderBlock | null;
+    provider: AgentProvider | null;
+    model: string | null;
+    effort: ModelEffort | null;
+    observedAt: string;
+  },
+  services: ReplyCompletionApplicationServices,
+) {
+  let anotherWorkerAvailable = false;
+  if (
+    input.block && input.provider &&
+    providerBlockRecovery(input.block.reason) !== "request"
+  ) {
+    anotherWorkerAvailable = await services.channelReplyWorkerAvailability(db, {
+      organizationId: input.scope.organizationId,
+      projectId: input.scope.replyKind === "issue" ? input.scope.projectId : null,
+      excludeWorkerId: input.scope.workerId,
+      provider: input.provider,
+      model: input.model,
+      effort: input.effort,
+      observedAt: input.observedAt,
+    }) === "available";
+  }
+  const disposition = replyFailureDisposition({
+    attempts: input.attempts,
+    block: input.block,
+    anotherWorkerAvailable,
+  });
+  return {
+    disposition,
+    terminal: disposition === "failed" && input.block !== null,
+    error: input.block ? providerBlockReplyMessage(input.block) : input.error,
+  };
+}
 
 const servicesWith = (overrides: Partial<ReplyCompletionApplicationServices>) =>
   ({ ...applicationServices, ...overrides });
@@ -472,23 +530,35 @@ export async function completeIssueReplyApplication(
       "Reply attachment reference is unavailable or outside the claim",
     );
   }
+  const outcome = input.request.outcome;
+  const resolved = outcome.case === "failure"
+    ? {
+      outcome,
+      failure: await failureOutcome(input.db, {
+      scope,
+      attempts: job.attempts,
+        error: outcome.error,
+        block: outcome.block,
+      provider: job.agent_provider,
+      model: job.selected_skill_model_snapshot ?? null,
+      effort: job.selected_skill_effort_snapshot ?? null,
+        observedAt,
+      }, services),
+    }
+    : { outcome, failure: null };
   const disposition: ReplyCompletionDisposition =
-    input.request.outcome.case === "success"
-      ? "completed"
-      : job.attempts >= 3
-      ? "failed"
-      : "requeued";
+    resolved.failure?.disposition ?? "completed";
   const commit = completionCommit(scope, {
     requestId: input.request.requestId,
     payloadHash,
-    outcomeKind: input.request.outcome.case,
+    outcomeKind: outcome.case,
     disposition,
     completedAt: observedAt,
     attachmentIds: input.request.attachmentIds,
   });
   try {
     let completed;
-    if (input.request.outcome.case === "failure") {
+    if (resolved.failure) {
       completed = await services.failIssueAgentReply(
         input.db,
         scope.projectId,
@@ -496,14 +566,15 @@ export async function completeIssueReplyApplication(
         {
           workerId: scope.workerId,
           claimTokenHash: scope.claimTokenHash,
-          error: input.request.outcome.error,
+          error: resolved.failure.error,
           updatedAt: observedAt,
           commit,
+          terminal: resolved.failure.terminal,
         },
       );
     } else {
       const replyBody = [
-        input.request.outcome.completion.body!,
+        resolved.outcome.completion.body!,
         ...attachments.map((attachment) => issueAttachmentMarkdown(
           attachment.upload_id,
           attachment.filename,
@@ -520,12 +591,12 @@ export async function completeIssueReplyApplication(
           output: {
             body: replyBody,
             proposedAction:
-              input.request.outcome.completion.proposedAction ?? null,
+              resolved.outcome.completion.proposedAction ?? null,
             executionProposal: Boolean(
-              input.request.outcome.completion.executionProposal,
+              resolved.outcome.completion.executionProposal,
             ),
             skillExecutionProposal: Boolean(
-              input.request.outcome.completion.skillExecutionProposal,
+              resolved.outcome.completion.skillExecutionProposal,
             ),
             attachments: issueAttachments(attachments),
           },
@@ -600,16 +671,28 @@ export async function completeChannelReplyApplication(
     );
   }
   const retainedUntil = channelReplySessionRetentionUntil(observedAt);
+  const outcome = input.request.outcome;
+  const resolved = outcome.case === "failure"
+    ? {
+      outcome,
+      failure: await failureOutcome(input.db, {
+      scope,
+      attempts: claimed.attempts,
+        error: outcome.error,
+        block: outcome.block,
+      provider: claimed.agent_provider,
+      model: claimed.selected_skill_model_snapshot ?? null,
+      effort: claimed.selected_skill_effort_snapshot ?? null,
+        observedAt,
+      }, services),
+    }
+    : { outcome, failure: null };
   const disposition: ReplyCompletionDisposition =
-    input.request.outcome.case === "success"
-      ? "completed"
-      : claimed.attempts >= 3
-      ? "failed"
-      : "requeued";
+    resolved.failure?.disposition ?? "completed";
   const commit = completionCommit(scope, {
     requestId: input.request.requestId,
     payloadHash,
-    outcomeKind: input.request.outcome.case,
+    outcomeKind: outcome.case,
     disposition,
     retainedUntil,
     completedAt: observedAt,
@@ -617,15 +700,19 @@ export async function completeChannelReplyApplication(
   });
   try {
     let completed;
-    if (input.request.outcome.case === "failure") {
+    if (resolved.failure) {
       completed = await services.failChannelReply(input.db, {
         jobId: scope.workId,
         deviceId: scope.deviceId,
         workerId: scope.workerId,
         claimTokenHash: scope.claimTokenHash,
-        error: input.request.outcome.error,
+        error: resolved.failure.error,
         updatedAt: observedAt,
         commit,
+        terminal: resolved.failure.terminal,
+        ...(resolved.outcome.block
+          ? { failureMessage: resolved.failure.error }
+          : {}),
       });
     } else {
       const agent = await services.getOrganizationAgent(
@@ -639,7 +726,7 @@ export async function completeChannelReplyApplication(
           "Reply job lost its Agent",
         );
       }
-      const result = input.request.outcome.completion;
+      const result = resolved.outcome.completion;
       if (result.memorySaveRequest) {
         const binding = await services.executionWorkerBindingById(
           input.db,

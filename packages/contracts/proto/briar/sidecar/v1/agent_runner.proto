@@ -4,8 +4,8 @@ package briar.sidecar.v1;
 
 import "briar/types/v1/agent_event.proto";
 import "briar/types/v1/provider.proto";
+import "briar/types/v1/provider_block.proto";
 import "google/protobuf/struct.proto";
-import "google/protobuf/timestamp.proto";
 
 // This protocol is carried as length-delimited protobuf messages over a
 // runner process's stdin and stdout. Diagnostics belong on stderr.
@@ -27,14 +27,6 @@ enum SandboxMode {
   SANDBOX_MODE_READ_ONLY = 1;
   SANDBOX_MODE_WORKSPACE_WRITE = 2;
   SANDBOX_MODE_DANGER_FULL_ACCESS = 3;
-}
-
-enum BlockReason {
-  BLOCK_REASON_UNSPECIFIED = 0;
-  BLOCK_REASON_MCP_AUTH_REQUIRED = 1;
-  BLOCK_REASON_USAGE_EXHAUSTED = 2;
-  BLOCK_REASON_UPSTREAM_OVERLOADED = 3;
-  BLOCK_REASON_FREE_TIER_LIMIT = 4;
 }
 
 enum RunErrorCode {
@@ -153,14 +145,7 @@ message RunResult {
 }
 
 message RunBlocked {
-  BlockReason reason = 1;
-  string message = 2;
-  // Provider-specific block diagnostics may name an upstream model provider,
-  // not one of Briar's configured runner providers.
-  optional string provider = 3;
-  repeated string server_names = 4;
-  optional google.protobuf.Timestamp next_retry_at = 5;
-  optional uint32 status_code = 6;
+  briar.types.v1.ProviderBlock block = 1;
 }
 
 message RunError {

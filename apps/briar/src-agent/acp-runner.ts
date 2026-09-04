@@ -1,5 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { AcpJsonRpcConnection, type AcpJsonRpcMessage } from "./acp-json-rpc";
+import {
+  AcpJsonRpcConnection,
+  AcpRpcError,
+  type AcpJsonRpcMessage,
+} from "./acp-json-rpc";
 import {
   acpStopReasonSucceeded,
   createAcpEventState,
@@ -19,6 +23,12 @@ import {
 import { acpComputerUseServers } from "./computer-use-provider-adapters";
 import { createRunnerIo } from "./runner-io";
 import type { RunnerRequest } from "./runner-request";
+import {
+  ProviderBlockedError,
+  classifyProviderFailure,
+  providerBlockFromError,
+  type ProviderBlock,
+} from "./provider-block";
 
 /**
  * Shared Agent Client Protocol runner core.
@@ -119,6 +129,8 @@ export type AcpSessionConfiguration = {
 };
 
 export type AcpProviderProfile = {
+  /** Briar provider id carried on blocks ("grok", "cursor"). */
+  readonly providerId: string;
   /** Transport label, used in process lifecycle errors ("Grok Agent"). */
   readonly providerName: string;
   /** Short label for the runner close and turn failure errors ("Grok"). */
@@ -471,6 +483,42 @@ export async function runAcpTurn(
   }
 }
 
+/**
+ * Classify an ACP lifecycle failure. JSON-RPC errors keep their `code` and
+ * `data`, where agents put HTTP statuses and provider error tags; anything
+ * else is judged by its text. Null means the turn simply failed.
+ */
+export function acpFailureBlock(
+  profile: Pick<AcpProviderProfile, "providerId">,
+  error: unknown,
+): ProviderBlock | null {
+  if (error instanceof ProviderBlockedError) return error.block;
+  if (error instanceof AcpRpcError) {
+    const data = error.data && typeof error.data === "object"
+      ? (error.data as Record<string, unknown>)
+      : null;
+    const dataCode = data
+      ? ["code", "type", "error", "reason"]
+        .map((key) => data[key])
+        .find((value): value is string => typeof value === "string" && value.trim() !== "")
+      : undefined;
+    const dataStatus = data
+      ? ["status", "statusCode", "httpStatus"]
+        .map((key) => Number(data[key]))
+        .find((value) => Number.isInteger(value) && value > 0)
+      : undefined;
+    return classifyProviderFailure({
+      provider: profile.providerId,
+      message: [error.message, typeof error.data === "string" ? error.data : null]
+        .filter(Boolean)
+        .join(" "),
+      code: dataCode,
+      statusCode: dataStatus ?? null,
+    });
+  }
+  return providerBlockFromError(profile.providerId, error);
+}
+
 export async function runAcpProvider(
   profile: AcpProviderProfile,
   overrides: AcpRunnerOverrides = {},
@@ -481,6 +529,11 @@ export async function runAcpProvider(
   try {
     await runAcpTurn(profile, runnerIo, overrides);
   } catch (caught) {
+    const block = acpFailureBlock(profile, caught);
+    if (block) {
+      runnerIo.emit.blocked(block);
+      return;
+    }
     runnerIo.emit.error(
       caught instanceof Error ? caught.message : String(caught),
     );

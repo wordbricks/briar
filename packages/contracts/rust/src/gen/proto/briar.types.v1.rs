@@ -10169,6 +10169,626 @@ pub const __GIT_HUB_PULL_REQUEST_IDENTITY_JSON_ANY: ::buffa::type_registry::Json
     from_json: ::buffa::type_registry::any_from_json::<GitHubPullRequestIdentity>,
     is_wkt: false,
 };
+/// Provider-neutral reasons a coding-agent turn stopped before producing a
+/// result. A block is an account, quota, or environment condition that time or
+/// a person can clear; a turn that simply failed is not a block. Every runner
+/// maps its provider's native failure onto this list, and every consumer —
+/// the desktop sidecar, the execution Worker, and the server — acts on the
+/// reason instead of on provider error text.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum ProviderBlockReason {
+    PROVIDER_BLOCK_REASON_UNSPECIFIED = 0i32,
+    /// An MCP server the turn needs is not authenticated on this machine.
+    PROVIDER_BLOCK_REASON_MCP_AUTH_REQUIRED = 1i32,
+    /// A plan's quota or rate limit is used up; next_retry_at names the reset
+    /// when the provider reported one.
+    PROVIDER_BLOCK_REASON_USAGE_EXHAUSTED = 2i32,
+    /// The model provider is temporarily overloaded (HTTP 502/503/504/529).
+    PROVIDER_BLOCK_REASON_UPSTREAM_OVERLOADED = 3i32,
+    /// A free tier's allowance is used up and the provider offered a retry time.
+    PROVIDER_BLOCK_REASON_FREE_TIER_LIMIT = 4i32,
+    /// The provider CLI itself is signed out or its credentials were rejected.
+    PROVIDER_BLOCK_REASON_AUTH_REQUIRED = 5i32,
+    /// The request no longer fits the model's context window.
+    PROVIDER_BLOCK_REASON_CONTEXT_WINDOW_EXCEEDED = 6i32,
+    /// The account needs billing attention: no credits, payment required, or
+    /// the selected usage is not part of the plan.
+    PROVIDER_BLOCK_REASON_BILLING_REQUIRED = 7i32,
+    /// The selected model does not exist or the account may not use it.
+    PROVIDER_BLOCK_REASON_MODEL_UNAVAILABLE = 8i32,
+}
+impl ProviderBlockReason {
+    ///Idiomatic alias for [`Self::PROVIDER_BLOCK_REASON_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Unspecified: Self = Self::PROVIDER_BLOCK_REASON_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::PROVIDER_BLOCK_REASON_MCP_AUTH_REQUIRED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const McpAuthRequired: Self = Self::PROVIDER_BLOCK_REASON_MCP_AUTH_REQUIRED;
+    ///Idiomatic alias for [`Self::PROVIDER_BLOCK_REASON_USAGE_EXHAUSTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const UsageExhausted: Self = Self::PROVIDER_BLOCK_REASON_USAGE_EXHAUSTED;
+    ///Idiomatic alias for [`Self::PROVIDER_BLOCK_REASON_UPSTREAM_OVERLOADED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const UpstreamOverloaded: Self = Self::PROVIDER_BLOCK_REASON_UPSTREAM_OVERLOADED;
+    ///Idiomatic alias for [`Self::PROVIDER_BLOCK_REASON_FREE_TIER_LIMIT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const FreeTierLimit: Self = Self::PROVIDER_BLOCK_REASON_FREE_TIER_LIMIT;
+    ///Idiomatic alias for [`Self::PROVIDER_BLOCK_REASON_AUTH_REQUIRED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AuthRequired: Self = Self::PROVIDER_BLOCK_REASON_AUTH_REQUIRED;
+    ///Idiomatic alias for [`Self::PROVIDER_BLOCK_REASON_CONTEXT_WINDOW_EXCEEDED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ContextWindowExceeded: Self = Self::PROVIDER_BLOCK_REASON_CONTEXT_WINDOW_EXCEEDED;
+    ///Idiomatic alias for [`Self::PROVIDER_BLOCK_REASON_BILLING_REQUIRED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const BillingRequired: Self = Self::PROVIDER_BLOCK_REASON_BILLING_REQUIRED;
+    ///Idiomatic alias for [`Self::PROVIDER_BLOCK_REASON_MODEL_UNAVAILABLE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ModelUnavailable: Self = Self::PROVIDER_BLOCK_REASON_MODEL_UNAVAILABLE;
+}
+impl ::core::default::Default for ProviderBlockReason {
+    fn default() -> Self {
+        Self::PROVIDER_BLOCK_REASON_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for ProviderBlockReason {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for ProviderBlockReason {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = ProviderBlockReason;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ",
+                        stringify!(ProviderBlockReason)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<ProviderBlockReason, E> {
+                <ProviderBlockReason as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<ProviderBlockReason, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <ProviderBlockReason as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<ProviderBlockReason, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <ProviderBlockReason as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<ProviderBlockReason, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ProviderBlockReason {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for ProviderBlockReason {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::PROVIDER_BLOCK_REASON_UNSPECIFIED),
+            1i32 => {
+                ::core::option::Option::Some(
+                    Self::PROVIDER_BLOCK_REASON_MCP_AUTH_REQUIRED,
+                )
+            }
+            2i32 => {
+                ::core::option::Option::Some(Self::PROVIDER_BLOCK_REASON_USAGE_EXHAUSTED)
+            }
+            3i32 => {
+                ::core::option::Option::Some(
+                    Self::PROVIDER_BLOCK_REASON_UPSTREAM_OVERLOADED,
+                )
+            }
+            4i32 => {
+                ::core::option::Option::Some(Self::PROVIDER_BLOCK_REASON_FREE_TIER_LIMIT)
+            }
+            5i32 => {
+                ::core::option::Option::Some(Self::PROVIDER_BLOCK_REASON_AUTH_REQUIRED)
+            }
+            6i32 => {
+                ::core::option::Option::Some(
+                    Self::PROVIDER_BLOCK_REASON_CONTEXT_WINDOW_EXCEEDED,
+                )
+            }
+            7i32 => {
+                ::core::option::Option::Some(
+                    Self::PROVIDER_BLOCK_REASON_BILLING_REQUIRED,
+                )
+            }
+            8i32 => {
+                ::core::option::Option::Some(
+                    Self::PROVIDER_BLOCK_REASON_MODEL_UNAVAILABLE,
+                )
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::PROVIDER_BLOCK_REASON_UNSPECIFIED => {
+                "PROVIDER_BLOCK_REASON_UNSPECIFIED"
+            }
+            Self::PROVIDER_BLOCK_REASON_MCP_AUTH_REQUIRED => {
+                "PROVIDER_BLOCK_REASON_MCP_AUTH_REQUIRED"
+            }
+            Self::PROVIDER_BLOCK_REASON_USAGE_EXHAUSTED => {
+                "PROVIDER_BLOCK_REASON_USAGE_EXHAUSTED"
+            }
+            Self::PROVIDER_BLOCK_REASON_UPSTREAM_OVERLOADED => {
+                "PROVIDER_BLOCK_REASON_UPSTREAM_OVERLOADED"
+            }
+            Self::PROVIDER_BLOCK_REASON_FREE_TIER_LIMIT => {
+                "PROVIDER_BLOCK_REASON_FREE_TIER_LIMIT"
+            }
+            Self::PROVIDER_BLOCK_REASON_AUTH_REQUIRED => {
+                "PROVIDER_BLOCK_REASON_AUTH_REQUIRED"
+            }
+            Self::PROVIDER_BLOCK_REASON_CONTEXT_WINDOW_EXCEEDED => {
+                "PROVIDER_BLOCK_REASON_CONTEXT_WINDOW_EXCEEDED"
+            }
+            Self::PROVIDER_BLOCK_REASON_BILLING_REQUIRED => {
+                "PROVIDER_BLOCK_REASON_BILLING_REQUIRED"
+            }
+            Self::PROVIDER_BLOCK_REASON_MODEL_UNAVAILABLE => {
+                "PROVIDER_BLOCK_REASON_MODEL_UNAVAILABLE"
+            }
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "PROVIDER_BLOCK_REASON_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::PROVIDER_BLOCK_REASON_UNSPECIFIED)
+            }
+            "PROVIDER_BLOCK_REASON_MCP_AUTH_REQUIRED" => {
+                ::core::option::Option::Some(
+                    Self::PROVIDER_BLOCK_REASON_MCP_AUTH_REQUIRED,
+                )
+            }
+            "PROVIDER_BLOCK_REASON_USAGE_EXHAUSTED" => {
+                ::core::option::Option::Some(Self::PROVIDER_BLOCK_REASON_USAGE_EXHAUSTED)
+            }
+            "PROVIDER_BLOCK_REASON_UPSTREAM_OVERLOADED" => {
+                ::core::option::Option::Some(
+                    Self::PROVIDER_BLOCK_REASON_UPSTREAM_OVERLOADED,
+                )
+            }
+            "PROVIDER_BLOCK_REASON_FREE_TIER_LIMIT" => {
+                ::core::option::Option::Some(Self::PROVIDER_BLOCK_REASON_FREE_TIER_LIMIT)
+            }
+            "PROVIDER_BLOCK_REASON_AUTH_REQUIRED" => {
+                ::core::option::Option::Some(Self::PROVIDER_BLOCK_REASON_AUTH_REQUIRED)
+            }
+            "PROVIDER_BLOCK_REASON_CONTEXT_WINDOW_EXCEEDED" => {
+                ::core::option::Option::Some(
+                    Self::PROVIDER_BLOCK_REASON_CONTEXT_WINDOW_EXCEEDED,
+                )
+            }
+            "PROVIDER_BLOCK_REASON_BILLING_REQUIRED" => {
+                ::core::option::Option::Some(
+                    Self::PROVIDER_BLOCK_REASON_BILLING_REQUIRED,
+                )
+            }
+            "PROVIDER_BLOCK_REASON_MODEL_UNAVAILABLE" => {
+                ::core::option::Option::Some(
+                    Self::PROVIDER_BLOCK_REASON_MODEL_UNAVAILABLE,
+                )
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::PROVIDER_BLOCK_REASON_UNSPECIFIED,
+            Self::PROVIDER_BLOCK_REASON_MCP_AUTH_REQUIRED,
+            Self::PROVIDER_BLOCK_REASON_USAGE_EXHAUSTED,
+            Self::PROVIDER_BLOCK_REASON_UPSTREAM_OVERLOADED,
+            Self::PROVIDER_BLOCK_REASON_FREE_TIER_LIMIT,
+            Self::PROVIDER_BLOCK_REASON_AUTH_REQUIRED,
+            Self::PROVIDER_BLOCK_REASON_CONTEXT_WINDOW_EXCEEDED,
+            Self::PROVIDER_BLOCK_REASON_BILLING_REQUIRED,
+            Self::PROVIDER_BLOCK_REASON_MODEL_UNAVAILABLE,
+        ]
+    }
+}
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ProviderBlock {
+    /// Field 1: `reason`
+    #[serde(
+        rename = "reason",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub reason: ::buffa::EnumValue<ProviderBlockReason>,
+    /// Human-readable provider text, already safe to show to an end user.
+    ///
+    /// Field 2: `message`
+    #[serde(
+        rename = "message",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub message: ::buffa::alloc::string::String,
+    /// The runner provider, or the upstream model provider a block names when
+    /// that differs (an OpenRouter model behind OpenCode, for example).
+    ///
+    /// Field 3: `provider`
+    #[serde(
+        rename = "provider",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub provider: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 4: `server_names`
+    #[serde(
+        rename = "serverNames",
+        alias = "server_names",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub server_names: ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
+    /// Field 5: `next_retry_at`
+    #[serde(
+        rename = "nextRetryAt",
+        alias = "next_retry_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub next_retry_at: ::buffa::MessageField<
+        ::buffa_types::google::protobuf::Timestamp,
+        ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+    >,
+    /// Field 6: `status_code`
+    #[serde(
+        rename = "statusCode",
+        alias = "status_code",
+        with = "::buffa::json_helpers::opt_uint32",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub status_code: ::core::option::Option<u32>,
+    /// The provider's own error identifier when it had one, such as
+    /// `usage_limit_reached` or `rate_limit`, for diagnostics and tests.
+    ///
+    /// Field 7: `provider_code`
+    #[serde(
+        rename = "providerCode",
+        alias = "provider_code",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub provider_code: ::core::option::Option<::buffa::alloc::string::String>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ProviderBlock {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ProviderBlock")
+            .field("reason", &self.reason)
+            .field("message", &self.message)
+            .field("provider", &self.provider)
+            .field("server_names", &self.server_names)
+            .field("next_retry_at", &self.next_retry_at)
+            .field("status_code", &self.status_code)
+            .field("provider_code", &self.provider_code)
+            .finish()
+    }
+}
+impl ProviderBlock {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.ProviderBlock";
+}
+impl ProviderBlock {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::provider`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_provider(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.provider = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::status_code`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_status_code(mut self, value: u32) -> Self {
+        self.status_code = Some(value);
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::provider_code`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_provider_code(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.provider_code = Some(value.into());
+        self
+    }
+}
+::buffa::impl_default_instance!(ProviderBlock);
+impl ::buffa::MessageName for ProviderBlock {
+    const PACKAGE: &'static str = "briar.types.v1";
+    const NAME: &'static str = "ProviderBlock";
+    const FULL_NAME: &'static str = "briar.types.v1.ProviderBlock";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.ProviderBlock";
+}
+impl ::buffa::Message for ProviderBlock {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        {
+            let val = self.reason.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        if !self.message.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.message) as u64;
+        }
+        if let Some(ref v) = self.provider {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        for v in &self.server_names {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if self.next_retry_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.next_retry_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if let Some(v) = self.status_code {
+            size += 1u64 + ::buffa::types::uint32_encoded_len(v) as u64;
+        }
+        if let Some(ref v) = self.provider_code {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        {
+            let val = self.reason.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(1u32, val, buf);
+            }
+        }
+        if !self.message.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.message, buf);
+        }
+        if let Some(ref v) = self.provider {
+            ::buffa::types::put_string_field(3u32, v, buf);
+        }
+        for v in &self.server_names {
+            ::buffa::types::put_string_field(4u32, v, buf);
+        }
+        if self.next_retry_at.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                5u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.next_retry_at.write_to(__cache, buf);
+        }
+        if let Some(v) = self.status_code {
+            ::buffa::types::put_uint32_field(6u32, v, buf);
+        }
+        if let Some(ref v) = self.provider_code {
+            ::buffa::types::put_string_field(7u32, v, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.reason = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.message, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .provider
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __elem = ::buffa::types::decode_string(buf)?;
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&__elem),
+                )?;
+                self.server_names.push(__elem);
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.next_retry_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.status_code = ::core::option::Option::Some(
+                    ::buffa::types::decode_uint32(buf)?,
+                );
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .provider_code
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.reason = ::buffa::EnumValue::from(0);
+        self.message.clear();
+        self.provider = ::core::option::Option::None;
+        self.server_names.clear();
+        self.next_retry_at = ::buffa::MessageField::none();
+        self.status_code = ::core::option::Option::None;
+        self.provider_code = ::core::option::Option::None;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ProviderBlock {
+    const PROTO_FQN: &'static str = "briar.types.v1.ProviderBlock";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ProviderBlock {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __PROVIDER_BLOCK_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.types.v1.ProviderBlock",
+    to_json: ::buffa::type_registry::any_to_json::<ProviderBlock>,
+    from_json: ::buffa::type_registry::any_from_json::<ProviderBlock>,
+    is_wkt: false,
+};
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
 pub enum RevisionConflictReason {
@@ -26961,6 +27581,500 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
+        pub struct ProviderBlockView<'a> {
+            /// Field 1: `reason`
+            pub reason: ::buffa::EnumValue<super::super::ProviderBlockReason>,
+            /// Human-readable provider text, already safe to show to an end user.
+            ///
+            /// Field 2: `message`
+            pub message: &'a str,
+            /// The runner provider, or the upstream model provider a block names when
+            /// that differs (an OpenRouter model behind OpenCode, for example).
+            ///
+            /// Field 3: `provider`
+            pub provider: ::core::option::Option<&'a str>,
+            /// Field 4: `server_names`
+            pub server_names: ::buffa::RepeatedView<'a, &'a str>,
+            /// Field 5: `next_retry_at`
+            pub next_retry_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            /// Field 6: `status_code`
+            pub status_code: ::core::option::Option<u32>,
+            /// The provider's own error identifier when it had one, such as
+            /// `usage_limit_reached` or `rate_limit`, for diagnostics and tests.
+            ///
+            /// Field 7: `provider_code`
+            pub provider_code: ::core::option::Option<&'a str>,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ProviderBlockView<'a> {
+            type Owned = super::super::ProviderBlock;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.reason = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.message = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.provider = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.next_retry_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.next_retry_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.status_code = Some(
+                            ::buffa::types::decode_uint32(&mut cur)?,
+                        );
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.provider_code = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __elem = ::buffa::types::borrow_str(&mut cur)?;
+                        ctx.register_element_memory(
+                            ::buffa::__private::element_footprint(&__elem),
+                        )?;
+                        view.server_names.push(__elem);
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ProviderBlock,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ProviderBlock,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ProviderBlock {
+                    reason: self.reason,
+                    message: self.message.to_string(),
+                    provider: self.provider.map(|s| s.to_string()),
+                    server_names: self
+                        .server_names
+                        .iter()
+                        .map(|s| s.to_string())
+                        .collect(),
+                    next_retry_at: match self.next_retry_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                                ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    status_code: self.status_code,
+                    provider_code: self.provider_code.map(|s| s.to_string()),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ProviderBlockView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                {
+                    let val = self.reason.to_i32();
+                    if val != 0 {
+                        size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+                    }
+                }
+                if !self.message.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.message) as u64;
+                }
+                if let Some(ref v) = self.provider {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                for v in &self.server_names {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                if self.next_retry_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.next_retry_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                if let Some(v) = self.status_code {
+                    size += 1u64 + ::buffa::types::uint32_encoded_len(v) as u64;
+                }
+                if let Some(ref v) = self.provider_code {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                {
+                    let val = self.reason.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(1u32, val, buf);
+                    }
+                }
+                if !self.message.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.message, buf);
+                }
+                if let Some(ref v) = self.provider {
+                    ::buffa::types::put_string_field(3u32, v, buf);
+                }
+                for v in &self.server_names {
+                    ::buffa::types::put_string_field(4u32, v, buf);
+                }
+                if self.next_retry_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        5u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.next_retry_at.write_to(__cache, buf);
+                }
+                if let Some(v) = self.status_code {
+                    ::buffa::types::put_uint32_field(6u32, v, buf);
+                }
+                if let Some(ref v) = self.provider_code {
+                    ::buffa::types::put_string_field(7u32, v, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ProviderBlockView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.reason) {
+                    __map.serialize_entry("reason", &self.reason)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.message) {
+                    __map.serialize_entry("message", self.message)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.provider {
+                    __map.serialize_entry("provider", __v)?;
+                }
+                if !self.server_names.is_empty() {
+                    __map.serialize_entry("serverNames", &*self.server_names)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .next_retry_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("nextRetryAt", __v)?;
+                    }
+                }
+                if let ::core::option::Option::Some(__v) = self.status_code {
+                    __map
+                        .serialize_entry(
+                            "statusCode",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                if let ::core::option::Option::Some(__v) = self.provider_code {
+                    __map.serialize_entry("providerCode", __v)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ProviderBlockView<'a> {
+            const PACKAGE: &'static str = "briar.types.v1";
+            const NAME: &'static str = "ProviderBlock";
+            const FULL_NAME: &'static str = "briar.types.v1.ProviderBlock";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.ProviderBlock";
+        }
+        ::buffa::impl_default_view_instance!(ProviderBlockView);
+        ::buffa::impl_view_reborrow!(ProviderBlockView);
+        /** Self-contained, `'static` owned view of a `ProviderBlock` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ProviderBlockView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ProviderBlockView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ProviderBlockOwnedView(
+            ::buffa::OwnedView<ProviderBlockView<'static>>,
+        );
+        impl ProviderBlockOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ProviderBlockOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ProviderBlockOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ProviderBlock,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ProviderBlockOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`ProviderBlockView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ProviderBlockView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::ProviderBlock {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `reason`
+            #[must_use]
+            pub fn reason(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::ProviderBlockReason> {
+                self.0.reborrow().reason
+            }
+            /// Human-readable provider text, already safe to show to an end user.
+            ///
+            /// Field 2: `message`
+            #[must_use]
+            pub fn message(&self) -> &'_ str {
+                self.0.reborrow().message
+            }
+            /// The runner provider, or the upstream model provider a block names when
+            /// that differs (an OpenRouter model behind OpenCode, for example).
+            ///
+            /// Field 3: `provider`
+            #[must_use]
+            pub fn provider(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().provider
+            }
+            /// Field 4: `server_names`
+            #[must_use]
+            pub fn server_names(&self) -> &::buffa::RepeatedView<'_, &'_ str> {
+                &self.0.reborrow().server_names
+            }
+            /// Field 5: `next_retry_at`
+            #[must_use]
+            pub fn next_retry_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().next_retry_at
+            }
+            /// Field 6: `status_code`
+            #[must_use]
+            pub fn status_code(&self) -> ::core::option::Option<u32> {
+                self.0.reborrow().status_code
+            }
+            /// The provider's own error identifier when it had one, such as
+            /// `usage_limit_reached` or `rate_limit`, for diagnostics and tests.
+            ///
+            /// Field 7: `provider_code`
+            #[must_use]
+            pub fn provider_code(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().provider_code
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<ProviderBlockView<'static>>>
+        for ProviderBlockOwnedView {
+            fn from(inner: ::buffa::OwnedView<ProviderBlockView<'static>>) -> Self {
+                ProviderBlockOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ProviderBlockOwnedView>
+        for ::buffa::OwnedView<ProviderBlockView<'static>> {
+            fn from(wrapper: ProviderBlockOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<ProviderBlockView<'static>>>
+        for ProviderBlockOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<ProviderBlockView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ProviderBlock {
+            type View<'a> = ProviderBlockView<'a>;
+            type ViewHandle = ProviderBlockOwnedView;
+        }
+        impl ::serde::Serialize for ProviderBlockOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
         pub struct FieldViolationView<'a> {
             /// Field 1: `path`
             pub path: &'a str,
@@ -29938,6 +31052,7 @@ pub mod __buffa {
         reg.register_json_any(super::__DM_MEMORY_LEARNING_CAPABILITY_JSON_ANY);
         reg.register_json_any(super::__WORKER_RUNTIME_ADVERTISEMENT_JSON_ANY);
         reg.register_json_any(super::__GIT_HUB_PULL_REQUEST_IDENTITY_JSON_ANY);
+        reg.register_json_any(super::__PROVIDER_BLOCK_JSON_ANY);
         reg.register_json_any(super::__FIELD_VIOLATION_JSON_ANY);
         reg.register_json_any(super::__VALIDATION_ERROR_DETAIL_JSON_ANY);
         reg.register_json_any(super::__APPLICATION_ERROR_DETAIL_JSON_ANY);
@@ -30088,6 +31203,10 @@ pub use self::__buffa::view::WorkerRuntimeAdvertisementOwnedView;
 pub use self::__buffa::view::GitHubPullRequestIdentityView;
 #[doc(inline)]
 pub use self::__buffa::view::GitHubPullRequestIdentityOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ProviderBlockView;
+#[doc(inline)]
+pub use self::__buffa::view::ProviderBlockOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::FieldViolationView;
 #[doc(inline)]

@@ -1,4 +1,9 @@
 import { create } from "@bufbuild/protobuf";
+import { timestampFromDate } from "@bufbuild/protobuf/wkt";
+import {
+  ProviderBlockReason,
+  ProviderBlockSchema,
+} from "@briar/contracts/gen/briar/types/v1/provider_block_pb";
 import {
   ChannelReplyClaimIdentitySchema,
   ChannelReplyArtifactsActionSchema,
@@ -51,6 +56,7 @@ import {
   type PreparedReplyAttachmentUploadsInput,
 } from "./worker-reply-completion-mappers";
 import { workerClaimRuntimeFixture } from "./test-helpers/worker-runtime";
+import type { channelReplyWorkerAvailability } from "./workers";
 
 const organizationId = "a9000000-0000-4000-8000-000000000001";
 const projectId = "b9000000-0000-4000-8000-000000000001";
@@ -732,6 +738,148 @@ describe("reply completion application", () => {
     ).bind(claim.workId).first()).resolves.toEqual({
       document_count: 1,
       proposal_count: 1,
+    });
+  });
+
+  it("fails a blocked channel reply at once and tells the channel why", async () => {
+    const claim = await seedChannelClaim();
+    const completion = completeChannelReplyInputFromProto(create(
+      CompleteChannelReplyRequestSchema,
+      {
+        requestId: crypto.randomUUID(),
+        projectId,
+        workerId,
+        work: channelIdentity(claim),
+        outcome: {
+          case: "failure",
+          value: {
+            error: "Agent runner exited without a result",
+            block: create(ProviderBlockSchema, {
+              reason: ProviderBlockReason.USAGE_EXHAUSTED,
+              provider: "codex",
+              message: "You've hit your usage limit.",
+              nextRetryAt: timestampFromDate(new Date("2026-09-04T10:00:00.000Z")),
+            }),
+          },
+        },
+      },
+    ));
+    expect(completion.outcome).toMatchObject({
+      case: "failure",
+      block: { reason: "usage_exhausted", provider: "codex" },
+    });
+    const observedAt = at(300 + sequence);
+    const availability = vi.fn<typeof channelReplyWorkerAvailability>(
+      async () => "unavailable",
+    );
+    const result = await completeChannelReplyApplication({
+      db,
+      env: env(),
+      worker,
+      request: completion,
+      observedAt,
+    }, { channelReplyWorkerAvailability: availability });
+    // No other Worker can take the job, so it fails on the first attempt.
+    expect(result.disposition).toBe("failed");
+    // The D1 binding itself cannot be inspected by the assertion library, so
+    // only the query the availability check received is compared.
+    expect(availability.mock.calls[0]?.[1]).toMatchObject({
+      organizationId,
+      excludeWorkerId: workerId,
+      provider: "codex",
+    });
+    const expectedMessage =
+      "Codex 사용량 한도에 도달했습니다. 답변을 생성하지 못했습니다. Codex가 안내한 다음 사용 가능 시각은 2026-09-04 19:00 (KST)입니다. 잠시 후 다시 요청하거나 다른 provider의 Agent를 사용해 주세요.";
+    await expect(db.prepare(
+      `select job.status, job.attempts, job.error,
+              (select body from briar_channel_messages
+               where id = job.reply_message_id) as posted_body
+       from briar_channel_agent_reply_jobs job where job.id = ?`,
+    ).bind(claim.workId).first()).resolves.toEqual({
+      status: "failed",
+      attempts: 1,
+      error: expectedMessage,
+      posted_body: expectedMessage,
+    });
+  });
+
+  it("requeues a blocked channel reply when another Worker can serve it", async () => {
+    const claim = await seedChannelClaim();
+    const completion = completeChannelReplyInputFromProto(create(
+      CompleteChannelReplyRequestSchema,
+      {
+        requestId: crypto.randomUUID(),
+        projectId,
+        workerId,
+        work: channelIdentity(claim),
+        outcome: {
+          case: "failure",
+          value: {
+            error: "blocked",
+            block: create(ProviderBlockSchema, {
+              reason: ProviderBlockReason.AUTH_REQUIRED,
+              provider: "codex",
+              message: "Not signed in",
+            }),
+          },
+        },
+      },
+    ));
+    const result = await completeChannelReplyApplication({
+      db,
+      env: env(),
+      worker,
+      request: completion,
+      observedAt: at(300 + sequence),
+    }, { channelReplyWorkerAvailability: async () => "available" });
+    expect(result.disposition).toBe("requeued");
+    await expect(db.prepare(
+      `select status, error from briar_channel_agent_reply_jobs where id = ?`,
+    ).bind(claim.workId).first()).resolves.toEqual({
+      status: "queued",
+      error: "Codex 로그인이 만료되었거나 인증이 거부되었습니다. 답변을 생성하지 못했습니다. Worker 컴퓨터에서 Codex 설정을 확인한 뒤 다시 요청해 주세요.",
+    });
+  });
+
+  it("fails a blocked issue reply whose request no Worker can serve", async () => {
+    const claim = await seedClaim(1);
+    const availability = vi.fn<typeof channelReplyWorkerAvailability>(
+      async () => "available",
+    );
+    const completion = completeIssueReplyInputFromProto(create(
+      CompleteIssueReplyRequestSchema,
+      {
+        requestId: crypto.randomUUID(),
+        projectId,
+        workerId,
+        work: identity(claim),
+        outcome: {
+          case: "failure",
+          value: {
+            error: "blocked",
+            block: create(ProviderBlockSchema, {
+              reason: ProviderBlockReason.CONTEXT_WINDOW_EXCEEDED,
+              provider: "codex",
+              message: "context window exceeded",
+            }),
+          },
+        },
+      },
+    ));
+    const result = await completeIssueReplyApplication({
+      db,
+      env: env(),
+      worker,
+      request: completion,
+      observedAt: at(400 + sequence),
+    }, { channelReplyWorkerAvailability: availability });
+    expect(result.disposition).toBe("failed");
+    expect(availability).not.toHaveBeenCalled();
+    await expect(db.prepare(
+      `select status, error from briar_issue_agent_reply_jobs where id = ?`,
+    ).bind(claim.workId).first()).resolves.toEqual({
+      status: "failed",
+      error: "요청이 Codex 모델의 컨텍스트 한도를 초과했습니다. 답변을 생성하지 못했습니다. 요청 내용을 줄이거나 다른 모델의 Agent를 사용해 다시 요청해 주세요.",
     });
   });
 

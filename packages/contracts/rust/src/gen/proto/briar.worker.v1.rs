@@ -12615,13 +12615,28 @@ pub struct ReplyFailure {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub error: ::buffa::alloc::string::String,
+    /// Present when the provider stopped the turn for a reason the server
+    /// should act on (route the retry elsewhere, tell the requester why).
+    ///
+    /// Field 2: `block`
+    #[serde(
+        rename = "block",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub block: ::buffa::MessageField<
+        super::super::types::v1::ProviderBlock,
+        ::buffa::Inline<super::super::types::v1::ProviderBlock>,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
 impl ::core::fmt::Debug for ReplyFailure {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("ReplyFailure").field("error", &self.error).finish()
+        f.debug_struct("ReplyFailure")
+            .field("error", &self.error)
+            .field("block", &self.block)
+            .finish()
     }
 }
 impl ReplyFailure {
@@ -12647,25 +12662,41 @@ impl ::buffa::Message for ReplyFailure {
     /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
     /// points reject, never a silently wrapped size.
     #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
         if !self.error.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.error) as u64;
         }
+        if self.block.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.block.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
     fn write_to(
         &self,
-        _cache: &mut ::buffa::SizeCache,
+        __cache: &mut ::buffa::SizeCache,
         buf: &mut impl ::buffa::EncodeSink,
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         if !self.error.is_empty() {
             ::buffa::types::put_string_field(1u32, &self.error, buf);
+        }
+        if self.block.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                2u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.block.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -12687,6 +12718,17 @@ impl ::buffa::Message for ReplyFailure {
                 )?;
                 ::buffa::types::merge_string(&mut self.error, buf)?;
             }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.block.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -12696,6 +12738,7 @@ impl ::buffa::Message for ReplyFailure {
     }
     fn clear(&mut self) {
         self.error.clear();
+        self.block = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -24359,13 +24402,25 @@ pub struct ProjectAgentTaskFailure {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub error: ::buffa::alloc::string::String,
+    /// Field 2: `block`
+    #[serde(
+        rename = "block",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub block: ::buffa::MessageField<
+        super::super::types::v1::ProviderBlock,
+        ::buffa::Inline<super::super::types::v1::ProviderBlock>,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
 impl ::core::fmt::Debug for ProjectAgentTaskFailure {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("ProjectAgentTaskFailure").field("error", &self.error).finish()
+        f.debug_struct("ProjectAgentTaskFailure")
+            .field("error", &self.error)
+            .field("block", &self.block)
+            .finish()
     }
 }
 impl ProjectAgentTaskFailure {
@@ -24391,25 +24446,41 @@ impl ::buffa::Message for ProjectAgentTaskFailure {
     /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
     /// points reject, never a silently wrapped size.
     #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
         if !self.error.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.error) as u64;
         }
+        if self.block.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.block.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
     fn write_to(
         &self,
-        _cache: &mut ::buffa::SizeCache,
+        __cache: &mut ::buffa::SizeCache,
         buf: &mut impl ::buffa::EncodeSink,
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         if !self.error.is_empty() {
             ::buffa::types::put_string_field(1u32, &self.error, buf);
+        }
+        if self.block.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                2u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.block.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -24431,6 +24502,17 @@ impl ::buffa::Message for ProjectAgentTaskFailure {
                 )?;
                 ::buffa::types::merge_string(&mut self.error, buf)?;
             }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.block.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -24440,6 +24522,7 @@ impl ::buffa::Message for ProjectAgentTaskFailure {
     }
     fn clear(&mut self) {
         self.error.clear();
+        self.block = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -63351,6 +63434,15 @@ pub mod __buffa {
         pub struct ReplyFailureView<'a> {
             /// Field 1: `error`
             pub error: &'a str,
+            /// Present when the provider stopped the turn for a reason the server
+            /// should act on (route the retry elsewhere, tell the requester why).
+            ///
+            /// Field 2: `block`
+            pub block: ::buffa::MessageFieldView<
+                super::super::super::super::types::v1::__buffa::view::ProviderBlockView<
+                    'a,
+                >,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ReplyFailureView<'a> {
@@ -63392,6 +63484,31 @@ pub mod __buffa {
                         )?;
                         view.error = ::buffa::types::borrow_str(&mut cur)?;
                     }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.block.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.block = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::types::v1::__buffa::view::ProviderBlockView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -63422,6 +63539,17 @@ pub mod __buffa {
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::ReplyFailure {
                     error: self.error.to_string(),
+                    block: match self.block.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::types::v1::ProviderBlock,
+                                ::buffa::Inline<
+                                    super::super::super::super::types::v1::ProviderBlock,
+                                >,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -63432,7 +63560,7 @@ pub mod __buffa {
         }
         impl<'a> ::buffa::ViewEncode<'a> for ReplyFailureView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
@@ -63440,19 +63568,35 @@ pub mod __buffa {
                     size
                         += 1u64 + ::buffa::types::string_encoded_len(&self.error) as u64;
                 }
+                if self.block.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.block.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
             #[allow(clippy::needless_borrow)]
             fn write_to(
                 &self,
-                _cache: &mut ::buffa::SizeCache,
+                __cache: &mut ::buffa::SizeCache,
                 buf: &mut impl ::buffa::EncodeSink,
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 if !self.error.is_empty() {
                     ::buffa::types::put_string_field(1u32, &self.error, buf);
+                }
+                if self.block.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.block.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -63477,6 +63621,11 @@ pub mod __buffa {
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.error) {
                     __map.serialize_entry("error", self.error)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.block.as_option() {
+                        __map.serialize_entry("block", __v)?;
+                    }
                 }
                 __map.end()
             }
@@ -63575,6 +63724,20 @@ pub mod __buffa {
             #[must_use]
             pub fn error(&self) -> &'_ str {
                 self.0.reborrow().error
+            }
+            /// Present when the provider stopped the turn for a reason the server
+            /// should act on (route the retry elsewhere, tell the requester why).
+            ///
+            /// Field 2: `block`
+            #[must_use]
+            pub fn block(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::types::v1::__buffa::view::ProviderBlockView<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().block
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<ReplyFailureView<'static>>>
@@ -83317,6 +83480,12 @@ pub mod __buffa {
         pub struct ProjectAgentTaskFailureView<'a> {
             /// Field 1: `error`
             pub error: &'a str,
+            /// Field 2: `block`
+            pub block: ::buffa::MessageFieldView<
+                super::super::super::super::types::v1::__buffa::view::ProviderBlockView<
+                    'a,
+                >,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ProjectAgentTaskFailureView<'a> {
@@ -83358,6 +83527,31 @@ pub mod __buffa {
                         )?;
                         view.error = ::buffa::types::borrow_str(&mut cur)?;
                     }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.block.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.block = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::types::v1::__buffa::view::ProviderBlockView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -83388,6 +83582,17 @@ pub mod __buffa {
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::ProjectAgentTaskFailure {
                     error: self.error.to_string(),
+                    block: match self.block.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::types::v1::ProviderBlock,
+                                ::buffa::Inline<
+                                    super::super::super::super::types::v1::ProviderBlock,
+                                >,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -83398,7 +83603,7 @@ pub mod __buffa {
         }
         impl<'a> ::buffa::ViewEncode<'a> for ProjectAgentTaskFailureView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
@@ -83406,19 +83611,35 @@ pub mod __buffa {
                     size
                         += 1u64 + ::buffa::types::string_encoded_len(&self.error) as u64;
                 }
+                if self.block.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.block.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
             #[allow(clippy::needless_borrow)]
             fn write_to(
                 &self,
-                _cache: &mut ::buffa::SizeCache,
+                __cache: &mut ::buffa::SizeCache,
                 buf: &mut impl ::buffa::EncodeSink,
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 if !self.error.is_empty() {
                     ::buffa::types::put_string_field(1u32, &self.error, buf);
+                }
+                if self.block.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.block.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -83443,6 +83664,11 @@ pub mod __buffa {
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.error) {
                     __map.serialize_entry("error", self.error)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.block.as_option() {
+                        __map.serialize_entry("block", __v)?;
+                    }
                 }
                 __map.end()
             }
@@ -83545,6 +83771,17 @@ pub mod __buffa {
             #[must_use]
             pub fn error(&self) -> &'_ str {
                 self.0.reborrow().error
+            }
+            /// Field 2: `block`
+            #[must_use]
+            pub fn block(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::types::v1::__buffa::view::ProviderBlockView<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().block
             }
         }
         impl ::core::convert::From<

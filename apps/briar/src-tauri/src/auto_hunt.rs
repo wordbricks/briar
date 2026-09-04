@@ -320,6 +320,9 @@ pub(super) fn auto_hunt_terminal_event_arguments(
     let (status_detail, structured_result) = if status == "blocked" {
         let reason = match cause {
             "workspace-allocation" => "Briar가 이 이슈를 처리할 별도 작업 공간을 준비하지 못해 작업을 시작할 수 없습니다. 아직 코드 변경은 시작되지 않았습니다.".to_string(),
+            "provider-block" => format!(
+                "coding agent provider가 요청을 거부해 작업을 계속할 수 없습니다: {detail} 작업이 완료되지 않았으며 현재까지의 변경 사항은 worktree에 보존됩니다."
+            ),
             _ => detail.to_string(),
         };
         let technical_detail = match cause {
@@ -330,6 +333,7 @@ pub(super) fn auto_hunt_terminal_event_arguments(
         };
         let next_action = match cause {
             "workspace-allocation" => "프로젝트 저장소에 접근할 수 있는 담당자가 Worker 컴퓨터의 Briar에서 저장소 연결을 다시 확인한 뒤 이 이슈를 재시도해 주세요. 이슈가 ‘진행 중’ 상태로 바뀌면 문제가 해결된 것입니다.",
+            "provider-block" => "provider 사용량, 로그인 또는 모델 설정을 확인해 안내된 원인을 해결한 뒤 이 이슈를 재시도해 주세요. 이슈가 ‘진행 중’ 상태로 바뀌면 문제가 해결된 것입니다.",
             _ => "이 문제를 담당할 수 있는 사람이 안내된 원인을 해결한 뒤 이 이슈를 재시도해 주세요. 이슈가 ‘진행 중’ 상태로 바뀌면 문제가 해결된 것입니다.",
         };
         let result = app_proto::StructuredRunResult {
@@ -1018,13 +1022,20 @@ pub(super) async fn start_project_auto_hunt(
                         }
                         return Err(detail);
                     }
+                    // A provider block is a blocked run with a next action, not
+                    // a failed one: the work is preserved and a person or time
+                    // clears it.
+                    let (status, cause, error) = match agent::ProviderBlock::from_error(&error) {
+                        Some(block) => ("blocked", "provider-block", block.describe()),
+                        None => ("failed", "worker-execution", error),
+                    };
                     let record_error = record_auto_hunt_terminal_event(
                         runner.as_ref(),
                         &cli_environment,
                         &worker_workspace,
                         &issue,
-                        "failed",
-                        "worker-execution",
+                        status,
+                        cause,
                         &error,
                     )
                     .err();

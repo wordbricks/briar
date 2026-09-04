@@ -1,3 +1,7 @@
+import {
+  isProviderBlockedError,
+  requestAgentUsageRefresh,
+} from "./provider-block-error";
 import type { TeamAgentRunInput } from "./team-llm";
 import type { ProjectAgentRunResponse } from "../generated/tauri";
 import { teamAgentRunSnapshots } from "./team-llm";
@@ -160,9 +164,12 @@ export async function executeTeamAgentTask(
         conversationId: input.conversationId ?? null,
         workspaceRoot: input.workspaceRoot ?? null,
         summary: null,
+        // A provider block keeps its structured form so every reader of the
+        // session can localize it; `describeDesktopError` renders it.
         error: caught instanceof Error ? caught.message : String(caught),
       });
     }
+    if (isProviderBlockedError(caught)) requestAgentUsageRefresh();
     throw caught;
   }
 }

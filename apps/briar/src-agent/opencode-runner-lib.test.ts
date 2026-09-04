@@ -647,11 +647,50 @@ describe("OpenCode terminal session outcomes", () => {
     );
   });
 
-  it("ends the run on a non-transient session error", () => {
+  it("blocks the run on a usage-limit session error", () => {
     expect(openCodeTerminalOutcome(usageLimitError, "ses_1")).toEqual({
-      type: "failed",
-      message: "AI_APICallError: Monthly usage limit reached",
+      type: "blocked",
+      blocker: {
+        reason: "usage_exhausted",
+        provider: "opencode",
+        message: "AI_APICallError: Monthly usage limit reached",
+        nextRetryAt: null,
+      },
     });
+    expect(
+      openCodeTerminalOutcome(
+        {
+          type: "session.error",
+          properties: {
+            sessionID: "ses_1",
+            error: {
+              name: "APIError",
+              data: { message: "Insufficient credits", statusCode: 402 },
+            },
+          },
+        },
+        "ses_1",
+        "openrouter",
+      ),
+    ).toMatchObject({
+      type: "blocked",
+      blocker: { reason: "billing_required", provider: "openrouter", statusCode: 402 },
+    });
+    expect(
+      openCodeTerminalOutcome(
+        {
+          type: "session.error",
+          properties: {
+            sessionID: "ses_1",
+            error: { name: "ProviderAuthError", data: { message: "Not signed in to Anthropic" } },
+          },
+        },
+        "ses_1",
+      ),
+    ).toMatchObject({ type: "blocked", blocker: { reason: "auth_required" } });
+  });
+
+  it("ends the run on a non-transient session error", () => {
     expect(
       openCodeTerminalOutcome(
         {
@@ -740,10 +779,11 @@ describe("OpenCode terminal session outcomes", () => {
     expect(normalizeOpenCodeEvent(usageLimitError, "ses_1", state)).toEqual([
       normalizedTurnCompleted("failed"),
     ]);
-    expect(openCodeBlockedRetry(usageLimitError, "ses_1")).toBeNull();
-    expect(openCodeTerminalOutcome(usageLimitError, "ses_1")).toEqual({
-      type: "failed",
-      message: "AI_APICallError: Monthly usage limit reached",
+    expect(openCodeBlockedRetry(usageLimitError, "ses_1")).toMatchObject({
+      reason: "usage_exhausted",
+    });
+    expect(openCodeTerminalOutcome(usageLimitError, "ses_1")).toMatchObject({
+      type: "blocked",
     });
   });
 });

@@ -24,6 +24,10 @@ import {
 } from "./normalized-agent-event";
 import { readAgentImage } from "./runner-attachments";
 import type { RunnerRequest } from "./runner-request";
+import {
+  classifyProviderFailure,
+  type ProviderBlock,
+} from "./provider-block";
 
 export type ClaudeEventState = {
   activeMessageId: string | null;
@@ -484,4 +488,113 @@ export function approvalResult(
         behavior: "deny",
         message: "The user declined this tool request.",
       };
+}
+
+/**
+ * What the Claude Agent SDK told us about why the API refused work. The SDK
+ * announces subscription limits as `rate_limit_event`, API-level refusals as
+ * the `error` field on a synthetic assistant message, and retries as
+ * `api_retry` system messages; the final result only carries free text, so
+ * the structured signals are remembered until the turn ends.
+ */
+export type ClaudeFailureState = {
+  block: ProviderBlock | null;
+  lastApiError: { code: string; statusCode: number | null } | null;
+};
+
+export function createClaudeFailureState(): ClaudeFailureState {
+  return { block: null, lastApiError: null };
+}
+
+type ClaudeRateLimitMessage = {
+  type: "rate_limit_event";
+  rate_limit_info?: {
+    status?: string;
+    resetsAt?: number;
+    rateLimitType?: string;
+    overageDisabledReason?: string;
+  };
+};
+
+export function observeClaudeFailure(
+  message: SDKMessage,
+  state: ClaudeFailureState,
+  now: () => number = Date.now,
+): void {
+  if ((message as { type?: string }).type === "rate_limit_event") {
+    const info = (message as ClaudeRateLimitMessage).rate_limit_info;
+    if (info?.status !== "rejected") return;
+    const code = info.overageDisabledReason === "out_of_credits"
+      ? "out_of_credits"
+      : "rate_limit";
+    state.block = classifyProviderFailure({
+      provider: "claude",
+      code,
+      message: `Claude usage limit reached (${info.rateLimitType ?? "plan"})`,
+      retryAt: info.resetsAt ?? null,
+      now,
+    });
+    return;
+  }
+  if (message.type === "assistant" && message.error) {
+    state.lastApiError = { code: message.error, statusCode: null };
+    const block = classifyProviderFailure({
+      provider: "claude",
+      code: message.error,
+      message: textContent(message) || message.error,
+      now,
+    });
+    if (block) state.block = block;
+    return;
+  }
+  if (message.type === "system" && message.subtype === "api_retry") {
+    state.lastApiError = {
+      code: message.error,
+      statusCode: message.error_status,
+    };
+  }
+}
+
+/** The block a failed result maps to, or null when the turn simply failed. */
+export function claudeResultBlock(
+  message: Extract<SDKMessage, { type: "result" }>,
+  state: ClaudeFailureState,
+  now: () => number = Date.now,
+): ProviderBlock | null {
+  if (message.subtype === "success") return null;
+  const text = message.errors.join("\n");
+  const terminal = message.terminal_reason;
+  if (terminal === "blocking_limit" || terminal === "rapid_refill_breaker") {
+    return state.block ?? classifyProviderFailure({
+      provider: "claude",
+      code: terminal,
+      message: text || "Claude usage limit reached",
+      now,
+    });
+  }
+  if (terminal === "prompt_too_long") {
+    return classifyProviderFailure({
+      provider: "claude",
+      code: "prompt_too_long",
+      message: text || "Prompt is too long",
+      now,
+    });
+  }
+  if (state.block) return state.block;
+  const fromText = classifyProviderFailure({
+    provider: "claude",
+    message: text,
+    now,
+  });
+  if (fromText) return fromText;
+  if (state.lastApiError) {
+    return classifyProviderFailure({
+      provider: "claude",
+      code: state.lastApiError.code,
+      statusCode: state.lastApiError.statusCode,
+      message: text || state.lastApiError.code,
+      now,
+    });
+  }
+  return null;
 }

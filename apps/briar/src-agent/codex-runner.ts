@@ -8,6 +8,7 @@ import {
   codexFinalMessage,
   codexInitializeRequest,
   codexMcpRecoveryPrompt,
+  codexProviderBlock,
   codexServerRequestResponse,
   consumeCodexAppServerMessage,
   createCodexAppServerState,
@@ -21,6 +22,7 @@ import { createRunnerIo } from "./runner-io";
 import type { RunnerRequest } from "./runner-request";
 import { prepareComputerUseMcp } from "./computer-use-mcp-config";
 import { codexComputerUseArgs } from "./computer-use-provider-adapters";
+import { ProviderBlockedError } from "./provider-block";
 
 let activeChild: ChildProcessWithoutNullStreams | null = null;
 const runnerIo = createRunnerIo({
@@ -176,6 +178,8 @@ async function runCodexAttempt(
       };
     }
     if (!completed) {
+      const stderrBlock = codexProviderBlock(null, stderr.trim());
+      if (stderrBlock) throw new ProviderBlockedError(stderrBlock);
       throw new Error(
         stderr.trim() ||
           `Codex App Server exited before turn completion (code ${exitCode ?? "unknown"}).`,
@@ -294,6 +298,10 @@ function isolationKey(value: CodexMcpIsolation): string {
 
 void main()
   .catch((caught) => {
+    if (caught instanceof ProviderBlockedError) {
+      emit.blocked(caught.block);
+      return;
+    }
     emit.error(caught instanceof Error ? caught.message : String(caught));
     process.exitCode = 1;
   })

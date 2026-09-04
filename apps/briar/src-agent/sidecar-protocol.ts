@@ -17,7 +17,6 @@ import { CONTRACTS_DESCRIPTOR_FINGERPRINT } from "@briar/contracts/descriptor-fi
 import {
   ApprovalRequestSchema,
   ApprovalResponseSchema,
-  BlockReason,
   ParentToRunnerSchema,
   ProviderEventSchema,
   RunBlockedSchema,
@@ -37,6 +36,11 @@ import {
   type NormalizedAgentEvent,
 } from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
 import { timingSafeEqual } from "node:crypto";
+import {
+  providerBlockFromProto,
+  providerBlockToProto,
+  type ProviderBlock,
+} from "../src/lib/provider-block";
 
 export type SidecarProviderEventInput = {
   raw: unknown;
@@ -56,25 +60,8 @@ export type SidecarResultInput = Pick<
   "sessionId" | "message"
 >;
 
-export type SidecarBlockedInput = {
-  reason:
-    | "mcp_auth_required"
-    | "usage_exhausted"
-    | "upstream_overloaded"
-    | "free_tier_limit";
-  message: string;
-  provider?: string;
-  serverNames?: string[];
-  nextRetryAt?: string | null;
-  statusCode?: number;
-};
-
-const blockReasonToProto = {
-  mcp_auth_required: BlockReason.MCP_AUTH_REQUIRED,
-  usage_exhausted: BlockReason.USAGE_EXHAUSTED,
-  upstream_overloaded: BlockReason.UPSTREAM_OVERLOADED,
-  free_tier_limit: BlockReason.FREE_TIER_LIMIT,
-} as const;
+/** A runner's block, encoded on the wire as `briar.types.v1.ProviderBlock`. */
+export type SidecarBlockedInput = ProviderBlock;
 
 function normalizedJson(value: unknown): JsonValue {
   const serialized = JSON.stringify(value);
@@ -190,27 +177,23 @@ export const sidecarRunResult = (
 
 export const sidecarRunBlocked = (
   input: SidecarBlockedInput,
-): RunnerToParent => {
-  const retryDate = input.nextRetryAt
-    ? new Date(input.nextRetryAt)
-    : undefined;
-  if (retryDate && Number.isNaN(retryDate.valueOf())) {
-    throw new Error(`Invalid sidecar retry timestamp: ${input.nextRetryAt}`);
-  }
-  return create(RunnerToParentSchema, {
+): RunnerToParent =>
+  create(RunnerToParentSchema, {
     payload: {
       case: "blocked",
       value: create(RunBlockedSchema, {
-        reason: blockReasonToProto[input.reason],
-        message: input.message,
-        provider: input.provider,
-        serverNames: input.serverNames ?? [],
-        nextRetryAt: retryDate ? timestampFromDate(retryDate) : undefined,
-        statusCode: input.statusCode,
+        block: providerBlockToProto(input),
       }),
     },
   });
-};
+
+/** The block carried by a `blocked` frame, or null for any other frame. */
+export const sidecarProviderBlock = (
+  message: RunnerToParent,
+): ProviderBlock | null =>
+  message.payload.case === "blocked"
+    ? providerBlockFromProto(message.payload.value.block)
+    : null;
 
 export const sidecarRunError = (message: string): RunnerToParent =>
   create(RunnerToParentSchema, {

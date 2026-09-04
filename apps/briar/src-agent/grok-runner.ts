@@ -78,6 +78,7 @@ export function grokAgentSpawnSpec(input: {
 }
 
 export const grokProfile: AcpProviderProfile = {
+  providerId: "grok",
   providerName: "Grok Agent",
   displayName: "Grok",
   missingSessionIdMessage: "Grok agent did not return a session id.",

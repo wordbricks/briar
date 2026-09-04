@@ -279,7 +279,7 @@ describe("Organization Agent channel delegation", () => {
     }
     const result = call.input.result;
     const outcome: ChannelReplyCompletionInput["outcome"] = call.input.error
-      ? { case: "failure", error: call.input.error }
+      ? { case: "failure", error: call.input.error, block: null }
       : result
       ? {
           case: "success",
@@ -293,7 +293,7 @@ describe("Organization Agent channel delegation", () => {
             delegation: result.delegation ?? null,
           },
         }
-      : { case: "failure", error: "Reply result is required" };
+      : { case: "failure", error: "Reply result is required", block: null };
     try {
       const result = await completeChannelReplyApplication({
         db,

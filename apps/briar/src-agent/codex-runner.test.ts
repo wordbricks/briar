@@ -1,9 +1,9 @@
 import { create } from "@bufbuild/protobuf";
 import { sizeDelimitedDecodeStream } from "@bufbuild/protobuf/wire";
+import { ProviderBlockReason } from "@briar/contracts/gen/briar/types/v1/provider_block_pb";
 import { CONTRACTS_DESCRIPTOR_FINGERPRINT } from "@briar/contracts/descriptor-fingerprint";
 import {
   ApprovalPolicy,
-  BlockReason,
   RunRequestSchema,
   RunnerToParentSchema,
   SandboxMode,
@@ -82,10 +82,12 @@ describe("Codex runner MCP isolation", () => {
       payload: {
         case: "blocked",
         value: expect.objectContaining({
-          reason: BlockReason.MCP_AUTH_REQUIRED,
-          provider: "codex",
-          message: "Authentication is required for MCP server(s): Figma.",
-          serverNames: ["Figma"],
+          block: expect.objectContaining({
+            reason: ProviderBlockReason.MCP_AUTH_REQUIRED,
+            provider: "codex",
+            message: "Authentication is required for MCP server(s): Figma.",
+            serverNames: ["Figma"],
+          }),
         }),
       },
     }));

@@ -131,6 +131,19 @@ impl AgentProviderKind {
         }
     }
 
+    /// Platform name as the CLI and the frontend spell it ("codex", "agy").
+    pub(crate) fn wire_name(self) -> &'static str {
+        match self {
+            Self::Codex => "codex",
+            Self::Claude => "claude",
+            Self::Cursor => "cursor",
+            Self::Grok => "grok",
+            Self::Agy => "agy",
+            Self::Opencode => "opencode",
+            Self::Openrouter => "openrouter",
+        }
+    }
+
     /// Wire identity from `briar.types.v1.AgentProvider` (ADR-0008). The match
     /// is exhaustive, so a new platform provider must declare a wire value.
     pub(crate) fn wire(self) -> types_proto::AgentProvider {
@@ -175,6 +188,153 @@ impl AgentProviderKind {
 impl From<AgentProviderKind> for types_proto::AgentProvider {
     fn from(value: AgentProviderKind) -> Self {
         value.wire()
+    }
+}
+
+/// Why a provider stopped a turn before producing a result, mirrored from
+/// `briar.types.v1.ProviderBlockReason`. Serialized in snake_case so the
+/// desktop frontend and the CLI share one vocabulary.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum ProviderBlockReason {
+    McpAuthRequired,
+    UsageExhausted,
+    UpstreamOverloaded,
+    FreeTierLimit,
+    AuthRequired,
+    ContextWindowExceeded,
+    BillingRequired,
+    ModelUnavailable,
+}
+
+impl ProviderBlockReason {
+    pub(crate) fn from_wire(value: types_proto::ProviderBlockReason) -> Option<Self> {
+        use types_proto::ProviderBlockReason as Wire;
+        match value {
+            Wire::PROVIDER_BLOCK_REASON_UNSPECIFIED => None,
+            Wire::PROVIDER_BLOCK_REASON_MCP_AUTH_REQUIRED => Some(Self::McpAuthRequired),
+            Wire::PROVIDER_BLOCK_REASON_USAGE_EXHAUSTED => Some(Self::UsageExhausted),
+            Wire::PROVIDER_BLOCK_REASON_UPSTREAM_OVERLOADED => Some(Self::UpstreamOverloaded),
+            Wire::PROVIDER_BLOCK_REASON_FREE_TIER_LIMIT => Some(Self::FreeTierLimit),
+            Wire::PROVIDER_BLOCK_REASON_AUTH_REQUIRED => Some(Self::AuthRequired),
+            Wire::PROVIDER_BLOCK_REASON_CONTEXT_WINDOW_EXCEEDED => {
+                Some(Self::ContextWindowExceeded)
+            }
+            Wire::PROVIDER_BLOCK_REASON_BILLING_REQUIRED => Some(Self::BillingRequired),
+            Wire::PROVIDER_BLOCK_REASON_MODEL_UNAVAILABLE => Some(Self::ModelUnavailable),
+        }
+    }
+
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::McpAuthRequired => "mcp_auth_required",
+            Self::UsageExhausted => "usage_exhausted",
+            Self::UpstreamOverloaded => "upstream_overloaded",
+            Self::FreeTierLimit => "free_tier_limit",
+            Self::AuthRequired => "auth_required",
+            Self::ContextWindowExceeded => "context_window_exceeded",
+            Self::BillingRequired => "billing_required",
+            Self::ModelUnavailable => "model_unavailable",
+        }
+    }
+}
+
+/// Tauri commands return `Result<_, String>`, so a block travels to the
+/// frontend as this prefix followed by the JSON of a [`ProviderBlock`]. The
+/// frontend strips the prefix and reads the structure; every other consumer
+/// still sees one readable line.
+pub(crate) const PROVIDER_BLOCKED_ERROR_PREFIX: &str = "BRIAR_PROVIDER_BLOCKED: ";
+
+#[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ProviderBlock {
+    pub(crate) reason: ProviderBlockReason,
+    pub(crate) provider: String,
+    pub(crate) message: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) next_retry_at: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) status_code: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) provider_code: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) server_names: Vec<String>,
+}
+
+impl ProviderBlock {
+    pub(crate) fn from_wire(
+        fallback_provider: AgentProviderKind,
+        value: types_proto::ProviderBlock,
+    ) -> Option<Self> {
+        let reason = ProviderBlockReason::from_wire(value.reason.as_known()?)?;
+        let provider = value
+            .provider
+            .as_deref()
+            .map(str::trim)
+            .filter(|provider| !provider.is_empty())
+            .map(str::to_string)
+            .unwrap_or_else(|| fallback_provider.wire_name().to_string());
+        let next_retry_at = value
+            .next_retry_at
+            .into_option()
+            .and_then(|timestamp| serde_json::to_value(timestamp).ok())
+            .and_then(|timestamp| timestamp.as_str().map(str::to_string));
+        Some(Self {
+            reason,
+            provider,
+            message: value.message.trim().to_string(),
+            next_retry_at,
+            status_code: value.status_code,
+            provider_code: value
+                .provider_code
+                .map(|code| code.trim().to_string())
+                .filter(|code| !code.is_empty()),
+            server_names: value
+                .server_names
+                .into_iter()
+                .map(|name| name.trim().to_string())
+                .filter(|name| !name.is_empty())
+                .collect(),
+        })
+    }
+
+    /// The `Err(String)` a Tauri command carries for this block.
+    pub(crate) fn to_error(&self, prefix: &str) -> String {
+        match serde_json::to_string(self) {
+            Ok(json) => format!("{PROVIDER_BLOCKED_ERROR_PREFIX}{json}"),
+            Err(_) => format!(
+                "{prefix}: {} (reason={})",
+                self.message,
+                self.reason.as_str()
+            ),
+        }
+    }
+
+    /// Recover the block from an error string produced by [`Self::to_error`].
+    pub(crate) fn from_error(error: &str) -> Option<Self> {
+        let json = error.trim().strip_prefix(PROVIDER_BLOCKED_ERROR_PREFIX)?;
+        serde_json::from_str(json).ok()
+    }
+
+    /// One readable line for logs and run events.
+    pub(crate) fn describe(&self) -> String {
+        let mut details = vec![
+            format!("reason={}", self.reason.as_str()),
+            format!("provider={}", self.provider),
+        ];
+        if !self.server_names.is_empty() {
+            details.push(format!("serverNames={}", self.server_names.join(",")));
+        }
+        if let Some(next_retry_at) = &self.next_retry_at {
+            details.push(format!("nextRetryAt={next_retry_at}"));
+        }
+        if let Some(status_code) = self.status_code {
+            details.push(format!("statusCode={status_code}"));
+        }
+        if let Some(code) = &self.provider_code {
+            details.push(format!("providerCode={code}"));
+        }
+        format!("{} ({})", self.message, details.join(", "))
     }
 }
 
@@ -639,8 +799,61 @@ pub(crate) fn summarize_auto_hunt_dispatch(
 mod tests {
     use super::{
         AgentActivityKind, AgentActivityStatus, AgentEvent, AgentProviderKind, BundledRunnerFile,
-        ProjectLlmRequest, BRIAR_SKILL_INSTRUCTION, CONVERSATION_NAMESPACES,
+        ProjectLlmRequest, ProviderBlock, ProviderBlockReason, BRIAR_SKILL_INSTRUCTION,
+        CONVERSATION_NAMESPACES, PROVIDER_BLOCKED_ERROR_PREFIX,
     };
+    use briar_contracts::proto::briar::types::v1 as types_proto;
+
+    #[test]
+    fn provider_block_round_trips_through_the_command_error_string() {
+        let block = ProviderBlock {
+            reason: ProviderBlockReason::UsageExhausted,
+            provider: "claude".to_string(),
+            message: "Claude AI usage limit reached".to_string(),
+            next_retry_at: Some("2026-09-04T12:00:00Z".to_string()),
+            status_code: Some(429),
+            provider_code: Some("rate_limit".to_string()),
+            server_names: Vec::new(),
+        };
+        let error = block.to_error("Claude Agent 요청이 차단되었습니다");
+        assert!(error.starts_with(PROVIDER_BLOCKED_ERROR_PREFIX));
+        assert!(error.contains("\"reason\":\"usage_exhausted\""));
+        assert_eq!(ProviderBlock::from_error(&error), Some(block.clone()));
+        assert_eq!(
+            ProviderBlock::from_error("Codex 요청에 실패했습니다: boom"),
+            None
+        );
+        assert_eq!(
+            block.describe(),
+            "Claude AI usage limit reached (reason=usage_exhausted, provider=claude, nextRetryAt=2026-09-04T12:00:00Z, statusCode=429, providerCode=rate_limit)"
+        );
+    }
+
+    #[test]
+    fn provider_block_reads_every_wire_reason_and_falls_back_to_the_runner_provider() {
+        use buffa::Enumeration as _;
+        for value in types_proto::ProviderBlockReason::values() {
+            let block = ProviderBlock::from_wire(
+                AgentProviderKind::Grok,
+                types_proto::ProviderBlock {
+                    reason: (*value).into(),
+                    message: " limit ".to_string(),
+                    ..Default::default()
+                },
+            );
+            if *value == types_proto::ProviderBlockReason::PROVIDER_BLOCK_REASON_UNSPECIFIED {
+                assert!(block.is_none());
+            } else {
+                let block = block.expect("known reason maps");
+                assert_eq!(block.provider, "grok");
+                assert_eq!(block.message, "limit");
+                assert_eq!(
+                    ProviderBlockReason::from_wire(*value).map(|reason| reason.as_str()),
+                    Some(block.reason.as_str())
+                );
+            }
+        }
+    }
     #[test]
     fn resolves_the_original_provider_from_a_project_conversation() {
         assert_eq!(

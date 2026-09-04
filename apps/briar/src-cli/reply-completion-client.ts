@@ -1,3 +1,7 @@
+import {
+  providerBlockToProto,
+  type ProviderBlock,
+} from "../src/lib/provider-block";
 import { create } from "@bufbuild/protobuf";
 import { EmptySchema, timestampDate } from "@bufbuild/protobuf/wkt";
 import { Code, ConnectError } from "@connectrpc/connect";
@@ -385,7 +389,7 @@ export function createReplyCompletionClient(
             attachments: readonly File[];
           };
         }
-      | { outcome: { case: "failure"; error: string } }
+      | { outcome: { case: "failure"; error: string; block?: ProviderBlock } }
     )) => {
       const attachmentIds = input.outcome.case === "success"
         ? await prepareAttachments({
@@ -405,7 +409,12 @@ export function createReplyCompletionClient(
             }
           : {
               case: "failure",
-              value: { error: input.outcome.error },
+              value: {
+                error: input.outcome.error,
+                ...(input.outcome.block
+                  ? { block: providerBlockToProto(input.outcome.block) }
+                  : {}),
+              },
             },
       });
       const response = await exactRpc(
@@ -435,7 +444,7 @@ export function createReplyCompletionClient(
             attachments: readonly File[];
           };
         }
-      | { outcome: { case: "failure"; error: string } }
+      | { outcome: { case: "failure"; error: string; block?: ProviderBlock } }
     )) => {
       const attachmentIds = input.outcome.case === "success"
         ? await prepareAttachments({
@@ -459,7 +468,12 @@ export function createReplyCompletionClient(
             }
           : {
               case: "failure",
-              value: { error: input.outcome.error },
+              value: {
+                error: input.outcome.error,
+                ...(input.outcome.block
+                  ? { block: providerBlockToProto(input.outcome.block) }
+                  : {}),
+              },
             },
       });
       const response = await exactRpc(

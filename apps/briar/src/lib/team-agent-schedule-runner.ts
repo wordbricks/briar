@@ -5,6 +5,11 @@ import type {
 import { events, type ProjectLlmResponse } from "../generated/tauri";
 import type { StructuredAgentResult } from "./agent-result";
 import { isDesktopTauri } from "./platform";
+import {
+  providerBlockNextAction,
+  providerBlockRunSummary,
+} from "./provider-block";
+import { providerBlockFromError } from "./provider-block-error";
 
 export const PROJECT_AGENT_SCHEDULE_POLL_INTERVAL_MS = 60_000;
 export const PROJECT_AGENT_SCHEDULE_RENEW_INTERVAL_MS = 5 * 60_000;
@@ -76,7 +81,12 @@ export async function executeClaimedTeamAgentSchedule(
       structuredResult: response.structuredResult,
     });
   } catch (error) {
-    const message = bounded(describe(error).trim() || "Unknown provider error", 4_000);
+    // A provider block names what a person must do and when the provider
+    // comes back; an ordinary failure only has the provider's text.
+    const block = providerBlockFromError(error);
+    const message = block
+      ? bounded(providerBlockRunSummary(block), 4_000)
+      : bounded(describe(error).trim() || "Unknown provider error", 4_000);
     try {
       return await dependencies.complete(run.teamId, run.id, {
         claimToken: run.claimToken,
@@ -89,8 +99,10 @@ export async function executeClaimedTeamAgentSchedule(
           urgency: "time_sensitive",
           impact: "issue",
           humanActionRequired: true,
-          nextAction: "실패 원인을 확인하고 예약 작업을 다시 실행하세요.",
-          dueAt: null,
+          nextAction: block
+            ? providerBlockNextAction(block)
+            : "실패 원인을 확인하고 예약 작업을 다시 실행하세요.",
+          dueAt: block?.nextRetryAt ?? null,
         },
       });
     } catch (completionError) {

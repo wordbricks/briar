@@ -1,3 +1,8 @@
+import {
+  describeDesktopError,
+  isProviderBlockedError,
+  requestAgentUsageRefresh,
+} from "../lib/provider-block-error";
 import { useAtomValue } from "@effect/atom-react";
 import { ArrowLeft, MonitorUp, Play } from "lucide-react";
 import { Spinner } from "./ui/spinner";
@@ -238,7 +243,8 @@ export function TeamAgentDetail({
         },
       );
     } catch (caught) {
-      toast(caught instanceof Error ? caught.message : String(caught), {
+      if (isProviderBlockedError(caught)) requestAgentUsageRefresh();
+      toast(describeDesktopError(caught, t), {
         tone: "error",
       });
     } finally {

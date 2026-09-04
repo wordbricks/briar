@@ -8,6 +8,7 @@ import { buildComputerUseArgs } from "@briar/agent-exec";
 import { Code, ConnectError } from "@connectrpc/connect";
 import { autoHuntRequirementKinds } from "../src/lib/auto-hunt-contract";
 import { runProjectAgentTaskCompletionFlow } from "./agent-runner";
+import { detachedProviderBlockOf } from "./detached-provider-turn";
 import {
   inspectWorkflowRequirements,
   workflowRequirementReadinessDetail,
@@ -923,6 +924,7 @@ async function workerCommand() {
               }),
             completeFailure: async (error) => {
               if (signal.aborted) throw error;
+              const block = detachedProviderBlockOf(error);
               return workerQueue.completeProjectAgentTask({
                 projectId: project.id,
                 workerId,
@@ -930,6 +932,7 @@ async function workerCommand() {
                 result: {
                   case: "failure",
                   error: error instanceof Error ? error.message : String(error),
+                  ...(block ? { block } : {}),
                 },
               });
             },

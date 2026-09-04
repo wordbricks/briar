@@ -12,6 +12,7 @@ import "briar/realtime/v1/realtime.proto";
 import "briar/types/v1/agent_event.proto";
 import "briar/types/v1/agent_execution.proto";
 import "briar/types/v1/computer_use.proto";
+import "briar/types/v1/provider_block.proto";
 import "briar/types/v1/github_identity.proto";
 import "briar/types/v1/provider.proto";
 import "briar/types/v1/upload.proto";
@@ -387,6 +388,9 @@ message PrepareReplyAttachmentUploadsResponse {
 
 message ReplyFailure {
   string error = 1;
+  // Present when the provider stopped the turn for a reason the server
+  // should act on (route the retry elsewhere, tell the requester why).
+  optional briar.types.v1.ProviderBlock block = 2;
 }
 
 message ReplyIssueDraft {
@@ -764,6 +768,7 @@ message ProjectAgentTaskSuccess {
 
 message ProjectAgentTaskFailure {
   string error = 1;
+  optional briar.types.v1.ProviderBlock block = 2;
 }
 
 message CompleteProjectAgentTaskResponse {

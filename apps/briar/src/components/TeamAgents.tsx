@@ -1,4 +1,9 @@
 import {
+  describeDesktopError,
+  isProviderBlockedError,
+  requestAgentUsageRefresh,
+} from "../lib/provider-block-error";
+import {
   ArrowLeft,
   Bot,
   ChevronRight,
@@ -369,7 +374,8 @@ export function TeamAgents({
         },
       );
     } catch (caught) {
-      toast(caught instanceof Error ? caught.message : String(caught), {
+      if (isProviderBlockedError(caught)) requestAgentUsageRefresh();
+      toast(describeDesktopError(caught, t), {
         tone: "error",
       });
     } finally {

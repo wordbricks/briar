@@ -25,10 +25,10 @@ import {
   openCodeSystemPrompt,
   parseOpenCodeModel,
   shouldAutoApproveOpenCodePermission,
-  type OpenCodeBlockedRetry,
   type OpenCodeEventState,
 } from "./opencode-runner-lib";
 import { normalizedTurnCompleted } from "./normalized-agent-event";
+import { ProviderBlockedError } from "./provider-block";
 import { createRunnerIo } from "./runner-io";
 import type { RunnerRequest } from "./runner-request";
 import { waitForOpenCodeServerUrl } from "./opencode-server-startup";
@@ -43,13 +43,6 @@ import {
 } from "./computer-use-mcp-config";
 import { openCodeComputerUseEnvironment } from
   "./computer-use-provider-adapters";
-
-class OpenCodeBlockedError extends Error {
-  constructor(readonly blocker: OpenCodeBlockedRetry) {
-    super(blocker.message);
-    this.name = "OpenCodeBlockedError";
-  }
-}
 
 type RunnerDiagnostic = (
   phase: string,
@@ -327,6 +320,10 @@ async function main(runnerIo: OpenCodeRunnerIo) {
   const { emit, request: requestPromise, waitForApproval } = runnerIo;
   emitRunnerDiagnostic("runner.request_waiting");
   const request = await requestPromise;
+  // OpenRouter and other upstream providers run behind OpenCode; a block
+  // names the upstream so the reader knows whose limit or account it is.
+  const upstreamProvider = parseOpenCodeModel(request.model)?.providerID?.trim() ||
+    "opencode";
   emitRunnerDiagnostic("runner.request_received", {
     workspaceRoot: request.workspaceRoot,
     opencodeBinary: request.providerBinaryPath,
@@ -371,10 +368,14 @@ async function main(runnerIo: OpenCodeRunnerIo) {
         // OpenCode leaves the assistant message unfinished after a fatal
         // session error, so the pump must end the run itself; the prompt
         // request would otherwise stay open forever.
-        const outcome = openCodeTerminalOutcome(raw, sessionId);
+        const outcome = openCodeTerminalOutcome(
+          raw,
+          sessionId,
+          upstreamProvider,
+        );
         if (outcome) {
           if (outcome.type === "blocked") {
-            throw new OpenCodeBlockedError(outcome.blocker);
+            throw new ProviderBlockedError(outcome.blocker);
           }
           throw new Error(`OpenCode session error: ${outcome.message}`);
         }
@@ -458,9 +459,12 @@ async function main(runnerIo: OpenCodeRunnerIo) {
     const responseError =
       "error" in response.data.info ? response.data.info.error : undefined;
     if (responseError) {
-      const transientOverload = openCodeTransientOverload(responseError);
-      if (transientOverload) {
-        throw new OpenCodeBlockedError(transientOverload);
+      const responseBlock = openCodeTransientOverload(
+        responseError,
+        upstreamProvider,
+      );
+      if (responseBlock) {
+        throw new ProviderBlockedError(responseBlock);
       }
       throw new Error(
         `OpenCode assistant response failed: ${JSON.stringify(responseError)}`,
@@ -507,12 +511,12 @@ export async function runOpenCodeRunner() {
     emitRunnerDiagnostic("runner.failed", {
       error: caught instanceof Error ? caught.message : String(caught),
     });
-    if (caught instanceof OpenCodeBlockedError) {
-      emit.blocked(caught.blocker);
+    if (caught instanceof ProviderBlockedError) {
+      emit.blocked(caught.block);
     } else {
       emit.error(caught instanceof Error ? caught.message : String(caught));
+      process.exitCode = 1;
     }
-    process.exitCode = 1;
   } finally {
     runnerIo.close();
     emitRunnerDiagnostic("runner.closed", {
