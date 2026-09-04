@@ -1,5 +1,6 @@
 import type { ChannelSummary } from "../../lib/channels-contract";
 import type {
+  AutoHuntSession,
   DashboardDeltaPayload,
   DashboardPayload,
   HuntRun,
@@ -82,6 +83,43 @@ export type SyncEvent =
       readonly teamId: string;
       readonly settings: TeamSettings;
     }
+  /**
+   * Agent sessions this device wrote: one started, settled, stopped or folded
+   * back together with the native dispatch it spawned. A session the store does
+   * not list yet is prepended, because the list renders newest first; the ones
+   * it already has keep their position.
+   *
+   * The kinds are plural because two of the writers work on a set at a time —
+   * the dispatch reconciliation walks a team, and native recovery answers for
+   * every session it found. A single session is a one element array.
+   */
+  | {
+      readonly kind: "agent-sessions-changed";
+      readonly sessions: readonly AutoHuntSession[];
+    }
+  /**
+   * Server copies of sessions, merged under the rule that the newer
+   * `updatedAt` wins and the detail only this device has survives. Re-sorts the
+   * whole list by `startedAt`, which is the order the server's page has.
+   */
+  | {
+      readonly kind: "agent-sessions-merged";
+      readonly sessions: readonly AutoHuntSession[];
+    }
+  /**
+   * One project's session page. Remote-owned sessions the page dropped go away
+   * and `reset` replaces the project's remote half wholesale, but a session
+   * this device owns is never removed by a server page.
+   */
+  | {
+      readonly kind: "agent-sessions-synced";
+      readonly teamId: string;
+      readonly sessions: readonly AutoHuntSession[];
+      readonly deletedSessionIds: readonly string[];
+      readonly reset: boolean;
+    }
+  /** Every session of one team is dropped: the team itself is gone. */
+  | { readonly kind: "agent-sessions-removed"; readonly teamId: string }
   /** The team's entities and per-team state are dropped. */
   | { readonly kind: "team-cleared"; readonly teamId: string }
   /**

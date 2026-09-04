@@ -469,6 +469,31 @@ describe("detached Agent runner", () => {
     }
   });
 
+  it("forbids copying server-owned snapshot members into a reply", () => {
+    // Prompt wording alone once carried the whole burden and the model still
+    // echoed the `status` it saw on execution targets and earlier proposals,
+    // rejecting every reply that proposed an issue.
+    const prompts = [
+      detachedChannelReplyPrompt({
+        agent,
+        snapshot: { messages: [] },
+        workspaceAvailable: true,
+      }),
+      detachedIssueReplyPrompt({
+        agent,
+        snapshot: { messages: [] },
+        userMessage: "Record this as an issue.",
+        workspaceAvailable: true,
+      }),
+    ];
+
+    for (const prompt of prompts) {
+      expect(prompt).toContain("Return exactly the members the response shape defines.");
+      expect(prompt).toContain("never copy one of those into your result");
+      expect(prompt).not.toContain("always use backlog");
+    }
+  });
+
   it("excludes display-only channel data from provider context", () => {
     const avatar = `data:image/png;base64,${"a".repeat(62_554)}`;
     const prompt = detachedChannelReplyPrompt({

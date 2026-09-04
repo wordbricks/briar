@@ -1023,7 +1023,7 @@ export function RunPage({
   const processNowButton = <TooltipProvider delayDuration={200}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button aria-label={processNowLabel} className="run-page-process-now" disabled={processNowDisabled} onClick={onProcessNow} size="icon-sm" type="button">
+          <Button aria-label={processNowLabel} className="run-page-process-now size-7 rounded-full p-0 shadow-none [&_svg]:size-[15px]" disabled={processNowDisabled} onClick={onProcessNow} size="icon-sm" type="button">
             {isProcessing ? <Spinner aria-hidden="true" size={15} /> : <Play aria-hidden="true" size={15} />}
           </Button>
         </TooltipTrigger>
