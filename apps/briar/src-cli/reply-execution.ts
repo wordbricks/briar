@@ -11,9 +11,13 @@ import {
 } from "./dm-memory-invocation";
 import {
   ChannelAgentReplyProviderOutputSchema,
+  type ChannelAgentReplyTurn,
   type ParsedChannelReplyAgentResult,
 } from "../src/lib/channel-agent-reply-contract";
-import { IssueAgentReplyProviderOutputSchema } from "../src/lib/agent-reply-contract";
+import {
+  IssueAgentReplyProviderOutputSchema,
+  type ParsedIssueAgentReply,
+} from "../src/lib/agent-reply-contract";
 import {
   createDetachedTranscriptSequencer,
   detachedChannelReplyPrompt,
@@ -67,6 +71,10 @@ import {
 import { ReplyGeneratedImageCollector } from "./reply-generated-images";
 import { validateReplyAttachments } from "./reply-attachments";
 import { providerStructuredOutputContract } from "./structured-output-contract";
+import {
+  nextStructuredOutputRepairPrompt,
+  repairableDecoder,
+} from "./structured-output-repair";
 import {
   channelReplyAttachmentDirectory,
   cleanupChannelReplyAttachments,
@@ -444,14 +452,17 @@ async function runClaimedIssueReply(
     let conversationId: string | null = issue.handoffContext?.conversationId ?? null;
     if (conversationId) reportCheckpoint?.({ conversationId });
     const generatedImages = new ReplyGeneratedImageCollector();
-    const turn = await (async () => {
+    const runReplyTurn = async (
+      turnPrompt: string,
+      turnAttachments: typeof attachments | undefined,
+    ) => {
       try {
         return await runDetachedProviderTurn({
           agent,
-          prompt,
+          prompt: turnPrompt,
           workspacePath,
           fullAccess: project.autoHunt?.sandbox?.fullAccess ?? true,
-          attachments,
+          attachments: turnAttachments,
           conversationId,
           outputSchema: outputContract.jsonSchema,
           environment: providerExecutionEnvironment(config, agent.provider, {
@@ -488,17 +499,41 @@ async function runClaimedIssueReply(
         // transcript data, but buffered events must get one final send chance.
         await transcriptBatcher.flush();
       }
-    })();
-    assertDetachedProviderTurnSucceeded(turn);
-    if (!turn.resultText) throw new Error("Agent returned an empty issue reply");
-    const parsedResult = parseIssueReplyAgentResult(
-      turn.resultText,
-      outputContract.decodeJson,
-      {
-        allowSkillExecutionProposal:
-          issue.skillExecutionTarget?.executionMode === "task",
-      },
-    );
+    };
+    const decodeReplyJson = repairableDecoder(outputContract.decodeJson);
+    let repairRounds = 0;
+    let turnPrompt = prompt;
+    let parsedResult: ParsedIssueAgentReply | null = null;
+    while (!parsedResult) {
+      // A repair continues the same provider conversation, which already holds
+      // the delivered images.
+      const turn = await runReplyTurn(
+        turnPrompt,
+        repairRounds === 0 ? attachments : undefined,
+      );
+      assertDetachedProviderTurnSucceeded(turn);
+      if (!turn.resultText) {
+        throw new Error("Agent returned an empty issue reply");
+      }
+      try {
+        parsedResult = parseIssueReplyAgentResult(
+          turn.resultText,
+          decodeReplyJson,
+          {
+            allowSkillExecutionProposal:
+              issue.skillExecutionTarget?.executionMode === "task",
+          },
+        );
+      } catch (error) {
+        turnPrompt = nextStructuredOutputRepairPrompt({
+          error,
+          rounds: repairRounds,
+          basePrompt: prompt,
+          conversationId,
+        });
+        repairRounds += 1;
+      }
+    }
     const result = parsedResult.result;
     const replyAttachments = validateReplyAttachments([
       ...await collectIssueReplyAttachments({
@@ -810,6 +845,8 @@ async function runClaimedChannelReply(
       reply.session?.conversationId ?? reply.handoffContext?.conversationId ?? null;
     if (conversationId) reportCheckpoint?.({ conversationId });
     let lookupRounds = 0;
+    let repairRounds = 0;
+    const decodeReplyJson = repairableDecoder(outputContract.decodeJson);
     let turnPrompt = [prompt, memoryInvocation?.prompt()]
       .filter(Boolean)
       .join("\n\n");
@@ -834,7 +871,7 @@ async function runClaimedChannelReply(
         workspacePath,
         fullAccess: project.autoHunt?.sandbox?.fullAccess ?? true,
         conversationId,
-        attachments: lookupRounds === 0
+        attachments: lookupRounds === 0 && repairRounds === 0
           ? downloadedAttachments.attachments
           : undefined,
         outputSchema: outputContract.jsonSchema,
@@ -908,7 +945,20 @@ async function runClaimedChannelReply(
       if (!turn.resultText) {
         throw new Error("Agent returned an empty channel reply");
       }
-      const decodedTurn = outputContract.decodeJson(turn.resultText);
+      let decodedTurn: ChannelAgentReplyTurn;
+      try {
+        decodedTurn = decodeReplyJson(turn.resultText);
+      } catch (error) {
+        turnPrompt = nextStructuredOutputRepairPrompt({
+          error,
+          rounds: repairRounds,
+          basePrompt: prompt,
+          conversationId: turn.conversationId,
+        });
+        repairRounds += 1;
+        conversationId = turn.conversationId;
+        continue;
+      }
       if (decodedTurn.case === "reply") {
         result = decodedTurn.result;
         if (result.memorySaveRequest && !reply.memoryLearningEnabled) {

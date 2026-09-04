@@ -1,4 +1,7 @@
 import * as Schema from "effect/Schema";
+// /installation/repositories answers with the same repository shape as the
+// user-scoped listing used during the OAuth connect.
+import { decodeGitHubUserRepositories as decodeInstallationRepositories } from "./github-contract";
 import { IsoDateTimeWithOffset } from "../../src/lib/date-time-schema";
 import { MERGE_ACTIVITY_DAY, type MergedPullRequest, type TeamMergeActivity } from "../../src/lib/team-merge-activity";
 
@@ -148,10 +151,8 @@ async function githubJson(response: Response, operation: string) {
   return body;
 }
 
-export async function createGithubInstallationToken(
+async function githubAppJwt(
   env: Pick<Env, "GITHUB_APP_ID" | "GITHUB_APP_PRIVATE_KEY">,
-  identity: TeamGithubIdentity,
-  fetchImpl: typeof fetch = fetch,
 ) {
   const appId = env.GITHUB_APP_ID?.trim();
   const privateKey = env.GITHUB_APP_PRIVATE_KEY?.trim();
@@ -161,7 +162,15 @@ export async function createGithubInstallationToken(
       503,
     );
   }
-  const jwt = await createGithubAppJwt({ appId, privateKey });
+  return createGithubAppJwt({ appId, privateKey });
+}
+
+export async function createGithubInstallationToken(
+  env: Pick<Env, "GITHUB_APP_ID" | "GITHUB_APP_PRIVATE_KEY">,
+  identity: TeamGithubIdentity,
+  fetchImpl: typeof fetch = fetch,
+) {
+  const jwt = await githubAppJwt(env);
   const response = await fetchImpl(
     `https://api.github.com/app/installations/${identity.installationId}/access_tokens`,
     {
@@ -193,6 +202,71 @@ export async function createGithubInstallationToken(
     );
   }
   return { token: token.token, expiresAt: token.expires_at };
+}
+
+export type GithubInstallationRepository = {
+  id: number;
+  owner: string;
+  name: string;
+  fullName: string;
+};
+
+/**
+ * Lists every repository the installation can reach right now, straight from
+ * GitHub. An installation granted "All repositories" never emits an
+ * installation_repositories webhook when a repository is created, so a stored
+ * snapshot silently goes stale and repositories the App can actually read look
+ * out of scope. Reading through the App itself is the only account that stays
+ * true for both "All repositories" and "Only select repositories".
+ */
+export async function listGithubInstallationRepositories(
+  env: Pick<Env, "GITHUB_APP_ID" | "GITHUB_APP_PRIVATE_KEY">,
+  installationId: number,
+  fetchImpl: typeof fetch = fetch,
+): Promise<GithubInstallationRepository[]> {
+  const jwt = await githubAppJwt(env);
+  const tokenResponse = await fetchImpl(
+    `https://api.github.com/app/installations/${installationId}/access_tokens`,
+    {
+      method: "POST",
+      headers: githubHeaders(jwt),
+      // The listing needs no repository scope beyond the metadata GitHub always
+      // grants, so the token this mints can do nothing else.
+      body: JSON.stringify({ permissions: { metadata: "read" } }),
+    },
+  );
+  const token = decodeInstallationToken(
+    await githubJson(tokenResponse, "GitHub installation token request failed"),
+  );
+  const repositories: GithubInstallationRepository[] = [];
+  for (let page = 1; page <= 10; page += 1) {
+    const response = await fetchImpl(
+      `https://api.github.com/installation/repositories?per_page=100&page=${page}`,
+      {
+        headers: githubHeaders(token.token),
+        signal: AbortSignal.timeout(30_000),
+      },
+    );
+    const payload = decodeInstallationRepositories(
+      await githubJson(
+        response,
+        "GitHub installation repository listing failed",
+      ),
+    );
+    repositories.push(...payload.repositories.map((repository) => ({
+      id: repository.id,
+      owner: repository.owner.login,
+      name: repository.name,
+      fullName: repository.full_name,
+    })));
+    if (payload.repositories.length < 100) return repositories;
+  }
+  // A truncated listing would read as "these repositories were removed", so a
+  // caller that replaces its snapshot has to see this as a failure instead.
+  throw new GithubAppApiError(
+    "The GitHub App installation has too many repositories to list",
+    503,
+  );
 }
 
 async function projectGithubRequest(

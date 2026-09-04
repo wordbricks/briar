@@ -1,3 +1,4 @@
+import { generateKeyPairSync } from "node:crypto";
 import { env } from "cloudflare:workers";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import worker from "./index";
@@ -15,6 +16,42 @@ import {
   syncGithubConnectionRepositories,
 } from "./db";
 import { githubSha256Hex } from "./github";
+import { getGithubIntegrationApplication } from "./github-integration-application";
+
+const githubAppEnv = (privateKey: string) => ({
+  GITHUB_WEBHOOK_SECRET: "webhook-secret",
+  GITHUB_APP_CLIENT_ID: "Iv1.client",
+  GITHUB_APP_CLIENT_SECRET: "client-secret",
+  GITHUB_APP_ID: "12345",
+  GITHUB_APP_PRIVATE_KEY: privateKey,
+  GITHUB_APP_SLUG: "briar-app",
+  GITHUB_CALLBACK_ORIGIN: "https://briar.example",
+});
+
+// The App JWT is signed for real, so the refresh path needs a usable key.
+let privateKeyPem: string | undefined;
+function installationPrivateKeyPem() {
+  privateKeyPem ??= generateKeyPairSync("rsa", { modulusLength: 2048 })
+    .privateKey.export({ format: "pem", type: "pkcs8" }).toString();
+  return privateKeyPem;
+}
+
+const installationRepositoriesFetch = (
+  repositories: Array<{
+    id: number;
+    owner: { login: string };
+    name: string;
+    full_name: string;
+  }>,
+) =>
+  vi.fn(async (input: string | URL | Request, _init?: RequestInit) =>
+    String(input).includes("/access_tokens")
+      ? Response.json({
+        token: "ghs_installation",
+        expires_at: "2099-01-01T00:00:00Z",
+      })
+      : Response.json({ total_count: repositories.length, repositories })
+  );
 
 describe("GitHub integration D1 state", () => {
   const db = env.DB;
@@ -496,6 +533,94 @@ describe("GitHub integration D1 state", () => {
         repository_id: 502,
         full_name: "wordbricks/briar",
       }),
+    ]);
+  });
+
+  it("reads repository access back from the App instead of trusting the stored snapshot", async () => {
+    const env = { ...githubAppEnv(installationPrivateKeyPem()), DB: db };
+    const fetchImpl = installationRepositoriesFetch([
+      {
+        id: 502,
+        owner: { login: "wordbricks" },
+        name: "briar",
+        full_name: "wordbricks/briar",
+      },
+      {
+        id: 503,
+        owner: { login: "wordbricks" },
+        name: "heydoti",
+        full_name: "wordbricks/heydoti",
+      },
+    ]);
+
+    const integration = await getGithubIntegrationApplication({
+      db,
+      env: env as never,
+      organizationId: firstOrganizationId,
+      userId: ownerId,
+      fetchImpl: fetchImpl as never,
+    });
+
+    // "All repositories" installations never emit installation_repositories for
+    // a repository created after the connection, so heydoti only shows up here
+    // because the App itself was asked.
+    expect(integration).toMatchObject({ connected: true });
+    expect(
+      integration.connected ? integration.repositories.map((r) => r.fullName) : [],
+    ).toEqual(["wordbricks/briar", "wordbricks/heydoti"]);
+    // The snapshot the team settings write validates against is updated too.
+    await expect(listGithubConnectionRepositories(db, 902)).resolves.toEqual([
+      expect.objectContaining({ repository_id: 502 }),
+      expect.objectContaining({ repository_id: 503 }),
+    ]);
+    expect(String(fetchImpl.mock.calls[0][0])).toBe(
+      "https://api.github.com/app/installations/902/access_tokens",
+    );
+    expect(JSON.parse(String(fetchImpl.mock.calls[0][1]?.body))).toEqual({
+      permissions: { metadata: "read" },
+    });
+  });
+
+  it("drops a repository the App can no longer reach", async () => {
+    const env = { ...githubAppEnv(installationPrivateKeyPem()), DB: db };
+    const integration = await getGithubIntegrationApplication({
+      db,
+      env: env as never,
+      organizationId: firstOrganizationId,
+      userId: ownerId,
+      fetchImpl: installationRepositoriesFetch([{
+        id: 503,
+        owner: { login: "wordbricks" },
+        name: "heydoti",
+        full_name: "wordbricks/heydoti",
+      }]) as never,
+    });
+
+    expect(
+      integration.connected ? integration.repositories.map((r) => r.id) : [],
+    ).toEqual([503]);
+    await expect(listGithubConnectionRepositories(db, 902)).resolves.toEqual([
+      expect.objectContaining({ repository_id: 503 }),
+    ]);
+  });
+
+  it("keeps the stored repositories when GitHub cannot be reached", async () => {
+    const env = { ...githubAppEnv(installationPrivateKeyPem()), DB: db };
+    const integration = await getGithubIntegrationApplication({
+      db,
+      env: env as never,
+      organizationId: firstOrganizationId,
+      userId: ownerId,
+      fetchImpl: vi.fn(async () =>
+        Response.json({ message: "Bad credentials" }, { status: 401 })
+      ) as never,
+    });
+
+    expect(
+      integration.connected ? integration.repositories.map((r) => r.id) : [],
+    ).toEqual([503]);
+    await expect(listGithubConnectionRepositories(db, 902)).resolves.toEqual([
+      expect.objectContaining({ repository_id: 503 }),
     ]);
   });
 
