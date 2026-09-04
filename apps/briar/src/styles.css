@@ -2763,6 +2763,10 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .repository-readiness strong { color:#4b4d47; font-size:var(--text-2xs); }
 .repository-readiness small { overflow:hidden; color:var(--muted-foreground); font:400 var(--text-2xs)/1.3 "DM Mono",monospace; text-overflow:ellipsis; white-space:nowrap; }
 .repository-readiness-error { margin:10px 1px 0; display:flex; align-items:center; gap:6px; color:#a34854; font-size:var(--text-2xs); line-height:1.5; }
+.onboarding-provider-choice { margin-top:13px; padding-top:13px; display:grid; gap:7px; border-top:1px solid #e5e7e0; text-align:left; }
+.onboarding-provider-choice > label { color:#4b4d47; font-size:var(--text-2xs); font-weight:500; }
+.onboarding-provider-choice > small { color:var(--muted-foreground); font-size:var(--text-2xs); line-height:1.5; }
+.onboarding-process .onboarding-provider-choice { width:min(520px,100%); margin:18px auto 0; padding-top:0; border-top:0; }
 .project-onboarding-card { width:min(700px,calc(100vw - 48px)); }
 .project-onboarding-modal-backdrop { z-index:95; padding:32px; background:rgba(33,35,30,.34); }
 .project-onboarding-dialog { width:min(900px,calc(100vw - 64px)); max-height:calc(100dvh - 64px); margin:0; padding:0; overflow:hidden; display:flex; flex-direction:column; border:1px solid var(--border); border-radius:26px; background:var(--card); box-shadow:0 34px 110px rgba(26,29,23,.28); }

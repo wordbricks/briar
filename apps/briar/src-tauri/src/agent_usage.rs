@@ -3,7 +3,8 @@ use briar_contracts::proto::briar::local::v1 as local_proto;
 use serde::Serialize;
 use std::{
     path::{Path, PathBuf},
-    time::{SystemTime, UNIX_EPOCH},
+    sync::Mutex,
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 // Provider quota and sign-in state are read by `briar provider usage|auth`.
@@ -57,6 +58,137 @@ pub(crate) struct AgentUsageSnapshot {
     openrouter: ProviderUsage,
     cursor: ProviderUsage,
     updated_at: u64,
+}
+
+/// What a provider's quota looks like right now, for the callers that decide
+/// which provider may run. `known` stays false when the usage probe could not
+/// read the provider, so a failed probe never blocks a provider that works.
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct ProviderQuota {
+    pub(crate) known: bool,
+    pub(crate) exhausted: bool,
+    pub(crate) max_used_percent: Option<f64>,
+    /// When the exhausted window refills, in milliseconds since the epoch.
+    pub(crate) resets_at: Option<u64>,
+}
+
+/// Every provider's quota from one `briar provider usage` call.
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct ProviderQuotas {
+    codex: ProviderQuota,
+    claude: ProviderQuota,
+    cursor: ProviderQuota,
+    grok: ProviderQuota,
+    agy: ProviderQuota,
+    opencode: ProviderQuota,
+    openrouter: ProviderQuota,
+}
+
+impl ProviderQuotas {
+    /// Replace one provider's quota, so selection tests can describe a machine
+    /// without running the usage probe.
+    #[cfg(test)]
+    pub(crate) fn with(mut self, provider: agent::AgentProviderKind, quota: ProviderQuota) -> Self {
+        match provider {
+            agent::AgentProviderKind::Codex => self.codex = quota,
+            agent::AgentProviderKind::Claude => self.claude = quota,
+            agent::AgentProviderKind::Cursor => self.cursor = quota,
+            agent::AgentProviderKind::Grok => self.grok = quota,
+            agent::AgentProviderKind::Agy => self.agy = quota,
+            agent::AgentProviderKind::Opencode => self.opencode = quota,
+            agent::AgentProviderKind::Openrouter => self.openrouter = quota,
+        }
+        self
+    }
+
+    pub(crate) fn provider(&self, provider: agent::AgentProviderKind) -> ProviderQuota {
+        match provider {
+            agent::AgentProviderKind::Codex => self.codex,
+            agent::AgentProviderKind::Claude => self.claude,
+            agent::AgentProviderKind::Cursor => self.cursor,
+            agent::AgentProviderKind::Grok => self.grok,
+            agent::AgentProviderKind::Agy => self.agy,
+            agent::AgentProviderKind::Opencode => self.opencode,
+            agent::AgentProviderKind::Openrouter => self.openrouter,
+        }
+    }
+}
+
+/*
+   Reading quotas costs one Briar CLI call that probes every provider over the
+   network, and connecting a repository asks for them twice: once for the
+   preflight that fills the connection screen, once for the commit that follows
+   seconds later. The second read reuses the first within this window rather
+   than probing every provider again. `load_agent_usage` is deliberately not
+   cached — the usage screen shows what it just read.
+*/
+const QUOTA_CACHE_TTL: Duration = Duration::from_secs(60);
+
+static QUOTA_CACHE: Mutex<Option<(Instant, PathBuf, bool, ProviderQuotas)>> = Mutex::new(None);
+
+/// Read every provider's remaining quota. A provider whose usage cannot be read
+/// is reported as unknown rather than exhausted.
+pub(crate) fn local_quotas(home: &Path, openrouter_configured: bool) -> ProviderQuotas {
+    if let Some(cached) = cached_quotas(home, openrouter_configured) {
+        return cached;
+    }
+    let snapshot = load_sync(home, openrouter_configured);
+    let quotas = ProviderQuotas {
+        codex: provider_quota(&snapshot.codex),
+        claude: provider_quota(&snapshot.claude),
+        cursor: provider_quota(&snapshot.cursor),
+        grok: provider_quota(&snapshot.grok),
+        agy: provider_quota(&snapshot.agy),
+        opencode: provider_quota(&snapshot.opencode),
+        openrouter: provider_quota(&snapshot.openrouter),
+    };
+    if let Ok(mut cache) = QUOTA_CACHE.lock() {
+        *cache = Some((
+            Instant::now(),
+            home.to_path_buf(),
+            openrouter_configured,
+            quotas,
+        ));
+    }
+    quotas
+}
+
+fn cached_quotas(home: &Path, openrouter_configured: bool) -> Option<ProviderQuotas> {
+    let cache = QUOTA_CACHE.lock().ok()?;
+    let (read_at, cached_home, cached_openrouter, quotas) = cache.as_ref()?;
+    (read_at.elapsed() < QUOTA_CACHE_TTL
+        && cached_home == home
+        && *cached_openrouter == openrouter_configured)
+        .then_some(*quotas)
+}
+
+/// A window at or above 100% used is exhausted, the same rule the execution
+/// worker applies in `src-cli/provider-health.ts`.
+fn provider_quota(usage: &ProviderUsage) -> ProviderQuota {
+    if usage.status != ProviderUsageStatus::Ok {
+        return ProviderQuota::default();
+    }
+    let windows: Vec<&AgentUsageWindow> = [&usage.session, &usage.weekly, &usage.monthly]
+        .into_iter()
+        .filter_map(Option::as_ref)
+        .collect();
+    let max_used_percent = windows.iter().map(|window| window.used_percent).fold(
+        None,
+        |current: Option<f64>, percent| {
+            Some(current.map_or(percent, |value: f64| value.max(percent)))
+        },
+    );
+    let resets_at = windows
+        .iter()
+        .filter(|window| window.used_percent >= 100.0)
+        .filter_map(|window| window.resets_at)
+        .min();
+    ProviderQuota {
+        known: true,
+        exhausted: windows.iter().any(|window| window.used_percent >= 100.0),
+        max_used_percent,
+        resets_at,
+    }
 }
 
 /// Provider sign-in state for the onboarding prerequisite list.
@@ -279,6 +411,26 @@ mod tests {
         let usage = provider_usage(agent::AgentProviderKind::Cursor, None);
         assert_eq!(usage.status, ProviderUsageStatus::Unavailable);
         assert!(usage.error.is_some());
+    }
+
+    #[test]
+    fn reads_a_spent_usage_window_as_an_exhausted_quota() {
+        let quota = provider_quota(&usage_from(
+            r#"{"status":"LOCAL_PROVIDER_USAGE_STATUS_OK","session":{"usedPercent":42,"windowMinutes":"300"},"weekly":{"usedPercent":100,"windowMinutes":"10080","resetsAt":"2027-01-15T22:40:00Z"},"authenticated":true}"#,
+        ));
+
+        assert!(quota.known && quota.exhausted);
+        assert_eq!(quota.max_used_percent, Some(100.0));
+        assert_eq!(quota.resets_at, Some(1_800_052_800_000));
+    }
+
+    #[test]
+    fn leaves_a_quota_unknown_when_usage_could_not_be_read() {
+        let snapshot = unavailable_snapshot(provider_cli::MISSING_CLI_ERROR.to_string());
+        let quota = provider_quota(&snapshot.codex);
+
+        assert!(!quota.known);
+        assert!(!quota.exhausted);
     }
 
     #[test]

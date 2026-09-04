@@ -4,12 +4,66 @@ import { act } from "react";
 import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { describe, expect, it, vi } from "vitest";
 
+import type {
+  AgentProviderKind,
+  LocalProjectConnectionPreflight,
+} from "../generated/tauri";
 import { I18nProvider } from "../i18n";
 import { demoRepositoryReadiness } from "../lib/demo-data";
 import { repositoryWorkflowBootstrap } from "../lib/auto-hunt-contract";
 import { TeamOnboarding } from "./TeamOnboarding";
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+
+type ProviderAvailability = LocalProjectConnectionPreflight["providers"][number];
+
+function providerAvailability(
+  provider: AgentProviderKind,
+  overrides: Partial<ProviderAvailability> = {},
+): ProviderAvailability {
+  return {
+    provider,
+    enabled: true,
+    installed: true,
+    authenticated: true,
+    selectable: true,
+    usageExhausted: false,
+    maxUsedPercent: null,
+    usageResetsAt: null,
+    reason: null,
+    ...overrides,
+  };
+}
+
+/** Codex is out of quota; Claude is the connected provider with room left. */
+const connectedProviders: ProviderAvailability[] = [
+  providerAvailability("codex", {
+    usageExhausted: true,
+    maxUsedPercent: 100,
+    reason: "usage_exhausted",
+  }),
+  providerAvailability("claude"),
+  providerAvailability("grok", {
+    installed: false,
+    authenticated: false,
+    selectable: false,
+    reason: "not_installed",
+  }),
+];
+
+function preflightResult(
+  repositoryPath: string,
+  repositoryRemote: string | null,
+  provider: AgentProviderKind = "codex",
+): LocalProjectConnectionPreflight {
+  return {
+    repositoryPath,
+    repositoryRemote,
+    provider,
+    providers: connectedProviders,
+  };
+}
+
 
 describe("TeamOnboarding", () => {
   it("starts invited development roles with required personal agent setup", async () => {
@@ -58,11 +112,8 @@ describe("TeamOnboarding", () => {
             scripts: [],
             stack: null,
           })}
-          onPreflight={async () => ({
-            repositoryPath: "/repo",
-            repositoryRemote: "git@github.com:wordbricks/briar.git",
-            provider: "codex",
-          })}
+          onPreflight={async () =>
+            preflightResult("/repo", "git@github.com:wordbricks/briar.git")}
           onPrepareGithubRepository={async () => ({
             completedSteps: ["clone"],
             repository: "wordbricks/briar",
@@ -94,19 +145,14 @@ describe("TeamOnboarding", () => {
   });
 
   it("does not create a project when Escape cancels an in-flight preflight", async () => {
-    const pendingPreflight = Promise.withResolvers<{
-      repositoryPath: string;
-      repositoryRemote: string | null;
-      provider: "codex";
-    }>();
+    const pendingPreflight = Promise
+      .withResolvers<LocalProjectConnectionPreflight>();
     const onCancel = vi.fn();
     const onCreate = vi.fn(async () => ({ project: { id: "project-1" } }));
     const onPreflight = vi.fn()
-      .mockResolvedValueOnce({
-        repositoryPath: "/repo",
-        repositoryRemote: "git@github.com:wordbricks/briar.git",
-        provider: "codex" as const,
-      })
+      .mockResolvedValueOnce(
+        preflightResult("/repo", "git@github.com:wordbricks/briar.git"),
+      )
       .mockImplementationOnce(() => pendingPreflight.promise);
     const { cleanup, container, root } = createReactTestRoot();
 
@@ -178,16 +224,123 @@ describe("TeamOnboarding", () => {
       window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     });
     await act(async () => {
-      pendingPreflight.resolve({
-        repositoryPath: "/repo",
-        repositoryRemote: "git@github.com:wordbricks/briar.git",
-        provider: "codex",
-      });
+      pendingPreflight.resolve(
+        preflightResult("/repo", "git@github.com:wordbricks/briar.git"),
+      );
       await pendingPreflight.promise;
     });
 
     expect(onCancel).toHaveBeenCalledOnce();
     expect(onCreate).not.toHaveBeenCalled();
+
+    await cleanup();
+  });
+
+  it("generates the workflow on the agent backend the user picked", async () => {
+    const onConnect = vi.fn(async () => ({
+      repositoryPath: "/repo",
+      workflow: repositoryWorkflowBootstrap,
+    }));
+    // The provider menu renders through a portal, so the card has to live in
+    // the document for its options to be reachable.
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <TeamOnboarding
+          connection={{
+            agentToken: null,
+            kind: "new",
+            project: {
+              id: "project-1",
+              name: "Briar",
+              organizationId: "organization-1",
+              organizationName: "Wordbricks",
+              role: "developer",
+              issueKeyPrefix: "BRIAR",
+              scheduleTabEnabled: false,
+              icon: null,
+              iconName: null,
+              iconColor: null,
+              createdAt: "2026-08-31T00:00:00.000Z",
+            },
+            workflow: repositoryWorkflowBootstrap,
+          }}
+          error={null}
+          loading={false}
+          onAnalyzeRequirements={async () => ({
+            requirements: [],
+            workflow: repositoryWorkflowBootstrap,
+          })}
+          onCancel={() => undefined}
+          onConnect={onConnect}
+          onCreate={async () => ({ project: { id: "project-1" } })}
+          onFinish={() => undefined}
+          onInspectLovableRepository={async () => ({
+            compatible: false,
+            issues: [],
+            packageManager: null,
+            scripts: [],
+            stack: null,
+          })}
+          onPreflight={async () =>
+            preflightResult("/repo", "git@github.com:wordbricks/briar.git")}
+          onPrepareGithubRepository={async () => ({
+            completedSteps: ["clone"],
+            repository: "wordbricks/briar",
+            repositoryId: 123456789,
+            repositoryPath: "/repo",
+            reused: false,
+          })}
+          onRepositoryInspect={async () => ({
+            ...demoRepositoryReadiness,
+            repositoryPath: "/repo",
+          })}
+          onResolveGithubRepository={async (repository) => repository}
+          onRepositorySelect={async () => "/repo"}
+          onReviseWorkflow={async () => repositoryWorkflowBootstrap}
+        />
+      </I18nProvider>,
+    );
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(".setup-repository-action")
+        ?.click();
+    });
+
+    const choice = container.querySelector(".onboarding-provider-choice");
+    expect(choice).not.toBeNull();
+    await act(async () => {
+      choice?.querySelector<HTMLButtonElement>(".select-menu-trigger")?.click();
+    });
+    const option = (provider: string) =>
+      document.querySelector<HTMLButtonElement>(
+        `.select-menu-option[data-value="${provider}"]`,
+      );
+    // Codex is resolved by default but out of quota, and a provider that is
+    // not installed cannot be picked at all.
+    expect(option("codex")?.textContent).toContain("Usage limit reached");
+    expect(option("grok")?.disabled).toBe(true);
+
+    await act(async () => option("claude")?.click());
+    await act(async () => {
+      container
+        .querySelector<HTMLFormElement>("form.project-form")
+        ?.dispatchEvent(
+          new Event("submit", { bubbles: true, cancelable: true }),
+        );
+    });
+
+    expect(onConnect).toHaveBeenCalledWith(
+      expect.anything(),
+      "/repo",
+      expect.anything(),
+      "claude",
+    );
 
     await cleanup();
   });
@@ -203,11 +356,11 @@ describe("TeamOnboarding", () => {
       repositoryPath: "/managed/briar",
       reused: false,
     }));
-    const onPreflight = vi.fn(async () => ({
-      repositoryPath: "/managed/briar",
-      repositoryRemote: "https://github.com/wordbricks/briar.git",
-      provider: "codex" as const,
-    }));
+    const onPreflight = vi.fn(async () =>
+      preflightResult(
+        "/managed/briar",
+        "https://github.com/wordbricks/briar.git",
+      ));
     const onResolveGithubRepository = vi.fn(async (repository: string) =>
       repository
     );
@@ -318,11 +471,11 @@ describe("TeamOnboarding", () => {
       scripts: ["lint", "build"],
       stack: "vite-react" as const,
     }));
-    const onPreflight = vi.fn(async () => ({
-      repositoryPath: "/managed/lovable-app",
-      repositoryRemote: "https://github.com/wordbricks/lovable-app.git",
-      provider: "codex" as const,
-    }));
+    const onPreflight = vi.fn(async () =>
+      preflightResult(
+        "/managed/lovable-app",
+        "https://github.com/wordbricks/lovable-app.git",
+      ));
     const { cleanup, container, root } = createReactTestRoot();
 
     await renderReactTestRoot(
