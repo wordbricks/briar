@@ -23,6 +23,7 @@ const config = {
     opencode: false,
     openrouter: false,
     vertex: false,
+    pi: false,
   },
   addedProviders: [],
   appSettings: {

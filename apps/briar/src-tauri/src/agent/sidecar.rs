@@ -30,6 +30,12 @@ pub(super) struct SidecarExecutableConfig {
     pub(super) name: &'static str,
     pub(super) home_candidates: &'static [&'static str],
     pub(super) absolute_candidates: &'static [&'static str],
+    /// Further executables that must resolve for the provider to be usable.
+    ///
+    /// Most providers are one binary. Pi is driven through the `pi-acp`
+    /// adapter, which spawns the separate `pi` CLI itself, so resolving only
+    /// the adapter would report an installed provider that cannot run a turn.
+    pub(super) companion_executables: &'static [&'static str],
     pub(super) missing_error: &'static str,
 }
 
@@ -138,7 +144,7 @@ impl AgentBackend for SidecarBackend {
 /// the working directory carries the analyzed repository's own untrusted
 /// `mise.toml`. The shim stays a last resort so a provider installed only
 /// through a version manager still resolves.
-pub(super) fn provider_binary(
+fn resolve_provider_executable(
     config: SidecarProviderConfig,
     home: &Path,
     execution_path: &OsStr,
@@ -171,6 +177,34 @@ pub(super) fn provider_binary(
     }
     crate::host::resolve_without_shim_shadowing(config.executable.name, execution_path, home)
         .ok_or_else(|| config.executable.missing_error.to_string())
+}
+
+/// Resolve one companion executable a provider declares, reporting the
+/// provider's own missing-binary message when it is absent.
+pub(super) fn provider_companion_binary(
+    config: SidecarProviderConfig,
+    name: &str,
+    home: &Path,
+    execution_path: &OsStr,
+) -> Result<PathBuf, String> {
+    crate::host::resolve_without_shim_shadowing(name, execution_path, home)
+        .ok_or_else(|| config.executable.missing_error.to_string())
+}
+
+/// Resolve the executable Briar spawns, and fail with the provider's own
+/// missing-binary message when any companion it needs is absent.
+pub(super) fn provider_binary(
+    config: SidecarProviderConfig,
+    home: &Path,
+    execution_path: &OsStr,
+) -> Result<PathBuf, String> {
+    let binary = resolve_provider_executable(config, home, execution_path)?;
+    for companion in config.executable.companion_executables {
+        if crate::host::resolve_without_shim_shadowing(companion, execution_path, home).is_none() {
+            return Err(config.executable.missing_error.to_string());
+        }
+    }
+    Ok(binary)
 }
 
 struct PreparedSidecarChat<'a> {
@@ -745,7 +779,7 @@ fn decode_conversation_id<'a>(
 mod tests {
     use super::*;
     use crate::{
-        agent::{agy, claude, codex, cursor, grok, opencode, ModelEffort},
+        agent::{agy, claude, codex, cursor, grok, opencode, pi, ModelEffort},
         host::CommandOutput,
     };
     use std::fs;
@@ -759,6 +793,7 @@ mod tests {
             name: "briar-fixture-provider",
             home_candidates: &[],
             absolute_candidates: &[],
+            companion_executables: &[],
             missing_error: "fixture provider is missing",
         },
         ..opencode::CONFIG
@@ -823,7 +858,7 @@ mod tests {
         }
     }
 
-    fn provider_configs() -> [SidecarProviderConfig; 6] {
+    fn provider_configs() -> [SidecarProviderConfig; 7] {
         [
             codex::CONFIG,
             claude::CONFIG,
@@ -831,6 +866,7 @@ mod tests {
             grok::CONFIG,
             agy::CONFIG,
             opencode::CONFIG,
+            pi::CONFIG,
         ]
     }
 
@@ -901,8 +937,11 @@ mod tests {
         }
     }
 
+    #[cfg(unix)]
     #[test]
     fn resolves_the_first_existing_provider_candidate() {
+        use std::os::unix::fs::PermissionsExt;
+
         for config in provider_configs() {
             let directory = tempfile::tempdir().expect("temp directory should exist");
             let home = directory.path();
@@ -915,8 +954,38 @@ mod tests {
             fs::write(&first, "first").expect("first candidate should exist");
             fs::write(&second, "second").expect("second candidate should exist");
 
-            assert_eq!(provider_binary(config, home, OsStr::new("")), Ok(first));
+            // A provider that declares companions only resolves once every one
+            // of them is on PATH, so the fixture installs them alongside.
+            let companion_directory = directory.path().join("companions");
+            fs::create_dir_all(&companion_directory).expect("companion directory should exist");
+            for companion in config.executable.companion_executables {
+                let path = companion_directory.join(companion);
+                fs::write(&path, "#!/bin/sh\n").expect("companion should exist");
+                fs::set_permissions(&path, fs::Permissions::from_mode(0o700))
+                    .expect("companion should be executable");
+            }
+            let execution_path = std::env::join_paths([&companion_directory]).expect("valid path");
+
+            assert_eq!(provider_binary(config, home, &execution_path), Ok(first));
         }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn reports_a_provider_missing_one_of_its_companion_executables() {
+        let config = pi::CONFIG;
+        assert!(!config.executable.companion_executables.is_empty());
+        let directory = tempfile::tempdir().expect("temp directory should exist");
+        let home = directory.path();
+        let installed = home.join(config.executable.home_candidates[0]);
+        fs::create_dir_all(installed.parent().expect("candidate should have a parent"))
+            .expect("candidate directory should exist");
+        fs::write(&installed, "adapter").expect("adapter should exist");
+
+        assert_eq!(
+            provider_binary(config, home, OsStr::new("")),
+            Err(config.executable.missing_error.to_string())
+        );
     }
 
     #[cfg(unix)]

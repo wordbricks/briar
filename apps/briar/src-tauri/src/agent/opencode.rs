@@ -18,6 +18,7 @@ pub(super) const CONFIG: SidecarProviderConfig = SidecarProviderConfig {
             "/opt/homebrew/bin/opencode",
             "/usr/local/bin/opencode",
         ],
+        companion_executables: &[],
         missing_error:
             "OpenCode CLI가 필요합니다. OpenCode를 설치하고 `opencode auth login`을 실행한 뒤 다시 시도하세요.",
     },

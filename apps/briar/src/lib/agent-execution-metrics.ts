@@ -1225,7 +1225,10 @@ function agentExecutionObservationsFromPayload(
       usage: codexExecutionUsageObservationsFromPayload(payload),
       costs: [] as AgentExecutionCostObservation[],
     })),
-    Match.when("cursor", () => ({
+    // Neither ACP adapter reports per-turn tokens or cost in a shape Briar
+    // can read: Cursor bills against its own account, and `pi-acp` forwards
+    // no usage from pi's `--mode rpc` stream.
+    Match.whenOr("cursor", "pi", () => ({
       usage: [] as AgentExecutionUsageObservation[],
       costs: [] as AgentExecutionCostObservation[],
     })),

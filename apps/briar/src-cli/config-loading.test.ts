@@ -23,6 +23,7 @@ const localSettings = {
     opencode: true,
     openrouter: true,
     vertex: true,
+    pi: true,
   },
   appSettings: {
     preventSleepWhileRunning: false,

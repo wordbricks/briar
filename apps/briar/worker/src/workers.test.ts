@@ -355,6 +355,12 @@ describe("detached execution workers", () => {
       allowCustomModels: true,
       error: null,
     },
+    pi: {
+      models: [],
+      defaultEfforts: [],
+      allowCustomModels: true,
+      error: null,
+    },
   } satisfies AgentProviderCapabilityCatalog;
 
   const runtimeMetadata = (

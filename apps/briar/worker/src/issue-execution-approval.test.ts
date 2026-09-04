@@ -129,6 +129,12 @@ const providerCapabilities = {
     allowCustomModels: true,
     error: null,
   },
+  pi: {
+    models: [],
+    defaultEfforts: [],
+    allowCustomModels: true,
+    error: null,
+  },
 };
 
 const event = (

@@ -27,6 +27,7 @@ import {
   CursorIcon,
   GrokIcon,
   OpenCodeIcon,
+  PiIcon,
 } from "./AgentIcons";
 
 /**
@@ -163,6 +164,8 @@ export function DeveloperToolsSetup({
                   <AntigravityIcon size={20} />
                 ) : id === "opencode" ? (
                   <OpenCodeIcon size={20} />
+                ) : id === "pi" ? (
+                  <PiIcon size={20} />
                 ) : null}
               </span>
               <div className="initial-prerequisite-copy">

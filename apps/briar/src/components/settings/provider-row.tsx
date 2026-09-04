@@ -147,7 +147,8 @@ export function ProviderIcon({
     | "agy"
     | "opencode"
     | "openrouter"
-    | "vertex";
+    | "vertex"
+    | "pi";
 }) {
   return (
     <span
@@ -164,6 +165,7 @@ export function ProviderIcon({
         tone === "opencode" && "bg-[#ececf1] text-[#211e1e]",
         tone === "openrouter" && "bg-[#f1edff] text-[#5941a9]",
         tone === "vertex" && "bg-[#e8f0fe] text-[#1a73e8]",
+        tone === "pi" && "bg-[#f0efe9] text-[#3f3d36]",
         className,
       )}
     >

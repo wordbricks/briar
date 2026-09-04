@@ -91,6 +91,18 @@ const providerPrefixes = {
     "TOGETHER_",
     "CEREBRAS_",
   ],
+  // Pi is multi-provider like OpenCode: it authenticates against whichever
+  // upstream the selected model belongs to, so its own key prefixes travel
+  // with it. `PI_` carries pi's own switches.
+  pi: [
+    "ANTHROPIC_",
+    "OPENAI_",
+    "GEMINI_",
+    "GOOGLE_",
+    "OPENROUTER_",
+    "XAI_",
+    "PI_",
+  ],
 } satisfies Record<Exclude<AgentProvider, OpenCodeUpstreamProvider>, string[]>;
 
 const providerEnvironmentKeys = {
@@ -100,6 +112,9 @@ const providerEnvironmentKeys = {
   grok: new Set(["XAI_API_KEY"]),
   agy: new Set(),
   opencode: new Set(),
+  // `PI_ACP_PI_COMMAND` names the `pi` executable the adapter spawns; without
+  // it an isolated turn falls back to a bare `pi` lookup on PATH.
+  pi: new Set(["PI_ACP_PI_COMMAND"]),
 } satisfies Record<
   Exclude<AgentProvider, OpenCodeUpstreamProvider>,
   Set<string>
@@ -427,6 +442,55 @@ async function prepareCursorEnvironment(
         join(targetCursorHome, name),
       );
     }
+  } catch (error) {
+    await rm(isolatedRoot, { recursive: true, force: true });
+    throw error;
+  }
+  return {
+    environment: {
+      ...allowed,
+      HOME: isolatedRoot,
+      USERPROFILE: isolatedRoot,
+      TMPDIR: isolatedRoot,
+      TMP: isolatedRoot,
+      TEMP: isolatedRoot,
+    },
+    stateRoot: isolatedRoot,
+    cleanup: () => rm(isolatedRoot, { recursive: true, force: true }),
+  };
+}
+
+/**
+ * Pi keeps every piece of its state under `$HOME/.pi/agent` and exposes no
+ * environment override for that root, so isolating a read-only turn means
+ * giving the process its own `HOME` and copying just the credential file in.
+ * `~/.pi/pi-acp` (the adapter's session map) is deliberately left behind: a
+ * read-only turn never resumes a recorded session.
+ */
+async function preparePiEnvironment(
+  allowed: NodeJS.ProcessEnv,
+  environment: NodeJS.ProcessEnv,
+) {
+  const isolatedRoot = await mkdtemp(join(tmpdir(), "briar-pi-read-only-"));
+  const targetAgentHome = join(isolatedRoot, ".pi", "agent");
+  const sourceHome = environment.HOME?.trim() || homedir();
+  const sourceAgentHome = join(sourceHome, ".pi", "agent");
+  try {
+    await mkdir(targetAgentHome, { recursive: true, mode: 0o700 });
+    for (const name of ["auth.json", "models.json"]) {
+      await copyOptionalCredential(
+        join(sourceAgentHome, name),
+        join(targetAgentHome, name),
+      );
+    }
+    // A turn must not adopt project-local pi resources it never reviewed.
+    // `defaultProjectTrust: "never"` is what makes `--mode rpc`, which shows
+    // no trust prompt, ignore `.pi/` in the workspace.
+    await writeFile(
+      join(targetAgentHome, "settings.json"),
+      `${JSON.stringify({ defaultProjectTrust: "never" }, null, 2)}\n`,
+      { mode: 0o600 },
+    );
   } catch (error) {
     await rm(isolatedRoot, { recursive: true, force: true });
     throw error;

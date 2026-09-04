@@ -30,6 +30,7 @@ const provider = {
   opencode: AgentProvider.OPENCODE,
   openrouter: AgentProvider.OPENROUTER,
   vertex: AgentProvider.VERTEX,
+  pi: AgentProvider.PI,
 } as const satisfies Record<OrganizationAgentRow["provider"], AgentProvider>;
 
 const computerUsePolicy = {

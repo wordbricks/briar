@@ -49,6 +49,7 @@ message LocalAgentProviderSettings {
   bool opencode = 6;
   bool openrouter = 7;
   bool vertex = 8;
+  bool pi = 9;
 }
 
 // Google Vertex AI is addressed by project and region; the credential itself

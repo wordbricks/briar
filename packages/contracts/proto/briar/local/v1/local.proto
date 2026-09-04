@@ -63,6 +63,7 @@ message LocalProviderUsageSnapshot {
   LocalProviderUsage opencode = 6;
   LocalProviderUsage openrouter = 7;
   LocalProviderUsage vertex = 9;
+  LocalProviderUsage pi = 10;
   google.protobuf.Timestamp updated_at = 8;
 }
 
@@ -107,6 +108,7 @@ message LocalProviderModelCatalog {
   LocalProviderModels opencode = 6;
   LocalProviderModels openrouter = 7;
   LocalProviderModels vertex = 8;
+  LocalProviderModels pi = 9;
 }
 
 message LocalProviderModels {
@@ -146,4 +148,5 @@ message LocalProviderAuthSnapshot {
   optional bool opencode = 6;
   optional bool openrouter = 7;
   optional bool vertex = 8;
+  optional bool pi = 9;
 }

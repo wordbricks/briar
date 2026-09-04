@@ -53,6 +53,8 @@ export const providerMissingBinaryMessage = {
     "OpenCode CLI가 필요합니다. OpenCode를 설치하고 `opencode auth login`을 실행한 뒤 다시 시도하세요.",
   openrouter: "OpenRouter 실행에 필요한 OpenCode CLI가 설치되어 있지 않습니다.",
   vertex: "Vertex AI 실행에 필요한 OpenCode CLI가 설치되어 있지 않습니다.",
+  pi:
+    "Pi CLI와 pi-acp 어댑터가 모두 필요합니다. `npm install -g @earendil-works/pi-coding-agent pi-acp`로 설치하고 `pi`에서 `/login`을 실행한 뒤 다시 시도하세요.",
 } satisfies Record<AgentProvider, string>;
 
 export type AgentUsageWindow = {

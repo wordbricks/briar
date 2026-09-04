@@ -119,6 +119,16 @@ type AgentProviderCatalogEntryBase = {
   readonly label: string;
   /** Executable Briar looks for on `PATH` when it drives the provider CLI. */
   readonly binaryName: string;
+  /**
+   * Further executables that must also be on `PATH` for a turn to run.
+   *
+   * Most providers are one binary. Pi is driven through the third-party
+   * `pi-acp` adapter, which spawns the separate `pi` CLI itself, so a machine
+   * carrying only one of the two cannot run a turn. Install checks resolve
+   * every name here, which keeps the second-binary rule in the catalog
+   * instead of a provider comparison at each probe.
+   */
+  readonly companionBinaries?: readonly string[];
   /** Provider the managed-computer setup agent can connect on its own. */
   readonly managedComputerSetup: boolean;
   /** Provider accepts model ids it never advertised in its capability report. */
@@ -262,6 +272,19 @@ export const agentProviderCatalog = {
       missingCredentialUsageMessage: "Vertex AI 프로젝트 설정이 필요합니다.",
     },
   },
+  pi: {
+    kind: "acpAgent",
+    label: "Pi",
+    // Pi ships no ACP server of its own. `pi-acp` is a third-party adapter
+    // that speaks ACP to Briar and drives `pi --mode rpc` underneath, so
+    // Briar spawns the adapter and the adapter spawns the CLI.
+    binaryName: "pi-acp",
+    companionBinaries: ["pi"],
+    managedComputerSetup: false,
+    allowsCustomModels: true,
+    builtIn: true,
+    installUrl: "https://github.com/svkozak/pi-acp",
+  },
 } as const satisfies Record.ReadonlyRecord<
   AgentProvider,
   AgentProviderCatalogEntry
@@ -364,6 +387,19 @@ export function sortAgentProviders(
 
 export function agentProviderBinaryName(provider: AgentProvider) {
   return agentProviderCatalog[provider].binaryName;
+}
+
+/**
+ * Every executable a provider needs on `PATH`, the one Briar spawns first.
+ *
+ * An install check that resolves all of these reports "not installed" for a
+ * half-installed provider without knowing which provider it is looking at.
+ */
+export function agentProviderRequiredBinaryNames(
+  provider: AgentProvider,
+): readonly string[] {
+  const entry: AgentProviderCatalogEntry = agentProviderCatalog[provider];
+  return [entry.binaryName, ...(entry.companionBinaries ?? [])];
 }
 
 export function agentProviderAllowsCustomModels(provider: AgentProvider) {

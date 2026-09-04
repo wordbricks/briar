@@ -498,6 +498,42 @@ export const opencodeAuthenticated = async (home: string) => {
   return false;
 };
 
+/**
+ * Provider keys pi reads straight from the environment. Pi is multi-provider:
+ * any one of these lets it run a turn without a stored credential, which is
+ * why an empty `auth.json` is not by itself a signed-out Pi.
+ */
+export const PI_PROVIDER_KEY_ENVIRONMENT_KEYS = [
+  "ANTHROPIC_API_KEY",
+  "OPENAI_API_KEY",
+  "GEMINI_API_KEY",
+  "GOOGLE_API_KEY",
+  "OPENROUTER_API_KEY",
+  "XAI_API_KEY",
+] as const;
+
+/**
+ * Pi is authenticated when `/login` has written a credential to
+ * `~/.pi/agent/auth.json`, or when a provider key is present in the
+ * environment.
+ */
+export const piAuthenticated = async (
+  home: string,
+  environment: NodeJS.ProcessEnv = process.env,
+) => {
+  if (
+    PI_PROVIDER_KEY_ENVIRONMENT_KEYS.some((key) =>
+      Boolean(environment[key]?.trim())
+    )
+  ) {
+    return true;
+  }
+  const parsed = objectOrNull(
+    await readJsonFile(join(home, ".pi", "agent", "auth.json")),
+  );
+  return Boolean(parsed && Object.keys(parsed).length > 0);
+};
+
 /** OpenCode stores the paid Go plan key under the `opencode-go` entry. */
 export const parseOpencodeGoKey = (contents: string): string | null => {
   try {

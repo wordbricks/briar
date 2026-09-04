@@ -1,7 +1,7 @@
 import { homedir } from "node:os";
 import {
   agentProviders,
-  agentProviderBinaryName,
+  agentProviderRequiredBinaryNames,
   openCodeUpstreamOf,
   type AgentProvider,
 } from "../src/lib/agent-provider";
@@ -14,6 +14,7 @@ import {
   opencodeAuthenticated,
   parseClaudeAuthStatus,
   parseCursorAboutEmail,
+  piAuthenticated,
 } from "./provider-credentials";
 import {
   probeWorkerProviderUsage,
@@ -34,6 +35,7 @@ export {
   opencodeAuthenticated,
   parseClaudeAuthStatus,
   parseCursorAboutEmail,
+  piAuthenticated,
 };
 
 export const workerProviderIds = agentProviders;
@@ -112,7 +114,15 @@ const defaultDependencies: ProviderHealthDependencies = {
     }
   },
   now: Date.now,
-  which: (provider) => Bun.which(agentProviderBinaryName(provider)),
+  which: (provider) => {
+    // A provider whose adapter spawns a second CLI is only installed when
+    // both are present. Resolving the catalog's whole list keeps that rule
+    // out of the per-provider branches below.
+    const [primary, ...companions] = agentProviderRequiredBinaryNames(provider);
+    const resolved = primary ? Bun.which(primary) : null;
+    if (!resolved) return null;
+    return companions.every((name) => Bun.which(name)) ? resolved : null;
+  },
   runtimeBlock: (provider, now) => activeProviderBlock(provider, () => now),
   authenticated: async (provider, binary, home, now, upstreamConfigured) => {
     if (openCodeUpstreamOf(provider)) {
@@ -132,6 +142,9 @@ const defaultDependencies: ProviderHealthDependencies = {
     }
     if (provider === "agy") {
       return agyAuthenticated(binary);
+    }
+    if (provider === "pi") {
+      return piAuthenticated(home);
     }
     return grokAuthenticated(home, now);
   },

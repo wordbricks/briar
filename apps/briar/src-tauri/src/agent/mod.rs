@@ -10,6 +10,7 @@ mod cursor;
 mod grok;
 mod opencode;
 mod openrouter;
+mod pi;
 mod project_agent;
 mod sidecar;
 mod vertex;
@@ -48,6 +49,7 @@ pub(crate) enum AgentProviderKind {
     Opencode,
     Openrouter,
     Vertex,
+    Pi,
 }
 
 /// Marker naming the Briar provider a runner process executes for.
@@ -175,6 +177,7 @@ const CONVERSATION_NAMESPACES: &[(AgentProviderKind, &str)] = &[
     (AgentProviderKind::Agy, "agy"),
     (AgentProviderKind::Openrouter, "openrouter"),
     (AgentProviderKind::Vertex, "vertex"),
+    (AgentProviderKind::Pi, "pi"),
 ];
 
 impl AgentProviderKind {
@@ -222,6 +225,7 @@ impl AgentProviderKind {
             Self::Opencode => "OpenCode",
             Self::Openrouter => "OpenRouter",
             Self::Vertex => "Vertex AI",
+            Self::Pi => "Pi",
         }
     }
 
@@ -237,6 +241,7 @@ impl AgentProviderKind {
             Self::Cursor => ".cursor",
             Self::Grok => ".grok",
             Self::Agy => ".gemini/config",
+            Self::Pi => ".pi/agent",
             Self::Opencode | Self::Openrouter | Self::Vertex => OPENCODE_SKILL_DIRECTORY,
         }
     }
@@ -253,6 +258,7 @@ impl AgentProviderKind {
             Self::Cursor => "cursor-runner.js",
             Self::Grok => "grok-runner.js",
             Self::Agy => "agy-runner.js",
+            Self::Pi => "pi-runner.js",
             Self::Opencode | Self::Openrouter | Self::Vertex => OPENCODE_RUNNER_BUNDLE,
         }
     }
@@ -268,6 +274,7 @@ impl AgentProviderKind {
             Self::Opencode => "opencode",
             Self::Openrouter => "openrouter",
             Self::Vertex => "vertex",
+            Self::Pi => "pi",
         }
     }
 
@@ -284,6 +291,7 @@ impl AgentProviderKind {
             Self::Opencode => Wire::AGENT_PROVIDER_OPENCODE,
             Self::Openrouter => Wire::AGENT_PROVIDER_OPENROUTER,
             Self::Vertex => Wire::AGENT_PROVIDER_VERTEX,
+            Self::Pi => Wire::AGENT_PROVIDER_PI,
         }
     }
 
@@ -301,6 +309,7 @@ impl AgentProviderKind {
             Wire::AGENT_PROVIDER_OPENCODE => Some(Self::Opencode),
             Wire::AGENT_PROVIDER_OPENROUTER => Some(Self::Openrouter),
             Wire::AGENT_PROVIDER_VERTEX => Some(Self::Vertex),
+            Wire::AGENT_PROVIDER_PI => Some(Self::Pi),
         }
     }
 
@@ -313,7 +322,7 @@ impl AgentProviderKind {
     /// inactive until this machine adds it, exactly like a disabled one.
     pub(crate) fn built_in(self) -> bool {
         match self {
-            Self::Codex | Self::Claude | Self::Agy | Self::Opencode => true,
+            Self::Codex | Self::Claude | Self::Agy | Self::Opencode | Self::Pi => true,
             Self::Cursor | Self::Grok | Self::Openrouter | Self::Vertex => false,
         }
     }
@@ -749,6 +758,7 @@ pub(crate) enum AgentBackendHandle {
     Grok(sidecar::SidecarBackend),
     Agy(sidecar::SidecarBackend),
     Opencode(sidecar::SidecarBackend),
+    Pi(sidecar::SidecarBackend),
 }
 
 impl AgentBackend for AgentBackendHandle {
@@ -767,7 +777,8 @@ impl AgentBackend for AgentBackendHandle {
             | Self::Cursor(backend)
             | Self::Grok(backend)
             | Self::Agy(backend)
-            | Self::Opencode(backend) => {
+            | Self::Opencode(backend)
+            | Self::Pi(backend) => {
                 backend.run(project_id, workspace_root, execution, request, approve)
             }
         }
@@ -833,6 +844,10 @@ pub(crate) fn discover_backend(
             sidecar::SidecarBackend::discover(runner, &runners.path(provider), vertex::CONFIG)
                 .map(AgentBackendHandle::Opencode)
         }
+        AgentProviderKind::Pi => {
+            sidecar::SidecarBackend::discover(runner, &runners.path(provider), pi::CONFIG)
+                .map(AgentBackendHandle::Pi)
+        }
     }
 }
 
@@ -872,6 +887,16 @@ pub(crate) fn grok_binary(home: &Path, execution_path: &OsStr) -> Result<PathBuf
 
 pub(crate) fn cursor_binary(home: &Path, execution_path: &OsStr) -> Result<PathBuf, String> {
     sidecar::provider_binary(cursor::CONFIG, home, execution_path)
+}
+
+pub(crate) fn pi_binary(home: &Path, execution_path: &OsStr) -> Result<PathBuf, String> {
+    sidecar::provider_binary(pi::CONFIG, home, execution_path)
+}
+
+/// The interactive `pi` CLI itself. `pi_binary` resolves the ACP adapter Briar
+/// spawns for a turn; the login flow needs the CLI that `/login` runs in.
+pub(crate) fn pi_cli_binary(home: &Path, execution_path: &OsStr) -> Result<PathBuf, String> {
+    sidecar::provider_companion_binary(pi::CONFIG, "pi", home, execution_path)
 }
 
 pub(crate) fn agy_binary(home: &Path, execution_path: &OsStr) -> Result<PathBuf, String> {
@@ -1267,6 +1292,7 @@ mod tests {
                 AgentProviderKind::Claude,
                 AgentProviderKind::Agy,
                 AgentProviderKind::Opencode,
+                AgentProviderKind::Pi,
             ]
         );
     }

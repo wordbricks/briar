@@ -1278,6 +1278,13 @@ pub struct LocalAgentProviderSettings {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub vertex: bool,
+    /// Field 9: `pi`
+    #[serde(
+        rename = "pi",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub pi: bool,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -1293,6 +1300,7 @@ impl ::core::fmt::Debug for LocalAgentProviderSettings {
             .field("opencode", &self.opencode)
             .field("openrouter", &self.openrouter)
             .field("vertex", &self.vertex)
+            .field("pi", &self.pi)
             .finish()
     }
 }
@@ -1347,6 +1355,9 @@ impl ::buffa::Message for LocalAgentProviderSettings {
         if self.vertex {
             size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
         }
+        if self.pi {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -1380,6 +1391,9 @@ impl ::buffa::Message for LocalAgentProviderSettings {
         }
         if self.vertex {
             ::buffa::types::put_bool_field(8u32, self.vertex, buf);
+        }
+        if self.pi {
+            ::buffa::types::put_bool_field(9u32, self.pi, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1450,6 +1464,13 @@ impl ::buffa::Message for LocalAgentProviderSettings {
                 )?;
                 self.vertex = ::buffa::types::decode_bool(buf)?;
             }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.pi = ::buffa::types::decode_bool(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -1466,6 +1487,7 @@ impl ::buffa::Message for LocalAgentProviderSettings {
         self.opencode = false;
         self.openrouter = false;
         self.vertex = false;
+        self.pi = false;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -6086,6 +6108,15 @@ pub struct LocalProviderUsageSnapshot {
         LocalProviderUsage,
         ::buffa::Inline<LocalProviderUsage>,
     >,
+    /// Field 10: `pi`
+    #[serde(
+        rename = "pi",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub pi: ::buffa::MessageField<
+        LocalProviderUsage,
+        ::buffa::Inline<LocalProviderUsage>,
+    >,
     /// Field 8: `updated_at`
     #[serde(
         rename = "updatedAt",
@@ -6111,6 +6142,7 @@ impl ::core::fmt::Debug for LocalProviderUsageSnapshot {
             .field("opencode", &self.opencode)
             .field("openrouter", &self.openrouter)
             .field("vertex", &self.vertex)
+            .field("pi", &self.pi)
             .field("updated_at", &self.updated_at)
             .finish()
     }
@@ -6214,6 +6246,14 @@ impl ::buffa::Message for LocalProviderUsageSnapshot {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if self.pi.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.pi.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -6295,6 +6335,14 @@ impl ::buffa::Message for LocalProviderUsageSnapshot {
                 buf,
             );
             self.vertex.write_to(__cache, buf);
+        }
+        if self.pi.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                10u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.pi.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -6408,6 +6456,17 @@ impl ::buffa::Message for LocalProviderUsageSnapshot {
                     ctx,
                 )?;
             }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.pi.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -6425,6 +6484,7 @@ impl ::buffa::Message for LocalProviderUsageSnapshot {
         self.openrouter = ::buffa::MessageField::none();
         self.updated_at = ::buffa::MessageField::none();
         self.vertex = ::buffa::MessageField::none();
+        self.pi = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -7166,6 +7226,15 @@ pub struct LocalProviderModelCatalog {
         LocalProviderModels,
         ::buffa::Inline<LocalProviderModels>,
     >,
+    /// Field 9: `pi`
+    #[serde(
+        rename = "pi",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub pi: ::buffa::MessageField<
+        LocalProviderModels,
+        ::buffa::Inline<LocalProviderModels>,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -7181,6 +7250,7 @@ impl ::core::fmt::Debug for LocalProviderModelCatalog {
             .field("opencode", &self.opencode)
             .field("openrouter", &self.openrouter)
             .field("vertex", &self.vertex)
+            .field("pi", &self.pi)
             .finish()
     }
 }
@@ -7275,6 +7345,14 @@ impl ::buffa::Message for LocalProviderModelCatalog {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if self.pi.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.pi.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -7348,6 +7426,14 @@ impl ::buffa::Message for LocalProviderModelCatalog {
                 buf,
             );
             self.vertex.write_to(__cache, buf);
+        }
+        if self.pi.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                9u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.pi.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -7450,6 +7536,17 @@ impl ::buffa::Message for LocalProviderModelCatalog {
                     ctx,
                 )?;
             }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.pi.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -7466,6 +7563,7 @@ impl ::buffa::Message for LocalProviderModelCatalog {
         self.opencode = ::buffa::MessageField::none();
         self.openrouter = ::buffa::MessageField::none();
         self.vertex = ::buffa::MessageField::none();
+        self.pi = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -8231,6 +8329,9 @@ pub struct LocalProviderAuthSnapshot {
     /// Field 8: `vertex`
     #[serde(rename = "vertex", skip_serializing_if = "::core::option::Option::is_none")]
     pub vertex: ::core::option::Option<bool>,
+    /// Field 9: `pi`
+    #[serde(rename = "pi", skip_serializing_if = "::core::option::Option::is_none")]
+    pub pi: ::core::option::Option<bool>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -8246,6 +8347,7 @@ impl ::core::fmt::Debug for LocalProviderAuthSnapshot {
             .field("opencode", &self.opencode)
             .field("openrouter", &self.openrouter)
             .field("vertex", &self.vertex)
+            .field("pi", &self.pi)
             .finish()
     }
 }
@@ -8313,6 +8415,13 @@ impl LocalProviderAuthSnapshot {
         self.vertex = Some(value);
         self
     }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::pi`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_pi(mut self, value: bool) -> Self {
+        self.pi = Some(value);
+        self
+    }
 }
 ::buffa::impl_default_instance!(LocalProviderAuthSnapshot);
 impl ::buffa::MessageName for LocalProviderAuthSnapshot {
@@ -8358,6 +8467,9 @@ impl ::buffa::Message for LocalProviderAuthSnapshot {
         if self.vertex.is_some() {
             size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
         }
+        if self.pi.is_some() {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -8391,6 +8503,9 @@ impl ::buffa::Message for LocalProviderAuthSnapshot {
         }
         if let Some(v) = self.vertex {
             ::buffa::types::put_bool_field(8u32, v, buf);
+        }
+        if let Some(v) = self.pi {
+            ::buffa::types::put_bool_field(9u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -8477,6 +8592,15 @@ impl ::buffa::Message for LocalProviderAuthSnapshot {
                     ::buffa::types::decode_bool(buf)?,
                 );
             }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.pi = ::core::option::Option::Some(
+                    ::buffa::types::decode_bool(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -8493,6 +8617,7 @@ impl ::buffa::Message for LocalProviderAuthSnapshot {
         self.opencode = ::core::option::Option::None;
         self.openrouter = ::core::option::Option::None;
         self.vertex = ::core::option::Option::None;
+        self.pi = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -9642,6 +9767,8 @@ pub mod __buffa {
             pub openrouter: bool,
             /// Field 8: `vertex`
             pub vertex: bool,
+            /// Field 9: `pi`
+            pub pi: bool,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for LocalAgentProviderSettingsView<'a> {
@@ -9732,6 +9859,13 @@ pub mod __buffa {
                         )?;
                         view.vertex = ::buffa::types::decode_bool(&mut cur)?;
                     }
+                    9u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.pi = ::buffa::types::decode_bool(&mut cur)?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -9769,6 +9903,7 @@ pub mod __buffa {
                     opencode: self.opencode,
                     openrouter: self.openrouter,
                     vertex: self.vertex,
+                    pi: self.pi,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -9807,6 +9942,9 @@ pub mod __buffa {
                 if self.vertex {
                     size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
                 }
+                if self.pi {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -9841,6 +9979,9 @@ pub mod __buffa {
                 }
                 if self.vertex {
                     ::buffa::types::put_bool_field(8u32, self.vertex, buf);
+                }
+                if self.pi {
+                    ::buffa::types::put_bool_field(9u32, self.pi, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -9886,6 +10027,9 @@ pub mod __buffa {
                 }
                 if self.vertex {
                     __map.serialize_entry("vertex", &self.vertex)?;
+                }
+                if self.pi {
+                    __map.serialize_entry("pi", &self.pi)?;
                 }
                 __map.end()
             }
@@ -10025,6 +10169,11 @@ pub mod __buffa {
             #[must_use]
             pub fn vertex(&self) -> bool {
                 self.0.reborrow().vertex
+            }
+            /// Field 9: `pi`
+            #[must_use]
+            pub fn pi(&self) -> bool {
+                self.0.reborrow().pi
             }
         }
         impl ::core::convert::From<
@@ -16905,6 +17054,10 @@ pub mod __buffa {
             pub vertex: ::buffa::MessageFieldView<
                 super::super::__buffa::view::LocalProviderUsageView<'a>,
             >,
+            /// Field 10: `pi`
+            pub pi: ::buffa::MessageFieldView<
+                super::super::__buffa::view::LocalProviderUsageView<'a>,
+            >,
             /// Field 8: `updated_at`
             pub updated_at: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
@@ -17143,6 +17296,31 @@ pub mod __buffa {
                             }
                         }
                     }
+                    10u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.pi.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.pi = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::LocalProviderUsageView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     8u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -17269,6 +17447,15 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    pi: match self.pi.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::LocalProviderUsage,
+                                ::buffa::Inline<super::super::LocalProviderUsage>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     updated_at: match self.updated_at.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
@@ -17364,6 +17551,14 @@ pub mod __buffa {
                         += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                             + inner_size as u64;
                 }
+                if self.pi.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.pi.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -17447,6 +17642,14 @@ pub mod __buffa {
                     );
                     self.vertex.write_to(__cache, buf);
                 }
+                if self.pi.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        10u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.pi.write_to(__cache, buf);
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -17510,6 +17713,11 @@ pub mod __buffa {
                 {
                     if let ::core::option::Option::Some(__v) = self.vertex.as_option() {
                         __map.serialize_entry("vertex", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.pi.as_option() {
+                        __map.serialize_entry("pi", __v)?;
                     }
                 }
                 {
@@ -17690,6 +17898,15 @@ pub mod __buffa {
                 super::super::__buffa::view::LocalProviderUsageView<'_>,
             > {
                 &self.0.reborrow().vertex
+            }
+            /// Field 10: `pi`
+            #[must_use]
+            pub fn pi(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::LocalProviderUsageView<'_>,
+            > {
+                &self.0.reborrow().pi
             }
             /// Field 8: `updated_at`
             #[must_use]
@@ -18827,6 +19044,10 @@ pub mod __buffa {
             pub vertex: ::buffa::MessageFieldView<
                 super::super::__buffa::view::LocalProviderModelsView<'a>,
             >,
+            /// Field 9: `pi`
+            pub pi: ::buffa::MessageFieldView<
+                super::super::__buffa::view::LocalProviderModelsView<'a>,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for LocalProviderModelCatalogView<'a> {
@@ -19061,6 +19282,31 @@ pub mod __buffa {
                             }
                         }
                     }
+                    9u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.pi.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.pi = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::LocalProviderModelsView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -19162,6 +19408,15 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    pi: match self.pi.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::LocalProviderModels,
+                                ::buffa::Inline<super::super::LocalProviderModels>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -19235,6 +19490,14 @@ pub mod __buffa {
                 if self.vertex.is_set() {
                     let __slot = __cache.reserve();
                     let inner_size = self.vertex.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                if self.pi.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.pi.compute_size(__cache);
                     __cache.set(__slot, inner_size);
                     size
                         += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
@@ -19315,6 +19578,14 @@ pub mod __buffa {
                     );
                     self.vertex.write_to(__cache, buf);
                 }
+                if self.pi.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        9u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.pi.write_to(__cache, buf);
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -19378,6 +19649,11 @@ pub mod __buffa {
                 {
                     if let ::core::option::Option::Some(__v) = self.vertex.as_option() {
                         __map.serialize_entry("vertex", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.pi.as_option() {
+                        __map.serialize_entry("pi", __v)?;
                     }
                 }
                 __map.end()
@@ -19550,6 +19826,15 @@ pub mod __buffa {
                 super::super::__buffa::view::LocalProviderModelsView<'_>,
             > {
                 &self.0.reborrow().vertex
+            }
+            /// Field 9: `pi`
+            #[must_use]
+            pub fn pi(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::LocalProviderModelsView<'_>,
+            > {
+                &self.0.reborrow().pi
             }
         }
         impl ::core::convert::From<
@@ -20760,6 +21045,8 @@ pub mod __buffa {
             pub openrouter: ::core::option::Option<bool>,
             /// Field 8: `vertex`
             pub vertex: ::core::option::Option<bool>,
+            /// Field 9: `pi`
+            pub pi: ::core::option::Option<bool>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for LocalProviderAuthSnapshotView<'a> {
@@ -20850,6 +21137,13 @@ pub mod __buffa {
                         )?;
                         view.vertex = Some(::buffa::types::decode_bool(&mut cur)?);
                     }
+                    9u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.pi = Some(::buffa::types::decode_bool(&mut cur)?);
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -20887,6 +21181,7 @@ pub mod __buffa {
                     opencode: self.opencode,
                     openrouter: self.openrouter,
                     vertex: self.vertex,
+                    pi: self.pi,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -20925,6 +21220,9 @@ pub mod __buffa {
                 if self.vertex.is_some() {
                     size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
                 }
+                if self.pi.is_some() {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -20959,6 +21257,9 @@ pub mod __buffa {
                 }
                 if let Some(v) = self.vertex {
                     ::buffa::types::put_bool_field(8u32, v, buf);
+                }
+                if let Some(v) = self.pi {
+                    ::buffa::types::put_bool_field(9u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -21004,6 +21305,9 @@ pub mod __buffa {
                 }
                 if let ::core::option::Option::Some(__v) = self.vertex {
                     __map.serialize_entry("vertex", &__v)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.pi {
+                    __map.serialize_entry("pi", &__v)?;
                 }
                 __map.end()
             }
@@ -21143,6 +21447,11 @@ pub mod __buffa {
             #[must_use]
             pub fn vertex(&self) -> ::core::option::Option<bool> {
                 self.0.reborrow().vertex
+            }
+            /// Field 9: `pi`
+            #[must_use]
+            pub fn pi(&self) -> ::core::option::Option<bool> {
+                self.0.reborrow().pi
             }
         }
         impl ::core::convert::From<

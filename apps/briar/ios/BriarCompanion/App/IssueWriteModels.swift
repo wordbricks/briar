@@ -11,6 +11,7 @@ enum AgentProvider: String, Codable, CaseIterable, Hashable, Identifiable, Senda
     case opencode
     case openrouter
     case vertex
+    case pi
 
     var id: String { rawValue }
     var displayName: String {
@@ -19,6 +20,7 @@ enum AgentProvider: String, Codable, CaseIterable, Hashable, Identifiable, Senda
         case .opencode: "OpenCode"
         case .openrouter: "OpenRouter"
         case .vertex: "Vertex AI"
+        case .pi: "Pi"
         default: rawValue.capitalized
         }
     }
@@ -48,6 +50,7 @@ enum AgentProvider: String, Codable, CaseIterable, Hashable, Identifiable, Senda
         case .opencode: .opencode
         case .openrouter: .openrouter
         case .vertex: .vertex
+        case .pi: .pi
         }
     }
 

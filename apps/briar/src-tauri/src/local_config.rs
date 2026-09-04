@@ -884,6 +884,7 @@ pub(super) fn provider_is_enabled(
         agent::AgentProviderKind::Opencode => settings.opencode,
         agent::AgentProviderKind::Openrouter => settings.openrouter,
         agent::AgentProviderKind::Vertex => settings.vertex,
+        agent::AgentProviderKind::Pi => settings.pi,
     }
 }
 
@@ -901,6 +902,7 @@ pub(super) fn set_provider_enabled(
         agent::AgentProviderKind::Opencode => settings.opencode = enabled,
         agent::AgentProviderKind::Openrouter => settings.openrouter = enabled,
         agent::AgentProviderKind::Vertex => settings.vertex = enabled,
+        agent::AgentProviderKind::Pi => settings.pi = enabled,
     }
 }
 

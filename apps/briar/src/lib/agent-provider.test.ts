@@ -52,7 +52,13 @@ describe("built-in and added providers", () => {
   ) as Record<(typeof agentProviders)[number], boolean>;
 
   it("splits every provider into exactly one of the two lists", () => {
-    expect(builtInProviders).toEqual(["codex", "claude", "agy", "opencode"]);
+    expect(builtInProviders).toEqual([
+      "codex",
+      "claude",
+      "agy",
+      "opencode",
+      "pi",
+    ]);
     expect(addableProviders).toEqual([
       "cursor",
       "grok",
@@ -88,6 +94,7 @@ describe("built-in and added providers", () => {
       opencode: true,
       openrouter: false,
       vertex: false,
+      pi: true,
     });
   });
 

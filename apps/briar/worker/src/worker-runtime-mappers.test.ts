@@ -41,7 +41,7 @@ describe("Worker runtime protobuf mapping", () => {
 
     expect(() => workerRuntimeMetadataFromProto(runtime)).toThrow(
       new WorkerRuntimeValidationError(
-        "Worker provider capabilities must contain exactly 8 providers",
+        "Worker provider capabilities must contain exactly 9 providers",
       ),
     );
 

@@ -53,6 +53,7 @@ const providerColors = {
   opencode: "#4f8a70",
   openrouter: "#6d5bd0",
   vertex: "#1a73e8",
+  pi: "#3f3d36",
   unknown: "var(--muted-foreground)",
 } satisfies Record<UsageAttribution, string>;
 
@@ -161,6 +162,7 @@ function ProviderMark({ provider }: { provider: UsageAttribution }) {
     provider === "agy" && "text-[#4285f4]",
     provider === "opencode" && "text-[#4f8a70]",
     provider === "openrouter" && "text-[#6d5bd0]",
+    provider === "pi" && "text-[#3f3d36]",
     provider === "unknown" && "text-muted-foreground",
   );
   if (provider === "unknown") {

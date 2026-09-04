@@ -113,6 +113,8 @@ export const agentProviderFromProto = (value: ProtoAgentProvider): AgentProvider
       return "openrouter";
     case ProtoAgentProvider.VERTEX:
       return "vertex";
+    case ProtoAgentProvider.PI:
+      return "pi";
     case ProtoAgentProvider.UNSPECIFIED:
       throw new Error("Agent provider is missing");
     default:
@@ -138,6 +140,8 @@ export const agentProviderToProto = (value: AgentProvider): ProtoAgentProvider =
       return ProtoAgentProvider.OPENROUTER;
     case "vertex":
       return ProtoAgentProvider.VERTEX;
+    case "pi":
+      return ProtoAgentProvider.PI;
   }
 };
 

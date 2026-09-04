@@ -18,6 +18,7 @@ const protoProvider = {
   opencode: ProtoAgentProvider.OPENCODE,
   openrouter: ProtoAgentProvider.OPENROUTER,
   vertex: ProtoAgentProvider.VERTEX,
+  pi: ProtoAgentProvider.PI,
 } as const satisfies Record<AgentProvider, ProtoAgentProvider>;
 
 export function dmLearningPolicy(env: DmLearningEnvironment, organizationId: string): DmLearningPolicy | null {

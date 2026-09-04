@@ -26,6 +26,7 @@ const config = {
     opencode: true,
     openrouter: true,
     vertex: true,
+    pi: true,
   },
   appSettings: {
     preventSleepWhileRunning: false,

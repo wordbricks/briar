@@ -157,6 +157,7 @@ pub(super) fn inspect_onboarding_prerequisites_sync(
     let mut cursor = inspect_cli(agent::cursor_binary(home, &execution_path), &execution_path);
     let mut grok = inspect_cli(agent::grok_binary(home, &execution_path), &execution_path);
     let mut agy = inspect_cli(agent::agy_binary(home, &execution_path), &execution_path);
+    let mut pi = inspect_cli(agent::pi_binary(home, &execution_path), &execution_path);
     let mut opencode = inspect_cli(
         agent::opencode_binary(home, &execution_path),
         &execution_path,
@@ -169,6 +170,7 @@ pub(super) fn inspect_onboarding_prerequisites_sync(
     cursor.authenticated = cursor.installed && authenticated.cursor;
     grok.authenticated = grok.installed && authenticated.grok;
     agy.authenticated = agy.installed && authenticated.agy;
+    pi.authenticated = pi.installed && authenticated.pi;
     // OpenCode delegates authentication to its configured model providers. A
     // healthy installed CLI is enough to launch; the server reports any
     // provider-specific authentication error during the request.
@@ -192,6 +194,7 @@ pub(super) fn inspect_onboarding_prerequisites_sync(
         opencode,
         openrouter,
         vertex,
+        pi,
     }
 }
 
@@ -212,6 +215,7 @@ pub(super) fn load_agent_provider_models_sync(home: &Path) -> AgentProviderModel
             opencode: provider_model_entry(catalog.opencode.into_option(), true),
             openrouter: provider_model_entry(catalog.openrouter.into_option(), true),
             vertex: provider_model_entry(catalog.vertex.into_option(), true),
+            pi: provider_model_entry(catalog.pi.into_option(), true),
         },
         // A CLI that cannot run reports the same missing-provider surface the
         // app has always shown, with the selector policy left intact.
@@ -224,6 +228,7 @@ pub(super) fn load_agent_provider_models_sync(home: &Path) -> AgentProviderModel
             opencode: unavailable_model_entry(&error, true),
             openrouter: unavailable_model_entry(&error, true),
             vertex: unavailable_model_entry(&error, true),
+            pi: unavailable_model_entry(&error, true),
         },
     }
 }
@@ -377,6 +382,7 @@ pub(super) enum AgentLoginProvider {
     Grok,
     Agy,
     Opencode,
+    Pi,
 }
 
 pub(super) fn provider_login_binary_and_args(
@@ -413,6 +419,9 @@ pub(super) fn provider_login_binary_and_args(
             agent::opencode_binary(home, &execution_path)?,
             vec!["auth", "login"],
         )),
+        // Pi has no `login` subcommand: the user runs `/login` inside the
+        // interactive CLI, so the terminal opens on a bare `pi`.
+        AgentLoginProvider::Pi => Ok((agent::pi_cli_binary(home, &execution_path)?, vec![])),
     }
 }
 
@@ -516,6 +525,7 @@ pub(super) enum OnboardingPrerequisite {
     Opencode,
     Openrouter,
     Vertex,
+    Pi,
 }
 
 #[tauri::command]
@@ -888,6 +898,11 @@ pub(super) async fn install_onboarding_prerequisite(
             OnboardingPrerequisite::Opencode
             | OnboardingPrerequisite::Openrouter
             | OnboardingPrerequisite::Vertex => install_cli_package(&home, "opencode-ai")?,
+            // Pi needs the CLI and the ACP adapter that drives it.
+            OnboardingPrerequisite::Pi => {
+                install_cli_package(&home, "@earendil-works/pi-coding-agent")?;
+                install_cli_package(&home, "pi-acp")?
+            }
         }
         let configured = configured_upstreams_from(&config_path)?;
         let prerequisites = inspect_onboarding_prerequisites_sync(&home, &configured);
@@ -901,6 +916,7 @@ pub(super) async fn install_onboarding_prerequisite(
             OnboardingPrerequisite::Opencode => prerequisites.opencode.installed,
             OnboardingPrerequisite::Openrouter => prerequisites.openrouter.installed,
             OnboardingPrerequisite::Vertex => prerequisites.vertex.installed,
+            OnboardingPrerequisite::Pi => prerequisites.pi.installed,
         };
         if !installed {
             return Err(

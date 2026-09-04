@@ -38,6 +38,7 @@ async function writeCliConfig(configDirectory: string, velenOrg?: string) {
       opencode: true,
       openrouter: true,
       vertex: true,
+      pi: true,
     },
     appSettings: {
       preventSleepWhileRunning: false,

@@ -11,6 +11,7 @@ pub(super) const CONFIG: SidecarProviderConfig = SidecarProviderConfig {
         name: "grok",
         home_candidates: &[".local/bin/grok", ".grok/bin/grok", ".bun/bin/grok"],
         absolute_candidates: &["/opt/homebrew/bin/grok", "/usr/local/bin/grok"],
+        companion_executables: &[],
         missing_error:
             "Grok CLI가 필요합니다. Grok을 설치하고 `grok login`을 실행한 뒤 다시 시도하세요.",
     },

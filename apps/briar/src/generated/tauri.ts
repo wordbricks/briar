@@ -109,7 +109,7 @@ export const commands = {
 	projectRepositoryReadiness: (projectId: string) => __TAURI_INVOKE<RepositoryReadiness>("project_repository_readiness", { projectId }),
 	prepareProjectRepository: (projectId: string, credential: ProjectGithubCredential) => __TAURI_INVOKE<PreparedProjectRepository>("prepare_project_repository", { projectId, credential }),
 	disconnectLocalProject: (projectId: string) => __TAURI_INVOKE<null>("disconnect_local_project", { projectId }),
-	connectLocalProject: (apiUrl: string, projectId: string, agentToken: string, repositoryPath: string, autoHunt: AutoHuntConfig_Deserialize, provider: "codex" | "claude" | "cursor" | "grok" | "agy" | "opencode" | "openrouter" | "vertex" | null) => __TAURI_INVOKE<ConnectedLocalProject_Serialize>("connect_local_project", { apiUrl, projectId, agentToken, repositoryPath, autoHunt, provider }),
+	connectLocalProject: (apiUrl: string, projectId: string, agentToken: string, repositoryPath: string, autoHunt: AutoHuntConfig_Deserialize, provider: "codex" | "claude" | "cursor" | "grok" | "agy" | "opencode" | "openrouter" | "vertex" | "pi" | null) => __TAURI_INVOKE<ConnectedLocalProject_Serialize>("connect_local_project", { apiUrl, projectId, agentToken, repositoryPath, autoHunt, provider }),
 	inspectVelen: (org: string | null) => __TAURI_INVOKE<VelenInspection>("inspect_velen", { org }),
 	autoHuntHealth: (projectId: string) => __TAURI_INVOKE<AutoHuntHealth>("auto_hunt_health", { projectId }),
 	repairAutoHunt: (projectId: string) => __TAURI_INVOKE<AutoHuntHealth>("repair_auto_hunt", { projectId }),
@@ -157,7 +157,7 @@ export type AgentEvent = { type: "conversationStarted"; conversationId: string }
 
 export type AgentEventDirection = "client" | "server";
 
-export type AgentLoginProvider = "codex" | "claude" | "cursor" | "grok" | "agy" | "opencode";
+export type AgentLoginProvider = "codex" | "claude" | "cursor" | "grok" | "agy" | "opencode" | "pi";
 
 /**
  *  One provider the connection screen may offer. `selectable` covers everything
@@ -184,7 +184,7 @@ export type AgentProviderEffort = {
 	isDefault: boolean,
 };
 
-export type AgentProviderKind = "codex" | "claude" | "cursor" | "grok" | "agy" | "opencode" | "openrouter" | "vertex";
+export type AgentProviderKind = "codex" | "claude" | "cursor" | "grok" | "agy" | "opencode" | "openrouter" | "vertex" | "pi";
 
 export type AgentProviderModel = {
 	id: string,
@@ -203,6 +203,7 @@ export type AgentProviderModelCatalog = {
 	opencode: AgentProviderModelCatalogEntry,
 	openrouter: AgentProviderModelCatalogEntry,
 	vertex: AgentProviderModelCatalogEntry,
+	pi: AgentProviderModelCatalogEntry,
 };
 
 export type AgentProviderModelCatalogEntry = {
@@ -235,6 +236,7 @@ export type AgentUsageSnapshot = {
 	opencode: ProviderUsage,
 	openrouter: ProviderUsage,
 	vertex: ProviderUsage,
+	pi: ProviderUsage,
 	cursor: ProviderUsage,
 	updatedAt: number,
 };
@@ -258,6 +260,7 @@ export type AppProviderSettings = {
 	opencode: boolean,
 	openrouter: boolean,
 	vertex: boolean,
+	pi: boolean,
 };
 
 export type AppRuntimeSettings = {
@@ -563,7 +566,7 @@ export type LovableStack = "tanstack-start" | "vite-react";
 
 export type ModelEffort = string;
 
-export type OnboardingPrerequisite = "git" | "codex" | "claude" | "cursor" | "grok" | "agy" | "opencode" | "openrouter" | "vertex";
+export type OnboardingPrerequisite = "git" | "codex" | "claude" | "cursor" | "grok" | "agy" | "opencode" | "openrouter" | "vertex" | "pi";
 
 export type OnboardingPrerequisiteStatus = {
 	installed: boolean,
@@ -581,6 +584,7 @@ export type OnboardingPrerequisites = {
 	opencode: OnboardingPrerequisiteStatus,
 	openrouter: OnboardingPrerequisiteStatus,
 	vertex: OnboardingPrerequisiteStatus,
+	pi: OnboardingPrerequisiteStatus,
 };
 
 export type OpenCodeTerminalPathStatus = {

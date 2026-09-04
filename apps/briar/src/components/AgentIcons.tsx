@@ -179,6 +179,34 @@ export function AntigravityIcon({ size = 14, className, style }: AgentIconProps)
   );
 }
 
+/**
+ * Brand-neutral mark for Pi: the Greek letter the agent is named after, drawn
+ * in `currentColor` so it inherits the surrounding tone in both themes. Pi
+ * ships no logo Briar may bundle, and the provider is reached through the
+ * third-party `pi-acp` adapter rather than a branded product surface.
+ */
+export function PiIcon({ size = 14, className, style }: AgentIconProps) {
+  return (
+    <svg
+      aria-hidden
+      className={className}
+      fill="none"
+      height={size}
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeWidth={2}
+      style={style}
+      viewBox="0 0 24 24"
+      width={size}
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path d="M4 7h16" />
+      <path d="M9 7v10" />
+      <path d="M16 7v8c0 1.1.9 2 2 2h1" />
+    </svg>
+  );
+}
+
 export type AgentProviderIconId =
   | "claude"
   | "codex"
@@ -187,7 +215,8 @@ export type AgentProviderIconId =
   | "agy"
   | "opencode"
   | "openrouter"
-  | "vertex";
+  | "vertex"
+  | "pi";
 
 export function AgentProviderIcon({
   provider,
@@ -220,6 +249,9 @@ export function AgentProviderIcon({
   }
   if (provider === "agy") {
     return <AntigravityIcon className={className} size={size} style={style} />;
+  }
+  if (provider === "pi") {
+    return <PiIcon className={className} size={size} style={style} />;
   }
   return <CodexIcon className={className} size={size} style={style} />;
 }
