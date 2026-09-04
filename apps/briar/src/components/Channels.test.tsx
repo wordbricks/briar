@@ -6,8 +6,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../i18n";
 import { RegistryContext } from "@effect/atom-react";
 import { createTestRegistry } from "../state/registry";
+import { activeOrganizationIdAtom } from "../state/organization/atoms";
+import { tokenAtom } from "../state/session/atoms";
 import type { ChannelMessage, ChannelSummary } from "../lib/channels-contract";
 import { Channels } from "./Channels";
+
+/*
+  The conversation loader reads its credentials from the registry rather than
+  from the view's props, so every registry these cases build is signed in to the
+  organization the fixtures use.
+*/
+const createChannelTestRegistry = () =>
+  createTestRegistry([
+    [tokenAtom, "token"],
+    [activeOrganizationIdAtom, "org-1"],
+  ]);
 
 const selectedChannel: ChannelSummary = {
   id: "channel-1",
@@ -199,7 +212,7 @@ describe("Channels", () => {
     const { cleanup, container, root } = createReactTestRoot();
     await renderReactTestRoot(
       root,
-      <RegistryContext.Provider value={createTestRegistry()}>
+      <RegistryContext.Provider value={createChannelTestRegistry()}>
       <I18nProvider>
         <Channels
           activeChannelId={selectedChannel.id}
@@ -272,7 +285,7 @@ describe("Channels", () => {
 
     await renderReactTestRoot(
       root,
-      <RegistryContext.Provider value={createTestRegistry()}>
+      <RegistryContext.Provider value={createChannelTestRegistry()}>
       <I18nProvider>
         <Channels
           activeChannelId={selectedChannel.id}
@@ -370,7 +383,7 @@ describe("Channels", () => {
 
     await renderReactTestRoot(
       root,
-      <RegistryContext.Provider value={createTestRegistry()}>
+      <RegistryContext.Provider value={createChannelTestRegistry()}>
       <I18nProvider>
         <Channels
           activeChannelId={selectedChannel.id}
@@ -476,7 +489,7 @@ describe("Channels", () => {
 
     await renderReactTestRoot(
       root,
-      <RegistryContext.Provider value={createTestRegistry()}>
+      <RegistryContext.Provider value={createChannelTestRegistry()}>
       <I18nProvider>
         <Channels
           activeChannelId={selectedChannel.id}
@@ -549,7 +562,7 @@ describe("Channels", () => {
       }),
     });
     const view = createReactTestRoot();
-    const registry = createTestRegistry();
+    const registry = createChannelTestRegistry();
     const render = (activeChannelId: string) => (
       <RegistryContext.Provider value={registry}>
       <I18nProvider>
@@ -624,7 +637,7 @@ describe("Channels", () => {
     const view = createReactTestRoot({ attachToDocument: true });
     // One registry across both renders: switching channels must keep the store
     // that makes the return instant, which is what the measurements reset for.
-    const registry = createTestRegistry();
+    const registry = createChannelTestRegistry();
     const render = (activeChannelId: string) => (
       <RegistryContext.Provider value={registry}>
       <I18nProvider>

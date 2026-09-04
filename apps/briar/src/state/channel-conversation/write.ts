@@ -234,19 +234,23 @@ function applyChannelPageToThreads(
 export function applyChannelConversationSnapshot(
   registry: AtomRegistry,
   channelId: string,
-  members: readonly ChannelMember[],
-  agents: readonly ChannelAgentSummary[],
+  members: readonly ChannelMember[] | undefined,
+  agents: readonly ChannelAgentSummary[] | undefined,
   messages: readonly ChannelMessage[],
   nextCursor: string | null,
   merge: boolean,
 ) {
   touchChannelConversation(registry, channelId);
-  registry.update(channelMembersAtom(channelId), (stored) =>
-    replaceEntitiesBy(stored, members, (member) => member.userId),
-  );
-  registry.update(channelAgentsAtom(channelId), (stored) =>
-    replaceEntitiesBy(stored, agents, (agent) => agent.agentId),
-  );
+  if (members) {
+    registry.update(channelMembersAtom(channelId), (stored) =>
+      replaceEntitiesBy(stored, members, (member) => member.userId),
+    );
+  }
+  if (agents) {
+    registry.update(channelAgentsAtom(channelId), (stored) =>
+      replaceEntitiesBy(stored, agents, (agent) => agent.agentId),
+    );
+  }
   const current = registry.get(channelRootMessagesAtom(channelId));
   writeChannelRootMessages(
     registry,
