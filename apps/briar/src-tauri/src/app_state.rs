@@ -193,12 +193,46 @@ pub(super) struct ConnectedLocalProject {
     pub(super) workflow: WorkflowConfig,
 }
 
+/// Why a provider cannot run this project's repository analysis. The vocabulary
+/// matches the execution worker's provider health in `src-cli/provider-health.ts`
+/// so both surfaces explain an unusable provider the same way.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub(super) enum AgentProviderUnavailableReason {
+    Disabled,
+    NotInstalled,
+    NotAuthenticated,
+    UsageExhausted,
+}
+
+/// One provider the connection screen may offer. `selectable` covers everything
+/// the app can act on — install, sign-in and the app settings switch — while an
+/// exhausted quota only downgrades the recommendation, because a limit that
+/// resets in an hour is the user's call, not a reason to hide the provider.
+#[derive(Clone, Copy, Debug, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct AgentProviderAvailability {
+    pub(super) provider: agent::AgentProviderKind,
+    pub(super) enabled: bool,
+    pub(super) installed: bool,
+    pub(super) authenticated: bool,
+    pub(super) selectable: bool,
+    pub(super) usage_exhausted: bool,
+    #[specta(type = Option<specta_typescript::Number>)]
+    pub(super) max_used_percent: Option<f64>,
+    pub(super) usage_resets_at: Option<u64>,
+    pub(super) reason: Option<AgentProviderUnavailableReason>,
+}
+
 #[derive(Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct LocalProjectConnectionPreflight {
     pub(super) repository_path: String,
     pub(super) repository_remote: Option<String>,
     pub(super) provider: agent::AgentProviderKind,
+    /// Every provider in wire order, so the connection screen can offer a
+    /// choice instead of only reporting the one that was resolved.
+    pub(super) providers: Vec<AgentProviderAvailability>,
 }
 
 pub(super) fn repository_workflow_bootstrap() -> WorkflowConfig {

@@ -88,7 +88,7 @@ export const commands = {
 	projectRepositoryReadiness: (projectId: string) => __TAURI_INVOKE<RepositoryReadiness>("project_repository_readiness", { projectId }),
 	prepareProjectRepository: (projectId: string, credential: ProjectGithubCredential) => __TAURI_INVOKE<PreparedProjectRepository>("prepare_project_repository", { projectId, credential }),
 	disconnectLocalProject: (projectId: string) => __TAURI_INVOKE<null>("disconnect_local_project", { projectId }),
-	connectLocalProject: (apiUrl: string, projectId: string, agentToken: string, repositoryPath: string, autoHunt: AutoHuntConfig_Deserialize) => __TAURI_INVOKE<ConnectedLocalProject_Serialize>("connect_local_project", { apiUrl, projectId, agentToken, repositoryPath, autoHunt }),
+	connectLocalProject: (apiUrl: string, projectId: string, agentToken: string, repositoryPath: string, autoHunt: AutoHuntConfig_Deserialize, provider: "codex" | "claude" | "cursor" | "grok" | "agy" | "opencode" | "openrouter" | null) => __TAURI_INVOKE<ConnectedLocalProject_Serialize>("connect_local_project", { apiUrl, projectId, agentToken, repositoryPath, autoHunt, provider }),
 	inspectVelen: (org: string | null) => __TAURI_INVOKE<VelenInspection>("inspect_velen", { org }),
 	autoHuntHealth: (projectId: string) => __TAURI_INVOKE<AutoHuntHealth>("auto_hunt_health", { projectId }),
 	repairAutoHunt: (projectId: string) => __TAURI_INVOKE<AutoHuntHealth>("repair_auto_hunt", { projectId }),
@@ -138,6 +138,24 @@ export type AgentEventDirection = "client" | "server";
 
 export type AgentLoginProvider = "codex" | "claude" | "cursor" | "grok" | "agy" | "opencode";
 
+/**
+ *  One provider the connection screen may offer. `selectable` covers everything
+ *  the app can act on — install, sign-in and the app settings switch — while an
+ *  exhausted quota only downgrades the recommendation, because a limit that
+ *  resets in an hour is the user's call, not a reason to hide the provider.
+ */
+export type AgentProviderAvailability = {
+	provider: AgentProviderKind,
+	enabled: boolean,
+	installed: boolean,
+	authenticated: boolean,
+	selectable: boolean,
+	usageExhausted: boolean,
+	maxUsedPercent: number | null,
+	usageResetsAt: number | null,
+	reason: AgentProviderUnavailableReason | null,
+};
+
 export type AgentProviderEffort = {
 	id: string,
 	label: string,
@@ -171,6 +189,13 @@ export type AgentProviderModelCatalogEntry = {
 	allowCustomModels: boolean,
 	error: string | null,
 };
+
+/**
+ *  Why a provider cannot run this project's repository analysis. The vocabulary
+ *  matches the execution worker's provider health in `src-cli/provider-health.ts`
+ *  so both surfaces explain an unusable provider the same way.
+ */
+export type AgentProviderUnavailableReason = "disabled" | "not_installed" | "not_authenticated" | "usage_exhausted";
 
 export type AgentResultImpact = "issue" | "project" | "organization";
 
@@ -493,6 +518,11 @@ export type LocalProjectConnectionPreflight = {
 	repositoryPath: string,
 	repositoryRemote: string | null,
 	provider: AgentProviderKind,
+	/**
+	 *  Every provider in wire order, so the connection screen can offer a
+	 *  choice instead of only reporting the one that was resolved.
+	 */
+	providers: AgentProviderAvailability[],
 };
 
 export type LovablePackageManager = "bun" | "npm" | "pnpm" | "yarn";
