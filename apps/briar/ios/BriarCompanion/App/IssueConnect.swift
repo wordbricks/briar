@@ -405,28 +405,14 @@ private func issueDate(_ value: Google_Protobuf_Timestamp) throws -> Date {
 }
 
 private func issueProvider(_ value: BriarTypes_AgentProvider) throws -> AgentProvider {
-    switch value {
-    case .codex: .codex
-    case .claude: .claude
-    case .cursor: .cursor
-    case .grok: .grok
-    case .agy: .agy
-    case .opencode: .opencode
-    case .openrouter: .openrouter
-    case .unspecified, .UNRECOGNIZED: throw MobileAPIError.invalidResponse
+    guard let provider = AgentProvider(wire: value) else {
+        throw MobileAPIError.invalidResponse
     }
+    return provider
 }
 
 func issueProviderMessage(_ value: AgentProvider) -> BriarTypes_AgentProvider {
-    switch value {
-    case .codex: .codex
-    case .claude: .claude
-    case .cursor: .cursor
-    case .grok: .grok
-    case .agy: .agy
-    case .opencode: .opencode
-    case .openrouter: .openrouter
-    }
+    value.wire
 }
 
 private func issueRunStatus(_ value: BriarAPI_RunStatus) throws -> DashboardRun.Status {

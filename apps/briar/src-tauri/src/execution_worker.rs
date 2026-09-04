@@ -548,16 +548,7 @@ pub(super) fn auto_hunt_health_sync_with(
         .map(project_llm_settings_from_proto)
         .transpose()?
         .unwrap_or_default();
-    let skill_directory = match llm.provider {
-        agent::AgentProviderKind::Codex => ".codex",
-        agent::AgentProviderKind::Claude => ".claude",
-        agent::AgentProviderKind::Cursor => ".cursor",
-        agent::AgentProviderKind::Grok => ".grok",
-        agent::AgentProviderKind::Agy => ".gemini/config",
-        agent::AgentProviderKind::Opencode | agent::AgentProviderKind::Openrouter => {
-            ".config/opencode"
-        }
-    };
+    let skill_directory = llm.provider.skill_directory();
     let skill_path = execution_home
         .join(skill_directory)
         .join("skills")

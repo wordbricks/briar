@@ -20,7 +20,11 @@ use std::{
     sync::Arc,
 };
 
+use briar_contracts::proto::briar::types::v1 as types_proto;
+use buffa::Enumeration as _;
+
 use crate::host::CommandRunner;
+use crate::project_config::bundled_path;
 
 pub(crate) use project_agent::{
     AutoHuntCliEnvironment, AutoHuntCoordinatorResponse, ProjectAgentRunRequest,
@@ -101,6 +105,77 @@ impl AgentProviderKind {
             Self::Opencode => "OpenCode",
             Self::Openrouter => "OpenRouter",
         }
+    }
+
+    /// Home-relative directory this provider reads Briar skills from.
+    pub(crate) fn skill_directory(self) -> &'static str {
+        match self {
+            Self::Codex => ".codex",
+            Self::Claude => ".claude",
+            Self::Cursor => ".cursor",
+            Self::Grok => ".grok",
+            Self::Agy => ".gemini/config",
+            // OpenRouter runs on OpenCode's local runtime and reads its skills.
+            Self::Opencode | Self::Openrouter => ".config/opencode",
+        }
+    }
+
+    /// Bundled Bun sidecar runner this provider executes, when it has one.
+    pub(crate) fn runner_bundle_name(self) -> &'static str {
+        match self {
+            Self::Codex => "codex-runner.js",
+            Self::Claude => "claude-runner.js",
+            Self::Cursor => "cursor-runner.js",
+            Self::Grok => "grok-runner.js",
+            Self::Agy => "agy-runner.js",
+            Self::Opencode | Self::Openrouter => "opencode-runner.js",
+        }
+    }
+
+    /// Wire identity from `briar.types.v1.AgentProvider` (ADR-0008). The match
+    /// is exhaustive, so a new platform provider must declare a wire value.
+    pub(crate) fn wire(self) -> types_proto::AgentProvider {
+        use types_proto::AgentProvider as Wire;
+        match self {
+            Self::Codex => Wire::AGENT_PROVIDER_CODEX,
+            Self::Claude => Wire::AGENT_PROVIDER_CLAUDE,
+            Self::Cursor => Wire::AGENT_PROVIDER_CURSOR,
+            Self::Grok => Wire::AGENT_PROVIDER_GROK,
+            Self::Agy => Wire::AGENT_PROVIDER_AGY,
+            Self::Opencode => Wire::AGENT_PROVIDER_OPENCODE,
+            Self::Openrouter => Wire::AGENT_PROVIDER_OPENROUTER,
+        }
+    }
+
+    /// Platform provider behind a wire value. The match is exhaustive over the
+    /// generated enum, so a new proto value must be handled here.
+    pub(crate) fn from_wire(value: types_proto::AgentProvider) -> Option<Self> {
+        use types_proto::AgentProvider as Wire;
+        match value {
+            Wire::AGENT_PROVIDER_UNSPECIFIED => None,
+            Wire::AGENT_PROVIDER_CODEX => Some(Self::Codex),
+            Wire::AGENT_PROVIDER_CLAUDE => Some(Self::Claude),
+            Wire::AGENT_PROVIDER_CURSOR => Some(Self::Cursor),
+            Wire::AGENT_PROVIDER_GROK => Some(Self::Grok),
+            Wire::AGENT_PROVIDER_AGY => Some(Self::Agy),
+            Wire::AGENT_PROVIDER_OPENCODE => Some(Self::Opencode),
+            Wire::AGENT_PROVIDER_OPENROUTER => Some(Self::Openrouter),
+        }
+    }
+
+    /// Every provider in wire declaration order, derived from the generated
+    /// enum so no caller keeps a provider list of its own.
+    pub(crate) fn all() -> impl Iterator<Item = Self> {
+        types_proto::AgentProvider::values()
+            .iter()
+            .copied()
+            .filter_map(Self::from_wire)
+    }
+}
+
+impl From<AgentProviderKind> for types_proto::AgentProvider {
+    fn from(value: AgentProviderKind) -> Self {
+        value.wire()
     }
 }
 
@@ -397,13 +472,25 @@ impl AgentBackend for AgentBackendHandle {
     }
 }
 
+/// Resolves the bundled runner a provider executes. Keyed by provider so no
+/// caller carries one field, argument, or path lookup per provider.
 pub(crate) struct AgentRunnerBundles<'a> {
-    pub(crate) codex: &'a Path,
-    pub(crate) claude: &'a Path,
-    pub(crate) cursor: &'a Path,
-    pub(crate) grok: &'a Path,
-    pub(crate) agy: &'a Path,
-    pub(crate) opencode: &'a Path,
+    resource_directory: &'a Path,
+}
+
+impl<'a> AgentRunnerBundles<'a> {
+    pub(crate) fn new(resource_directory: &'a Path) -> Self {
+        Self { resource_directory }
+    }
+
+    fn path(&self, provider: AgentProviderKind) -> PathBuf {
+        let name = provider.runner_bundle_name();
+        bundled_path(
+            self.resource_directory,
+            &format!("agent/{name}"),
+            &format!("dist-agent/{name}"),
+        )
+    }
 }
 
 pub(crate) fn discover_backend(
@@ -413,31 +500,31 @@ pub(crate) fn discover_backend(
 ) -> Result<AgentBackendHandle, String> {
     match provider {
         AgentProviderKind::Codex => {
-            sidecar::SidecarBackend::discover(runner, runners.codex, codex::CONFIG)
+            sidecar::SidecarBackend::discover(runner, &runners.path(provider), codex::CONFIG)
                 .map(AgentBackendHandle::Codex)
         }
         AgentProviderKind::Claude => {
-            sidecar::SidecarBackend::discover(runner, runners.claude, claude::CONFIG)
+            sidecar::SidecarBackend::discover(runner, &runners.path(provider), claude::CONFIG)
                 .map(AgentBackendHandle::Claude)
         }
         AgentProviderKind::Cursor => {
-            sidecar::SidecarBackend::discover(runner, runners.cursor, cursor::CONFIG)
+            sidecar::SidecarBackend::discover(runner, &runners.path(provider), cursor::CONFIG)
                 .map(AgentBackendHandle::Cursor)
         }
         AgentProviderKind::Grok => {
-            sidecar::SidecarBackend::discover(runner, runners.grok, grok::CONFIG)
+            sidecar::SidecarBackend::discover(runner, &runners.path(provider), grok::CONFIG)
                 .map(AgentBackendHandle::Grok)
         }
         AgentProviderKind::Agy => {
-            sidecar::SidecarBackend::discover(runner, runners.agy, agy::CONFIG)
+            sidecar::SidecarBackend::discover(runner, &runners.path(provider), agy::CONFIG)
                 .map(AgentBackendHandle::Agy)
         }
         AgentProviderKind::Opencode => {
-            sidecar::SidecarBackend::discover(runner, runners.opencode, opencode::CONFIG)
+            sidecar::SidecarBackend::discover(runner, &runners.path(provider), opencode::CONFIG)
                 .map(AgentBackendHandle::Opencode)
         }
         AgentProviderKind::Openrouter => {
-            sidecar::SidecarBackend::discover(runner, runners.opencode, openrouter::CONFIG)
+            sidecar::SidecarBackend::discover(runner, &runners.path(provider), openrouter::CONFIG)
                 .map(AgentBackendHandle::Opencode)
         }
     }
@@ -751,5 +838,43 @@ mod tests {
                 status: AgentActivityStatus::Cancelled,
             } if id == "tool-1" && title == "src/main.ts" && text == "updated"
         ));
+    }
+
+    #[test]
+    fn covers_every_wire_provider() {
+        use super::types_proto;
+        use buffa::Enumeration as _;
+
+        let wire_values = types_proto::AgentProvider::values();
+        let providers = AgentProviderKind::all().collect::<Vec<_>>();
+        assert_eq!(providers.len(), wire_values.len() - 1);
+
+        for value in wire_values {
+            let provider = AgentProviderKind::from_wire(*value);
+            if *value == types_proto::AgentProvider::AGENT_PROVIDER_UNSPECIFIED {
+                assert_eq!(provider, None);
+                continue;
+            }
+            let provider = provider.unwrap_or_else(|| {
+                panic!("{value:?} has no AgentProviderKind");
+            });
+            assert_eq!(provider.wire(), *value);
+            assert!(
+                providers.contains(&provider),
+                "{value:?} missing from all()"
+            );
+        }
+    }
+
+    #[test]
+    fn names_a_runner_bundle_for_every_sidecar_provider() {
+        for provider in AgentProviderKind::all() {
+            assert!(!provider.display_name().is_empty());
+            assert!(!provider.skill_directory().is_empty());
+            assert!(
+                provider.runner_bundle_name().ends_with("-runner.js"),
+                "{provider:?} has no runner bundle"
+            );
+        }
     }
 }

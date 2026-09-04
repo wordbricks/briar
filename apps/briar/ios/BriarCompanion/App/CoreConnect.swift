@@ -783,16 +783,10 @@ private func coreDate(_ value: Google_Protobuf_Timestamp) throws -> Date {
 }
 
 private func coreProvider(_ value: BriarTypes_AgentProvider) throws -> AgentProvider {
-    switch value {
-    case .codex: .codex
-    case .claude: .claude
-    case .cursor: .cursor
-    case .grok: .grok
-    case .agy: .agy
-    case .opencode: .opencode
-    case .openrouter: .openrouter
-    case .unspecified, .UNRECOGNIZED: throw MobileAPIError.invalidResponse
+    guard let provider = AgentProvider(wire: value) else {
+        throw MobileAPIError.invalidResponse
     }
+    return provider
 }
 
 private func coreWorkflow(_ value: BriarTypes_AutoHuntWorkflow) throws -> AutoHuntWorkflow {

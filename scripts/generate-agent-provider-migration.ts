@@ -2,6 +2,11 @@ import { Database } from "bun:sqlite";
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { unstable_splitSqlQuery } from "wrangler";
+import { agentProviders } from "../apps/briar/src/lib/agent-provider";
+import {
+  agentProviderConstraints,
+  currentSqlProviderList,
+} from "./agent-provider-sql-constraints";
 
 const nextProvider = process.argv[2]?.trim();
 const outputName = process.argv[3]?.trim();
@@ -25,25 +30,44 @@ for (const name of migrationNames) {
   }
 }
 
-const existingProviders = [
-  "codex",
-  "claude",
-  "grok",
-  "opencode",
-  "agy",
-  "cursor",
-];
-const providerList = existingProviders.map((value) => `'${value}'`).join(", ");
-const expandedProviderList = [...existingProviders, nextProvider]
-  .map((value) => `'${value}'`)
-  .join(", ");
-const affected = db
-  .query<{ name: string }, [string]>(
-    `select name from sqlite_schema
-     where type = 'table' and sql like ? order by name`,
+// The provider being added must already exist in briar.types.v1.AgentProvider:
+// the proto owns provider identity and every other site derives from it.
+if (!agentProviders.some((provider) => provider === nextProvider)) {
+  throw new Error(
+    `Add ${nextProvider} to briar/types/v1/provider.proto and run contracts:generate first.`,
+  );
+}
+const tableSchemaSql = db
+  .query<{ sql: string }, []>(
+    `select sql from sqlite_schema where type = 'table' and sql is not null`,
   )
-  .all(`%${providerList}%`)
-  .map((row) => row.name);
+  .all()
+  .map((row) => row.sql)
+  .join(";\n");
+// Membership is checked against the generated enum; ordering comes from the
+// schema so the replacement matches the SQL text it rewrites.
+currentSqlProviderList(
+  tableSchemaSql,
+  agentProviders.filter((provider) => provider !== nextProvider),
+);
+// Every provider list in a table is rewritten, not just one canonical spelling.
+// Tables that ordered their list differently used to be skipped silently, which
+// is how columns fell behind the catalog in the first place.
+const expandedLists = new Map<string, Map<string, string>>();
+for (
+  const { table, listText, providers } of agentProviderConstraints(
+    tableSchemaSql,
+  )
+) {
+  if (providers.includes(nextProvider)) continue;
+  const lists = expandedLists.get(table) ?? new Map<string, string>();
+  lists.set(
+    listText,
+    [...providers, nextProvider].map((value) => `'${value}'`).join(", "),
+  );
+  expandedLists.set(table, lists);
+}
+const affected = [...expandedLists.keys()].sort();
 if (affected.length === 0) throw new Error("No provider-constrained tables found.");
 
 const tableRows = db
@@ -101,7 +125,6 @@ const schema = db
      where sql is not null and type in ('index', 'trigger') order by rowid`,
   )
   .all();
-const affectedSet = new Set(affected);
 const backedPattern = new RegExp(
   [...backed]
     .map((name) => name.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"))
@@ -136,8 +159,12 @@ const statements: string[] = [
   ...restoreOrder.map((table) => {
     const sql = tableSql.get(table);
     if (!sql) throw new Error(`Missing table schema for ${table}.`);
-    if (!affectedSet.has(table)) return `${sql};`;
-    const expanded = sql.replaceAll(providerList, expandedProviderList);
+    const lists = expandedLists.get(table);
+    if (!lists) return `${sql};`;
+    let expanded = sql;
+    for (const [listText, expandedList] of lists) {
+      expanded = expanded.replaceAll(listText, expandedList);
+    }
     if (expanded === sql) {
       throw new Error(`Provider constraint not found in ${table}.`);
     }

@@ -9,35 +9,29 @@ import {
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
-import type { ManagedComputerSetupProvider } from "./agent-provider";
+import {
+  managedComputerSetupProviders,
+  type ManagedComputerSetupProvider,
+} from "./agent-provider";
+import { protoAgentProvider } from "./agent-provider-proto";
 
-const setupProviderByName = {
-  codex: AgentProvider.CODEX,
-  claude: AgentProvider.CLAUDE,
-  grok: AgentProvider.GROK,
-  opencode: AgentProvider.OPENCODE,
-} satisfies Record<ManagedComputerSetupProvider, AgentProvider>;
+const setupProviderByProto = new Map<
+  AgentProvider,
+  ManagedComputerSetupProvider
+>(
+  managedComputerSetupProviders.map((
+    provider,
+  ) => [protoAgentProvider[provider], provider]),
+);
 
 export const managedComputerSetupProviderToProto = (
   provider: ManagedComputerSetupProvider,
-) => setupProviderByName[provider];
+): AgentProvider => protoAgentProvider[provider];
 
 export const managedComputerSetupProviderFromProto = (
   provider: AgentProvider,
-): ManagedComputerSetupProvider | null => {
-  switch (provider) {
-    case AgentProvider.CODEX:
-      return "codex";
-    case AgentProvider.CLAUDE:
-      return "claude";
-    case AgentProvider.GROK:
-      return "grok";
-    case AgentProvider.OPENCODE:
-      return "opencode";
-    default:
-      return null;
-  }
-};
+): ManagedComputerSetupProvider | null =>
+  setupProviderByProto.get(provider) ?? null;
 
 export const ManagedComputerSetupToken = Schema.String.check(
   Schema.isPattern(/^briar_setup_[A-Za-z0-9_-]{43}$/u),

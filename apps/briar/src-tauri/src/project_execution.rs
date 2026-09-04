@@ -37,36 +37,6 @@ pub(super) async fn project_llm_chat(
         .path()
         .resource_dir()
         .map_err(|error| error.to_string())?;
-    let codex_runner = bundled_path(
-        &resource_directory,
-        "agent/codex-runner.js",
-        "dist-agent/codex-runner.js",
-    );
-    let claude_runner = bundled_path(
-        &resource_directory,
-        "agent/claude-runner.js",
-        "dist-agent/claude-runner.js",
-    );
-    let cursor_runner = bundled_path(
-        &resource_directory,
-        "agent/cursor-runner.js",
-        "dist-agent/cursor-runner.js",
-    );
-    let grok_runner = bundled_path(
-        &resource_directory,
-        "agent/grok-runner.js",
-        "dist-agent/grok-runner.js",
-    );
-    let agy_runner = bundled_path(
-        &resource_directory,
-        "agent/agy-runner.js",
-        "dist-agent/agy-runner.js",
-    );
-    let opencode_runner = bundled_path(
-        &resource_directory,
-        "agent/opencode-runner.js",
-        "dist-agent/opencode-runner.js",
-    );
     let approval_app = app.clone();
     let progress_project_id = project_id.clone();
     let progress_event_sink = request
@@ -176,14 +146,7 @@ pub(super) async fn project_llm_chat(
         let backend = agent::discover_backend(
             provider,
             runner.clone(),
-            agent::AgentRunnerBundles {
-                codex: &codex_runner,
-                claude: &claude_runner,
-                cursor: &cursor_runner,
-                grok: &grok_runner,
-                agy: &agy_runner,
-                opencode: &opencode_runner,
-            },
+            agent::AgentRunnerBundles::new(&resource_directory),
         )?;
         let (model, effort) = if provider == settings.provider {
             (settings.model, settings.effort)
@@ -303,36 +266,6 @@ pub(super) async fn run_project_agent(
         .path()
         .resource_dir()
         .map_err(|error| error.to_string())?;
-    let codex_runner = bundled_path(
-        &resource_directory,
-        "agent/codex-runner.js",
-        "dist-agent/codex-runner.js",
-    );
-    let claude_runner = bundled_path(
-        &resource_directory,
-        "agent/claude-runner.js",
-        "dist-agent/claude-runner.js",
-    );
-    let cursor_runner = bundled_path(
-        &resource_directory,
-        "agent/cursor-runner.js",
-        "dist-agent/cursor-runner.js",
-    );
-    let grok_runner = bundled_path(
-        &resource_directory,
-        "agent/grok-runner.js",
-        "dist-agent/grok-runner.js",
-    );
-    let agy_runner = bundled_path(
-        &resource_directory,
-        "agent/agy-runner.js",
-        "dist-agent/agy-runner.js",
-    );
-    let opencode_runner = bundled_path(
-        &resource_directory,
-        "agent/opencode-runner.js",
-        "dist-agent/opencode-runner.js",
-    );
     let recovery_store = planned_update_recovery::PlannedUpdateRecoveryStore::new(
         &app.path()
             .app_data_dir()
@@ -375,14 +308,7 @@ pub(super) async fn run_project_agent(
         let backend = agent::discover_backend(
             provider,
             runner.clone(),
-            agent::AgentRunnerBundles {
-                codex: &codex_runner,
-                claude: &claude_runner,
-                cursor: &cursor_runner,
-                grok: &grok_runner,
-                agy: &agy_runner,
-                opencode: &opencode_runner,
-            },
+            agent::AgentRunnerBundles::new(&resource_directory),
         )?;
         let model = request
             .agent_model

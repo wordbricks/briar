@@ -1,6 +1,12 @@
 import * as Option from "effect/Option";
+import * as Record from "effect/Record";
 import * as Schema from "effect/Schema";
-import { agentProviders, type AgentProvider } from "./agent-provider";
+import {
+  agentProviderAllowsCustomModels,
+  agentProviderCatalog,
+  agentProviders,
+  type AgentProvider,
+} from "./agent-provider";
 
 const strictSchemaOptions = {
   errors: "all",
@@ -64,15 +70,12 @@ export const AgentProviderCapability = Schema.Struct({
 }).annotate({ parseOptions: strictSchemaOptions });
 export type AgentProviderCapability = typeof AgentProviderCapability.Type;
 
-export const AgentProviderCapabilityCatalog = Schema.Struct({
-  codex: Schema.mutableKey(AgentProviderCapability),
-  claude: Schema.mutableKey(AgentProviderCapability),
-  cursor: Schema.mutableKey(AgentProviderCapability),
-  grok: Schema.mutableKey(AgentProviderCapability),
-  agy: Schema.mutableKey(AgentProviderCapability),
-  opencode: Schema.mutableKey(AgentProviderCapability),
-  openrouter: Schema.mutableKey(AgentProviderCapability),
-}).annotate({ parseOptions: strictSchemaOptions });
+export const AgentProviderCapabilityCatalog = Schema.Struct(
+  Record.map(
+    agentProviderCatalog,
+    () => Schema.mutableKey(AgentProviderCapability),
+  ),
+).annotate({ parseOptions: strictSchemaOptions });
 
 export type AgentProviderCapabilityCatalog =
   typeof AgentProviderCapabilityCatalog.Type;
@@ -92,24 +95,15 @@ const emptyAgentProviderCapability = (
 ): AgentProviderCapability => ({
   models: [],
   defaultEfforts: [],
-  allowCustomModels:
-    provider === "claude" ||
-    provider === "cursor" ||
-    provider === "opencode" ||
-    provider === "openrouter",
+  allowCustomModels: agentProviderAllowsCustomModels(provider),
   error: null,
 });
 
 export function emptyAgentProviderCapabilityCatalog(): AgentProviderCapabilityCatalog {
-  return {
-    codex: emptyAgentProviderCapability("codex"),
-    claude: emptyAgentProviderCapability("claude"),
-    cursor: emptyAgentProviderCapability("cursor"),
-    grok: emptyAgentProviderCapability("grok"),
-    agy: emptyAgentProviderCapability("agy"),
-    opencode: emptyAgentProviderCapability("opencode"),
-    openrouter: emptyAgentProviderCapability("openrouter"),
-  };
+  return Record.map(
+    agentProviderCatalog,
+    (_entry, provider) => emptyAgentProviderCapability(provider),
+  );
 }
 
 export function agentProviderSupportsSelection(
