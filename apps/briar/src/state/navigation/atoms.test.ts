@@ -13,6 +13,7 @@ import { activeChannelIdAtom } from "../channels/atoms";
 import { activeOrganizationIdAtom } from "../organization/atoms";
 import { createTestRegistry, type AtomRegistry } from "../registry";
 import { userAtom } from "../session/atoms";
+import { applySyncEvent } from "../sync/apply";
 import { activeTeamIdAtom, teamsAtom } from "../team/atoms";
 import {
   activePageAtom,
@@ -25,6 +26,7 @@ import {
   navigationHistoryAtom,
   navigationHistoryEntriesAtom,
   navigationHistoryIndexAtom,
+  navigationHistoryRunLabelsAtom,
   navigationHistoryUserIdAtom,
   navigationLocationAtom,
   navigationOrganizationIdAtom,
@@ -269,5 +271,84 @@ describe("navigation location atoms", () => {
     expect(registry.get(navigationHistoryAtom)).toEqual(
       createNavigationHistory("lobby"),
     );
+  });
+});
+
+describe("navigationHistoryRunLabelsAtom", () => {
+  const target = demoDashboard.runs[0]!;
+
+  const loaded = () => {
+    const registry = createTestRegistry([
+      [teamsAtom, [teamA]],
+      [activeTeamIdAtom, teamA.id],
+    ]);
+    applySyncEvent(registry, {
+      kind: "team-snapshot",
+      teamId: teamA.id,
+      payload: { ...demoDashboard, team: teamA },
+    });
+    return registry;
+  };
+
+  it("labels only the runs the visit stack points at", () => {
+    const registry = loaded();
+    const other = demoDashboard.runs[1]!;
+    navigate(registry, issueNavigationLocation(teamA.id, target.id));
+
+    const labels = registry.get(navigationHistoryRunLabelsAtom);
+    expect(labels.get(target.id)).toEqual({
+      runNumber: target.runNumber,
+      title: target.title,
+    });
+    expect(labels.has(other.id)).toBe(false);
+  });
+
+  it("says nothing when a run it never visited changes", () => {
+    const registry = loaded();
+    navigate(registry, issueNavigationLocation(teamA.id, target.id));
+    const seen: unknown[] = [];
+    registry.subscribe(
+      navigationHistoryRunLabelsAtom,
+      (labels) => seen.push(labels),
+      { immediate: true },
+    );
+    seen.length = 0;
+
+    const other = demoDashboard.runs[1]!;
+    applySyncEvent(registry, {
+      kind: "run-changed",
+      teamId: teamA.id,
+      run: { ...other, title: "다른 이슈를 고쳤다" },
+    });
+    // …and neither does a field this row does not print.
+    applySyncEvent(registry, {
+      kind: "run-changed",
+      teamId: teamA.id,
+      run: { ...target, progress: (target.progress + 1) % 100 },
+    });
+
+    expect(seen).toEqual([]);
+  });
+
+  it("follows a visited run's title", () => {
+    const registry = loaded();
+    navigate(registry, issueNavigationLocation(teamA.id, target.id));
+    const seen: unknown[] = [];
+    registry.subscribe(
+      navigationHistoryRunLabelsAtom,
+      (labels) => seen.push(labels),
+      { immediate: true },
+    );
+    seen.length = 0;
+
+    applySyncEvent(registry, {
+      kind: "run-changed",
+      teamId: teamA.id,
+      run: { ...target, title: "고친 이슈" },
+    });
+
+    expect(seen).toHaveLength(1);
+    expect(registry.get(navigationHistoryRunLabelsAtom).get(target.id)?.title)
+      .toBe("고친 이슈");
   });
 });

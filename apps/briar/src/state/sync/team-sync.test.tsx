@@ -24,10 +24,10 @@ import type {
   Project,
   SessionUser,
 } from "../../types";
+import { readActiveTeamView } from "../../test/team-view";
 import { createSyncActions } from "./actions";
 import { getTeamSyncLoader } from "./loader";
 import { useTeamSync } from "./useTeamSync";
-import { activeDashboardAtom } from "./view";
 
 /**
  * The two effects these cases need: the bootstrap that restores the stored
@@ -51,7 +51,7 @@ function Harness() {
   the entity store and the loader — a visited team renders before the network
   answers, a never visited one does not, a late or misaddressed response is
   dropped, and a credential or organization change discards what the previous
-  one loaded.
+  one loaded. They outlived the reassembled payload view for the same reason.
 */
 
 const user: SessionUser = {
@@ -157,7 +157,12 @@ let server: DashboardServer;
 let view: ReactTestRoot;
 let registry: AtomRegistry;
 
-const dashboard = () => registry.get(activeDashboardAtom);
+/**
+ * What the selected team has on screen, as the payload it came from. The app
+ * reads the projections one by one; a case about the loader is about the whole
+ * answer, so it puts the payload back together — see `test/team-view.ts`.
+ */
+const dashboard = () => readActiveTeamView(registry);
 const dashboardStale = () => registry.get(dashboardStaleAtom);
 const selectTeam = async (teamId: string) => {
   await act(async () => {
@@ -216,7 +221,7 @@ afterEach(async () => {
   vi.restoreAllMocks();
 });
 
-describe("team dashboard view", () => {
+describe("team sync", () => {
   it("renders a stored dashboard immediately when returning to a visited team", async () => {
     await mount([projectA1, projectA2], [organizationA]);
 

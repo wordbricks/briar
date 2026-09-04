@@ -30,8 +30,9 @@ import {
   type SessionDataSources,
 } from "../session/api";
 import { userAtom } from "../session/atoms";
+import { teamRunsAtom } from "../entities/runs";
+import { readActiveTeamView } from "../../test/team-view";
 import { applySyncEvent } from "../sync/apply";
-import { activeDashboardAtom } from "../sync/view";
 import { activeTeamIdAtom, teamsAtom } from "../team/atoms";
 import { writeSnapshotAccount } from "./account";
 import { collectSnapshot, type ClientSnapshot } from "./snapshot";
@@ -178,10 +179,11 @@ const gateProps: Omit<AuthGateProps, "children"> = {
 
 /** The board, as little of it as an assertion needs. */
 function Board() {
-  const dashboard = useAtomValue(activeDashboardAtom);
+  const teamId = useAtomValue(activeTeamIdAtom) ?? "";
+  const runs = useAtomValue(teamRunsAtom(teamId));
   return (
     <div data-testid="board">
-      {dashboard ? dashboard.runs.map((run) => run.title).join(", ") : "empty"}
+      {runs ? runs.map((run) => run.title).join(", ") : "empty"}
     </div>
   );
 }
@@ -302,7 +304,7 @@ describe("cold boot", () => {
       { teamId: team.id, cursor: STORED_CURSOR },
     ]);
     expect(server.snapshotRequests).toEqual([team.id]);
-    expect(registry.get(activeDashboardAtom)).toEqual(freshPayload);
+    expect(readActiveTeamView(registry)).toEqual(freshPayload);
     expect(board()).toBe("Today's run");
   });
 });

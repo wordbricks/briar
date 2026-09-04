@@ -19,7 +19,7 @@ import {
 import { createTestRegistry, type AtomRegistry } from "../registry";
 import { tokenAtom, userAtom } from "../session/atoms";
 import { applySyncEvent } from "../sync/apply";
-import { activeDashboardAtom } from "../sync/view";
+import { readActiveTeamView } from "../../test/team-view";
 import { activeTeamIdAtom, teamCursorAtom, teamsAtom } from "../team/atoms";
 import {
   SNAPSHOT_SCHEMA_VERSION,
@@ -149,7 +149,7 @@ describe("client snapshot", () => {
     applySnapshot(target, restored);
 
     // The payload the screen renders, rebuilt from a record on disk.
-    expect(target.get(activeDashboardAtom)).toEqual(payloadA);
+    expect(readActiveTeamView(target)).toEqual(payloadA);
     expect(target.get(userAtom)).toEqual(user);
     expect(target.get(teamsAtom)).toEqual([teamA]);
     expect(target.get(organizationsAtom)).toEqual([organization]);

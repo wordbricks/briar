@@ -5,6 +5,7 @@ import { demoDashboard } from "../../lib/demo-data";
 import type {
   DashboardDeltaPayload,
   DashboardPayload,
+  TeamAgentBoard,
   Team,
 } from "../../types";
 import {
@@ -21,14 +22,15 @@ import {
   activeTeamIdAtom,
   loadedTeamIdAtom,
   staleTeamIdAtom,
+  teamAgentBoardAtom,
   teamCursorAtom,
   teamGeneratedAtAtom,
   teamLoadedAtom,
   teamPayloadCursorAtom,
   teamSettingsAtom,
 } from "../team/atoms";
+import { readTeamView } from "../../test/team-view";
 import { applySyncEvent, markTeamStale } from "./apply";
-import { dashboardViewAtom } from "./view";
 
 const teamA = "team-a";
 const teamB = "team-b";
@@ -76,7 +78,7 @@ describe("team snapshots", () => {
   it("unpacks a payload the view rebuilds identically", () => {
     const { registry, payload } = loaded();
 
-    expect(registry.get(dashboardViewAtom(teamA))).toEqual(payload);
+    expect(readTeamView(registry, teamA)).toEqual(payload);
     expect(registry.get(teamLoadedAtom(teamA))).toBe(true);
     expect(registry.get(loadedTeamIdAtom)).toBe(teamA);
     expect(registry.get(teamCursorAtom(teamA))).toBe(1);
@@ -97,7 +99,7 @@ describe("team snapshots", () => {
       organizationProviders: undefined,
       executionPolicy: undefined,
     });
-    const view = registry.get(dashboardViewAtom(teamA));
+    const view = readTeamView(registry, teamA);
 
     expect(view?.workers).toBeUndefined();
     expect(view?.members).toBeUndefined();
@@ -105,13 +107,15 @@ describe("team snapshots", () => {
     expect(view?.executionPolicy).toBeUndefined();
   });
 
-  it("notifies the dashboard view once for the whole batch", () => {
+  it("notifies a view over many projections once for the whole batch", () => {
     const registry = createTestRegistry([[activeTeamIdAtom, teamA]]);
-    const seen: (DashboardPayload | null)[] = [];
+    // Four projections in one atom: a snapshot writes all of them, and the
+    // batch is what turns that into a single notification.
+    const seen: (TeamAgentBoard | null)[] = [];
     registry.subscribe(
-      dashboardViewAtom(teamA),
-      (view) => {
-        seen.push(view);
+      teamAgentBoardAtom(teamA),
+      (board) => {
+        seen.push(board);
       },
       { immediate: true },
     );
@@ -135,18 +139,18 @@ describe("team snapshots", () => {
       payload: snapshotOf(teamB),
     });
 
-    expect(registry.get(dashboardViewAtom(teamA))).toEqual(payload);
-    expect(registry.get(dashboardViewAtom(teamB))?.team.id).toBe(teamB);
+    expect(readTeamView(registry, teamA)).toEqual(payload);
+    expect(readTeamView(registry, teamB)?.team.id).toBe(teamB);
   });
 });
 
 describe("team deltas", () => {
-  it("keeps the exact dashboard reference when a sync has no changes", () => {
+  it("keeps every projection's reference when a sync has no changes", () => {
     const { registry } = loaded();
-    const before = registry.get(dashboardViewAtom(teamA));
-    const seen: (DashboardPayload | null)[] = [];
-    registry.subscribe(dashboardViewAtom(teamA), (view) => {
-      seen.push(view);
+    const before = readTeamView(registry, teamA);
+    const seen: (TeamAgentBoard | null)[] = [];
+    registry.subscribe(teamAgentBoardAtom(teamA), (board) => {
+      seen.push(board);
     }, { immediate: true });
     seen.length = 0;
 
@@ -156,7 +160,17 @@ describe("team deltas", () => {
       payload: deltaOf(),
     });
 
-    expect(registry.get(dashboardViewAtom(teamA))).toBe(before);
+    /*
+      Every part the payload is made of keeps its reference, which is what lets
+      a view holding one of them sit still. Nothing subscribed hears anything.
+    */
+    const after = readTeamView(registry, teamA);
+    expect(after?.team).toBe(before?.team);
+    expect(after?.settings).toBe(before?.settings);
+    expect(after?.runs).toBe(before?.runs);
+    expect(after?.workers).toBe(before?.workers);
+    expect(after?.members).toBe(before?.members);
+    expect(after?.organizationProviders).toBe(before?.organizationProviders);
     expect(seen).toEqual([]);
     // …but the resume cursor still advanced, so the next delta continues.
     expect(registry.get(teamCursorAtom(teamA))).toBe(2);
@@ -182,7 +196,7 @@ describe("team deltas", () => {
       }),
     });
 
-    const view = registry.get(dashboardViewAtom(teamA));
+    const view = readTeamView(registry, teamA);
     expect(view?.runs.find((run) => run.id === target.id)).not.toBe(target);
     expect(view?.runs.find((run) => run.id === untouched.id)).toBe(untouched);
     expect(view?.cursor).toBe(2);
@@ -200,7 +214,7 @@ describe("team deltas", () => {
       payload: deltaOf({ deletedRunIds: [removed.id] }),
     });
 
-    const view = registry.get(dashboardViewAtom(teamA));
+    const view = readTeamView(registry, teamA);
     expect(view?.runs.some((run) => run.id === removed.id)).toBe(false);
     expect(view?.runs.find((run) => run.id === survivor.id)).toBe(survivor);
     expect(registry.get(runsByIdAtom).has(removed.id)).toBe(false);
@@ -225,7 +239,7 @@ describe("team deltas", () => {
       payload: deltaOf({ conversationNotifications: [notification] }),
     });
 
-    const view = registry.get(dashboardViewAtom(teamA));
+    const view = readTeamView(registry, teamA);
     expect(view?.conversationNotifications).toEqual([notification]);
     expect(view?.runs[0]).toBe(payload.runs[0]);
   });
@@ -249,7 +263,7 @@ describe("team deltas", () => {
       payload: deltaOf({ channelNotifications: [notification] }),
     });
 
-    const view = registry.get(dashboardViewAtom(teamA));
+    const view = readTeamView(registry, teamA);
     expect(view?.channelNotifications).toEqual([notification]);
     expect(view?.runs[0]).toBe(payload.runs[0]);
   });
@@ -265,7 +279,7 @@ describe("team deltas", () => {
       payload: deltaOf({ team: renamed, settings }),
     });
 
-    const view = registry.get(dashboardViewAtom(teamA));
+    const view = readTeamView(registry, teamA);
     expect(view?.team).toBe(renamed);
     expect(view?.settings).toBe(settings);
     expect(registry.get(teamEntityAtom(teamA))).toBe(renamed);
@@ -280,7 +294,7 @@ describe("team deltas", () => {
       payload: deltaOf(),
     });
 
-    expect(registry.get(dashboardViewAtom(teamA))).toBeNull();
+    expect(readTeamView(registry, teamA)).toBeNull();
     expect(registry.get(teamCursorAtom(teamA))).toBeNull();
   });
 });
@@ -296,7 +310,7 @@ describe("run events", () => {
     expect(registry.get(teamRunIdsAtom(teamA))).toEqual(
       payload.runs.map((run) => run.id),
     );
-    expect(registry.get(dashboardViewAtom(teamA))?.runs[1]).toBe(edited);
+    expect(readTeamView(registry, teamA)?.runs[1]).toBe(edited);
   });
 
   it("prepends a run the team did not list yet", () => {
@@ -338,8 +352,8 @@ describe("clearing", () => {
 
     applySyncEvent(registry, { kind: "team-cleared", teamId: teamB });
 
-    expect(registry.get(dashboardViewAtom(teamB))).toBeNull();
-    expect(registry.get(dashboardViewAtom(teamA))).not.toBeNull();
+    expect(readTeamView(registry, teamB)).toBeNull();
+    expect(readTeamView(registry, teamA)).not.toBeNull();
     expect(registry.get(retainedTeamIdsAtom)).toEqual([teamA]);
   });
 
@@ -356,8 +370,8 @@ describe("clearing", () => {
       retainedOrganizationId: "org-b",
     });
 
-    expect(registry.get(dashboardViewAtom(teamA))).toBeNull();
-    expect(registry.get(dashboardViewAtom(teamB))).not.toBeNull();
+    expect(readTeamView(registry, teamA)).toBeNull();
+    expect(readTeamView(registry, teamB)).not.toBeNull();
   });
 
   it("drops everything when the session ends", () => {
@@ -366,7 +380,7 @@ describe("clearing", () => {
 
     applySyncEvent(registry, { kind: "session-cleared" });
 
-    expect(registry.get(dashboardViewAtom(teamA))).toBeNull();
+    expect(readTeamView(registry, teamA)).toBeNull();
     expect(registry.get(runsByIdAtom).size).toBe(0);
     expect(registry.get(membersByIdAtom).size).toBe(0);
     expect(registry.get(retainedTeamIdsAtom)).toEqual([]);
@@ -406,8 +420,8 @@ describe("clearing", () => {
     expect(registry.get(retainedTeamIdsAtom)).toHaveLength(
       TEAM_RETENTION_LIMIT,
     );
-    expect(registry.get(dashboardViewAtom(teamIds[0]!))).toBeNull();
-    expect(registry.get(dashboardViewAtom(teamIds.at(-1)!))).not.toBeNull();
+    expect(readTeamView(registry, teamIds[0]!)).toBeNull();
+    expect(readTeamView(registry, teamIds.at(-1)!)).not.toBeNull();
   });
 });
 

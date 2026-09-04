@@ -17,7 +17,7 @@ import {
 import { createTestRegistry, type AtomRegistry } from "../registry";
 import { loadingAtom, sessionErrorAtom, tokenAtom } from "../session/atoms";
 import { applySyncEvent } from "../sync/apply";
-import { activeDashboardAtom } from "../sync/view";
+import { readActiveTeamView } from "../../test/team-view";
 import {
   activeTeamIdAtom,
   teamConnectionAtom,
@@ -487,6 +487,6 @@ describe("createWorkspaceActions", () => {
     expect(project.name).toBe("Demo");
     expect(registry.get(teamsAtom)).toEqual([project]);
     expect(registry.get(activeTeamIdAtom)).toBe(project.id);
-    expect(registry.get(activeDashboardAtom)?.team.id).toBe(project.id);
+    expect(readActiveTeamView(registry)?.team.id).toBe(project.id);
   });
 });

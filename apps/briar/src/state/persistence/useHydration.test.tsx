@@ -33,7 +33,7 @@ import {
 import { useSessionBootstrap } from "../session/useSessionBootstrap";
 import { applySyncEvent } from "../sync/apply";
 import { useTeamSync } from "../sync/useTeamSync";
-import { activeDashboardAtom } from "../sync/view";
+import { readActiveTeamView } from "../../test/team-view";
 import { activeTeamIdAtom, teamCursorAtom, teamsAtom } from "../team/atoms";
 import { readSnapshotAccount, writeSnapshotAccount } from "./account";
 import { hydratedAccountAtom } from "./hydration";
@@ -272,7 +272,7 @@ describe("useHydration", () => {
     expect(registry.get(restoringSessionAtom)).toBe(false);
     expect(registry.get(userAtom)).toEqual(user);
     expect(registry.get(tokenAtom)).toBeNull();
-    expect(registry.get(activeDashboardAtom)).toEqual(storedPayload);
+    expect(readActiveTeamView(registry)).toEqual(storedPayload);
     expect(registry.get(organizationChannelIdsAtom(organization.id))).toEqual([
       channel.id,
     ]);
@@ -298,7 +298,7 @@ describe("useHydration", () => {
       { teamId: teamA.id, cursor: STORED_CURSOR },
     ]);
     expect(server.snapshotRequests).toEqual([]);
-    expect(registry.get(activeDashboardAtom)?.runs[0]?.title).toBe("Fresh run");
+    expect(readActiveTeamView(registry)?.runs[0]?.title).toBe("Fresh run");
     expect(registry.get(teamCursorAtom(teamA.id))).toBe(STORED_CURSOR + 1);
   });
 
@@ -312,19 +312,19 @@ describe("useHydration", () => {
     await flush();
 
     expect(registry.get(activeTeamIdAtom)).toBe(teamA.id);
-    expect(registry.get(activeDashboardAtom)?.team.id).toBe(teamA.id);
+    expect(readActiveTeamView(registry)?.team.id).toBe(teamA.id);
   });
 
   it("takes the record away when another account signs in", async () => {
     await mount();
-    expect(registry.get(activeDashboardAtom)).not.toBeNull();
+    expect(readActiveTeamView(registry)).not.toBeNull();
 
     server.teams = [];
     server.releaseSession(otherUser);
     await flush();
 
     expect(registry.get(userAtom)).toEqual(otherUser);
-    expect(registry.get(activeDashboardAtom)).toBeNull();
+    expect(readActiveTeamView(registry)).toBeNull();
     expect(registry.get(hydratedAccountAtom)).toBeNull();
     // …and the record itself, so the next boot cannot show it either.
     expect(store.entries().size).toBe(0);
@@ -338,7 +338,7 @@ describe("useHydration", () => {
 
     expect(registry.get(restoringSessionAtom)).toBe(false);
     expect(registry.get(userAtom)).toBeNull();
-    expect(registry.get(activeDashboardAtom)).toBeNull();
+    expect(readActiveTeamView(registry)).toBeNull();
     expect(store.entries().size).toBe(0);
   });
 
@@ -351,7 +351,7 @@ describe("useHydration", () => {
     server.releaseSession();
     await flush();
     expect(registry.get(restoringSessionAtom)).toBe(false);
-    expect(registry.get(activeDashboardAtom)?.team.id).toBe(teamA.id);
+    expect(readActiveTeamView(registry)?.team.id).toBe(teamA.id);
   });
 
   it("keeps the boot gate for a record written by an older version", async () => {
@@ -359,7 +359,7 @@ describe("useHydration", () => {
     await mount({ record: outdated });
 
     expect(registry.get(restoringSessionAtom)).toBe(true);
-    expect(registry.get(activeDashboardAtom)).toBeNull();
+    expect(readActiveTeamView(registry)).toBeNull();
     expect(registry.get(hydratedAccountAtom)).toBeNull();
   });
 
@@ -367,7 +367,7 @@ describe("useHydration", () => {
     await mount({ record: { ...storedSnapshot(), userId: otherUser.id } });
 
     expect(registry.get(restoringSessionAtom)).toBe(true);
-    expect(registry.get(activeDashboardAtom)).toBeNull();
+    expect(readActiveTeamView(registry)).toBeNull();
     expect(registry.get(hydratedAccountAtom)).toBeNull();
   });
 
@@ -386,6 +386,6 @@ describe("useHydration", () => {
     server.releaseSession();
     await flush();
     expect(registry.get(restoringSessionAtom)).toBe(false);
-    expect(registry.get(activeDashboardAtom)?.team.id).toBe(teamA.id);
+    expect(readActiveTeamView(registry)?.team.id).toBe(teamA.id);
   });
 });

@@ -383,6 +383,8 @@ workspace / workflow / integrations를 옮기며 확인한, 이후 단계에 영
 - **`dashboardViewAtom`은 남겼다.** 계획의 Phase 7 항목이지만 17개 모듈이 통짜
   `DashboardPayload`를 읽고 있어, 지우려면 소비자를 전부 엔티티 atom으로 바꿔야
   한다. Phase 8의 스냅샷 직렬화가 같은 뷰를 쓰므로 그때 함께 판단한다.
+  (후속 F2가 소비자를 전부 옮기고 `state/sync/view.ts`를 지웠다. 스냅샷은 이미
+  엔티티 맵에서 모으고 있어서 영향이 없었다.)
 - **`MessageRow`의 memo를 되살리려면 프롭 모양을 바꿔야 했다.** 인라인 클로저를
   `useCallback`으로 감싸는 것만으로는 부족하다 — 훅이 메시지 목록이 바뀔 때마다
   콜백을 다시 만들기 때문이다. 행이 **자기 메시지를 스스로 바인딩**하고 목록은
@@ -494,6 +496,44 @@ workspace / workflow / integrations를 옮기며 확인한, 이후 단계에 영
   전환으로 새로 여는 팀도 같은 규칙을 받지만, 그 팀의 설정은 어차피 첫 동기화가
   채우므로 동작 차이는 없다.
 
+### 기준 갱신 (2026-09-04, 후속 F2 이후)
+
+`dashboardViewAtom`을 지우며 확인한, 같은 형태의 "통짜 값을 읽는 소비자"를 옮길 때
+쓸 사실:
+
+- **통짜 페이로드를 읽던 자리는 네 종류로 갈렸다.** ① 그리는 프로젝션 하나만 읽는
+  뷰(대부분), ② 한 벌을 함께 쓰는 페이지의 **조합 atom**(`teamAgentBoardAtom`,
+  `inboxSourceAtom` — `withEquality`가 참조 네 개를 비교하므로 안 읽는 프로젝션은
+  깨우지 못한다), ③ 액션의 호출 시점 `registry.get`, ④ 와이어 응답을 그대로 쓰는
+  자리(`MyIssues`). 새 소비자를 만들 때 이 넷 중 어디인지 먼저 정한다.
+- **"화면에 있는 팀" 가드는 이제 하나다.** `loadedTeamIdAtom`(선택 + 로드됨)과
+  `renderedTeamSettingsAtom(teamId)`이 `dashboard?.team.id === teamId` 검사 열 곳을
+  대신한다.
+- **콜백만 부르는 구독은 렌더가 필요 없다.** `InboxBridge`의 디스패치 조정은 보드
+  전체를 필요로 하지만 값을 그리지 않으므로, effect 안의
+  `registry.subscribe(atom, f, { immediate: true })`로 옮겼다. 호출 빈도는 그대로고
+  리렌더만 0이 된다. `immediate`는 마운트 시 현재 값을 주는 동시에 파생 atom의
+  의존 그래프를 만든다.
+- **`renderCounter.track`으로는 구독 렌더를 셀 수 없다.** 래퍼는 부모가 프롭을 밀어
+  넣을 때만 다시 그려지므로, 스스로 깨어나는 컴포넌트에 대한 "0회"는 언제나 참이다
+  (이 사실을 모르고 쓴 기존 케이스가 하나 있었다). `renderCounter.profile`(React
+  `Profiler`)이 서브트리의 **커밋**을 세므로 0회만 강한 주장이 된다. 서브트리를
+  세기 때문에, 보드를 그리는 페이지에서는 "카드가 다시 그려진 것"과 "페이지가
+  깨어난 것"이 구별되지 않는다 — 그런 주장은 보드가 없는 페이지에서 측정한다.
+- **인박스는 알림이 될 수 있는 런만 있으면 된다.** 상태가 알림 상태이거나 대화
+  알림이 가리키는 런만 실으면 메시지 결과가 같다. 진행률만 움직인 폴링 틱이
+  브리지를 깨우지 않는 것은 이 필터 덕분이다.
+- **스냅샷은 이미 엔티티 맵에서 모으고 있었다.** `collectSnapshot` /
+  `applySnapshot`은 팀별 family를 하나씩 읽고 쓰므로 직렬화 형태가 뷰와 무관했다.
+  `SNAPSHOT_SCHEMA_VERSION`은 1 그대로이고 저장된 스냅샷은 그대로 읽힌다.
+- **페이로드를 다시 조립하는 곳은 테스트에만 남았다.** `src/test/team-view.ts`의
+  `readTeamView` / `readActiveTeamView`가 그것이며, "서버가 보낸 것을 저장소가
+  그대로 들고 있나"를 묻는 케이스(진입점·로더·스냅샷)가 쓴다. 앱 코드에서 쓰면
+  F2가 되돌아온다.
+- **`bun audit`이 로컬 CI의 유일한 상시 실패원이다.** 네트워크가 느리면 300초쯤에
+  끊기고, 바로 앞에 손으로 한 번 돌려 두면 1초에 캐시로 끝난다. 사인오프 전에
+  `bun run audit:dependencies`를 먼저 돌리는 편이 빠르다.
+
 ## 목표
 
 1. `apps/briar/src/hooks/useBriar.ts`(4,668줄)와 `apps/briar/src/App.tsx`(5,116줄)가
@@ -525,7 +565,9 @@ workspace / workflow / integrations를 옮기며 확인한, 이후 단계에 영
   동기화 진입점, 도메인 액션, 부수효과 훅, 영속화가 전부 여기에 있다.
 - **PR 24개(#1581–#1605)로 나눠 머지했다.** 가장 긴 것도 하루 안에 머지 가능한
   크기였고, 두 고변경 파일과의 충돌로 되돌린 PR은 없다.
-- **렌더 카운트로 고정된 보장 4가지.**
+- **렌더 카운트로 고정된 보장 6가지.** 마지막 둘은 후속 F2가 더했고, 그것은
+  `renderCounter.profile`(React `Profiler`)로 센다 — 구독이 컴포넌트 안으로 밀어
+  넣은 렌더는 `track`이 볼 수 없다.
   1. 변경 없는 폴링 틱: 셸·보드·행 모두 리렌더 0회
      (`components/app/HuntDashboardWithTeam.test.tsx`).
   2. 런 하나의 내용 변경: 그 런의 카드 1회, 그 외 0회 — 다른 카드도, 컬럼 헤더도,
@@ -534,6 +576,10 @@ workspace / workflow / integrations를 옮기며 확인한, 이후 단계에 영
      키보드 순서, 상태 탭 카운트만 리렌더된다(같은 파일).
   4. 열린 런이 바뀔 때 셸 리렌더 0회(`RunPageWithRun.test.tsx`), 페이지 이동 시
      크롬·상태 표시줄 리렌더 0회(`DesktopPages` 렌더 카운트 테스트).
+  5. 런 하나의 변경: 보드를 그리고 있지 않은 셸(`DesktopPages` / `CompanionShell`),
+     창 내비게이션 컨트롤, 인박스 브리지 모두 리렌더 0회
+     (`DesktopPages.test.tsx`, `CompanionShell.test.tsx`).
+  6. 팀 설정 변경: 설정을 읽는 구독만 리렌더된다(`DesktopPages.test.tsx`).
 - **콜드 부팅은 네트워크 응답 전에 마지막 대시보드를 그린다**
   (`state/persistence/cold-boot.test.tsx`). 그 화면을 **그리는** 것과 그 화면으로
   **행동하는** 것은 후속 F1이 갈라 두었다. 디스크에서 올라온 값으로 서버 작업을
@@ -1196,3 +1242,4 @@ Phase 2 이후 언제든 착수 가능하며 Phase 3–7과 병행할 수 있다
 | 항목 | PR | 상태 | 비고 |
 |---|---|---|---|
 | F1 워크플로 자동 생성 하이드레이션 가드 + `useDeepLinks` 이름 정리 | #1607 | 머지됨 | `state/team/atoms.ts`에 팀별 `teamSyncedSinceBootAtom`을 두고 `applySyncEvent`의 `team-snapshot` / `team-delta`가 세운다(`clearTeamState`가 되돌리고, 같은 값의 쓰기는 레지스트리가 버리므로 조용한 틱의 알림은 그대로 0회다). `useWorkflowAutoGeneration`은 하이드레이션된 부팅에서 이 플래그가 서기 전까지 조건을 보지 않으므로, 디스크에서 올라온 pending 플레이스홀더로 LLM 자동 생성이 한 번 더 도는 일이 없다. 스냅샷을 읽지 않은 부팅과 팀 전환은 그대로다. `useWorkflowAutoGeneration.test.tsx`에 하이드레이션 케이스 3종 추가. `useDeepLinks`의 지역 변수 `listeners`는 실제로 리졸버를 담고 있어 `resolvers`로 고쳤다(네이티브 리스너 4종을 가리키는 주석은 그대로 둔다). |
+| F2 `dashboardViewAtom` 제거 | #1608, #1615, #1618 | 머지됨 | 통짜 `DashboardPayload`를 읽던 19개 모듈을 옮기고 `state/sync/view.ts`를 지웠다. #1608: `loadedTeamIdAtom` / `renderedTeamSettingsAtom`(`state/team`)과 `activeTeamTrayRunsAtom`(`state/status-tray`), 액션 여섯 곳과 훅 다섯 개. `useCommandPaletteItems`는 팔레트가 열렸을 때만, `useDeepLinks`는 id 목록만 구독하고 `useAgentDispatch`는 구독을 아예 끊었다. `MyIssues`는 자기가 읽는 네 프로젝션(`MyIssuesTeamBoard`)만 받는다. #1615: 뷰 일곱 개와 `inboxSourceAtom` / `navigationHistoryRunLabelsAtom` / `teamAgentBoardAtom`, `InboxBridge`의 디스패치 조정을 effect 구독으로, `TeamLobby` / `TeamSettings` / `TeamAgents` 계열과 `useInbox` / `inboxDetailLabel` / `executeTeamAgentTask`의 프롭·인자 좁히기, `test/render-count.tsx`의 `profile`(React `Profiler`)과 `run-changed` / `team-settings-changed` 렌더 카운트. #1618: `state/sync/view.ts`와 그 테스트 삭제, 페이로드 단위 단언은 테스트 전용 `test/team-view.ts`로, `dashboard-view.test.tsx` → `team-sync.test.tsx`. 스냅샷은 이미 엔티티 맵에서 모으고 있어 `SNAPSHOT_SCHEMA_VERSION`은 1 그대로다. |
