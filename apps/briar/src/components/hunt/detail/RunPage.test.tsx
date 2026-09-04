@@ -283,6 +283,57 @@ describe("RunPage", () => {
     });
     await cleanup();
   });
+  it("renders compact titlebar assignee, worker, and action controls together", async () => {
+    const member = {
+      ...demoDashboard.members![0]!,
+      image: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+    };
+    const run = {
+      ...demoDashboard.runs[0],
+      assigneeUserId: member.userId,
+      workerId: dashboardWorker.id,
+    };
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <TooltipProvider>
+        <RunPage
+          assignedWorker={dashboardWorker}
+          error={null}
+          isRecovering={false}
+          isSidebarOpen
+          mentionMembers={[member]}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => []}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => {
+            throw new Error("not implemented in this test");
+          }}
+          run={run}
+        />
+      </TooltipProvider>,
+    );
+    const actions = container.querySelector(".run-page-titlebar-actions");
+    expect(actions).not.toBeNull();
+    const badges = actions?.querySelector(".run-page-property-badges");
+    expect(badges?.querySelectorAll(".run-page-property-select.select-menu")).toHaveLength(2);
+    const assignee = badges?.querySelector<HTMLImageElement>(".run-page-property-badge.assignee .issue-assignee-avatar");
+    expect(assignee?.tagName).toBe("IMG");
+    expect(assignee?.getAttribute("src")).toBe(member.image);
+    expect(badges?.querySelector(".run-page-property-badge.worker .worker-icon")?.textContent).toContain("🍋");
+    expect(actions?.querySelector(".run-page-titlebar-divider")).not.toBeNull();
+    const tools = actions?.querySelector(".run-page-titlebar-tools");
+    expect(tools?.querySelector(".run-page-process-now")).not.toBeNull();
+    expect(tools?.querySelector(".run-page-properties-toggle")).not.toBeNull();
+    expect(tools?.querySelector(".run-page-actions-trigger")).not.toBeNull();
+    await cleanup();
+  });
   it("lets users edit every mutable issue property from the properties panel", async () => {
     const currentMember = {
       ...demoDashboard.members![0]!,
