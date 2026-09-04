@@ -26,7 +26,13 @@ import {
   teamsAtom,
 } from "../../state/team/atoms";
 import { healthAtom } from "../../state/workspace/atoms";
-import { createReactTestRoot, settle } from "../../test/react";
+import {
+  createReactTestRoot,
+  flush,
+  settle,
+  settleLazy,
+  visibleText,
+} from "../../test/react";
 import {
   createRenderCounter,
   type RenderCounter,
@@ -76,7 +82,6 @@ const payload: DashboardPayload = {
 const noop = () => undefined;
 
 const pageProps: DesktopPagesProps = {
-  activeProject: team,
   agents: {
     activeTeamAgents: [],
     all: [],
@@ -275,7 +280,10 @@ describe("desktop page slot", () => {
 
     // The page slot swapped the board for the agents page…
     expect(view.container.textContent).toContain("Agent list");
-    expect(view.container.textContent).not.toContain(run.title);
+    // …and put the board away rather than throwing it away: its DOM is still
+    // there, held off screen by its slot.
+    expect(visibleText(view.container)).not.toContain(run.title);
+    expect(view.container.textContent).toContain(run.title);
     // …and the sidebar followed the same location.
     expect(currentSidebarPages(view.container)).toContain("Agents");
     expect(currentSidebarPages(view.container)).not.toContain("Issues");
@@ -327,6 +335,161 @@ describe("desktop page slot", () => {
     expect(registry.get(teamSettingsAtom(team.id))?.velenOrg).toBe(
       "wordbricks",
     );
+
+    await view.cleanup();
+  });
+});
+
+/*
+  What a visit costs, before and after the slot.
+
+  The board and the agents page make the pair: the board is kept and the agents
+  page is not, so the same walk — away and back — is a reveal for one and a
+  rebuild for the other, in the same render tree and counted the same way.
+*/
+describe("desktop page keep-alive", () => {
+  const boardRoot = (container: HTMLElement) =>
+    container.querySelector<HTMLElement>('[data-page-slot^="board:"]')
+      ?.firstElementChild ?? null;
+
+  /*
+    Waits until the counted subtree stops committing on its own.
+
+    The counter is over the whole subtree, so it also sees work a render left
+    behind — a `lazy()` chunk still arriving, an effect's promise. Waiting for
+    that to stop is what makes a later count mean "this visit did it" rather
+    than "the machine was busy".
+  */
+  const quiesce = async (renders: RenderCounter) => {
+    for (let attempt = 0; ; attempt += 1) {
+      renders.reset();
+      await flush(2);
+      if (renders.count("pages") === 0) return;
+      if (attempt >= 20) throw new Error("the page slot never went quiet");
+    }
+  };
+
+  const mountIssuesPage = async (renders: RenderCounter) => {
+    const registry: AtomRegistry = createTestRegistry([
+      [userAtom, demoUser],
+      [tokenAtom, "token-1"],
+      [teamsAtom, [team]],
+      [activeTeamIdAtom, team.id],
+      [organizationsAtom, [demoOrganization]],
+      [activeOrganizationIdAtom, demoOrganization.id],
+    ]);
+    applySyncEvent(registry, {
+      kind: "team-snapshot",
+      teamId: team.id,
+      payload,
+    });
+    const actions = createNavigationActions(registry);
+    actions.resetNavigation("issues");
+
+    const view = createReactTestRoot({ attachToDocument: true });
+    await view.render(
+      <RegistryContext.Provider value={registry}>
+        <I18nProvider>
+          <AppKeyboardCommandProvider>
+            <ToastProvider>
+              <TooltipProvider>
+                {renders.profile("pages", <DesktopPages {...pageProps} />)}
+              </TooltipProvider>
+            </ToastProvider>
+          </AppKeyboardCommandProvider>
+        </I18nProvider>
+      </RegistryContext.Provider>,
+    );
+    await settle(() => visibleText(view.container).includes(run.title), {
+      description: "the board to draw its first run",
+    });
+    await quiesce(renders);
+    return { actions, view };
+  };
+
+  it("returns to the board as a reveal and to the agents page as a rebuild", async () => {
+    const renders = createRenderCounter();
+    const { actions, view } = await mountIssuesPage(renders);
+    const board = boardRoot(view.container);
+    expect(board).not.toBeNull();
+
+    await act(async () => actions.navigateToPage("agents", team.id));
+    await settle(() => visibleText(view.container).includes("Agent list"));
+    const firstAgents = view.container.querySelector("#project-agents");
+    expect(firstAgents).not.toBeNull();
+    await quiesce(renders);
+
+    await act(async () => actions.navigateToPage("issues", team.id));
+    await settle(() => visibleText(view.container).includes(run.title));
+
+    /*
+      The board is the node it was — a reveal, not a rebuild. The same walk
+      against the chain this replaced returned a different node, so the ~350
+      elements the board had built were thrown away and made again; here the
+      return is a couple of commits and no new element at all.
+    */
+    expect(boardRoot(view.container)).toBe(board);
+    expect(renders.count("pages")).toBeLessThanOrEqual(4);
+    // The agents page is gone, because nothing keeps it.
+    expect(view.container.querySelector("#project-agents")).toBeNull();
+
+    await act(async () => actions.navigateToPage("agents", team.id));
+    await settle(() => visibleText(view.container).includes("Agent list"));
+    // …and coming back to it built a new one, which is what every page did
+    // before the slot.
+    expect(view.container.querySelector("#project-agents")).not.toBe(
+      firstAgents,
+    );
+
+    await view.cleanup();
+  });
+
+  it("does not show a kept page's lazy fallback twice", async () => {
+    const renders = createRenderCounter();
+    const { actions, view } = await mountIssuesPage(renders);
+    const fallbacks = () =>
+      view.container.querySelectorAll(".lazy-view-placeholder").length;
+
+    await act(async () => actions.navigateToPage("my-issues"));
+    await settle(() => fallbacks() === 0 && visibleText(view.container) !== "", {
+      description: "my issues to come out of its lazy boundary",
+    });
+    const myIssues = view.container.querySelector<HTMLElement>(
+      '[data-page-slot^="my-issues:"]',
+    )?.firstElementChild;
+    expect(myIssues).not.toBeNull();
+
+    await act(async () => actions.navigateToPage("issues", team.id));
+    await settle(() => visibleText(view.container).includes(run.title));
+
+    await act(async () => actions.navigateToPage("my-issues"));
+    // The chunk is loaded and the tree it built is still there, so there is
+    // nothing to suspend on and no placeholder to flash.
+    expect(fallbacks()).toBe(0);
+    expect(
+      view.container.querySelector<HTMLElement>(
+        '[data-page-slot^="my-issues:"]',
+      )?.firstElementChild,
+    ).toBe(myIssues);
+
+    await view.cleanup();
+  });
+
+  it("bounds the kept pages and drops them all when the organization changes", async () => {
+    const renders = createRenderCounter();
+    const { actions, view } = await mountIssuesPage(renders);
+    const slotKeys = () =>
+      [...view.container.querySelectorAll("[data-page-slot]")].map(
+        (slot) => slot.getAttribute("data-page-slot") ?? "",
+      );
+
+    for (const page of ["inbox", "my-issues", "channels", "dms"] as const) {
+      await act(async () => actions.navigateToPage(page));
+      await settleLazy();
+    }
+    // Four heavy pages at most: the one on screen and the three before it.
+    expect(slotKeys()).toHaveLength(4);
+    expect(slotKeys()).not.toContain(`board:${team.id}`);
 
     await view.cleanup();
   });

@@ -127,3 +127,19 @@ export async function settle(
     await settleLazy();
   }
 }
+
+/**
+ * The text a reader could actually see.
+ *
+ * `textContent` also reports the pages a keep-alive slot is holding off screen,
+ * because keeping a page alive is exactly keeping its DOM. A test that means
+ * "this page is gone" wants this instead — a hidden slot is marked `inert`,
+ * which is also what stops focus from reaching it.
+ */
+export function visibleText(container: HTMLElement): string {
+  const clone = container.cloneNode(true) as HTMLElement;
+  for (const hidden of clone.querySelectorAll("[data-page-slot][inert]")) {
+    hidden.remove();
+  }
+  return clone.textContent ?? "";
+}

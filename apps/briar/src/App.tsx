@@ -237,7 +237,6 @@ export function App({
     />
   ) : (
     <DesktopShell
-      activeProject={activeTeam}
       agents={{
         activeTeamAgents,
         all: issueAgents,
