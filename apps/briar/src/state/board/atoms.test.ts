@@ -17,6 +17,7 @@ import {
 import {
   boardColumnKey,
   boardColumnRunIdsAtom,
+  boardGroupedRunIdsAtom,
   boardLoadedAtom,
   boardPropertyFiltersAtom,
   boardQueryAtom,
@@ -178,6 +179,22 @@ describe("board atoms", () => {
     );
 
     expect(columns).toEqual([[], [], []]);
+  });
+
+  it("keeps the grouping equal when a run's title changes", () => {
+    const registry = harness();
+    const seen = watch(registry, boardGroupedRunIdsAtom(teamId));
+
+    registry.update(runsByIdAtom, (runs) =>
+      upsertMany(runs, [{ ...queued, title: "고친 이슈" }]),
+    );
+    expect(seen).toEqual([]);
+
+    registry.update(runsByIdAtom, (runs) =>
+      upsertMany(runs, [{ ...queued, status: "blocked" }]),
+    );
+    expect(seen).toHaveLength(1);
+    expect(seen[0]?.get("status:blocked")).toEqual(["run-b"]);
   });
 
   it("counts the status tabs and only moves them when a status does", () => {

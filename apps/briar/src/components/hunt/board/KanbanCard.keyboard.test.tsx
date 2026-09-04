@@ -1,10 +1,10 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
+import { BoardHarness } from "../../../test/board-harness";
 import { createReactTestRoot, renderReactTestRoot } from "../../../test/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { HuntDashboard } from "@/components/hunt/HuntDashboard";
 import { AppKeyboardCommandProvider } from "@/hooks/appKeyboardCommands";
 import { demoDashboard } from "@/lib/demo-data";
 import { saveKeyboardNavigationPreferences } from "@/lib/keybindings";
@@ -90,7 +90,7 @@ describe("Kanban card keyboard navigation", () => {
       root,
       <AppKeyboardCommandProvider>
         <button data-testid="outside" type="button">Outside</button>
-        <HuntDashboard
+        <BoardHarness
           {...dashboardProps}
           dashboard={{ ...demoDashboard, runs: [...boardRuns] }}
           onSelectedRunChange={onSelectedRunChange}

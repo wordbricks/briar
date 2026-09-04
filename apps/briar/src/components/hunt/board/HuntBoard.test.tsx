@@ -1,6 +1,9 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
+import { BoardHarness } from "../../../test/board-harness";
+import { activePlanningProjectIdAtom } from "@/state/dialogs/atoms";
+import { createTestRegistry } from "@/state/registry";
 import { createReactTestRoot, renderReactTestRoot } from "../../../test/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
@@ -10,7 +13,6 @@ import * as api from "@/lib/api";
 import * as channelRealtime from "@/lib/channel-realtime";
 import * as issueActivityHook from "@/hooks/use-issue-agent-activity";
 import type { ExecutionWorker, HuntRun, IssueMessage, IssueMessageSendResult, ProjectAgent, RunEvidence, UpdateIssueInput } from "@/types";
-import { HuntDashboard } from "@/components/hunt/HuntDashboard";
 import { IssueAgentActivityPanel } from "@/components/hunt/detail/IssueAgentActivityPanel";
 import { RunPage } from "@/components/hunt/detail/RunPage";
 import { CreateIssueDialog } from "@/components/hunt/editor/CreateIssueDialog";
@@ -155,7 +157,7 @@ describe("HuntBoard", () => {
     });
     await renderReactTestRoot(
       root,
-      <HuntDashboard
+      <BoardHarness
         {...dashboardProps}
         dashboard={{
           ...demoDashboard,
@@ -183,7 +185,7 @@ describe("HuntBoard", () => {
     });
     await renderReactTestRoot(
       root,
-      <HuntDashboard
+      <BoardHarness
         {...dashboardProps}
         dashboard={{
           ...demoDashboard,
@@ -201,7 +203,7 @@ describe("HuntBoard", () => {
     const { cleanup, container, root } = createReactTestRoot({
       attachToDocument: true,
     });
-    await renderReactTestRoot(root, <HuntDashboard {...dashboardProps} dashboard={demoDashboard} />);
+    await renderReactTestRoot(root, <BoardHarness {...dashboardProps} dashboard={demoDashboard} />);
     const trigger = container.querySelector<HTMLButtonElement>('[aria-label="프로퍼티 필터"]');
     expect(trigger).not.toBeNull();
     await act(async () => {
@@ -269,7 +271,7 @@ describe("HuntBoard", () => {
     const { cleanup, container, root } = createReactTestRoot({
       attachToDocument: true,
     });
-    await renderReactTestRoot(root, <HuntDashboard {...dashboardProps} dashboard={demoDashboard} />);
+    await renderReactTestRoot(root, <BoardHarness {...dashboardProps} dashboard={demoDashboard} />);
     expect(container.querySelector('[aria-keyshortcuts="Meta+N"]')).not.toBeNull();
     const shortcut = new KeyboardEvent("keydown", {
       bubbles: true,
@@ -289,7 +291,7 @@ describe("HuntBoard", () => {
     const { cleanup, container, root } = createReactTestRoot({
       attachToDocument: true,
     });
-    await renderReactTestRoot(root, <HuntDashboard {...dashboardProps} dashboard={null} noProject />);
+    await renderReactTestRoot(root, <BoardHarness {...dashboardProps} dashboard={null} noProject />);
     const shortcut = new KeyboardEvent("keydown", {
       bubbles: true,
       cancelable: true,
@@ -306,7 +308,7 @@ describe("HuntBoard", () => {
   });
   it("shows loading issues while the dashboard snapshot is missing", async () => {
     const { cleanup, container, root } = createReactTestRoot();
-    await renderReactTestRoot(root, <HuntDashboard {...dashboardProps} dashboard={null} />);
+    await renderReactTestRoot(root, <BoardHarness {...dashboardProps} dashboard={null} />);
     expect(container.querySelector(".issues-loading-overlay")).not.toBeNull();
     expect(container.textContent).toContain("이슈를 불러오는 중입니다");
     expect(container.textContent).toContain("0개 작업");
@@ -318,9 +320,11 @@ describe("HuntBoard", () => {
     if (!firstRun) throw new Error("demo dashboard has no runs");
     await renderReactTestRoot(
       root,
-      <HuntDashboard
+      <BoardHarness
         {...dashboardProps}
-        activeIssueProjectId="planning-general"
+        registry={createTestRegistry([
+          [activePlanningProjectIdAtom, "planning-general"],
+        ])}
         dashboard={{
           ...demoDashboard,
           runs: [
@@ -346,7 +350,7 @@ describe("HuntBoard", () => {
     const { cleanup, container, root } = createReactTestRoot({
       attachToDocument: true,
     });
-    await renderReactTestRoot(root, <HuntDashboard {...dashboardProps} dashboard={demoDashboard} />);
+    await renderReactTestRoot(root, <BoardHarness {...dashboardProps} dashboard={demoDashboard} />);
     const implementingColumn = container.querySelector<HTMLElement>('[data-kanban-column-id="stage:implementing"]');
     const addButton = implementingColumn?.querySelector<HTMLButtonElement>("[data-kanban-column-add]");
     expect(implementingColumn?.querySelector(".kanban-column-content")).not.toBeNull();
@@ -367,7 +371,7 @@ describe("HuntBoard", () => {
     });
     await renderReactTestRoot(
       root,
-      <HuntDashboard
+      <BoardHarness
         {...dashboardProps}
         dashboard={demoDashboard}
         onCreateIssue={onCreateIssue}
@@ -404,7 +408,7 @@ describe("HuntBoard", () => {
       workflowStage: null,
       workerId: dashboardWorker.id
     };
-    const markup = renderToStaticMarkup(<HuntDashboard {...dashboardProps} dashboard={{
+    const markup = renderToStaticMarkup(<BoardHarness {...dashboardProps} dashboard={{
       ...demoDashboard,
       runs: [run],
       workers: [dashboardWorker]
@@ -428,7 +432,7 @@ describe("HuntBoard", () => {
     });
     await renderReactTestRoot(
       root,
-      <HuntDashboard
+      <BoardHarness
         {...dashboardProps}
         dashboard={{
           ...demoDashboard,
@@ -459,7 +463,7 @@ describe("HuntBoard", () => {
     });
     await renderReactTestRoot(
       root,
-      <HuntDashboard {...dashboardProps} currentUserId={userId} dashboard={demoDashboard} />,
+      <BoardHarness {...dashboardProps} currentUserId={userId} dashboard={demoDashboard} />,
     );
     const collapseButton = container.querySelector<HTMLButtonElement>('button[aria-label="분석 열 접기"]');
     expect(collapseButton).not.toBeNull();
@@ -486,7 +490,7 @@ describe("HuntBoard", () => {
     });
     await renderReactTestRoot(
       root,
-      <HuntDashboard {...dashboardProps} currentUserId={userId} dashboard={demoDashboard} />,
+      <BoardHarness {...dashboardProps} currentUserId={userId} dashboard={demoDashboard} />,
     );
     const hideTrigger = container.querySelector<HTMLButtonElement>('[aria-label="분석 열 메뉴"]');
     expect(hideTrigger).not.toBeNull();
@@ -536,7 +540,7 @@ describe("HuntBoard", () => {
     });
     await renderReactTestRoot(
       desktop.root,
-      <HuntDashboard
+      <BoardHarness
         {...dashboardProps}
         currentUserId={userId}
         dashboard={demoDashboard}
@@ -562,7 +566,7 @@ describe("HuntBoard", () => {
     });
     await renderReactTestRoot(
       companion.root,
-      <HuntDashboard
+      <BoardHarness
         {...dashboardProps}
         companionMode
         currentUserId={userId}
@@ -586,7 +590,7 @@ describe("HuntBoard", () => {
   });
   it("switches between kanban and list views while preserving issue navigation", async () => {
     const { cleanup, container, root } = createReactTestRoot();
-    await renderReactTestRoot(root, <HuntDashboard {...dashboardProps} dashboard={demoDashboard} />);
+    await renderReactTestRoot(root, <BoardHarness {...dashboardProps} dashboard={demoDashboard} />);
     const listButton = container.querySelector<HTMLButtonElement>('button[aria-label="리스트 보기"]');
     expect(listButton?.getAttribute("aria-pressed")).toBe("false");
     expect(container.querySelector(".kanban-progress")).toBeNull();
@@ -636,7 +640,7 @@ describe("HuntBoard", () => {
     const { cleanup, container, root } = createReactTestRoot();
     await renderReactTestRoot(
       root,
-      <HuntDashboard
+      <BoardHarness
         {...dashboardProps}
         companionMode
         dashboard={{
@@ -695,7 +699,7 @@ describe("HuntBoard", () => {
     expect(pausedRun).toBeTruthy();
     expect(blockedRun).toBeTruthy();
     const { cleanup, container, root } = createReactTestRoot();
-    await renderReactTestRoot(root, <HuntDashboard {...dashboardProps} dashboard={demoDashboard} />);
+    await renderReactTestRoot(root, <BoardHarness {...dashboardProps} dashboard={demoDashboard} />);
     const attentionTab = Array.from(container.querySelectorAll<HTMLButtonElement>(".status-tabs button")).find(button => button.textContent?.includes("확인 필요"));
     expect(attentionTab).toBeTruthy();
     await act(async () => {
@@ -722,7 +726,7 @@ describe("HuntBoard", () => {
     });
     await renderReactTestRoot(
       root,
-      <HuntDashboard
+      <BoardHarness
         {...dashboardProps}
         dashboard={{
           ...demoDashboard,
@@ -834,7 +838,7 @@ describe("HuntBoard", () => {
       },
       runs: []
     };
-    const markup = renderToStaticMarkup(<HuntDashboard {...dashboardProps} dashboard={dashboard} />);
+    const markup = renderToStaticMarkup(<BoardHarness {...dashboardProps} dashboard={dashboard} />);
     expect(markup.match(/class="kanban-checkpoint-marker"/g)).toHaveLength(1);
     expect(markup).toContain('data-checkpoint-count="2"');
     expect(markup).toContain("분석 완료 후 확인");
@@ -855,11 +859,11 @@ describe("HuntBoard", () => {
         checkpointPolicy
       }
     };
-    await renderReactTestRoot(root, <HuntDashboard {...dashboardProps} dashboard={dashboard} />);
+    await renderReactTestRoot(root, <BoardHarness {...dashboardProps} dashboard={dashboard} />);
     expect(container.querySelector(".kanban-checkpoint-marker")).toBeNull();
     await renderReactTestRoot(
       root,
-      <HuntDashboard
+      <BoardHarness
         {...dashboardProps}
         dashboard={{
           ...dashboard,
@@ -902,7 +906,7 @@ describe("HuntBoard", () => {
     });
     await renderReactTestRoot(
       root,
-      <HuntDashboard
+      <BoardHarness
         {...dashboardProps}
         dashboard={{
           ...demoDashboard,
@@ -987,7 +991,7 @@ describe("HuntBoard", () => {
     await renderReactTestRoot(
       root,
       <ToastProvider>
-        <HuntDashboard
+        <BoardHarness
           {...dashboardProps}
           dashboard={demoDashboard}
           recoveryError="상태 이동에 실패했습니다."
@@ -1019,7 +1023,7 @@ describe("HuntBoard", () => {
       attachToDocument: true,
     });
     await act(async () => {
-      root.render(<HuntDashboard {...dashboardProps} dashboard={{
+      root.render(<BoardHarness {...dashboardProps} dashboard={{
         ...demoDashboard,
         runs: [channelRun]
       }} onMoveRun={onMoveRun} onProcessIssueNow={onProcessIssueNow} requestedRunId={channelRun.id} />);
@@ -1040,7 +1044,7 @@ describe("HuntBoard", () => {
       status: "queued"
     };
     await act(async () => {
-      root.render(<HuntDashboard {...dashboardProps} dashboard={{
+      root.render(<BoardHarness {...dashboardProps} dashboard={{
         ...demoDashboard,
         runs: [queuedChannelRun]
       }} onMoveRun={onMoveRun} onProcessIssueNow={onProcessIssueNow} requestedRunId={queuedChannelRun.id} />);
@@ -1062,7 +1066,7 @@ describe("HuntBoard", () => {
     const { cleanup, container, root } = createReactTestRoot({
       attachToDocument: true,
     });
-    await renderReactTestRoot(root, <HuntDashboard {...dashboardProps} dashboard={dashboard} />);
+    await renderReactTestRoot(root, <BoardHarness {...dashboardProps} dashboard={dashboard} />);
     const board = container.querySelector<HTMLDivElement>(".kanban-board");
     expect(board).not.toBeNull();
     if (board) board.scrollLeft = 248;

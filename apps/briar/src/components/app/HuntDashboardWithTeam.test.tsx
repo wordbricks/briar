@@ -7,6 +7,13 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { ToastProvider } from "../ui/toast";
 import { TooltipProvider } from "../ui/tooltip";
 import { demoDashboard } from "../../lib/demo-data";
+import {
+  boardColumnKey,
+  boardColumnRunIdsAtom,
+  boardGroupedRunIdsAtom,
+  boardRunCountAtom,
+  boardStatusCountsAtom,
+} from "../../state/board/atoms";
 import { runAtom } from "../../state/entities/runs";
 import { createTestRegistry, type AtomRegistry } from "../../state/registry";
 import { tokenAtom, userAtom } from "../../state/session/atoms";
@@ -30,12 +37,18 @@ import { HuntDashboardWithTeam } from "./HuntDashboardWithTeam";
      shell that owns the board's callbacks, not the board, not a row.
   2. A change to one run reaches that run's `runAtom` subscriber and nobody
      else's, and never reaches the shell.
+  3. A change that moves a run between columns reaches those two columns' id
+     lists and the counts, and leaves every other column alone.
 
-  What is still not true is the board's *own* subtree for (2): it draws a card
-  per run, so it reads the runs and not only their ids and renders again with
-  them. Pushing its filtering and grouping onto derived atoms — the step that
-  would make the list itself id-only — is left to a follow-up; it is a rewrite
-  of the board rather than a change of where its data comes from.
+  How the counting works. `renderCounter.track` only sees renders a parent
+  pushed, which is exactly what is asserted for the board itself: nothing is
+  handed down to it any more. Everything below the board subscribes rather than
+  receives, so the probes here subscribe to the very same atoms the components
+  do — `boardColumnDefinitionsAtom` and the two count atoms for the chrome,
+  `boardGroupedRunIdsAtom` for the kanban (its keyboard order is the grouping),
+  `boardColumnRunIdsAtom` for one column, `runAtom` for one card — and a probe
+  renders exactly when its component does. The real board is mounted alongside
+  them, so the DOM assertions are about the board itself.
 */
 
 const user: SessionUser = {
@@ -46,17 +59,19 @@ const user: SessionUser = {
 
 const team: Project = { ...demoDashboard.team, id: "team-a", name: "Team A" };
 
-const runOf = (id: string, title: string): HuntRun => ({
+const runOf = (id: string, title: string, status: HuntRun["status"]): HuntRun => ({
   ...demoDashboard.runs[0]!,
   id,
   runNumber: Number(id.replace(/\D/g, "")) || 1,
   title,
+  status,
+  workflowStage: null,
   teamId: team.id,
   updatedAt: "2026-09-01T00:00:00.000Z",
 });
 
-const runA = runOf("run-a", "첫 번째 이슈");
-const runB = runOf("run-b", "두 번째 이슈");
+const runA = runOf("run-1", "첫 번째 이슈", "backlog");
+const runB = runOf("run-2", "두 번째 이슈", "queued");
 
 const snapshot: DashboardPayload = {
   ...demoDashboard,
@@ -102,6 +117,41 @@ function RunRow({
   return <output>{run?.title ?? ""}</output>;
 }
 
+/** One kanban column: it subscribes to the ids it draws. */
+function ColumnProbe({
+  columnId,
+  renders,
+}: {
+  columnId: string;
+  renders: RenderCounter;
+}) {
+  renders.useRenderCount(`column:${columnId}`);
+  const runIds = useAtomValue(
+    boardColumnRunIdsAtom(boardColumnKey(team.id, columnId)),
+  );
+  return <output>{runIds.length}</output>;
+}
+
+/** The kanban surface, whose keyboard order is the grouping. */
+function KanbanProbe({ renders }: { renders: RenderCounter }) {
+  renders.useRenderCount("kanban");
+  useAtomValue(boardGroupedRunIdsAtom(team.id));
+  return null;
+}
+
+/** The two numbers the board chrome shows. */
+function ChromeProbe({ renders }: { renders: RenderCounter }) {
+  renders.useRenderCount("task-count");
+  useAtomValue(boardRunCountAtom(team.id));
+  return null;
+}
+
+function StatusTabsProbe({ renders }: { renders: RenderCounter }) {
+  renders.useRenderCount("status-tabs");
+  useAtomValue(boardStatusCountsAtom(team.id));
+  return null;
+}
+
 const harness = () => {
   const registry: AtomRegistry = createTestRegistry([
     [userAtom, user],
@@ -117,6 +167,52 @@ const harness = () => {
   return registry;
 };
 
+const mount = async (registry: AtomRegistry, renders: RenderCounter) => {
+  const view = createReactTestRoot({ attachToDocument: true });
+  const Board = renders.track("board", HuntDashboardWithTeam);
+
+  function AppShell() {
+    // Stands in for App.tsx: it owns the board's navigation callbacks and
+    // subscribes to none of the atoms the board renders from.
+    renders.useRenderCount("shell");
+    return (
+      <>
+        <Board {...boardProps} projects={[team]} sessions={[]} />
+        <RunRow name="row-a" renders={renders} runId={runA.id} />
+        <RunRow name="row-b" renders={renders} runId={runB.id} />
+        <ColumnProbe columnId="status:backlog" renders={renders} />
+        <ColumnProbe columnId="status:queued" renders={renders} />
+        <ColumnProbe columnId="status:blocked" renders={renders} />
+        <ColumnProbe columnId="status:completed" renders={renders} />
+        <KanbanProbe renders={renders} />
+        <ChromeProbe renders={renders} />
+        <StatusTabsProbe renders={renders} />
+      </>
+    );
+  }
+
+  await view.render(
+    <RegistryContext.Provider value={registry}>
+      <ToastProvider>
+        <TooltipProvider>
+          <AppShell />
+        </TooltipProvider>
+      </ToastProvider>
+    </RegistryContext.Provider>,
+  );
+  return view;
+};
+
+/** The card the board drew for `run`, so the DOM can be checked directly. */
+const cardTitle = (container: ParentNode, runId: string) =>
+  container.querySelector(`.kanban-card[data-run-id="${runId}"] .kanban-card-copy strong`)
+    ?.textContent ?? null;
+
+const columnCount = (container: ParentNode, columnId: string) =>
+  container.querySelector(
+    `[data-kanban-column-id="${columnId}"] .kanban-column-header-actions strong`,
+  )?.textContent ?? null;
+
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 });
@@ -125,37 +221,9 @@ describe("HuntDashboardWithTeam", () => {
   it("renders nothing again for a delta tick that changed nothing", async () => {
     const registry = harness();
     const renders = createRenderCounter();
-    const view = createReactTestRoot({ attachToDocument: true });
+    const view = await mount(registry, renders);
 
-    const Board = renders.track("board", HuntDashboardWithTeam);
-
-    function AppShell() {
-      // Stands in for App.tsx: it owns the board's navigation callbacks and
-      // subscribes to none of the atoms the board renders from.
-      renders.useRenderCount("shell");
-      return (
-        <>
-          <Board
-            {...boardProps}
-            projects={[team]}
-            sessions={[]}
-          />
-          <RunRow name="row-a" renders={renders} runId={runA.id} />
-          <RunRow name="row-b" renders={renders} runId={runB.id} />
-        </>
-      );
-    }
-
-    await view.render(
-      <RegistryContext.Provider value={registry}>
-        <ToastProvider>
-          <TooltipProvider>
-            <AppShell />
-          </TooltipProvider>
-        </ToastProvider>
-      </RegistryContext.Provider>,
-    );
-    expect(view.container.textContent).toContain("첫 번째 이슈");
+    expect(cardTitle(view.container, runA.id)).toBe("첫 번째 이슈");
     renders.reset();
 
     await act(async () => {
@@ -171,37 +239,10 @@ describe("HuntDashboardWithTeam", () => {
     await view.cleanup();
   });
 
-  it("reaches only the changed run's row, never the shell", async () => {
+  it("reaches only the changed run's row, never the board or the shell", async () => {
     const registry = harness();
     const renders = createRenderCounter();
-    const view = createReactTestRoot({ attachToDocument: true });
-
-    const Board = renders.track("board", HuntDashboardWithTeam);
-
-    function AppShell() {
-      renders.useRenderCount("shell");
-      return (
-        <>
-          <Board
-            {...boardProps}
-            projects={[team]}
-            sessions={[]}
-          />
-          <RunRow name="row-a" renders={renders} runId={runA.id} />
-          <RunRow name="row-b" renders={renders} runId={runB.id} />
-        </>
-      );
-    }
-
-    await view.render(
-      <RegistryContext.Provider value={registry}>
-        <ToastProvider>
-          <TooltipProvider>
-            <AppShell />
-          </TooltipProvider>
-        </ToastProvider>
-      </RegistryContext.Provider>,
-    );
+    const view = await mount(registry, renders);
     renders.reset();
 
     await act(async () => {
@@ -212,17 +253,51 @@ describe("HuntDashboardWithTeam", () => {
       });
     });
 
-    // The row for the run that changed rendered once; the other run's row and
-    // the shell that owns the board's callbacks did not render at all.
-    expect(renders.count("row-b")).toBe(1);
-    expect(renders.count("row-a")).toBe(0);
-    expect(renders.count("shell")).toBe(0);
-    // Nothing was pushed into the board from above either: the counter wraps
-    // it, so it only counts renders the shell caused. The board's own subtree
-    // does render again — it draws a card per run — which is why the follow-up
-    // noted at the top of this file matters.
-    expect(renders.count("board")).toBe(0);
-    expect(view.container.textContent).toContain("고친 이슈");
+    /*
+      The row of the run that changed rendered once. Nothing else did: not the
+      other row, not a column, not the kanban that holds the keyboard order, not
+      the two counts, not the board and not the shell above it.
+    */
+    renders.expectRenderCounts({ "row-b": 1 });
+    expect(cardTitle(view.container, runB.id)).toBe("고친 이슈");
+    expect(cardTitle(view.container, runA.id)).toBe("첫 번째 이슈");
+
+    await view.cleanup();
+  });
+
+  it("reaches the two columns a status change moves the run between", async () => {
+    const registry = harness();
+    const renders = createRenderCounter();
+    const view = await mount(registry, renders);
+
+    expect(columnCount(view.container, "status:queued")).toBe("1");
+    expect(columnCount(view.container, "status:blocked")).toBe("0");
+    renders.reset();
+
+    await act(async () => {
+      applySyncEvent(registry, {
+        kind: "run-changed",
+        run: { ...runB, status: "blocked", updatedAt: "2026-09-01T00:02:00.000Z" },
+        teamId: team.id,
+      });
+    });
+
+    /*
+      The run's own card, the id lists of the column it left and the one it
+      joined, the grouping the kanban's keyboard order is built from, and the
+      status tab totals. The column the run never touched did not render, and
+      neither did the "N tasks" count — the run still passes the filters — nor
+      the board or the shell.
+    */
+    renders.expectRenderCounts({
+      "column:status:blocked": 1,
+      "column:status:queued": 1,
+      kanban: 1,
+      "row-b": 1,
+      "status-tabs": 1,
+    });
+    expect(columnCount(view.container, "status:queued")).toBe("0");
+    expect(columnCount(view.container, "status:blocked")).toBe("1");
 
     await view.cleanup();
   });

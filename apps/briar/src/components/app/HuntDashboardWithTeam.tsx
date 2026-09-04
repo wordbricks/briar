@@ -12,8 +12,6 @@ import {
 import { planningProjectsAtom } from "../../state/planning/atoms";
 import { useRunDetailActions } from "../../state/run-detail/actions";
 import { tokenAtom, userAtom } from "../../state/session/atoms";
-import { activeDashboardAtom } from "../../state/sync/view";
-import { activeTeamIdAtom } from "../../state/team/atoms";
 import { HuntDashboard } from "../hunt/HuntDashboard";
 
 /*
@@ -22,14 +20,17 @@ import { HuntDashboard } from "../hunt/HuntDashboard";
   `App.tsx` used to hand the board the dashboard plus about forty issue and run
   callbacks, at two render sites — once for the desktop shell and once for the
   companion one. Every one of those props was rebuilt on each App render, which
-  is what made a polling tick reach the board at all. They come from here now,
-  and this component is the only one the store's notifications reach.
+  is what made a polling tick reach the board at all. They come from here now.
+
+  Since Phase 2C it no longer reads the dashboard either: the board resolves the
+  team's runs itself, one id at a time, so nothing an issue edit touches passes
+  through this component. What is left is the pending-mutation flags and the
+  action bundles, none of which a delta tick moves.
 */
 
 /** The props this wrapper supplies; `App` may not pass them. */
 type ConnectedProps =
   | "currentUserId"
-  | "dashboard"
   | "deletingIssueId"
   | "isCreatingIssue"
   | "issueProjects"
@@ -60,7 +61,6 @@ type ConnectedProps =
   | "onRetryRun"
   | "onReworkRun"
   | "onSetIssueParent"
-  | "onUnassignRun"
   | "onUpdateIssue"
   | "onUpdateIssueCheckpoints"
   | "onUpdateIssuePreferences"
@@ -72,8 +72,6 @@ export type HuntDashboardWithTeamProps = Omit<
 >;
 
 export function HuntDashboardWithTeam(props: HuntDashboardWithTeamProps) {
-  const dashboard = useAtomValue(activeDashboardAtom);
-  const activeTeamId = useAtomValue(activeTeamIdAtom);
   const issueProjects = useAtomValue(planningProjectsAtom);
   const user = useAtomValue(userAtom);
   const token = useAtomValue(tokenAtom);
@@ -133,14 +131,12 @@ export function HuntDashboardWithTeam(props: HuntDashboardWithTeamProps) {
       onRetryRun: (runId: string) => issueActions.recoverRun(runId, "retry"),
       onReworkRun: issueActions.reworkRun,
       onSetIssueParent: issueActions.changeIssueParent,
-      onUnassignRun: (runId: string) =>
-        issueActions.unassignRun(activeTeamId ?? "", runId),
       onUpdateIssue: issueActions.editIssue,
       onUpdateIssueCheckpoints: issueActions.editIssueCheckpoints,
       onUpdateIssuePreferences: issueActions.editIssueExecutionPreferences,
       onUpdateIssueSubscription: issueActions.editIssueSubscription,
     }),
-    [activeTeamId, issueActions, runDetailActions],
+    [issueActions, runDetailActions],
   );
 
   return (
@@ -148,7 +144,6 @@ export function HuntDashboardWithTeam(props: HuntDashboardWithTeamProps) {
       {...props}
       {...callbacks}
       currentUserId={user?.id ?? null}
-      dashboard={dashboard}
       deletingIssueId={deletingIssueId}
       isCreatingIssue={isCreatingIssue}
       issueProjects={issueProjects}

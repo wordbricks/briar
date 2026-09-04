@@ -1,30 +1,13 @@
 import type { HuntRun, HuntRunPlacement } from "@/types";
-export type KanbanColumn = {
-  id: string;
-  label: string;
-  tone: string;
-  placement: HuntRunPlacement;
-  runs: HuntRun[];
-  checkpointsBefore: string[];
-};
-export type KanbanPointerDrag = {
-  active: boolean;
-  pointerId: number;
-  startX: number;
-  startY: number;
-};
-export const kanbanPointerDragThreshold = 6;
-export const kanbanAutoScrollEdge = 72;
-export const kanbanAutoScrollInterval = 16;
-export function kanbanColumnForRun(run: HuntRun, workflowStageIds: string[]) {
-  if (run.status === "paused" || run.status === "running") {
-    if (run.workflowStage && workflowStageIds.includes(run.workflowStage)) {
-      return `stage:${run.workflowStage}`;
-    }
-    return workflowStageIds[0] ? `stage:${workflowStageIds[0]}` : "status:queued";
-  }
-  return `status:${run.status}`;
-}
+
+/*
+  Where a run sits on the board, as ids.
+
+  The column list itself moved to `state/board/columns.ts` when the board
+  started drawing itself from the store; what is left here is the placement a
+  run reports and the placement a menu option asks for, which the issue detail
+  and the context menu both need without a board around them.
+*/
 export function placementIdForRun(run: HuntRun) {
   return run.status === "running" && run.workflowStage ? `stage:${run.workflowStage}` : `status:${run.status}`;
 }
