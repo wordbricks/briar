@@ -31,6 +31,8 @@ describe("channel link preview fetching", () => {
       imageUrl: "https://news.example.com/images/hero.png",
       faviconUrl: "https://cdn.example.org/favicon.ico",
       siteName: "News & Co.",
+      imageWidth: null,
+      imageHeight: null,
     });
   });
 
