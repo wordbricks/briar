@@ -157,13 +157,18 @@ import {
 } from "../lib/channel-performance";
 import type { ChannelAgentActivityDescriptor } from "../lib/channel-agent-activity";
 import { useChannelConversation } from "../hooks/use-channel-conversation";
+import { useAtomValue } from "@effect/atom-react";
 import { useRegistry } from "../state/registry";
 import {
+  channelMessageAtom,
+  channelMessageKey,
   channelRootMessageIdsAtom,
+  channelRootMessageSummariesAtom,
   channelRootMessagesAtom,
   channelThreadKey,
   channelThreadMessagesAtom,
 } from "../state/channel-conversation/atoms";
+import type { ChannelMessageSummary } from "../state/channel-conversation/model";
 import {
   useChannelConversationStore,
   useChannelConversationView,
@@ -368,12 +373,19 @@ export function Channels({
   const {
     agents,
     members,
-    messageNextCursor,
-    messages,
     replies,
     threadMessages,
     threadParentId,
   } = useChannelConversationView(activeChannelId);
+  /*
+    The list reads summaries, not messages. A summary carries what the timeline
+    needs to key a row, draw a day separator and measure it; editing a message
+    leaves every summary equal, so this component is not woken and only the row
+    that owns the message re-renders.
+  */
+  const messageSummaries = useAtomValue(
+    channelRootMessageSummariesAtom(activeChannelId ?? ""),
+  );
   useEffect(() => {
     onViewingChannelChange?.(activeChannelId, threadParentId);
     return () => onViewingChannelChange?.(null, null);
@@ -523,11 +535,9 @@ export function Channels({
     channel: activeChannel,
     members,
     agents,
-    messages,
     replies,
     threadParentId,
     threadMessages,
-    messageNextCursor,
     pageSize: desktopChannelMessagePageSize,
     updateRootMessages: conversationStore.updateRootMessages,
     updateThreadMessages: conversationStore.updateThreadMessages,
@@ -1093,7 +1103,7 @@ export function Channels({
   }, [
     activeChannelId,
     channelLoading,
-    messages,
+    messageSummaries,
     registry,
     requestStickToBottom,
     stickToBottomRef,
@@ -1138,7 +1148,7 @@ export function Channels({
   }, [
     activeChannelId,
     channelLoading,
-    messages.length,
+    messageSummaries.length,
     onRequestedMessageOpen,
     requestedMessage,
     setStickToBottom,
@@ -1287,6 +1297,59 @@ export function Channels({
     [typingActivityByAgentName],
   );
 
+  /*
+    Everything a row needs that is not its own message, as one object.
+
+    A row reads its message from the store, so the only thing that may travel
+    with it is the context the whole list shares. Keeping it memoised is what
+    makes the row memo mean something: a message arriving changes the id list
+    and this object stays put, so React re-renders the one new row.
+  */
+  const messageRowContext = useMemo<ChannelMessageRowContext | null>(
+    () => activeChannel === null ? null : ({
+      acceptingProposalId,
+      agents,
+      busy,
+      canOpenThread: surface === "channel",
+      channel: activeChannel,
+      currentUserId,
+      decliningProposalId,
+      handlers: messageHandlers,
+      highlightedMessageId: requestedMessage?.messageId ?? null,
+      loadCreateExecutionProposalContext,
+      localeTag,
+      members,
+      onIssueOpen: openIssue,
+      projects,
+      proposalProjects,
+      threadParentId,
+      token,
+      typingActivityByAgentName: rowTypingActivity,
+      typingAgentNames: rowTypingAgentNames,
+    }),
+    [
+      acceptingProposalId,
+      activeChannel,
+      agents,
+      busy,
+      currentUserId,
+      decliningProposalId,
+      loadCreateExecutionProposalContext,
+      localeTag,
+      members,
+      messageHandlers,
+      openIssue,
+      projects,
+      proposalProjects,
+      requestedMessage?.messageId,
+      rowTypingActivity,
+      rowTypingAgentNames,
+      surface,
+      threadParentId,
+      token,
+    ],
+  );
+
   const memberCount = Math.max(activeChannel?.memberCount ?? 0, members.length);
   const participantCount = memberCount + Math.max(
     activeChannel?.agentCount ?? 0,
@@ -1423,46 +1486,21 @@ export function Channels({
                   <VirtualizedChannelMessageList
                     key={`${organizationId}:${activeChannelId}`}
                     localeTag={localeTag}
-                    messages={messages}
+                    messages={messageSummaries}
                     onRowsResize={reportChannelRowsResize}
-                    renderMessage={(message) => (
-                      <MessageRow
-                      agents={agents}
-                      canOpenThread={surface === "channel"}
-                      channel={activeChannel}
-                      handlers={messageHandlers}
-                      highlighted={message.id === requestedMessage?.messageId}
-                      message={message}
-                      members={members}
-                      localeTag={localeTag}
-                      currentUserId={currentUserId}
-                      loadCreateExecutionProposalContext={
-                        loadCreateExecutionProposalContext
-                      }
-                      onIssueOpen={openIssue}
-                      busy={busy}
-                      acceptingProposal={
-                        acceptingProposalId === message.proposal?.id
-                      }
-                      decliningProposal={
-                        decliningProposalId === message.proposal?.id
-                      }
-                      projects={projects}
-                      selectedProjectId={
-                        message.proposal
-                          ? proposalProjects[message.proposal.id] ?? null
-                          : null
-                      }
-                      token={token}
-                      typingAgentNames={rowTypingAgentNames(message.id)}
-                      typingActivityByAgentName={rowTypingActivity(message.id)}
-                      showTypingState={message.id !== threadParentId}
-                    />
+                    renderMessage={(summary) => (
+                      messageRowContext ? (
+                        <ChannelMessageRow
+                          channelId={activeChannel.id}
+                          context={messageRowContext}
+                          messageId={summary.id}
+                        />
+                      ) : null
                     )}
                     scrollerRef={messagesScrollRef}
                     t={t}
                   />
-                  {messages.length === 0 ? (
+                  {messageSummaries.length === 0 ? (
                     <p className="channel-empty-hint muted">
                       {t("channel.emptyHint")}
                     </p>
@@ -1863,6 +1901,15 @@ function ChannelMessageSkeleton({ label }: { label: string }) {
   );
 }
 
+/*
+  The timeline, drawn from summaries.
+
+  It used to take the messages themselves, which meant an edit inside any one
+  of them produced a new array and re-rendered the whole list. All it ever read
+  was the id and the creation time — keying, day separators and measurement —
+  so it takes {@link ChannelMessageSummary} now and each row reads its own
+  message.
+*/
 function VirtualizedChannelMessageList({
   localeTag,
   messages,
@@ -1872,9 +1919,9 @@ function VirtualizedChannelMessageList({
   t,
 }: {
   localeTag: string;
-  messages: ChannelMessage[];
+  messages: readonly ChannelMessageSummary[];
   onRowsResize: ChannelScrollRowsResize;
-  renderMessage: (message: ChannelMessage) => ReactNode;
+  renderMessage: (message: ChannelMessageSummary) => ReactNode;
   scrollerRef: RefObject<HTMLDivElement | null>;
   t: Translate;
 }) {
@@ -2912,6 +2959,98 @@ export interface MessageRowHandlers
     projectId: string,
   ) => void;
 }
+
+/**
+ * Everything a {@link ChannelMessageRow} needs beyond its own message. One
+ * object for the whole list, so a row's props change only when something the
+ * list itself decided changed.
+ */
+export interface ChannelMessageRowContext {
+  readonly acceptingProposalId: string | null;
+  readonly agents: ChannelAgentSummary[];
+  readonly busy: boolean;
+  readonly canOpenThread: boolean;
+  readonly channel: ChannelSummary;
+  readonly currentUserId: string | null;
+  readonly decliningProposalId: string | null;
+  readonly handlers: MessageRowHandlers;
+  readonly highlightedMessageId: string | null;
+  readonly loadCreateExecutionProposalContext: (projectId: string) => Promise<{
+    run: HuntRun | null;
+    workers: ExecutionWorker[];
+    policy?: ProjectExecutionWorkerPolicy;
+  }>;
+  readonly localeTag: string;
+  readonly members: ChannelMember[];
+  readonly onIssueOpen?: (
+    projectId: string,
+    runId: string,
+  ) => void | Promise<void>;
+  readonly projects: readonly Pick<Project, "id" | "name" | "organizationId">[];
+  readonly proposalProjects: Readonly<Record<string, string>>;
+  readonly threadParentId: string | null;
+  readonly token: string;
+  readonly typingActivityByAgentName: (
+    messageId: string,
+  ) => Readonly<Record<string, ChannelAgentActivityDescriptor>>;
+  readonly typingAgentNames: (messageId: string) => string[];
+}
+
+/**
+ * One row, subscribed to its own message.
+ *
+ * The list hands it an id rather than a message, so a page that changed one
+ * message wakes one row: the summaries the list reads compare equal, and every
+ * other row's atom keeps the object it had.
+ */
+export const ChannelMessageRow = memo(function ChannelMessageRow({
+  channelId,
+  context,
+  messageId,
+}: {
+  channelId: string;
+  context: ChannelMessageRowContext;
+  messageId: string;
+}) {
+  const message = useAtomValue(
+    channelMessageAtom(channelMessageKey(channelId, messageId)),
+  );
+  if (!message) return null;
+  return (
+    <MessageRow
+      acceptingProposal={
+        context.acceptingProposalId === message.proposal?.id
+      }
+      agents={context.agents}
+      busy={context.busy}
+      canOpenThread={context.canOpenThread}
+      channel={context.channel}
+      currentUserId={context.currentUserId}
+      decliningProposal={
+        context.decliningProposalId === message.proposal?.id
+      }
+      handlers={context.handlers}
+      highlighted={message.id === context.highlightedMessageId}
+      loadCreateExecutionProposalContext={
+        context.loadCreateExecutionProposalContext
+      }
+      localeTag={context.localeTag}
+      members={context.members}
+      message={message}
+      onIssueOpen={context.onIssueOpen}
+      projects={context.projects}
+      selectedProjectId={
+        message.proposal
+          ? context.proposalProjects[message.proposal.id] ?? null
+          : null
+      }
+      showTypingState={message.id !== context.threadParentId}
+      token={context.token}
+      typingActivityByAgentName={context.typingActivityByAgentName(message.id)}
+      typingAgentNames={context.typingAgentNames(message.id)}
+    />
+  );
+});
 
 export const MessageRow = memo(function MessageRow({
   acceptingProposal,
