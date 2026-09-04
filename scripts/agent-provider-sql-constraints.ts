@@ -44,7 +44,12 @@ export function agentProviderConstraints(
       .split(",")
       .map((value) => value.trim().slice(1, -1));
     if (!providers.some((provider) => catalogProviders.has(provider))) continue;
-    const table = tables.findLast((candidate) => candidate.index < match.index);
+    // The worker tsconfig targets a lib without `Array.prototype.findLast`.
+    let table: { index: number; name: string } | undefined;
+    for (const candidate of tables) {
+      if (candidate.index < match.index) table = candidate;
+      else break;
+    }
     constraints.push({
       table: table?.name ?? "(unknown table)",
       column,
