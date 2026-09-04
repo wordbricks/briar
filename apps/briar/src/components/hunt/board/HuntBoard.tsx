@@ -67,7 +67,6 @@ export function HuntBoard({
   issueKeyPrefix,
   members,
   planningProjects,
-  processingIssueIds,
   recoveringRunId,
   scrollLeftRef,
   teamId,
@@ -86,7 +85,6 @@ export function HuntBoard({
   issueKeyPrefix: string | undefined;
   members: OrganizationMember[];
   planningProjects: Array<Pick<PlanningProject, "id" | "name" | "teamId">>;
-  processingIssueIds: ReadonlySet<string>;
   recoveringRunId: string | null;
   scrollLeftRef: MutableRefObject<number | null>;
   teamId: string;
@@ -149,7 +147,6 @@ export function HuntBoard({
       deletingIssueId,
       issueKeyPrefix,
       planningProjects,
-      processingIssueIds,
       recoveringRunId,
       teamId,
       teams,
@@ -161,7 +158,6 @@ export function HuntBoard({
       deletingIssueId,
       issueKeyPrefix,
       planningProjects,
-      processingIssueIds,
       recoveringRunId,
       teamId,
       teams,

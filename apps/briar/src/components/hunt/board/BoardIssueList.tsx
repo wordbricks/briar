@@ -5,6 +5,7 @@ import { memo, useCallback, useMemo, useRef, useState, type Ref } from "react";
 import { useAppCollectionKeyboardCommandScope } from "@/hooks/useAppCollectionKeyboardCommandScope";
 import { useControlledCollectionNavigation } from "@/hooks/useControlledCollectionNavigation";
 import { useI18n } from "@/i18n";
+import { runIsProcessingAtom } from "@/state/agent-sessions/atoms";
 import { boardRunIdsAtom, boardRunKey } from "@/state/board/atoms";
 import { runAssigneeAtom } from "@/state/board/run-facts";
 import { runAtom } from "@/state/entities/runs";
@@ -47,6 +48,7 @@ const BoardIssueRow = memo(function BoardIssueRow({
   const { handlers, shared } = context;
   const run = useAtomValue(runAtom(runId));
   const assignee = useAtomValue(runAssigneeAtom(boardRunKey(shared.teamId, runId)));
+  const isProcessing = useAtomValue(runIsProcessingAtom(runId));
   if (!run) return null;
   return (
     <IssueListRow
@@ -55,7 +57,7 @@ const BoardIssueRow = memo(function BoardIssueRow({
       currentTeamId={shared.teamId}
       deletingIssueId={shared.deletingIssueId}
       isCursor={isCursor}
-      isProcessing={shared.processingIssueIds.has(runId)}
+      isProcessing={isProcessing}
       issueKeyPrefix={shared.issueKeyPrefix}
       itemRef={itemRef}
       onActivate={(repeat) => onActivate(runId, repeat)}

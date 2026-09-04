@@ -15,6 +15,7 @@ import { useControlledCollectionNavigation } from "@/hooks/useControlledCollecti
 import { useI18n } from "@/i18n";
 import type { MessageKey } from "@/i18n/messages";
 import { type AgentProvider } from "@/lib/team-llm";
+import { runIsProcessingAtom } from "@/state/agent-sessions/atoms";
 import { boardSourceAtom, companionRunIdsAtom } from "@/state/board/atoms";
 import { runAtom } from "@/state/entities/runs";
 import type { PlanningProject, Project } from "@/types";
@@ -34,6 +35,7 @@ const CompanionTaskRow = memo(function CompanionTaskRow({
   runId: string;
 }) {
   const run = useAtomValue(runAtom(runId));
+  const isProcessing = useAtomValue(runIsProcessingAtom(runId));
   if (!run) return null;
   const { handlers } = context;
   const claimed =
@@ -46,7 +48,7 @@ const CompanionTaskRow = memo(function CompanionTaskRow({
         !handlers.processNow ||
         run.executionReadiness === "waiting" ||
         claimed ||
-        context.processingIssueIds.has(runId)
+        isProcessing
       }
       enabled={run.status === "backlog" || run.status === "queued"}
       onProcessNow={() => handlers.processNow?.(run)}
@@ -71,7 +73,6 @@ export function CompanionTaskBoard({
   isLoading,
   issueKeyPrefix,
   planningProjects,
-  processingIssueIds,
   recoveringRunId,
   scrollLeftRef,
   teamId,
@@ -85,7 +86,6 @@ export function CompanionTaskBoard({
   isLoading: boolean;
   issueKeyPrefix: string | undefined;
   planningProjects: Array<Pick<PlanningProject, "id" | "name" | "teamId">>;
-  processingIssueIds: ReadonlySet<string>;
   recoveringRunId: string | null;
   scrollLeftRef: MutableRefObject<number | null>;
   teamId: string;
@@ -168,7 +168,6 @@ export function CompanionTaskBoard({
       onCursor: setCursorRunId,
       planningProjects,
       pointer,
-      processingIssueIds,
       recoveringRunId,
       teamId,
       teams,
@@ -184,7 +183,6 @@ export function CompanionTaskBoard({
       navigation.getItemRef,
       planningProjects,
       pointer,
-      processingIssueIds,
       recoveringRunId,
       teamId,
       teams,

@@ -1,6 +1,7 @@
 import { useAtomValue } from "@effect/atom-react";
 import { memo } from "react";
 
+import { runIsProcessingAtom } from "@/state/agent-sessions/atoms";
 import { boardRunKey } from "@/state/board/atoms";
 import {
   runAgentAssociationAtom,
@@ -15,10 +16,11 @@ import { KanbanCard } from "./KanbanCard";
   One kanban card, subscribed to its own run.
 
   This is where Phase 2's second promise lands: the column above hands down an
-  id and the shared context, and the card reads the run and its three derived
-  facts itself. An edit to one issue therefore notifies one card. The card is
-  memoised and the context is one stable object, so a column that re-renders
-  because its own id list moved does not drag its untouched cards with it.
+  id and the shared context, and the card reads the run, its three derived facts
+  and whether an agent is on it itself. An edit to one issue, or a session
+  starting on it, therefore notifies one card. The card is memoised and the
+  context is one stable object, so a column that re-renders because its own id
+  list moved does not drag its untouched cards with it.
 */
 export const BoardCard = memo(function BoardCard({
   context,
@@ -32,6 +34,7 @@ export const BoardCard = memo(function BoardCard({
   const agents = useAtomValue(runAgentAssociationAtom(key));
   const assignedWorker = useAtomValue(runAssignedWorkerAtom(key));
   const assignee = useAtomValue(runAssigneeAtom(key));
+  const isProcessing = useAtomValue(runIsProcessingAtom(runId));
   if (!run) return null;
 
   const { companionMode, handlers, pointer } = context;
@@ -53,7 +56,7 @@ export const BoardCard = memo(function BoardCard({
       isDragging={context.draggedRunId === runId}
       isKeyboardCursor={context.cursorRunId === runId}
       isMoving={context.recoveringRunId === runId}
-      isProcessing={context.processingIssueIds.has(runId)}
+      isProcessing={isProcessing}
       issueKeyPrefix={context.issueKeyPrefix}
       onCheckpointsChange={(checkpoints) => handlers.changeCheckpoints(run, checkpoints)}
       onDelete={() => handlers.remove(run)}

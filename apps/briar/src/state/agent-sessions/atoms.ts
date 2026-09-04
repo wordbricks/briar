@@ -222,8 +222,8 @@ export const runningAgentSessionsAtom = Atom.family((key: string) =>
  * plus the one a quick dispatch has just been asked to start.
  *
  * It was a `useMemo` in `useIssueAgents`, which is what made the app shell
- * subscribe to the session list. The board still takes it as a prop — it is part
- * of the context that reaches each card — but nothing above the board does.
+ * subscribe to the session list. Views that need the whole set at once still
+ * read it; a card reads {@link runIsProcessingAtom} for its own run instead.
  */
 export const processingIssueIdsAtom = Atom.make(
   (get): ReadonlySet<string> => {
@@ -240,6 +240,21 @@ export const processingIssueIdsAtom = Atom.make(
   Atom.keepAlive,
   Atom.withEquality<ReadonlySet<string>>(sameIds),
   Atom.withLabel("agentSessions/processingIssueIds"),
+);
+
+/**
+ * Whether one run has an agent on it.
+ *
+ * The board threaded the whole set down as a prop, through the card context, so
+ * a session starting anywhere in the organization gave every card a new context
+ * object and re-rendered the board. Each card subscribes to its own answer
+ * instead: a session that starts on one issue notifies that issue's card and
+ * leaves the rest of the board asleep.
+ */
+export const runIsProcessingAtom = Atom.family((runId: string) =>
+  Atom.map(processingIssueIdsAtom, (runIds) => runIds.has(runId)).pipe(
+    Atom.withLabel(`agentSessions/processing/${runId}`),
+  ),
 );
 
 /** The token and the teams the session sync is currently subscribed for. */

@@ -1,7 +1,6 @@
 import { useAtomValue } from "@effect/atom-react";
 import { useMemo, type ComponentProps } from "react";
 
-import { processingIssueIdsAtom } from "../../state/agent-sessions/atoms";
 import { useIssueActions } from "../../state/issues/actions";
 import {
   deletingIssueIdAtom,
@@ -35,7 +34,6 @@ type ConnectedProps =
   | "deletingIssueId"
   | "isCreatingIssue"
   | "issueProjects"
-  | "processingIssueIds"
   | "recoveringRunId"
   | "recoveryError"
   | "token"
@@ -82,7 +80,6 @@ export function HuntDashboardWithTeam(props: HuntDashboardWithTeamProps) {
   const deletingIssueId = useAtomValue(deletingIssueIdAtom);
   const recoveringRunId = useAtomValue(recoveringRunIdAtom);
   const recoveryError = useAtomValue(recoveryErrorAtom);
-  const processingIssueIds = useAtomValue(processingIssueIdsAtom);
   const issueActions = useIssueActions();
   const runDetailActions = useRunDetailActions();
 
@@ -150,7 +147,6 @@ export function HuntDashboardWithTeam(props: HuntDashboardWithTeamProps) {
       deletingIssueId={deletingIssueId}
       isCreatingIssue={isCreatingIssue}
       issueProjects={issueProjects}
-      processingIssueIds={processingIssueIds}
       recoveringRunId={recoveringRunId}
       recoveryError={recoveryError}
       token={token}

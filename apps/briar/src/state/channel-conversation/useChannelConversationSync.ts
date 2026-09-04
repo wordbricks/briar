@@ -3,7 +3,6 @@ import { useEffect, useRef } from "react";
 import { channelReplyErrorText } from "../../lib/channel-reply-error";
 import type {
   ChannelAgentReply,
-  ChannelDelta,
   ChannelMessage,
   ChannelSummary,
 } from "../../lib/channels-contract";
@@ -44,8 +43,6 @@ export type ChannelConversationRealtimeOptions = {
   readonly channelId: string | null;
   /** Direct messages render replies in the single timeline rather than a thread. */
   readonly includeRepliesInRoot?: boolean;
-  /** The catalog the view keeps for itself, where it still keeps one. */
-  readonly onCatalogDelta?: (delta: ChannelDelta) => void;
   readonly onSelectedChannelRemoved: () => void;
   readonly onSelectedChannelSummary?: (channel: ChannelSummary) => void;
   /** New root messages arrived, which is what decides the scroll. */
@@ -83,8 +80,6 @@ export function useChannelConversationSync(
     subscribeToChannelDelta(registry, (delta) => {
       const current = optionsRef.current;
       if (!current?.enabled) return;
-      current.onCatalogDelta?.(delta);
-
       const channelId = current.channelId;
       if (!channelId) return;
       const summary = delta.channels.find((item) => item.id === channelId);

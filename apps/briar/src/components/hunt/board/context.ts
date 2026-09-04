@@ -73,7 +73,6 @@ export interface BoardCardContext {
   readonly onCursor: (runId: string) => void;
   readonly planningProjects: Array<Pick<PlanningProject, "id" | "name" | "teamId">>;
   readonly pointer: BoardPointerHandlers;
-  readonly processingIssueIds: ReadonlySet<string>;
   readonly recoveringRunId: string | null;
   readonly teamId: string;
   readonly teams: Array<Pick<Project, "id" | "name">>;
