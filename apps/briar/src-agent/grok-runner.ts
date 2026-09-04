@@ -1,57 +1,27 @@
-import { randomUUID } from "node:crypto";
 import {
-  BRIAR_OAUTH_REFERRER,
-  buildGrokPromptParts,
-  createGrokEventState,
-  finalizeGrokMessage,
-  GROK_OAUTH2_REFERRER_ENV,
-  grokSessionMeta,
-  grokStopReasonSucceeded,
-  mapEffortToGrok,
-  normalizeGrokSessionUpdate,
-  permissionDecisionResult,
-  permissionInput,
-  permissionOptions,
-  permissionToolName,
-  resolveGrokAuthMethodId,
-  resolveGrokFinalMessage,
-  resolveGrokModelId,
+  acpSessionMeta,
+  buildAcpPromptParts,
   shouldAutoApprovePermission,
-  shouldDenyGrokPermission,
-  type JsonRpcMessage,
-} from "./grok-runner-lib";
-import { createRunnerIo } from "./runner-io";
+  shouldDenyPermission,
+} from "./acp-runner-lib";
+import { runAcpProvider, type AcpProviderProfile } from "./acp-runner";
 import {
   providerInstructionSeatbeltPattern,
   readOnlySeatbeltSpawnSpec,
 } from "./read-only-seatbelt";
-import { AcpJsonRpcConnection } from "./acp-json-rpc";
-import { prepareComputerUseMcp } from "./computer-use-mcp-config";
-import { acpComputerUseServers } from "./computer-use-provider-adapters";
 
-class GrokAcpConnection extends AcpJsonRpcConnection {
-  constructor(
-    grokBinary: string,
-    workspaceRoot: string,
-    environment: NodeJS.ProcessEnv,
-    readOnly: boolean,
-  ) {
-    const spawnSpec = grokAgentSpawnSpec({
-      binary: grokBinary,
-      arguments: grokAgentArgs(readOnly),
-      workspaceRoot,
-      environment,
-      readOnly,
-    });
-    super({
-      providerName: "Grok Agent",
-      command: spawnSpec.command,
-      arguments: spawnSpec.arguments,
-      cwd: workspaceRoot,
-      environment: grokAgentEnvironment(environment, readOnly),
-    });
-  }
-}
+/**
+ * Grok CLI ACP profile.
+ *
+ * Mirrors t3code's Grok ACP surface (`grok agent stdio`). The lifecycle lives
+ * in `acp-runner.ts`; only the values below are Grok-specific.
+ */
+
+export const GROK_OAUTH2_REFERRER_ENV = "GROK_OAUTH2_REFERRER";
+export const BRIAR_OAUTH_REFERRER = "briar";
+export const GROK_API_KEY_ENV = "XAI_API_KEY";
+export const GROK_AUTH_METHOD_API_KEY = "xai.api_key";
+export const GROK_AUTH_METHOD_CACHED_TOKEN = "cached_token";
 
 export function grokAgentArgs(readOnly: boolean) {
   return readOnly
@@ -107,260 +77,48 @@ export function grokAgentSpawnSpec(input: {
   });
 }
 
-export function grokRpcResultEnvelope(
-  method: string,
-  params: unknown,
-  result: unknown,
-) {
-  return {
-    jsonrpc: "2.0" as const,
-    method,
-    ...(params === undefined ? {} : { params }),
-    result: result ?? null,
-  };
-}
-
-export function createGrokPromptInvocation(
-  sessionId: string,
-  prompt: unknown,
-  allocateId: () => string = randomUUID,
-) {
-  const promptId = allocateId();
-  return {
-    promptId,
-    params: {
-      sessionId,
-      prompt,
-      messageId: promptId,
-      _meta: {
-        promptId,
-        requestId: promptId,
-      },
+export const grokProfile: AcpProviderProfile = {
+  providerName: "Grok Agent",
+  displayName: "Grok",
+  missingSessionIdMessage: "Grok agent did not return a session id.",
+  spawn: (input) =>
+    grokAgentSpawnSpec({
+      binary: input.binary,
+      arguments: grokAgentArgs(input.readOnly),
+      workspaceRoot: input.workspaceRoot,
+      environment: input.environment,
+      readOnly: input.readOnly,
+    }),
+  environment: grokAgentEnvironment,
+  clientCapabilities: {
+    fs: { readTextFile: false, writeTextFile: false },
+  },
+  authMethods: [
+    {
+      methodId: GROK_AUTH_METHOD_API_KEY,
+      available: (environment) =>
+        Boolean(environment[GROK_API_KEY_ENV]?.trim()),
     },
-  };
-}
-
-export function grokPromptResultEnvelope(
-  invocation: ReturnType<typeof createGrokPromptInvocation>,
-  result: unknown,
-) {
-  const { sessionId, messageId, _meta } = invocation.params;
-  return grokRpcResultEnvelope(
-    "session/prompt",
-    { sessionId, messageId, _meta },
-    result,
-  );
-}
-
-export function grokPromptStartEnvelope(
-  invocation: ReturnType<typeof createGrokPromptInvocation>,
-) {
-  const { sessionId, messageId, _meta } = invocation.params;
-  return {
-    jsonrpc: "2.0" as const,
-    method: "briar/session/prompt_start",
-    params: { sessionId, messageId, _meta },
-  };
-}
-
-function hasReplayMeta(message: JsonRpcMessage): boolean {
-  if (!message.params || typeof message.params !== "object") return false;
-  const meta = (message.params as Record<string, unknown>)._meta;
-  return Boolean(
-    meta &&
-      typeof meta === "object" &&
-      (meta as Record<string, unknown>).isReplay === true,
-  );
-}
-
-/**
- * Grok can replay both standard and private notifications while session/load
- * is pending. Once loading ends, private xAI completion notifications remain
- * visible so a live turn can still be correlated and accounted for.
- */
-export function shouldSuppressGrokNotification(
-  message: JsonRpcMessage,
-  sessionLoadInProgress: boolean,
-): boolean {
-  if (hasReplayMeta(message)) return true;
-  return sessionLoadInProgress;
-}
-
-type GrokRunnerIo = ReturnType<typeof createRunnerIo>;
-
-async function main(runnerIo: GrokRunnerIo) {
-  const { emit, request: requestPromise, waitForApproval } = runnerIo;
-  const request = await requestPromise;
-  const message = request.message.trim();
-  if (!message) {
-    throw new Error("LLM에 보낼 메시지를 입력하세요.");
-  }
-
-  const computerUseMcp = await prepareComputerUseMcp(request);
-  const connection = new GrokAcpConnection(
-    request.providerBinaryPath,
-    request.workspaceRoot,
-    process.env,
-    request.sandboxMode === "readOnly",
-  );
-  const state = createGrokEventState();
-  let approvalSequence = 0;
-  let sessionLoadInProgress = false;
-
-  try {
-    connection.setHandlers({
-      onNotification: (rpc) => {
-        if (shouldSuppressGrokNotification(rpc, sessionLoadInProgress)) {
-          return;
-        }
-        if (rpc.method !== "session/update") {
-          emit.event({ raw: rpc });
-          return;
-        }
-        const normalized = normalizeGrokSessionUpdate(rpc.params, state);
-        if (normalized.events.length === 0) {
-          emit.event({ raw: normalized.raw });
-        } else {
-          for (const event of normalized.events) {
-            emit.event({ raw: normalized.raw, event });
-          }
-        }
-      },
-      onServerRequest: async (rpc) => {
-        if (rpc.id === undefined || rpc.id === null) return;
-
-        if (rpc.method === "session/request_permission") {
-          const toolName = permissionToolName(rpc.params);
-          const input = permissionInput(rpc.params);
-          const options = permissionOptions(rpc.params);
-
-          if (await shouldDenyGrokPermission(request, toolName, input)) {
-            connection.respond(
-              rpc.id,
-              permissionDecisionResult(options, false),
-            );
-            return;
-          }
-
-          if (shouldAutoApprovePermission(request)) {
-            connection.respond(
-              rpc.id,
-              permissionDecisionResult(options, true),
-            );
-            return;
-          }
-
-          const id = String(++approvalSequence);
-          emit.approval({
-            id,
-            toolName,
-            input,
-            ...(typeof input.reason === "string"
-              ? { title: input.reason }
-              : {}),
-          });
-          const approved = await waitForApproval(id);
-          connection.respond(
-            rpc.id,
-            permissionDecisionResult(options, approved),
-          );
-          return;
-        }
-
-        // Grok may request client fs/terminal capabilities we do not expose.
-        connection.respond(rpc.id, {});
-      },
-    });
-
-    await connection.request("initialize", {
-      protocolVersion: 1,
-      clientCapabilities: {
-        fs: { readTextFile: false, writeTextFile: false },
-      },
-      clientInfo: { name: "briar-desktop", version: "0.0.0" },
-    });
-
-    await connection.request("authenticate", {
-      methodId: resolveGrokAuthMethodId(process.env),
-    });
-
-    let sessionId: string;
-    const resumeId = request.conversationId?.trim();
-    const sessionMeta = grokSessionMeta(request);
-    if (resumeId) {
-      const loadParams = {
-        sessionId: resumeId,
-        cwd: request.workspaceRoot,
-        mcpServers: acpComputerUseServers(computerUseMcp.servers),
-        ...(sessionMeta ? { _meta: sessionMeta } : {}),
-      };
-      let loaded: {
-        sessionId?: string;
-        models?: { currentModelId?: string };
-      } | undefined;
-      sessionLoadInProgress = true;
-      try {
-        loaded = (await connection.request(
-          "session/load",
-          loadParams,
-        )) as typeof loaded;
-      } finally {
-        sessionLoadInProgress = false;
-      }
-      emit.event({
-        raw: grokRpcResultEnvelope("session/load", loadParams, loaded),
-      });
-      sessionId = loaded?.sessionId?.trim() || resumeId;
-    } else {
-      const newParams = {
-        cwd: request.workspaceRoot,
-        mcpServers: acpComputerUseServers(computerUseMcp.servers),
-        ...(sessionMeta ? { _meta: sessionMeta } : {}),
-      };
-      const created = (await connection.request(
-        "session/new",
-        newParams,
-      )) as {
-        sessionId?: string;
-        models?: { currentModelId?: string };
-      };
-      emit.event({
-        raw: grokRpcResultEnvelope("session/new", newParams, created),
-      });
-      sessionId = created.sessionId?.trim() || "";
-      if (!sessionId) {
-        throw new Error("Grok agent did not return a session id.");
-      }
-    }
-    emit.session(sessionId);
-
-    const modelId = resolveGrokModelId(request.model);
+    { methodId: GROK_AUTH_METHOD_CACHED_TOKEN },
+  ],
+  sessionMeta: acpSessionMeta,
+  promptParts: buildAcpPromptParts,
+  configureSession: async ({ request, sessionId, call, emitRpc }) => {
+    const modelId = request.model?.trim();
     if (modelId) {
       try {
-        const setModelParams = {
-          sessionId,
-          modelId,
-        };
-        const setModelResult = await connection.request(
-          "session/set_model",
-          setModelParams,
-        );
-        emit.event({
-          raw: grokRpcResultEnvelope(
-            "session/set_model",
-            setModelParams,
-            setModelResult,
-          ),
-        });
+        const setModelParams = { sessionId, modelId };
+        const setModelResult = await call("session/set_model", setModelParams);
+        emitRpc("session/set_model", setModelParams, setModelResult);
       } catch {
         // Older Grok builds may lack set_model; continue with session default.
       }
     }
 
-    const effort = mapEffortToGrok(request.effort);
+    const effort = request.effort;
     if (effort) {
       try {
-        await connection.request("session/set_config_option", {
+        await call("session/set_config_option", {
           sessionId,
           configId: "reasoning_effort",
           value: effort,
@@ -369,62 +127,15 @@ async function main(runnerIo: GrokRunnerIo) {
         // Effort selection is best-effort across Grok versions.
       }
     }
-
-    const prompt = await buildGrokPromptParts(request);
-    const promptInvocation = createGrokPromptInvocation(sessionId, prompt);
-    emit.event({
-      raw: grokPromptStartEnvelope(promptInvocation),
-    });
-    const promptResult = (await connection.request(
-      "session/prompt",
-      promptInvocation.params,
-    )) as { stopReason?: string; text?: string } | undefined;
-    emit.event({
-      raw: grokPromptResultEnvelope(promptInvocation, promptResult),
-    });
-
-    for (const event of finalizeGrokMessage(state, promptResult?.stopReason)) {
-      emit.event({
-        raw: { type: "turn", event },
-        event,
-      });
-    }
-    if (!grokStopReasonSucceeded(promptResult?.stopReason)) {
-      throw new Error(
-        `Grok turn did not complete successfully (stop reason: ${
-          promptResult?.stopReason?.trim() || "missing"
-        }).`,
-      );
-    }
-
-    const finalMessage = resolveGrokFinalMessage(
-      state,
-      typeof promptResult?.text === "string" ? promptResult.text : undefined,
-      request.outputSchema,
-    );
-    emit.result({
-      sessionId,
-      message: finalMessage || "(empty response)",
-    });
-  } finally {
-    connection.close();
-    await computerUseMcp.cleanup();
-  }
-}
+  },
+  permissionPolicy: {
+    shouldDeny: shouldDenyPermission,
+    shouldAutoApprove: shouldAutoApprovePermission,
+  },
+};
 
 export async function runGrokRunner() {
-  const runnerIo = createRunnerIo({
-    closeError: "Briar closed the Grok runner input.",
-  });
-  const { emit } = runnerIo;
-  try {
-    await main(runnerIo);
-  } catch (caught) {
-    emit.error(caught instanceof Error ? caught.message : String(caught));
-    process.exitCode = 1;
-  } finally {
-    runnerIo.close();
-  }
+  await runAcpProvider(grokProfile);
 }
 
 if (import.meta.main) {

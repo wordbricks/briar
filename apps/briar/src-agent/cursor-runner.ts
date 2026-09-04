@@ -1,31 +1,28 @@
-import { randomUUID } from "node:crypto";
-import { AcpJsonRpcConnection, type AcpJsonRpcMessage } from "./acp-json-rpc";
 import {
-  buildCursorPromptParts,
-  createCursorEventState,
-  cursorPermissionDecisionResult,
-  cursorPermissionInput,
-  cursorPermissionOptions,
-  cursorPermissionToolName,
-  cursorSessionMeta,
-  cursorStopReasonSucceeded,
-  finalizeCursorMessage,
-  mapEffortToCursor,
-  normalizeCursorSessionUpdate,
-  resolveCursorFinalMessage,
-  resolveCursorModelId,
-  shouldAutoApproveCursorPermission,
-  shouldDenyCursorPermission,
-} from "./cursor-runner-lib";
+  acpSessionMeta,
+  buildAcpPromptParts,
+  shouldAutoApprovePermission,
+  shouldDenyPermission,
+  type AcpPromptPart,
+} from "./acp-runner-lib";
+import { runAcpProvider, type AcpProviderProfile } from "./acp-runner";
 import {
   providerInstructionSeatbeltPattern,
   readOnlySeatbeltSpawnSpec,
 } from "./read-only-seatbelt";
-import { createRunnerIo } from "./runner-io";
-import { prepareComputerUseMcp } from "./computer-use-mcp-config";
-import { acpComputerUseServers } from "./computer-use-provider-adapters";
+import type { RunnerRequest } from "./runner-request";
 
-const CURSOR_AUTH_METHOD = "cursor_login";
+/**
+ * Cursor Agent ACP profile.
+ *
+ * `cursor-agent acp` speaks the standard ACP session contract, so the
+ * lifecycle lives in `acp-runner.ts`. Cursor differs in its login method, its
+ * parameterized model picker (model and effort are `session/set_config_option`
+ * ids discovered from the session setup), and in prepending trusted Briar
+ * instructions to the user prompt.
+ */
+
+export const CURSOR_AUTH_METHOD = "cursor_login";
 
 type CursorSessionSetup = {
   sessionId?: string;
@@ -74,31 +71,6 @@ export function cursorAgentSpawnSpec(input: {
   });
 }
 
-function cursorRpcEnvelope(method: string, params: unknown, result: unknown) {
-  return {
-    jsonrpc: "2.0" as const,
-    method,
-    ...(params === undefined ? {} : { params }),
-    result: result ?? null,
-  };
-}
-
-function hasReplayMeta(message: AcpJsonRpcMessage) {
-  if (!message.params || typeof message.params !== "object") return false;
-  const meta = (message.params as Record<string, unknown>)._meta;
-  return Boolean(
-    meta && typeof meta === "object" &&
-      (meta as Record<string, unknown>).isReplay === true,
-  );
-}
-
-export function shouldSuppressCursorNotification(
-  message: AcpJsonRpcMessage,
-  sessionLoadInProgress: boolean,
-) {
-  return sessionLoadInProgress || hasReplayMeta(message);
-}
-
 function normalizedCursorEffort(value: string | undefined) {
   const normalized = value?.trim().toLowerCase().replaceAll("_", "-");
   return normalized === "extra-high" || normalized === "extra high"
@@ -106,7 +78,17 @@ function normalizedCursorEffort(value: string | undefined) {
     : normalized;
 }
 
-function cursorEffortConfigUpdate(
+export function mapEffortToCursor(
+  effort: RunnerRequest["effort"],
+): string | undefined {
+  const normalized = effort?.trim().toLowerCase();
+  if (!normalized) return undefined;
+  return normalized === "extra-high" || normalized === "extra high"
+    ? "xhigh"
+    : normalized;
+}
+
+export function cursorEffortConfigUpdate(
   setup: CursorSessionSetup | undefined,
   requestedEffort: string,
 ) {
@@ -144,168 +126,65 @@ export function cursorModelConfigId(setup: CursorSessionSetup | undefined) {
   )?.id ?? "model";
 }
 
-type CursorRunnerIo = ReturnType<typeof createRunnerIo>;
+export function resolveCursorModelId(model: string | null | undefined): string {
+  const trimmed = model?.trim();
+  const base = trimmed ? trimmed : "default";
+  return base.includes("[") ? base.slice(0, base.indexOf("[")) : base;
+}
 
-async function main(runnerIo: CursorRunnerIo) {
-  const { emit, request: requestPromise, waitForApproval } = runnerIo;
-  const request = await requestPromise;
-  if (!request.message.trim()) {
-    throw new Error("LLM에 보낼 메시지를 입력하세요.");
-  }
+export function buildCursorPromptParts(
+  request: RunnerRequest,
+): Promise<AcpPromptPart[]> {
+  const instructions = request.instructions?.trim();
+  const message = instructions
+    ? [
+        "Follow these trusted Briar instructions:",
+        instructions,
+        "User request:",
+        request.message,
+      ].join("\n\n")
+    : request.message;
+  return buildAcpPromptParts({ ...request, message });
+}
 
-  const readOnly = request.sandboxMode === "readOnly";
-  const computerUseMcp = await prepareComputerUseMcp(request);
-  const spawnSpec = cursorAgentSpawnSpec({
-    binary: request.providerBinaryPath,
-    workspaceRoot: request.workspaceRoot,
-    environment: process.env,
-    readOnly,
-  });
-  const connection = new AcpJsonRpcConnection({
-    providerName: "Cursor Agent",
-    command: spawnSpec.command,
-    arguments: spawnSpec.arguments,
-    cwd: request.workspaceRoot,
-    environment: process.env,
-  });
-  const state = createCursorEventState();
-  let approvalSequence = 0;
-  let sessionLoadInProgress = false;
-
-  try {
-    connection.setHandlers({
-      onNotification: (rpc) => {
-        if (shouldSuppressCursorNotification(rpc, sessionLoadInProgress)) return;
-        if (rpc.method !== "session/update") {
-          emit.event({ raw: rpc });
-          return;
-        }
-        const normalized = normalizeCursorSessionUpdate(rpc.params, state);
-        if (normalized.events.length === 0) {
-          emit.event({ raw: normalized.raw });
-          return;
-        }
-        for (const event of normalized.events) {
-          emit.event({ raw: normalized.raw, event });
-        }
-      },
-      onServerRequest: async (rpc) => {
-        if (rpc.id === undefined || rpc.id === null) return;
-        if (rpc.method === "cursor/create_plan") {
-          connection.respond(rpc.id, { accepted: true });
-          return;
-        }
-        if (rpc.method === "cursor/ask_question") {
-          connection.respond(rpc.id, { answers: {} });
-          return;
-        }
-        if (rpc.method !== "session/request_permission") {
-          connection.respond(rpc.id, {});
-          return;
-        }
-
-        const toolName = cursorPermissionToolName(rpc.params);
-        const input = cursorPermissionInput(rpc.params);
-        const options = cursorPermissionOptions(rpc.params);
-        if (await shouldDenyCursorPermission(request, toolName, input)) {
-          connection.respond(
-            rpc.id,
-            cursorPermissionDecisionResult(options, false),
-          );
-          return;
-        }
-        if (shouldAutoApproveCursorPermission(request)) {
-          connection.respond(
-            rpc.id,
-            cursorPermissionDecisionResult(options, true),
-          );
-          return;
-        }
-
-        const id = String(++approvalSequence);
-        emit.approval({
-          id,
-          toolName,
-          input,
-          ...(typeof input.reason === "string" ? { title: input.reason } : {}),
-        });
-        connection.respond(
-          rpc.id,
-          cursorPermissionDecisionResult(options, await waitForApproval(id)),
-        );
-      },
-    });
-
-    await connection.request("initialize", {
-      protocolVersion: 1,
-      clientCapabilities: {
-        fs: { readTextFile: false, writeTextFile: false },
-        terminal: false,
-        _meta: { parameterizedModelPicker: true },
-      },
-      clientInfo: { name: "briar-desktop", version: "0.0.0" },
-    });
-    await connection.request("authenticate", { methodId: CURSOR_AUTH_METHOD });
-
-    let setup: CursorSessionSetup | undefined;
-    let sessionId: string;
-    const resumeId = request.conversationId?.trim();
-    const sessionMeta = cursorSessionMeta(request);
-    if (resumeId) {
-      const params = {
-        sessionId: resumeId,
-        cwd: request.workspaceRoot,
-        mcpServers: acpComputerUseServers(computerUseMcp.servers),
-        ...(sessionMeta ? { _meta: sessionMeta } : {}),
-      };
-      sessionLoadInProgress = true;
-      try {
-        setup = await connection.request("session/load", params) as CursorSessionSetup;
-      } finally {
-        sessionLoadInProgress = false;
-      }
-      emit.event({ raw: cursorRpcEnvelope("session/load", params, setup) });
-      sessionId = setup?.sessionId?.trim() || resumeId;
-    } else {
-      const params = {
-        cwd: request.workspaceRoot,
-        mcpServers: acpComputerUseServers(computerUseMcp.servers),
-        ...(sessionMeta ? { _meta: sessionMeta } : {}),
-      };
-      setup = await connection.request("session/new", params) as CursorSessionSetup;
-      emit.event({ raw: cursorRpcEnvelope("session/new", params, setup) });
-      sessionId = setup?.sessionId?.trim() || "";
-      if (!sessionId) throw new Error("Cursor Agent did not return a session id.");
-    }
-    emit.session(sessionId);
-
+export const cursorProfile: AcpProviderProfile = {
+  providerName: "Cursor Agent",
+  displayName: "Cursor",
+  missingSessionIdMessage: "Cursor Agent did not return a session id.",
+  spawn: cursorAgentSpawnSpec,
+  // Cursor reads its own credentials from the inherited environment.
+  environment: (environment) => environment,
+  clientCapabilities: {
+    fs: { readTextFile: false, writeTextFile: false },
+    terminal: false,
+    _meta: { parameterizedModelPicker: true },
+  },
+  authMethods: [{ methodId: CURSOR_AUTH_METHOD }],
+  sessionMeta: acpSessionMeta,
+  promptParts: buildCursorPromptParts,
+  configureSession: async ({ request, sessionId, setup, call, emitRpc }) => {
+    let sessionSetup = setup as CursorSessionSetup | undefined;
     const modelParams = {
       sessionId,
-      configId: cursorModelConfigId(setup),
+      configId: cursorModelConfigId(sessionSetup),
       value: resolveCursorModelId(request.model),
     };
-    const modelResult = await connection.request(
+    const modelResult = await call(
       "session/set_config_option",
       modelParams,
     ) as CursorSessionSetup | undefined;
     if (modelResult?.configOptions) {
-      setup = { ...setup, configOptions: modelResult.configOptions };
+      sessionSetup = { ...sessionSetup, configOptions: modelResult.configOptions };
     }
-    emit.event({
-      raw: cursorRpcEnvelope(
-        "session/set_config_option",
-        modelParams,
-        modelResult,
-      ),
-    });
+    emitRpc("session/set_config_option", modelParams, modelResult);
 
     const effort = mapEffortToCursor(request.effort);
     const effortUpdate = effort
-      ? cursorEffortConfigUpdate(setup, effort)
+      ? cursorEffortConfigUpdate(sessionSetup, effort)
       : undefined;
     if (effortUpdate) {
       try {
-        await connection.request("session/set_config_option", {
+        await call("session/set_config_option", {
           sessionId,
           ...effortUpdate,
         });
@@ -314,73 +193,19 @@ async function main(runnerIo: CursorRunnerIo) {
         // session's default when the selected option is unavailable.
       }
     }
-
-    const promptId = randomUUID();
-    const promptParams = {
-      sessionId,
-      prompt: await buildCursorPromptParts(request),
-      messageId: promptId,
-      _meta: { promptId, requestId: promptId },
-    };
-    emit.event({
-      raw: {
-        jsonrpc: "2.0",
-        method: "briar/session/prompt_start",
-        params: { sessionId, messageId: promptId, _meta: promptParams._meta },
-      },
-    });
-    const promptResult = await connection.request(
-      "session/prompt",
-      promptParams,
-    ) as { stopReason?: string; text?: string } | undefined;
-    emit.event({
-      raw: cursorRpcEnvelope(
-        "session/prompt",
-        { sessionId, messageId: promptId, _meta: promptParams._meta },
-        promptResult,
-      ),
-    });
-
-    for (const event of finalizeCursorMessage(state, promptResult?.stopReason)) {
-      emit.event({ raw: { type: "turn", event }, event });
-    }
-    if (!cursorStopReasonSucceeded(promptResult?.stopReason)) {
-      throw new Error(
-        `Cursor turn did not complete successfully (stop reason: ${
-          promptResult?.stopReason?.trim() || "missing"
-        }).`,
-      );
-    }
-
-    const finalMessage = resolveCursorFinalMessage(
-      state,
-      typeof promptResult?.text === "string" ? promptResult.text : undefined,
-      request.outputSchema,
-    );
-    emit.result({
-      sessionId,
-      message: finalMessage || "(empty response)",
-    });
-  } finally {
-    connection.close();
-    await computerUseMcp.cleanup();
-  }
-}
+  },
+  permissionPolicy: {
+    shouldDeny: shouldDenyPermission,
+    shouldAutoApprove: shouldAutoApprovePermission,
+  },
+  serverRequestResponses: {
+    "cursor/create_plan": { accepted: true },
+    "cursor/ask_question": { answers: {} },
+  },
+};
 
 export async function runCursorRunner() {
-  const runnerIo = createRunnerIo({
-    closeError: "Briar closed the Cursor runner input.",
-  });
-  try {
-    await main(runnerIo);
-  } catch (caught) {
-    runnerIo.emit.error(
-      caught instanceof Error ? caught.message : String(caught),
-    );
-    process.exitCode = 1;
-  } finally {
-    runnerIo.close();
-  }
+  await runAcpProvider(cursorProfile);
 }
 
 if (import.meta.main) void runCursorRunner();

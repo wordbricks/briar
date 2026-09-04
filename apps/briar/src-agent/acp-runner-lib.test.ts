@@ -16,44 +16,43 @@ import {
   normalizedTurnCompleted,
 } from "./normalized-agent-event";
 import {
-  buildGrokPromptParts,
+  acpSessionMeta,
+  acpStopReasonSucceeded,
+  buildAcpPromptParts,
   buildPromptParts,
-  createGrokEventState,
+  createAcpEventState,
   extractJsonObject,
-  finalizeGrokMessage,
-  grokSessionMeta,
-  grokStopReasonSucceeded,
-  normalizeGrokSessionUpdate,
+  finalizeAcpMessage,
+  normalizeAcpSessionUpdate,
   permissionDecisionResult,
   permissionInput,
   permissionToolName,
-  resolveGrokAuthMethodId,
-  resolveGrokFinalMessage,
+  resolveAcpFinalMessage,
   shouldAutoApprovePermission,
-  shouldDenyGrokPermission,
-} from "./grok-runner-lib";
+  shouldDenyPermission,
+} from "./acp-runner-lib";
 import type { RunnerRequest } from "./runner-request";
 
 const request: RunnerRequest = {
   message: "Inspect the repository",
   workspaceRoot: "/repo",
-  model: "grok-4.5",
+  model: "acp-model-1",
   effort: "high",
   approvalPolicy: "never",
   sandboxMode: "readOnly",
   networkAccess: false,
   attachments: [],
   additionalDirectories: [],
-  providerBinaryPath: "/usr/local/bin/grok",
+  providerBinaryPath: "/usr/local/bin/acp-agent",
 };
 
-describe("Grok runner", () => {
+describe("ACP runner library", () => {
   it("embeds common image attachments as ACP image blocks", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "briar-grok-image-"));
+    const directory = await mkdtemp(join(tmpdir(), "briar-acp-image-"));
     const path = join(directory, "screen.png");
     await writeFile(path, new Uint8Array([1, 2, 3, 4]));
     try {
-      expect(await buildGrokPromptParts({
+      expect(await buildAcpPromptParts({
         ...request,
         attachments: [{
           type: "image",
@@ -68,13 +67,6 @@ describe("Grok runner", () => {
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
-  });
-
-  it("prefers the API key auth method when XAI_API_KEY is set", () => {
-    expect(resolveGrokAuthMethodId({ XAI_API_KEY: "sk-test" })).toBe(
-      "xai.api_key",
-    );
-    expect(resolveGrokAuthMethodId({})).toBe("cached_token");
   });
 
   it("auto-approves unrestricted and never policies", () => {
@@ -96,7 +88,7 @@ describe("Grok runner", () => {
   });
 
   it("allows only explicit read tools and workspace-confined paths", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "briar-grok-permission-"));
+    const directory = await mkdtemp(join(tmpdir(), "briar-acp-permission-"));
     const workspaceRoot = join(directory, "repo");
     const sourceDirectory = join(workspaceRoot, "src");
     const safeFile = join(sourceDirectory, "safe.ts");
@@ -119,95 +111,95 @@ describe("Grok runner", () => {
     const scopedRequest = { ...request, workspaceRoot };
     try {
       expect(
-        await shouldDenyGrokPermission(
+        await shouldDenyPermission(
           scopedRequest,
           "read_file",
           { path: "src/safe.ts" },
         ),
       ).toBe(false);
       expect(
-        await shouldDenyGrokPermission(
+        await shouldDenyPermission(
           scopedRequest,
           "ReadFile",
           { target_file: safeFile },
         ),
       ).toBe(false);
       expect(
-        await shouldDenyGrokPermission(
+        await shouldDenyPermission(
           scopedRequest,
           "glob",
           { pattern: "src/**/*.ts" },
         ),
       ).toBe(false);
       expect(
-        await shouldDenyGrokPermission(
+        await shouldDenyPermission(
           scopedRequest,
           "grep",
           { pattern: "safe", options: { directory: "src" } },
         ),
       ).toBe(false);
       expect(
-        await shouldDenyGrokPermission(scopedRequest, "list_dir"),
+        await shouldDenyPermission(scopedRequest, "list_dir"),
       ).toBe(false);
 
       expect(
-        await shouldDenyGrokPermission(
+        await shouldDenyPermission(
           scopedRequest,
           "read_file",
           { path: outsideFile },
         ),
       ).toBe(true);
       expect(
-        await shouldDenyGrokPermission(
+        await shouldDenyPermission(
           scopedRequest,
           "read_file",
           { path: "../outside/secret.txt" },
         ),
       ).toBe(true);
       expect(
-        await shouldDenyGrokPermission(
+        await shouldDenyPermission(
           scopedRequest,
           "read_file",
           { path: "..\\outside\\secret.txt" },
         ),
       ).toBe(true);
       expect(
-        await shouldDenyGrokPermission(
+        await shouldDenyPermission(
           scopedRequest,
           "read_file",
           { path: "linked-outside/secret.txt" },
         ),
       ).toBe(true);
       expect(
-        await shouldDenyGrokPermission(
+        await shouldDenyPermission(
           scopedRequest,
           "read_file",
           { target: "dangling/secret.txt" },
         ),
       ).toBe(true);
       expect(
-        await shouldDenyGrokPermission(
+        await shouldDenyPermission(
           scopedRequest,
           "glob",
           { glob: "linked-outside/**/*.txt" },
         ),
       ).toBe(true);
       expect(
-        await shouldDenyGrokPermission(
+        await shouldDenyPermission(
           scopedRequest,
           "glob",
           { pattern: "{src,../outside}/**/*" },
         ),
       ).toBe(true);
       expect(
-        await shouldDenyGrokPermission(
+        await shouldDenyPermission(
           scopedRequest,
           "read_file",
           { path: 42 },
         ),
       ).toBe(true);
       expect(
-        await shouldDenyGrokPermission(scopedRequest, "read_file"),
+        await shouldDenyPermission(scopedRequest, "read_file"),
       ).toBe(true);
 
       for (const permission of [
@@ -221,26 +213,26 @@ describe("Grok runner", () => {
         "read_file_and_upload",
       ]) {
         expect(
-          await shouldDenyGrokPermission(scopedRequest, permission),
+          await shouldDenyPermission(scopedRequest, permission),
         ).toBe(true);
       }
       expect(
-        await shouldDenyGrokPermission(scopedRequest, "web_search"),
+        await shouldDenyPermission(scopedRequest, "web_search"),
       ).toBe(true);
       expect(
-        await shouldDenyGrokPermission(
+        await shouldDenyPermission(
           { ...scopedRequest, networkAccess: true },
           "web_search",
         ),
       ).toBe(false);
       expect(
-        await shouldDenyGrokPermission(
+        await shouldDenyPermission(
           { ...scopedRequest, sandboxMode: "workspaceWrite" },
           "web_fetch",
         ),
       ).toBe(true);
       expect(
-        await shouldDenyGrokPermission(
+        await shouldDenyPermission(
           { ...scopedRequest, sandboxMode: "workspaceWrite" },
           "write_file",
         ),
@@ -290,9 +282,9 @@ describe("Grok runner", () => {
 
   it("passes trusted instructions as ACP session system rules", () => {
     const longInstructions = "x".repeat(40_000);
-    expect(grokSessionMeta({ ...request, instructions: longInstructions }))
+    expect(acpSessionMeta({ ...request, instructions: longInstructions }))
       .toEqual({ rules: longInstructions });
-    expect(grokSessionMeta({ ...request, instructions: "  " })).toBeUndefined();
+    expect(acpSessionMeta({ ...request, instructions: "  " })).toBeUndefined();
   });
 
   it("builds user prompt parts with the schema", () => {
@@ -312,8 +304,8 @@ describe("Grok runner", () => {
   });
 
   it("normalizes streamed assistant text and finalizes the turn", () => {
-    const state = createGrokEventState();
-    const started = normalizeGrokSessionUpdate(
+    const state = createAcpEventState();
+    const started = normalizeAcpSessionUpdate(
       {
         sessionId: "session-1",
         update: {
@@ -323,7 +315,7 @@ describe("Grok runner", () => {
       },
       state,
     );
-    const delta = normalizeGrokSessionUpdate(
+    const delta = normalizeAcpSessionUpdate(
       {
         sessionId: "session-1",
         update: {
@@ -343,7 +335,7 @@ describe("Grok runner", () => {
       id: "session-1:assistant:1",
       delta: "lo",
     })]);
-    expect(finalizeGrokMessage(state, "end_turn")).toEqual([
+    expect(finalizeAcpMessage(state, "end_turn")).toEqual([
       normalizedMessageCompleted({
         id: "session-1:assistant:1",
         phase: "final",
@@ -351,18 +343,18 @@ describe("Grok runner", () => {
       }),
       normalizedTurnCompleted("completed"),
     ]);
-    expect(grokStopReasonSucceeded("end_turn")).toBe(true);
-    expect(grokStopReasonSucceeded("cancelled")).toBe(false);
-    expect(grokStopReasonSucceeded("max_tokens")).toBe(false);
-    expect(grokStopReasonSucceeded(undefined)).toBe(false);
-    expect(finalizeGrokMessage(createGrokEventState(), "max_tokens")).toEqual([
+    expect(acpStopReasonSucceeded("end_turn")).toBe(true);
+    expect(acpStopReasonSucceeded("cancelled")).toBe(false);
+    expect(acpStopReasonSucceeded("max_tokens")).toBe(false);
+    expect(acpStopReasonSucceeded(undefined)).toBe(false);
+    expect(finalizeAcpMessage(createAcpEventState(), "max_tokens")).toEqual([
       normalizedTurnCompleted("max_tokens"),
     ]);
   });
 
   it("segments assistant messages around tool calls", () => {
-    const state = createGrokEventState();
-    normalizeGrokSessionUpdate(
+    const state = createAcpEventState();
+    normalizeAcpSessionUpdate(
       {
         sessionId: "session-1",
         update: {
@@ -372,14 +364,14 @@ describe("Grok runner", () => {
       },
       state,
     );
-    const toolCall = normalizeGrokSessionUpdate(
+    const toolCall = normalizeAcpSessionUpdate(
       {
         sessionId: "session-1",
         update: { sessionUpdate: "tool_call", toolCallId: "tool-1" },
       },
       state,
     );
-    const finalStarted = normalizeGrokSessionUpdate(
+    const finalStarted = normalizeAcpSessionUpdate(
       {
         sessionId: "session-1",
         update: {
@@ -400,7 +392,7 @@ describe("Grok runner", () => {
       phase: "commentary",
       text: '{"action":"respond"}',
     }));
-    expect(finalizeGrokMessage(state, "end_turn")[0]).toEqual(
+    expect(finalizeAcpMessage(state, "end_turn")[0]).toEqual(
       normalizedMessageCompleted({
       id: "session-1:assistant:2",
       phase: "final",
@@ -411,9 +403,9 @@ describe("Grok runner", () => {
   });
 
   it("normalizes ACP tool output and terminal outcomes", () => {
-    const state = createGrokEventState();
+    const state = createAcpEventState();
     const update = (value: Record<string, unknown>) =>
-      normalizeGrokSessionUpdate(
+      normalizeAcpSessionUpdate(
         {
           sessionId: "session-1",
           update: value,
@@ -517,8 +509,8 @@ describe("Grok runner", () => {
   });
 
   it("uses the final assistant segment for structured output", () => {
-    const state = createGrokEventState();
-    normalizeGrokSessionUpdate(
+    const state = createAcpEventState();
+    normalizeAcpSessionUpdate(
       {
         sessionId: "session-1",
         update: {
@@ -528,14 +520,14 @@ describe("Grok runner", () => {
       },
       state,
     );
-    normalizeGrokSessionUpdate(
+    normalizeAcpSessionUpdate(
       {
         sessionId: "session-1",
         update: { sessionUpdate: "tool_call", toolCallId: "tool-1" },
       },
       state,
     );
-    normalizeGrokSessionUpdate(
+    normalizeAcpSessionUpdate(
       {
         sessionId: "session-1",
         update: {
@@ -548,12 +540,12 @@ describe("Grok runner", () => {
       },
       state,
     );
-    finalizeGrokMessage(state, "end_turn");
+    finalizeAcpMessage(state, "end_turn");
 
     expect(
-      resolveGrokFinalMessage(state, undefined, { type: "object" }),
+      resolveAcpFinalMessage(state, undefined, { type: "object" }),
     ).toBe('{"action":"respond"}');
-    expect(resolveGrokFinalMessage(state, undefined, undefined)).toBe(
+    expect(resolveAcpFinalMessage(state, undefined, undefined)).toBe(
       '```json\\n{"action":"respond"}\\n```',
     );
   });

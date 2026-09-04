@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { prepareReadOnlyAgentEnvironment } from "../src-cli/read-only-agent-environment";
 
 const installedGrokBinary = (process.env.PATH ?? "")
@@ -11,18 +11,15 @@ const installedGrokBinary = (process.env.PATH ?? "")
   .map((directory) => join(directory, "grok"))
   .find(existsSync);
 
+import { resolveAcpAuthMethodId } from "./acp-runner";
 import {
-  createGrokPromptInvocation,
   grokAgentArgs,
   grokAgentEnvironment,
   grokAgentSpawnSpec,
-  grokPromptResultEnvelope,
-  grokPromptStartEnvelope,
-  grokRpcResultEnvelope,
-  shouldSuppressGrokNotification,
+  grokProfile,
 } from "./grok-runner";
 
-describe("Grok runner protocol preservation", () => {
+describe("Grok ACP profile", () => {
   it("forces local, offline Grok mode for read-only turns", () => {
     expect(grokAgentArgs(true)).toEqual([
       "--disable-web-search",
@@ -33,6 +30,14 @@ describe("Grok runner protocol preservation", () => {
       "stdio",
     ]);
     expect(grokAgentArgs(false)).toEqual(["agent", "stdio"]);
+    expect(
+      grokProfile.spawn({
+        binary: "/bin/echo",
+        workspaceRoot: "/repo",
+        environment: {},
+        readOnly: false,
+      }),
+    ).toEqual({ command: "/bin/echo", arguments: ["agent", "stdio"] });
   });
 
   it("fails closed when a read-only Grok OS sandbox is unavailable", () => {
@@ -46,6 +51,15 @@ describe("Grok runner protocol preservation", () => {
         platform: "linux",
       })
     ).toThrow("require the macOS OS sandbox");
+    expect(() =>
+      grokAgentSpawnSpec({
+        binary: "/bin/echo",
+        arguments: ["agent", "stdio"],
+        workspaceRoot: "/repo",
+        environment: {},
+        readOnly: true,
+      })
+    ).toThrow("Grok read-only state is not isolated");
     expect(
       grokAgentSpawnSpec({
         binary: "/bin/echo",
@@ -64,6 +78,105 @@ describe("Grok runner protocol preservation", () => {
         true,
       ),
     ).toMatchObject({ GROK_SANDBOX: "off", GROK_HOME: "/state" });
+    expect(
+      grokProfile.environment({ GROK_HOME: "/state" }, false),
+    ).toEqual({ GROK_HOME: "/state", GROK_OAUTH2_REFERRER: "briar" });
+  });
+
+  it("prefers the API key auth method when XAI_API_KEY is set", () => {
+    expect(resolveAcpAuthMethodId(grokProfile, { XAI_API_KEY: "sk-test" }))
+      .toBe("xai.api_key");
+    expect(resolveAcpAuthMethodId(grokProfile, { XAI_API_KEY: "  " }))
+      .toBe("cached_token");
+    expect(resolveAcpAuthMethodId(grokProfile, {})).toBe("cached_token");
+  });
+
+  it("keeps the Grok lifecycle labels the desktop app matches on", () => {
+    expect(grokProfile.providerName).toBe("Grok Agent");
+    expect(grokProfile.displayName).toBe("Grok");
+    expect(grokProfile.missingSessionIdMessage).toBe(
+      "Grok agent did not return a session id.",
+    );
+    expect(grokProfile.clientCapabilities).toEqual({
+      fs: { readTextFile: false, writeTextFile: false },
+    });
+    expect(grokProfile.serverRequestResponses).toBeUndefined();
+  });
+
+  it("selects the Grok model and reasoning effort, tolerating older builds", async () => {
+    const calls: Array<{ method: string; params: unknown }> = [];
+    const emitted: Array<{ method: string; result: unknown }> = [];
+    await grokProfile.configureSession({
+      request: {
+        message: "Inspect the repository",
+        workspaceRoot: "/repo",
+        model: "  grok-code-fast-1  ",
+        effort: "high",
+        approvalPolicy: "never",
+        sandboxMode: "readOnly",
+        networkAccess: false,
+        attachments: [],
+        additionalDirectories: [],
+        providerBinaryPath: "/usr/local/bin/grok",
+      },
+      sessionId: "session-1",
+      setup: { sessionId: "session-1" },
+      call: (method, params) => {
+        calls.push({ method, params });
+        if (method === "session/set_config_option") {
+          return Promise.reject(new Error("unsupported"));
+        }
+        return Promise.resolve({ ok: true });
+      },
+      emitRpc: (method, _params, result) => emitted.push({ method, result }),
+    });
+
+    expect(calls).toEqual([
+      {
+        method: "session/set_model",
+        params: { sessionId: "session-1", modelId: "grok-code-fast-1" },
+      },
+      {
+        method: "session/set_config_option",
+        params: {
+          sessionId: "session-1",
+          configId: "reasoning_effort",
+          value: "high",
+        },
+      },
+    ]);
+    expect(emitted).toEqual([
+      { method: "session/set_model", result: { ok: true } },
+    ]);
+  });
+
+  it("keeps the session default when set_model is unavailable", async () => {
+    const emitted: string[] = [];
+    const calls: string[] = [];
+    await grokProfile.configureSession({
+      request: {
+        message: "Inspect the repository",
+        workspaceRoot: "/repo",
+        model: "grok-4.5",
+        approvalPolicy: "never",
+        sandboxMode: "readOnly",
+        networkAccess: false,
+        attachments: [],
+        additionalDirectories: [],
+        providerBinaryPath: "/usr/local/bin/grok",
+      },
+      sessionId: "session-1",
+      setup: undefined,
+      call: (method) => {
+        calls.push(method);
+        return Promise.reject(new Error("unsupported"));
+      },
+      emitRpc: (method) => emitted.push(method),
+    });
+    // A rejected set_model must not emit an event and must not fail the turn,
+    // and an absent effort must not touch the session configuration at all.
+    expect(calls).toEqual(["session/set_model"]);
+    expect(emitted).toEqual([]);
   });
 
   it.skipIf(process.platform !== "darwin" || !installedGrokBinary)(
@@ -103,146 +216,4 @@ describe("Grok runner protocol preservation", () => {
       }
     },
   );
-
-  it("uses one prompt UUID for messageId and both xAI correlation keys", () => {
-    const promptId = "cc559dac-1597-4a72-a155-c8f5a6c46231";
-    const allocateId = vi.fn(() => promptId);
-    const prompt = [{ type: "text", text: "Inspect the repository" }];
-
-    const invocation = createGrokPromptInvocation(
-      "session-1",
-      prompt,
-      allocateId,
-    );
-
-    expect(allocateId).toHaveBeenCalledTimes(1);
-    expect(invocation).toEqual({
-      promptId,
-      params: {
-        sessionId: "session-1",
-        prompt,
-        messageId: promptId,
-        _meta: {
-          promptId,
-          requestId: promptId,
-        },
-      },
-    });
-  });
-
-  it("retains setup model state, successful model selection, and prompt results", () => {
-    expect(
-      grokRpcResultEnvelope(
-        "session/new",
-        { cwd: "/repo", mcpServers: [] },
-        {
-          sessionId: "session-1",
-          models: { currentModelId: "grok-4.5" },
-        },
-      ),
-    ).toEqual({
-      jsonrpc: "2.0",
-      method: "session/new",
-      params: { cwd: "/repo", mcpServers: [] },
-      result: {
-        sessionId: "session-1",
-        models: { currentModelId: "grok-4.5" },
-      },
-    });
-    expect(
-      grokRpcResultEnvelope(
-        "session/set_model",
-        { sessionId: "session-1", modelId: "grok-code-fast-1" },
-        undefined,
-      ),
-    ).toMatchObject({
-      method: "session/set_model",
-      params: { sessionId: "session-1", modelId: "grok-code-fast-1" },
-      result: null,
-    });
-    const promptInvocation = createGrokPromptInvocation(
-      "session-1",
-      [{ type: "image", data: "large-sensitive-base64" }],
-      () => "prompt-1",
-    );
-    const promptEnvelope = grokPromptResultEnvelope(promptInvocation, {
-      stopReason: "end_turn",
-      _meta: { usage: { inputTokens: 10, outputTokens: 5 } },
-    });
-    expect(promptEnvelope).toMatchObject({
-      method: "session/prompt",
-      params: {
-        sessionId: "session-1",
-        messageId: "prompt-1",
-        _meta: { promptId: "prompt-1", requestId: "prompt-1" },
-      },
-      result: {
-        stopReason: "end_turn",
-        _meta: { usage: { inputTokens: 10, outputTokens: 5 } },
-      },
-    });
-    expect(promptInvocation.params).toHaveProperty("prompt");
-    expect(promptEnvelope.params).not.toHaveProperty("prompt");
-    expect(grokPromptStartEnvelope(promptInvocation)).toEqual({
-      jsonrpc: "2.0",
-      method: "briar/session/prompt_start",
-      params: {
-        sessionId: "session-1",
-        messageId: "prompt-1",
-        _meta: { promptId: "prompt-1", requestId: "prompt-1" },
-      },
-    });
-    expect(grokPromptStartEnvelope(promptInvocation).params).not.toHaveProperty(
-      "prompt",
-    );
-  });
-
-  it("suppresses load replay and _meta.isReplay session updates", () => {
-    const liveUpdate = {
-      jsonrpc: "2.0",
-      method: "session/update",
-      params: {
-        sessionId: "session-1",
-        update: {
-          sessionUpdate: "agent_message_chunk",
-          content: { type: "text", text: "live" },
-        },
-      },
-    };
-    const markedReplay = {
-      ...liveUpdate,
-      params: {
-        ...liveUpdate.params,
-        _meta: { isReplay: true },
-      },
-    };
-
-    expect(shouldSuppressGrokNotification(liveUpdate, true)).toBe(true);
-    expect(shouldSuppressGrokNotification(markedReplay, false)).toBe(true);
-    expect(shouldSuppressGrokNotification(liveUpdate, false)).toBe(false);
-  });
-
-  it("suppresses private load replay but keeps live xAI prompt completion", () => {
-    const completion = {
-      jsonrpc: "2.0",
-      method: "_x.ai/session/prompt_complete",
-      params: {
-        sessionId: "session-1",
-        promptId: "prompt-1",
-        stopReason: "end_turn",
-      },
-    };
-
-    expect(shouldSuppressGrokNotification(completion, true)).toBe(true);
-    expect(shouldSuppressGrokNotification(completion, false)).toBe(false);
-    expect(
-      shouldSuppressGrokNotification(
-        {
-          ...completion,
-          params: { ...completion.params, _meta: { isReplay: true } },
-        },
-        false,
-      ),
-    ).toBe(true);
-  });
 });
