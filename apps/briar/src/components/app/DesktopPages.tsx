@@ -65,7 +65,6 @@ import {
 import { inboxDetailTargetAtom } from "../../state/inbox-selection";
 import { useInboxActions } from "../../state/inbox/actions";
 import {
-  channelInboxSyncSignalAtom,
   conversationInboxSyncSignalAtom,
   inboxMessagesAtom,
 } from "../../state/inbox/atoms";
@@ -243,7 +242,6 @@ export function DesktopPages({
   startProjectAgentTask,
 }: DesktopPagesProps) {
   const { t } = useI18n();
-  const channelInboxSyncSignal = useAtomValue(channelInboxSyncSignalAtom);
   const conversationInboxSyncSignal = useAtomValue(
     conversationInboxSyncSignalAtom,
   );
@@ -386,7 +384,6 @@ export function DesktopPages({
   ) => (
     <InboxDetailContent
       agents={issueAgents}
-      channelInboxSyncSignal={channelInboxSyncSignal}
       conversationInboxSyncSignal={conversationInboxSyncSignal}
       onEnsureTeamSelected={ensureTeamSelected}
       onNavigateToIssue={navigateToIssue}
@@ -449,7 +446,6 @@ export function DesktopPages({
       token ? (
       <DirectMessagesWithCatalog
         activeChannelId={desktopActiveChannelId}
-        channelInboxSyncSignal={channelInboxSyncSignal}
         isSidebarOpen={isSidebarOpen}
         key={`desktop-dms:${activeOrganizationId}`}
         onChannelFallback={(channelId) =>
@@ -680,7 +676,6 @@ export function DesktopPages({
       token ? (
       <ChannelsWithCatalog
         activeChannelId={desktopActiveChannelId}
-        channelInboxSyncSignal={channelInboxSyncSignal}
         key={`desktop-channels:${activeOrganizationId}`}
         onChannelFallback={(channelId) =>
           handleDesktopChannelFallback(channelId, "channels")

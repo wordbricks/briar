@@ -15,7 +15,6 @@ import {
   channelAgentsAtom,
   channelConversationBusyAtom,
   channelMembersAtom,
-  channelMessageCursorAtom,
   channelOpenThreadIdAtom,
   channelProposalProjectsAtom,
   channelRootMessageIdsAtom,
@@ -25,6 +24,11 @@ import {
   channelThreadRootIdsAtom,
 } from "./atoms";
 import {
+  applyChannelMessageDeletionToChannel,
+  mergeIntoChannelSurface,
+  patchChannelMessages,
+  patchChannelRootMessage,
+  removeOptimisticChannelMessages,
   resetChannelConversationViewState,
   writeChannelAgentReplies,
   writeChannelOpenThreadId,
@@ -165,6 +169,118 @@ describe("conversation store writers", () => {
 
     writeChannelAgentReplies(registry, channelId, []);
     expect(registry.get(channelAgentRepliesAtom(channelId))).toEqual([]);
+  });
+
+  /*
+    The optimistic writers. What they encode is "both surfaces at once": a
+    message is drawn as a root row and, while its thread is open, as a thread
+    row, and a patch that reached one of them showed two versions of the same
+    message on one screen. The actions used to do this by calling a pair of
+    `useState`-shaped updaters and remembering to call both.
+  */
+  it("patches a message wherever the channel is drawing it", () => {
+    const registry = createTestRegistry();
+    writeChannelTimeline(registry, channelId, [
+      testChannelMessage("root"),
+      testChannelMessage("other"),
+    ]);
+    writeChannelThreadMessages(registry, channelId, "root", [
+      testChannelMessage("root"),
+      testChannelMessage("reply", { parentMessageId: "root" }),
+    ]);
+    writeChannelOpenThreadId(registry, channelId, "root");
+
+    patchChannelMessages(registry, channelId, (message) =>
+      message.id === "root" ? { ...message, body: "edited" } : message,
+    );
+
+    expect(
+      registry.get(channelRootMessagesAtom(channelId))[0]?.body,
+    ).toBe("edited");
+    expect(
+      registry.get(channelThreadMessagesAtom(channelThreadKey(channelId, "root")))[0]
+        ?.body,
+    ).toBe("edited");
+    // A message the patch returned unchanged keeps its object.
+    expect(registry.get(channelRootMessagesAtom(channelId))[1]?.body).not.toBe(
+      "edited",
+    );
+  });
+
+  it("patches one root message and leaves the rest of the timeline alone", () => {
+    const registry = createTestRegistry();
+    writeChannelTimeline(registry, channelId, [
+      testChannelMessage("root"),
+      testChannelMessage("other"),
+    ]);
+    const before = registry.get(channelRootMessagesAtom(channelId));
+
+    patchChannelRootMessage(registry, channelId, "root", (message) => ({
+      ...message,
+      replyCount: 1,
+    }));
+
+    const after = registry.get(channelRootMessagesAtom(channelId));
+    expect(after.find((message) => message.id === "root")?.replyCount).toBe(1);
+    expect(after.find((message) => message.id === "other")).toBe(
+      before.find((message) => message.id === "other"),
+    );
+  });
+
+  it("merges into the surface it is told, and rolls an optimistic send back", () => {
+    const registry = createTestRegistry();
+    writeChannelTimeline(registry, channelId, [testChannelMessage("root")]);
+    writeChannelThreadMessages(registry, channelId, "root", [
+      testChannelMessage("root"),
+    ]);
+    writeChannelOpenThreadId(registry, channelId, "root");
+
+    mergeIntoChannelSurface(registry, channelId, "thread", [
+      testChannelMessage("pending", {
+        parentMessageId: "root",
+        optimistic: true,
+      }),
+    ]);
+    const threadIds = () =>
+      registry
+        .get(channelThreadMessagesAtom(channelThreadKey(channelId, "root")))
+        .map((message) => message.id);
+    expect(threadIds()).toContain("pending");
+    // The thread was the surface named, so the root timeline did not move.
+    expect(
+      registry.get(channelRootMessagesAtom(channelId)).map((m) => m.id),
+    ).toEqual(["root"]);
+
+    removeOptimisticChannelMessages(registry, channelId, "pending");
+    expect(threadIds()).toEqual(["root"]);
+  });
+
+  it("applies a delete response to both surfaces", () => {
+    const registry = createTestRegistry();
+    writeChannelTimeline(registry, channelId, [
+      testChannelMessage("root"),
+      testChannelMessage("gone"),
+    ]);
+    writeChannelThreadMessages(registry, channelId, "root", [
+      testChannelMessage("root"),
+      testChannelMessage("gone", { parentMessageId: "root" }),
+    ]);
+    writeChannelOpenThreadId(registry, channelId, "root");
+
+    applyChannelMessageDeletionToChannel(registry, channelId, "gone", {
+      deleted: true,
+      message: null,
+      parentMessage: null,
+    });
+
+    expect(
+      registry.get(channelRootMessagesAtom(channelId)).map((m) => m.id),
+    ).toEqual(["root"]);
+    expect(
+      registry
+        .get(channelThreadMessagesAtom(channelThreadKey(channelId, "root")))
+        .map((message) => message.id),
+    ).toEqual(["root"]);
   });
 
   it("resets the flags a newly opened channel starts clean with", () => {

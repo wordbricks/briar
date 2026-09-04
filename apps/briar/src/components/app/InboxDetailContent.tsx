@@ -65,7 +65,6 @@ export interface InboxDetailContentProps {
   /** Agents loaded so far, for the mention list and the "who ran this" label. */
   readonly agents: ProjectAgent[];
   /** Runs a dispatch or an auto hunt session is currently working on. */
-  readonly channelInboxSyncSignal: string;
   readonly conversationInboxSyncSignal: string;
   /** Leaving the pane for the full issue page, still the shell's history. */
   readonly onNavigateToIssue: (runId: string, teamId?: string | null) => void;
@@ -78,7 +77,6 @@ export interface InboxDetailContentProps {
 
 export function InboxDetailContent({
   agents,
-  channelInboxSyncSignal,
   conversationInboxSyncSignal,
   onEnsureTeamSelected,
   onNavigateToIssue,
@@ -219,7 +217,6 @@ export function InboxDetailContent({
       ) : channelId && activeOrganizationId && token ? (
         <ChannelsWithCatalog
           activeChannelId={channelId}
-          channelInboxSyncSignal={channelInboxSyncSignal}
           inboxDetail
           onChannelSelect={selectChannel}
           onInboxDetailClose={() => {

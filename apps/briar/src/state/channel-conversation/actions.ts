@@ -13,16 +13,12 @@ import {
   updateChannelThreadSubscription,
 } from "../../lib/api";
 import {
-  applyChannelThreadSubscribers,
   type ChannelExecutionProposal,
   type ChannelMessage,
   type ChannelSummary,
 } from "../../lib/channels-contract";
-import { applyChannelMessageDeletion } from "../../lib/channel-message-deletion";
-import { mergeChannelMessages } from "../../lib/channel-message-merge";
 import type { MentionTarget } from "../../lib/channel-mentions";
 import { createOptimisticChannelMessage } from "../../lib/optimistic-channel-message";
-import { removeOptimisticChannelMessage } from "../../lib/optimistic-channel-message";
 import { toggleOptimisticChannelReaction } from "../../lib/optimistic-channel-reaction";
 import { currentExecutionWorkerDeviceId } from "../../lib/execution-worker-device";
 import { channelIssueProposalRequestsExecution } from "../../components/ChannelIssueProposalDetails";
@@ -52,8 +48,6 @@ import {
   channelOpenThreadIdAtom,
   channelProposalProjectsAtom,
   channelRootMessagesAtom,
-  channelThreadKey,
-  channelThreadMessagesAtom,
   channelThreadSubscriptionPendingAtom,
 } from "./atoms";
 import {
@@ -71,10 +65,13 @@ import {
   type ChannelSurfaceContext,
 } from "./loader";
 import {
+  applyChannelMessageDeletionToChannel,
+  mergeIntoChannelSurface,
+  patchChannelMessages,
+  patchChannelRootMessage,
+  removeOptimisticChannelMessages,
   writeChannelAgentReplies,
   writeChannelOpenThreadId,
-  writeChannelThreadMessages,
-  writeChannelTimeline,
 } from "./write";
 
 /*
@@ -236,39 +233,6 @@ export function createChannelConversationActions(
     return token && organizationId ? { token, organizationId } : null;
   };
 
-  /*
-    The two timeline updaters. They are the shape the hook handed to the view's
-    `useState` setters, kept because the merge rules they call live in
-    `model.ts` and the ordering, identity preservation and retention bound live
-    in `write.ts` — the action only decides what the next list is.
-  */
-  const updateRoot = (
-    channelId: string,
-    update: (current: ChannelMessage[]) => ChannelMessage[],
-  ) => {
-    writeChannelTimeline(
-      registry,
-      channelId,
-      update(registry.get(channelRootMessagesAtom(channelId))),
-    );
-  };
-  const updateThread = (
-    channelId: string,
-    update: (current: ChannelMessage[]) => ChannelMessage[],
-  ) => {
-    const rootMessageId = registry.get(channelOpenThreadIdAtom(channelId));
-    if (!rootMessageId) return;
-    writeChannelThreadMessages(
-      registry,
-      channelId,
-      rootMessageId,
-      update(
-        registry.get(
-          channelThreadMessagesAtom(channelThreadKey(channelId, rootMessageId)),
-        ),
-      ),
-    );
-  };
   const setBusy = (channelId: string, value: boolean) =>
     registry.set(channelConversationBusyAtom(channelId), value);
 
@@ -321,21 +285,13 @@ export function createChannelConversationActions(
     setBusy(channelId, true);
     if (parentMessageId) {
       optimisticThreadMessageIds.add(clientMessageId);
-      updateRoot(channelId, (current) =>
-        current.map((item) =>
-          item.id === parentMessageId
-            ? appendReplySummary(item, optimisticMessage)
-            : item,
-        ),
+      patchChannelRootMessage(registry, channelId, parentMessageId, (parent) =>
+        appendReplySummary(parent, optimisticMessage),
       );
-      updateThread(channelId, (current) =>
-        mergeChannelMessages(current, [optimisticMessage], []),
-      );
+      mergeIntoChannelSurface(registry, channelId, "thread", [optimisticMessage]);
     } else {
       context.onRootMessagePending?.();
-      updateRoot(channelId, (current) =>
-        mergeChannelMessages(current, [optimisticMessage], []),
-      );
+      mergeIntoChannelSurface(registry, channelId, "root", [optimisticMessage]);
     }
     try {
       const hasAgentMention = mentions.some(
@@ -396,36 +352,22 @@ export function createChannelConversationActions(
       );
       if (parentMessageId) {
         optimisticThreadMessageIds.delete(clientMessageId);
-        updateThread(channelId, (current) =>
-          mergeChannelMessages(current, [result.message], []),
-        );
+        mergeIntoChannelSurface(registry, channelId, "thread", [result.message]);
       } else {
         context.onRootMessagePending?.();
-        updateRoot(channelId, (current) =>
-          mergeChannelMessages(current, [result.message], []),
-        );
+        mergeIntoChannelSurface(registry, channelId, "root", [result.message]);
       }
     } catch (cause) {
       if (loader.surfaceIsCurrent(sendContext)) {
         const shouldRollbackReplySummary = parentMessageId
           ? optimisticThreadMessageIds.delete(clientMessageId)
           : false;
-        updateThread(channelId, (current) =>
-          removeOptimisticChannelMessage(current, clientMessageId),
-        );
-        updateRoot(channelId, (current) => {
-          const removed = removeOptimisticChannelMessage(
-            current,
-            clientMessageId,
+        removeOptimisticChannelMessages(registry, channelId, clientMessageId);
+        if (parentMessageId && shouldRollbackReplySummary) {
+          patchChannelRootMessage(registry, channelId, parentMessageId, (parent) =>
+            removeReplySummary(parent, optimisticMessage, parentBeforeSend),
           );
-          return parentMessageId && shouldRollbackReplySummary
-            ? removed.map((item) =>
-                item.id === parentMessageId
-                  ? removeReplySummary(item, optimisticMessage, parentBeforeSend)
-                  : item,
-              )
-            : removed;
-        });
+        }
         reportChannelConversationError(registry, cause);
       }
       for (const url of attachmentUrls) {
@@ -451,10 +393,7 @@ export function createChannelConversationActions(
   const applyProposalPatch = (
     channelId: string,
     apply: (item: ChannelMessage) => ChannelMessage,
-  ) => {
-    updateRoot(channelId, (current) => current.map(apply));
-    updateThread(channelId, (current) => current.map(apply));
-  };
+  ) => patchChannelMessages(registry, channelId, apply);
 
   const acceptProposal: ChannelConversationActions["acceptProposal"] = async (
     channelId,
@@ -687,12 +626,7 @@ export function createChannelConversationActions(
         item.id,
       );
       if (!loader.surfaceIsCurrent(deletionContext)) return;
-      updateRoot(channelId, (current) =>
-        applyChannelMessageDeletion(current, item.id, result),
-      );
-      updateThread(channelId, (current) =>
-        applyChannelMessageDeletion(current, item.id, result),
-      );
+      applyChannelMessageDeletionToChannel(registry, channelId, item.id, result);
       if (result.deleted) {
         writeChannelAgentReplies(
           registry,
@@ -746,14 +680,11 @@ export function createChannelConversationActions(
           subscribed,
         );
         if (!loader.surfaceIsCurrent(context)) return;
-        const apply = (current: ChannelMessage[]) =>
-          applyChannelThreadSubscribers(
-            current,
-            result.rootMessageId,
-            result.subscribers,
-          );
-        updateRoot(channelId, apply);
-        updateThread(channelId, apply);
+        patchChannelMessages(registry, channelId, (message) =>
+          message.id === result.rootMessageId
+            ? { ...message, subscribers: result.subscribers }
+            : message,
+        );
       } catch (cause) {
         if (loader.surfaceIsCurrent(context)) {
           reportChannelConversationError(registry, cause);

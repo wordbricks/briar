@@ -406,9 +406,9 @@ describe("useDeepLinks", () => {
     });
     await flush();
 
-    // The read receipt is sent before the team check, so the pass that
-    // switches teams already recorded it and the pass that routes finds it
-    // read.
+    // The read receipt is sent before the team check, so the pass that switches
+    // teams records it and the pass that routes asks for nothing: the hook
+    // remembers the message the receipt landed for.
     expect(readInboxMessageIds(registry)).toEqual(["message-9"]);
     expect(registry.get(activeTeamIdAtom)).toBe(teamB.id);
     expect(destination(registry)).toMatchObject({

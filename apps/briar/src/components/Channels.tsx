@@ -43,7 +43,6 @@ import {
 } from "react";
 import { LoadingState } from "@/components/ui/loading-state";
 import { useI18n } from "../i18n";
-import { useToast } from "./ui/toast";
 import {
   useChannelComposer,
   type ChannelSkillCommandTarget,
@@ -75,7 +74,6 @@ import type {
 } from "../types";
 import {
   type ChannelAgentSummary,
-  type ChannelDelta,
   type ChannelMember,
   type ChannelMessage,
   type ChannelExecutionProposal,
@@ -103,7 +101,6 @@ import {
 import { channelAttachmentAccept } from "../lib/channel-attachments";
 import { ChannelMentionMenu } from "./ChannelMentionMenu";
 import { ChannelSkillMenu } from "./ChannelSkillMenu";
-import { ChannelTypingState } from "./ChannelTypingState";
 import { MentionComposerField } from "./MentionComposerField";
 import { AgentProviderIcon } from "./AgentIcons";
 import { ChannelLinkPreview } from "./ChannelLinkPreview";
@@ -154,7 +151,6 @@ import {
   recordDesktopChannelHeader,
   type DesktopChannelDisplaySource,
 } from "../lib/channel-performance";
-import type { ChannelAgentActivityDescriptor } from "../lib/channel-agent-activity";
 import { useAtomValue } from "@effect/atom-react";
 import { useRegistry } from "../state/registry";
 import {
@@ -207,7 +203,6 @@ type ChannelsProps = {
   onChannelSelect: (channelId: string | null) => void;
   onChannelFallback?: (channelId: string | null) => void;
   onChannelsChange: Dispatch<SetStateAction<ChannelSummary[]>>;
-  channelInboxSyncSignal?: string;
   onIssueCreated?: (projectId: string, runId: string) => void | Promise<void>;
   onSkillSessionAccepted?: (session: AutoHuntSession) => void;
   onViewingChannelChange?: (
@@ -338,7 +333,6 @@ export function Channels({
   onChannelSelect,
   onChannelFallback = onChannelSelect,
   onChannelsChange,
-  channelInboxSyncSignal,
   onIssueCreated,
   onSkillSessionAccepted,
   onViewingChannelChange,
@@ -356,7 +350,6 @@ export function Channels({
 }: ChannelsProps) {
   const [memoryOpen, setMemoryOpen] = useState(false);
   const { t, localeTag } = useI18n();
-  const { toast } = useToast();
   const imageCache = useChannelMessageImageCache(`${organizationId}\0${token}`);
   useEffect(() => {
     if (!activeChannelId) return;

@@ -1,11 +1,14 @@
 import * as Atom from "effect/unstable/reactivity/Atom";
 
+import { applyChannelMessageDeletion } from "../../lib/channel-message-deletion";
 import type {
   ChannelAgentReply,
   ChannelAgentSummary,
   ChannelMember,
   ChannelMessage,
+  DeleteChannelMessageResponse,
 } from "../../lib/channels-contract";
+import { removeOptimisticChannelMessage } from "../../lib/optimistic-channel-message";
 import {
   removeMany,
   replaceEntities,
@@ -20,7 +23,6 @@ import {
   channelAgentRepliesAtom,
   channelAgentsAtom,
   channelConversationBusyAtom,
-  channelConversationLoadingAtom,
   channelDecliningProposalIdAtom,
   channelEarlierMessagesLoadingAtom,
   channelMembersAtom,
@@ -428,13 +430,178 @@ export function applyAuthoritativeChannelAgentReplies(
 /*
   The writes the conversation's own actions make.
 
-  `state/channel-conversation/actions.ts` computes the next timeline with the
-  merge helpers in `model.ts` and hands the result here, which is what the
-  optimistic paths need: a send, a rollback, a reaction and an approval all
-  patch messages the server has not answered for yet, so there is no event to
-  apply. The ordering, the identity preservation and the retention bound stay
-  in this module, so there is still one implementation of each.
+  These are the optimistic paths: a send, a rollback, a reaction, an approval and
+  a deletion all touch messages the server has not answered for yet, so there is
+  no event to apply. Each one says what it does to the store rather than handing
+  a whole next list in — `actions.ts` used to compute the timeline itself and
+  pass it through a pair of `updateRoot` / `updateThread` helpers shaped like the
+  `useState` setters the deleted hook was given, which meant every caller had to
+  remember to do the same thing to both surfaces.
+
+  "Both surfaces" is the rule these encode: a message can be drawn twice at once,
+  as a row of the root timeline and as a row of the open thread, and an
+  optimistic patch that reached only one of them showed two different versions of
+  the same message on one screen.
 */
+
+/** The open thread of one channel, or `null` when none is open. */
+const openThreadKey = (registry: AtomRegistry, channelId: string) => {
+  const rootMessageId = registry.get(channelOpenThreadIdAtom(channelId));
+  return rootMessageId === null
+    ? null
+    : ({ rootMessageId, key: channelThreadKey(channelId, rootMessageId) } as const);
+};
+
+/**
+ * Rewrites every message of the channel's root timeline and of its open thread
+ * through `patch`. The patch returns the message unchanged for rows it does not
+ * touch, and the writers below drop the write when nothing moved.
+ */
+export function patchChannelMessages(
+  registry: AtomRegistry,
+  channelId: string,
+  patch: (message: ChannelMessage) => ChannelMessage,
+): void {
+  Atom.batch(() => {
+    writeChannelTimeline(
+      registry,
+      channelId,
+      registry.get(channelRootMessagesAtom(channelId)).map(patch),
+    );
+    const thread = openThreadKey(registry, channelId);
+    if (!thread) return;
+    writeChannelThreadMessages(
+      registry,
+      channelId,
+      thread.rootMessageId,
+      registry.get(channelThreadMessagesAtom(thread.key)).map(patch),
+    );
+  });
+}
+
+/**
+ * Rewrites one message of the root timeline — the reply summary an optimistic
+ * thread reply moves, which only a root row draws. The stored message is one
+ * object per id per channel, so a thread holding that same message as its own
+ * first row sees the new value too; what this skips is rewriting the thread's
+ * id index, which the patch cannot move.
+ */
+export function patchChannelRootMessage(
+  registry: AtomRegistry,
+  channelId: string,
+  messageId: string,
+  patch: (message: ChannelMessage) => ChannelMessage,
+): void {
+  writeChannelTimeline(
+    registry,
+    channelId,
+    registry
+      .get(channelRootMessagesAtom(channelId))
+      .map((message) => (message.id === messageId ? patch(message) : message)),
+  );
+}
+
+/**
+ * Merges `messages` into one surface of the channel — the root timeline or the
+ * open thread — under the same ordering and identity rules a server page gets.
+ * This is the optimistic send and the confirmation that replaces it.
+ */
+export function mergeIntoChannelSurface(
+  registry: AtomRegistry,
+  channelId: string,
+  surface: "root" | "thread",
+  messages: readonly ChannelMessage[],
+): void {
+  if (surface === "root") {
+    writeChannelTimeline(
+      registry,
+      channelId,
+      mergeChannelMessages(
+        registry.get(channelRootMessagesAtom(channelId)),
+        messages,
+        [],
+      ),
+    );
+    return;
+  }
+  const thread = openThreadKey(registry, channelId);
+  if (!thread) return;
+  writeChannelThreadMessages(
+    registry,
+    channelId,
+    thread.rootMessageId,
+    mergeChannelMessages(
+      registry.get(channelThreadMessagesAtom(thread.key)),
+      messages,
+      [],
+    ),
+  );
+}
+
+/**
+ * Drops the placeholder a failed send left behind, from both surfaces. Only a
+ * message still marked optimistic is removed, so a confirmation that arrived
+ * first is never rolled back.
+ */
+export function removeOptimisticChannelMessages(
+  registry: AtomRegistry,
+  channelId: string,
+  clientMessageId: string,
+): void {
+  Atom.batch(() => {
+    writeChannelTimeline(
+      registry,
+      channelId,
+      removeOptimisticChannelMessage(
+        registry.get(channelRootMessagesAtom(channelId)),
+        clientMessageId,
+      ),
+    );
+    const thread = openThreadKey(registry, channelId);
+    if (!thread) return;
+    writeChannelThreadMessages(
+      registry,
+      channelId,
+      thread.rootMessageId,
+      removeOptimisticChannelMessage(
+        registry.get(channelThreadMessagesAtom(thread.key)),
+        clientMessageId,
+      ),
+    );
+  });
+}
+
+/** Applies a delete response to both surfaces, refreshed parent summary included. */
+export function applyChannelMessageDeletionToChannel(
+  registry: AtomRegistry,
+  channelId: string,
+  messageId: string,
+  response: DeleteChannelMessageResponse,
+): void {
+  Atom.batch(() => {
+    writeChannelTimeline(
+      registry,
+      channelId,
+      applyChannelMessageDeletion(
+        registry.get(channelRootMessagesAtom(channelId)),
+        messageId,
+        response,
+      ),
+    );
+    const thread = openThreadKey(registry, channelId);
+    if (!thread) return;
+    writeChannelThreadMessages(
+      registry,
+      channelId,
+      thread.rootMessageId,
+      applyChannelMessageDeletion(
+        registry.get(channelThreadMessagesAtom(thread.key)),
+        messageId,
+        response,
+      ),
+    );
+  });
+}
 
 /** Replaces one channel's root timeline. */
 export function writeChannelTimeline(

@@ -1,7 +1,6 @@
 /** @vitest-environment jsdom */
 
 import { RegistryContext } from "@effect/atom-react";
-import * as React from "react";
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 

@@ -4,7 +4,7 @@ import {
   useAtomSet,
   useAtomValue,
 } from "@effect/atom-react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 import { useI18n } from "../i18n";
 import { useToast } from "../components/ui/toast";
@@ -145,6 +145,18 @@ export function useDeepLinks({
   const { ensureTeamSelected, selectTeam } = useTeamActions();
   const { selectOrganization } = useOrganizationActions();
   const { markRead: markInboxRead } = useInboxActions();
+  /*
+    The notification whose read receipt this window has already sent.
+
+    Routing a notification for another team takes two passes — the first selects
+    the team and returns, the second routes — and the receipt goes before the
+    team check so the pass that routes already finds it read. That made the
+    transition call `markRead` twice for one notification. It stays before the
+    check; this remembers the message the receipt landed for, so the second pass
+    asks nothing. It is not cleared on failure: a notification whose message the
+    inbox does not hold yet returns `false` and is retried on the next pass.
+  */
+  const sentInboxReceiptFor = useRef<string | null>(null);
 
   useEffect(() => {
     if (!pendingBriarLink || !user || loading) return;
@@ -357,7 +369,12 @@ export function useDeepLinks({
     );
     if (!targetProject) return;
 
-    markInboxRead(pendingInboxNotificationTarget.messageId);
+    if (
+      sentInboxReceiptFor.current !== pendingInboxNotificationTarget.messageId &&
+      markInboxRead(pendingInboxNotificationTarget.messageId)
+    ) {
+      sentInboxReceiptFor.current = pendingInboxNotificationTarget.messageId;
+    }
     if (pendingInboxNotificationTarget.projectId !== activeTeamId) {
       selectTeam(pendingInboxNotificationTarget.projectId);
       return;
