@@ -12,6 +12,7 @@ import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { EmptyState, MainContent, PageHeader } from "./layout";
 import { cn } from "../lib/utils";
+import { teamIconComponent } from "./TeamIcon";
 
 const statusVariant = {
   planned: "soft",
@@ -130,7 +131,10 @@ export function Teams({
                       className="grid size-8 shrink-0 place-items-center rounded-lg bg-accent text-primary"
                       style={project.color ? { color: project.color } : undefined}
                     >
-                      <FolderKanban aria-hidden="true" size={17} />
+                      {project.icon ? (() => {
+                        const Icon = teamIconComponent(project.icon);
+                        return <Icon aria-hidden="true" size={17} strokeWidth={1.7} />;
+                      })() : <FolderKanban aria-hidden="true" size={17} />}
                     </span>
                     <span className="grid min-w-0 gap-0.5">
                       <strong className="truncate text-sm font-semibold text-foreground">

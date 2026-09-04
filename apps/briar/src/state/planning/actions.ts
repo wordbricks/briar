@@ -42,6 +42,8 @@ export interface EditPlanningProjectInput {
   readonly name: string;
   readonly description: string;
   readonly status: PlanningProjectStatus;
+  readonly icon?: string | null;
+  readonly color?: string | null;
 }
 
 export interface PlanningActions {
@@ -156,6 +158,8 @@ export function createPlanningActions(
         name: input.name.trim(),
         description: input.description.trim(),
         status: input.status,
+        ...(input.icon !== undefined ? { icon: input.icon } : {}),
+        ...(input.color !== undefined ? { color: input.color } : {}),
       };
       let project: PlanningProject;
       if (demoMode) {
