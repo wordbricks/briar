@@ -12,6 +12,7 @@ import {
   gitValueAt,
   loadConfig,
   login,
+  openCodeUpstreamConfigured,
   saveConfig,
   value,
 } from "./command-support";
@@ -206,7 +207,10 @@ export async function managedComputerSetupCommand() {
   const provider = providerFromFlag(existingProject?.llm?.provider ?? "codex");
   const providerHealth = await inspectWorkerProviderHealth(
     config.agentProviders,
-    { openrouterApiKey: config.openrouterApiKey ?? null },
+    {
+      upstreamConfigured: (provider) =>
+        openCodeUpstreamConfigured(config, provider),
+    },
   );
   const selectedProviderHealth = providerHealth[provider];
   if (!selectedProviderHealth.installed) {

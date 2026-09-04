@@ -19,7 +19,11 @@ import {
   resolve,
 } from "node:path";
 import packageJson from "../../../package.json";
-import { type AgentProvider } from "../src/lib/agent-provider";
+import {
+  agentProviderExecutionEnvironment,
+  openCodeUpstreamOf,
+  type AgentProvider,
+} from "../src/lib/agent-provider";
 import {
   createDeviceAuthorizationClient,
   type DeviceAuthorizationClient,
@@ -48,11 +52,24 @@ import {
 } from "./managed-computer-credential";
 import { fetchCurrentUser } from "./app-connect-client";
 
-const openRouterOpenCodeConfig = JSON.stringify({
-  provider: {
-    openrouter: { options: { apiKey: "{env:OPENROUTER_API_KEY}" } },
-  },
-});
+/**
+ * Credential this provider's OpenCode upstream authenticates with, read from
+ * the Briar config field the upstream descriptor names. Providers that run
+ * their own CLI carry no upstream credential.
+ */
+function openCodeUpstreamCredential(
+  config: Config,
+  provider: AgentProvider,
+): string | null {
+  const upstream = openCodeUpstreamOf(provider);
+  if (!upstream) return null;
+  return config[upstream.credential.configField]?.trim() || null;
+}
+
+/** Whether this provider's upstream credential is saved in the Briar config. */
+function openCodeUpstreamConfigured(config: Config, provider: AgentProvider) {
+  return openCodeUpstreamCredential(config, provider) !== null;
+}
 
 function providerExecutionEnvironment(
   config: Config,
@@ -70,16 +87,11 @@ function providerExecutionEnvironment(
         }
       : {}),
   };
-  if (provider !== "openrouter") return browserEnvironment;
-  const apiKey = config.openrouterApiKey?.trim();
-  if (!apiKey) {
-    throw new Error("앱 설정에서 OpenRouter API 키를 먼저 저장하세요.");
-  }
-  return {
-    ...browserEnvironment,
-    OPENROUTER_API_KEY: apiKey,
-    OPENCODE_CONFIG_CONTENT: openRouterOpenCodeConfig,
-  };
+  return agentProviderExecutionEnvironment(
+    provider,
+    openCodeUpstreamCredential(config, provider),
+    browserEnvironment,
+  );
 }
 const executionToken = (project: ProjectConfig) => {
   const token = process.env.BRIAR_WORKER_TOKEN ??
@@ -476,7 +488,8 @@ async function currentProject(config: Config): Promise<ProjectConfig> {
 }
 
 export {
-  openRouterOpenCodeConfig,
+  openCodeUpstreamConfigured,
+  openCodeUpstreamCredential,
   providerExecutionEnvironment,
   executionToken,
   configuredConfigDirectory,

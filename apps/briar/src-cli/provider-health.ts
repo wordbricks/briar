@@ -2,6 +2,7 @@ import { homedir } from "node:os";
 import {
   agentProviders,
   agentProviderBinaryName,
+  openCodeUpstreamOf,
   type AgentProvider,
 } from "../src/lib/agent-provider";
 import {
@@ -63,7 +64,11 @@ export type WorkerProviderHealthMap = Record<
 
 type ProviderHealthDependencies = {
   home: string;
-  openrouterApiKey: string | null;
+  /**
+   * Whether an OpenCode upstream credential is configured. Upstreams have no
+   * sign-in of their own, so this is what "authenticated" means for them.
+   */
+  upstreamConfigured: (provider: WorkerProvider) => boolean;
   now: () => number;
   which: (provider: WorkerProvider) => string | null;
   /** A block a runner reported for this provider that is still in force. */
@@ -76,7 +81,7 @@ type ProviderHealthDependencies = {
     binary: string,
     home: string,
     now: number,
-    openrouterApiKey: string | null,
+    upstreamConfigured: boolean,
   ) => Promise<boolean>;
   /**
    * Probe remaining provider quota. Return `exhausted: true` only when usage
@@ -93,11 +98,20 @@ type ProviderHealthDependencies = {
 
 const defaultDependencies: ProviderHealthDependencies = {
   home: homedir(),
-  openrouterApiKey: process.env.OPENROUTER_API_KEY?.trim() || null,
+  upstreamConfigured: (provider) => {
+    const upstream = openCodeUpstreamOf(provider);
+    if (!upstream) return false;
+    return Boolean(
+      process.env[upstream.credential.environmentVariable]?.trim(),
+    );
+  },
   now: Date.now,
   which: (provider) => Bun.which(agentProviderBinaryName(provider)),
   runtimeBlock: (provider, now) => activeProviderBlock(provider, () => now),
-  authenticated: async (provider, binary, home, now, openrouterApiKey) => {
+  authenticated: async (provider, binary, home, now, upstreamConfigured) => {
+    if (openCodeUpstreamOf(provider)) {
+      return upstreamConfigured;
+    }
     if (provider === "codex") {
       return codexAuthenticated(home);
     }
@@ -109,9 +123,6 @@ const defaultDependencies: ProviderHealthDependencies = {
     }
     if (provider === "opencode") {
       return opencodeAuthenticated(home);
-    }
-    if (provider === "openrouter") {
-      return Boolean(openrouterApiKey?.trim());
     }
     if (provider === "agy") {
       return agyAuthenticated(binary);
@@ -158,7 +169,7 @@ export async function inspectWorkerProviderHealth(
               binary,
               resolved.home,
               resolved.now(),
-              resolved.openrouterApiKey,
+              resolved.upstreamConfigured(provider),
             )
           : false;
       if (!enabled[provider]) {

@@ -623,9 +623,6 @@ pub(super) fn app_provider_settings_from(
         .ok_or_else(|| "Briar 로컬 설정의 agentProviders 값이 없습니다.".to_string())
 }
 
-pub(super) const OPENROUTER_OPENCODE_CONFIG: &str =
-    r#"{"provider":{"openrouter":{"options":{"apiKey":"{env:OPENROUTER_API_KEY}"}}}}"#;
-
 pub(super) fn openrouter_api_key_from(config_path: &Path) -> Result<Option<String>, String> {
     Ok(read_cli_config(config_path)?
         .openrouter_api_key
@@ -633,20 +630,49 @@ pub(super) fn openrouter_api_key_from(config_path: &Path) -> Result<Option<Strin
         .filter(|key| !key.is_empty()))
 }
 
+/// Credential an OpenCode upstream authenticates with. Credential shapes differ
+/// per upstream, so the match stays exhaustive over the provider enum.
+fn opencode_upstream_credential(
+    config_path: &Path,
+    upstream: &agent::OpenCodeUpstream,
+) -> Result<Option<String>, String> {
+    use agent::AgentProviderKind as Provider;
+    match upstream.provider {
+        Provider::Openrouter => openrouter_api_key_from(config_path),
+        // Not OpenCode upstreams; `opencode_upstream()` never returns them.
+        Provider::Codex
+        | Provider::Claude
+        | Provider::Cursor
+        | Provider::Grok
+        | Provider::Agy
+        | Provider::Opencode => Ok(None),
+    }
+}
+
+/// Environment additions a provider process needs. Only OpenCode upstreams have
+/// any: their credential, the OpenCode config that resolves it, and the marker
+/// naming the Briar provider the shared OpenCode runner executes as.
 pub(super) fn provider_environment_from(
     config_path: &Path,
     provider: agent::AgentProviderKind,
 ) -> Result<Vec<(String, String)>, String> {
-    if provider != agent::AgentProviderKind::Openrouter {
+    let Some(upstream) = provider.opencode_upstream() else {
         return Ok(Vec::new());
-    }
-    let api_key = openrouter_api_key_from(config_path)?
-        .ok_or_else(|| "앱 설정에서 OpenRouter API 키를 먼저 저장하세요.".to_string())?;
+    };
+    let credential = opencode_upstream_credential(config_path, upstream)?
+        .ok_or_else(|| upstream.missing_credential_error.to_string())?;
     Ok(vec![
-        ("OPENROUTER_API_KEY".to_string(), api_key),
+        (
+            upstream.credential_environment_variable.to_string(),
+            credential,
+        ),
         (
             "OPENCODE_CONFIG_CONTENT".to_string(),
-            OPENROUTER_OPENCODE_CONFIG.to_string(),
+            upstream.config_content.to_string(),
+        ),
+        (
+            agent::AGENT_PROVIDER_ENVIRONMENT_KEY.to_string(),
+            provider.wire_name().to_string(),
         ),
     ])
 }

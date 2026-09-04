@@ -12,6 +12,8 @@ import {
 import {
   agentProviderBinaryName,
   agentProviders,
+  openCodeUpstreamModelPrefix,
+  openCodeUpstreamOf,
   type AgentProvider,
 } from "../src/lib/agent-provider";
 import { cursorAuthenticated } from "./provider-credentials";
@@ -560,10 +562,14 @@ export async function discoverWorkerProviderCapabilities(
       if (provider === "opencode") {
         catalog.opencode.models = openCodeModels(binary, home, env, catalog);
       }
-      if (provider === "openrouter") {
-        catalog.openrouter.models = parseOpenCodeVerbose(
+      const upstream = openCodeUpstreamOf(provider);
+      if (upstream) {
+        // An upstream is an OpenCode provider, so its catalog is OpenCode's
+        // list narrowed to the ids that carry the upstream's prefix.
+        const prefix = openCodeUpstreamModelPrefix(upstream);
+        catalog[provider].models = parseOpenCodeVerbose(
           commandWithEnv(binary, ["models", "--verbose"], env),
-        ).filter((model) => model.id.startsWith("openrouter/"));
+        ).filter((model) => model.id.startsWith(prefix));
       }
       if (provider === "claude") {
         const help = helpOutput(binary, env);

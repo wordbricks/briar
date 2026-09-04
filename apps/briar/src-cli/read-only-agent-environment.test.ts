@@ -15,6 +15,7 @@ import {
   readOnlyAgentEnvironment,
   readOnlyStateRootEnvironmentKey,
 } from "./read-only-agent-environment";
+import { agentProviderCatalog } from "../src/lib/agent-provider";
 
 describe("read-only Agent environment", () => {
   it("keeps provider auth and OS basics but drops execution credentials", () => {
@@ -319,6 +320,30 @@ describe("read-only Agent environment", () => {
     } finally {
       await prepared.cleanup();
     }
+  });
+
+  it("derives the OpenRouter allowlist from its upstream descriptor", () => {
+    const { upstream } = agentProviderCatalog.openrouter;
+    const allowed = readOnlyAgentEnvironment("openrouter", {
+      HOME: "/Users/worker",
+      [upstream.credential.environmentVariable]: "sk-or-v1-provider-secret",
+      OPENCODE_CONFIG_CONTENT: '{"provider":{"openrouter":{}}}',
+      OPENAI_API_KEY: "unrelated-secret",
+      ANTHROPIC_API_KEY: "unrelated-secret",
+      BRIAR_WORKER_TOKEN: "worker-secret",
+    });
+    expect(allowed[upstream.credential.environmentVariable])
+      .toBe("sk-or-v1-provider-secret");
+    expect(allowed.OPENCODE_CONFIG_CONTENT)
+      .toBe('{"provider":{"openrouter":{}}}');
+    expect(allowed.HOME).toBe("/Users/worker");
+    expect(allowed.OPENAI_API_KEY).toBeUndefined();
+    expect(allowed.ANTHROPIC_API_KEY).toBeUndefined();
+    expect(allowed.BRIAR_WORKER_TOKEN).toBeUndefined();
+    // The upstream credential prefix and config key come from the catalog, so
+    // a new upstream cannot be left out of the allowlist.
+    expect(upstream.environmentPrefixes).toContain("OPENROUTER_");
+    expect(upstream.environmentKeys).toContain("OPENCODE_CONFIG_CONTENT");
   });
 
   it("isolates Antigravity state while preserving Google subscription OAuth", async () => {

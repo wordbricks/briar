@@ -207,7 +207,7 @@ describe("inspectWorkerProviderHealth", () => {
         which: (provider) => `/usr/local/bin/${provider}`,
         authenticated,
         usage,
-        openrouterApiKey: null,
+        upstreamConfigured: () => false,
       },
     );
 
@@ -217,7 +217,7 @@ describe("inspectWorkerProviderHealth", () => {
       "/usr/local/bin/claude",
       expect.any(String),
       expect.any(Number),
-      null,
+      false,
     );
     expect(usage).toHaveBeenCalledTimes(1);
     expect(healthyWorkerProviders(health)).toEqual(["claude"]);
@@ -241,7 +241,7 @@ describe("inspectWorkerProviderHealth", () => {
     } satisfies Record<WorkerProvider, boolean>;
     const withoutKey = await inspectWorkerProviderHealth(onlyOpenRouter, {
       which: (provider) => provider === "openrouter" ? "/usr/local/bin/opencode" : null,
-      openrouterApiKey: null,
+      upstreamConfigured: () => false,
     });
     expect(withoutKey.openrouter).toMatchObject({
       installed: true,
@@ -252,7 +252,7 @@ describe("inspectWorkerProviderHealth", () => {
 
     const withKey = await inspectWorkerProviderHealth(onlyOpenRouter, {
       which: (provider) => provider === "openrouter" ? "/usr/local/bin/opencode" : null,
-      openrouterApiKey: "sk-or-v1-test-key",
+      upstreamConfigured: (provider) => provider === "openrouter",
       usage: vi.fn(async () => ({
         exhausted: false,
         maxUsedPercent: null,
