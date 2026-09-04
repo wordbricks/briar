@@ -701,6 +701,14 @@ fn stores_openrouter_credentials_locally_and_only_exposes_configuration_status()
     );
     assert_eq!(environment[1].0, "OPENCODE_CONFIG_CONTENT");
     assert!(!environment[1].1.contains("sk-or-v1-local-test-key"));
+    // The shared OpenCode runner learns which upstream it runs as from here.
+    assert_eq!(
+        environment[2],
+        (
+            agent::AGENT_PROVIDER_ENVIRONMENT_KEY.to_string(),
+            "openrouter".to_string(),
+        )
+    );
 
     let cleared =
         update_openrouter_api_key_at(&config_path, None).expect("credential should clear");

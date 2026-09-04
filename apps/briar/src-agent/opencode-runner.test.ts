@@ -17,15 +17,26 @@ import {
   ensureReadOnlyAgentEnvironment,
   readOnlyStateRootEnvironmentKey,
 } from "./read-only-agent-environment";
+import { agentProviderEnvironmentKey } from "../src/lib/agent-provider";
 
 describe("OpenCode read-only isolation", () => {
-  it("selects the OpenRouter allowlist only when Briar generated its config", () => {
+  it("takes the upstream from the provider marker Briar stamps", () => {
     expect(openCodeIsolationProvider({})).toBe("opencode");
-    expect(openCodeIsolationProvider({ OPENCODE_CONFIG_CONTENT: "  " }))
+    expect(openCodeIsolationProvider({ [agentProviderEnvironmentKey]: "  " }))
       .toBe("opencode");
+    // A generated config alone no longer names an upstream: every upstream
+    // ships one, so only the marker says which provider a turn runs as.
     expect(
       openCodeIsolationProvider({ OPENCODE_CONFIG_CONTENT: '{"provider":{}}' }),
+    ).toBe("opencode");
+    expect(
+      openCodeIsolationProvider({ [agentProviderEnvironmentKey]: "openrouter" }),
     ).toBe("openrouter");
+    // A marker naming a provider that is not an upstream falls back to
+    // OpenCode's own allowlist instead of being trusted.
+    expect(
+      openCodeIsolationProvider({ [agentProviderEnvironmentKey]: "codex" }),
+    ).toBe("opencode");
   });
 
   it("moves TMPDIR and the seatbelt state root inside the isolated home", async () => {

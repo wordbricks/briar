@@ -11,7 +11,13 @@ import {
 } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import type { AgentProvider } from "../src/lib/agent-provider";
+import {
+  agentProviderCatalog,
+  agentProviderEnvironmentKey,
+  isOpenCodeUpstreamProvider,
+  type AgentProvider,
+  type OpenCodeUpstreamProvider,
+} from "../src/lib/agent-provider";
 
 const commonEnvironmentKeys = new Set([
   "HOME",
@@ -49,8 +55,16 @@ const commonEnvironmentKeys = new Set([
   "HTTPS_PROXY",
   "ALL_PROXY",
   "NO_PROXY",
+  // Names the Briar provider rather than carrying a credential, and the
+  // runner reads it to pick the isolation allowlist for its own provider.
+  agentProviderEnvironmentKey,
 ]);
 
+/**
+ * Env prefixes each provider CLI authenticates through. OpenCode upstreams are
+ * absent on purpose: their rows come from the catalog descriptor, so a new
+ * upstream cannot be forgotten here.
+ */
 const providerPrefixes = {
   codex: ["OPENAI_"],
   claude: ["ANTHROPIC_", "AWS_", "GOOGLE_", "VERTEX_"],
@@ -76,8 +90,7 @@ const providerPrefixes = {
     "TOGETHER_",
     "CEREBRAS_",
   ],
-  openrouter: ["OPENROUTER_"],
-} satisfies Record<AgentProvider, string[]>;
+} satisfies Record<Exclude<AgentProvider, OpenCodeUpstreamProvider>, string[]>;
 
 const providerEnvironmentKeys = {
   codex: new Set(["CODEX_ACCESS_TOKEN"]),
@@ -86,8 +99,36 @@ const providerEnvironmentKeys = {
   grok: new Set(["XAI_API_KEY"]),
   agy: new Set(),
   opencode: new Set(),
-  openrouter: new Set(["OPENCODE_CONFIG_CONTENT"]),
-} satisfies Record<AgentProvider, Set<string>>;
+} satisfies Record<
+  Exclude<AgentProvider, OpenCodeUpstreamProvider>,
+  Set<string>
+>;
+
+/** Environment names a provider's own authentication inputs live under. */
+type ProviderEnvironmentAllowlist = {
+  prefixes: readonly string[];
+  keys: ReadonlySet<string>;
+};
+
+/**
+ * Upstream rows are derived from the catalog descriptor; every other provider
+ * keeps its explicit, total table above.
+ */
+function providerEnvironmentAllowlist(
+  provider: AgentProvider,
+): ProviderEnvironmentAllowlist {
+  if (isOpenCodeUpstreamProvider(provider)) {
+    const { upstream } = agentProviderCatalog[provider];
+    return {
+      prefixes: upstream.environmentPrefixes,
+      keys: new Set(upstream.environmentKeys),
+    };
+  }
+  return {
+    prefixes: providerPrefixes[provider],
+    keys: providerEnvironmentKeys[provider],
+  };
+}
 
 const grokReadOnlyProfile = "briar_read_only";
 
@@ -119,8 +160,7 @@ export function readOnlyAgentEnvironment(
   environment: NodeJS.ProcessEnv = process.env,
 ): NodeJS.ProcessEnv {
   const allowed: NodeJS.ProcessEnv = {};
-  const prefixes = providerPrefixes[provider];
-  const exactKeys = providerEnvironmentKeys[provider];
+  const { prefixes, keys: exactKeys } = providerEnvironmentAllowlist(provider);
   for (const [key, value] of Object.entries(environment)) {
     if (value === undefined) continue;
     const normalized = key.toUpperCase();

@@ -49,7 +49,12 @@ import {
   ensureReadOnlyAgentEnvironment,
   type PreparedReadOnlyAgentEnvironment,
 } from "./read-only-agent-environment";
-import type { AgentProvider } from "../src/lib/agent-provider";
+import {
+  agentProviderEnvironmentKey,
+  agentProviders,
+  openCodeUpstreamOf,
+  type AgentProvider,
+} from "../src/lib/agent-provider";
 
 type RunnerDiagnostic = (
   phase: string,
@@ -363,15 +368,17 @@ type OpenCodeRunnerResources = {
 };
 
 /**
- * OpenRouter runs behind the same OpenCode server, and the sidecar request
- * carries no provider id. Briar only ever sets `OPENCODE_CONFIG_CONTENT` for
- * the OpenRouter provider, so its presence selects the isolation allowlist
- * that keeps that generated config and the OpenRouter key.
+ * Every OpenCode upstream runs behind this same server and the sidecar request
+ * carries no provider id, so the launcher names the Briar provider in the
+ * environment instead. An absent or non-upstream marker means plain OpenCode,
+ * whose allowlist is the safe default.
  */
 export function openCodeIsolationProvider(
   environment: NodeJS.ProcessEnv,
 ): AgentProvider {
-  return environment.OPENCODE_CONFIG_CONTENT?.trim() ? "openrouter" : "opencode";
+  const marker = environment[agentProviderEnvironmentKey]?.trim();
+  const provider = agentProviders.find((candidate) => candidate === marker);
+  return provider && openCodeUpstreamOf(provider) ? provider : "opencode";
 }
 
 const activeResources: OpenCodeRunnerResources = {};

@@ -24,7 +24,10 @@ import {
 } from "../src/lib/provider-block";
 import { recordProviderBlock } from "./provider-block-registry";
 import type { JsonSchema } from "../src/lib/team-llm";
-import { agentProviderBinaryName } from "../src/lib/agent-provider";
+import {
+  agentProviderBinaryName,
+  openCodeUpstreamOf,
+} from "../src/lib/agent-provider";
 import { agentProviderToProto } from "../src/lib/agent-provider-proto";
 import { supportsComputerUseProvider } from
   "../src/lib/computer-use-contract";
@@ -273,7 +276,8 @@ async function runPreparedDetachedProviderTurn(
       : new Error("Worker execution was cancelled");
   }
   const provider = input.agent.provider;
-  const runnerProvider = provider === "openrouter" ? "opencode" : provider;
+  // An OpenCode upstream has no runner bundle of its own; OpenCode's drives it.
+  const runnerProvider = openCodeUpstreamOf(provider) ? "opencode" : provider;
   const binaryName = agentProviderBinaryName(provider);
   diagnose("turn.started", {
     provider,

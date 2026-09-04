@@ -17,14 +17,22 @@ import {
 } from "@briar/contracts/gen/briar/local/v1/local_pb";
 import {
   agentProviderBinaryName,
+  agentProviderExecutionEnvironment,
   agentProviders,
+  openCodeUpstreamOf,
   type AgentProvider,
 } from "../src/lib/agent-provider";
 import type {
   AgentEffortCapability,
   AgentProviderCapability,
 } from "../src/lib/agent-provider-contract";
-import { has, loadConfig, openRouterOpenCodeConfig, value, values } from "./command-support";
+import {
+  has,
+  loadConfig,
+  openCodeUpstreamCredential,
+  value,
+  values,
+} from "./command-support";
 import { discoverWorkerProviderCapabilities } from "./provider-capabilities";
 import {
   agyAuthenticated,
@@ -98,17 +106,34 @@ const requestedTimeout = (fallback: number) => {
   return parsed;
 };
 
-/** The CLI owns the Briar config, so it reads its own OpenRouter credential. */
-const openrouterApiKey = async () => {
+/** Saved credential of every OpenCode upstream, keyed by provider. */
+type UpstreamCredentials = Partial<Record<AgentProvider, string | null>>;
+
+/** The CLI owns the Briar config, so it reads its own upstream credentials. */
+const upstreamCredentials = async (): Promise<UpstreamCredentials> => {
+  let config: Awaited<ReturnType<typeof loadConfig>>;
   try {
-    return (await loadConfig()).openrouterApiKey?.trim() || null;
+    config = await loadConfig();
   } catch {
-    return null;
+    return {};
   }
+  return Object.fromEntries(
+    agentProviders
+      .filter((provider) => openCodeUpstreamOf(provider))
+      .map((provider) =>
+        [provider, openCodeUpstreamCredential(config, provider)] as const
+      ),
+  );
 };
 
-const openrouterConfigured = async () =>
-  has("--openrouter-configured") || (await openrouterApiKey()) !== null;
+/**
+ * `--openrouter-configured` lets the desktop answer for the credential it owns
+ * without handing the key to the CLI.
+ */
+const upstreamConfigured =
+  (credentials: UpstreamCredentials) => (provider: AgentProvider) =>
+    (provider === "openrouter" && has("--openrouter-configured")) ||
+    (credentials[provider] ?? null) !== null;
 
 const providerBinary = (provider: AgentProvider) =>
   Bun.which(agentProviderBinaryName(provider));
@@ -181,7 +206,7 @@ async function providerUsageCommand() {
     home: requestedHome(),
     providers,
     timeoutMs: requestedTimeout(10_000),
-    openrouterConfigured: await openrouterConfigured(),
+    upstreamConfigured: upstreamConfigured(await upstreamCredentials()),
   });
   if (!has("--json")) {
     for (const provider of providers) {
@@ -210,7 +235,7 @@ async function providerUsageCommand() {
 async function providerModelsCommand() {
   applyExecutionPath();
   const providers = requestedProviders();
-  const apiKey = await openrouterApiKey();
+  const credentials = await upstreamCredentials();
   const catalog = await discoverWorkerProviderCapabilities(
     Object.fromEntries(
       providerOrder.map((provider) => [provider, providers.includes(provider)]),
@@ -219,17 +244,12 @@ async function providerModelsCommand() {
       refresh: true,
       home: requestedHome(),
       which: providerBinary,
-      environment: (provider) => {
-        if (provider !== "openrouter") return process.env;
-        if (!apiKey) {
-          throw new Error("앱 설정에서 OpenRouter API 키를 먼저 저장하세요.");
-        }
-        return {
-          ...process.env,
-          OPENROUTER_API_KEY: apiKey,
-          OPENCODE_CONFIG_CONTENT: openRouterOpenCodeConfig,
-        };
-      },
+      environment: (provider) =>
+        agentProviderExecutionEnvironment(
+          provider,
+          credentials[provider] ?? null,
+          process.env,
+        ),
     },
   );
   if (!has("--json")) {
@@ -254,12 +274,13 @@ const providerAuthenticated = async (
   provider: AgentProvider,
   home: string,
   now: number,
-  openrouterConfigured: boolean,
+  configured: (provider: AgentProvider) => boolean,
 ) => {
+  // An upstream has no sign-in of its own; its saved credential is its auth.
+  if (openCodeUpstreamOf(provider)) return configured(provider);
   if (provider === "codex") return codexAuthenticated(home);
   if (provider === "grok") return grokAuthenticated(home, now);
   if (provider === "opencode") return opencodeAuthenticated(home);
-  if (provider === "openrouter") return openrouterConfigured;
   const binary = providerBinary(provider);
   if (!binary) return false;
   if (provider === "claude") return claudeAuthenticated(binary);
@@ -272,7 +293,7 @@ async function providerAuthCommand() {
   const providers = requestedProviders();
   const home = requestedHome();
   const now = Date.now();
-  const configured = await openrouterConfigured();
+  const configured = upstreamConfigured(await upstreamCredentials());
   const entries = await Promise.all(
     providers.map(async (provider) =>
       [

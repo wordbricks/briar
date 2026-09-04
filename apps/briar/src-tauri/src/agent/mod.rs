@@ -48,6 +48,42 @@ pub(crate) enum AgentProviderKind {
     Openrouter,
 }
 
+/// Marker naming the Briar provider a runner process executes for.
+///
+/// The sidecar `RunRequest` carries no provider id and several providers share
+/// one runner bundle, so the launcher names the provider in the environment
+/// instead. Mirrors `agentProviderEnvironmentKey` in `src/lib/agent-provider.ts`.
+pub(crate) const AGENT_PROVIDER_ENVIRONMENT_KEY: &str = "BRIAR_AGENT_PROVIDER";
+
+/// Home-relative skills directory of OpenCode's local runtime.
+const OPENCODE_SKILL_DIRECTORY: &str = ".config/opencode";
+
+/// Bundled runner that drives OpenCode's local runtime.
+const OPENCODE_RUNNER_BUNDLE: &str = "opencode-runner.js";
+
+/// A provider that is not its own CLI: it runs behind the OpenCode runner with
+/// a Briar-generated OpenCode config, which names the credential environment
+/// variable rather than carrying the credential itself.
+pub(crate) struct OpenCodeUpstream {
+    pub(crate) provider: AgentProviderKind,
+    /// Environment variable OpenCode resolves this upstream's credential from.
+    pub(crate) credential_environment_variable: &'static str,
+    /// `OPENCODE_CONFIG_CONTENT` Briar generates for this upstream. Byte for
+    /// byte what `openCodeUpstreamConfigJson` produces in TypeScript.
+    pub(crate) config_content: &'static str,
+    /// Shown when a turn is requested before the credential is saved.
+    pub(crate) missing_credential_error: &'static str,
+}
+
+/// The single source of OpenCode upstreams. Everything that used to enumerate
+/// `Opencode | Openrouter` derives from this table instead.
+static OPENCODE_UPSTREAMS: &[OpenCodeUpstream] = &[OpenCodeUpstream {
+    provider: AgentProviderKind::Openrouter,
+    credential_environment_variable: "OPENROUTER_API_KEY",
+    config_content: r#"{"provider":{"openrouter":{"options":{"apiKey":"{env:OPENROUTER_API_KEY}"}}}}"#,
+    missing_credential_error: "앱 설정에서 OpenRouter API 키를 먼저 저장하세요.",
+}];
+
 /// 대화 ID 네임스페이스의 단일 출처.
 ///
 /// 여기 등록된 provider는 대화 ID를 `briar:<네임스페이스>:<프로젝트 id>:<세션 id>`
@@ -67,6 +103,13 @@ const CONVERSATION_NAMESPACES: &[(AgentProviderKind, &str)] = &[
 ];
 
 impl AgentProviderKind {
+    /// The OpenCode upstream this provider runs as, when it is one.
+    pub(crate) fn opencode_upstream(self) -> Option<&'static OpenCodeUpstream> {
+        OPENCODE_UPSTREAMS
+            .iter()
+            .find(|upstream| upstream.provider == self)
+    }
+
     /// provider가 대화 ID에 사용하는 네임스페이스. 레거시 형식만 쓰면 `None`.
     pub(crate) fn conversation_namespace(self) -> Option<&'static str> {
         CONVERSATION_NAMESPACES
@@ -108,26 +151,33 @@ impl AgentProviderKind {
 
     /// Home-relative directory this provider reads Briar skills from.
     pub(crate) fn skill_directory(self) -> &'static str {
+        // Every upstream runs on OpenCode's local runtime and reads its skills.
+        if self.opencode_upstream().is_some() {
+            return OPENCODE_SKILL_DIRECTORY;
+        }
         match self {
             Self::Codex => ".codex",
             Self::Claude => ".claude",
             Self::Cursor => ".cursor",
             Self::Grok => ".grok",
             Self::Agy => ".gemini/config",
-            // OpenRouter runs on OpenCode's local runtime and reads its skills.
-            Self::Opencode | Self::Openrouter => ".config/opencode",
+            Self::Opencode | Self::Openrouter => OPENCODE_SKILL_DIRECTORY,
         }
     }
 
     /// Bundled Bun sidecar runner this provider executes, when it has one.
     pub(crate) fn runner_bundle_name(self) -> &'static str {
+        // An upstream has no runner of its own; OpenCode's runner drives it.
+        if self.opencode_upstream().is_some() {
+            return OPENCODE_RUNNER_BUNDLE;
+        }
         match self {
             Self::Codex => "codex-runner.js",
             Self::Claude => "claude-runner.js",
             Self::Cursor => "cursor-runner.js",
             Self::Grok => "grok-runner.js",
             Self::Agy => "agy-runner.js",
-            Self::Opencode | Self::Openrouter => "opencode-runner.js",
+            Self::Opencode | Self::Openrouter => OPENCODE_RUNNER_BUNDLE,
         }
     }
 
@@ -800,9 +850,43 @@ mod tests {
     use super::{
         AgentActivityKind, AgentActivityStatus, AgentEvent, AgentProviderKind, BundledRunnerFile,
         ProjectLlmRequest, ProviderBlock, ProviderBlockReason, BRIAR_SKILL_INSTRUCTION,
-        CONVERSATION_NAMESPACES, PROVIDER_BLOCKED_ERROR_PREFIX,
+        CONVERSATION_NAMESPACES, OPENCODE_UPSTREAMS, PROVIDER_BLOCKED_ERROR_PREFIX,
     };
     use briar_contracts::proto::briar::types::v1 as types_proto;
+
+    #[test]
+    fn opencode_upstreams_run_on_the_opencode_runtime() {
+        for upstream in OPENCODE_UPSTREAMS {
+            assert_eq!(
+                upstream.provider.skill_directory(),
+                AgentProviderKind::Opencode.skill_directory()
+            );
+            assert_eq!(
+                upstream.provider.runner_bundle_name(),
+                AgentProviderKind::Opencode.runner_bundle_name()
+            );
+            // The generated config names the credential variable so the key
+            // itself only ever travels through the child environment.
+            assert!(upstream.config_content.contains(&format!(
+                "{{env:{}}}",
+                upstream.credential_environment_variable
+            )));
+        }
+    }
+
+    #[test]
+    fn only_upstream_providers_carry_an_upstream_descriptor() {
+        for provider in AgentProviderKind::all() {
+            assert_eq!(
+                provider.opencode_upstream().is_some(),
+                OPENCODE_UPSTREAMS
+                    .iter()
+                    .any(|upstream| upstream.provider == provider)
+            );
+        }
+        assert!(AgentProviderKind::Opencode.opencode_upstream().is_none());
+        assert!(AgentProviderKind::Openrouter.opencode_upstream().is_some());
+    }
 
     #[test]
     fn provider_block_round_trips_through_the_command_error_string() {

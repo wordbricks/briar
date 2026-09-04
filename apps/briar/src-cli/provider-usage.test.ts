@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { agentProviderCatalog } from "../src/lib/agent-provider";
 import {
   claudeTokenState,
   jwtEmail,
@@ -13,7 +14,7 @@ import {
 } from "./provider-credentials";
 import {
   claudeUsageErrorForStatus,
-  loadOpenrouterUsage,
+  loadOpenCodeUpstreamUsage,
   loadProviderUsage,
   opencodeUsageErrorForStatus,
   parseAgyCliQuota,
@@ -27,6 +28,8 @@ import {
   type ProviderUsageResult,
 } from "./provider-usage";
 
+const openRouterUpstream = agentProviderCatalog.openrouter.upstream;
+
 const usageOf = (result: ProviderUsageResult) => {
   expect(result.error).toBeNull();
   return result.usage!;
@@ -37,7 +40,7 @@ const probeOf = (result: ProviderUsageResult) =>
 
 describe("provider usage probes", () => {
   it("reflects the OpenRouter credential status without quota windows", () => {
-    const configured = loadOpenrouterUsage(true);
+    const configured = loadOpenCodeUpstreamUsage(openRouterUpstream, true);
     expect(configured.status).toBe("ok");
     expect(configured.authenticated).toBe(true);
     expect(configured.session).toBeNull();
@@ -45,7 +48,7 @@ describe("provider usage probes", () => {
     expect(configured.monthly).toBeNull();
     expect(configured.error).toBeNull();
 
-    const missing = loadOpenrouterUsage(false);
+    const missing = loadOpenCodeUpstreamUsage(openRouterUpstream, false);
     expect(missing.status).toBe("unavailable");
     expect(missing.authenticated).toBe(false);
     expect(missing.error).toBe("OpenRouter API 키가 필요합니다.");

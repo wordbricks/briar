@@ -65,6 +65,7 @@ import {
   worktreeSettings,
   worktreesEnabled,
   currentProject,
+  openCodeUpstreamConfigured,
   providerExecutionEnvironment,
 } from "./command-support";
 import {
@@ -247,7 +248,10 @@ async function workerRegisterCommand() {
   const configuredProvider = project.llm?.provider ?? "codex";
   const providerHealth = await inspectWorkerProviderHealth(
     config.agentProviders,
-    { openrouterApiKey: config.openrouterApiKey ?? null },
+    {
+      upstreamConfigured: (provider) =>
+        openCodeUpstreamConfigured(config, provider),
+    },
   );
   const providerCapabilities = await discoverWorkerProviderCapabilities(
     config.agentProviders,
@@ -276,7 +280,7 @@ async function workerRegisterCommand() {
           worktrees: true,
           dmMemoryLearning: dmMemoryLearningCapability(
             providers,
-            Boolean(config.openrouterApiKey?.trim()),
+            openCodeUpstreamConfigured(config, "openrouter"),
           ),
           computerUse,
         }),
@@ -309,7 +313,7 @@ async function workerRegisterCommand() {
       worktrees: true,
       dmMemoryLearning: dmMemoryLearningCapability(
         providers,
-        Boolean(config.openrouterApiKey?.trim()),
+        openCodeUpstreamConfigured(config, "openrouter"),
       ),
       computerUse,
     }),
@@ -563,7 +567,10 @@ async function workerCommand() {
   if (readinessProblem) {
     const providerHealth = await inspectWorkerProviderHealth(
       config.agentProviders,
-      { openrouterApiKey: config.openrouterApiKey ?? null },
+      {
+        upstreamConfigured: (provider) =>
+          openCodeUpstreamConfigured(config, provider),
+      },
     );
     const providerCapabilities = await discoverWorkerProviderCapabilities(
       config.agentProviders,
@@ -582,7 +589,7 @@ async function workerCommand() {
         worktrees: true,
         dmMemoryLearning: dmMemoryLearningCapability(
           providers,
-          Boolean(config.openrouterApiKey?.trim()),
+          openCodeUpstreamConfigured(config, "openrouter"),
         ),
         computerUse,
       }),
@@ -710,7 +717,10 @@ async function workerCommand() {
         }
         const providerHealth = await inspectWorkerProviderHealth(
           config.agentProviders,
-          { openrouterApiKey: config.openrouterApiKey ?? null },
+          {
+            upstreamConfigured: (provider) =>
+              openCodeUpstreamConfigured(config, provider),
+          },
         );
         const providerCapabilities = await discoverWorkerProviderCapabilities(
           config.agentProviders,
@@ -762,7 +772,7 @@ async function workerCommand() {
             })),
             dmMemoryLearning: dmMemoryLearningCapability(
               providers,
-              Boolean(config.openrouterApiKey?.trim()),
+              openCodeUpstreamConfigured(config, "openrouter"),
             ),
             computerUse,
           }),
@@ -826,7 +836,7 @@ async function workerCommand() {
                   })),
                   dmMemoryLearning: dmMemoryLearningCapability(
                     providers,
-                    Boolean(config.openrouterApiKey?.trim()),
+                    openCodeUpstreamConfigured(config, "openrouter"),
                   ),
                   computerUse,
                 }),

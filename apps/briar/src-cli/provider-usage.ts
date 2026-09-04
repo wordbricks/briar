@@ -3,7 +3,9 @@ import { homedir } from "node:os";
 import {
   agentProviderBinaryName,
   agentProviders,
+  openCodeUpstreamOf,
   type AgentProvider,
+  type OpenCodeUpstreamDescriptor,
 } from "../src/lib/agent-provider";
 import { isProviderUsageExhausted } from "../src/lib/agent-usage";
 import {
@@ -1097,16 +1099,29 @@ function loadCursorUsage(binary: string | null): ProviderUsageReport {
     : providerWithoutUsage("unavailable", "Cursor 로그인이 필요합니다.");
 }
 
-export function loadOpenrouterUsage(configured: boolean): ProviderUsageReport {
-  return configured
-    ? connectedWithoutWindows()
-    : providerWithoutUsage("unavailable", "OpenRouter API 키가 필요합니다.");
+/** Usage an OpenCode upstream can report, per its descriptor. */
+export function loadOpenCodeUpstreamUsage(
+  upstream: OpenCodeUpstreamDescriptor,
+  configured: boolean,
+): ProviderUsageReport {
+  switch (upstream.usage) {
+    // No usage endpoint of its own, so the report says whether the credential
+    // is there and carries no quota windows.
+    case "none":
+      return configured
+        ? connectedWithoutWindows()
+        : providerWithoutUsage(
+          "unavailable",
+          upstream.missingCredentialUsageMessage,
+        );
+  }
 }
 
 export type ProviderUsageSnapshotOptions = {
   home?: string;
   now?: number;
-  openrouterConfigured?: boolean;
+  /** Whether an OpenCode upstream's credential is configured. */
+  upstreamConfigured?: (provider: AgentProvider) => boolean;
   providers?: readonly AgentProvider[];
   timeoutMs?: number;
   which?: (provider: AgentProvider) => string | null;
@@ -1125,6 +1140,13 @@ export async function loadProviderUsage(
   const timeoutMs = options.timeoutMs ?? DEFAULT_PROBE_TIMEOUT_MS;
   const fetchImpl = options.fetchImpl ?? fetch;
   const binary = (options.which ?? defaultWhich)(provider);
+  const upstream = openCodeUpstreamOf(provider);
+  if (upstream) {
+    return loadOpenCodeUpstreamUsage(
+      upstream,
+      options.upstreamConfigured?.(provider) === true,
+    );
+  }
   if (provider === "codex") return loadCodexUsage(home, binary, timeoutMs);
   if (provider === "claude") {
     return loadClaudeUsage(home, now, timeoutMs, fetchImpl);
@@ -1136,8 +1158,7 @@ export async function loadProviderUsage(
   if (provider === "opencode") {
     return loadOpencodeUsage(home, binary, timeoutMs, fetchImpl);
   }
-  if (provider === "cursor") return loadCursorUsage(binary);
-  return loadOpenrouterUsage(options.openrouterConfigured === true);
+  return loadCursorUsage(binary);
 }
 
 /** Probe every requested provider in parallel, exactly like the desktop did. */
