@@ -206,13 +206,7 @@ const mountInboxPage = async () => {
                 "window-controls",
                 <WindowNavigationControlsWithHistory />,
               )}
-              {renders.profile(
-                "inbox-bridge",
-                <InboxBridge
-                  reconcileWorkerDispatches={noop}
-                  sessions={[]}
-                />,
-              )}
+              {renders.profile("inbox-bridge", <InboxBridge sessions={[]} />)}
               <RunProbe renders={renders} />
               <SettingsProbe renders={renders} />
             </TooltipProvider>

@@ -140,16 +140,6 @@ export function App({
     [token],
   );
 
-  useEffect(() => {
-    autoHunt.configureSync(
-      token,
-      teams.map((team) => ({
-        id: team.id,
-        organizationId: team.organizationId,
-      })),
-    );
-  }, [autoHunt.configureSync, teams, token]);
-
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(
     hasCompletedInitialOnboarding,
   );
@@ -328,10 +318,7 @@ export function App({
   return (
     <>
       <AppEffects />
-      <InboxBridge
-        reconcileWorkerDispatches={autoHunt.reconcileWorkerDispatches}
-        sessions={autoHunt.sessions}
-      />
+      <InboxBridge sessions={autoHunt.sessions} />
       <AuthGate
         acceptingInvitation={invitation.acceptingInvitation}
         invitationToken={invitation.invitationToken}
