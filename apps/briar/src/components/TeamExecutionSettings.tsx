@@ -180,7 +180,7 @@ export function TeamExecutionSettings({
 
         {loading ? (
           <div className="grid min-h-32 place-items-center">
-            <Spinner size={20} />
+            <Spinner className="size-[20px]" />
           </div>
         ) : (
           <>
@@ -333,7 +333,7 @@ export function TeamExecutionSettings({
                 type="button"
               >
                 {saving ? (
-                  <Spinner size={14} />
+                  <Spinner className="size-[14px]" />
                 ) : !dirty ? (
                   <Check size={14} />
                 ) : (

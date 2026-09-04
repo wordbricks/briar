@@ -7,7 +7,6 @@ import { DirectMessages } from "../DirectMessages";
 import { useChannelActions } from "../../state/channels/actions";
 import {
   channelCatalogCursorAtom,
-  getCompanionChannelCache,
   initialChannelInviteIdAtom,
   organizationDirectMessagesAtom,
   requestedChannelIdAtom,
@@ -160,7 +159,6 @@ export function DirectMessagesWithCatalog(props: DirectMessagesShellProps) {
 type CompanionChannelsShellProps = Omit<
   ComponentProps<typeof CompanionChannels>,
   | "activeProjectId"
-  | "channelCache"
   | "currentUserId"
   | "onRequestedChannelOpen"
   | "onRequestedMessageOpen"
@@ -174,8 +172,8 @@ type CompanionChannelsShellProps = Omit<
 
 /**
  * The companion channel view. Its message cache used to be a `useRef` on the
- * shell handed down as a prop, which is what let it survive the view
- * remounting; it lives on the registry now and survives for the same reason.
+ * shell handed down as a prop, then a `WeakMap` on the registry; it is the
+ * `state/channel-conversation` store now, shared with the desktop view.
  */
 export function CompanionChannelsWithCatalog(
   props: CompanionChannelsShellProps,
@@ -195,7 +193,6 @@ export function CompanionChannelsWithCatalog(
     <CompanionChannels
       {...props}
       activeProjectId={activeTeam?.id ?? null}
-      channelCache={getCompanionChannelCache(registry)}
       currentUserId={user?.id ?? null}
       onRequestedChannelOpen={() => registry.set(requestedChannelIdAtom, null)}
       onRequestedMessageOpen={clearRequestedChannelMessage}

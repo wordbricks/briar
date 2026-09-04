@@ -75,7 +75,6 @@ import type {
   ProjectExecutionWorkerPolicy,
 } from "../types";
 import {
-  type ChannelAgentReply,
   type ChannelAgentSummary,
   type ChannelDelta,
   type ChannelMember,
@@ -158,6 +157,22 @@ import {
 } from "../lib/channel-performance";
 import type { ChannelAgentActivityDescriptor } from "../lib/channel-agent-activity";
 import { useChannelConversation } from "../hooks/use-channel-conversation";
+import { useAtomValue } from "@effect/atom-react";
+import { useRegistry } from "../state/registry";
+import {
+  channelMessageAtom,
+  channelMessageKey,
+  channelRootMessageIdsAtom,
+  channelRootMessageSummariesAtom,
+  channelRootMessagesAtom,
+  channelThreadKey,
+  channelThreadMessagesAtom,
+} from "../state/channel-conversation/atoms";
+import type { ChannelMessageSummary } from "../state/channel-conversation/model";
+import {
+  useChannelConversationStore,
+  useChannelConversationView,
+} from "../state/channel-conversation/useChannelConversationStore";
 
 type ChannelsProps = {
   organizationId: string;
@@ -193,14 +208,6 @@ type ChannelsProps = {
     rootMessageId: string;
   } | null;
   onRequestedMessageOpen?: () => void;
-};
-
-type CachedDesktopChannel = {
-  channel: ChannelSummary;
-  members: ChannelMember[];
-  agents: ChannelAgentSummary[];
-  messages: ChannelMessage[];
-  nextCursor: string | null;
 };
 
 /** Only opened from the DM header menu, so it loads on demand. */
@@ -352,20 +359,37 @@ export function Channels({
     organizationId,
     token,
   ]);
-  const [members, setMembers] = useState<ChannelMember[]>([]);
-  const [agents, setAgents] = useState<ChannelAgentSummary[]>([]);
   const [headerProfile, setHeaderProfile] = useState<ProfileTarget | null>(null);
   const [participantMenuOpen, setParticipantMenuOpen] = useState(false);
-  const [messages, setMessages] = useState<ChannelMessage[]>([]);
-  const [messageNextCursor, setMessageNextCursor] = useState<string | null>(null);
   const [channelLoading, setChannelLoading] = useState(false);
-  const [replies, setReplies] = useState<ChannelAgentReply[]>([]);
-  const [threadParentId, setThreadParentId] = useState<string | null>(null);
+  /*
+    The conversation is `state/channel-conversation`'s, not this component's.
+    It used to be seven `useState` values plus a `channelCache` ref that copied
+    them per channel so returning to one did not blank the screen; the store is
+    both now, shared with the companion view and bounded in one place.
+  */
+  const registry = useRegistry();
+  const conversationStore = useChannelConversationStore(activeChannelId);
+  const {
+    agents,
+    members,
+    replies,
+    threadMessages,
+    threadParentId,
+  } = useChannelConversationView(activeChannelId);
+  /*
+    The list reads summaries, not messages. A summary carries what the timeline
+    needs to key a row, draw a day separator and measure it; editing a message
+    leaves every summary equal, so this component is not woken and only the row
+    that owns the message re-renders.
+  */
+  const messageSummaries = useAtomValue(
+    channelRootMessageSummariesAtom(activeChannelId ?? ""),
+  );
   useEffect(() => {
     onViewingChannelChange?.(activeChannelId, threadParentId);
     return () => onViewingChannelChange?.(null, null);
   }, [activeChannelId, onViewingChannelChange, threadParentId]);
-  const [threadMessages, setThreadMessages] = useState<ChannelMessage[]>([]);
   const [channelListReady, setChannelListReady] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteIsInitial, setInviteIsInitial] = useState(false);
@@ -404,7 +428,6 @@ export function Channels({
   const threadMessagesScrollRef = useRef<HTMLDivElement | null>(null);
   const initialInviteHandledChannelId = useRef<string | null>(null);
   const activeChannelIdRef = useRef(activeChannelId);
-  const channelCache = useRef(new Map<string, CachedDesktopChannel>());
   const channelLoadAbortController = useRef<AbortController | null>(null);
   const preparedChannelId = useRef<string | null>(null);
   const requestedMessageFocusKeyRef = useRef<string | null>(null);
@@ -425,30 +448,6 @@ export function Channels({
     scrollerRef: messagesScrollRef,
   });
 
-  const updateRootMessages = useCallback(
-    (update: (current: ChannelMessage[]) => ChannelMessage[]) => {
-      setMessages((current) => {
-        const next = update(current);
-        const channelId = activeChannelIdRef.current;
-        if (channelId) {
-          const cached = channelCache.current.get(channelId);
-          if (cached) {
-            channelCache.current.set(channelId, { ...cached, messages: next });
-          }
-        }
-        return next;
-      });
-    },
-    [],
-  );
-
-  const updateThreadMessages = useCallback(
-    (update: (current: ChannelMessage[]) => ChannelMessage[]) => {
-      setThreadMessages(update);
-    },
-    [],
-  );
-
   const activeChannel = useMemo(
     () => channels.find((channel) => channel.id === activeChannelId) ?? null,
     [channels, activeChannelId],
@@ -462,21 +461,8 @@ export function Channels({
             )
           : [...current, loadedChannel]
       );
-      const cached = channelCache.current.get(loadedChannel.id);
-      if (cached) {
-        channelCache.current.set(loadedChannel.id, {
-          ...cached,
-          channel: loadedChannel,
-        });
-      }
     },
     [onChannelsChange],
-  );
-  const applyConversationSnapshot = useCallback(
-    (snapshot: CachedDesktopChannel) => {
-      channelCache.current.set(snapshot.channel.id, snapshot);
-    },
-    [],
   );
   const applyChannelCatalogDelta = useCallback(
     (delta: ChannelDelta) => {
@@ -549,21 +535,18 @@ export function Channels({
     channel: activeChannel,
     members,
     agents,
-    messages,
     replies,
     threadParentId,
     threadMessages,
-    messageNextCursor,
     pageSize: desktopChannelMessagePageSize,
-    updateRootMessages,
-    updateThreadMessages,
-    setMembers,
-    setAgents,
-    setReplies,
-    setThreadParentId,
-    setMessageNextCursor,
+    updateRootMessages: conversationStore.updateRootMessages,
+    updateThreadMessages: conversationStore.updateThreadMessages,
+    setMembers: conversationStore.setMembers,
+    setAgents: conversationStore.setAgents,
+    setReplies: conversationStore.setReplies,
+    setThreadParentId: conversationStore.setThreadParentId,
+    setMessageNextCursor: conversationStore.setMessageNextCursor,
     onChannelLoaded: applyLoadedChannel,
-    onConversationLoaded: applyConversationSnapshot,
     onIssueOpen: onIssueCreated,
     onSkillSessionAccepted,
     onRootMessagePending: () => {
@@ -735,13 +718,6 @@ export function Channels({
             channel.id === result.channel.id ? result.channel : channel,
           ),
         );
-        const cached = channelCache.current.get(activeChannelId);
-        if (cached) {
-          channelCache.current.set(activeChannelId, {
-            ...cached,
-            channel: result.channel,
-          });
-        }
       } catch (cause) {
         setSettingsError(errorMessage(cause));
       } finally {
@@ -838,17 +814,8 @@ export function Channels({
           activeChannelId,
           { messageLimit: 1 },
         );
-        setMembers(refreshed.members);
-        setAgents(refreshed.agents);
-        const cached = channelCache.current.get(activeChannelId);
-        if (cached) {
-          channelCache.current.set(activeChannelId, {
-            ...cached,
-            channel: refreshed.channel,
-            members: refreshed.members,
-            agents: refreshed.agents,
-          });
-        }
+        conversationStore.setMembers(refreshed.members);
+        conversationStore.setAgents(refreshed.agents);
         onChannelsChange((current) =>
           current.map((channel) =>
             channel.id === refreshed.channel.id ? refreshed.channel : channel,
@@ -945,10 +912,17 @@ export function Channels({
   ]);
 
   useEffect(() => {
-    channelCache.current.clear();
     preparedChannelId.current = null;
   }, [organizationId, token]);
 
+  /*
+    Opening a channel no longer copies a cache into component state: the store
+    already holds whatever this account has read of the channel, so the switch
+    is a render rather than a fetch. What is left here is the state that does
+    *not* survive leaving — the open thread, the picked proposal projects, the
+    agent replies (live execution state, which a stale "typing" indicator must
+    not outlive) — plus the two markers the performance trace reads.
+  */
   useLayoutEffect(() => {
     if (!activeChannelId || !channelListReady) return;
     recordDesktopChannelHeader(activeChannelId);
@@ -956,23 +930,20 @@ export function Channels({
     preparedChannelId.current = activeChannelId;
     invalidateChannelSurface(activeChannelId, null);
     channelLoadAbortController.current?.abort();
-    const cached = channelCache.current.get(activeChannelId) ?? null;
-    displaySource.current = cached ? "cache" : "network";
+    const stored = registry.get(channelRootMessageIdsAtom(activeChannelId));
+    displaySource.current = stored ? "cache" : "network";
     requestStickToBottom();
-    setMembers(cached?.members ?? []);
-    setAgents(cached?.agents ?? []);
-    setMessages(cached?.messages ?? []);
-    setMessageNextCursor(cached?.nextCursor ?? null);
-    setChannelLoading(!cached);
+    setChannelLoading(!stored);
     setProposalProjects({});
-    setThreadParentId(null);
-    setThreadMessages([]);
-    setReplies([]);
+    conversationStore.setThreadParentId(null);
+    conversationStore.setReplies([]);
     setError(null);
   }, [
     activeChannelId,
     channelListReady,
+    conversationStore,
     invalidateChannelSurface,
+    registry,
     requestStickToBottom,
     setError,
     setProposalProjects,
@@ -988,11 +959,11 @@ export function Channels({
     authoritativeLoadVersion.current = loadVersion;
     void (async () => {
       try {
-        const cached = channelCache.current.get(activeChannelId) ?? null;
+        const stored = registry.get(channelRootMessageIdsAtom(activeChannelId));
         const loaded = await loadChannelConversation({
           channelId: activeChannelId,
           messageLimit: desktopChannelMessagePageSize,
-          mergeWithCurrentMessages: Boolean(cached),
+          mergeWithCurrentMessages: stored !== null,
           requestedMessage,
           signal: abortController.signal,
         });
@@ -1001,7 +972,7 @@ export function Channels({
           cancelled ||
           loadVersion !== channelDataVersion.current
         ) return;
-        if (!cached) {
+        if (stored === null) {
           displaySource.current = loaded.messages.length > 0
             ? "network"
             : "empty";
@@ -1038,11 +1009,9 @@ export function Channels({
               target.rootMessageId === target.messageId &&
               messageScroller
             ) {
-              const targetIndex = channelCache.current
-                .get(activeChannelId)
-                ?.messages.findIndex(
-                  (message) => message.id === target.messageId,
-                ) ?? -1;
+              const targetIndex = registry
+                .get(channelRootMessagesAtom(activeChannelId))
+                .findIndex((message) => message.id === target.messageId);
               if (targetIndex >= 0) {
                 setStickToBottom(false);
                 messageScroller.scrollTop =
@@ -1106,14 +1075,6 @@ export function Channels({
     const previousScrollTop = scroller?.scrollTop ?? 0;
     const result = await loadEarlierConversationMessages();
     if (result.applied) {
-      const activeId = activeChannelIdRef.current;
-      const cached = activeId ? channelCache.current.get(activeId) : null;
-      if (activeId && cached) {
-        channelCache.current.set(activeId, {
-          ...cached,
-          nextCursor: result.nextCursor,
-        });
-      }
       window.requestAnimationFrame(() => {
         if (!scroller) return;
         restoreScrollTop(
@@ -1127,12 +1088,10 @@ export function Channels({
 
   useLayoutEffect(() => {
     if (!activeChannelId || channelLoading) return;
-    const cached = channelCache.current.get(activeChannelId);
-    if (!cached) return;
-    if (
-      messages.length !== cached.messages.length ||
-      messages.some((message) => message.channelId !== activeChannelId)
-    ) {
+    // The store's timeline is the channel's own, so what the check above the
+    // store needed — "these messages belong to the channel on screen" — is now
+    // true by construction; what is left is "the channel has ever been read".
+    if (registry.get(channelRootMessageIdsAtom(activeChannelId)) === null) {
       return;
     }
     if (stickToBottomRef.current) {
@@ -1144,7 +1103,8 @@ export function Channels({
   }, [
     activeChannelId,
     channelLoading,
-    messages,
+    messageSummaries,
+    registry,
     requestStickToBottom,
     stickToBottomRef,
   ]);
@@ -1188,7 +1148,7 @@ export function Channels({
   }, [
     activeChannelId,
     channelLoading,
-    messages.length,
+    messageSummaries.length,
     onRequestedMessageOpen,
     requestedMessage,
     setStickToBottom,
@@ -1203,17 +1163,21 @@ export function Channels({
       authoritativeLoadVersion.current = loadVersion;
       channelLoadAbortController.current?.abort();
       try {
-        await openConversationThread(parentId);
+        // What the store holds for the thread renders while its authoritative
+        // page loads, the same way the timeline does.
+        const stored = registry.get(
+          channelThreadMessagesAtom(
+            channelThreadKey(activeChannelId, parentId),
+          ),
+        );
+        await openConversationThread(parentId, [...stored]);
       } finally {
         if (authoritativeLoadVersion.current === loadVersion) {
           authoritativeLoadVersion.current = null;
         }
       }
     },
-    [
-      activeChannelId,
-      openConversationThread,
-    ],
+    [activeChannelId, openConversationThread, registry],
   );
 
   /*
@@ -1331,6 +1295,59 @@ export function Channels({
       return next;
     },
     [typingActivityByAgentName],
+  );
+
+  /*
+    Everything a row needs that is not its own message, as one object.
+
+    A row reads its message from the store, so the only thing that may travel
+    with it is the context the whole list shares. Keeping it memoised is what
+    makes the row memo mean something: a message arriving changes the id list
+    and this object stays put, so React re-renders the one new row.
+  */
+  const messageRowContext = useMemo<ChannelMessageRowContext | null>(
+    () => activeChannel === null ? null : ({
+      acceptingProposalId,
+      agents,
+      busy,
+      canOpenThread: surface === "channel",
+      channel: activeChannel,
+      currentUserId,
+      decliningProposalId,
+      handlers: messageHandlers,
+      highlightedMessageId: requestedMessage?.messageId ?? null,
+      loadCreateExecutionProposalContext,
+      localeTag,
+      members,
+      onIssueOpen: openIssue,
+      projects,
+      proposalProjects,
+      threadParentId,
+      token,
+      typingActivityByAgentName: rowTypingActivity,
+      typingAgentNames: rowTypingAgentNames,
+    }),
+    [
+      acceptingProposalId,
+      activeChannel,
+      agents,
+      busy,
+      currentUserId,
+      decliningProposalId,
+      loadCreateExecutionProposalContext,
+      localeTag,
+      members,
+      messageHandlers,
+      openIssue,
+      projects,
+      proposalProjects,
+      requestedMessage?.messageId,
+      rowTypingActivity,
+      rowTypingAgentNames,
+      surface,
+      threadParentId,
+      token,
+    ],
   );
 
   const memberCount = Math.max(activeChannel?.memberCount ?? 0, members.length);
@@ -1463,52 +1480,27 @@ export function Channels({
                   )}
                   {loadingEarlierMessages ? (
                     <div className="channel-message-page-loader" role="status">
-                      <Spinner aria-hidden="true" size={15} />
+                      <Spinner aria-hidden="true" className="size-[15px]" />
                     </div>
                   ) : null}
                   <VirtualizedChannelMessageList
                     key={`${organizationId}:${activeChannelId}`}
                     localeTag={localeTag}
-                    messages={messages}
+                    messages={messageSummaries}
                     onRowsResize={reportChannelRowsResize}
-                    renderMessage={(message) => (
-                      <MessageRow
-                      agents={agents}
-                      canOpenThread={surface === "channel"}
-                      channel={activeChannel}
-                      handlers={messageHandlers}
-                      highlighted={message.id === requestedMessage?.messageId}
-                      message={message}
-                      members={members}
-                      localeTag={localeTag}
-                      currentUserId={currentUserId}
-                      loadCreateExecutionProposalContext={
-                        loadCreateExecutionProposalContext
-                      }
-                      onIssueOpen={openIssue}
-                      busy={busy}
-                      acceptingProposal={
-                        acceptingProposalId === message.proposal?.id
-                      }
-                      decliningProposal={
-                        decliningProposalId === message.proposal?.id
-                      }
-                      projects={projects}
-                      selectedProjectId={
-                        message.proposal
-                          ? proposalProjects[message.proposal.id] ?? null
-                          : null
-                      }
-                      token={token}
-                      typingAgentNames={rowTypingAgentNames(message.id)}
-                      typingActivityByAgentName={rowTypingActivity(message.id)}
-                      showTypingState={message.id !== threadParentId}
-                    />
+                    renderMessage={(summary) => (
+                      messageRowContext ? (
+                        <ChannelMessageRow
+                          channelId={activeChannel.id}
+                          context={messageRowContext}
+                          messageId={summary.id}
+                        />
+                      ) : null
                     )}
                     scrollerRef={messagesScrollRef}
                     t={t}
                   />
-                  {messages.length === 0 ? (
+                  {messageSummaries.length === 0 ? (
                     <p className="channel-empty-hint muted">
                       {t("channel.emptyHint")}
                     </p>
@@ -1909,6 +1901,15 @@ function ChannelMessageSkeleton({ label }: { label: string }) {
   );
 }
 
+/*
+  The timeline, drawn from summaries.
+
+  It used to take the messages themselves, which meant an edit inside any one
+  of them produced a new array and re-rendered the whole list. All it ever read
+  was the id and the creation time — keying, day separators and measurement —
+  so it takes {@link ChannelMessageSummary} now and each row reads its own
+  message.
+*/
 function VirtualizedChannelMessageList({
   localeTag,
   messages,
@@ -1918,9 +1919,9 @@ function VirtualizedChannelMessageList({
   t,
 }: {
   localeTag: string;
-  messages: ChannelMessage[];
+  messages: readonly ChannelMessageSummary[];
   onRowsResize: ChannelScrollRowsResize;
-  renderMessage: (message: ChannelMessage) => ReactNode;
+  renderMessage: (message: ChannelMessageSummary) => ReactNode;
   scrollerRef: RefObject<HTMLDivElement | null>;
   t: Translate;
 }) {
@@ -2578,7 +2579,7 @@ function ChannelWebhooksDialog({
 
         <div className="channel-webhook-list">
           {loading ? (
-            <p className="channel-invite-status"><Spinner size={16} />{t("channel.webhookLoading")}</p>
+            <p className="channel-invite-status"><Spinner className="size-[16px]" />{t("channel.webhookLoading")}</p>
           ) : webhooks.length === 0 ? (
             <p className="channel-invite-status">{t("channel.webhookEmpty")}</p>
           ) : webhooks.map((webhook) => (
@@ -2840,7 +2841,7 @@ function ChannelInviteDialog({
             <div className="channel-invite-results">
               {loading ? (
                 <p className="channel-invite-status">
-                  <Spinner size={16} />
+                  <Spinner className="size-[16px]" />
                   {t("channel.inviteLoading")}
                 </p>
               ) : filtered.length > 0 ? (
@@ -2958,6 +2959,98 @@ export interface MessageRowHandlers
     projectId: string,
   ) => void;
 }
+
+/**
+ * Everything a {@link ChannelMessageRow} needs beyond its own message. One
+ * object for the whole list, so a row's props change only when something the
+ * list itself decided changed.
+ */
+export interface ChannelMessageRowContext {
+  readonly acceptingProposalId: string | null;
+  readonly agents: ChannelAgentSummary[];
+  readonly busy: boolean;
+  readonly canOpenThread: boolean;
+  readonly channel: ChannelSummary;
+  readonly currentUserId: string | null;
+  readonly decliningProposalId: string | null;
+  readonly handlers: MessageRowHandlers;
+  readonly highlightedMessageId: string | null;
+  readonly loadCreateExecutionProposalContext: (projectId: string) => Promise<{
+    run: HuntRun | null;
+    workers: ExecutionWorker[];
+    policy?: ProjectExecutionWorkerPolicy;
+  }>;
+  readonly localeTag: string;
+  readonly members: ChannelMember[];
+  readonly onIssueOpen?: (
+    projectId: string,
+    runId: string,
+  ) => void | Promise<void>;
+  readonly projects: readonly Pick<Project, "id" | "name" | "organizationId">[];
+  readonly proposalProjects: Readonly<Record<string, string>>;
+  readonly threadParentId: string | null;
+  readonly token: string;
+  readonly typingActivityByAgentName: (
+    messageId: string,
+  ) => Readonly<Record<string, ChannelAgentActivityDescriptor>>;
+  readonly typingAgentNames: (messageId: string) => string[];
+}
+
+/**
+ * One row, subscribed to its own message.
+ *
+ * The list hands it an id rather than a message, so a page that changed one
+ * message wakes one row: the summaries the list reads compare equal, and every
+ * other row's atom keeps the object it had.
+ */
+export const ChannelMessageRow = memo(function ChannelMessageRow({
+  channelId,
+  context,
+  messageId,
+}: {
+  channelId: string;
+  context: ChannelMessageRowContext;
+  messageId: string;
+}) {
+  const message = useAtomValue(
+    channelMessageAtom(channelMessageKey(channelId, messageId)),
+  );
+  if (!message) return null;
+  return (
+    <MessageRow
+      acceptingProposal={
+        context.acceptingProposalId === message.proposal?.id
+      }
+      agents={context.agents}
+      busy={context.busy}
+      canOpenThread={context.canOpenThread}
+      channel={context.channel}
+      currentUserId={context.currentUserId}
+      decliningProposal={
+        context.decliningProposalId === message.proposal?.id
+      }
+      handlers={context.handlers}
+      highlighted={message.id === context.highlightedMessageId}
+      loadCreateExecutionProposalContext={
+        context.loadCreateExecutionProposalContext
+      }
+      localeTag={context.localeTag}
+      members={context.members}
+      message={message}
+      onIssueOpen={context.onIssueOpen}
+      projects={context.projects}
+      selectedProjectId={
+        message.proposal
+          ? context.proposalProjects[message.proposal.id] ?? null
+          : null
+      }
+      showTypingState={message.id !== context.threadParentId}
+      token={context.token}
+      typingActivityByAgentName={context.typingActivityByAgentName(message.id)}
+      typingAgentNames={context.typingAgentNames(message.id)}
+    />
+  );
+});
 
 export const MessageRow = memo(function MessageRow({
   acceptingProposal,
@@ -3264,7 +3357,7 @@ export const MessageRow = memo(function MessageRow({
                 >
                   {acceptingProposal ? (
                     <>
-                      <Spinner aria-hidden="true" size={15} />
+                      <Spinner aria-hidden="true" className="size-[15px]" />
                       {t("channel.creatingIssue")}
                     </>
                   ) : (

@@ -1096,7 +1096,7 @@ async function prepareReplyAttachmentUploadsRpc(
       clientId: upload.clientId,
       reference: { uploadId: upload.attachmentId },
       uploadUrl: new URL(
-        `/uploads/${encodeURIComponent(upload.attachmentId)}`,
+        `/app-api/uploads/${encodeURIComponent(upload.attachmentId)}`,
         input.request.url,
       ).toString(),
       uploadCapability: upload.uploadCapability,

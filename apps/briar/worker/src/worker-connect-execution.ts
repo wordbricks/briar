@@ -509,7 +509,7 @@ export function createWorkerExecutionService(
             uploadId: upload.uploadId,
           }),
           uploadUrl: new URL(
-            `/uploads/${encodeURIComponent(upload.uploadId)}`,
+            `/app-api/uploads/${encodeURIComponent(upload.uploadId)}`,
             input.request.url,
           ).toString(),
           uploadCapability: upload.uploadCapability,

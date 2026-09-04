@@ -60,7 +60,7 @@ export function ChannelThreadSubscribeControls({
           type="button"
         >
           {pending ? (
-            <Spinner aria-hidden="true" size={13} />
+            <Spinner aria-hidden="true" className="size-[13px]" />
           ) : (
             <Bell aria-hidden="true" size={13} />
           )}

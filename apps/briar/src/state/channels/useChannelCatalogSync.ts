@@ -16,7 +16,6 @@ import {
   channelCatalogCursorAtom,
   channelCatalogRetryAtom,
   channelsLoadingAtom,
-  clearCompanionChannelCache,
   resetChannelSelection,
 } from "./atoms";
 
@@ -81,7 +80,6 @@ export function useChannelCatalogSync(): void {
       resetChannelSelection(registry);
     });
     cursorRef.current = 0;
-    clearCompanionChannelCache(registry);
     if (!organizationId || !token) {
       registry.set(channelsLoadingAtom, false);
       return;

@@ -299,7 +299,7 @@ export function LinearIssueImport({
               {t("settings.linearImportOneTimeNote")}
             </Typography>
             <Button disabled={busy || !apiKey.trim()} onClick={() => void connect()} type="button">
-              {busy ? <Spinner size={14} /> : <Link2 size={14} />}
+              {busy ? <Spinner className="size-[14px]" /> : <Link2 size={14} />}
               {busy
                 ? t("settings.linearImportConnecting")
                 : t("settings.linearImportConnect")}
@@ -381,7 +381,7 @@ export function LinearIssueImport({
               onClick={() => void loadStates()}
               type="button"
             >
-              {busy ? <Spinner size={14} /> : null}
+              {busy ? <Spinner className="size-[14px]" /> : null}
               {busy
                 ? t("settings.linearImportLoadingStates")
                 : t("settings.linearImportContinueMapping", {
@@ -470,7 +470,7 @@ export function LinearIssueImport({
               type="button"
             >
               {busy ? (
-                <Spinner size={14} />
+                <Spinner className="size-[14px]" />
               ) : (
                 <Download size={14} />
               )}

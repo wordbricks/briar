@@ -542,7 +542,7 @@ export function ManagedComputerSetupWizard({
         {screen === "running" ? (
           <div className="grid gap-4 py-2">
             <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/25 p-4">
-              <Spinner size={18} />
+              <Spinner className="size-[18px]" />
               <Typography variant="bodySm">{phaseMessage}</Typography>
             </div>
 

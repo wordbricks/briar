@@ -93,7 +93,7 @@ export function ChannelDocumentPreview({
           <div className="channel-document-dialog-body">
             {loading ? (
               <div className="channel-document-state" role="status">
-                <Spinner aria-hidden="true" size={20} />
+                <Spinner aria-hidden="true" className="size-[20px]" />
                 {t("channel.documentLoading")}
               </div>
             ) : error ? (

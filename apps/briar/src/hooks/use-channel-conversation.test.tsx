@@ -22,6 +22,18 @@ import {
   defaultChannelConversationDependencies,
   useChannelConversation,
 } from "./use-channel-conversation";
+import { RegistryContext } from "@effect/atom-react";
+import { createTestRegistry, useRegistry } from "../state/registry";
+import { channelRootMessagesAtom } from "../state/channel-conversation/atoms";
+import {
+  useChannelConversationStore,
+  useChannelConversationView,
+} from "../state/channel-conversation/useChannelConversationStore";
+import {
+  writeChannelMessageCursor,
+  writeChannelOpenThreadId,
+  writeChannelTimeline,
+} from "../state/channel-conversation/write";
 import type { ChannelMessageImageCache } from "../components/ChannelImages";
 
 const api = {
@@ -176,32 +188,34 @@ function Harness({
   realtimeEnabled?: boolean;
   imageCache?: ChannelMessageImageCache | null;
 }) {
+  const registry = useRegistry();
   const [members, setMembers] = React.useState<ChannelMember[]>([member]);
   const [agents, setAgents] = React.useState<ChannelAgentSummary[]>([]);
-  const [messages, setMessages] = React.useState(initialMessages);
+  /*
+    The timeline is the store's, so the harness seeds it once instead of
+    holding a `useState` copy. The replies are still a prop of the hook, so
+    they stay here.
+  */
+  const seeded = React.useRef(false);
+  if (!seeded.current) {
+    seeded.current = true;
+    if (initialMessages.length > 0) {
+      writeChannelTimeline(registry, activeChannel.id, initialMessages);
+    }
+    writeChannelMessageCursor(registry, activeChannel.id, initialNextCursor);
+    writeChannelOpenThreadId(registry, activeChannel.id, initialThreadParentId);
+  }
+  const conversationStore = useChannelConversationStore(activeChannel.id);
+  const {
+    messageNextCursor,
+    messages,
+    threadMessages,
+    threadParentId,
+  } = useChannelConversationView(activeChannel.id);
   const [replies, setReplies] = React.useState<ChannelAgentReply[]>(
     initialReplies,
   );
-  const [threadParentId, setThreadParentId] = React.useState<string | null>(
-    initialThreadParentId,
-  );
-  const [threadMessages, setThreadMessages] = React.useState<ChannelMessage[]>([]);
-  const [messageNextCursor, setMessageNextCursor] = React.useState<string | null>(
-    initialNextCursor,
-  );
   const catalogCursor = React.useRef(0);
-  const updateRootMessages = React.useCallback(
-    (update: (current: ChannelMessage[]) => ChannelMessage[]) => {
-      setMessages(update);
-    },
-    [],
-  );
-  const updateThreadMessages = React.useCallback(
-    (update: (current: ChannelMessage[]) => ChannelMessage[]) => {
-      setThreadMessages(update);
-    },
-    [],
-  );
   const conversation = useChannelConversation({
     token: "token",
     organizationId: "org-1",
@@ -210,19 +224,17 @@ function Harness({
     channel: activeChannel,
     members,
     agents,
-    messages,
     replies,
     threadParentId,
     threadMessages,
-    messageNextCursor,
     pageSize: 20,
-    updateRootMessages,
-    updateThreadMessages,
+    updateRootMessages: conversationStore.updateRootMessages,
+    updateThreadMessages: conversationStore.updateThreadMessages,
     setMembers,
     setAgents,
     setReplies,
-    setThreadParentId,
-    setMessageNextCursor,
+    setThreadParentId: conversationStore.setThreadParentId,
+    setMessageNextCursor: conversationStore.setMessageNextCursor,
     dependencies,
     activityEnabled: false,
     realtime: realtimeEnabled
@@ -249,19 +261,40 @@ function Harness({
 
 async function renderHarness(props: React.ComponentProps<typeof Harness>) {
   const { cleanup, root } = createReactTestRoot();
-  await renderReactTestRoot(root, <Harness {...props} />);
-  return { cleanup, root };
+  const registry = createTestRegistry();
+  await renderReactTestRoot(
+    root,
+    <RegistryContext.Provider value={registry}>
+      <Harness {...props} />
+    </RegistryContext.Provider>,
+  );
+  const render = (element: React.ReactElement) =>
+    root.render(
+      <RegistryContext.Provider value={registry}>
+        {element}
+      </RegistryContext.Provider>,
+    );
+  return { cleanup, registry, render, root };
 }
 
 async function renderToastHarness(props: React.ComponentProps<typeof Harness>) {
   const { cleanup, root } = createReactTestRoot({ attachToDocument: true });
+  const registry = createTestRegistry();
   await renderReactTestRoot(
     root,
-    <ToastProvider>
-      <Harness {...props} />
-    </ToastProvider>,
+    <RegistryContext.Provider value={registry}>
+      <ToastProvider>
+        <Harness {...props} />
+      </ToastProvider>
+    </RegistryContext.Provider>,
   );
-  return { cleanup, root };
+  const render = (element: React.ReactElement) =>
+    root.render(
+      <RegistryContext.Provider value={registry}>
+        <ToastProvider>{element}</ToastProvider>
+      </RegistryContext.Provider>,
+    );
+  return { cleanup, registry, render, root };
 }
 
 const current = () => {
@@ -271,12 +304,14 @@ const current = () => {
 
 describe("useChannelConversation", () => {
   let cleanup: (() => Promise<void>) | null = null;
+  let render: ((element: React.ReactElement) => void) | null = null;
   let root: Root | null = null;
 
   beforeEach(() => {
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     latest = null;
     cleanup = null;
+    render = null;
     realtimeTransport.listener = null;
     vi.clearAllMocks();
   });
@@ -284,6 +319,7 @@ describe("useChannelConversation", () => {
   afterEach(async () => {
     if (cleanup) await cleanup();
     cleanup = null;
+    render = null;
     root = null;
     vi.restoreAllMocks();
   });
@@ -291,7 +327,7 @@ describe("useChannelConversation", () => {
   it("drops a channel detail response after the selected surface changes", async () => {
     const pending = deferred<Awaited<ReturnType<typeof import("../lib/api").loadChannel>>>();
     api.loadChannel.mockReturnValueOnce(pending.promise);
-    ({ cleanup, root } = await renderHarness({ activeChannel: channel("channel-a") }));
+    ({ cleanup, render, root } = await renderHarness({ activeChannel: channel("channel-a") }));
 
     let request!: ReturnType<Conversation["loadChannelConversation"]>;
     await act(async () => {
@@ -301,7 +337,7 @@ describe("useChannelConversation", () => {
         mergeWithCurrentMessages: false,
       });
     });
-    await act(async () => root?.render(
+    await act(async () => render?.(
       <Harness activeChannel={channel("channel-b")} />,
     ));
     await act(async () => pending.resolve({
@@ -325,7 +361,7 @@ describe("useChannelConversation", () => {
       messages: [message("older", { createdAt: "2026-08-01T00:00:00.000Z" })],
       nextCursor: null,
     });
-    ({ cleanup, root } = await renderHarness({
+    ({ cleanup, render, root } = await renderHarness({
       activeChannel: channel("channel-a"),
       initialMessages: [message("current")],
       initialNextCursor: "cursor-1",
@@ -360,7 +396,7 @@ describe("useChannelConversation", () => {
       messages: [message("older", { createdAt: "2026-08-01T00:00:00.000Z" })],
       nextCursor: null,
     });
-    ({ cleanup, root } = await renderHarness({
+    ({ cleanup, render, root } = await renderHarness({
       activeChannel: channel("channel-a"),
       initialMessages: [message("current")],
       initialNextCursor: "cursor-1",
@@ -392,7 +428,7 @@ describe("useChannelConversation", () => {
       messages: [message("older", { createdAt: "2026-08-01T00:00:00.000Z" })],
       nextCursor: null,
     });
-    ({ cleanup, root } = await renderHarness({
+    ({ cleanup, render, root } = await renderHarness({
       activeChannel: channel("channel-a"),
       initialMessages: [message("current")],
       initialNextCursor: "cursor-1",
@@ -424,7 +460,7 @@ describe("useChannelConversation", () => {
       removedMessageIds: [],
       agentReplies: [],
     });
-    ({ cleanup, root } = await renderHarness({
+    ({ cleanup, render, root } = await renderHarness({
       activeChannel: channel("channel-a"),
       realtimeEnabled: true,
     }));
@@ -455,7 +491,7 @@ describe("useChannelConversation", () => {
       removedMessageIds: [],
       agentReplies: [freshReply],
     });
-    ({ cleanup, root } = await renderHarness({
+    ({ cleanup, render, root } = await renderHarness({
       activeChannel: channel("channel-a"),
       initialMessages: [message("stale")],
       initialReplies: [agentReply("reply-stale")],
@@ -482,7 +518,7 @@ describe("useChannelConversation", () => {
       agentReplies: [],
       nextCursor: null,
     });
-    ({ cleanup, root } = await renderHarness({
+    ({ cleanup, render, root } = await renderHarness({
       activeChannel: channel("channel-a"),
       initialReplies: [stale],
     }));
@@ -506,7 +542,7 @@ describe("useChannelConversation", () => {
     const pending = deferred<Awaited<ReturnType<typeof import("../lib/api").loadChannel>>>();
     const concurrent = agentReply("reply-new", { status: "queued" });
     api.loadChannel.mockReturnValueOnce(pending.promise);
-    ({ cleanup, root } = await renderHarness({
+    ({ cleanup, render, root } = await renderHarness({
       activeChannel: channel("channel-a"),
     }));
 
@@ -550,7 +586,7 @@ describe("useChannelConversation", () => {
       removedMessageIds: [],
       agentReplies: [completed],
     });
-    ({ cleanup, root } = await renderHarness({
+    ({ cleanup, render, root } = await renderHarness({
       activeChannel: channel("channel-a"),
       realtimeEnabled: true,
     }));
@@ -589,7 +625,7 @@ describe("useChannelConversation", () => {
       status: "running",
       updatedAt: "2026-08-01T02:00:00.000Z",
     });
-    ({ cleanup, root } = await renderHarness({
+    ({ cleanup, render, root } = await renderHarness({
       activeChannel: channel("channel-a"),
       initialReplies: [first, second],
     }));
@@ -623,7 +659,7 @@ describe("useChannelConversation", () => {
       messages: [rootMessage, reply],
       nextCursor: null,
     };
-    ({ cleanup, root } = await renderHarness({
+    ({ cleanup, render, root } = await renderHarness({
       activeChannel: channel("channel-a"),
       initialMessages: [rootMessage],
     }));
@@ -661,7 +697,7 @@ describe("useChannelConversation", () => {
       messages: [requestedRoot, requestedReply],
       nextCursor: null,
     });
-    ({ cleanup, root } = await renderHarness({ activeChannel: channel("channel-a") }));
+    ({ cleanup, render, root } = await renderHarness({ activeChannel: channel("channel-a") }));
 
     await act(async () => {
       await current().loadChannelConversation({
@@ -687,7 +723,7 @@ describe("useChannelConversation", () => {
   it("reconciles an optimistic root message with the server response", async () => {
     const pending = deferred<Awaited<ReturnType<typeof import("../lib/api").sendChannelMessage>>>();
     api.sendChannelMessage.mockReturnValueOnce(pending.promise);
-    ({ cleanup, root } = await renderHarness({ activeChannel: channel("channel-a") }));
+    ({ cleanup, render, root } = await renderHarness({ activeChannel: channel("channel-a") }));
 
     let request!: ReturnType<Conversation["send"]>;
     await act(async () => {
@@ -732,7 +768,8 @@ describe("useChannelConversation", () => {
       resultItems: undefined,
       executionProposal: null,
     });
-    ({ cleanup, root } = await renderHarness({
+    let registry!: ReturnType<typeof createTestRegistry>;
+    ({ cleanup, registry, render, root } = await renderHarness({
       activeChannel: channel("channel-a"),
       initialMessages: [proposalMessage],
     }));
@@ -766,7 +803,8 @@ describe("useChannelConversation", () => {
       },
     });
     api.declineChannelProposal.mockResolvedValueOnce({ outcome: "declined" });
-    ({ cleanup, root } = await renderHarness({
+    let registry!: ReturnType<typeof createTestRegistry>;
+    ({ cleanup, registry, render, root } = await renderHarness({
       activeChannel: channel("channel-a"),
       initialMessages: [proposalMessage],
     }));
@@ -809,7 +847,8 @@ describe("useChannelConversation", () => {
       executionProposal: null;
     }>();
     api.acceptChannelProposal.mockReturnValueOnce(pending.promise);
-    ({ cleanup, root } = await renderHarness({
+    let registry!: ReturnType<typeof createTestRegistry>;
+    ({ cleanup, registry, render, root } = await renderHarness({
       activeChannel: channel("channel-a"),
       initialMessages: [proposalMessage],
     }));
@@ -819,7 +858,7 @@ describe("useChannelConversation", () => {
       request = current().acceptProposal(proposalMessage);
       await Promise.resolve();
     });
-    await act(async () => root?.render(
+    await act(async () => render?.(
       <Harness activeChannel={channel("channel-b")} />,
     ));
     await act(async () => pending.resolve({
@@ -830,13 +869,20 @@ describe("useChannelConversation", () => {
     }));
     await act(async () => request);
 
-    expect(current().messages[0]?.proposal).toMatchObject({ status: "pending" });
+    /*
+      The timeline is the store's and it is keyed by channel, so the question
+      "was the late answer applied" is asked of channel A rather than of
+      whatever the harness happens to be showing.
+    */
+    expect(
+      registry.get(channelRootMessagesAtom("channel-a"))[0]?.proposal,
+    ).toMatchObject({ status: "pending" });
     expect(current().busy).toBe(false);
     expect(current().error).toBeNull();
   });
 
   it("toasts a newly failed Agent reply instead of setting a banner error", async () => {
-    ({ cleanup, root } = await renderToastHarness({
+    ({ cleanup, render, root } = await renderToastHarness({
       activeChannel: channel("channel-a"),
       initialReplies: [agentReply("reply-a", { status: "running" })],
     }));
@@ -861,7 +907,7 @@ describe("useChannelConversation", () => {
       status: "failed",
       error: channelReplyProviderUsageExhaustedError,
     });
-    ({ cleanup, root } = await renderToastHarness({
+    ({ cleanup, render, root } = await renderToastHarness({
       activeChannel: channel("channel-a"),
       initialReplies: [failed],
     }));
@@ -874,7 +920,7 @@ describe("useChannelConversation", () => {
 
   it("toasts a send failure instead of setting a banner error", async () => {
     api.sendChannelMessage.mockRejectedValueOnce(new Error("offline"));
-    ({ cleanup, root } = await renderToastHarness({
+    ({ cleanup, render, root } = await renderToastHarness({
       activeChannel: channel("channel-a"),
     }));
 
@@ -905,7 +951,7 @@ describe("useChannelConversation", () => {
     const pending = deferred<Awaited<ReturnType<typeof import("../lib/api").sendChannelMessage>>>();
     api.sendChannelMessage.mockReturnValueOnce(pending.promise);
 
-    ({ cleanup, root } = await renderHarness({
+    ({ cleanup, render, root } = await renderHarness({
       activeChannel: channel("channel-a"),
       imageCache,
     }));

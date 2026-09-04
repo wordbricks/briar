@@ -171,15 +171,6 @@ body { overflow: hidden; font-synthesis: none; }
 .document-workspace { display: flex; min-height: 0; flex: 1; flex-direction: column; }
 
 .detail-error { position: fixed; z-index: 40; top: 66px; right: 12px; max-width: 420px; }
-.spin {
-  display: inline-block;
-  flex: none;
-  overflow: visible;
-  vertical-align: middle;
-  transform-origin: center;
-  animation: briar-spin .8s linear infinite;
-}
-@keyframes briar-spin { to { transform: rotate(360deg); } }
 
 @media (max-width: 800px) {
   .document-workspace { display: flex; }
@@ -1895,6 +1886,12 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .issue-message-composer footer button:active { transform:scale(.94); }
 .issue-message-composer footer button:focus-visible { outline:2px solid #8b70dd; outline-offset:1px; }
 .issue-message-composer footer .issue-reply-cancel { margin-right:auto; }
+.issue-composer-agent-shortcuts { display:flex; align-items:center; gap:2px; }
+.issue-composer-agent-shortcuts:first-child { margin-right:auto; }
+.issue-reply-cancel + .issue-composer-agent-shortcuts { margin-right:0; }
+.issue-message-composer footer .issue-composer-agent-shortcuts button { width:26px; height:26px; border-radius:7px; overflow:hidden; }
+.issue-composer-agent-shortcuts button img { width:100%; height:100%; border-radius:inherit; object-fit:cover; }
+.issue-message-composer footer .issue-composer-agent-shortcuts button:disabled { opacity:.5; cursor:default; transform:none; }
 .issue-composer-file-input { display:none; }
 .issue-message-composer footer .issue-message-send { color:var(--foreground); }
 .issue-message-composer footer .issue-message-send:disabled { color:var(--muted-foreground); background:transparent; cursor:default; transform:none; }
@@ -2772,6 +2769,10 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .repository-readiness strong { color:#4b4d47; font-size:var(--text-2xs); }
 .repository-readiness small { overflow:hidden; color:var(--muted-foreground); font:400 var(--text-2xs)/1.3 "DM Mono",monospace; text-overflow:ellipsis; white-space:nowrap; }
 .repository-readiness-error { margin:10px 1px 0; display:flex; align-items:center; gap:6px; color:#a34854; font-size:var(--text-2xs); line-height:1.5; }
+.onboarding-provider-choice { margin-top:13px; padding-top:13px; display:grid; gap:7px; border-top:1px solid #e5e7e0; text-align:left; }
+.onboarding-provider-choice > label { color:#4b4d47; font-size:var(--text-2xs); font-weight:500; }
+.onboarding-provider-choice > small { color:var(--muted-foreground); font-size:var(--text-2xs); line-height:1.5; }
+.onboarding-process .onboarding-provider-choice { width:min(520px,100%); margin:18px auto 0; padding-top:0; border-top:0; }
 .project-onboarding-card { width:min(700px,calc(100vw - 48px)); }
 .project-onboarding-modal-backdrop { z-index:95; padding:32px; background:rgba(33,35,30,.34); }
 .project-onboarding-dialog { width:min(900px,calc(100vw - 64px)); max-height:calc(100dvh - 64px); margin:0; padding:0; overflow:hidden; display:flex; flex-direction:column; border:1px solid var(--border); border-radius:26px; background:var(--card); box-shadow:0 34px 110px rgba(26,29,23,.28); }

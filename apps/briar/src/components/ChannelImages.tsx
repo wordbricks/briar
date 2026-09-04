@@ -384,7 +384,7 @@ function ChannelMessagePdfAttachment({
                 <span>{t("common.open")}</span>
               </a>
             )
-          : <Spinner aria-label={t("loading.churning")} size={18} />
+          : <Spinner aria-label={t("loading.churning")} className="size-[18px]" />
         : <span className="channel-message-file-kind">PDF</span>}
     </article>
   );
@@ -461,7 +461,7 @@ function ChannelMessageMediaAttachment({
   } else if (!source) {
     preview = (
       <span className="channel-message-image-state" title={attachment.filename}>
-        <Spinner aria-hidden="true" size={18} />
+        <Spinner aria-hidden="true" className="size-[18px]" />
       </span>
     );
   } else {

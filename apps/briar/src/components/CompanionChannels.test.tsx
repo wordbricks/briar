@@ -4,6 +4,8 @@ import { act } from "react";
 import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../i18n";
+import { RegistryContext } from "@effect/atom-react";
+import { createTestRegistry } from "../state/registry";
 import type { ChannelSummary } from "../lib/channels-contract";
 import { CompanionChannels } from "./CompanionChannels";
 
@@ -90,6 +92,7 @@ describe("CompanionChannels", () => {
     const onLobbyOpen = vi.fn();
     await renderReactTestRoot(
       root,
+      <RegistryContext.Provider value={createTestRegistry()}>
       <I18nProvider>
         <CompanionChannels
           activeProjectId={null}
@@ -99,7 +102,8 @@ describe("CompanionChannels", () => {
           projects={[]}
           token="token"
         />
-      </I18nProvider>,
+      </I18nProvider>
+      </RegistryContext.Provider>,
     );
 
     const firstButton = container.querySelector<HTMLButtonElement>(
@@ -115,6 +119,7 @@ describe("CompanionChannels", () => {
     const { cleanup, container, root } = createReactTestRoot();
     await renderReactTestRoot(
       root,
+      <RegistryContext.Provider value={createTestRegistry()}>
       <I18nProvider>
         <CompanionChannels
           activeProjectId={null}
@@ -123,7 +128,8 @@ describe("CompanionChannels", () => {
           projects={[]}
           token="token"
         />
-      </I18nProvider>,
+      </I18nProvider>
+      </RegistryContext.Provider>,
     );
     await act(async () => Promise.resolve());
 

@@ -1032,7 +1032,7 @@ export function RunPage({
       <Tooltip>
         <TooltipTrigger asChild>
           <Button aria-label={processNowLabel} className="run-page-process-now size-7 rounded-full p-0 shadow-none [&_svg]:size-[15px]" disabled={processNowDisabled} onClick={onProcessNow} size="icon-sm" type="button">
-            {isProcessing ? <Spinner aria-hidden="true" size={15} /> : <Play aria-hidden="true" size={15} />}
+            {isProcessing ? <Spinner aria-hidden="true" className="size-[15px]" /> : <Play aria-hidden="true" size={15} />}
           </Button>
         </TooltipTrigger>
         <TooltipContent side="bottom">{processNowLabel}</TooltipContent>
@@ -1040,7 +1040,7 @@ export function RunPage({
     </TooltipProvider>;
   const inlineSaveLabel = t(inlineSaveStatus === "saving" ? "common.saving" : inlineSaveStatus === "failed" ? "issue.saveFailed" : "common.saved");
   const inlineSaveIndicator = onUpdateIssue ? <span aria-label={inlineSaveLabel} aria-live="polite" className={`run-page-save-status ${inlineSaveStatus}`} role="status" title={inlineSaveLabel}>
-      {inlineSaveStatus === "saving" ? <Spinner aria-hidden="true" size={13} /> : inlineSaveStatus === "failed" ? <CircleAlert aria-hidden="true" size={13} /> : <Check aria-hidden="true" size={13} />}
+      {inlineSaveStatus === "saving" ? <Spinner aria-hidden="true" className="size-[13px]" /> : inlineSaveStatus === "failed" ? <CircleAlert aria-hidden="true" size={13} /> : <Check aria-hidden="true" size={13} />}
       {inlineSaveStatus === "saved" ? null : <span>{inlineSaveLabel}</span>}
     </span> : null;
   return <MainContent className="run-page-shell" id="issue-detail">
@@ -1158,7 +1158,7 @@ export function RunPage({
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <button aria-description={t("run.retryWorkerTooltip")} disabled={isRecovering} onClick={() => void runAction(onRetry)} type="button">
-                                  <Spinner icon={RotateCcw} size={14} spinning={isRecovering} />
+                                  <RotateCcw className={isRecovering ? "animate-spin" : undefined} size={14} />
                                   {t("run.retry")}
                                 </button>
                               </TooltipTrigger>
@@ -1205,7 +1205,7 @@ export function RunPage({
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <button aria-description={t("run.retryWorkerTooltip")} disabled={isRecovering} onClick={() => void runAction(onRetry)} type="button">
-                                  <Spinner icon={RotateCcw} size={14} spinning={isRecovering} />
+                                  <RotateCcw className={isRecovering ? "animate-spin" : undefined} size={14} />
                                   {t("run.retry")}
                                 </button>
                               </TooltipTrigger>
@@ -1281,7 +1281,7 @@ export function RunPage({
                             </div> : null}
                           <div className="paused-result-actions">
                             <button className="paused-result-resume" disabled={resumeIsPending} onClick={() => void resumePausedRun()} type="button">
-                              {resumeIsPending ? <Spinner aria-hidden="true" size={14} /> : <RotateCcw aria-hidden="true" size={14} />}
+                              {resumeIsPending ? <Spinner aria-hidden="true" className="size-[14px]" /> : <RotateCcw aria-hidden="true" size={14} />}
                               {t("run.resume")}
                             </button>
                             {onRework && reworkStageOptions.length > 0 ? <button aria-expanded={isReworkFormOpen} className="paused-result-rework" disabled={isRecovering || isSubmittingRework} onClick={() => isReworkFormOpen ? setIsReworkFormOpen(false) : openReworkForm()} type="button">
@@ -1314,7 +1314,7 @@ export function RunPage({
                                   {t("common.cancel")}
                                 </button>
                                 <button disabled={isSubmittingRework || !reworkStage || !reworkFeedback.trim()} type="submit">
-                                  {isSubmittingRework ? <Spinner aria-hidden="true" size={14} /> : <GitFork aria-hidden="true" size={14} />}
+                                  {isSubmittingRework ? <Spinner aria-hidden="true" className="size-[14px]" /> : <GitFork aria-hidden="true" size={14} />}
                                   {t(isSubmittingRework ? "run.reworkSubmitting" : "run.reworkSubmit")}
                                 </button>
                               </div>
@@ -1333,7 +1333,7 @@ export function RunPage({
                                   </small> : null}
                               </header>
                               {runEventsLoading ? <div className="paused-review-state">
-                                  <Spinner size={15} />
+                                  <Spinner className="size-[15px]" />
                                   {t("run.activityLoading")}
                                 </div> : runEventsLoadError ? <button className="paused-review-state error" onClick={() => void loadRunEvents()} type="button">
                                   <CircleAlert size={14} />
@@ -1411,7 +1411,7 @@ export function RunPage({
                             </div>
                             <IssueResultReviewers emptyLabel={t("run.resultReviewEmpty")} reviews={resultReviews} />
                             {currentUserId && onCompleteResultReview ? <button className="run-result-review-complete" disabled={currentUserHasReviewed || isCompletingResultReview} onClick={() => void completeResultReview()} type="button">
-                                {isCompletingResultReview ? <Spinner aria-hidden="true" size={15} /> : <Check aria-hidden="true" size={15} />}
+                                {isCompletingResultReview ? <Spinner aria-hidden="true" className="size-[15px]" /> : <Check aria-hidden="true" size={15} />}
                                 {t(isCompletingResultReview ? "run.resultReviewSaving" : currentUserHasReviewed ? "run.resultReviewed" : "run.resultReviewComplete")}
                               </button> : null}
                             {resultReviewError ? <p className="run-result-review-error" role="alert">
@@ -1463,7 +1463,7 @@ export function RunPage({
                         void runAction(() => onMove(placement));
                       }} options={statusSelectOptions} searchable searchPlaceholder={t("dashboard.status")} size="small" value={placementValue} />
                     </span>
-                    {isRecovering && <Spinner size={14} />}
+                    {isRecovering && <Spinner className="size-[14px]" />}
                   </label>
                   <label className="run-property run-property-editable">
                     <span className="run-property-icon priority"><Signal size={15} /></span>
@@ -1689,7 +1689,7 @@ export function RunPage({
               setDeleteError(caught instanceof Error ? caught.message : String(caught));
             });
           }} type="button" variant="destructive">
-              {isDeletingIssue ? <Spinner size={15} /> : <Trash2 size={15} />}
+              {isDeletingIssue ? <Spinner className="size-[15px]" /> : <Trash2 size={15} />}
               {isDeletingIssue ? t("issue.deleting") : t("issue.delete")}
             </Button>
           </DialogFooter>
@@ -1734,7 +1734,7 @@ export function RunPage({
               setTransferError(caught instanceof Error ? caught.message : String(caught));
             });
           }} type="button">
-              {isDeletingIssue ? <Spinner size={15} /> : <FolderInput size={15} />}
+              {isDeletingIssue ? <Spinner className="size-[15px]" /> : <FolderInput size={15} />}
               {isDeletingIssue ? t("issue.transferring") : t("issue.transferConfirm")}
             </Button>
           </DialogFooter>

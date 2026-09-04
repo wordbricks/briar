@@ -460,10 +460,9 @@ export function ManagedComputersCard({
                       type="button"
                       variant="outline"
                     >
-                      <Spinner
-                        icon={RefreshCw}
+                      <RefreshCw
+                        className={retryingId === computer.id ? "animate-spin" : undefined}
                         size={14}
-                        spinning={retryingId === computer.id}
                       />
                       {t("managedComputer.retry")}
                     </Button>
@@ -571,7 +570,7 @@ export function ManagedComputersCard({
                 >
                   {checkingCode ? (
                     <>
-                      <Spinner size={14} />
+                      <Spinner className="size-[14px]" />
                       {t("managedComputer.checkingCode")}
                     </>
                   ) : t("managedComputer.checkCode")}
@@ -624,7 +623,7 @@ export function ManagedComputersCard({
             >
               {submitting ? (
                 <>
-                  <Spinner size={14} />
+                  <Spinner className="size-[14px]" />
                   {t("managedComputer.preparing")}
                 </>
               ) : t("managedComputer.applyFree")}
@@ -670,7 +669,7 @@ export function ManagedComputersCard({
               type="button"
               variant="destructive"
             >
-              {retiringId ? <Spinner size={15} /> : <PowerOff size={15} />}
+              {retiringId ? <Spinner className="size-[15px]" /> : <PowerOff size={15} />}
               {t("managedComputer.retireConfirm")}
             </Button>
           </DialogFooter>
@@ -711,7 +710,7 @@ export function ManagedComputersCard({
               type="button"
               variant="destructive"
             >
-              {terminatingId ? <Spinner size={15} /> : <Trash2 aria-hidden="true" size={15} />}
+              {terminatingId ? <Spinner className="size-[15px]" /> : <Trash2 aria-hidden="true" size={15} />}
               {t(terminatingId ? "managedComputer.terminating" : "managedComputer.terminateAction")}
             </Button>
           </DialogFooter>

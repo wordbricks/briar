@@ -187,6 +187,30 @@ export function MessageComposer({
       textarea.setSelectionRange(nextCaret, nextCaret);
     });
   };
+  const insertAgentMention = (agent: ProjectAgent) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    const handle = mentionHandle(agent.name);
+    const insertedMention = `@${handle} `;
+    const nextBody = `${body.slice(0, caret)}${insertedMention}${body.slice(caret)}`;
+    const nextCaret = caret + insertedMention.length;
+    setBody(nextBody);
+    setCaret(nextCaret);
+    setMentionDismissed(false);
+    setSelectedMentions(current => ({
+      ...current,
+      [`agent:${agent.id}`]: {
+        handle,
+        label: agent.name,
+        userId: null,
+        agentId: agent.id
+      }
+    }));
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(nextCaret, nextCaret);
+    });
+  };
   return <form className={`issue-message-composer${compact ? " compact" : ""}`} onBlur={event => {
     if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
       setComposerFocused(false);
@@ -254,6 +278,11 @@ export function MessageComposer({
         {onCancel ? <button aria-label={t("run.cancelReply")} className="issue-reply-cancel" disabled={sending} onClick={onCancel} title={t("run.cancelReply")} type="button">
             <X size={17} />
           </button> : null}
+        {mentionAgents.length > 0 && <div className="issue-composer-agent-shortcuts">
+            {mentionAgents.map(agent => <button aria-label={`@${mentionHandle(agent.name)}`} disabled={sending} key={agent.id} onClick={() => insertAgentMention(agent)} onMouseDown={event => event.preventDefault()} title={agent.name} type="button">
+                {agent.avatar ? <img alt="" src={agent.avatar} /> : <Bot size={14} />}
+              </button>)}
+          </div>}
         {!disableAttachments ? <>
             <button aria-label={t("issue.attachmentLabel")} className="issue-composer-link" disabled={sending || attachments.length >= maxIssueAttachmentCount} onClick={() => attachmentInputRef.current?.click()} type="button">
               <Paperclip size={18} />
@@ -264,7 +293,7 @@ export function MessageComposer({
         }} ref={attachmentInputRef} type="file" />
           </> : null}
         <button aria-label={sending ? t("run.sendingMessage") : t("run.sendMessage")} className="issue-message-send" disabled={!body.trim() && attachments.length === 0 || sending} type="submit">
-          {sending ? <Spinner size={16} /> : <Send aria-hidden="true" size={19} strokeWidth={2.2} />}
+          {sending ? <Spinner className="size-[16px]" /> : <Send aria-hidden="true" size={19} strokeWidth={2.2} />}
         </button>
       </footer>
       {error && <p className="issue-composer-error">

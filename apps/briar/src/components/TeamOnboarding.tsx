@@ -33,6 +33,8 @@ import {
   type LocalAutoHuntConfig,
 } from "../lib/team-connection";
 import type {
+  AgentProviderAvailability,
+  AgentProviderKind,
   LocalProjectConnectionPreflight,
   LovableRepositoryCompatibility,
   PreparedProjectRepository,
@@ -53,11 +55,18 @@ import {
   agentProviderLabels,
   type TeamLlmProgress,
 } from "../lib/team-llm";
+import { formatUsageDuration } from "../lib/agent-usage";
+import {
+  isProviderUsageExhausted,
+  preferredProvider,
+  providerChoiceNote,
+} from "../lib/team-provider-choice";
 import { formatExecutionDuration } from "../lib/agent-execution-metrics";
 import { useI18n } from "../i18n";
 import lovableLogo from "../assets/lovable-color.png";
 import lovableTutorialVideo from "../assets/lovable-export.mp4";
 import { DeveloperToolsSetup } from "./DeveloperToolsSetup";
+import { ProviderSelect } from "./ProviderSelect";
 import { ChoiceCard } from "./ui/choice-card";
 import {
   StatusPanel,
@@ -112,6 +121,7 @@ type Props = {
     settings: LocalAutoHuntConfig,
     repositoryPath: string,
     onProgress?: (progress: TeamLlmProgress) => void,
+    provider?: AgentProviderKind | null,
   ) => Promise<PreparedProjectConnection>;
   onCreate: (input: { name: string }) => Promise<{
     project: { id: string };
@@ -190,6 +200,87 @@ function WorkflowPreview({ workflow }: { workflow: AutoHuntWorkflow }) {
         </li>
       ))}
     </ol>
+  );
+}
+
+/**
+ * The agent backend that will read the repository and write the workflow.
+ *
+ * Every provider the preflight reported is listed, including the ones that
+ * cannot run, because "Claude is not signed in" is the answer to why the list
+ * is short. A provider whose usage window is spent stays selectable — the run
+ * would fail the way the Codex limit failed it, so the choice is the user's,
+ * with the limit stated next to the name.
+ */
+function OnboardingProviderChoice({
+  disabled = false,
+  id,
+  onChange,
+  providers,
+  value,
+}: {
+  disabled?: boolean;
+  id: string;
+  onChange: (provider: AgentProviderKind) => void;
+  providers: readonly AgentProviderAvailability[];
+  value: AgentProviderKind | null;
+}) {
+  const { t } = useI18n();
+  if (providers.length === 0) return null;
+
+  const describe = (availability: AgentProviderAvailability) => {
+    const note = providerChoiceNote(availability);
+    if (!note) return undefined;
+    switch (note.kind) {
+      case "disabled":
+        return t("onboarding.providerDisabled");
+      case "notInstalled":
+        return t("onboarding.providerNotInstalled");
+      case "notAuthenticated":
+        return t("onboarding.providerNotSignedIn");
+      case "usageExhausted":
+        return note.resetsAt
+          ? t("onboarding.providerUsageResets", {
+              duration: formatUsageDuration(note.resetsAt - Date.now()),
+            })
+          : t("onboarding.providerUsageExhausted");
+      case "usage":
+        return t("onboarding.providerUsageRemaining", {
+          percent: Math.round(note.usedPercent),
+        });
+    }
+  };
+  const byProvider = new Map(
+    providers.map((availability) => [availability.provider, availability]),
+  );
+
+  return (
+    <div className="onboarding-provider-choice">
+      <label htmlFor={id}>{t("onboarding.providerLabel")}</label>
+      <ProviderSelect
+        disabled={disabled}
+        id={id}
+        label={t("onboarding.providerLabel")}
+        onValueChange={(selected) => onChange(selected as AgentProviderKind)}
+        optionExtras={(candidate) => {
+          const availability = byProvider.get(candidate as AgentProviderKind);
+          return {
+            description: availability ? describe(availability) : undefined,
+            disabled: !availability?.selectable,
+          };
+        }}
+        providers={providers.map((availability) => availability.provider)}
+        size="small"
+        value={value ?? ""}
+      />
+      <small>{t("onboarding.providerHelp")}</small>
+      {isProviderUsageExhausted(providers, value) ? (
+        <StatusPanel density="compact" role="status" tone="warning">
+          <CircleAlert aria-hidden="true" size={14} />
+          <span>{t("onboarding.providerUsageWarning")}</span>
+        </StatusPanel>
+      ) : null}
+    </div>
   );
 }
 
@@ -363,6 +454,9 @@ export function TeamOnboarding({
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const [connectionPreflight, setConnectionPreflight] =
     useState<LocalProjectConnectionPreflight | null>(null);
+  /* The provider the user picked, kept until it stops being usable. */
+  const [chosenProvider, setChosenProvider] =
+    useState<AgentProviderKind | null>(null);
   const [workflow, setWorkflow] = useState<AutoHuntWorkflow | null>(null);
   const [workflowError, setWorkflowError] = useState<WorkflowFailure | null>(null);
   const [workflowProgress, setWorkflowProgress] =
@@ -418,6 +512,18 @@ export function TeamOnboarding({
   ]);
 
   const preflightingRepository = repositoryOperation !== "idle";
+  const providerAvailability = connectionPreflight?.providers ?? [];
+  /*
+    The provider this connection will run on: the user's pick while it stays
+    usable, and otherwise the one the native preflight resolved.
+  */
+  const activeProvider = connectionPreflight
+    ? preferredProvider(
+        providerAvailability,
+        chosenProvider,
+        connectionPreflight.provider,
+      )
+    : null;
 
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -463,11 +569,16 @@ export function TeamOnboarding({
       setWorkflowProgress(null);
       generationRequest.current = {
         key,
-        promise: onConnect(settings, repositoryPath, (progress) => {
-          if (generationProgressKey.current === key) {
-            setWorkflowProgress(progress);
-          }
-        }),
+        promise: onConnect(
+          settings,
+          repositoryPath,
+          (progress) => {
+            if (generationProgressKey.current === key) {
+              setWorkflowProgress(progress);
+            }
+          },
+          activeProvider,
+        ),
       };
     }
     let active = true;
@@ -501,6 +612,7 @@ export function TeamOnboarding({
       active = false;
     };
   }, [
+    activeProvider,
     connection,
     generationAttempt,
     lovablePreset,
@@ -702,7 +814,16 @@ export function TeamOnboarding({
         !isRepositoryWorkflowPending(connection.workflow)
       ) {
         updateRepositoryOperation("commit");
-        await onConnect(settings, preflight.repositoryPath);
+        await onConnect(
+          settings,
+          preflight.repositoryPath,
+          undefined,
+          preferredProvider(
+            preflight.providers,
+            chosenProvider,
+            preflight.provider,
+          ),
+        );
         assertCurrent();
         onFinish();
         return;
@@ -981,7 +1102,7 @@ export function TeamOnboarding({
                   >
                     {githubImporting ? (
                       <>
-                        <Spinner size={17} />
+                        <Spinner className="size-[17px]" />
                         {t("onboarding.githubCloning")}
                       </>
                     ) : (
@@ -1089,7 +1210,7 @@ export function TeamOnboarding({
                     type="submit"
                   >
                     {lovableImporting ? (
-                      <><Spinner size={17} />{t("onboarding.lovableCloning")}</>
+                      <><Spinner className="size-[17px]" />{t("onboarding.lovableCloning")}</>
                     ) : (
                       <>{t("onboarding.confirm")}<ArrowRight size={17} /></>
                     )}
@@ -1137,7 +1258,7 @@ export function TeamOnboarding({
                         onClick={() => void selectRepository()}
                         type="button"
                       >
-                        {selectingRepository ? <Spinner size={14} /> : <FolderOpen size={14} />}
+                        {selectingRepository ? <Spinner className="size-[14px]" /> : <FolderOpen size={14} />}
                         {selectingRepository
                           ? t("onboarding.repositorySelecting")
                           : repositoryPath
@@ -1159,18 +1280,29 @@ export function TeamOnboarding({
                           {repositoryReadiness?.pushAccess ? <Check size={13} /> : <CircleAlert size={13} />}
                           <i><strong>push</strong><small>{repositoryReadiness?.pushAccess ? t("onboarding.pushReady") : t("onboarding.pushCheckNeeded")}</small></i>
                         </span>
-                        <span className={connectionPreflight ? "ready" : "warning"}>
-                          {connectionPreflight ? <Check size={13} /> : <Cpu size={13} />}
+                        <span className={activeProvider ? "ready" : "warning"}>
+                          {activeProvider ? <Check size={13} /> : <Cpu size={13} />}
                           <i>
                             <strong>{t("settings.provider")}</strong>
                             <small>
-                              {connectionPreflight
-                                ? agentProviderLabels[connectionPreflight.provider]
+                              {activeProvider
+                                ? agentProviderLabels[activeProvider]
                                 : t("common.checkNeeded")}
                             </small>
                           </i>
                         </span>
                       </div>
+                    ) : null}
+                    {repositoryPath ? (
+                      <OnboardingProviderChoice
+                        disabled={
+                          loading || selectingRepository || preflightingRepository
+                        }
+                        id="onboarding-provider"
+                        onChange={setChosenProvider}
+                        providers={providerAvailability}
+                        value={activeProvider}
+                      />
                     ) : null}
                     {repositoryError ? <p className="repository-readiness-error" role="alert"><CircleAlert size={13} />{repositoryError}</p> : null}
                   </section>
@@ -1230,6 +1362,12 @@ export function TeamOnboarding({
                         </ul>
                       ) : null}
                     </StatusPanel>
+                    <OnboardingProviderChoice
+                      id="onboarding-retry-provider"
+                      onChange={setChosenProvider}
+                      providers={providerAvailability}
+                      value={activeProvider}
+                    />
                     <div className="onboarding-secondary-actions">
                       <button onClick={retryWorkflowGeneration} type="button">{t("onboarding.retry")}<ArrowRight size={15} /></button>
                       <button onClick={returnToRepository} type="button"><ArrowLeft size={15} />{t("onboarding.returnToRepository")}</button>
@@ -1237,7 +1375,7 @@ export function TeamOnboarding({
                   </>
                 ) : (
                   <>
-                    <span className="onboarding-process-icon"><Spinner size={27} /></span>
+                    <span className="onboarding-process-icon"><Spinner className="size-[27px]" /></span>
                     <h1>
                       {lovablePreset
                         ? t("onboarding.lovablePresetTitle")
@@ -1277,7 +1415,7 @@ export function TeamOnboarding({
                     value={workflowRevision}
                   />
                   <button disabled={revisingWorkflow || !workflowRevision.trim()} type="submit">
-                    {revisingWorkflow ? <Spinner size={14} /> : <Sparkles size={14} />}
+                    {revisingWorkflow ? <Spinner className="size-[14px]" /> : <Sparkles size={14} />}
                     {revisingWorkflow ? t("onboarding.workflowRevising") : t("onboarding.workflowRevise")}
                   </button>
                 </form>

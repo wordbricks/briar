@@ -235,7 +235,7 @@ export function TeamAgentSettings({
             type="button"
           >
             {profileSaving ? (
-              <Spinner size={14} />
+              <Spinner className="size-[14px]" />
             ) : !profileChanged ? (
               <Check size={14} />
             ) : (
@@ -571,7 +571,7 @@ export function TeamAgentSettings({
                   type="submit"
                 >
                   {profileSaving ? (
-                    <Spinner size={14} />
+                    <Spinner className="size-[14px]" />
                   ) : !profileChanged ? (
                     <Check size={14} />
                   ) : (
@@ -665,7 +665,7 @@ export function TeamAgentSettings({
               variant="destructive"
             >
               {isDeleting ? (
-                <Spinner size={15} />
+                <Spinner className="size-[15px]" />
               ) : (
                 <Trash2 size={15} />
               )}

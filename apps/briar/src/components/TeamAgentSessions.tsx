@@ -182,7 +182,7 @@ function TeamAgentSessionRow({
             type="button"
             variant="ghost"
           >
-            {isStopping ? <Spinner size={14} /> : <OctagonX size={15} />}
+            {isStopping ? <Spinner className="size-[14px]" /> : <OctagonX size={15} />}
           </Button>
         ) : null}
         <ChevronRight size={16} />
@@ -194,7 +194,7 @@ function TeamAgentSessionRow({
 function SessionStatusIcon({ status }: { status: AutoHuntSessionStatus }) {
   return (
     <span className={`auto-hunt-session-icon ${status}`}>
-      {status === "running" ? <Spinner size={17} /> : <Bot size={17} />}
+      {status === "running" ? <Spinner className="size-[17px]" /> : <Bot size={17} />}
     </span>
   );
 }
