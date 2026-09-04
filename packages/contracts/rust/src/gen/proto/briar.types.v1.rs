@@ -5381,6 +5381,24 @@ pub struct UploadFileMetadata {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_bytes"
     )]
     pub sha256: ::buffa::alloc::vec::Vec<u8>,
+    /// Optional image dimensions provided by the client for layout reservation.
+    ///
+    /// Field 6: `image_width`
+    #[serde(
+        rename = "imageWidth",
+        alias = "image_width",
+        with = "::buffa::json_helpers::opt_int32",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub image_width: ::core::option::Option<i32>,
+    /// Field 7: `image_height`
+    #[serde(
+        rename = "imageHeight",
+        alias = "image_height",
+        with = "::buffa::json_helpers::opt_int32",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub image_height: ::core::option::Option<i32>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -5393,6 +5411,8 @@ impl ::core::fmt::Debug for UploadFileMetadata {
             .field("content_type", &self.content_type)
             .field("byte_size", &self.byte_size)
             .field("sha256", &self.sha256)
+            .field("image_width", &self.image_width)
+            .field("image_height", &self.image_height)
             .finish()
     }
 }
@@ -5402,6 +5422,22 @@ impl UploadFileMetadata {
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
     pub const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.UploadFileMetadata";
+}
+impl UploadFileMetadata {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::image_width`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_image_width(mut self, value: i32) -> Self {
+        self.image_width = Some(value);
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::image_height`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_image_height(mut self, value: i32) -> Self {
+        self.image_height = Some(value);
+        self
+    }
 }
 ::buffa::impl_default_instance!(UploadFileMetadata);
 impl ::buffa::MessageName for UploadFileMetadata {
@@ -5438,6 +5474,12 @@ impl ::buffa::Message for UploadFileMetadata {
         if !self.sha256.is_empty() {
             size += 1u64 + ::buffa::types::bytes_encoded_len(&self.sha256) as u64;
         }
+        if let Some(v) = self.image_width {
+            size += 1u64 + ::buffa::types::int32_encoded_len(v) as u64;
+        }
+        if let Some(v) = self.image_height {
+            size += 1u64 + ::buffa::types::int32_encoded_len(v) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -5462,6 +5504,12 @@ impl ::buffa::Message for UploadFileMetadata {
         }
         if !self.sha256.is_empty() {
             ::buffa::types::put_shared_bytes_field(5u32, &self.sha256, buf);
+        }
+        if let Some(v) = self.image_width {
+            ::buffa::types::put_int32_field(6u32, v, buf);
+        }
+        if let Some(v) = self.image_height {
+            ::buffa::types::put_int32_field(7u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -5511,6 +5559,24 @@ impl ::buffa::Message for UploadFileMetadata {
                 )?;
                 ::buffa::types::merge_bytes(&mut self.sha256, buf)?;
             }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.image_width = ::core::option::Option::Some(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.image_height = ::core::option::Option::Some(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -5524,6 +5590,8 @@ impl ::buffa::Message for UploadFileMetadata {
         self.content_type.clear();
         self.byte_size = 0u64;
         self.sha256.clear();
+        self.image_width = ::core::option::Option::None;
+        self.image_height = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -19662,6 +19730,12 @@ pub mod __buffa {
             ///
             /// Field 5: `sha256`
             pub sha256: &'a [u8],
+            /// Optional image dimensions provided by the client for layout reservation.
+            ///
+            /// Field 6: `image_width`
+            pub image_width: ::core::option::Option<i32>,
+            /// Field 7: `image_height`
+            pub image_height: ::core::option::Option<i32>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for UploadFileMetadataView<'a> {
@@ -19731,6 +19805,22 @@ pub mod __buffa {
                         )?;
                         view.sha256 = ::buffa::types::borrow_bytes(&mut cur)?;
                     }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.image_width = Some(::buffa::types::decode_int32(&mut cur)?);
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.image_height = Some(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -19765,6 +19855,8 @@ pub mod __buffa {
                     content_type: self.content_type.to_string(),
                     byte_size: self.byte_size,
                     sha256: (self.sha256).to_vec(),
+                    image_width: self.image_width,
+                    image_height: self.image_height,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -19804,6 +19896,12 @@ pub mod __buffa {
                     size
                         += 1u64 + ::buffa::types::bytes_encoded_len(&self.sha256) as u64;
                 }
+                if let Some(v) = self.image_width {
+                    size += 1u64 + ::buffa::types::int32_encoded_len(v) as u64;
+                }
+                if let Some(v) = self.image_height {
+                    size += 1u64 + ::buffa::types::int32_encoded_len(v) as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -19829,6 +19927,12 @@ pub mod __buffa {
                 }
                 if !self.sha256.is_empty() {
                     ::buffa::types::put_shared_bytes_field(5u32, &self.sha256, buf);
+                }
+                if let Some(v) = self.image_width {
+                    ::buffa::types::put_int32_field(6u32, v, buf);
+                }
+                if let Some(v) = self.image_height {
+                    ::buffa::types::put_int32_field(7u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -19872,6 +19976,20 @@ pub mod __buffa {
                         .serialize_entry(
                             "sha256",
                             &::buffa::json_helpers::BytesJson(self.sha256),
+                        )?;
+                }
+                if let ::core::option::Option::Some(__v) = self.image_width {
+                    __map
+                        .serialize_entry(
+                            "imageWidth",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                if let ::core::option::Option::Some(__v) = self.image_height {
+                    __map
+                        .serialize_entry(
+                            "imageHeight",
+                            &::buffa::json_helpers::ProtoJson(&__v),
                         )?;
                 }
                 __map.end()
@@ -19998,6 +20116,18 @@ pub mod __buffa {
             #[must_use]
             pub fn sha256(&self) -> &'_ [u8] {
                 self.0.reborrow().sha256
+            }
+            /// Optional image dimensions provided by the client for layout reservation.
+            ///
+            /// Field 6: `image_width`
+            #[must_use]
+            pub fn image_width(&self) -> ::core::option::Option<i32> {
+                self.0.reborrow().image_width
+            }
+            /// Field 7: `image_height`
+            #[must_use]
+            pub fn image_height(&self) -> ::core::option::Option<i32> {
+                self.0.reborrow().image_height
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<UploadFileMetadataView<'static>>>

@@ -459,9 +459,30 @@ public nonisolated struct BriarAPI_IssueAttachment: Sendable {
 
   public var url: String = String()
 
+  public var imageWidth: Int32 {
+    get {_imageWidth ?? 0}
+    set {_imageWidth = newValue}
+  }
+  /// Returns true if `imageWidth` has been explicitly set.
+  public var hasImageWidth: Bool {self._imageWidth != nil}
+  /// Clears the value of `imageWidth`. Subsequent reads from it will return its default value.
+  public mutating func clearImageWidth() {self._imageWidth = nil}
+
+  public var imageHeight: Int32 {
+    get {_imageHeight ?? 0}
+    set {_imageHeight = newValue}
+  }
+  /// Returns true if `imageHeight` has been explicitly set.
+  public var hasImageHeight: Bool {self._imageHeight != nil}
+  /// Clears the value of `imageHeight`. Subsequent reads from it will return its default value.
+  public mutating func clearImageHeight() {self._imageHeight = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+
+  fileprivate var _imageWidth: Int32? = nil
+  fileprivate var _imageHeight: Int32? = nil
 }
 
 public nonisolated struct BriarAPI_MessageAuthor: Sendable {
@@ -1614,7 +1635,7 @@ nonisolated extension BriarAPI_IssueSubscriber: SwiftProtobuf.Message, SwiftProt
 
 nonisolated extension BriarAPI_IssueAttachment: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".IssueAttachment"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}filename\0\u{3}content_type\0\u{3}byte_size\0\u{1}url\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}filename\0\u{3}content_type\0\u{3}byte_size\0\u{1}url\0\u{3}image_width\0\u{3}image_height\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1627,12 +1648,18 @@ nonisolated extension BriarAPI_IssueAttachment: SwiftProtobuf.Message, SwiftProt
       case 3: try { try decoder.decodeSingularStringField(value: &self.contentType) }()
       case 4: try { try decoder.decodeSingularUInt64Field(value: &self.byteSize) }()
       case 5: try { try decoder.decodeSingularStringField(value: &self.url) }()
+      case 6: try { try decoder.decodeSingularInt32Field(value: &self._imageWidth) }()
+      case 7: try { try decoder.decodeSingularInt32Field(value: &self._imageHeight) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
     if !self.id.isEmpty {
       try visitor.visitSingularStringField(value: self.id, fieldNumber: 1)
     }
@@ -1648,6 +1675,12 @@ nonisolated extension BriarAPI_IssueAttachment: SwiftProtobuf.Message, SwiftProt
     if !self.url.isEmpty {
       try visitor.visitSingularStringField(value: self.url, fieldNumber: 5)
     }
+    try { if let v = self._imageWidth {
+      try visitor.visitSingularInt32Field(value: v, fieldNumber: 6)
+    } }()
+    try { if let v = self._imageHeight {
+      try visitor.visitSingularInt32Field(value: v, fieldNumber: 7)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1657,6 +1690,8 @@ nonisolated extension BriarAPI_IssueAttachment: SwiftProtobuf.Message, SwiftProt
     if lhs.contentType != rhs.contentType {return false}
     if lhs.byteSize != rhs.byteSize {return false}
     if lhs.url != rhs.url {return false}
+    if lhs._imageWidth != rhs._imageWidth {return false}
+    if lhs._imageHeight != rhs._imageHeight {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

@@ -733,6 +733,8 @@ export type ChannelMessageAttachment = {
   contentType: string;
   byteSize: number;
   url: string;
+  imageWidth: number | null;
+  imageHeight: number | null;
 };
 
 /** Public metadata used to render a channel message link preview. */
@@ -743,6 +745,8 @@ export type ChannelLinkPreview = {
   imageUrl: string | null;
   faviconUrl: string | null;
   siteName: string | null;
+  imageWidth: number | null;
+  imageHeight: number | null;
 };
 
 /** Aggregated emoji reaction on a channel message. */
