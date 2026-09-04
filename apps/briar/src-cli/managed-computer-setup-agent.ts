@@ -522,7 +522,7 @@ type GuidedSetupDependencies = {
   input: (challengeId: string, signal: AbortSignal) => Promise<string>;
 };
 
-async function runAuthentication(
+export async function runAuthentication(
   input: {
     service: "github" | "provider";
     provider?: ManagedComputerSetupProvider;
@@ -589,7 +589,10 @@ async function runAuthentication(
         if (next.value === OPENCODE_SKIP_SENTINEL && input.provider === "opencode") {
           throw new ProviderSkippedError();
         }
-        processHandle.write(`${next.value}\n`);
+        // The command runs under a pty, where a real Enter key sends CR.
+        // Raw-mode prompts (opencode auth login, claude auth login) only
+        // submit on CR, so LF would leave the prompt open forever.
+        processHandle.write(`${next.value}\r`);
       }
       else if (next.code !== 0) {
         throw new Error(authenticationFailureMessage(output));
