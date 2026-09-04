@@ -9,7 +9,6 @@ import { CompanionHeaderWithSession } from "./CompanionHeaderWithSession";
 import { Inbox } from "../Inbox";
 import { inboxNotificationTarget } from "../../lib/inbox-notifications";
 import {
-  activePlanningProjectIdAtom,
   createIssueTeamIdAtom,
   isIssueDialogOpenAtom,
   quickProcessErrorAtom,
@@ -140,7 +139,7 @@ export function CompanionShell({
   const inboxMessages = useAtomValue(visibleInboxMessagesAtom);
   const inboxUnreadCount = useAtomValue(visibleInboxUnreadCountAtom);
   const [companionPage, setCompanionPage] = useAtom(companionPageAtom);
-  const [companionStatus, setCompanionStatus] = useAtom(companionStatusAtom);
+  const setCompanionStatus = useAtomSet(companionStatusAtom);
   const [requestedRunId, setRequestedRunId] = useAtom(requestedRunIdAtom);
   const requestedRunMessageId = useAtomValue(requestedRunMessageIdAtom);
   const setRequestedRunMessageId = useAtomSet(requestedRunMessageIdAtom);
@@ -158,7 +157,6 @@ export function CompanionShell({
     isIssueDialogOpenAtom,
   );
   const setCreateIssueTeamId = useAtomSet(createIssueTeamIdAtom);
-  const activePlanningProjectId = useAtomValue(activePlanningProjectIdAtom);
   const quickProcessError = useAtomValue(quickProcessErrorAtom);
   const activeChannelId = useAtomValue(activeChannelIdAtom);
   const unreadDirectMessageCount = useAtomValue(unreadDirectMessageCountAtom);
@@ -391,7 +389,6 @@ export function CompanionShell({
           agents={agents}
           conversationInboxSyncSignal={conversationInboxSyncSignal}
           companionMode
-          companionStatus={companionStatus}
           companionUnreadDmCount={unreadDirectMessageCount}
           companionUnreadInboxCount={inboxUnreadCount}
           error={quickProcessError ?? sessionError}
@@ -427,7 +424,6 @@ export function CompanionShell({
           onSendIssueMessage={addIssueMessage}
           processingIssueIds={processingIssueIds}
           projects={organizationTeams}
-          activeIssueProjectId={activePlanningProjectId}
           sessions={sessions.list}
         />
       )}

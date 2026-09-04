@@ -754,7 +754,6 @@ export function DesktopPages({
         onSendIssueMessage={addIssueMessage}
         processingIssueIds={processingIssueIds}
         projects={activeOrganizationProjects}
-        activeIssueProjectId={activePlanningProjectId}
         sessions={autoHunt.sessions}
       />
       )}

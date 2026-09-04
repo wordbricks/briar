@@ -245,6 +245,21 @@ export const companionRunIdsAtom = Atom.family((teamId: string) =>
   ),
 );
 
+/*
+  Every field a column renders is compared, the stage's own label included: two
+  workflows can name the same stage id differently, and a comparison that
+  stopped at the id would leave the old name on the column header.
+*/
+const sameLabel = (
+  left: BoardColumnDefinition["label"],
+  right: BoardColumnDefinition["label"],
+) =>
+  left.kind === "status"
+    ? right.kind === "status" && left.status === right.status
+    : right.kind === "stage" &&
+      left.stageId === right.stageId &&
+      left.fallbackLabel === right.fallbackLabel;
+
 const sameDefinitions = (
   left: readonly BoardColumnDefinition[],
   right: readonly BoardColumnDefinition[],
@@ -255,6 +270,7 @@ const sameDefinitions = (
     return (
       column.id === other.id &&
       column.tone === other.tone &&
+      sameLabel(column.label, other.label) &&
       column.checkpointsBefore.length === other.checkpointsBefore.length &&
       column.checkpointsBefore.every((marker, markerIndex) => {
         const otherMarker = other.checkpointsBefore[markerIndex]!;
@@ -281,6 +297,24 @@ export const boardColumnDefinitionsAtom = Atom.family((teamId: string) =>
   ),
 );
 
+/*
+  The grouping is rebuilt whenever any run changes, because a run's status is
+  what decides its column. Comparing it column by column is what keeps a run
+  edit that moved nothing from reaching the kanban, whose keyboard order is this
+  map flattened.
+*/
+const sameGrouping = (
+  left: ReadonlyMap<string, string[]>,
+  right: ReadonlyMap<string, string[]>,
+) => {
+  if (left.size !== right.size) return false;
+  for (const [columnId, ids] of left) {
+    const other = right.get(columnId);
+    if (!other || !sameReferences(ids, other)) return false;
+  }
+  return true;
+};
+
 /** The filtered ids grouped by column id. */
 export const boardGroupedRunIdsAtom = Atom.family((teamId: string) =>
   Atom.make((get): ReadonlyMap<string, string[]> =>
@@ -290,7 +324,10 @@ export const boardGroupedRunIdsAtom = Atom.family((teamId: string) =>
       get(boardColumnDefinitionsAtom(teamId)),
       get(teamSettingsAtom(teamId))?.workflow,
     ),
-  ).pipe(Atom.withLabel(`board/${teamId}/grouped`)),
+  ).pipe(
+    Atom.withEquality<ReadonlyMap<string, string[]>>(sameGrouping),
+    Atom.withLabel(`board/${teamId}/grouped`),
+  ),
 );
 
 /** The column ids the board draws, after the attention tab's empty-stage rule. */

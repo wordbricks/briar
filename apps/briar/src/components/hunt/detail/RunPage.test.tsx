@@ -1,6 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
+import { BoardHarness } from "../../../test/board-harness";
 import { createReactTestRoot, renderReactTestRoot } from "../../../test/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
@@ -11,7 +12,6 @@ import * as api from "@/lib/api";
 import * as channelRealtime from "@/lib/channel-realtime";
 import * as issueActivityHook from "@/hooks/use-issue-agent-activity";
 import type { ExecutionWorker, HuntRun, IssueMessage, IssueMessageSendResult, PlanningProject, ProjectAgent, RunEvidence, UpdateIssueInput } from "@/types";
-import { HuntDashboard } from "@/components/hunt/HuntDashboard";
 import { IssueAgentActivityPanel } from "@/components/hunt/detail/IssueAgentActivityPanel";
 import { RunPage } from "@/components/hunt/detail/RunPage";
 import { CreateIssueDialog } from "@/components/hunt/editor/CreateIssueDialog";
@@ -204,7 +204,7 @@ describe("RunPage", () => {
     });
     await renderReactTestRoot(
       root,
-      <HuntDashboard
+      <BoardHarness
         {...dashboardProps}
         dashboard={{
           ...demoDashboard,
@@ -374,7 +374,7 @@ describe("RunPage", () => {
     const { cleanup, container, root } = createReactTestRoot({
       attachToDocument: true,
     });
-    await renderReactTestRoot(root, <HuntDashboard {...dashboardProps} dashboard={demoDashboard} />);
+    await renderReactTestRoot(root, <BoardHarness {...dashboardProps} dashboard={demoDashboard} />);
     await act(async () => {
       container.querySelector<HTMLButtonElement>(".kanban-card")?.click();
     });
@@ -710,7 +710,7 @@ describe("RunPage", () => {
     const onIssueViewed = vi.fn();
     await renderReactTestRoot(
       root,
-      <HuntDashboard {...dashboardProps} dashboard={demoDashboard} onIssueViewed={onIssueViewed} />,
+      <BoardHarness {...dashboardProps} dashboard={demoDashboard} onIssueViewed={onIssueViewed} />,
     );
     await act(async () => {
       container.querySelector<HTMLButtonElement>(".kanban-card")?.click();
@@ -728,14 +728,14 @@ describe("RunPage", () => {
     };
     await renderReactTestRoot(
       root,
-      <HuntDashboard {...dashboardProps} dashboard={updatedDashboard} onIssueViewed={onIssueViewed} />,
+      <BoardHarness {...dashboardProps} dashboard={updatedDashboard} onIssueViewed={onIssueViewed} />,
     );
     expect(onIssueViewed).toHaveBeenLastCalledWith(viewedRun.id);
     expect(onIssueViewed).toHaveBeenCalledTimes(callsAfterOpening + 1);
     const callsAfterIssueUpdate = onIssueViewed.mock.calls.length;
     await renderReactTestRoot(
       root,
-      <HuntDashboard
+      <BoardHarness
         {...dashboardProps}
         dashboard={{
           ...updatedDashboard,
@@ -779,7 +779,7 @@ describe("RunPage", () => {
     });
     await renderReactTestRoot(
       root,
-      <HuntDashboard
+      <BoardHarness
         {...dashboardProps}
         dashboard={initialDashboard}
         onLoadRunEvents={onLoadRunEvents}
@@ -792,7 +792,7 @@ describe("RunPage", () => {
     expect(container.querySelectorAll(".issue-status-history-panel .timeline-event")).toHaveLength(1);
     await renderReactTestRoot(
       root,
-      <HuntDashboard
+      <BoardHarness
         {...dashboardProps}
         dashboard={demoDashboard}
         onLoadRunEvents={onLoadRunEvents}
@@ -857,7 +857,7 @@ describe("RunPage", () => {
     });
     await renderReactTestRoot(
       root,
-      <HuntDashboard
+      <BoardHarness
         {...dashboardProps}
         companionMode
         dashboard={demoDashboard}

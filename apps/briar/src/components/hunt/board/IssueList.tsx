@@ -1,21 +1,13 @@
-import { Bot, ChevronRight } from "lucide-react";
-import { Fragment, useCallback, useMemo, useRef, useState } from "react";
+import { Bot } from "lucide-react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useAppCollectionKeyboardCommandScope } from "@/hooks/useAppCollectionKeyboardCommandScope";
 import { useControlledCollectionNavigation } from "@/hooks/useControlledCollectionNavigation";
-import { runMeta } from "@/lib/stages";
 import { type AutoHuntWorkflowCheckpoint } from "@/lib/auto-hunt-contract";
-import { formatIssueKey } from "@/lib/issue-key";
 import type { HuntRun, HuntRunPlacement, IssueExecutionPreferences, OrganizationMember, PlanningProject, Project } from "@/types";
 import { type AgentProvider } from "@/lib/team-llm";
 import { useI18n } from "@/i18n";
-import type { MessageKey } from "@/i18n/messages";
-import { IssueContextMenu } from "./IssueContextMenu";
-import { TeamIcon } from "../../TeamIcon";
-import { PullRequestIconLink } from "./PullRequestIconLink";
-import { RunStatusPill } from "../detail/RunStatusPill";
-import { localizeStatus, relativeTime } from "../model/formatters";
-import { hasResultReviews } from "../results/model";
-import { IssueDifficultyIcon } from "../IssueDifficultyIcon";
+import { IssueListHeader } from "./IssueListHeader";
+import { IssueListRow } from "./IssueListRow";
 export function IssueList({
   availableProviders,
   issueKeyPrefix,
@@ -95,74 +87,49 @@ export function IssueList({
     rootRef: listRef
   });
   return <div aria-label={t("dashboard.issueList")} className="issue-list" role="table">
-      <div className="issue-list-grid issue-list-header" role="row">
-        <span role="columnheader">{t("dashboard.task")}</span>
-        <span role="columnheader">{t("dashboard.status")}</span>
-        <span role="columnheader">{t("issue.priority")}</span>
-        <span role="columnheader">{t("dashboard.updated")}</span>
-        <span aria-hidden="true" />
-      </div>
+      <IssueListHeader />
       <div className="issue-list-body" data-keyboard-list="" ref={listRef} role="rowgroup">
         {runs.length === 0 ? <div className="issue-list-empty">
             <Bot size={22} />
             <strong>{t("dashboard.emptyTitle")}</strong>
             <span>{t("dashboard.emptyDescription")}</span>
-          </div> : runs.map(run => {
-        const assignee = members.find(member => member.userId === run.assigneeUserId);
-        const project = projectForRun?.(run);
-        const meta = runMeta(run.status, run.workflowStage, run.workflow);
-        const label = localizeStatus(t, run.status, run.workflowStage, meta.label);
-        const isClaimed = run.status === "queued" && Boolean(run.leaseExpiresAt) && Date.parse(run.leaseExpiresAt!) > Date.now();
-        const row = <div aria-label={t("run.details", {
-            title: run.title
-          })} className="issue-list-grid issue-list-row" data-keyboard-list-current={cursorId === run.id ? "" : undefined} data-keyboard-list-item="" data-run-id={run.id} onClick={() => {
-            setCursorId(run.id);
-            setSelectedId(run.id);
-            onOpen(run.id);
-          }} onFocus={() => setCursorId(run.id)} onKeyDown={event => {
-            if (event.key !== "Enter" && event.key !== " ") return;
-            event.preventDefault();
-            navigation.activate({
-              repeat: event.repeat,
+          </div> : runs.map(run => <IssueListRow
+            assignee={members.find(member => member.userId === run.assigneeUserId) ?? null}
+            availableProviders={availableProviders}
+            currentTeamId={currentTeamId}
+            deletingIssueId={deletingIssueId}
+            isCursor={cursorId === run.id}
+            isProcessing={processingIssueIds.has(run.id)}
+            issueKeyPrefix={issueKeyPrefixForRun?.(run) ?? issueKeyPrefix}
+            itemRef={navigation.getItemRef(run.id)}
+            key={run.id}
+            onActivate={repeat => navigation.activate({
+              repeat,
               source: "keyboard"
-            });
-          }} onPointerDown={() => setCursorId(run.id)} ref={navigation.getItemRef(run.id)} role="row" tabIndex={0}>
-                <span className="issue-list-task" role="cell">
-                  <span className="issue-list-task-kicker">
-                    {project ? <TeamIcon className="issue-list-project-icon" project={project} /> : null}
-                    <small>
-                      {formatIssueKey(issueKeyPrefixForRun?.(run) ?? issueKeyPrefix, run.runNumber)} · {run.sourceKey}
-                      {assignee ? ` · ${assignee.name}` : ""}
-                    </small>
-                    <PullRequestIconLink urls={run.pullRequestUrls} />
-                    <IssueDifficultyIcon difficulty={run.difficulty} size={12} />
-                  </span>
-                  <strong>{run.title}</strong>
-                  {(run.detail || run.issueDescription) && <span>{run.detail || run.issueDescription}</span>}
-                </span>
-                <span className="issue-list-status" role="cell">
-                  <RunStatusPill label={label} reviewed={hasResultReviews(run)} status={run.status} tone={meta.tone} />
-                  <small>
-                    <i className={`source-dot ${run.source}`} />
-                    {t(`source.${run.source}` as MessageKey)}
-                  </small>
-                </span>
-                <span className="issue-list-priority" role="cell">
-                  {run.priority === null ? "—" : `P${run.priority}`}
-                </span>
-                <span className="issue-list-updated" role="cell">
-                  {isClaimed ? t("run.assigned", {
-                agent: run.claimedBy ?? "agent"
-              }) : relativeTime(run.updatedAt, t)}
-                </span>
-                <ChevronRight aria-hidden="true" size={15} />
-              </div>;
-        const teamIdForRun = run.teamId ?? currentTeamId;
-        const planningProjectsForRun = teamIdForRun ? planningProjects.filter(project => project.teamId === teamIdForRun) : planningProjects;
-        return readOnly ? <Fragment key={run.id}>{row}</Fragment> : <IssueContextMenu availableProviders={availableProviders} disabled={deletingIssueId === run.id || updatingIssueId === run.id} key={run.id} onDelete={() => onDelete(run.id)} onTransfer={onTransfer ? () => onTransfer(run.id) : undefined} onTeamChange={onTeamChange ? teamId => onTeamChange(run, teamId) : undefined} onProjectChange={onProjectChange ? projectId => onProjectChange(run, projectId) : undefined} teams={teams} currentTeamId={currentTeamId} planningProjects={planningProjectsForRun} onEdit={() => onEdit(run.id)} onMove={placement => onMove(run, placement)} onOpen={() => onOpen(run.id)} onProcessNow={onProcessIssueNow ? () => onProcessIssueNow(run) : undefined} onPriorityChange={priority => onPriorityChange(run, priority)} onPreferencesChange={preferences => onPreferencesChange(run, preferences)} onCheckpointsChange={checkpoints => onCheckpointsChange(run, checkpoints)} run={run} isProcessing={processingIssueIds.has(run.id)}>
-            {row}
-          </IssueContextMenu>;
-      })}
+            })}
+            onCheckpointsChange={onCheckpointsChange}
+            onCursor={() => setCursorId(run.id)}
+            onDelete={onDelete}
+            onEdit={onEdit}
+            onMove={onMove}
+            onOpen={onOpen}
+            onPreferencesChange={onPreferencesChange}
+            onPriorityChange={onPriorityChange}
+            onProcessNow={onProcessIssueNow}
+            onProjectChange={onProjectChange}
+            onSelect={() => {
+              setCursorId(run.id);
+              setSelectedId(run.id);
+            }}
+            onTeamChange={onTeamChange}
+            onTransfer={onTransfer}
+            planningProjects={planningProjects}
+            project={projectForRun?.(run)}
+            readOnly={readOnly}
+            run={run}
+            teams={teams}
+            updatingIssueId={updatingIssueId}
+          />)}
       </div>
     </div>;
 }

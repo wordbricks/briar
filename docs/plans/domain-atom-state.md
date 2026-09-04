@@ -1,6 +1,6 @@
 # 도메인 atom 상태 분리와 App / useBriar 모듈화
 
-Status: proposed. Updated 2026-09-03.
+Status: implemented. Updated 2026-09-04.
 
 기준 커밋 `66dd07b1`(분석 시점). 아래 줄 번호는 이 커밋 기준이며 두 파일 모두 변경이
 잦으므로, 각 단계 착수 시 심볼 이름으로 다시 찾는다.
@@ -144,13 +144,11 @@ Phase 2A를 구현하며 확인한, 이후 단계에 영향을 주는 사실:
 - **`RunPage`는 완전한 행 단위 구독이 되었다.** `components/app/RunPageWithRun`이
   런 객체 대신 `runId`를 받고 `runAtom(runId)`을 읽는다. 열린 런이 바뀌면 셸 리렌더
   0회로 상세만 다시 그린다(`RunPageWithRun.test.tsx`가 검증).
-- **`HuntDashboard`는 아직 아니다.** 보드는 런 **객체**로 필터·정렬·칸반 컬럼·에이전트
-  연결·카운트를 모두 계산하므로, 목록을 id만으로 그리려면 로컬 필터 상태
-  (`query` / `status` / `source` / `propertyFilters` / `view`)를 atom으로 올리고
-  파생 `boardRunIdsAtom`을 만들어야 한다. 1,279줄 컴포넌트와 1,076줄 테스트의
-  재작성이라 이 PR의 "동작 변화 없음" 제약과 맞지 않아 **후속으로 남긴다.** 지금
+- **`HuntDashboard`는 이 PR에서는 아직 런 객체로 그렸다.** 보드가 필터·정렬·칸반
+  컬럼·에이전트 연결·카운트를 모두 런 **객체** 위에서 계산하고 있었기 때문이며,
+  1,279줄 컴포넌트와 1,076줄 테스트의 재작성이라 이 PR의 범위 밖이었다. 여기서
   달성된 것은 셸이 보드에 새 프롭을 밀어 넣지 않는 것이고, 무변경 델타 틱은 이미
-  리렌더 0회다.
+  리렌더 0회였다. **Phase 2C(#1604 / #1605)가 이 마지막 조각을 끝냈다.**
 - **연결 래퍼가 lazy 경계를 대신 들고 있어야 한다.** App이 래퍼를 정적으로 import하고
   래퍼 안에서 `lazy(() => import(...))`를 하면 코드 스플리팅이 그대로 유지된다.
   래퍼를 lazy로 감싸면 청크가 한 번 더 겹친다.
@@ -433,6 +431,51 @@ workspace / workflow / integrations를 옮기며 확인한, 이후 단계에 영
 - **내비게이션 위치는 여전히 저장되지 않는다.** 콜드 부팅은 마지막 **데이터**를
   즉시 렌더하지만 페이지는 기본 위치에서 시작한다. 위치 복원은 별도 결정이다.
 
+### 기준 갱신 (2026-09-04, Phase 2C 이후)
+
+보드를 id로 그리며 확인한, 같은 형태의 뷰를 옮길 때 쓸 사실:
+
+- **보드는 컴포넌트 하나가 아니라 구독 경계 다섯 개다.** 크롬(`HuntBoard`),
+  카운트 두 개(`BoardTaskCount` / `BoardStatusTabs`), 칸반(`BoardKanban`),
+  컬럼(`BoardColumn`), 카드(`BoardCard`). 각 경계가 자기 atom만 읽어야 "런 하나
+  변경 → 카드 하나"가 나온다. 카운트를 크롬 본문에서 읽으면 상태 하나 바뀔 때마다
+  헤더가 다시 그려진다.
+- **키보드 순서가 그룹핑에 묶여 있다.** 칸반의 이동 규칙은 "보이는 컬럼들의 id를
+  이어 붙인 것"이므로 `BoardKanban`은 그룹핑 맵을 구독할 수밖에 없다. 그래서
+  `boardGroupedRunIdsAtom`에는 컬럼별 배열을 **원소 단위로** 비교하는 equality가
+  필수다. 없으면 제목 한 글자만 바뀌어도 매번 새 `Map`이 나와 칸반 전체가 다시
+  그려진다.
+- **`Atom.family`는 키가 하나다.** 팀 + 컬럼, 팀 + 런처럼 두 축이 필요한 파생은
+  `boardColumnKey` / `boardRunKey`로 문자열을 합치고 `splitBoardKey`로 되돌린다.
+  구분자는 `"\u0000"`인데, 파일에 **진짜 NUL 바이트**를 쓰지 않도록 이스케이프
+  시퀀스로 적어야 한다(한 번 실수했다).
+- **닫힌 다이얼로그는 빈 id로 읽는다.** 열린 런·편집 중인 런·삭제 확인 중인 런을
+  `runAtom(id ?? "")`로 읽으면 아무것도 열려 있지 않을 때 셋 다 같은 `null`이라
+  알림이 오지 않는다. 조건부 훅 없이 "지금은 구독하지 않는다"를 표현하는 방법이다.
+  런 목록도 마찬가지로 `teamRunsAtom(selected ? teamId : "")`로 열었을 때만 붙는다.
+- **`memo`는 프롭 묶음이 있어야 산다.** 카드가 받는 것은 `runId`와 컨텍스트 객체
+  하나뿐이고, 핸들러는 **자기가 받은 런**을 인자로 되돌려 준다(`MessageRowHandlers`
+  와 같은 형태). 카드마다 클로저를 만들면 컬럼이 다시 그려질 때 카드도 전부 따라
+  그려진다.
+- **뷰 상태의 스코프는 언마운트가 결정하고 있었다.** `query` / `source` / `status`
+  / `view`는 페이지를 떠나면 초기화되고 `propertyFilters`만 팀 전환에도 초기화된다.
+  전역 atom으로 올릴 때 이 두 규칙을 `resetBoardViewState`(마운트)와
+  `resetBoardPropertyFilters`(팀 전환)로 명시하지 않으면 조용히 동작이 바뀐다.
+- **컴패니언과 데스크톱의 상태 탭은 원래 다른 상태였다.** 하단 바가 쓰는
+  `navigation/companionStatusAtom`과 보드의 `boardStatusAtom`을 하나로 합치려면 첫
+  페인트에 프롭을 미러링해야 해서 화면이 튄다. 파생 atom을 둘로 나누는 편이 맞다.
+- **`IssueCollection`은 남는다.** "내 이슈"는 이 창이 선택한 적 없는 팀의 대시보드를
+  직접 불러오므로 그 런들은 엔티티 저장소에 없다. 행 마크업만
+  `IssueListRow` / `IssueListHeader`로 뽑아 두 목록이 공유한다.
+- **보드 테스트는 페이로드를 레지스트리에 심는다.** `test/board-harness.tsx`의
+  `BoardHarness`가 `dashboard` 프롭을 받아 첫 렌더에서 동기로
+  `applySyncEvent(team-snapshot)`을 적용하므로(그때는 구독자가 없다) 기존 36개
+  렌더 지점은 컴포넌트 이름만 바꾸면 됐고, `renderToStaticMarkup`도 그대로 돈다.
+  이후 페이로드는 effect에서 적용한다.
+- **`renderCounter.track`은 여전히 프롭 렌더만 센다.** 구독 경계별 카운트는 같은
+  atom을 읽는 프로브 컴포넌트를 형제로 두고 세며, 실제 보드는 옆에서 같은
+  레지스트리로 렌더해 DOM으로 검증한다.
+
 ## 목표
 
 1. `apps/briar/src/hooks/useBriar.ts`(4,668줄)와 `apps/briar/src/App.tsx`(5,116줄)가
@@ -451,6 +494,30 @@ workspace / workflow / integrations를 옮기며 확인한, 이후 단계에 영
 비목표: 라우팅 방식 변경(뷰 언마운트 정책), `useInbox` / `useAutoHuntSessions` /
 `useChannelConversation`의 전환(동일 패턴으로 후속 진행), 서버 API 변경, 오프라인
 우선과 멀티 디바이스 충돌 해결.
+
+## 결과
+
+계획대로 끝났다. 2026-09-04 기준 `main`의 숫자다.
+
+- **`useBriar.ts`는 삭제되었다.** 기준 커밋에서 4,668줄이었고, `apps/briar/src`에
+  `useBriar` 참조와 `briar.` 멤버 접근이 0개다.
+- **`App.tsx`는 5,116줄 → 419줄이다.** 목표였던 "500줄 이하"를 지켰고, 남은 것은
+  `AppEffects` + `AuthGate` + 셸 선택 + `AppDialogs` 조립이다.
+- **`apps/briar/src/state/`가 19개 도메인, 소스 73개와 테스트 45개다.** 엔티티 맵과
+  동기화 진입점, 도메인 액션, 부수효과 훅, 영속화가 전부 여기에 있다.
+- **PR 24개(#1581–#1605)로 나눠 머지했다.** 가장 긴 것도 하루 안에 머지 가능한
+  크기였고, 두 고변경 파일과의 충돌로 되돌린 PR은 없다.
+- **렌더 카운트로 고정된 보장 4가지.**
+  1. 변경 없는 폴링 틱: 셸·보드·행 모두 리렌더 0회
+     (`components/app/HuntDashboardWithTeam.test.tsx`).
+  2. 런 하나의 내용 변경: 그 런의 카드 1회, 그 외 0회 — 다른 카드도, 컬럼 헤더도,
+     보드도, 셸도 리렌더되지 않는다(같은 파일).
+  3. 런 하나의 상태 변경: 그 카드와 **떠난 컬럼·도착한 컬럼**의 id 목록, 칸반의
+     키보드 순서, 상태 탭 카운트만 리렌더된다(같은 파일).
+  4. 열린 런이 바뀔 때 셸 리렌더 0회(`RunPageWithRun.test.tsx`), 페이지 이동 시
+     크롬·상태 표시줄 리렌더 0회(`DesktopPages` 렌더 카운트 테스트).
+- **콜드 부팅은 네트워크 응답 전에 마지막 대시보드를 그린다**
+  (`state/persistence/cold-boot.test.tsx`).
 
 ## 현재 구조 요약
 
@@ -1098,3 +1165,4 @@ Phase 2 이후 언제든 착수 가능하며 Phase 3–7과 병행할 수 있다
 | 6 | #1596, #1597, #1598 | 머지됨 | #1596: `state/navigation`의 `history` / `atoms`(방문 스택 + 파생 12종) / `actions` / `useNavigationReconciliation`, `hooks/useAppNavigation`을 호환 훅으로 축소, `setDefaultTeam` 제거. #1597: 조정 effect를 `AppEffects`로, `useAppNavigation` 삭제, `WindowNavigationControlsWithHistory` / `CompanionHeaderWithSession` 래퍼, `SidebarWithSession`의 페이지 구독, `useAppShortcuts`(11→4) / `useCommandPaletteItems`(16→5) / `useDeepLinks` / `useRepositorySetup` / `AppDialogs` / `CommandPaletteWithContext`의 내비게이션 프롭 제거. #1598: `DesktopPages` 페이지 슬롯 분리와 렌더 카운트 테스트. App.tsx 783줄 → 661줄, `briar.` 키 28개 유지(전부 세션·로그인). |
 | 7 | #1599, #1600, #1601 | 머지됨 | #1599: `state/session`의 `api` / `useSessionBootstrap` / `useAuthReturnListener`와 로그인 액션 6종(폴링 상태는 registry `WeakMap`), `state/team`의 `selectTeam` / `ensureTeamSelected`와 `getTeamActions`, `state/sync/actions`의 `refreshActiveTeam`, `state/planning/usePlanningProjectsSync`, `state/action-bridges`. `IssueActionBridge.selectTeam`과 `AppEffects` / `useNavigationReconciliation`의 `selectTeam` 프롭 제거, 데모 선택 시드를 모듈 상수로, `lib/default-organization` 삭제. #1600: `useBriar.ts` 삭제, `components/app/InboxBridge`와 `state/inbox`(atoms / actions), `state/app-error`, `hooks/useOrganizationViewData`. 훅 6종과 게이트·셸·페이지가 프롭 대신 액션 훅을 쓴다. App.tsx 661줄 → 421줄, `briar.` 키 28개 → 0개. #1601: `state/status-tray`와 `state/deep-links`의 구독형 atom 5종(`addFinalizer` + `setIdleTTL`), `MessageRow` memo 복구와 렌더 카운트 테스트. |
 | 8 | #1602, #1603 | 머지됨 | #1602: `state/persistence`의 `snapshot`(조직 단위 `ClientSnapshot` + Effect Schema 검증 + `collectSnapshot` / `applySnapshot`), `store`(`SnapshotStore`와 IndexedDB / 인메모리 / no-op 구현, `snapshotStoreAtom` 이음매, 예외를 삼키는 접근 래퍼), `account`(부팅 포인터), `useSnapshotWriter`(1초 창 디바운스, hidden·pagehide 즉시 기록, 조직 이탈 시 삭제). `clearSessionState`가 저장소 전체를 함께 비운다. #1603: `hydration`(게이트와 `hydratedAccountAtom`)과 `useHydration`, `AppEffects`의 첫 훅. 부트스트랩이 커밋 직전에 게이트를 기다리고 계정이 다르면 폐기하며, `useTeamSync`와 `useChannelCatalogSync`가 부팅 시점의 초기화를 건너뛴다. 저장된 커서에서 델타로 따라잡고 410이면 스냅샷으로 대체한다. |
+| 2C | #1604, #1605 | 머지됨 | Phase 2 완료 조건 2를 닫는다. #1604: `components/hunt/model/filters.ts`를 `state/board/filters.ts`로 옮기고 검색 텍스트·상태 탭·목록 필터·컴패니언 정렬을 순수 함수로 뽑음. `state/board`의 `columns`(컬럼 정의와 런 배정, 체크포인트 경계), `atoms`(보드 뷰 상태와 `boardScopedRunIds` / `boardRunIds` / `boardStatusCounts` / `boardColumnDefinitions` / `boardGroupedRunIds` / `boardColumnRunIds` / `boardVisibleColumnIds` / `companionRunIds` / `boardRun`), `run-facts`(`runAgentAssociation` / `runAssignedWorker` / `runAssignee`와 게시 훅 `useBoardSources`). #1605: `HuntDashboard`에서 `dashboard` / `activeIssueProjectId` 프롭 제거, `board`의 `HuntBoard` / `BoardKanban` / `BoardColumn` / `BoardCard` / `BoardIssueList` / `BoardFilterBar` / `CompanionTaskBoard`와 공용 행 `IssueListRow` / `IssueListHeader`, `test/board-harness`. `HuntDashboardWithTeam`이 `activeDashboardAtom` 구독을 끊었다. `HuntDashboard.tsx` 1,279줄 → 737줄. |
