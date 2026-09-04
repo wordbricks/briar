@@ -7,6 +7,7 @@ import type {
   ChannelMember,
   ChannelMessage,
 } from "../../lib/channels-contract";
+import { actionIsWaiting, defineTaskActionFamily } from "../actions";
 import { shallowArrayEqual } from "../entities/upsert";
 import {
   channelReplyIsPending,
@@ -349,21 +350,64 @@ export const channelOpenThreadIdAtom = Atom.family((channelId: string) =>
   ),
 );
 
-/** A write for this channel is in flight: the composer and the row actions wait. */
-export const channelConversationBusyAtom = Atom.family((channelId: string) =>
-  Atom.make(false).pipe(
-    Atom.keepAlive,
-    Atom.withLabel(`channelConversation/${channelId}/busy`),
-  ),
+/*
+  The writes a reader can start in one channel, as request state.
+
+  These were six hand written flags — one boolean for "a write is running", two
+  ids for the proposal being accepted or declined, one for the thread subscribe
+  toggle — set at the top of each action and cleared in a `finally` guarded by
+  "is this still the surface that started it". The guard was there because the
+  clear of an *older* request would otherwise land on a *newer* one's flag; a
+  request that owns its own atom cannot make that mistake, so the guards and the
+  clears are gone and the flags below are derived.
+
+  Overlap differs by flow, so `concurrent` does too. Two sends overlap by design
+  in a chat, and interrupting the first would reject the composer that is
+  awaiting it, so sending and deleting join instead of replacing. A proposal has
+  one decision, and the card is disabled while it runs.
+*/
+
+/** Sending a message in this channel. */
+export const channelSendAction = defineTaskActionFamily(
+  "channelConversation/send",
+  { concurrent: true },
 );
 
-/** The channel's first page is loading and nothing stored is being shown. */
-export const channelConversationLoadingAtom = Atom.family((channelId: string) =>
-  Atom.make(false).pipe(
-    Atom.keepAlive,
-    Atom.withLabel(`channelConversation/${channelId}/loading`),
-  ),
+/** Deleting a message of this channel. */
+export const channelDeleteMessageAction = defineTaskActionFamily(
+  "channelConversation/deleteMessage",
+  { concurrent: true },
 );
+
+/** Approving a proposal in this channel. */
+export const channelAcceptProposalAction = defineTaskActionFamily(
+  "channelConversation/acceptProposal",
+);
+
+/** Declining a proposal in this channel. */
+export const channelDeclineProposalAction = defineTaskActionFamily(
+  "channelConversation/declineProposal",
+);
+
+/** Subscribing to or unsubscribing from the open thread. */
+export const channelThreadSubscriptionAction = defineTaskActionFamily(
+  "channelConversation/threadSubscription",
+);
+
+/** A write for this channel is in flight: the composer and the row actions wait. */
+export const channelConversationBusyAtom = Atom.family((channelId: string) => {
+  const send = channelSendAction(channelId);
+  const remove = channelDeleteMessageAction(channelId);
+  const accept = channelAcceptProposalAction(channelId);
+  const decline = channelDeclineProposalAction(channelId);
+  return Atom.make(
+    (get): boolean =>
+      actionIsWaiting(get(send.result)) ||
+      actionIsWaiting(get(remove.result)) ||
+      actionIsWaiting(get(accept.result)) ||
+      actionIsWaiting(get(decline.result)),
+  ).pipe(Atom.withLabel(`channelConversation/${channelId}/busy`));
+});
 
 /** An older page is being fetched, which the timeline shows as a spinner. */
 export const channelEarlierMessagesLoadingAtom = Atom.family(
@@ -385,27 +429,22 @@ export const channelThreadLoadingAtom = Atom.family((channelId: string) =>
 /** The thread subscribe toggle is waiting for its response. */
 export const channelThreadSubscriptionPendingAtom = Atom.family(
   (channelId: string) =>
-    Atom.make(false).pipe(
-      Atom.keepAlive,
-      Atom.withLabel(`channelConversation/${channelId}/threadSubscriptionPending`),
+    Atom.make((get): boolean =>
+      actionIsWaiting(get(channelThreadSubscriptionAction(channelId).result)),
+    ).pipe(
+      Atom.withLabel(
+        `channelConversation/${channelId}/threadSubscriptionPending`,
+      ),
     ),
 );
 
 /** The proposal whose approval is in flight, so its card shows a spinner. */
-export const channelAcceptingProposalIdAtom = Atom.family((channelId: string) =>
-  Atom.make<string | null>(null).pipe(
-    Atom.keepAlive,
-    Atom.withLabel(`channelConversation/${channelId}/acceptingProposalId`),
-  ),
-);
+export const channelAcceptingProposalIdAtom = (channelId: string) =>
+  channelAcceptProposalAction(channelId).pendingTarget;
 
 /** The proposal whose decline is in flight. */
-export const channelDecliningProposalIdAtom = Atom.family((channelId: string) =>
-  Atom.make<string | null>(null).pipe(
-    Atom.keepAlive,
-    Atom.withLabel(`channelConversation/${channelId}/decliningProposalId`),
-  ),
-);
+export const channelDecliningProposalIdAtom = (channelId: string) =>
+  channelDeclineProposalAction(channelId).pendingTarget;
 
 /**
  * The project a reader picked for a proposal that does not name one. Keyed by

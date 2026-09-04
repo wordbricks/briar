@@ -39,15 +39,17 @@ import { activeOrganizationIdAtom } from "../organization/atoms";
 import { useRegistry, type AtomRegistry } from "../registry";
 import { tokenAtom } from "../session/atoms";
 import {
-  channelAcceptingProposalIdAtom,
+  channelAcceptProposalAction,
   channelAgentRepliesAtom,
   channelAgentsAtom,
-  channelConversationBusyAtom,
-  channelDecliningProposalIdAtom,
+  channelDeclineProposalAction,
+  channelDeleteMessageAction,
   channelMembersAtom,
   channelOpenThreadIdAtom,
   channelProposalProjectsAtom,
   channelRootMessagesAtom,
+  channelSendAction,
+  channelThreadSubscriptionAction,
   channelThreadSubscriptionPendingAtom,
 } from "./atoms";
 import {
@@ -60,6 +62,7 @@ import {
   removeReplySummary,
   channelConversationError,
 } from "./model";
+import { runTask } from "../actions";
 import {
   getChannelConversationLoader,
   type ChannelSurfaceContext,
@@ -233,8 +236,6 @@ export function createChannelConversationActions(
     return token && organizationId ? { token, organizationId } : null;
   };
 
-  const setBusy = (channelId: string, value: boolean) =>
-    registry.set(channelConversationBusyAtom(channelId), value);
 
   const send: ChannelConversationActions["send"] = async (
     channelId,
@@ -282,102 +283,102 @@ export function createChannelConversationActions(
           .get(channelRootMessagesAtom(channelId))
           .find((item) => item.id === parentMessageId) ?? null
       : null;
-    setBusy(channelId, true);
-    if (parentMessageId) {
-      optimisticThreadMessageIds.add(clientMessageId);
-      patchChannelRootMessage(registry, channelId, parentMessageId, (parent) =>
-        appendReplySummary(parent, optimisticMessage),
-      );
-      mergeIntoChannelSurface(registry, channelId, "thread", [optimisticMessage]);
-    } else {
-      context.onRootMessagePending?.();
-      mergeIntoChannelSurface(registry, channelId, "root", [optimisticMessage]);
-    }
-    try {
-      const hasAgentMention = mentions.some(
-        (mention) => mention.type === "agent",
-      );
-      const implicitlyInvokesDirectAgent =
-        context.channelKind === "dm" &&
-        members.length === 1 &&
-        agents.length === 1;
-      const preferredDeviceId =
-        hasAgentMention || implicitlyInvokesDirectAgent || selectedSkill
-          ? await api.currentExecutionWorkerDeviceId(organizationId)
-          : null;
-      const mentionedAgentIds = mentions
-        .filter((mention) => mention.type === "agent")
-        .map((mention) => mention.id);
-      if (selectedSkill && !mentionedAgentIds.includes(selectedSkill.agentId)) {
-        mentionedAgentIds.push(selectedSkill.agentId);
-      }
-      const result = await api.sendChannelMessage(
-        token,
-        organizationId,
-        channelId,
-        {
-          body: body.trim(),
-          clientMessageId,
-          skillId: selectedSkill?.skill.id ?? null,
-          parentMessageId,
-          mentionedUserIds: mentions
-            .filter((mention) => mention.type === "user")
-            .map((mention) => mention.id),
-          mentionedAgentIds,
-          ...(preferredDeviceId ? { preferredDeviceId } : {}),
-          attachments,
-          attachmentReferences,
-        },
-      );
-      if (!loader.surfaceIsCurrent(sendContext)) return;
-      if (imageCache && result?.message?.attachments) {
-        result.message.attachments.forEach((attachment, index) => {
-          const url = attachmentUrls[index];
-          if (url) {
-            registerChannelMessageImageSource(imageCache, attachment.id, url);
-            registerChannelMessageImageSource(imageCache, attachment.url, url);
-            registerChannelMessageImageSource(
-              imageCache,
-              `${attachment.id}:${attachment.url}`,
-              url,
-            );
-          }
-        });
-      }
-      applyIncomingChannelAgentReplies(
-        registry,
-        channelId,
-        result.agentReplies,
-        false,
-      );
+    return runTask(registry, channelSendAction(channelId), null, async () => {
       if (parentMessageId) {
-        optimisticThreadMessageIds.delete(clientMessageId);
-        mergeIntoChannelSurface(registry, channelId, "thread", [result.message]);
+        optimisticThreadMessageIds.add(clientMessageId);
+        patchChannelRootMessage(registry, channelId, parentMessageId, (parent) =>
+          appendReplySummary(parent, optimisticMessage),
+        );
+        mergeIntoChannelSurface(registry, channelId, "thread", [optimisticMessage]);
       } else {
         context.onRootMessagePending?.();
-        mergeIntoChannelSurface(registry, channelId, "root", [result.message]);
+        mergeIntoChannelSurface(registry, channelId, "root", [optimisticMessage]);
       }
-    } catch (cause) {
-      if (loader.surfaceIsCurrent(sendContext)) {
-        const shouldRollbackReplySummary = parentMessageId
-          ? optimisticThreadMessageIds.delete(clientMessageId)
-          : false;
-        removeOptimisticChannelMessages(registry, channelId, clientMessageId);
-        if (parentMessageId && shouldRollbackReplySummary) {
-          patchChannelRootMessage(registry, channelId, parentMessageId, (parent) =>
-            removeReplySummary(parent, optimisticMessage, parentBeforeSend),
-          );
+      try {
+        const hasAgentMention = mentions.some(
+          (mention) => mention.type === "agent",
+        );
+        const implicitlyInvokesDirectAgent =
+          context.channelKind === "dm" &&
+          members.length === 1 &&
+          agents.length === 1;
+        const preferredDeviceId =
+          hasAgentMention || implicitlyInvokesDirectAgent || selectedSkill
+            ? await api.currentExecutionWorkerDeviceId(organizationId)
+            : null;
+        const mentionedAgentIds = mentions
+          .filter((mention) => mention.type === "agent")
+          .map((mention) => mention.id);
+        if (selectedSkill && !mentionedAgentIds.includes(selectedSkill.agentId)) {
+          mentionedAgentIds.push(selectedSkill.agentId);
         }
-        reportChannelConversationError(registry, cause);
+        const result = await api.sendChannelMessage(
+          token,
+          organizationId,
+          channelId,
+          {
+            body: body.trim(),
+            clientMessageId,
+            skillId: selectedSkill?.skill.id ?? null,
+            parentMessageId,
+            mentionedUserIds: mentions
+              .filter((mention) => mention.type === "user")
+              .map((mention) => mention.id),
+            mentionedAgentIds,
+            ...(preferredDeviceId ? { preferredDeviceId } : {}),
+            attachments,
+            attachmentReferences,
+          },
+        );
+        if (!loader.surfaceIsCurrent(sendContext)) return;
+        if (imageCache && result?.message?.attachments) {
+          result.message.attachments.forEach((attachment, index) => {
+            const url = attachmentUrls[index];
+            if (url) {
+              registerChannelMessageImageSource(imageCache, attachment.id, url);
+              registerChannelMessageImageSource(imageCache, attachment.url, url);
+              registerChannelMessageImageSource(
+                imageCache,
+                `${attachment.id}:${attachment.url}`,
+                url,
+              );
+            }
+          });
+        }
+        applyIncomingChannelAgentReplies(
+          registry,
+          channelId,
+          result.agentReplies,
+          false,
+        );
+        if (parentMessageId) {
+          optimisticThreadMessageIds.delete(clientMessageId);
+          mergeIntoChannelSurface(registry, channelId, "thread", [result.message]);
+        } else {
+          context.onRootMessagePending?.();
+          mergeIntoChannelSurface(registry, channelId, "root", [result.message]);
+        }
+      } catch (cause) {
+        if (loader.surfaceIsCurrent(sendContext)) {
+          const shouldRollbackReplySummary = parentMessageId
+            ? optimisticThreadMessageIds.delete(clientMessageId)
+            : false;
+          removeOptimisticChannelMessages(registry, channelId, clientMessageId);
+          if (parentMessageId && shouldRollbackReplySummary) {
+            patchChannelRootMessage(registry, channelId, parentMessageId, (parent) =>
+              removeReplySummary(parent, optimisticMessage, parentBeforeSend),
+            );
+          }
+          reportChannelConversationError(registry, cause);
+        }
+        for (const url of attachmentUrls) {
+          URL.revokeObjectURL(url);
+          imageCache?.entries.delete(url);
+        }
+      } finally {
+        optimisticThreadMessageIds.delete(clientMessageId);
       }
-      for (const url of attachmentUrls) {
-        URL.revokeObjectURL(url);
-        imageCache?.entries.delete(url);
-      }
-    } finally {
-      optimisticThreadMessageIds.delete(clientMessageId);
-      if (loader.surfaceIsCurrent(sendContext)) setBusy(channelId, false);
-    }
+    });
   };
 
   const closeThread: ChannelConversationActions["closeThread"] = (channelId) => {
@@ -422,96 +423,96 @@ export function createChannelConversationActions(
       approvalContext.channelId === channelId &&
       loader.surfaceIsCurrent(approvalContext);
     const approvalProposalVersion = loader.proposalVersion(proposalId);
-    setBusy(channelId, true);
-    registry.set(channelAcceptingProposalIdAtom(channelId), proposalId);
-    try {
-      const result = execution
-        ? await api.acceptChannelProposal(
-            token,
-            organizationId,
-            channelId,
-            proposalId,
-            projectId,
-            execution,
-          )
-        : await api.acceptChannelProposal(
-            token,
-            organizationId,
-            channelId,
-            proposalId,
-            projectId,
-          );
-      const hasExecutionFollowUp =
-        requestsExecution || result.executionProposal != null;
-      if (!approvalContextIsCurrent()) return;
-      const applyResult = (candidate: ChannelMessage): ChannelMessage =>
-        candidate.proposal?.id === proposalId
-          ? {
-              ...candidate,
-              proposal: {
-                ...candidate.proposal,
-                status: "accepted",
-                projectId: result.projectId,
-                resultRunId: result.resultRunId,
-                resultItems: result.resultItems,
-              },
-              executionProposal:
-                result.executionProposal ?? candidate.executionProposal,
+    return runTask(
+      registry,
+      channelAcceptProposalAction(channelId),
+      proposalId,
+      async () => {
+        try {
+          const result = execution
+            ? await api.acceptChannelProposal(
+                token,
+                organizationId,
+                channelId,
+                proposalId,
+                projectId,
+                execution,
+              )
+            : await api.acceptChannelProposal(
+                token,
+                organizationId,
+                channelId,
+                proposalId,
+                projectId,
+              );
+          const hasExecutionFollowUp =
+            requestsExecution || result.executionProposal != null;
+          if (!approvalContextIsCurrent()) return;
+          const applyResult = (candidate: ChannelMessage): ChannelMessage =>
+            candidate.proposal?.id === proposalId
+              ? {
+                  ...candidate,
+                  proposal: {
+                    ...candidate.proposal,
+                    status: "accepted",
+                    projectId: result.projectId,
+                    resultRunId: result.resultRunId,
+                    resultItems: result.resultItems,
+                  },
+                  executionProposal:
+                    result.executionProposal ?? candidate.executionProposal,
+                }
+              : candidate;
+          const applySuccessfulResponse = () => {
+            applyProposalPatch(channelId, applyResult);
+            loader.recordProposalMessages([applyResult(item)]);
+          };
+          const refresh = (target: ChannelMessage) =>
+            loader.refresh(channelId, {
+              item: target,
+              proposalId,
+              pageSize: context.pageSize,
+              onChannelLoaded: context.onChannelLoaded,
+            });
+          if (loader.proposalVersion(proposalId) === approvalProposalVersion) {
+            applySuccessfulResponse();
+            if (hasExecutionFollowUp && !result.executionProposal) {
+              await refresh(applyResult(item));
             }
-          : candidate;
-      const applySuccessfulResponse = () => {
-        applyProposalPatch(channelId, applyResult);
-        loader.recordProposalMessages([applyResult(item)]);
-      };
-      const refresh = (target: ChannelMessage) =>
-        loader.refresh(channelId, {
-          item: target,
-          proposalId,
-          pageSize: context.pageSize,
-          onChannelLoaded: context.onChannelLoaded,
-        });
-      if (loader.proposalVersion(proposalId) === approvalProposalVersion) {
-        applySuccessfulResponse();
-        if (hasExecutionFollowUp && !result.executionProposal) {
-          await refresh(applyResult(item));
-        }
-      } else {
-        let latest = loader.latestProposal(proposalId) ?? undefined;
-        if (latest?.status !== "accepted") {
-          latest = (await refresh(item)) ?? undefined;
-        }
-        if (!approvalContextIsCurrent()) return;
-        if (
-          latest?.status === "accepted" &&
-          latest.projectId &&
-          latest.resultRunId
-        ) {
-          if (hasExecutionFollowUp) {
-            if (result.executionProposal) applySuccessfulResponse();
-            else await refresh(item);
+          } else {
+            let latest = loader.latestProposal(proposalId) ?? undefined;
+            if (latest?.status !== "accepted") {
+              latest = (await refresh(item)) ?? undefined;
+            }
+            if (!approvalContextIsCurrent()) return;
+            if (
+              latest?.status === "accepted" &&
+              latest.projectId &&
+              latest.resultRunId
+            ) {
+              if (hasExecutionFollowUp) {
+                if (result.executionProposal) applySuccessfulResponse();
+                else await refresh(item);
+              }
+            } else if (
+              latest?.status === "pending" &&
+              latest.projectId === result.projectId
+            ) {
+              applySuccessfulResponse();
+              if (hasExecutionFollowUp && !result.executionProposal) {
+                await refresh(applyResult(item));
+              }
+            }
           }
-        } else if (
-          latest?.status === "pending" &&
-          latest.projectId === result.projectId
-        ) {
-          applySuccessfulResponse();
-          if (hasExecutionFollowUp && !result.executionProposal) {
-            await refresh(applyResult(item));
+          return null;
+        } catch (cause) {
+          if (approvalContextIsCurrent()) {
+            reportChannelConversationError(registry, cause);
           }
+          return channelConversationError(cause);
         }
-      }
-      return null;
-    } catch (cause) {
-      if (approvalContextIsCurrent()) {
-        reportChannelConversationError(registry, cause);
-      }
-      return channelConversationError(cause);
-    } finally {
-      if (approvalContextIsCurrent()) {
-        setBusy(channelId, false);
-        registry.set(channelAcceptingProposalIdAtom(channelId), null);
-      }
-    }
+      },
+    );
   };
 
   const declineProposal: ChannelConversationActions["declineProposal"] = async (
@@ -530,36 +531,36 @@ export function createChannelConversationActions(
     const { token, organizationId } = session;
     const api = resolveApi();
     const declineContext = loader.captureSurface();
-    setBusy(channelId, true);
-    registry.set(channelDecliningProposalIdAtom(channelId), proposal.id);
-    try {
-      await api.declineChannelProposal(
-        token,
-        organizationId,
-        channelId,
-        proposal.id,
-      );
-      if (!loader.surfaceIsCurrent(declineContext)) return;
-      const applyDecline = (candidate: ChannelMessage): ChannelMessage =>
-        candidate.proposal?.id === proposal.id &&
-        candidate.proposal.status === "pending"
-          ? {
-              ...candidate,
-              proposal: { ...candidate.proposal, status: "declined" },
-            }
-          : candidate;
-      applyProposalPatch(channelId, applyDecline);
-      loader.recordProposalMessages([applyDecline(item)]);
-    } catch (cause) {
-      if (loader.surfaceIsCurrent(declineContext)) {
-        reportChannelConversationError(registry, cause);
-      }
-    } finally {
-      if (loader.surfaceIsCurrent(declineContext)) {
-        setBusy(channelId, false);
-        registry.set(channelDecliningProposalIdAtom(channelId), null);
-      }
-    }
+    return runTask(
+      registry,
+      channelDeclineProposalAction(channelId),
+      proposal.id,
+      async () => {
+        try {
+          await api.declineChannelProposal(
+            token,
+            organizationId,
+            channelId,
+            proposal.id,
+          );
+          if (!loader.surfaceIsCurrent(declineContext)) return;
+          const applyDecline = (candidate: ChannelMessage): ChannelMessage =>
+            candidate.proposal?.id === proposal.id &&
+            candidate.proposal.status === "pending"
+              ? {
+                  ...candidate,
+                  proposal: { ...candidate.proposal, status: "declined" },
+                }
+              : candidate;
+          applyProposalPatch(channelId, applyDecline);
+          loader.recordProposalMessages([applyDecline(item)]);
+        } catch (cause) {
+          if (loader.surfaceIsCurrent(declineContext)) {
+            reportChannelConversationError(registry, cause);
+          }
+        }
+      },
+    );
   };
 
   const toggleReaction: ChannelConversationActions["toggleReaction"] = async (
@@ -617,42 +618,46 @@ export function createChannelConversationActions(
     const { token, organizationId } = session;
     const api = resolveApi();
     const deletionContext = loader.captureSurface();
-    setBusy(channelId, true);
-    try {
-      const result = await api.deleteChannelMessage(
-        token,
-        organizationId,
-        channelId,
-        item.id,
-      );
-      if (!loader.surfaceIsCurrent(deletionContext)) return;
-      applyChannelMessageDeletionToChannel(registry, channelId, item.id, result);
-      if (result.deleted) {
-        writeChannelAgentReplies(
-          registry,
-          channelId,
-          registry
-            .get(channelAgentRepliesAtom(channelId))
-            .filter(
-              (reply) =>
-                reply.triggerMessageId !== item.id &&
-                reply.replyMessageId !== item.id,
-            ),
-        );
-        if (
-          registry.get(channelOpenThreadIdAtom(channelId)) === item.id &&
-          !result.message
-        ) {
-          closeThread(channelId);
+    return runTask(
+      registry,
+      channelDeleteMessageAction(channelId),
+      item.id,
+      async () => {
+        try {
+          const result = await api.deleteChannelMessage(
+            token,
+            organizationId,
+            channelId,
+            item.id,
+          );
+          if (!loader.surfaceIsCurrent(deletionContext)) return;
+          applyChannelMessageDeletionToChannel(registry, channelId, item.id, result);
+          if (result.deleted) {
+            writeChannelAgentReplies(
+              registry,
+              channelId,
+              registry
+                .get(channelAgentRepliesAtom(channelId))
+                .filter(
+                  (reply) =>
+                    reply.triggerMessageId !== item.id &&
+                    reply.replyMessageId !== item.id,
+                ),
+            );
+            if (
+              registry.get(channelOpenThreadIdAtom(channelId)) === item.id &&
+              !result.message
+            ) {
+              closeThread(channelId);
+            }
+          }
+        } catch (cause) {
+          if (loader.surfaceIsCurrent(deletionContext)) {
+            reportChannelConversationError(registry, cause);
+          }
         }
-      }
-    } catch (cause) {
-      if (loader.surfaceIsCurrent(deletionContext)) {
-        reportChannelConversationError(registry, cause);
-      }
-    } finally {
-      if (loader.surfaceIsCurrent(deletionContext)) setBusy(channelId, false);
-    }
+      },
+    );
   };
 
   const toggleThreadSubscription: ChannelConversationActions["toggleThreadSubscription"] =
@@ -670,28 +675,32 @@ export function createChannelConversationActions(
       const { token, organizationId } = session;
       const api = resolveApi();
       const context = loader.captureSurface();
-      registry.set(channelThreadSubscriptionPendingAtom(channelId), true);
-      try {
-        const result = await api.updateChannelThreadSubscription(
-          token,
-          organizationId,
-          channelId,
-          parentId,
-          subscribed,
-        );
-        if (!loader.surfaceIsCurrent(context)) return;
-        patchChannelMessages(registry, channelId, (message) =>
-          message.id === result.rootMessageId
-            ? { ...message, subscribers: result.subscribers }
-            : message,
-        );
-      } catch (cause) {
-        if (loader.surfaceIsCurrent(context)) {
-          reportChannelConversationError(registry, cause);
-        }
-      } finally {
-        registry.set(channelThreadSubscriptionPendingAtom(channelId), false);
-      }
+      return runTask(
+        registry,
+        channelThreadSubscriptionAction(channelId),
+        parentId,
+        async () => {
+          try {
+            const result = await api.updateChannelThreadSubscription(
+              token,
+              organizationId,
+              channelId,
+              parentId,
+              subscribed,
+            );
+            if (!loader.surfaceIsCurrent(context)) return;
+            patchChannelMessages(registry, channelId, (message) =>
+              message.id === result.rootMessageId
+                ? { ...message, subscribers: result.subscribers }
+                : message,
+            );
+          } catch (cause) {
+            if (loader.surfaceIsCurrent(context)) {
+              reportChannelConversationError(registry, cause);
+            }
+          }
+        },
+      );
     };
 
   return {

@@ -19,11 +19,8 @@ import type { AtomRegistry } from "../registry";
 import {
   CHANNEL_CONVERSATION_RETENTION_LIMIT,
   CHANNEL_THREAD_RETENTION_LIMIT,
-  channelAcceptingProposalIdAtom,
   channelAgentRepliesAtom,
   channelAgentsAtom,
-  channelConversationBusyAtom,
-  channelDecliningProposalIdAtom,
   channelEarlierMessagesLoadingAtom,
   channelMembersAtom,
   channelMessageCursorAtom,
@@ -38,7 +35,6 @@ import {
   channelThreadMessageIdsAtom,
   channelThreadMessagesAtom,
   channelThreadRootIdsAtom,
-  channelThreadSubscriptionPendingAtom,
   retainedConversationChannelIdsAtom,
   touchRetained,
 } from "./atoms";
@@ -677,18 +673,22 @@ export function writeChannelOpenThreadId(
   registry.set(channelOpenThreadIdAtom(channelId), rootMessageId);
 }
 
-/** Drops the per-channel flags a newly opened channel starts clean with. */
+/**
+ * Drops the per-channel flags a newly opened channel starts clean with.
+ *
+ * The write flags are not among them any more. "A send is running", "this
+ * proposal is being approved" and the thread subscribe toggle are the request's
+ * own state now, and a request that is still going is not something a fresh
+ * view may declare finished — it goes down when the request does, and a request
+ * that was never started reads as not running to begin with.
+ */
 export function resetChannelConversationViewState(
   registry: AtomRegistry,
   channelId: string,
 ): void {
   Atom.batch(() => {
-    registry.set(channelConversationBusyAtom(channelId), false);
-    registry.set(channelAcceptingProposalIdAtom(channelId), null);
-    registry.set(channelDecliningProposalIdAtom(channelId), null);
     registry.set(channelThreadLoadingAtom(channelId), false);
     registry.set(channelEarlierMessagesLoadingAtom(channelId), false);
-    registry.set(channelThreadSubscriptionPendingAtom(channelId), false);
     registry.set(channelProposalProjectsAtom(channelId), {});
     registry.set(channelOpenThreadIdAtom(channelId), null);
   });

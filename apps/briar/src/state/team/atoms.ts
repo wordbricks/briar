@@ -10,6 +10,7 @@ import type {
   TeamExecutionWorkerPolicy,
   TeamSettings,
 } from "../../types";
+import { defineTaskAction } from "../actions";
 import { demoSelectionApplies } from "../demo-fixtures";
 import { teamRunsAtom } from "../entities/runs";
 import { teamEntityAtom } from "../entities/teams";
@@ -55,11 +56,18 @@ export const isCreatingTeamAtom = Atom.make(false).pipe(
   Atom.withLabel("team/isCreating"),
 );
 
+/**
+ * Deleting a team.
+ *
+ * `isCreatingTeamAtom` above stays a plain flag on purpose: it says the
+ * creation *flow is open*, which `startTeamCreation` raises and
+ * `finishTeamCreation` lowers, and no request owns that span. A deletion is a
+ * request, so its atom is the request.
+ */
+export const deleteTeamAction = defineTaskAction("team/delete");
+
 /** The team whose deletion is in flight, if any. */
-export const deletingTeamIdAtom = Atom.make<string | null>(null).pipe(
-  Atom.keepAlive,
-  Atom.withLabel("team/deletingId"),
-);
+export const deletingTeamIdAtom = deleteTeamAction.pendingTarget;
 
 /**
  * The selected team resolved against the list. The result is an element of

@@ -9,8 +9,17 @@ import {
   testChannelMessage,
 } from "../../test/channel-conversation";
 import { createTestRegistry } from "../registry";
+
+/** A promise this test settles by hand. */
+const deferredVoid = () => {
+  let resolve!: () => void;
+  const promise = new Promise<void>((onResolve) => {
+    resolve = () => onResolve();
+  });
+  return { promise, resolve };
+};
+import { runTask } from "../actions";
 import {
-  channelAcceptingProposalIdAtom,
   channelAgentRepliesAtom,
   channelAgentsAtom,
   channelConversationBusyAtom,
@@ -19,6 +28,7 @@ import {
   channelProposalProjectsAtom,
   channelRootMessageIdsAtom,
   channelRootMessagesAtom,
+  channelSendAction,
   channelThreadKey,
   channelThreadMessagesAtom,
   channelThreadRootIdsAtom,
@@ -287,17 +297,33 @@ describe("conversation store writers", () => {
     const registry = createTestRegistry();
     writeChannelTimeline(registry, channelId, [testChannelMessage("a")]);
     writeChannelOpenThreadId(registry, channelId, "a");
-    registry.set(channelConversationBusyAtom(channelId), true);
-    registry.set(channelAcceptingProposalIdAtom(channelId), "proposal-1");
     registry.set(channelProposalProjectsAtom(channelId), { "p-1": "team-1" });
 
     resetChannelConversationViewState(registry, channelId);
 
     expect(registry.get(channelOpenThreadIdAtom(channelId))).toBeNull();
-    expect(registry.get(channelConversationBusyAtom(channelId))).toBe(false);
-    expect(registry.get(channelAcceptingProposalIdAtom(channelId))).toBeNull();
     expect(registry.get(channelProposalProjectsAtom(channelId))).toEqual({});
     // The messages are not view state: they are what makes the return instant.
     expect(registry.get(channelRootMessageIdsAtom(channelId))).toEqual(["a"]);
+  });
+
+  it("leaves a write in flight alone: the request owns that flag", async () => {
+    const registry = createTestRegistry();
+    const gate = deferredVoid();
+    const send = runTask(
+      registry,
+      channelSendAction(channelId),
+      null,
+      () => gate.promise,
+    );
+    expect(registry.get(channelConversationBusyAtom(channelId))).toBe(true);
+
+    resetChannelConversationViewState(registry, channelId);
+
+    // Opening a channel does not make a request that is still running finished.
+    expect(registry.get(channelConversationBusyAtom(channelId))).toBe(true);
+    gate.resolve();
+    await send;
+    expect(registry.get(channelConversationBusyAtom(channelId))).toBe(false);
   });
 });
