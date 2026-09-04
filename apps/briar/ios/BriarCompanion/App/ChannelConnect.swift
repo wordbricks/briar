@@ -776,28 +776,14 @@ private func channelOptionalDate(
 }
 
 private func channelProvider(_ value: BriarTypes_AgentProvider) throws -> AgentProvider {
-    switch value {
-    case .codex: .codex
-    case .claude: .claude
-    case .cursor: .cursor
-    case .grok: .grok
-    case .agy: .agy
-    case .opencode: .opencode
-    case .openrouter: .openrouter
-    case .unspecified, .UNRECOGNIZED: throw MobileAPIError.invalidResponse
+    guard let provider = AgentProvider(wire: value) else {
+        throw MobileAPIError.invalidResponse
     }
+    return provider
 }
 
 private func channelProviderMessage(_ value: AgentProvider) -> BriarTypes_AgentProvider {
-    switch value {
-    case .codex: .codex
-    case .claude: .claude
-    case .cursor: .cursor
-    case .grok: .grok
-    case .agy: .agy
-    case .opencode: .opencode
-    case .openrouter: .openrouter
-    }
+    value.wire
 }
 
 private func channelRole(_ value: BriarAPI_ProjectRole) throws -> String {

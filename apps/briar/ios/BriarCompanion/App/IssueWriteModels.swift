@@ -1,3 +1,4 @@
+import BriarContracts
 import Foundation
 import UIKit
 
@@ -31,6 +32,29 @@ enum AgentProvider: String, Codable, CaseIterable, Hashable, Identifiable, Senda
                 ? left.offset < right.offset
                 : leftPosition < rightPosition
         }.map(\.element)
+    }
+
+    /// Wire identity from `briar.types.v1.AgentProvider` (ADR-0008). Exhaustive
+    /// over this enum, so a new case must declare the value it travels as.
+    var wire: BriarTypes_AgentProvider {
+        switch self {
+        case .codex: .codex
+        case .claude: .claude
+        case .cursor: .cursor
+        case .grok: .grok
+        case .agy: .agy
+        case .opencode: .opencode
+        case .openrouter: .openrouter
+        }
+    }
+
+    /// Derived from `wire`, so the two directions cannot disagree. Nil for
+    /// `.unspecified` and for any value this build has no provider for.
+    init?(wire: BriarTypes_AgentProvider) {
+        guard let provider = Self.allCases.first(where: { $0.wire == wire }) else {
+            return nil
+        }
+        self = provider
     }
 }
 

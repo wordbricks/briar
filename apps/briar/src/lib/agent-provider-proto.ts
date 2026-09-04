@@ -1,16 +1,25 @@
 import { AgentProvider as ProtoAgentProvider } from
   "@briar/contracts/gen/briar/types/v1/provider_pb";
-import type { AgentProvider } from "./agent-provider";
+import * as Record from "effect/Record";
+import {
+  agentProviderCatalog,
+  agentProviders,
+  type AgentProvider,
+} from "./agent-provider";
 
-export const protoAgentProvider = {
-  codex: ProtoAgentProvider.CODEX,
-  claude: ProtoAgentProvider.CLAUDE,
-  cursor: ProtoAgentProvider.CURSOR,
-  grok: ProtoAgentProvider.GROK,
-  agy: ProtoAgentProvider.AGY,
-  opencode: ProtoAgentProvider.OPENCODE,
-  openrouter: ProtoAgentProvider.OPENROUTER,
-} as const satisfies Record<AgentProvider, ProtoAgentProvider>;
+/**
+ * Platform names are the generated enum keys lowercased, so the wire map is a
+ * derivation rather than a second hand-maintained list.
+ */
+export const protoAgentProvider = Record.map(
+  agentProviderCatalog,
+  (_entry, provider) =>
+    ProtoAgentProvider[provider.toUpperCase() as Uppercase<AgentProvider>],
+);
+
+const agentProviderByProto = new Map<ProtoAgentProvider, AgentProvider>(
+  agentProviders.map((provider) => [protoAgentProvider[provider], provider]),
+);
 
 export const agentProviderToProto = (
   provider: AgentProvider,
@@ -19,22 +28,9 @@ export const agentProviderToProto = (
 export const agentProviderFromProto = (
   provider: ProtoAgentProvider,
 ): AgentProvider => {
-  switch (provider) {
-    case ProtoAgentProvider.CODEX:
-      return "codex";
-    case ProtoAgentProvider.CLAUDE:
-      return "claude";
-    case ProtoAgentProvider.CURSOR:
-      return "cursor";
-    case ProtoAgentProvider.GROK:
-      return "grok";
-    case ProtoAgentProvider.AGY:
-      return "agy";
-    case ProtoAgentProvider.OPENCODE:
-      return "opencode";
-    case ProtoAgentProvider.OPENROUTER:
-      return "openrouter";
-    default:
-      throw new Error("Agent provider is missing or unsupported");
+  const known = agentProviderByProto.get(provider);
+  if (known === undefined) {
+    throw new Error("Agent provider is missing or unsupported");
   }
+  return known;
 };

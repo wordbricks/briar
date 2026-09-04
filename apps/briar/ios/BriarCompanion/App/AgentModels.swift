@@ -868,17 +868,10 @@ extension ChannelAgentSummary {
 
 private extension AgentProvider {
     init(connectMessage provider: BriarTypes_AgentProvider) throws {
-        switch provider {
-        case .codex: self = .codex
-        case .claude: self = .claude
-        case .cursor: self = .cursor
-        case .grok: self = .grok
-        case .agy: self = .agy
-        case .opencode: self = .opencode
-        case .openrouter: self = .openrouter
-        case .unspecified, .UNRECOGNIZED:
+        guard let known = AgentProvider(wire: provider) else {
             throw MobileAPIError.invalidResponse
         }
+        self = known
     }
 }
 

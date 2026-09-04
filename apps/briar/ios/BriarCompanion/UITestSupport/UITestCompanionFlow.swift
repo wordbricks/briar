@@ -1461,14 +1461,7 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
     }
 
     private static func providerMessage(_ value: String) -> BriarTypes_AgentProvider {
-        switch value {
-        case "claude": .claude
-        case "cursor": .cursor
-        case "opencode": .opencode
-        case "grok": .grok
-        case "agy": .agy
-        default: .codex
-        }
+        (AgentProvider(rawValue: value) ?? .codex).wire
     }
 
     private static let organizationID = UUID(

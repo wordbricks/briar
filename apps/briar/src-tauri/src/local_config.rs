@@ -542,31 +542,16 @@ fn validate_auto_hunt(auto_hunt: &LocalAutoHuntConfig) -> Result<(), String> {
 pub(super) fn agent_provider_from_proto(
     value: buffa::EnumValue<types_proto::AgentProvider>,
 ) -> Result<agent::AgentProviderKind, String> {
-    match value.as_known() {
-        Some(types_proto::AgentProvider::Codex) => Ok(agent::AgentProviderKind::Codex),
-        Some(types_proto::AgentProvider::Claude) => Ok(agent::AgentProviderKind::Claude),
-        Some(types_proto::AgentProvider::Cursor) => Ok(agent::AgentProviderKind::Cursor),
-        Some(types_proto::AgentProvider::Grok) => Ok(agent::AgentProviderKind::Grok),
-        Some(types_proto::AgentProvider::Agy) => Ok(agent::AgentProviderKind::Agy),
-        Some(types_proto::AgentProvider::Opencode) => Ok(agent::AgentProviderKind::Opencode),
-        Some(types_proto::AgentProvider::Openrouter) => Ok(agent::AgentProviderKind::Openrouter),
-        _ => Err("Briar 로컬 설정의 Agent provider가 올바르지 않습니다.".to_string()),
-    }
+    value
+        .as_known()
+        .and_then(agent::AgentProviderKind::from_wire)
+        .ok_or_else(|| "Briar 로컬 설정의 Agent provider가 올바르지 않습니다.".to_string())
 }
 
 pub(super) fn agent_provider_to_proto(
     value: agent::AgentProviderKind,
 ) -> buffa::EnumValue<types_proto::AgentProvider> {
-    match value {
-        agent::AgentProviderKind::Codex => types_proto::AgentProvider::Codex,
-        agent::AgentProviderKind::Claude => types_proto::AgentProvider::Claude,
-        agent::AgentProviderKind::Cursor => types_proto::AgentProvider::Cursor,
-        agent::AgentProviderKind::Grok => types_proto::AgentProvider::Grok,
-        agent::AgentProviderKind::Agy => types_proto::AgentProvider::Agy,
-        agent::AgentProviderKind::Opencode => types_proto::AgentProvider::Opencode,
-        agent::AgentProviderKind::Openrouter => types_proto::AgentProvider::Openrouter,
-    }
-    .into()
+    value.wire().into()
 }
 
 pub(super) fn project_llm_settings_from_proto(
@@ -850,13 +835,7 @@ pub(super) fn provider_is_enabled(
 }
 
 pub(super) fn providers_any_enabled(settings: &LocalAgentProviderSettings) -> bool {
-    settings.codex
-        || settings.claude
-        || settings.cursor
-        || settings.grok
-        || settings.agy
-        || settings.opencode
-        || settings.openrouter
+    agent::AgentProviderKind::all().any(|provider| provider_is_enabled(settings, provider))
 }
 
 #[cfg(test)]

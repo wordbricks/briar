@@ -6,13 +6,7 @@ export type AgentProviderModelPreference = {
 };
 
 export type AgentProviderModelPreferences = {
-  codex: AgentProviderModelPreference;
-  claude: AgentProviderModelPreference;
-  cursor: AgentProviderModelPreference;
-  grok: AgentProviderModelPreference;
-  agy: AgentProviderModelPreference;
-  opencode: AgentProviderModelPreference;
-  openrouter: AgentProviderModelPreference;
+  [Provider in AgentProvider]: AgentProviderModelPreference;
 };
 
 export const agentModelPreferencesStorageKey =
@@ -21,15 +15,14 @@ export const agentModelPreferencesChangedEvent =
   "briar:agent-model-preferences-changed";
 
 export function defaultAgentProviderModelPreferences(): AgentProviderModelPreferences {
-  return {
-    codex: { defaultModel: null, favoriteModels: [] },
-    claude: { defaultModel: null, favoriteModels: [] },
-    cursor: { defaultModel: null, favoriteModels: [] },
-    grok: { defaultModel: null, favoriteModels: [] },
-    agy: { defaultModel: null, favoriteModels: [] },
-    opencode: { defaultModel: null, favoriteModels: [] },
-    openrouter: { defaultModel: null, favoriteModels: [] },
-  };
+  return Object.fromEntries(
+    agentProviders.map((
+      provider,
+    ): [AgentProvider, AgentProviderModelPreference] => [
+      provider,
+      { defaultModel: null, favoriteModels: [] },
+    ]),
+  ) as AgentProviderModelPreferences;
 }
 
 function normalizeModelId(value: unknown): string | null {

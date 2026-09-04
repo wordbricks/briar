@@ -847,24 +847,25 @@ pub(super) fn connected_agent_provider(
     prerequisites: &OnboardingPrerequisites,
     enabled: LocalAgentProviderSettings,
 ) -> Result<agent::AgentProviderKind, String> {
-    [
-        (agent::AgentProviderKind::Codex, &prerequisites.codex),
-        (agent::AgentProviderKind::Claude, &prerequisites.claude),
-        (agent::AgentProviderKind::Cursor, &prerequisites.cursor),
-        (agent::AgentProviderKind::Grok, &prerequisites.grok),
-        (agent::AgentProviderKind::Agy, &prerequisites.agy),
-        (agent::AgentProviderKind::Opencode, &prerequisites.opencode),
-        (agent::AgentProviderKind::Openrouter, &prerequisites.openrouter),
-    ]
-    .into_iter()
-    .find_map(|(provider, status)| {
-        (provider_is_enabled(&enabled, provider) && status.installed && status.authenticated)
-            .then_some(provider)
-    })
-    .ok_or_else(|| {
-        "연결된 LLM 프로바이더가 없습니다. 앱 설정에서 Codex, Claude, Cursor, Grok, Antigravity, OpenCode 또는 OpenRouter를 연결한 뒤 다시 시도하세요."
-            .to_string()
-    })
+    agent::AgentProviderKind::all()
+        .find(|provider| {
+            let status = prerequisites.provider(*provider);
+            provider_is_enabled(&enabled, *provider) && status.installed && status.authenticated
+        })
+        .ok_or_else(|| {
+            let names = agent::AgentProviderKind::all()
+                .map(agent::AgentProviderKind::display_name)
+                .collect::<Vec<_>>();
+            let choices = match names.split_last() {
+                Some((last, leading)) if !leading.is_empty() => {
+                    format!("{} 또는 {last}", leading.join(", "))
+                }
+                _ => names.join(", "),
+            };
+            format!(
+                "연결된 LLM 프로바이더가 없습니다. 앱 설정에서 {choices}를 연결한 뒤 다시 시도하세요."
+            )
+        })
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, specta::Type)]

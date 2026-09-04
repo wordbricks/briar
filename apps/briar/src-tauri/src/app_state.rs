@@ -283,6 +283,25 @@ pub(super) struct OnboardingPrerequisites {
     pub(super) openrouter: OnboardingPrerequisiteStatus,
 }
 
+impl OnboardingPrerequisites {
+    /// The CLI status behind a provider. Exhaustive, so a new provider cannot
+    /// be silently left out of onboarding.
+    pub(super) fn provider(
+        &self,
+        provider: agent::AgentProviderKind,
+    ) -> &OnboardingPrerequisiteStatus {
+        match provider {
+            agent::AgentProviderKind::Codex => &self.codex,
+            agent::AgentProviderKind::Claude => &self.claude,
+            agent::AgentProviderKind::Cursor => &self.cursor,
+            agent::AgentProviderKind::Grok => &self.grok,
+            agent::AgentProviderKind::Agy => &self.agy,
+            agent::AgentProviderKind::Opencode => &self.opencode,
+            agent::AgentProviderKind::Openrouter => &self.openrouter,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct AgentProviderModel {
