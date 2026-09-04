@@ -5,8 +5,8 @@
 -- Whenever a migration changes the schema or seeds rows, run
 -- `bun run d1:snapshot` and commit the result; `bun run d1:snapshot:check`
 -- fails in CI otherwise.
--- migrations-digest: 10deea3b8a4aeb7fcd56c613682343da19abf73fd08c6bff61fd9bfdc99bc97c
--- snapshot-digest: 711dd4d1be8b54e92cecbc33c84d4e14be24fcd43439468018366b73816d7acb
+-- migrations-digest: 371d7d168d7b17f6da3a23c009316bb12fdbf563e9bfe5d2e6d246561574a5e5
+-- snapshot-digest: 9f8ac6f870c7a371b0e267047074aec9c00c6ebd1334181082f98d14c7537ca2
 -- @statement
 CREATE TABLE IF NOT EXISTS "d1_migrations"(
 		id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -3277,7 +3277,11 @@ CREATE TABLE briar_uploads (
   uploaded_at text,
   consumed_at text,
   consumer_kind text,
-  consumer_id text,
+  consumer_id text, image_width integer check (
+  image_width is null or (typeof(image_width) = 'integer' and image_width > 0)
+), image_height integer check (
+  image_height is null or (typeof(image_height) = 'integer' and image_height > 0)
+),
   check (
     (consumed_at is null and consumer_kind is null and consumer_id is null)
     or (
@@ -3531,7 +3535,11 @@ CREATE TABLE briar_channel_message_attachments (
   )),
   byte_size integer not null check (byte_size between 1 and 20971520),
   created_at text not null
-);
+, image_width integer check (
+  image_width is null or (typeof(image_width) = 'integer' and image_width > 0)
+), image_height integer check (
+  image_height is null or (typeof(image_height) = 'integer' and image_height > 0)
+));
 -- @statement
 CREATE TABLE IF NOT EXISTS "account" (
   "id" text primary key not null,
