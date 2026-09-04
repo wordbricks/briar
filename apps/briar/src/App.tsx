@@ -6,7 +6,6 @@ import { AppEffects } from "./components/app/AppEffects";
 import { AuthGate } from "./components/app/AuthGate";
 import { CompanionShell } from "./components/app/CompanionShell";
 import { DesktopShell } from "./components/app/DesktopShell";
-import { InboxBridge } from "./components/app/InboxBridge";
 import { loadProjectMergeActivity } from "./lib/app-rpc/github";
 import { useOrganizationViewData } from "./hooks/useOrganizationViewData";
 import { useAgentDispatch } from "./hooks/useAgentDispatch";
@@ -60,10 +59,11 @@ import type { AppZoomCommands } from "./lib/app-zoom";
   nothing else: which gates stand between a cold start and the shell, which
   shell that is, and what the dialogs above both of them are showing.
 
-  It deliberately subscribes to no run, no channel and no agent session. The
-  inbox, which does need the open board, lives in `InboxBridge` below — so a
-  polling tick that changes one run commits that run's subscribers and this
-  component is not one of them.
+  It deliberately subscribes to no run, no channel, no agent session and no
+  inbox message. The inbox does need the open board, but it reads it in
+  `state/inbox` and its effects are mounted by `AppEffects` — so a polling tick
+  that changes one run commits that run's subscribers and this component is not
+  one of them.
 */
 
 export function App({
@@ -263,7 +263,6 @@ export function App({
   return (
     <>
       <AppEffects />
-      <InboxBridge />
       <AuthGate
         acceptingInvitation={invitation.acceptingInvitation}
         invitationToken={invitation.invitationToken}

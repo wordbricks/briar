@@ -1,38 +1,51 @@
+import * as Option from "effect/Option";
 import * as Atom from "effect/unstable/reactivity/Atom";
 
-import { inboxConversationSyncSignal } from "../../hooks/useInboxNotifications";
-import {
-  classifyInboxMessage,
-  inboxIssueNotifyingStatuses,
-  type InboxMessageWithReadState,
-  type InboxSource,
-} from "../../hooks/useInbox";
-import type { HuntRun } from "../../types";
+import type { HuntRun, Project } from "../../types";
+import { agentSessionsAtom } from "../agent-sessions/atoms";
 import { runsByIdAtom, teamRunIdsAtom } from "../entities/runs";
 import { teamEntityAtom } from "../entities/teams";
 import { shallowArrayEqual } from "../entities/upsert";
 import { lockedTeamIdAtom } from "../platform";
-import { activeTeamIdAtom, teamNotificationsAtom } from "../team/atoms";
+import { activeOrganizationIdAtom } from "../organization/atoms";
+import { tokenAtom, userAtom } from "../session/atoms";
+import { activeTeamIdAtom, teamNotificationsAtom, teamsAtom } from "../team/atoms";
+import {
+  buildCurrentInboxMessages,
+  classifyInboxMessage,
+  collapseInboxThreadMessages,
+  filterInboxMessagesByOrganization,
+  inboxConversationSyncSignal,
+  inboxIssueNotifyingStatuses,
+  inboxMessageSnapshotsEqual,
+  isInboxMessageUnread,
+  reuseInboxMessageIdentities,
+  type InboxMessage,
+  type InboxMessageWithReadState,
+  type InboxSource,
+} from "./model";
+import { inboxStorageKey, readInboxState, type InboxState } from "./persistence";
 
 /*
-  The inbox, published rather than passed.
+  The inbox, derived rather than published.
 
-  `useInbox` is still a hook with its own storage, feed sync and realtime
-  transport — converting it is not this phase's work. What changed is where its
-  result lands: a bridge component below `App` writes it here, and the shells
-  and pages subscribe. `App` therefore no longer re-renders when a run changes,
-  which is what made every inbox tick cost a whole-tree render.
+  Until follow-up F4 a hook below `App` owned all of this and a bridge component
+  copied its result into two atoms. Now the whole chain is here: the stored
+  record, the messages the open board implies, the merge of the two, and the
+  counts and per-row atoms the views read. `state/inbox/useInboxSync.ts` feeds
+  the two ends that are not arithmetic — the account feed and the read-state
+  round trip — and `actions.ts` writes what a click means.
+
+  Two identity rules do the render-count work. The source keeps the references
+  the store holds, so a polling tick that moved a running run's progress bar
+  reaches nothing here; and the displayed list reuses the object each message
+  already had, so a tick that changed one message wakes one row.
 */
 
 /*
-  What `useInbox` reads of the open team.
-
-  The hook still takes a payload-shaped argument — converting it is follow-up
-  F4 — but it only ever reads four projections of one, and of the run list only
-  the runs that can *become* a message: one whose status notifies, or one a
-  conversation notification points at. Filtering to those here is what lets the
-  bridge sit still through a polling tick that moved a running run's progress
-  bar, which is most of them.
+  What the inbox reads of the open team: of the run list only the runs that can
+  *become* a message — one whose status notifies, or one a conversation
+  notification points at.
 */
 
 /** The runs of `teamId` that the inbox can build a message from. */
@@ -74,8 +87,8 @@ const sameInboxSource = (
 
 /**
  * The selected team as the inbox sees it, or `null` before it has a payload.
- * Each part keeps the reference the store holds, so the hook's own memo over
- * them survives a tick that changed something else.
+ * Each part keeps the reference the store holds, so the derivation over them
+ * survives a tick that changed something else.
  */
 export const inboxSourceAtom = Atom.make((get): InboxSource | null => {
   const teamId = get(activeTeamIdAtom);
@@ -96,17 +109,191 @@ export const inboxSourceAtom = Atom.make((get): InboxSource | null => {
   Atom.withLabel("inbox/source"),
 );
 
-/** Every message the inbox knows, across the account's teams. */
-export const inboxMessagesAtom = Atom.make<InboxMessageWithReadState[]>([]).pipe(
+/** The signed-in account id, which names both the record and the messages. */
+export const inboxUserIdAtom = Atom.make(
+  (get): string | null => get(userAtom)?.id ?? null,
+).pipe(Atom.keepAlive, Atom.withLabel("inbox/userId"));
+
+/** Which `localStorage` record this window's inbox is. */
+export const inboxStorageKeyAtom = Atom.make((get): string =>
+  inboxStorageKey(get(inboxUserIdAtom)),
+).pipe(Atom.keepAlive, Atom.withLabel("inbox/storageKey"));
+
+/**
+ * The stored record, read on first access rather than on mount, so the first
+ * component to look has yesterday's inbox without waiting for an effect.
+ *
+ * The read body depends on the storage key, which is what makes signing in as
+ * somebody else swap the whole record: the key changes, this recomputes, and
+ * the writes the previous account made stay in its own key.
+ */
+export const inboxStateAtom = Atom.writable<InboxState, InboxState>(
+  (get) => readInboxState(get(inboxStorageKeyAtom)),
+  (ctx, value) => ctx.setSelf(value),
+).pipe(Atom.keepAlive, Atom.withLabel("inbox/state"));
+
+/** The account and record one read-state round trip belongs to. */
+export type InboxReadSyncIdentity = {
+  readonly storageKey: string;
+  readonly token: string;
+  readonly userId: string;
+};
+
+/** The account and organization one feed refresh belongs to. */
+export type InboxFeedIdentity = {
+  readonly scope: string;
+  readonly token: string;
+};
+
+/**
+ * The identity whose account read versions have arrived. Until it matches the
+ * account on screen every message reads as read: showing an unread badge from a
+ * stale local cache and taking it away a moment later is worse than waiting.
+ */
+export const inboxReadSyncIdentityAtom = Atom.make<InboxReadSyncIdentity | null>(
+  null,
+).pipe(Atom.keepAlive, Atom.withLabel("inbox/readSyncIdentity"));
+
+/** The identity whose authoritative feed has arrived. */
+export const inboxFeedIdentityAtom = Atom.make<InboxFeedIdentity | null>(
+  null,
+).pipe(Atom.keepAlive, Atom.withLabel("inbox/feedIdentity"));
+
+/** The feed scope on screen, or `null` when there is not one yet. */
+export const inboxFeedScopeAtom = Atom.make((get): string | null => {
+  const userId = get(inboxUserIdAtom);
+  const organizationId = get(activeOrganizationIdAtom);
+  return userId && organizationId ? `${userId}:${organizationId}` : null;
+}).pipe(Atom.keepAlive, Atom.withLabel("inbox/feedScope"));
+
+/**
+ * True once both account responses — the read versions and the authoritative
+ * feed — have arrived for the account and organization on screen. Unread
+ * markers, the app badge and system notifications all wait on it.
+ */
+export const inboxInitialSyncCompleteAtom = Atom.make((get): boolean => {
+  const token = get(tokenAtom);
+  const userId = get(inboxUserIdAtom);
+  const organizationId = get(activeOrganizationIdAtom);
+  const storageKey = get(inboxStorageKeyAtom);
+  const feedScope = get(inboxFeedScopeAtom);
+  const readSync = get(inboxReadSyncIdentityAtom);
+  const feed = get(inboxFeedIdentityAtom);
+  return Boolean(
+    token &&
+      userId &&
+      organizationId &&
+      readSync?.storageKey === storageKey &&
+      readSync.token === token &&
+      readSync.userId === userId &&
+      feed?.scope === feedScope &&
+      feed.token === token,
+  );
+}).pipe(Atom.keepAlive, Atom.withLabel("inbox/initialSyncComplete"));
+
+/**
+ * What a system notification baseline is keyed on: the account feed once it has
+ * answered, and a local marker before that, so the first authoritative response
+ * is a new baseline rather than a burst of alerts for everything already there.
+ */
+export const inboxNotificationBaselineIdAtom = Atom.make((get): string => {
+  const feedScope = get(inboxFeedScopeAtom);
+  const feed = get(inboxFeedIdentityAtom);
+  return feed?.scope === feedScope && feedScope !== null
+    ? feed.scope
+    : `${get(inboxUserIdAtom) ?? "signed-out"}:local`;
+}).pipe(Atom.keepAlive, Atom.withLabel("inbox/notificationBaselineId"));
+
+/** The messages the open board and this device's sessions imply right now. */
+export const currentInboxMessagesAtom = Atom.make((get): InboxMessage[] =>
+  buildCurrentInboxMessages(
+    get(inboxSourceAtom),
+    get(agentSessionsAtom),
+    get(teamsAtom),
+    get(inboxUserIdAtom),
+  ),
+).pipe(
   Atom.keepAlive,
+  Atom.withEquality<InboxMessage[]>(inboxMessageSnapshotsEqual),
+  Atom.withLabel("inbox/currentMessages"),
+);
+
+/**
+ * Everything the merge of board into store depends on, in one atom so a
+ * subscriber wakes for the same four reasons the effect it replaced did.
+ */
+export interface InboxMergeSources {
+  readonly currentMessages: readonly InboxMessage[];
+  readonly projects: readonly Project[];
+  readonly storageKey: string;
+  readonly userId: string | null;
+}
+
+export const inboxMergeSourcesAtom = Atom.make((get) =>
+  ({
+    currentMessages: get(currentInboxMessagesAtom),
+    projects: get(teamsAtom),
+    storageKey: get(inboxStorageKeyAtom),
+    userId: get(inboxUserIdAtom),
+  }) satisfies InboxMergeSources
+).pipe(Atom.keepAlive, Atom.withLabel("inbox/mergeSources"));
+
+/**
+ * Every message the inbox knows, across the account's teams: the stored record
+ * scoped to the open organization, marked read and collapsed into threads.
+ *
+ * A message that would render identically keeps the object it had, so the row
+ * atoms below compare equal and the rows they feed do not re-render.
+ */
+export const inboxMessagesAtom = Atom.make(
+  (get): InboxMessageWithReadState[] => {
+    const state = get(inboxStateAtom);
+    const storageKey = get(inboxStorageKeyAtom);
+    const initialSyncComplete = get(inboxInitialSyncCompleteAtom);
+    const next = state.storageKey === storageKey
+      ? collapseInboxThreadMessages(
+          filterInboxMessagesByOrganization(
+            state.messages,
+            get(teamsAtom),
+            get(activeOrganizationIdAtom),
+          ).map((message) => ({
+            ...message,
+            isUnread:
+              initialSyncComplete &&
+              isInboxMessageUnread(message, state.readVersions),
+          })),
+        )
+      : [];
+    const previous = Option.getOrElse(
+      get.self<InboxMessageWithReadState[]>(),
+      (): InboxMessageWithReadState[] => [],
+    );
+    return reuseInboxMessageIdentities(previous, next);
+  },
+).pipe(
+  Atom.keepAlive,
+  Atom.withEquality<InboxMessageWithReadState[]>(shallowArrayEqual),
   Atom.withLabel("inbox/messages"),
 );
 
-/** Unread count over every message, which the badge and the phone header use. */
-export const inboxUnreadCountAtom = Atom.make(0).pipe(
-  Atom.keepAlive,
-  Atom.withLabel("inbox/unreadCount"),
+/** Every message by id, so a row subscribes to one message rather than a list. */
+export const inboxMessagesByIdAtom = Atom.make(
+  (get): ReadonlyMap<string, InboxMessageWithReadState> =>
+    new Map(get(inboxMessagesAtom).map((message) => [message.id, message])),
+).pipe(Atom.keepAlive, Atom.withLabel("inbox/messagesById"));
+
+/** One displayed message, or `null` when the list no longer has it. */
+export const inboxMessageAtom = Atom.family((messageId: string) =>
+  Atom.map(
+    inboxMessagesByIdAtom,
+    (messages) => messages.get(messageId) ?? null,
+  ).pipe(Atom.withLabel(`inbox/message/${messageId}`)),
 );
+
+/** Unread count over every message, which the badge and the phone header use. */
+export const inboxUnreadCountAtom = Atom.make((get): number =>
+  countActionableUnread(get(inboxMessagesAtom)),
+).pipe(Atom.keepAlive, Atom.withLabel("inbox/unreadCount"));
 
 /**
  * What this window may show. A project window is pinned to one team and must
@@ -130,11 +317,17 @@ export const visibleInboxMessagesAtom = Atom.make(
  * counted: they are a log of what happened, not something to act on.
  */
 export const visibleInboxUnreadCountAtom = Atom.make((get): number =>
-  get(visibleInboxMessagesAtom).filter(
+  countActionableUnread(get(visibleInboxMessagesAtom)),
+).pipe(Atom.keepAlive, Atom.withLabel("inbox/visibleUnreadCount"));
+
+function countActionableUnread(
+  messages: readonly InboxMessageWithReadState[],
+): number {
+  return messages.filter(
     (message) =>
       message.isUnread && classifyInboxMessage(message) !== "activity",
-  ).length,
-).pipe(Atom.keepAlive, Atom.withLabel("inbox/visibleUnreadCount"));
+  ).length;
+}
 
 /*
   The two signals a conversation view re-syncs on. They are strings so a view

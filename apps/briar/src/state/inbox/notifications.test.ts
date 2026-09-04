@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import type { InboxMessageWithReadState } from "./useInbox";
 import {
   findChangedInboxMessages,
   inboxConversationSyncSignal,
   shouldSuppressInboxNotification,
-} from "./useInboxNotifications";
+  type InboxMessageWithReadState,
+} from "./model";
 
 const message = (
   id: string,

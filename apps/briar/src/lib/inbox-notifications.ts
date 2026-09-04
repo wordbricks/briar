@@ -2,7 +2,7 @@ import {
   inboxNotificationIdentity,
   type InboxCategory,
   type InboxMessage,
-} from "../hooks/useInbox";
+} from "../state/inbox/model";
 import {
   MobilePushNotificationTargetSchema,
   type MobilePushNotificationTarget,

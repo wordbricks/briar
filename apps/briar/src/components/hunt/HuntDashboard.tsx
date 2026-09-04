@@ -9,7 +9,7 @@ import { Typography } from "@/components/ui/typography";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import { NativeSelect } from "@/components/NativeSelect";
 import { CompanionBottomNavigation, type CompanionStatusFilter } from "@/components/CompanionBottomNavigation";
-import { inboxIssueMessageVersion } from "@/hooks/useInbox";
+import { inboxIssueMessageVersion } from "@/state/inbox/model";
 import { AppKeyboardCommandBoundary, useAppKeyboardCommandScope } from "@/hooks/appKeyboardCommands";
 import { useMobileBackHandler } from "@/hooks/useMobileNavigation";
 import { errorDiagnosticOccurrenceKey, errorDiagnosticsForMessage } from "@/lib/error-diagnostics";

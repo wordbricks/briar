@@ -11,7 +11,7 @@ import { demoDashboard } from "../lib/demo-data";
 import { loadKeybindings } from "../lib/keybindings";
 import { channelCatalogCursorAtom } from "../state/channels/atoms";
 import { isCommandPaletteOpenAtom } from "../state/dialogs/atoms";
-import { inboxMessagesAtom } from "../state/inbox/atoms";
+import type { InboxMessage } from "../state/inbox/model";
 import {
   activeOrganizationIdAtom,
   organizationsAtom,
@@ -22,6 +22,7 @@ import { createTestRegistry, type AtomRegistry } from "../state/registry";
 import { tokenAtom, userAtom } from "../state/session/atoms";
 import { applySyncEvent } from "../state/sync/apply";
 import { activeTeamIdAtom, teamsAtom } from "../state/team/atoms";
+import { seedInboxMessages } from "../test/inbox";
 import { createReactTestRoot } from "../test/react";
 import type { Organization, Project, SessionUser } from "../types";
 import {
@@ -83,23 +84,21 @@ const channel = (overrides: Partial<ChannelSummary> = {}): ChannelSummary => ({
 });
 
 /** One unread issue notification, which is what promotes the inbox entry. */
-const unreadInboxMessage = (id: string) =>
-  ({
-    id,
-    kind: "issue",
-    projectId: team.id,
-    projectName: team.name,
-    targetId: "run-1",
-    title: "run-1",
-    occurredAt: "2026-09-01T00:00:00.000Z",
-    version: "1",
-    runNumber: 1,
-    status: "failed",
-    workflowStage: null,
-    priority: null,
-    structuredResult: null,
-    isUnread: true,
-  }) as never;
+const unreadInboxMessage = (id: string): InboxMessage => ({
+  id,
+  kind: "issue",
+  projectId: team.id,
+  projectName: team.name,
+  targetId: "run-1",
+  title: "run-1",
+  occurredAt: "2026-09-01T00:00:00.000Z",
+  version: "1",
+  runNumber: 1,
+  status: "failed",
+  workflowStage: null,
+  priority: null,
+  structuredResult: null,
+});
 
 const baseInput: CommandPaletteItemsInput = {
   commandPaletteAvailable: true,
@@ -234,7 +233,7 @@ describe("useCommandPaletteItems", () => {
     ).toBe("navigation");
 
     const registry = harness();
-    registry.set(inboxMessagesAtom, [unreadInboxMessage("m-1")]);
+    seedInboxMessages(registry, [unreadInboxMessage("m-1")]);
     const busy = await build(registry);
     const inbox = busy.find((item) => item.id === "navigation:inbox");
     expect(inbox?.section).toBe("continue");

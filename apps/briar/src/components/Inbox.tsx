@@ -36,7 +36,7 @@ import {
   type InboxCategory,
   type InboxIssueMessage,
   type InboxMessageWithReadState,
-} from "../hooks/useInbox";
+} from "../state/inbox/model";
 
 /** Number of filtered inbox rows revealed per page while scrolling. */
 export const INBOX_PAGE_SIZE = 50;

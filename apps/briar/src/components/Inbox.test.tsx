@@ -4,7 +4,7 @@ import { act, useState, type ReactNode } from "react";
 import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AppKeyboardCommandProvider } from "../hooks/appKeyboardCommands";
-import type { InboxMessageWithReadState } from "../hooks/useInbox";
+import type { InboxMessageWithReadState } from "../state/inbox/model";
 import { I18nProvider } from "../i18n";
 import type { Project } from "../types";
 import {

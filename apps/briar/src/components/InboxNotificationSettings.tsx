@@ -23,7 +23,7 @@ import {
   type InboxNotificationPreferences,
 } from "../lib/inbox-notifications";
 import type { InboxNotificationPermissionStatus } from "../generated/tauri";
-import type { InboxCategory } from "../hooks/useInbox";
+import type { InboxCategory } from "../state/inbox/model";
 import { isMacDesktopTauri } from "../lib/platform";
 
 type InboxNotificationSettingsProps = {

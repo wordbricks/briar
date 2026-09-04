@@ -38,9 +38,9 @@ import type {
 
   Phase 5 fixed the gate and the shells at zero renders per run change, but
   `App` itself still counted one: the facade subscribed to the open board and
-  `useInbox` took it as an argument. Both moved — the board is `InboxBridge`'s
-  and the inbox is published to `state/inbox` — so this pins the whole chain
-  above the page slot at zero.
+  `useInbox` took it as an argument. Both moved into `state/inbox`, where the
+  board is one atom and the messages are derived from it — so this pins the
+  whole chain above the page slot at zero.
 
   Everything below the shell is the shells' own tests; what this one asserts is
   that nothing *between* the store and the board re-renders on the way.
