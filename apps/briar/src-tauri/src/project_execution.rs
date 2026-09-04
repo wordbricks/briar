@@ -37,6 +37,11 @@ pub(super) async fn project_llm_chat(
         .path()
         .resource_dir()
         .map_err(|error| error.to_string())?;
+    let codex_runner = bundled_path(
+        &resource_directory,
+        "agent/codex-runner.js",
+        "dist-agent/codex-runner.js",
+    );
     let claude_runner = bundled_path(
         &resource_directory,
         "agent/claude-runner.js",
@@ -172,6 +177,7 @@ pub(super) async fn project_llm_chat(
             provider,
             runner.clone(),
             agent::AgentRunnerBundles {
+                codex: &codex_runner,
                 claude: &claude_runner,
                 cursor: &cursor_runner,
                 grok: &grok_runner,
@@ -297,6 +303,11 @@ pub(super) async fn run_project_agent(
         .path()
         .resource_dir()
         .map_err(|error| error.to_string())?;
+    let codex_runner = bundled_path(
+        &resource_directory,
+        "agent/codex-runner.js",
+        "dist-agent/codex-runner.js",
+    );
     let claude_runner = bundled_path(
         &resource_directory,
         "agent/claude-runner.js",
@@ -365,6 +376,7 @@ pub(super) async fn run_project_agent(
             provider,
             runner.clone(),
             agent::AgentRunnerBundles {
+                codex: &codex_runner,
                 claude: &claude_runner,
                 cursor: &cursor_runner,
                 grok: &grok_runner,

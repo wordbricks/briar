@@ -41,6 +41,9 @@ pub(super) struct SidecarProviderConfig {
     pub(super) executable: SidecarExecutableConfig,
     pub(super) missing_bun_error: &'static str,
     pub(super) forwards_additional_directories: bool,
+    /// Also resume `briar:<project>:<session>` conversations stored before this
+    /// provider had a namespace. Only Codex predates namespacing.
+    pub(super) accepts_legacy_conversation_id: bool,
     pub(super) empty_session_error: &'static str,
     pub(super) missing_session_error: &'static str,
     pub(super) request_failure_prefix: &'static str,
@@ -728,6 +731,12 @@ fn decode_conversation_id<'a>(
     let prefix = format!("briar:{namespace}:{project_id}:");
     conversation_id
         .strip_prefix(&prefix)
+        .or_else(|| {
+            config
+                .accepts_legacy_conversation_id
+                .then(|| conversation_id.strip_prefix(&format!("briar:{project_id}:")))
+                .flatten()
+        })
         .filter(|session_id| !session_id.is_empty())
         .ok_or_else(|| config.invalid_conversation_error.to_string())
 }
@@ -736,7 +745,7 @@ fn decode_conversation_id<'a>(
 mod tests {
     use super::*;
     use crate::{
-        agent::{agy, claude, cursor, grok, opencode, ModelEffort},
+        agent::{agy, claude, codex, cursor, grok, opencode, ModelEffort},
         host::CommandOutput,
     };
     use std::fs;
@@ -766,8 +775,9 @@ mod tests {
         }
     }
 
-    fn provider_configs() -> [SidecarProviderConfig; 5] {
+    fn provider_configs() -> [SidecarProviderConfig; 6] {
         [
+            codex::CONFIG,
             claude::CONFIG,
             cursor::CONFIG,
             grok::CONFIG,
@@ -831,11 +841,14 @@ mod tests {
     }
 
     #[test]
-    fn only_claude_forwards_additional_directories() {
+    fn only_workspace_root_providers_forward_additional_directories() {
         for config in provider_configs() {
             assert_eq!(
                 config.forwards_additional_directories,
-                config.provider == AgentProviderKind::Claude,
+                matches!(
+                    config.provider,
+                    AgentProviderKind::Claude | AgentProviderKind::Codex
+                ),
             );
         }
     }
@@ -1057,6 +1070,107 @@ for await (const message of sizeDelimitedDecodeStream(
         ));
     }
 
+    /// Drive the shipped Codex runner bundle against a fake App Server so the
+    /// desktop handshake, approval round trip, and final message stay verified
+    /// across the Rust/TypeScript boundary they now cross.
+    #[cfg(unix)]
+    #[test]
+    fn runs_the_codex_runner_bundle_against_a_fake_app_server() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let app_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("Tauri crate should be inside the Briar app");
+        let directory = tempfile::tempdir().expect("temp directory should exist");
+        let fake_codex = directory.path().join("fake-codex");
+        fs::write(
+            &fake_codex,
+            r#"#!/bin/sh
+read line
+printf '%s\n' '{"id":1,"result":{"userAgent":"fake"}}'
+read line
+read line
+printf '%s\n' '{"id":2,"result":{"config":{"model":"gpt-5.6-sol"}}}'
+read line
+printf '%s\n' '{"id":6,"result":{"apps":[]}}'
+read line
+printf '%s\n' '{"id":4,"result":{"thread":{"id":"thread-1"}}}'
+read line
+printf '%s\n' '{"id":5,"result":{"turn":{"id":"turn-1","items":[],"status":"inProgress"}}}'
+printf '%s\n' '{"id":9,"method":"item/commandExecution/requestApproval","params":{"threadId":"thread-1","turnId":"turn-1","itemId":"item-1","command":"bun test"}}'
+read line
+printf '%s\n' "$line" > approval-response.json
+printf '%s\n' '{"method":"item/completed","params":{"threadId":"thread-1","turnId":"turn-1","item":{"id":"message-1","type":"agentMessage","phase":"final_answer","text":"Repository summary"}}}'
+printf '%s\n' '{"method":"turn/completed","params":{"threadId":"thread-1","turn":{"id":"turn-1","items":[],"status":"completed"}}}'
+"#,
+        )
+        .expect("fake Codex App Server should be written");
+        fs::set_permissions(&fake_codex, fs::Permissions::from_mode(0o755))
+            .expect("fake Codex App Server should be executable");
+        let runtime = SidecarRuntime::for_test(
+            which::which("bun").expect("Bun should be installed for the cross-language test"),
+            fake_codex,
+            app_root.join("src-agent/codex-runner.ts"),
+        );
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let captured_events = events.clone();
+        let mut execution = execution(Some(Arc::new(move |event| {
+            captured_events
+                .lock()
+                .expect("events should lock")
+                .push(event);
+            Ok(())
+        })));
+        execution.workspace_write_roots = vec!["/tmp/auto-hunt".to_string()];
+
+        let response = chat(
+            &runtime,
+            codex::CONFIG,
+            "project-1",
+            directory.path(),
+            execution,
+            request(),
+            &|method, input| {
+                method == "item/commandExecution/requestApproval"
+                    && input["command"] == "bun test"
+                    && input["reason"] == "bun test"
+            },
+        )
+        .expect("the Codex runner bundle should complete the turn");
+
+        assert_eq!(response.conversation_id, "briar:codex:project-1:thread-1");
+        assert_eq!(response.message, "Repository summary");
+        assert_eq!(
+            serde_json::from_str::<Value>(
+                &fs::read_to_string(directory.path().join("approval-response.json"))
+                    .expect("the fake App Server should record the approval response")
+            )
+            .expect("the approval response should be json")["result"]["decision"],
+            "accept"
+        );
+        let events = events.lock().expect("events should lock");
+        assert_eq!(events[0].provider, AgentProviderKind::Codex);
+        assert_eq!(events[0].raw["providerBinaryPath"], runtime.provider_binary);
+        assert_eq!(
+            events[0].raw["additionalDirectories"],
+            json!(["/tmp/auto-hunt"])
+        );
+        assert!(events.iter().any(|event| matches!(
+            &event.event,
+            Some(AgentEvent::ConversationStarted { conversation_id })
+                if conversation_id == "briar:codex:project-1:thread-1"
+        )));
+        assert!(events.iter().any(|event| matches!(
+            &event.event,
+            Some(AgentEvent::MessageCompleted { phase, text, .. })
+                if phase.as_deref() == Some("final_answer") && text == "Repository summary"
+        )));
+        assert!(events.iter().any(|event| matches!(
+            &event.event,
+            Some(AgentEvent::TurnCompleted { status }) if status == "completed"
+        )));
+    }
+
     #[test]
     fn scopes_conversation_ids_to_the_provider_and_project() {
         for config in provider_configs() {
@@ -1081,9 +1195,30 @@ for await (const message of sizeDelimitedDecodeStream(
             );
             assert!(decode_conversation_id(config, "project-2", &conversation_id).is_err());
             assert!(
-                decode_conversation_id(config, "project-1", "briar:codex:project-1:thread-1")
+                decode_conversation_id(config, "project-1", "briar:nobody:project-1:thread-1")
                     .is_err()
             );
         }
+    }
+
+    #[test]
+    fn resumes_codex_conversations_stored_before_provider_namespaces() {
+        assert_eq!(
+            encode_conversation_id(codex::CONFIG, "project-1", "thread-1"),
+            Ok("briar:codex:project-1:thread-1".to_string())
+        );
+        assert_eq!(
+            decode_conversation_id(codex::CONFIG, "project-1", "briar:project-1:thread-1"),
+            Ok("thread-1")
+        );
+        assert!(
+            decode_conversation_id(codex::CONFIG, "project-2", "briar:project-1:thread-1").is_err()
+        );
+        assert!(decode_conversation_id(codex::CONFIG, "project-1", "briar:project-1:").is_err());
+        // Namespaced providers never fall back to the un-namespaced form.
+        assert!(
+            decode_conversation_id(claude::CONFIG, "project-1", "briar:project-1:thread-1")
+                .is_err()
+        );
     }
 }

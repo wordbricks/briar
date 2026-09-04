@@ -113,8 +113,19 @@ export function createCodexAppServerState(
   };
 }
 
+/** Render paths as a TOML array of basic strings, escaping what TOML requires. */
+function tomlStringArray(values: readonly string[]): string {
+  return `[${
+    values
+      .map((value) => `"${value.replace(/\\/gu, "\\\\").replace(/"/gu, '\\"')}"`)
+      .join(",")
+  }]`;
+}
+
 export function codexAppServerArgs(
-  request: Pick<RunnerRequest, "networkAccess" | "externalTools">,
+  request:
+    & Pick<RunnerRequest, "networkAccess" | "externalTools">
+    & Partial<Pick<RunnerRequest, "additionalDirectories">>,
   browserAutomationProvider?: string,
   computerUseArguments: readonly string[] = [],
 ): string[] {
@@ -158,6 +169,17 @@ export function codexAppServerArgs(
     argumentsList.push(
       "--config",
       "sandbox_workspace_write.network_access=true",
+    );
+  }
+  // Auto Hunt worktrees live outside the checkout and would otherwise be
+  // read-only to a workspace-write sandbox. The roots ride on their own
+  // `--config` so they cannot disturb the network setting.
+  if (request.additionalDirectories?.length) {
+    argumentsList.push(
+      "--config",
+      `sandbox_workspace_write.writable_roots=${
+        tomlStringArray(request.additionalDirectories)
+      }`,
     );
   }
   return argumentsList;

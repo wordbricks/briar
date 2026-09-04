@@ -165,12 +165,19 @@ contain no agent token and use restrictive permissions.
 
 ## Agent launcher
 
-The desktop launcher remains provider-specific in Rust, while detached workers
-use the bundled runners in `apps/briar/src-agent/`. All four supported providers now use
-the same detached runner envelope; detached Codex specifically uses the same
-App Server JSON-RPC handshake, normalized Agent events, approval decisions,
-and terminal result handling as the desktop Codex backend. Transcript upload
-preserves client/server direction and normalized session/message events.
+The desktop launcher and detached workers run the same bundled runners in
+`apps/briar/src-agent/`. Every supported provider, Codex included, is a
+`SidecarProviderConfig` executed by the shared Rust sidecar backend, which
+spawns `bun <provider>-runner.js` and speaks the length-delimited
+`briar.sidecar.v1` protobuf envelope on stdio. Each provider protocol —
+Codex's App Server JSON-RPC handshake, normalized Agent events, approval
+decisions, MCP-failure isolation, and terminal result handling — therefore
+exists once, in TypeScript. Transcript upload preserves client/server direction
+and normalized session/message events.
+
+Codex conversations created before providers were namespaced use the
+un-namespaced `briar:<project>:<session>` id. New Codex conversations use
+`briar:codex:<project>:<session>`, and both forms still resume.
 
 Heartbeat and execution-timeout improvements remain a separate follow-up so
 the provider transport change can be observed independently.
