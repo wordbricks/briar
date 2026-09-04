@@ -25,18 +25,19 @@ import {
 } from "./normalized-agent-event";
 import { readAgentImage } from "./runner-attachments";
 import { extractSingleJsonObject } from "../src/lib/single-json-object";
-import type { AcpJsonRpcMessage } from "./acp-json-rpc";
 import type { RunnerRequest } from "./runner-request";
 
 /**
- * Grok CLI ACP client helpers.
+ * Provider-neutral Agent Client Protocol helpers.
  *
- * Mirrors t3code's Grok ACP surface (`grok agent stdio`): initialize →
- * authenticate → session/new|load → optional set_model → session/prompt,
- * while mapping stream updates into Briar's provider-neutral agent events.
+ * Every ACP agent Briar drives (`grok agent stdio`, `cursor-agent acp`, …)
+ * exposes the same session-update, permission, and prompt contract, so the
+ * stream normalization, permission policy, and final-message resolution live
+ * here while `acp-runner.ts` owns the lifecycle and `AcpProviderProfile`
+ * carries the per-agent differences.
  */
 
-export type GrokEventState = {
+export type AcpEventState = {
   activeMessageId: string | null;
   activeAssistantText: string;
   lastAssistantText: string;
@@ -53,21 +54,6 @@ export type GrokEventState = {
   >;
 };
 
-export type JsonRpcMessage = AcpJsonRpcMessage;
-
-export const GROK_OAUTH2_REFERRER_ENV = "GROK_OAUTH2_REFERRER";
-export const BRIAR_OAUTH_REFERRER = "briar";
-export const GROK_API_KEY_ENV = "XAI_API_KEY";
-export const GROK_AUTH_METHOD_API_KEY = "xai.api_key";
-export const GROK_AUTH_METHOD_CACHED_TOKEN = "cached_token";
-export function resolveGrokAuthMethodId(
-  environment: NodeJS.ProcessEnv = process.env,
-): string {
-  return environment[GROK_API_KEY_ENV]?.trim()
-    ? GROK_AUTH_METHOD_API_KEY
-    : GROK_AUTH_METHOD_CACHED_TOKEN;
-}
-
 export function shouldAutoApprovePermission(
   request: RunnerRequest,
 ): boolean {
@@ -77,7 +63,7 @@ export function shouldAutoApprovePermission(
   );
 }
 
-const grokWorkspaceReadPermissions = new Set([
+const workspaceReadPermissions = new Set([
   "find",
   "find_files",
   "glob",
@@ -91,19 +77,19 @@ const grokWorkspaceReadPermissions = new Set([
   "search_files",
 ]);
 
-const grokNetworkReadPermissions = new Set([
+const networkReadPermissions = new Set([
   "browser_search",
   "http_get",
   "web_fetch",
   "web_search",
 ]);
 
-const normalizedGrokPermission = (toolName: string) =>
+const normalizedPermissionName = (toolName: string) =>
   toolName.trim().replace(/([a-z0-9])([A-Z])/gu, "$1_$2").toLowerCase()
     .replace(/[^a-z0-9]+/gu, "_")
     .replace(/^_+|_+$/gu, "");
 
-const grokRequiredPathPermissions = new Set(["read", "read_file"]);
+const requiredPathPermissions = new Set(["read", "read_file"]);
 
 const directPathKeys = new Set([
   "base",
@@ -161,14 +147,14 @@ const globPathKeys = new Set([
   "patterns",
 ]);
 
-type GrokPathCandidate = { value: string; glob: boolean };
+type PathCandidate = { value: string; glob: boolean };
 
-type GrokPathCollection = {
-  candidates: GrokPathCandidate[];
+type PathCollection = {
+  candidates: PathCandidate[];
   invalid: boolean;
 };
 
-const normalizedInputKey = (key: string) => normalizedGrokPermission(key);
+const normalizedInputKey = (key: string) => normalizedPermissionName(key);
 
 const isDirectPathKey = (key: string) => {
   if (directPathKeys.has(key)) return true;
@@ -197,7 +183,7 @@ const isGlobPathKey = (key: string) =>
 const collectPathValue = (
   value: unknown,
   glob: boolean,
-  collection: GrokPathCollection,
+  collection: PathCollection,
 ) => {
   if (typeof value === "string") {
     const trimmed = value.trim();
@@ -215,7 +201,7 @@ const collectPathValue = (
   }
   if (value && typeof value === "object") {
     const before = collection.candidates.length;
-    collectGrokPathInputs(
+    collectPathInputs(
       value as Record<string, unknown>,
       collection,
     );
@@ -225,9 +211,9 @@ const collectPathValue = (
   collection.invalid = true;
 };
 
-const collectGrokPathInputs = (
+const collectPathInputs = (
   input: Record<string, unknown>,
-  collection: GrokPathCollection = { candidates: [], invalid: false },
+  collection: PathCollection = { candidates: [], invalid: false },
 ) => {
   for (const [rawKey, value] of Object.entries(input)) {
     const key = normalizedInputKey(rawKey);
@@ -240,14 +226,14 @@ const collectGrokPathInputs = (
       if (Array.isArray(value)) {
         for (const item of value) {
           if (item && typeof item === "object" && !Array.isArray(item)) {
-            collectGrokPathInputs(
+            collectPathInputs(
               item as Record<string, unknown>,
               collection,
             );
           }
         }
       } else {
-        collectGrokPathInputs(
+        collectPathInputs(
           value as Record<string, unknown>,
           collection,
         );
@@ -300,9 +286,9 @@ const unsafePathSyntax = (value: string) =>
   /(^|[\\/,{])\.\.($|[\\/},])/u.test(value) ||
   /%2e(?:%2e|\.)/iu.test(value);
 
-async function grokPathIsWithinWorkspace(
+async function pathIsWithinWorkspace(
   workspaceRoot: string,
-  candidate: GrokPathCandidate,
+  candidate: PathCandidate,
 ) {
   if (unsafePathSyntax(candidate.value)) return false;
 
@@ -312,8 +298,8 @@ async function grokPathIsWithinWorkspace(
   if (candidate.glob) value = value.replace(/^!+/u, "");
   if (!value || (win32.isAbsolute(value) && !isAbsolute(value))) return false;
 
-  // Treat either slash style as a separator while validating traversal. Grok
-  // may normalize ACP inputs independently of the host Node implementation.
+  // Treat either slash style as a separator while validating traversal. An ACP
+  // agent may normalize inputs independently of the host Node implementation.
   const portableValue = value.replaceAll("\\", "/");
   const absoluteCandidate = isAbsolute(portableValue)
     ? resolve(portableValue)
@@ -331,40 +317,40 @@ async function grokPathIsWithinWorkspace(
     pathIsWithin(canonicalRoot, canonicalCandidate);
 }
 
-async function grokWorkspaceReadInputIsAllowed(
+async function workspaceReadInputIsAllowed(
   request: RunnerRequest,
   toolName: string,
   input: Record<string, unknown>,
 ) {
-  const collection = collectGrokPathInputs(input);
+  const collection = collectPathInputs(input);
   if (collection.invalid) return false;
   if (
-    grokRequiredPathPermissions.has(toolName) &&
+    requiredPathPermissions.has(toolName) &&
     collection.candidates.length === 0
   ) {
     return false;
   }
   const decisions = await Promise.all(
     collection.candidates.map((candidate) =>
-      grokPathIsWithinWorkspace(request.workspaceRoot, candidate)
+      pathIsWithinWorkspace(request.workspaceRoot, candidate)
     ),
   );
   return decisions.every(Boolean);
 }
 
-export async function shouldDenyGrokPermission(
+export async function shouldDenyPermission(
   request: RunnerRequest,
   toolName: string,
   input: Record<string, unknown> = {},
 ): Promise<boolean> {
-  const name = normalizedGrokPermission(toolName);
+  const name = normalizedPermissionName(toolName);
   if (request.sandboxMode === "readOnly") {
-    if (grokWorkspaceReadPermissions.has(name)) {
-      return !(await grokWorkspaceReadInputIsAllowed(request, name, input));
+    if (workspaceReadPermissions.has(name)) {
+      return !(await workspaceReadInputIsAllowed(request, name, input));
     }
-    return !(request.networkAccess && grokNetworkReadPermissions.has(name));
+    return !(request.networkAccess && networkReadPermissions.has(name));
   }
-  return !request.networkAccess && grokNetworkReadPermissions.has(name);
+  return !request.networkAccess && networkReadPermissions.has(name);
 }
 
 export function selectPermissionOptionId(
@@ -396,19 +382,19 @@ export function permissionDecisionResult(
   return { outcome: { outcome: "selected", optionId: allowId } };
 }
 
-export type GrokPromptPart =
+export type AcpPromptPart =
   | { type: "text"; text: string }
   | { type: "image"; data: string; mimeType: string };
 
-export function grokSessionMeta(
+export function acpSessionMeta(
   request: RunnerRequest,
 ): { rules: string } | undefined {
   const instructions = request.instructions?.trim();
   return instructions ? { rules: instructions } : undefined;
 }
 
-export function buildPromptParts(request: RunnerRequest): GrokPromptPart[] {
-  const parts: GrokPromptPart[] = [];
+export function buildPromptParts(request: RunnerRequest): AcpPromptPart[] {
+  const parts: AcpPromptPart[] = [];
   if (
     request.outputSchema !== null &&
     request.outputSchema !== undefined
@@ -422,9 +408,9 @@ export function buildPromptParts(request: RunnerRequest): GrokPromptPart[] {
   return parts;
 }
 
-export async function buildGrokPromptParts(
+export async function buildAcpPromptParts(
   request: RunnerRequest,
-): Promise<GrokPromptPart[]> {
+): Promise<AcpPromptPart[]> {
   const parts = buildPromptParts(request);
   for (const attachment of request.attachments ?? []) {
     parts.push({
@@ -436,19 +422,7 @@ export async function buildGrokPromptParts(
   return parts;
 }
 
-export function resolveGrokModelId(model: string | null | undefined): string | undefined {
-  const trimmed = model?.trim();
-  return trimmed ? trimmed : undefined;
-}
-
-export function mapEffortToGrok(
-  effort: RunnerRequest["effort"],
-): string | undefined {
-  if (!effort) return undefined;
-  return effort;
-}
-
-export function createGrokEventState(): GrokEventState {
+export function createAcpEventState(): AcpEventState {
   return {
     activeMessageId: null,
     activeAssistantText: "",
@@ -458,8 +432,8 @@ export function createGrokEventState(): GrokEventState {
   };
 }
 
-function completeActiveGrokMessage(
-  state: GrokEventState,
+function completeActiveMessage(
+  state: AcpEventState,
   phase: string,
 ): NormalizedAgentEvent | undefined {
   if (!state.activeMessageId) return;
@@ -475,15 +449,15 @@ function completeActiveGrokMessage(
   return event;
 }
 
-export type NormalizedGrokSessionUpdate = {
+export type NormalizedAcpSessionUpdate = {
   raw: unknown;
   events: NormalizedAgentEvent[];
 };
 
-export function normalizeGrokSessionUpdate(
+export function normalizeAcpSessionUpdate(
   params: unknown,
-  state: GrokEventState,
-): NormalizedGrokSessionUpdate {
+  state: AcpEventState,
+): NormalizedAcpSessionUpdate {
   const record =
     typeof params === "object" && params !== null
       ? (params as Record<string, unknown>)
@@ -536,23 +510,23 @@ export function normalizeGrokSessionUpdate(
   if (kind === "tool_call" || kind === "tool_call_update") {
     if (!update) return { raw: params, events: [] };
     const events: NormalizedAgentEvent[] = [];
-    const completedMessage = completeActiveGrokMessage(state, "commentary");
+    const completedMessage = completeActiveMessage(state, "commentary");
     if (completedMessage) events.push(completedMessage);
-    events.push(...normalizeGrokActivity(update, state));
+    events.push(...normalizeAcpActivity(update, state));
     return { raw: params, events };
   }
 
   return { raw: params, events: [] };
 }
 
-function normalizeGrokActivity(
+function normalizeAcpActivity(
   update: Record<string, unknown>,
-  state: GrokEventState,
+  state: AcpEventState,
 ): NormalizedAgentEvent[] {
   const id = typeof update.toolCallId === "string" ? update.toolCallId : null;
   if (!id) return [];
   const existing = state.activities.get(id);
-  const kind = grokActivityKind(
+  const kind = acpActivityKind(
     typeof update.kind === "string" ? update.kind : null,
     existing?.kind,
   );
@@ -566,7 +540,7 @@ function normalizeGrokActivity(
         : "Use tool"),
   );
   const output = normalizedActivityText(
-    grokActivityOutput(update) ?? existing?.text ?? "",
+    acpActivityOutput(update) ?? existing?.text ?? "",
   );
   const activity = {
     kind,
@@ -626,7 +600,7 @@ function normalizeGrokActivity(
   return events;
 }
 
-function grokActivityKind(
+function acpActivityKind(
   kind: string | null,
   fallback: AgentActivityKind | undefined,
 ): AgentActivityKind {
@@ -646,7 +620,7 @@ function grokActivityKind(
   return AgentActivityKind.TOOL;
 }
 
-function grokActivityOutput(update: Record<string, unknown>): string | null {
+function acpActivityOutput(update: Record<string, unknown>): string | null {
   if (typeof update.rawOutput === "string") return update.rawOutput;
   if (update.rawOutput != null) return jsonText(update.rawOutput);
   if (!Array.isArray(update.content)) return null;
@@ -678,22 +652,22 @@ function asRecord(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
-export function finalizeGrokMessage(
-  state: GrokEventState,
+export function finalizeAcpMessage(
+  state: AcpEventState,
   stopReason: string | undefined,
 ): NormalizedAgentEvent[] {
   const events: NormalizedAgentEvent[] = [];
-  const completed = completeActiveGrokMessage(state, "final");
+  const completed = completeActiveMessage(state, "final");
   if (completed) events.push(completed);
   events.push(normalizedTurnCompleted(
-    grokStopReasonSucceeded(stopReason)
+    acpStopReasonSucceeded(stopReason)
       ? "completed"
       : stopReason || "failed",
   ));
   return events;
 }
 
-export function grokStopReasonSucceeded(stopReason: string | undefined) {
+export function acpStopReasonSucceeded(stopReason: string | undefined) {
   return stopReason === "end_turn";
 }
 
@@ -708,8 +682,8 @@ export function extractJsonObject(raw: string): string {
   return extractSingleJsonObject(trimmed)?.text ?? trimmed;
 }
 
-export function resolveGrokFinalMessage(
-  state: GrokEventState,
+export function resolveAcpFinalMessage(
+  state: AcpEventState,
   promptResultText: string | undefined,
   outputSchema: RunnerRequest["outputSchema"],
 ): string {
