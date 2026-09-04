@@ -65,6 +65,8 @@ export type CreateIssueInput = {
   preferredEffort?: ModelEffort | null;
   checkpoints?: AutoHuntWorkflowCheckpoint[];
   fullAuto?: boolean;
+  /** Stable idempotency key reused across retries of the same submission. */
+  clientIssueId?: string;
 };
 
 export type UpdateIssueInput = {

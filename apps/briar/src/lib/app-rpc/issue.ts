@@ -286,7 +286,7 @@ export async function createIssue(
   injectedRuntime?: IssueMutationRuntime,
 ): Promise<CreateIssueResult> {
   const runtime = injectedRuntime ?? defaultIssueMutationRuntime();
-  const clientIssueId = runtime.randomUUID().toLowerCase();
+  const clientIssueId = input.clientIssueId ?? runtime.randomUUID().toLowerCase();
   const attachmentReferences = input.attachmentReferences ?? [];
   const attachmentIds = await uploadIssueAttachments({
     runtime,
