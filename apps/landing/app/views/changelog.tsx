@@ -30,6 +30,17 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.195",
+        date: "2026년 9월 4일",
+        title: "이슈와 채널 대화의 대기·오류 상태를 액션 상태 기계로 옮깁니다",
+        summary:
+          "이슈 편집과 채널 대화의 진행 중·실패 표시가 액션 상태 기계가 직접 관리해, 재시도가 시작되면 지난 실패 배너가 바로 사라지고 겹친 호출이 서로의 표시를 지우지 않습니다.",
+        items: [
+          "이슈 생성·수정·삭제·복구와 런별 갱신·삭제·복구의 진행 중·오류 상태를 액션 상태 기계가 자동으로 관리합니다. 재시도를 시작하면 이전 실패 배너가 곧바로 사라지고, 겹친 두 호출 중 먼저 끝난 쪽이 나중 호출의 대기 표시를 지우지 않습니다.",
+          "팀 삭제와 채널 대화의 보내기·메시지 삭제·제안 승인·거절·스레드 구독 대기 표시도 같은 기계로 옮겼습니다. 채팅 전송과 메시지 삭제는 겹치는 전송을 그대로 허용하고, 오래된 요청이 새 요청의 표시를 지우지 않도록 하던 수동 가드와 중복 정리 코드를 하나로 줄였습니다.",
+        ],
+      },
+      {
         version: "1.2.194",
         date: "2026년 9월 4일",
         title: "프로바이더 턴 판정과 OpenCode 러너 종료, 스냅샷 저장소 연결 문제를 고칩니다",
@@ -1633,6 +1644,17 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.195",
+        date: "September 4, 2026",
+        title: "Move issue and channel conversation pending states onto an action state machine",
+        summary:
+          "The in-progress and failure indicators for issue edits and channel conversations are now owned by an action state machine, so starting a retry clears the previous failure banner immediately and overlapping calls no longer clear each other's indicators.",
+        items: [
+          "The create, update, delete, and recover issue actions plus per-run update, delete, and recovery flags now derive their pending and error states from an action state machine. Starting a retry removes the previous failure banner right away, and the earlier of two overlapping calls no longer clears the later call's pending indicator when it finishes.",
+          "Team deletion and the channel conversation send, message delete, proposal accept, decline, and thread subscription indicators follow the same machine. Chat sends and message deletes explicitly allow overlapping calls, and the manual guards plus duplicated cleanup that used to stop an older request from clearing a newer request's flag collapse into one owner.",
+        ],
+      },
       {
         version: "1.2.194",
         date: "September 4, 2026",
