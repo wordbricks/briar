@@ -45,6 +45,8 @@ export const appAgentProviderFromProto = (provider: AgentProvider) => {
       return "opencode" as const;
     case AgentProvider.OPENROUTER:
       return "openrouter" as const;
+    case AgentProvider.VERTEX:
+      return "vertex" as const;
     case AgentProvider.UNSPECIFIED:
       return undefined;
     default:

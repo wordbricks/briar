@@ -186,6 +186,12 @@ export function openCodeServerSpawnSpec(input: {
   if (!stateRoot) {
     throw new Error("OpenCode read-only state is not isolated");
   }
+  // An upstream authenticating through Google Application Default Credentials
+  // reads a file under the real home, which the isolated state root replaced.
+  // The environment already pins it to an absolute path; keep that one file
+  // readable so the sandbox does not turn a signed-in machine into a failure.
+  const googleCredentials = input.environment.GOOGLE_APPLICATION_CREDENTIALS
+    ?.trim();
   return readOnlySeatbeltSpawnSpec({
     providerName: "OpenCode",
     binary: input.binary,
@@ -193,6 +199,7 @@ export function openCodeServerSpawnSpec(input: {
     workspaceRoot: input.workspaceRoot,
     stateRoot,
     readOnly: true,
+    readablePaths: googleCredentials ? [googleCredentials] : [],
     deniedPathPatterns: [
       providerInstructionSeatbeltPattern,
       "/(?:opencode[.]jsonc?|[.]opencode)(?:/.*)?$",

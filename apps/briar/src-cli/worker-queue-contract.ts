@@ -112,6 +112,8 @@ const agentProvider = (value: ProtoAgentProvider): AgentProvider => {
       return "opencode";
     case ProtoAgentProvider.OPENROUTER:
       return "openrouter";
+    case ProtoAgentProvider.VERTEX:
+      return "vertex";
     default:
       throw new Error("Worker claim omitted Agent provider");
   }
@@ -135,6 +137,8 @@ export const agentProviderToProto = (
       return ProtoAgentProvider.OPENCODE;
     case "openrouter":
       return ProtoAgentProvider.OPENROUTER;
+    case "vertex":
+      return ProtoAgentProvider.VERTEX;
   }
 };
 

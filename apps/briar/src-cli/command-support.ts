@@ -23,6 +23,7 @@ import {
   agentProviderExecutionEnvironment,
   openCodeUpstreamOf,
   type AgentProvider,
+  type OpenCodeUpstreamCredentialValue,
 } from "../src/lib/agent-provider";
 import {
   createDeviceAuthorizationClient,
@@ -60,10 +61,24 @@ import { fetchCurrentUser } from "./app-connect-client";
 function openCodeUpstreamCredential(
   config: Config,
   provider: AgentProvider,
-): string | null {
+): OpenCodeUpstreamCredentialValue | null {
   const upstream = openCodeUpstreamOf(provider);
   if (!upstream) return null;
-  return config[upstream.credential.configField]?.trim() || null;
+  const { credential } = upstream;
+  switch (credential.type) {
+    case "apiKey": {
+      const apiKey = config[credential.configField]?.trim();
+      return apiKey ? { type: "apiKey", apiKey } : null;
+    }
+    case "googleAdc": {
+      const saved = config[credential.configField];
+      const projectId = saved?.projectId.trim();
+      const location = saved?.location.trim();
+      return projectId && location
+        ? { type: "googleAdc", projectId, location }
+        : null;
+    }
+  }
 }
 
 /** Whether this provider's upstream credential is saved in the Briar config. */
@@ -146,6 +161,7 @@ async function loadConfig(): Promise<Config> {
           agy: true,
           opencode: true,
           openrouter: true,
+          vertex: true,
         },
         appSettings: {
           preventSleepWhileRunning: false,

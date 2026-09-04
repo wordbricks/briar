@@ -15,6 +15,7 @@ import {
   agentProviderCatalog,
   agentProviderEnvironmentKey,
   isOpenCodeUpstreamProvider,
+  usesGoogleApplicationDefaultCredentials,
   type AgentProvider,
   type OpenCodeUpstreamProvider,
 } from "../src/lib/agent-provider";
@@ -569,10 +570,37 @@ export async function prepareReadOnlyAgentEnvironment(
   return {
     environment: {
       ...prepared.environment,
+      // Resolved from the pre-swap environment, so it still points at the real
+      // home after the preparation above replaced HOME.
+      ...(await pinnedGoogleApplicationCredentials(provider, environment)),
       [readOnlyStateRootEnvironmentKey]: prepared.stateRoot,
     },
     cleanup: prepared.cleanup,
   };
+}
+
+/**
+ * Google Application Default Credentials are found relative to the home
+ * directory, and every read-only preparation swaps `HOME` for an isolated
+ * root. Pin the ADC file as an absolute path so google-auth-library still
+ * finds it, without copying the credential anywhere.
+ *
+ * Nothing is pinned when the caller already named a credential file, when the
+ * provider does not authenticate this way, or when the machine has no ADC file
+ * — the last case is a real "not signed in", and the provider reports it.
+ */
+async function pinnedGoogleApplicationCredentials(
+  provider: AgentProvider,
+  environment: NodeJS.ProcessEnv,
+): Promise<NodeJS.ProcessEnv> {
+  if (!usesGoogleApplicationDefaultCredentials(provider)) return {};
+  if (environment.GOOGLE_APPLICATION_CREDENTIALS?.trim()) return {};
+  const gcloudConfigRoot = environment.CLOUDSDK_CONFIG?.trim() ||
+    join(environment.HOME?.trim() || homedir(), ".config", "gcloud");
+  const [adcPath] = await existingPaths([
+    join(gcloudConfigRoot, "application_default_credentials.json"),
+  ]);
+  return adcPath ? { GOOGLE_APPLICATION_CREDENTIALS: adcPath } : {};
 }
 
 function preparedProviderEnvironment(

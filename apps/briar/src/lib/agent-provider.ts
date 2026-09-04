@@ -36,16 +36,46 @@ export const agentProviders: readonly AgentProvider[] = AgentProviderSchema
 export const agentProviderEnvironmentKey = "BRIAR_AGENT_PROVIDER";
 
 /**
- * Credential an OpenCode upstream authenticates with. OpenRouter is a single
- * API key; other upstreams use other shapes, so this stays a union.
+ * Credential an OpenCode upstream authenticates with. Upstreams do not share
+ * one credential shape, so the descriptor names the shape and every consumer
+ * switches over it exhaustively.
+ *
+ * - `apiKey`: one secret string Briar stores and hands to the process through
+ *   the environment (OpenRouter).
+ * - `googleAdc`: Briar stores only the addressing inputs (project and region).
+ *   The secret is the machine's Google Application Default Credentials, which
+ *   Briar never reads, stores, or transmits (Vertex AI).
  */
-export type OpenCodeUpstreamCredential = {
-  readonly type: "apiKey";
-  /** Environment variable the OpenCode config resolves the key through. */
-  readonly environmentVariable: string;
-  /** Briar config field holding the saved key. */
-  readonly configField: "openrouterApiKey";
-};
+export type OpenCodeUpstreamCredential =
+  | {
+    readonly type: "apiKey";
+    /** Environment variable the OpenCode config resolves the key through. */
+    readonly environmentVariable: string;
+    /** Briar config field holding the saved key. */
+    readonly configField: "openrouterApiKey";
+  }
+  | {
+    readonly type: "googleAdc";
+    /** Environment variable naming the Google Cloud project. */
+    readonly projectEnvironmentVariable: string;
+    /** Environment variable naming the Vertex AI region. */
+    readonly locationEnvironmentVariable: string;
+    /** Briar config field holding the saved project and region. */
+    readonly configField: "vertexAi";
+  };
+
+/**
+ * A credential a user has actually saved, in the shape its descriptor names.
+ * The descriptor stays a static table of variable names; this is the runtime
+ * value read out of the Briar config.
+ */
+export type OpenCodeUpstreamCredentialValue =
+  | { readonly type: "apiKey"; readonly apiKey: string }
+  | {
+    readonly type: "googleAdc";
+    readonly projectId: string;
+    readonly location: string;
+  };
 
 /**
  * A provider that is not its own CLI: it runs behind the OpenCode runner with
@@ -63,6 +93,19 @@ export type OpenCodeUpstreamDescriptor = {
   /** Exact env keys the read-only isolation allowlist keeps. */
   readonly environmentKeys: readonly string[];
   readonly credential: OpenCodeUpstreamCredential;
+  /**
+   * How this upstream's OpenCode catalog is narrowed to models that can drive
+   * a coding turn.
+   *
+   * - `"all"`: every model under the upstream's prefix. OpenRouter's catalog
+   *   is already chat models.
+   * - `"agentCapable"`: models this upstream serves through its own AI SDK
+   *   package that also report tool calling. Vertex AI publishes speech,
+   *   image and embedding models under the same provider id, and resells
+   *   partner models through an OpenAI-compatible endpoint; none of those can
+   *   run an agent turn.
+   */
+  readonly modelSelection: "all" | "agentCapable";
   /** `"none"` upstreams report connectivity instead of quota windows. */
   readonly usage: "none";
   /** Shown when a turn is requested before the credential is saved. */
@@ -159,9 +202,38 @@ export const agentProviderCatalog = {
         environmentVariable: "OPENROUTER_API_KEY",
         configField: "openrouterApiKey",
       },
+      modelSelection: "all",
       usage: "none",
       missingCredentialMessage: "앱 설정에서 OpenRouter API 키를 먼저 저장하세요.",
       missingCredentialUsageMessage: "OpenRouter API 키가 필요합니다.",
+    },
+  },
+  vertex: {
+    kind: "openCodeUpstream",
+    label: "Vertex AI",
+    binaryName: "opencode",
+    managedComputerSetup: false,
+    allowsCustomModels: true,
+    upstream: {
+      openCodeProviderId: "google-vertex",
+      // `CLOUDSDK_` carries the gcloud config root the Application Default
+      // Credentials file is resolved under.
+      environmentPrefixes: ["GOOGLE_VERTEX_", "GOOGLE_CLOUD_", "CLOUDSDK_"],
+      environmentKeys: [
+        "OPENCODE_CONFIG_CONTENT",
+        "GOOGLE_APPLICATION_CREDENTIALS",
+      ],
+      credential: {
+        type: "googleAdc",
+        projectEnvironmentVariable: "GOOGLE_VERTEX_PROJECT",
+        locationEnvironmentVariable: "GOOGLE_VERTEX_LOCATION",
+        configField: "vertexAi",
+      },
+      modelSelection: "agentCapable",
+      usage: "none",
+      missingCredentialMessage:
+        "앱 설정에서 Vertex AI 프로젝트 ID와 리전을 먼저 저장하세요.",
+      missingCredentialUsageMessage: "Vertex AI 프로젝트 설정이 필요합니다.",
     },
   },
 } as const satisfies Record.ReadonlyRecord<
@@ -259,11 +331,55 @@ export function openCodeUpstreamConfigJson(
   });
 }
 
-/** OpenCode's `provider.<id>.options` for a credential shape. */
+/**
+ * OpenCode's `provider.<id>.options` for a credential shape. OpenCode expands
+ * `{env:NAME}` in nested option values, so the generated config names the
+ * variables and never carries a value.
+ */
 function openCodeUpstreamOptions(credential: OpenCodeUpstreamCredential) {
   switch (credential.type) {
     case "apiKey":
       return { apiKey: `{env:${credential.environmentVariable}}` };
+    case "googleAdc":
+      return {
+        project: `{env:${credential.projectEnvironmentVariable}}`,
+        location: `{env:${credential.locationEnvironmentVariable}}`,
+      };
+  }
+}
+
+/**
+ * Environment pairs a saved credential contributes to a provider process. The
+ * value's shape is checked against the descriptor's, so a config field holding
+ * the wrong shape fails here instead of reaching the provider.
+ */
+function openCodeUpstreamCredentialEnvironment(
+  upstream: OpenCodeUpstreamDescriptor,
+  credential: OpenCodeUpstreamCredentialValue,
+): Record<string, string> {
+  const { credential: descriptor } = upstream;
+  if (descriptor.type === "apiKey" && credential.type === "apiKey") {
+    return { [descriptor.environmentVariable]: credential.apiKey };
+  }
+  if (descriptor.type === "googleAdc" && credential.type === "googleAdc") {
+    return {
+      [descriptor.projectEnvironmentVariable]: credential.projectId,
+      [descriptor.locationEnvironmentVariable]: credential.location,
+    };
+  }
+  throw new Error(upstream.missingCredentialMessage);
+}
+
+/** Whether a saved credential carries every input its shape requires. */
+function openCodeUpstreamCredentialComplete(
+  credential: OpenCodeUpstreamCredentialValue,
+) {
+  switch (credential.type) {
+    case "apiKey":
+      return credential.apiKey.trim().length > 0;
+    case "googleAdc":
+      return credential.projectId.trim().length > 0 &&
+        credential.location.trim().length > 0;
   }
 }
 
@@ -276,17 +392,29 @@ export function agentProviderExecutionEnvironment<
   Environment extends Readonly<Record<string, string | undefined>>,
 >(
   provider: AgentProvider,
-  credential: string | null | undefined,
+  credential: OpenCodeUpstreamCredentialValue | null | undefined,
   environment: Environment,
 ): Environment & Record<string, string | undefined> {
   const marked = { ...environment, [agentProviderEnvironmentKey]: provider };
   const upstream = openCodeUpstreamOf(provider);
   if (!upstream) return marked;
-  const value = credential?.trim();
-  if (!value) throw new Error(upstream.missingCredentialMessage);
+  if (!credential || !openCodeUpstreamCredentialComplete(credential)) {
+    throw new Error(upstream.missingCredentialMessage);
+  }
   return {
     ...marked,
-    [upstream.credential.environmentVariable]: value,
+    ...openCodeUpstreamCredentialEnvironment(upstream, credential),
     OPENCODE_CONFIG_CONTENT: openCodeUpstreamConfigJson(upstream),
   };
+}
+
+/**
+ * Whether this upstream authenticates through Google Application Default
+ * Credentials, which live under the real home rather than in the Briar config.
+ * Read-only isolation swaps `HOME`, so those turns have to pin the ADC path.
+ */
+export function usesGoogleApplicationDefaultCredentials(
+  provider: AgentProvider,
+) {
+  return openCodeUpstreamOf(provider)?.credential.type === "googleAdc";
 }

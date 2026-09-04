@@ -267,6 +267,21 @@ const AgentProviderSettings = strict(Schema.Struct({
   agy: Schema.mutableKey(Schema.Boolean),
   opencode: Schema.mutableKey(Schema.Boolean),
   openrouter: Schema.mutableKey(Schema.Boolean),
+  vertex: Schema.mutableKey(Schema.Boolean),
+}));
+
+/**
+ * Vertex AI is addressed by project and region. The secret is the machine's
+ * Google Application Default Credentials, so nothing here is a credential and
+ * both fields are safe to keep in the plain config.
+ */
+const VertexAiCredential = strict(Schema.Struct({
+  projectId: Schema.mutableKey(
+    Schema.String.check(Schema.isPattern(/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/u)),
+  ),
+  location: Schema.mutableKey(
+    Schema.String.check(Schema.isPattern(/^[a-z0-9-]{1,40}$/u)),
+  ),
 }));
 const AppSettings = strict(Schema.Struct({
   preventSleepWhileRunning: Schema.mutableKey(Schema.Boolean),
@@ -294,6 +309,7 @@ export const Config = strict(Schema.Struct({
   openrouterApiKey: Schema.mutableKey(
     Schema.optional(Schema.Trim.check(Schema.isLengthBetween(10, 500))),
   ),
+  vertexAi: Schema.mutableKey(Schema.optional(VertexAiCredential)),
   appSettings: Schema.mutableKey(AppSettings),
   workerDeviceIdentity: Schema.mutableKey(
     Schema.optional(
@@ -519,8 +535,13 @@ const configFromProto = (value: LocalConfig): Config => {
       agy: agentProviderSettings.agy,
       opencode: agentProviderSettings.opencode,
       openrouter: agentProviderSettings.openrouter,
+      vertex: agentProviderSettings.vertex,
     },
     openrouterApiKey: value.openrouterApiKey,
+    vertexAi: value.vertexAi === undefined ? undefined : {
+      projectId: value.vertexAi.projectId,
+      location: value.vertexAi.location,
+    },
     appSettings: {
       preventSleepWhileRunning: appSettings.preventSleepWhileRunning,
       browserAutomationProvider: browserAutomationProviderFromProto(
@@ -626,6 +647,9 @@ const configToProto = (input: Config): LocalConfig => {
     userToken: value.userToken,
     agentProviders: { ...value.agentProviders },
     openrouterApiKey: value.openrouterApiKey,
+    vertexAi: value.vertexAi === undefined
+      ? undefined
+      : { ...value.vertexAi },
     appSettings: {
       preventSleepWhileRunning: value.appSettings.preventSleepWhileRunning,
       browserAutomationProvider: browserAutomationProviderToProto(

@@ -20,6 +20,12 @@ export function readOnlySeatbeltProfile(input: {
   workspaceRoot: string;
   stateRoot: string;
   executablePaths: string[];
+  /**
+   * Individual files outside the state root the provider still has to read,
+   * such as a credential file named by an absolute path in the environment.
+   * Each is granted on its own, never as a directory subtree.
+   */
+  readablePaths?: string[];
   deniedPathPatterns?: string[];
 }) {
   const workspaceRoot = canonicalSeatbeltPath(input.workspaceRoot);
@@ -34,6 +40,9 @@ export function readOnlySeatbeltProfile(input: {
   }
   const executablePaths = Array.from(
     new Set(input.executablePaths.map(canonicalSeatbeltPath)),
+  );
+  const readablePaths = Array.from(
+    new Set((input.readablePaths ?? []).map(canonicalSeatbeltPath)),
   );
   return [
     "(version 1)",
@@ -52,6 +61,9 @@ export function readOnlySeatbeltProfile(input: {
     ...executablePaths.map(
       (path) => `  (path-ancestors ${seatbeltString(path)})`,
     ),
+    ...readablePaths.map(
+      (path) => `  (path-ancestors ${seatbeltString(path)})`,
+    ),
     ")",
     "(allow file-read*",
     '  (subpath "/usr/bin")',
@@ -59,6 +71,7 @@ export function readOnlySeatbeltProfile(input: {
     `  (subpath ${seatbeltString(workspaceRoot)})`,
     `  (subpath ${seatbeltString(stateRoot)})`,
     ...executablePaths.map((path) => `  (literal ${seatbeltString(path)})`),
+    ...readablePaths.map((path) => `  (literal ${seatbeltString(path)})`),
     ")",
     "(allow file-write*",
     '  (literal "/dev/null")',
@@ -79,6 +92,7 @@ export function readOnlySeatbeltSpawnSpec(input: {
   workspaceRoot: string;
   stateRoot: string;
   readOnly: boolean;
+  readablePaths?: string[];
   deniedPathPatterns?: string[];
   platform?: NodeJS.Platform;
 }) {
@@ -102,6 +116,7 @@ export function readOnlySeatbeltSpawnSpec(input: {
     workspaceRoot: input.workspaceRoot,
     stateRoot: input.stateRoot,
     executablePaths: [input.binary, realBinary],
+    readablePaths: input.readablePaths,
     deniedPathPatterns: input.deniedPathPatterns,
   });
   return {

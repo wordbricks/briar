@@ -15,6 +15,7 @@ import {
   openCodeUpstreamModelPrefix,
   openCodeUpstreamOf,
   type AgentProvider,
+  type OpenCodeUpstreamDescriptor,
 } from "../src/lib/agent-provider";
 import { cursorAuthenticated } from "./provider-credentials";
 import { providerMissingBinaryMessage } from "./provider-usage";
@@ -240,10 +241,24 @@ export function parseClaudeModels(output: string): AgentModelCapability[] {
     .map((id) => ({ id, label: id, isDefault: false, defaultEffortId: null, efforts: [] }));
 }
 
-export function parseOpenCodeVerbose(output: string): AgentModelCapability[] {
+/**
+ * One `opencode models --verbose` entry: the capability Briar reports, plus the
+ * few descriptor fields model selection needs. `sdkPackage` is the npm package
+ * OpenCode drives the model through and `toolCall` is its advertised tool
+ * calling support; both come straight from OpenCode's own record.
+ */
+type OpenCodeModelRecord = {
+  model: AgentModelCapability;
+  sdkPackage: string;
+  toolCall: boolean;
+};
+
+export function parseOpenCodeVerboseRecords(
+  output: string,
+): OpenCodeModelRecord[] {
   const lines = output.split(/\r?\n/u);
-  const models: AgentModelCapability[] = [];
-  for (let index = 0; index < lines.length && models.length < MAX_MODELS; index += 1) {
+  const records: OpenCodeModelRecord[] = [];
+  for (let index = 0; index < lines.length && records.length < MAX_MODELS; index += 1) {
     const id = lines[index]!.trim();
     if (!id || /\s/u.test(id) || lines[index + 1]?.trim() !== "{") continue;
     const jsonLines: string[] = [];
@@ -253,22 +268,93 @@ export function parseOpenCodeVerbose(output: string): AgentModelCapability[] {
       if (lines[index] === "}") break;
     }
     try {
-      const value = JSON.parse(jsonLines.join("\n")) as { name?: unknown; variants?: unknown };
+      const value = JSON.parse(jsonLines.join("\n")) as {
+        name?: unknown;
+        variants?: unknown;
+        api?: unknown;
+        capabilities?: unknown;
+      };
       const variants = value.variants && typeof value.variants === "object" && !Array.isArray(value.variants)
         ? Object.keys(value.variants).slice(0, MAX_EFFORTS).map((id) => effort(id))
         : [];
-      models.push({
-        id,
-        label: typeof value.name === "string" ? value.name : id,
-        isDefault: false,
-        defaultEffortId: null,
-        efforts: variants,
+      const api = value.api && typeof value.api === "object" && !Array.isArray(value.api)
+        ? (value.api as Record<string, unknown>)
+        : {};
+      const capabilities =
+        value.capabilities && typeof value.capabilities === "object" &&
+          !Array.isArray(value.capabilities)
+          ? (value.capabilities as Record<string, unknown>)
+          : {};
+      records.push({
+        model: {
+          id,
+          label: typeof value.name === "string" ? value.name : id,
+          isDefault: false,
+          defaultEffortId: null,
+          efforts: variants,
+        },
+        sdkPackage: typeof api.npm === "string" ? api.npm : "",
+        toolCall: capabilities.toolcall === true,
       });
     } catch {
       // Skip one malformed provider record without discarding other models.
     }
   }
-  return models;
+  return records;
+}
+
+export function parseOpenCodeVerbose(output: string): AgentModelCapability[] {
+  return parseOpenCodeVerboseRecords(output).map((record) => record.model);
+}
+
+/**
+ * Models an OpenCode upstream offers that Briar can run a coding turn on.
+ *
+ * OpenCode lists everything the upstream publishes under one provider id. For
+ * Vertex AI that includes speech, image and embedding models, and partner
+ * models resold through an OpenAI-compatible endpoint. Selection reads
+ * OpenCode's own record rather than matching on model names: a model qualifies
+ * when the upstream serves it through its own AI SDK package and it advertises
+ * tool calling, which is what an agent turn needs.
+ *
+ * The upstream's primary package sorts before its sub-packages, so Vertex AI's
+ * Gemini models lead and Claude-on-Vertex follows. OpenCode's own order is
+ * kept within each group.
+ */
+export function selectOpenCodeUpstreamModels(
+  output: string,
+  upstream: OpenCodeUpstreamDescriptor,
+): AgentModelCapability[] {
+  const prefix = openCodeUpstreamModelPrefix(upstream);
+  const records = parseOpenCodeVerboseRecords(output)
+    .filter((record) => record.model.id.startsWith(prefix));
+  if (upstream.modelSelection === "all") {
+    return records.map((record) => record.model);
+  }
+  // OpenCode names an upstream's own AI SDK after its provider id, and drives
+  // that upstream's sub-families through sub-packages of it.
+  const sdkPackage = `@ai-sdk/${upstream.openCodeProviderId}`;
+  return records
+    .filter((record) =>
+      record.toolCall &&
+      (record.sdkPackage === sdkPackage ||
+        record.sdkPackage.startsWith(`${sdkPackage}/`)) &&
+      // Vertex AI resells partner models under its own provider id, and marks
+      // them "Model as a Service". Some are served through the upstream's own
+      // SDK package and advertise tool calling, so the documented `-maas`
+      // suffix is the only thing that tells them apart. They bill and gate
+      // separately from the upstream's own models, so Briar leaves them out.
+      !record.model.id.endsWith("-maas")
+    )
+    .map((record, index) => ({
+      record,
+      index,
+      primary: record.sdkPackage === sdkPackage ? 0 : 1,
+    }))
+    .sort((left, right) =>
+      left.primary - right.primary || left.index - right.index
+    )
+    .map(({ record }) => record.model);
 }
 
 const normalizedCursorEffort = (value: string) => {
@@ -565,11 +651,11 @@ export async function discoverWorkerProviderCapabilities(
       const upstream = openCodeUpstreamOf(provider);
       if (upstream) {
         // An upstream is an OpenCode provider, so its catalog is OpenCode's
-        // list narrowed to the ids that carry the upstream's prefix.
-        const prefix = openCodeUpstreamModelPrefix(upstream);
-        catalog[provider].models = parseOpenCodeVerbose(
+        // list narrowed to what this upstream can run a coding turn on.
+        catalog[provider].models = selectOpenCodeUpstreamModels(
           commandWithEnv(binary, ["models", "--verbose"], env),
-        ).filter((model) => model.id.startsWith(prefix));
+          upstream,
+        );
       }
       if (provider === "claude") {
         const help = helpOutput(binary, env);

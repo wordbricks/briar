@@ -315,6 +315,7 @@ pub(super) struct OnboardingPrerequisites {
     pub(super) agy: OnboardingPrerequisiteStatus,
     pub(super) opencode: OnboardingPrerequisiteStatus,
     pub(super) openrouter: OnboardingPrerequisiteStatus,
+    pub(super) vertex: OnboardingPrerequisiteStatus,
 }
 
 impl OnboardingPrerequisites {
@@ -332,6 +333,7 @@ impl OnboardingPrerequisites {
             agent::AgentProviderKind::Agy => &self.agy,
             agent::AgentProviderKind::Opencode => &self.opencode,
             agent::AgentProviderKind::Openrouter => &self.openrouter,
+            agent::AgentProviderKind::Vertex => &self.vertex,
         }
     }
 }
@@ -373,6 +375,7 @@ pub(super) struct AgentProviderModelCatalog {
     pub(super) agy: AgentProviderModelCatalogEntry,
     pub(super) opencode: AgentProviderModelCatalogEntry,
     pub(super) openrouter: AgentProviderModelCatalogEntry,
+    pub(super) vertex: AgentProviderModelCatalogEntry,
 }
 
 #[derive(Serialize, specta::Type)]
@@ -739,6 +742,17 @@ pub(super) struct OpenRouterCredentialStatus {
     pub(super) configured: bool,
 }
 
+/// Vertex AI addressing the settings screen shows back to the user. Neither
+/// field is a secret: the credential is the machine's Application Default
+/// Credentials, which Briar never reads or stores.
+#[derive(Clone, Debug, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct VertexAiCredentialStatus {
+    pub(super) configured: bool,
+    pub(super) project_id: Option<String>,
+    pub(super) location: Option<String>,
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct AppProviderSettings {
@@ -749,6 +763,7 @@ pub(super) struct AppProviderSettings {
     pub(super) agy: bool,
     pub(super) opencode: bool,
     pub(super) openrouter: bool,
+    pub(super) vertex: bool,
 }
 
 impl From<LocalAgentProviderSettings> for AppProviderSettings {
@@ -761,6 +776,7 @@ impl From<LocalAgentProviderSettings> for AppProviderSettings {
             agy: settings.agy,
             opencode: settings.opencode,
             openrouter: settings.openrouter,
+            vertex: settings.vertex,
         }
     }
 }
@@ -775,6 +791,7 @@ impl From<AppProviderSettings> for LocalAgentProviderSettings {
             agy: settings.agy,
             opencode: settings.opencode,
             openrouter: settings.openrouter,
+            vertex: settings.vertex,
             ..Default::default()
         }
     }

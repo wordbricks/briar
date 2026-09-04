@@ -5,8 +5,8 @@
 -- Whenever a migration changes the schema or seeds rows, run
 -- `bun run d1:snapshot` and commit the result; `bun run d1:snapshot:check`
 -- fails in CI otherwise.
--- migrations-digest: aef772c50f35a8d663e4ebf40d64da74566c4c403406e5b041f58eed15f325a9
--- snapshot-digest: 3a025ef1a2c70d3279fce35eb91a7c7718c8cfc646fc5e9b3a10613076e714e1
+-- migrations-digest: fb227ab9b656912156746395c24d7df91311587a8679cd8fd437331e5d00e990
+-- snapshot-digest: bd19a6c2945fb4959793b7323fe304a826724236a344d3caf852812f2dff00c6
 -- @statement
 CREATE TABLE IF NOT EXISTS "d1_migrations"(
 		id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -699,205 +699,6 @@ CREATE TABLE briar_organization_inbox_realtime_outbox (
   updated_at text not null
 );
 -- @statement
-CREATE TABLE briar_agent_skill_execution_approval_audit (
-  id text primary key not null,
-  proposal_id text not null unique,
-  organization_id text not null
-    references briar_organizations (id) on delete cascade,
-  project_id text not null,
-  source_kind text not null check (source_kind in ('channel', 'issue')),
-  channel_id text,
-  conversation_run_id text,
-  trigger_message_id text not null,
-  reply_message_id text not null,
-  source_reply_job_id text not null,
-  delegated_by_reply_job_id text,
-  agent_id text not null,
-  agent_name text not null,
-  agent_responsibility text not null,
-  skill_id text not null,
-  skill_name text not null,
-  skill_instructions text not null,
-  skill_kind text not null check (skill_kind in ('issue_processing', 'custom')),
-  provider text not null
-    check (provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter')),
-  model text,
-  effort text check (
-    effort is null or effort in ('low', 'medium', 'high', 'xhigh', 'max', 'ultra')
-  ),
-  request text not null,
-  worker_id text not null,
-  worker_label text not null,
-  result_session_id text not null unique,
-  approved_by_user_id text references "user" (id) on delete set null,
-  approved_at text not null,
-  delegated_by_agent_id text,
-  delegated_by_agent_name text,
-  created_at text not null
-, execution_mode text not null default 'task'
-  check (execution_mode in ('conversation', 'task')), approval_policy text not null default 'explicit'
-  check (approval_policy in ('invoke_is_consent', 'explicit')), thread_root_message_id text, result_reply_job_id text, result_message_id text);
--- @statement
-CREATE TABLE briar_agent_skill_execution_proposals (
-  id text primary key not null,
-  organization_id text not null
-    references briar_organizations (id) on delete cascade,
-  project_id text not null references briar_projects (id) on delete cascade,
-  source_kind text not null check (source_kind in ('channel', 'issue')),
-  channel_id text,
-  conversation_run_id text,
-  trigger_message_id text not null,
-  reply_message_id text not null unique,
-  source_reply_job_id text not null,
-  delegated_by_reply_job_id text,
-  agent_id text not null,
-  agent_name text not null check (
-    length(trim(agent_name)) between 1 and 100
-  ),
-  agent_responsibility text not null check (
-    length(trim(agent_responsibility)) between 1 and 20000
-  ),
-  skill_id text not null,
-  skill_name text not null check (
-    length(trim(skill_name)) between 1 and 100
-  ),
-  skill_instructions text not null check (length(skill_instructions) <= 20000),
-  skill_kind text not null check (skill_kind in ('issue_processing', 'custom')),
-  provider text not null
-    check (provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter')),
-  model text check (
-    model is null or length(trim(model)) between 1 and 100
-  ),
-  effort text check (
-    effort is null or effort in ('low', 'medium', 'high', 'xhigh', 'max', 'ultra')
-  ),
-  request text not null check (length(trim(request)) between 1 and 10000),
-  delegated_by_agent_id text,
-  delegated_by_agent_name text check (
-    delegated_by_agent_name is null
-    or length(trim(delegated_by_agent_name)) between 1 and 100
-  ),
-  generation integer not null default 1 check (generation >= 1),
-  status text not null default 'pending'
-    check (status in ('pending', 'accepted', 'invalidated')),
-  requested_worker_id text,
-  requested_worker_label text,
-  result_session_id text unique,
-  accepted_by_user_id text references "user" (id) on delete set null,
-  accepted_at text,
-  created_at text not null,
-  updated_at text not null, execution_mode text not null default 'task'
-  check (execution_mode in ('conversation', 'task')), approval_policy text not null default 'explicit'
-  check (approval_policy in ('invoke_is_consent', 'explicit')), thread_root_message_id text, result_reply_job_id text, result_message_id text, materialized_session_payload_json text,
-  check (
-    (source_kind = 'channel' and channel_id is not null
-      and conversation_run_id is null)
-    or
-    (source_kind = 'issue' and channel_id is null
-      and conversation_run_id is not null)
-  ),
-  check (
-    (status = 'pending' and requested_worker_id is null
-      and requested_worker_label is null and result_session_id is null
-      and accepted_by_user_id is null and accepted_at is null)
-    or
-    (status = 'accepted' and requested_worker_id is not null
-      and requested_worker_label is not null and result_session_id is not null
-      and accepted_at is not null)
-    or status = 'invalidated'
-  )
-);
--- @statement
-CREATE TABLE IF NOT EXISTS "briar_project_agents" (
-  id text primary key not null,
-  organization_id text not null
-    references briar_organizations (id) on delete cascade,
-
-  project_id text references briar_projects (id) on delete cascade,
-
-  handle text check (
-    handle is null
-    or (
-      length(handle) between 1 and 63
-      and handle not glob '*[^a-z0-9-]*'
-    )
-  ),
-  name text not null check (length(trim(name)) between 1 and 100),
-  provider text not null
-    check (provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter')),
-  model text check (
-    model is null or (model = trim(model) and length(model) between 1 and 100)
-  ),
-  responsibility text not null check (
-    responsibility = trim(responsibility)
-    and length(responsibility) between 1 and 20000
-  ),
-  created_at text not null,
-  updated_at text not null,
-  calendar_color text not null default '#3275d5'
-    check (length(calendar_color) = 7 and substr(calendar_color, 1, 1) = '#'),
-  skill_markdown text not null default '' check (length(skill_markdown) <= 25000),
-  avatar text check (
-    avatar is null or (
-      length(avatar) <= 400000 and (
-        substr(avatar, 1, 22) = 'data:image/png;base64,'
-        or substr(avatar, 1, 23) = 'data:image/jpeg;base64,'
-        or substr(avatar, 1, 23) = 'data:image/webp;base64,'
-      )
-    )
-  ),
-  avatar_pet_json text check (
-    avatar_pet_json is null or (
-      length(avatar_pet_json) <= 4000 and json_valid(avatar_pet_json)
-    )
-  ),
-  avatar_spritesheet_object_key text check (
-    avatar_spritesheet_object_key is null or (
-      length(avatar_spritesheet_object_key) <= 1000
-      and avatar_spritesheet_object_key like 'project-agent-spritesheets/%'
-    )
-  ),
-  effort text check (
-    effort is null or effort in ('low', 'medium', 'high', 'xhigh', 'max', 'ultra')
-  )
-, description text not null default '' check (
-  description = trim(description)
-  and length(description) <= 500
-), designated_worker_id text
-  references briar_execution_workers (id) on delete restrict, designated_worker_label text
-  check (
-    designated_worker_label is null
-    or length(trim(designated_worker_label)) between 1 and 100
-  ), computer_use_policy text not null default 'disabled'
-check (computer_use_policy in ('disabled', 'unattended')));
--- @statement
-CREATE TABLE briar_agent_skills (
-  id text primary key not null,
-  agent_id text not null
-    references briar_project_agents (id) on delete cascade,
-  name text not null check (
-    name = trim(name) and length(name) between 1 and 100
-  ),
-  body text not null default '' check (length(body) <= 20000),
-  provider text not null
-    check (provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter')),
-  model text check (
-    model is null or (model = trim(model) and length(model) between 1 and 100)
-  ),
-  effort text check (
-    effort is null or effort in ('low', 'medium', 'high', 'xhigh', 'max', 'ultra')
-  ),
-  kind text not null default 'custom'
-    check (kind in ('issue_processing', 'custom')),
-  is_default integer not null default 0 check (is_default in (0, 1)),
-  position integer not null default 0 check (position >= 0),
-  created_at text not null,
-  updated_at text not null
-, description text not null default ''
-  check (length(description) <= 1000), execution_mode text not null
-  default 'task' check (execution_mode in ('conversation', 'task')), approval_policy text not null
-  default 'explicit' check (approval_policy in ('invoke_is_consent', 'explicit')));
--- @statement
 CREATE TABLE IF NOT EXISTS "briar_execution_workers" (
   id text primary key not null,
   project_id text not null references briar_projects (id) on delete cascade,
@@ -921,719 +722,6 @@ CREATE TABLE IF NOT EXISTS "briar_execution_workers" (
   unique (project_id, host_fingerprint)
 );
 -- @statement
-CREATE TABLE IF NOT EXISTS "briar_hunt_runs" (
-  run_number integer primary key autoincrement,
-  id text not null unique,
-  project_id text not null references briar_projects (id) on delete cascade,
-  source text not null check (source in ('issue', 'error', 'feedback')),
-  source_key text not null check (
-    source_key = trim(source_key) and length(source_key) between 1 and 200
-  ),
-  title text not null check (length(trim(title)) between 1 and 300),
-  stage text not null check (stage in (
-    'queued', 'analyzing', 'implementing', 'pr_open', 'staging_qa',
-    'production_qa', 'completed', 'blocked', 'failed', 'cancelled'
-  )),
-  detail text check (detail is null or length(detail) <= 4000),
-  repository text not null check (length(trim(repository)) between 1 and 500),
-  branch text check (branch is null or length(trim(branch)) between 1 and 500),
-  commit_sha text check (
-    commit_sha is null or (
-      length(commit_sha) between 7 and 64
-      and commit_sha not glob '*[^0-9a-f]*'
-    )
-  ),
-  started_at text not null,
-  completed_at text,
-  last_event_at text not null,
-  created_at text not null,
-  updated_at text not null,
-  priority integer check (priority is null or priority between 1 and 4),
-  tracker_provider text
-    check (tracker_provider is null or length(trim(tracker_provider)) between 1 and 50),
-  tracker_issue_id text
-    check (tracker_issue_id is null or length(trim(tracker_issue_id)) between 1 and 200),
-  tracker_issue_identifier text
-    check (tracker_issue_identifier is null or length(trim(tracker_issue_identifier)) between 1 and 100),
-  tracker_issue_url text
-    check (tracker_issue_url is null or length(trim(tracker_issue_url)) between 1 and 1000),
-  tracker_issue_state text
-    check (tracker_issue_state is null or length(trim(tracker_issue_state)) between 1 and 100),
-  issue_description text
-    check (issue_description is null or length(issue_description) <= 100000),
-  result_summary text
-    check (result_summary is null or length(result_summary) <= 100000),
-  pull_request_urls text not null default '[]'
-    check (json_valid(pull_request_urls) and json_type(pull_request_urls) = 'array'),
-  target_sha text check (
-    target_sha is null or (
-      length(target_sha) between 7 and 64
-      and target_sha not glob '*[^0-9a-f]*'
-    )
-  ),
-  source_created_at text,
-  staging_qa_status text
-    check (staging_qa_status is null or staging_qa_status in ('pending', 'passed', 'skipped')),
-  production_qa_status text
-    check (production_qa_status is null or production_qa_status in ('pending', 'passed', 'skipped')),
-  staging_qa_detail text
-    check (staging_qa_detail is null or length(staging_qa_detail) <= 100000),
-  production_qa_detail text
-    check (production_qa_detail is null or length(production_qa_detail) <= 100000),
-  context_json text check (
-    context_json is null or (
-      json_valid(context_json) and json_type(context_json) = 'object'
-    )
-  ),
-  claim_token_hash text check (
-    claim_token_hash is null or (
-      length(claim_token_hash) = 64
-      and claim_token_hash not glob '*[^0-9a-f]*'
-    )
-  ),
-  claimed_by text
-    check (claimed_by is null or length(trim(claimed_by)) between 1 and 128),
-  claimed_at text,
-  lease_expires_at text,
-  claim_attempts integer not null default 0 check (claim_attempts >= 0),
-  current_attempt integer not null default 1 check (current_attempt >= 1),
-  workflow_stage text,
-  workflow_snapshot_json text not null
-    default '{"version":1,"stages":[{"id":"repository_workflow_pending","label":"Repository workflow pending","required":true}],"completion":{"requiredStages":["repository_workflow_pending"]},"release":{"enabled":false}}'
-    check (
-      json_valid(workflow_snapshot_json)
-      and json_type(workflow_snapshot_json) = 'object'
-    ),
-  worker_id text references briar_execution_workers (id) on delete set null,
-  status text not null default 'queued' check (status in (
-    'backlog', 'queued', 'running', 'blocked', 'failed', 'completed', 'cancelled'
-  )),
-  current_revision integer not null default 1 check (current_revision >= 1),
-  structured_result_json text,
-  agent_id text references briar_project_agents (id) on delete set null,
-  requested_worker_id text
-    references briar_execution_workers (id) on delete set null,
-  requested_by_user_id text references "user" (id) on delete set null,
-  dispatch_mode text check (dispatch_mode in ('any', 'specific')),
-  dispatch_request_id text,
-  dispatched_at text,
-  requested_agent_provider text check (
-    requested_agent_provider is null
-    or requested_agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter')
-  ),
-  preferred_agent_provider text check (
-    preferred_agent_provider is null
-    or preferred_agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter')
-  ),
-  preferred_agent_model text check (
-    preferred_agent_model is null
-    or length(trim(preferred_agent_model)) between 1 and 100
-  ),
-  preferred_agent_effort text check (
-    preferred_agent_effort is null
-    or preferred_agent_effort in ('low', 'medium', 'high', 'xhigh', 'max', 'ultra')
-  ),
-  requested_agent_model text check (
-    requested_agent_model is null
-    or length(trim(requested_agent_model)) between 1 and 100
-  ),
-  requested_agent_effort text check (
-    requested_agent_effort is null
-    or requested_agent_effort in ('low', 'medium', 'high', 'xhigh', 'max', 'ultra')
-  ),
-  event_count integer not null default 0 check (event_count >= 0),
-  execution_metrics_json text, paused_at text, waiting_checkpoint_key text, waiting_checkpoint_revision integer
-  check (waiting_checkpoint_revision is null or waiting_checkpoint_revision >= 1), resume_requested_at text, assignee_user_id text references "user" (id) on delete set null, issue_checkpoints_json text
-  not null default '[]' check (
-    json_valid(issue_checkpoints_json)
-    and json_type(issue_checkpoints_json) = 'array'
-  ), last_execution_id text, created_by_user_id text
-  references "user" (id) on delete set null, planned_update_resume integer not null
-  default 0 check (planned_update_resume in (0, 1)), difficulty text
-  check (difficulty in ('easy', 'normal', 'hard')), team_id text
-  references briar_teams (id) on delete cascade, planning_project_id text
-  references briar_planning_projects (id) on delete restrict, full_auto integer not null default 0
-  check (full_auto in (0, 1)), requires_claim_token integer not null default 0
-  check (requires_claim_token in (0, 1)),
-  unique (project_id, source, source_key),
-  check (
-    (stage in ('completed', 'cancelled') and completed_at is not null)
-    or (stage not in ('completed', 'cancelled') and completed_at is null)
-  )
-);
--- @statement
-CREATE TABLE IF NOT EXISTS "briar_agent_transcript_sessions" (
-  session_id text primary key not null check (
-    session_id = trim(session_id) and length(session_id) between 1 and 128
-  ),
-  project_id text not null references briar_projects (id) on delete cascade,
-  run_id text references briar_hunt_runs (id) on delete cascade,
-  worker_id text references briar_execution_workers (id) on delete set null,
-  agent_provider text not null
-    check (agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter')),
-  started_at text not null,
-  last_event_at text not null,
-  event_count integer not null default 0 check (event_count >= 0),
-  byte_count integer not null default 0 check (byte_count >= 0)
-);
--- @statement
-CREATE TABLE briar_agent_transcript_segments (
-  session_id text not null
-    references briar_agent_transcript_sessions (session_id) on delete cascade,
-  first_sequence integer not null check (first_sequence > 0),
-  last_sequence integer not null check (last_sequence >= first_sequence),
-  object_key text not null unique,
-  event_count integer not null check (event_count > 0),
-  uncompressed_bytes integer not null check (uncompressed_bytes > 0),
-  compressed_bytes integer not null check (compressed_bytes > 0),
-  sha256 text not null check (
-    length(sha256) = 64 and sha256 not glob '*[^0-9a-f]*'
-  ),
-  recorded_at text not null,
-  primary key (session_id, first_sequence, last_sequence)
-);
--- @statement
-CREATE TABLE briar_agent_transcripts (
-  session_id text not null
-    references briar_agent_transcript_sessions (session_id) on delete cascade,
-  sequence integer not null check (sequence > 0),
-  direction text not null check (direction in ('client', 'server')),
-  payload_json text not null check (
-    json_valid(payload_json)
-    and length(payload_json) <= 32768
-  ),
-  recorded_at text not null,
-  primary key (session_id, sequence)
-);
--- @statement
-CREATE TABLE briar_agent_worklog_entries (
-  session_id text not null
-    references briar_agent_transcript_sessions (session_id) on delete cascade,
-  entry_id text not null check (
-    entry_id = trim(entry_id) and length(entry_id) between 1 and 512
-  ),
-  sequence integer not null check (sequence > 0),
-  updated_sequence integer not null check (updated_sequence >= sequence),
-  entry_type text not null check (entry_type in ('message', 'activity')),
-  activity_kind text check (
-    activity_kind is null
-    or activity_kind in ('command', 'fileChange', 'webSearch', 'tool')
-  ),
-  phase text,
-  title text,
-  body text not null default '',
-  status text not null check (
-    status in (
-      'writing', 'completed', 'failed', 'cancelled', 'interrupted'
-    )
-  ),
-  started_at text not null,
-  updated_at text not null,
-  completed_at text,
-  primary key (session_id, entry_id)
-);
--- @statement
-CREATE TABLE IF NOT EXISTS "briar_channel_action_proposals" (
-  id text primary key not null,
-  channel_id text not null references briar_channels (id) on delete cascade,
-  project_id text references briar_projects (id) on delete set null,
-  trigger_message_id text not null,
-  reply_message_id text not null unique,
-  action_type text not null check (
-    action_type in ('request_issue_create', 'request_plan_document')
-  ),
-  payload_json text not null check (json_valid(payload_json)),
-  status text not null default 'pending'
-    check (status in ('pending', 'accepted')),
-  accepted_by_user_id text references "user" (id) on delete set null,
-  accepted_at text,
-  result_run_id text references briar_hunt_runs (id) on delete set null,
-  created_at text not null,
-  updated_at text not null, issue_source_key text, execute_after_create integer not null default 0
-    check (execute_after_create in (0, 1)), execution_proposal_id text, declined_by_user_id text, declined_at text,
-  unique (channel_id, trigger_message_id)
-);
--- @statement
-CREATE TABLE IF NOT EXISTS "briar_channel_messages" (
-  id text primary key not null,
-  channel_id text not null references briar_channels (id) on delete cascade,
-  parent_message_id text
-    references "briar_channel_messages" (id) on delete cascade,
-  author_user_id text references "user" (id) on delete set null,
-  author_agent_id text
-    references briar_project_agents (id) on delete set null,
-  author_agent_name text check (
-    author_agent_name is null
-    or length(trim(author_agent_name)) between 1 and 100
-  ),
-  author_agent_provider text check (
-    author_agent_provider is null
-    or author_agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter')
-  ),
-  author_webhook_id text
-    references briar_channel_webhooks (id) on delete set null,
-  author_webhook_name text check (
-    author_webhook_name is null
-    or length(trim(author_webhook_name)) between 1 and 100
-  ),
-  webhook_event_id text check (
-    webhook_event_id is null
-    or (webhook_event_id = trim(webhook_event_id)
-      and length(webhook_event_id) between 1 and 200)
-  ),
-  body text not null check (
-    body = trim(body) and length(body) between 1 and 10000
-  ),
-  created_at text not null,
-  updated_at text not null, blocks_json text check (
-    blocks_json is null
-    or (json_valid(blocks_json) and length(blocks_json) <= 65536)
-  ), deleted_at text, memory_source_version integer not null default 1,
-  check (parent_message_id is null or parent_message_id <> id),
-  check (
-    author_agent_name is not null
-    or (author_agent_id is null and author_agent_provider is null)
-  ),
-  check (author_webhook_name is not null or author_webhook_id is null),
-  check (
-    (author_user_id is not null)
-    + (author_agent_name is not null)
-    + (author_webhook_name is not null) = 1
-  ),
-  check (
-    (author_webhook_name is null and webhook_event_id is null)
-    or author_webhook_name is not null
-  )
-);
--- @statement
-CREATE TABLE briar_channel_agent_reply_jobs (
-  id text primary key not null,
-  organization_id text not null
-    references briar_organizations (id) on delete cascade,
-  channel_id text not null references briar_channels (id) on delete cascade,
-  project_id text references briar_projects (id) on delete cascade,
-  agent_id text not null
-    references briar_project_agents (id) on delete cascade,
-  trigger_message_id text not null
-    references briar_channel_messages (id) on delete cascade,
-  parent_message_id text not null
-    references briar_channel_messages (id) on delete cascade,
-  reply_message_id text not null unique,
-  status text not null default 'queued'
-    check (status in ('queued', 'running', 'completed', 'failed')),
-  agent_provider text check (
-    agent_provider is null
-    or agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter')
-  ),
-  claimed_device_id text
-    references briar_execution_worker_devices (id) on delete set null,
-  claim_token_hash text,
-  claimed_at text,
-  lease_expires_at text,
-  attempts integer not null default 0 check (attempts >= 0),
-  error text check (error is null or length(error) <= 4000),
-  created_at text not null,
-  updated_at text not null,
-  completed_at text, skill_id text
-    references briar_agent_skills (id) on delete set null, claimed_worker_id text
-  references briar_execution_workers (id) on delete set null, delegated_by_reply_job_id text
-    references briar_channel_agent_reply_jobs (id) on delete cascade, delegation_request text check (
-    (delegated_by_reply_job_id is null and delegation_request is null)
-    or (
-      delegated_by_reply_job_id is not null
-      and delegation_request is not null
-      and length(delegation_request) between 1 and 10000
-    )
-  ), selected_skill_id_snapshot text check (
-    selected_skill_id_snapshot is null
-    or length(selected_skill_id_snapshot) = 36
-  ), execution_target_ids_json text not null default '[]'
-    check (
-      json_valid(execution_target_ids_json)
-      and json_type(execution_target_ids_json) = 'array'
-    ), selected_agent_name_snapshot text, selected_agent_responsibility_snapshot text, selected_skill_name_snapshot text, selected_skill_instructions_snapshot text, selected_skill_provider_snapshot text, selected_skill_kind_snapshot text, selected_skill_model_snapshot text, selected_skill_effort_snapshot text, skill_execution_request_snapshot text, preferred_device_id text
-  references briar_execution_worker_devices (id) on delete set null, planned_update_resume integer not null
-  default 0 check (planned_update_resume in (0, 1)), session_id text
-  references briar_channel_reply_sessions (id) on delete cascade, approved_skill_execution_proposal_id text, memory_restart_count integer not null default 0,
-  unique (channel_id, trigger_message_id, agent_id)
-);
--- @statement
-CREATE TABLE briar_channel_agents (
-  channel_id text not null references briar_channels (id) on delete cascade,
-  agent_id text not null
-    references briar_project_agents (id) on delete cascade,
-  added_by_user_id text references "user" (id) on delete set null,
-  created_at text not null,
-  primary key (channel_id, agent_id)
-);
--- @statement
-CREATE TABLE briar_channel_message_agent_mentions (
-  message_id text not null
-    references briar_channel_messages (id) on delete cascade,
-  agent_id text not null
-    references briar_project_agents (id) on delete cascade,
-  created_at text not null,
-  primary key (message_id, agent_id)
-);
--- @statement
-CREATE TABLE IF NOT EXISTS "briar_channel_message_documents" (
-  message_id text primary key not null
-    references briar_channel_messages (id) on delete cascade,
-  channel_id text not null references briar_channels (id) on delete cascade,
-
-
-  project_id text references briar_projects (id) on delete set null,
-  title text not null check (length(trim(title)) between 1 and 300),
-  markdown text not null check (length(markdown) <= 200000),
-  created_at text not null,
-  updated_at text not null
-);
--- @statement
-CREATE TABLE briar_channel_message_mentions (
-  message_id text not null
-    references briar_channel_messages (id) on delete cascade,
-  user_id text not null references "user" (id) on delete cascade,
-  created_at text not null,
-  primary key (message_id, user_id)
-);
--- @statement
-CREATE TABLE briar_channel_message_reactions (
-  message_id text not null
-    references briar_channel_messages (id) on delete cascade,
-  user_id text not null references "user" (id) on delete cascade,
-  emoji text not null check (
-    emoji = trim(emoji)
-    and length(emoji) between 1 and 32
-  ),
-  created_at text not null,
-  primary key (message_id, user_id, emoji)
-);
--- @statement
-CREATE TABLE IF NOT EXISTS "briar_channel_notification_inbox" (
-  user_id text not null references "user" (id) on delete cascade,
-  organization_id text not null,
-  message_id text not null
-    references briar_channel_messages (id) on delete cascade,
-  notification_reason text not null
-    check (notification_reason in ('mention', 'thread_reply', 'subscription')),
-  created_at text not null,
-  primary key (user_id, message_id)
-);
--- @statement
-CREATE TABLE briar_execution_audit_events (
-  id text primary key not null,
-  organization_id text not null
-    references briar_organizations (id) on delete cascade,
-  project_id text not null references briar_projects (id) on delete cascade,
-  run_id text references briar_hunt_runs (id) on delete cascade,
-  worker_id text references briar_execution_workers (id) on delete set null,
-  agent_id text references briar_project_agents (id) on delete set null,
-  actor_user_id text references "user" (id) on delete set null,
-  actor_device_id text
-    references briar_execution_worker_devices (id) on delete set null,
-  action text not null check (
-    action in (
-      'dispatched', 'reassigned', 'claimed', 'lease_lost', 'cancelled',
-      'requeued', 'blocked', 'completed', 'worker_readiness_changed'
-    )
-  ),
-  request_id text,
-  detail_json text not null default '{}' check (
-    json_valid(detail_json) and json_type(detail_json) = 'object'
-  ),
-  occurred_at text not null
-);
--- @statement
-CREATE TABLE IF NOT EXISTS "briar_hunt_events" (
-  id text primary key not null,
-  run_id text not null references "briar_hunt_runs" (id) on delete cascade,
-  event_key text not null check (
-    event_key = trim(event_key)
-    and length(event_key) between 1 and 300
-  ),
-  stage text not null check (stage in (
-    'queued', 'analyzing', 'implementing', 'pr_open', 'staging_qa',
-    'production_qa', 'completed', 'blocked', 'failed', 'cancelled'
-  )),
-  detail text check (detail is null or length(detail) <= 4000),
-  actor text not null check (length(trim(actor)) between 1 and 128),
-  branch text,
-  commit_sha text check (
-    commit_sha is null or (
-      length(commit_sha) between 7 and 64
-      and commit_sha not glob '*[^0-9a-f]*'
-    )
-  ),
-  occurred_at text not null,
-  recorded_at text not null, qa_status text
-  check (qa_status is null or qa_status in ('pending', 'passed', 'skipped')), tracker_issue_state text
-  check (tracker_issue_state is null or length(trim(tracker_issue_state)) between 1 and 100), pull_request_urls text not null default '[]'
-  check (json_valid(pull_request_urls) and json_type(pull_request_urls) = 'array'), target_sha text
-  check (target_sha is null or (
-    length(target_sha) between 7 and 64
-    and target_sha not glob '*[^0-9a-f]*'
-  )), attempt integer not null default 1
-  check (attempt >= 1), workflow_stage text, status text not null
-  default 'queued'
-  check (status in (
-    'backlog', 'queued', 'running', 'blocked', 'failed', 'completed',
-    'cancelled'
-  )), revision integer not null default 1
-  check (revision >= 1),
-  unique (run_id, event_key)
-);
--- @statement
-CREATE TABLE briar_issue_action_proposals (
-  id text primary key not null,
-  project_id text not null references briar_projects (id) on delete cascade,
-  conversation_run_id text not null references briar_hunt_runs (id) on delete cascade,
-  trigger_message_id text not null,
-  reply_message_id text not null unique,
-  action_type text not null
-    check (action_type in ('request_issue_update', 'request_issue_create')),
-  payload_json text not null check (json_valid(payload_json)),
-  expected_run_updated_at text,
-  status text not null default 'pending'
-    check (status in ('pending', 'accepted')),
-  accepted_by_user_id text references "user" (id) on delete set null,
-  accepted_at text,
-  result_run_id text references briar_hunt_runs (id) on delete set null,
-  created_at text not null,
-  updated_at text not null, approval_reserved_by_user_id text
-    references "user" (id) on delete set null, approval_reserved_at text, issue_source_key text, execute_after_create integer not null default 0
-    check (execute_after_create in (0, 1)), execution_proposal_id text,
-  unique (project_id, trigger_message_id)
-);
--- @statement
-CREATE TABLE IF NOT EXISTS "briar_issue_messages" (
-  id text primary key not null,
-  project_id text not null references briar_projects (id) on delete cascade,
-  run_id text not null references briar_hunt_runs (id) on delete cascade,
-  parent_message_id text,
-  author_user_id text references "user" (id) on delete set null,
-  author_agent_provider text check (
-    author_agent_provider is null
-    or author_agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter')
-  ),
-  body text not null check (
-    body = trim(body) and length(body) between 1 and 10000
-  ),
-  created_at text not null,
-  updated_at text not null, author_agent_id text
-  references briar_project_agents (id) on delete set null, author_agent_name text,
-  check (parent_message_id is null or parent_message_id <> id)
-);
--- @statement
-CREATE TABLE briar_issue_dependencies (
-  project_id text not null references briar_projects (id) on delete cascade,
-  prerequisite_run_id text not null
-    references briar_hunt_runs (id) on delete cascade,
-  dependent_run_id text not null
-    references briar_hunt_runs (id) on delete cascade,
-  created_by_user_id text references "user" (id) on delete set null,
-  created_at text not null,
-  primary key (prerequisite_run_id, dependent_run_id),
-  check (prerequisite_run_id <> dependent_run_id)
-);
--- @statement
-CREATE TABLE briar_issue_execution_approval_audit (
-  id text primary key not null,
-  proposal_id text not null,
-  organization_id text not null
-    references briar_organizations (id) on delete cascade,
-  project_id text not null,
-  source_kind text not null check (source_kind in ('channel', 'issue')),
-  channel_id text,
-  conversation_run_id text,
-  run_id text not null,
-  generation integer not null,
-  approved_by_user_id text references "user" (id) on delete set null,
-  approved_at text not null,
-  provider text not null
-    check (provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter')),
-  model text,
-  effort text check (
-    effort is null or effort in ('low', 'medium', 'high', 'xhigh', 'max', 'ultra')
-  ),
-  worker_id text,
-  dispatch_request_id text not null unique,
-  proposed_by_agent_id text,
-  delegated_by_agent_id text,
-  created_at text not null
-);
--- @statement
-CREATE TABLE briar_issue_execution_proposals (
-  id text primary key not null,
-  organization_id text not null
-    references briar_organizations (id) on delete cascade,
-  project_id text not null references briar_projects (id) on delete cascade,
-  source_kind text not null check (source_kind in ('channel', 'issue')),
-  channel_id text references briar_channels (id) on delete set null,
-  conversation_run_id text references briar_hunt_runs (id) on delete set null,
-  trigger_message_id text not null,
-  reply_message_id text not null unique,
-  target_run_id text not null references briar_hunt_runs (id) on delete cascade,
-  target_title text not null check (length(trim(target_title)) between 1 and 300),
-  target_run_updated_at text not null,
-  proposed_by_agent_id text
-    references briar_project_agents (id) on delete set null,
-  delegated_by_agent_id text
-    references briar_project_agents (id) on delete set null,
-  delegated_by_agent_name text
-    check (
-      delegated_by_agent_name is null
-      or length(trim(delegated_by_agent_name)) between 1 and 100
-    ),
-  origin_create_proposal_id text,
-  generation integer not null default 1 check (generation >= 1),
-  status text not null default 'pending'
-    check (status in ('pending', 'accepted', 'invalidated')),
-  approval_reserved_by_user_id text
-    references "user" (id) on delete set null,
-  approval_reserved_at text,
-  requested_provider text check (
-    requested_provider is null
-    or requested_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter')
-  ),
-  requested_model text check (
-    requested_model is null
-    or length(trim(requested_model)) between 1 and 100
-  ),
-  requested_effort text check (
-    requested_effort is null
-    or requested_effort in ('low', 'medium', 'high', 'xhigh', 'max', 'ultra')
-  ),
-  requested_worker_id text
-    references briar_execution_workers (id) on delete set null,
-  dispatch_request_id text unique,
-  accepted_by_user_id text references "user" (id) on delete set null,
-  accepted_at text,
-  created_at text not null,
-  updated_at text not null,
-  check (
-    status = 'invalidated'
-    or (
-      source_kind = 'channel' and channel_id is not null
-      and conversation_run_id is null
-    )
-    or (
-      source_kind = 'issue' and channel_id is null
-      and conversation_run_id is not null
-    )
-  ),
-  check (
-    (approval_reserved_at is null
-      and requested_provider is null
-      and requested_model is null
-      and requested_effort is null
-      and requested_worker_id is null
-      and dispatch_request_id is null)
-    or
-    (approval_reserved_at is not null
-      and requested_provider is not null
-      and dispatch_request_id is not null)
-  )
-);
--- @statement
-CREATE TABLE briar_issue_message_mentions (
-  message_id text not null references briar_issue_messages (id) on delete cascade,
-  user_id text not null references "user" (id) on delete cascade,
-  created_at text not null,
-  primary key (message_id, user_id)
-);
--- @statement
-CREATE TABLE briar_issue_result_reviews (
-  run_id text not null references briar_hunt_runs (id) on delete cascade,
-  reviewer_user_id text not null references "user" (id) on delete cascade,
-  completed_at text not null,
-  primary key (run_id, reviewer_user_id)
-);
--- @statement
-CREATE TABLE briar_issue_rework_proposals (
-  id text primary key not null,
-  project_id text not null references briar_projects (id) on delete cascade,
-  run_id text not null references briar_hunt_runs (id) on delete cascade,
-  trigger_message_id text not null,
-  reply_message_id text not null unique,
-  workflow_stage text not null,
-  reason text not null,
-  expected_attempt integer not null check (expected_attempt > 0),
-  expected_revision integer not null check (expected_revision > 0),
-  status text not null default 'pending'
-    check (status in ('pending', 'accepted')),
-  accepted_by_user_id text references "user" (id) on delete set null,
-  accepted_at text,
-  applied_revision integer check (applied_revision is null or applied_revision > 0),
-  created_at text not null,
-  updated_at text not null,
-  unique (project_id, trigger_message_id)
-);
--- @statement
-CREATE TABLE briar_log_archives (
-  id text primary key not null check (
-    length(id) = 64 and id not glob '*[^0-9a-f]*'
-  ),
-  project_id text not null references briar_projects (id) on delete cascade,
-  run_id text references briar_hunt_runs (id) on delete cascade,
-  scope_id text not null check (
-    scope_id = trim(scope_id) and length(scope_id) between 1 and 128
-  ),
-  archive_kind text not null check (archive_kind in (
-    'run_events', 'run_evidence', 'execution_audit',
-    'agent_transcript', 'issue_messages', 'project_agent_sessions'
-  )),
-  object_key text not null unique check (
-    object_key = trim(object_key) and length(object_key) between 1 and 1024
-  ),
-  format_version integer not null check (format_version = 1),
-  status text not null check (status in ('failed', 'verified', 'complete')),
-  row_count integer not null check (row_count > 0),
-  byte_size integer not null check (byte_size >= 0),
-  sha256 text not null check (
-    length(sha256) = 64 and sha256 not glob '*[^0-9a-f]*'
-  ),
-  content_sha256 text not null check (
-    length(content_sha256) = 64 and content_sha256 not glob '*[^0-9a-f]*'
-  ),
-  period_start text not null,
-  period_end text not null,
-  created_at text not null,
-  verified_at text,
-  completed_at text,
-  expires_at text not null,
-  failure_count integer not null default 0 check (failure_count >= 0),
-  last_error text,
-  related_object_keys_json text not null default '[]' check (
-    json_valid(related_object_keys_json)
-    and json_type(related_object_keys_json) = 'array'
-  )
-);
--- @statement
-CREATE TABLE briar_project_agent_task_jobs (
-  id text primary key not null,
-  project_id text not null references briar_projects (id) on delete cascade,
-  agent_id text not null references briar_project_agents (id) on delete cascade,
-  request text not null,
-  request_id text not null,
-  status text not null default 'queued'
-    check (status in ('queued', 'running', 'completed', 'failed')),
-  preferred_worker_id text not null
-    references briar_execution_workers (id) on delete cascade,
-  claimed_worker_id text
-    references briar_execution_workers (id) on delete set null,
-  claim_token_hash text,
-  claimed_at text,
-  lease_expires_at text,
-  attempts integer not null default 0 check (attempts >= 0),
-  error text,
-  created_at text not null,
-  updated_at text not null,
-  completed_at text, skill_id text
-    references briar_agent_skills (id) on delete set null, skill_execution_proposal_id text, result_summary text, result_conversation_id text, planned_update_resume integer not null
-  default 0 check (planned_update_resume in (0, 1)), cancel_requested_at text, cancelled_by_user_id text, resume_count integer not null default 0 check (resume_count >= 0),
-  unique (project_id, request_id)
-);
--- @statement
 CREATE TABLE briar_project_execution_worker_allowlist (
   project_id text not null references briar_projects (id) on delete cascade,
   worker_id text not null
@@ -1652,329 +740,6 @@ CREATE TABLE briar_project_execution_worker_policies (
   updated_by_user_id text references "user" (id) on delete set null,
   created_at text not null,
   updated_at text not null
-);
--- @statement
-CREATE TABLE briar_run_checkpoint_progress (
-  run_id text not null references briar_hunt_runs(id) on delete cascade,
-  attempt integer not null check (attempt >= 1),
-  revision integer not null check (revision >= 1),
-  checkpoint_key text not null check (
-    length(checkpoint_key) between 1 and 64
-    and substr(checkpoint_key, 1, 1) glob '[a-z]'
-    and checkpoint_key not glob '*[^a-z0-9_-]*'
-  ),
-  stage_id text not null check (
-    length(stage_id) between 1 and 64
-    and substr(stage_id, 1, 1) glob '[a-z]'
-    and stage_id not glob '*[^a-z0-9_-]*'
-  ),
-  position text not null check (position in ('before', 'after')),
-  state text not null check (state in ('pending', 'waiting', 'approved', 'invalidated')),
-  reached_at text,
-  approved_at text,
-  approved_by text,
-  approved_request_id text,
-  primary key (run_id, attempt, revision, checkpoint_key),
-  check (
-    (state = 'pending'
-      and reached_at is null
-      and approved_at is null
-      and approved_by is null
-      and approved_request_id is null)
-    or (state = 'waiting'
-      and reached_at is not null
-      and approved_at is null
-      and approved_by is null
-      and approved_request_id is null)
-    or (state = 'approved'
-      and reached_at is not null
-      and approved_at is not null
-      and approved_by is not null
-      and approved_request_id is not null)
-    or (state = 'invalidated')
-  )
-);
--- @statement
-CREATE TABLE briar_run_execution_attempts (
-  id text primary key not null check (
-    length(id) = 36
-    and substr(id, 9, 1) = '-'
-    and substr(id, 14, 1) = '-'
-    and substr(id, 19, 1) = '-'
-    and substr(id, 24, 1) = '-'
-  ),
-  organization_id text not null
-    references briar_organizations (id) on delete cascade,
-
-
-  project_id text not null,
-  run_id text not null
-    references briar_hunt_runs (id) on delete cascade,
-  run_attempt integer not null check (run_attempt > 0),
-  claim_attempt integer not null check (claim_attempt > 0),
-  worker_id text,
-  claimed_by text,
-  claimed_at text not null,
-  recorded_at text not null
-);
--- @statement
-CREATE TABLE briar_run_cost_records (
-  execution_id text not null
-    references briar_run_execution_attempts (id) on delete cascade,
-  cost_key text not null check (length(trim(cost_key)) between 1 and 512),
-  usage_key text check (
-    usage_key is null or length(trim(usage_key)) between 1 and 512
-  ),
-  session_id text check (
-    session_id is null or length(trim(session_id)) between 1 and 512
-  ),
-  turn_id text check (
-    turn_id is null or length(trim(turn_id)) between 1 and 512
-  ),
-  scope_id text check (
-    scope_id is null or length(trim(scope_id)) between 1 and 512
-  ),
-  agent_provider text not null check (
-    agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter')
-  ),
-  model_provider text check (
-    model_provider is null or length(trim(model_provider)) between 1 and 256
-  ),
-  model text check (
-    model is null or length(trim(model)) between 1 and 512
-  ),
-  canonical_model text check (
-    canonical_model is null or length(trim(canonical_model)) between 1 and 512
-  ),
-  model_source text not null check (
-    model_source in (
-      'providerReported', 'providerConfig', 'configuredFallback', 'unknown'
-    )
-  ),
-  source text not null check (length(trim(source)) between 1 and 128),
-  amount_usd_ticks integer not null check (
-    typeof(amount_usd_ticks) = 'integer'
-    and amount_usd_ticks >= 0
-    and amount_usd_ticks <= 9007199254740991
-  ),
-  observed_at text not null,
-  recorded_at text not null,
-  primary key (execution_id, cost_key)
-);
--- @statement
-CREATE TABLE briar_run_evidence (
-  id text primary key,
-  project_id text not null references briar_projects(id) on delete cascade,
-  run_id text not null references briar_hunt_runs(id) on delete cascade,
-  attempt integer not null,
-  evidence_key text not null,
-  workflow_stage text not null,
-  evidence_type text not null,
-  status text not null check (status in ('pending', 'passed', 'failed', 'skipped')),
-  detail text,
-  command text,
-  url text,
-  metadata_json text check (
-    metadata_json is null or (
-      json_valid(metadata_json) and json_type(metadata_json) = 'object'
-    )
-  ),
-  actor text not null,
-  observed_at text not null,
-  recorded_at text not null, revision integer not null default 1
-  check (revision >= 1), github_association_started_at text, image_upload_ids_json text not null default '[]'
-  check (
-    json_valid(image_upload_ids_json)
-    and json_type(image_upload_ids_json) = 'array'
-  ),
-  unique (run_id, attempt, evidence_key)
-);
--- @statement
-CREATE TABLE briar_run_pull_requests (
-  project_id text not null
-    references briar_projects (id) on delete cascade,
-  run_id text not null
-    references briar_hunt_runs (id) on delete cascade,
-  attempt integer not null check (attempt >= 1),
-  revision integer not null check (revision >= 1),
-  revision_started_at text not null,
-  url text not null check (
-    url = trim(url)
-    and length(url) between 1 and 1000
-    and url like 'https://%'
-  ),
-  installation_id integer check (installation_id is null or installation_id > 0),
-  repository_id integer not null check (repository_id > 0),
-  repository text not null check (
-    repository = lower(trim(repository))
-    and length(repository) between 3 and 300
-  ),
-  pull_request_id integer not null check (pull_request_id > 0),
-  pull_request_node_id text not null check (
-    length(trim(pull_request_node_id)) between 1 and 200
-  ),
-  pull_request_number integer not null check (pull_request_number > 0),
-  state text not null default 'unknown'
-    check (state in ('unknown', 'open', 'closed', 'merged')),
-  draft integer check (draft is null or draft in (0, 1)),
-  head_sha text check (
-    head_sha is null or (
-      length(head_sha) between 7 and 64
-      and head_sha not glob '*[^0-9a-f]*'
-    )
-  ),
-  base_sha text check (
-    base_sha is null or (
-      length(base_sha) between 7 and 64
-      and base_sha not glob '*[^0-9a-f]*'
-    )
-  ),
-  merge_commit_sha text check (
-    merge_commit_sha is null or (
-      length(merge_commit_sha) between 7 and 64
-      and merge_commit_sha not glob '*[^0-9a-f]*'
-    )
-  ),
-  opened_at text,
-  closed_at text,
-  merged_at text,
-  provider_updated_at text,
-  last_delivery_id text,
-  created_at text not null,
-  updated_at text not null, base_branch text,
-  primary key (
-    run_id, attempt, revision, repository_id, pull_request_number
-  )
-);
--- @statement
-CREATE TABLE briar_run_stage_progress (
-  run_id text not null references briar_hunt_runs(id) on delete cascade,
-  attempt integer not null check (attempt >= 1),
-  revision integer not null check (revision >= 1),
-  stage_id text not null check (
-    length(stage_id) between 1 and 64
-    and substr(stage_id, 1, 1) glob '[a-z]'
-    and stage_id not glob '*[^a-z0-9_-]*'
-  ),
-  state text not null check (state in ('pending', 'running', 'completed', 'skipped')),
-  started_at text,
-  finished_at text,
-  primary key (run_id, attempt, revision, stage_id),
-  check (
-    (state = 'pending' and started_at is null and finished_at is null)
-    or (state = 'running' and started_at is not null and finished_at is null)
-    or (state = 'completed' and started_at is not null and finished_at is not null)
-    or (state = 'skipped' and finished_at is not null)
-  )
-);
--- @statement
-CREATE TABLE briar_run_stage_revisions (
-  run_id text not null references briar_hunt_runs(id) on delete cascade,
-  attempt integer not null check (attempt >= 1),
-  workflow_stage text not null,
-  required_revision integer not null check (required_revision >= 1),
-  primary key (run_id, attempt, workflow_stage)
-);
--- @statement
-CREATE TABLE briar_run_usage_records (
-  execution_id text not null
-    references briar_run_execution_attempts (id) on delete cascade,
-  usage_key text not null check (length(trim(usage_key)) between 1 and 512),
-  session_id text,
-  turn_id text,
-  scope_id text,
-  agent_provider text not null check (
-    agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter')
-  ),
-  model_provider text,
-  model text,
-  canonical_model text,
-  model_source text not null check (
-    model_source in (
-      'providerReported', 'providerConfig', 'configuredFallback', 'unknown'
-    )
-  ),
-  source text not null check (length(trim(source)) between 1 and 128),
-  uncached_input_tokens integer check (
-    uncached_input_tokens is null or uncached_input_tokens >= 0
-  ),
-  cache_read_tokens integer check (
-    cache_read_tokens is null or cache_read_tokens >= 0
-  ),
-  cache_write_tokens integer check (
-    cache_write_tokens is null or cache_write_tokens >= 0
-  ),
-  output_tokens integer check (output_tokens is null or output_tokens >= 0),
-  reasoning_output_tokens integer check (
-    reasoning_output_tokens is null or reasoning_output_tokens >= 0
-  ),
-  total_tokens integer check (total_tokens is null or total_tokens >= 0),
-  observed_at text not null,
-  recorded_at text not null,
-  check (
-    uncached_input_tokens is not null
-    or cache_read_tokens is not null
-    or cache_write_tokens is not null
-    or output_tokens is not null
-    or reasoning_output_tokens is not null
-    or total_tokens is not null
-  ),
-  check (
-    reasoning_output_tokens is null
-    or (
-      output_tokens is not null
-      and reasoning_output_tokens <= output_tokens
-    )
-  ),
-
-  primary key (execution_id, usage_key)
-);
--- @statement
-CREATE TABLE briar_issue_agent_reply_jobs (
-  id text primary key not null,
-  project_id text not null references briar_projects (id) on delete cascade,
-  run_id text not null references briar_hunt_runs (id) on delete cascade,
-  trigger_message_id text not null
-    references briar_issue_messages (id) on delete cascade,
-  parent_message_id text not null
-    references briar_issue_messages (id) on delete cascade,
-  reply_message_id text not null unique,
-  agent_id text references briar_project_agents (id) on delete set null,
-  requires_preferred_worker integer not null default 0
-    check (requires_preferred_worker in (0, 1)),
-  agent_name_snapshot text,
-  agent_responsibility_snapshot text,
-  status text not null default 'queued'
-    check (status in ('queued', 'running', 'completed', 'failed')),
-  preferred_worker_id text
-    references briar_execution_workers (id) on delete set null,
-  claimed_worker_id text
-    references briar_execution_workers (id) on delete set null,
-  preferred_provider text
-    check (preferred_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor')),
-  agent_provider text
-    check (agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor')),
-  claim_token_hash text,
-  claimed_at text,
-  lease_expires_at text,
-  attempts integer not null default 0 check (attempts >= 0),
-  error text,
-  created_at text not null,
-  updated_at text not null,
-  completed_at text,
-  skill_id text references briar_agent_skills (id) on delete set null,
-  selected_skill_id_snapshot text,
-  selected_agent_name_snapshot text,
-  selected_agent_responsibility_snapshot text,
-  selected_skill_name_snapshot text,
-  selected_skill_instructions_snapshot text,
-  selected_skill_provider_snapshot text,
-  selected_skill_kind_snapshot text,
-  selected_skill_model_snapshot text,
-  selected_skill_effort_snapshot text,
-  skill_execution_request_snapshot text, planned_update_resume integer not null
-  default 0 check (planned_update_resume in (0, 1)),
-  unique (project_id, trigger_message_id, agent_id)
 );
 -- @statement
 CREATE TABLE IF NOT EXISTS "rateLimit" (
@@ -2128,58 +893,6 @@ CREATE TABLE briar_merge_batches (
     (final_delivery_id is not null and merge_group_ref is not null
       and merge_group_sha is not null and merge_group_base_sha is not null)
   )
-);
--- @statement
-CREATE TABLE briar_merge_batch_candidates (
-  id text primary key not null,
-  project_id text not null references briar_projects (id) on delete cascade,
-  batch_id text references briar_merge_batches (id) on delete cascade,
-  run_id text not null references briar_hunt_runs (id) on delete cascade,
-  attempt integer not null check (attempt >= 1),
-  revision integer not null check (revision >= 1),
-  repository_id integer not null check (repository_id > 0),
-  repository text not null check (
-    repository = lower(trim(repository)) and length(repository) between 3 and 300
-  ),
-  base_branch text not null check (base_branch = 'main'),
-  pull_request_id integer not null check (pull_request_id > 0),
-  pull_request_node_id text not null check (
-    length(trim(pull_request_node_id)) between 1 and 200
-  ),
-  pull_request_number integer not null check (pull_request_number > 0),
-  pull_request_url text not null check (
-    pull_request_url = trim(pull_request_url) and pull_request_url like 'https://%'
-  ),
-  frozen_head_sha text not null check (
-    length(frozen_head_sha) = 40
-    and frozen_head_sha not glob '*[^0-9a-f]*'
-  ),
-  frozen_base_sha text not null check (
-    length(frozen_base_sha) = 40
-    and frozen_base_sha not glob '*[^0-9a-f]*'
-  ),
-  priority integer check (priority between 1 and 4),
-  ready_at text not null,
-  ordinal integer check (ordinal is null or ordinal between 1 and 5),
-  state text not null default 'ready' check (state in (
-    'ready', 'frozen', 'enqueued', 'merged', 'dequeued', 'failed'
-  )),
-  queue_entry_id text,
-  enqueued_at text,
-  
-  
-  merged_delivery_id text,
-  merged_at text,
-  failure_code text,
-  failure_detail text,
-  created_at text not null,
-  updated_at text not null,
-  unique (
-    run_id, attempt, revision, repository_id, pull_request_number
-  ),
-  unique (batch_id, ordinal),
-  unique (batch_id, repository_id, pull_request_number),
-  unique (queue_entry_id)
 );
 -- @statement
 CREATE TABLE briar_merge_queue_pull_request_observations (
@@ -2465,64 +1178,6 @@ CREATE TABLE briar_channel_issue_batch_items (
   unique (proposal_id, position)
 );
 -- @statement
-CREATE TABLE briar_channel_reply_sessions (
-  id text primary key not null,
-  organization_id text not null
-    references briar_organizations (id) on delete cascade,
-  channel_id text not null references briar_channels (id) on delete cascade,
-  thread_root_message_id text not null
-    references briar_channel_messages (id) on delete cascade,
-  project_id text references briar_projects (id) on delete set null,
-  agent_id text not null
-    references briar_project_agents (id) on delete cascade,
-  provider text not null check (
-    provider in (
-      'codex', 'claude', 'cursor', 'grok', 'agy', 'opencode', 'openrouter'
-    )
-  ),
-  model text,
-  effort text,
-  owner_device_id text
-    references briar_execution_worker_devices (id) on delete set null,
-  owner_worker_id text
-    references briar_execution_workers (id) on delete set null,
-  conversation_id text check (
-    conversation_id is null or length(conversation_id) between 1 and 1024
-  ),
-  last_activity_at text not null,
-  retained_until text not null,
-  created_at text not null,
-  updated_at text not null, owner_worker_label text
-  check (
-    owner_worker_label is null
-    or length(trim(owner_worker_label)) between 1 and 100
-  ), memory_space_id text, memory_revocation_epoch integer,
-  unique (channel_id, thread_root_message_id, agent_id),
-  check (retained_until >= last_activity_at),
-  check (
-    (owner_device_id is null and owner_worker_id is null)
-    or (owner_device_id is not null and owner_worker_id is not null)
-  )
-);
--- @statement
-CREATE TABLE briar_channel_reply_session_events (
-  id text primary key not null,
-  session_id text not null
-    references briar_channel_reply_sessions (id) on delete cascade,
-  reply_job_id text
-    references briar_channel_agent_reply_jobs (id) on delete set null,
-  event_type text not null check (
-    event_type in ('claimed', 'checkpointed', 'ttl_renewed', 'cleaned')
-  ),
-  reason text not null check (length(reason) between 1 and 100),
-  from_worker_id text,
-  to_worker_id text,
-  retained_until text,
-  detail_json text not null default '{}'
-    check (json_valid(detail_json) and json_type(detail_json) = 'object'),
-  occurred_at text not null
-);
--- @statement
 CREATE TABLE briar_execution_worker_lifecycle_events (
   request_id text primary key not null check (
     request_id = trim(request_id) and length(request_id) between 1 and 200
@@ -2556,23 +1211,6 @@ CREATE TABLE briar_execution_worker_lifecycle_events (
   completed_at text
 );
 -- @statement
-CREATE TABLE briar_issue_attachments (
-  id text primary key not null,
-  run_id text not null references briar_hunt_runs (id) on delete cascade,
-  project_id text not null references briar_projects (id) on delete cascade,
-  object_key text not null unique check (
-    object_key = trim(object_key)
-    and length(object_key) between 1 and 500
-  ),
-  filename text not null check (length(trim(filename)) between 1 and 255),
-  content_type text not null check (content_type in (
-    'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif',
-    'image/svg+xml', 'text/html', 'video/mp4', 'video/webm', 'video/quicktime'
-  )),
-  byte_size integer not null check (byte_size between 1 and 20971520),
-  created_at text not null
-);
--- @statement
 CREATE TABLE briar_organization_members (
   organization_id text not null
     references briar_organizations (id) on delete cascade,
@@ -2594,31 +1232,6 @@ CREATE TABLE briar_project_members (
   primary key (project_id, user_id),
   foreign key (project_id, organization_id)
     references briar_projects (id, organization_id) on delete cascade,
-  foreign key (organization_id, user_id)
-    references briar_organization_members (organization_id, user_id)
-    on delete cascade
-);
--- @statement
-CREATE TABLE briar_issue_subscriptions (
-  run_id text not null references briar_hunt_runs (id) on delete cascade,
-  organization_id text not null,
-  user_id text not null,
-  created_at text not null,
-  primary key (run_id, user_id),
-  foreign key (organization_id, user_id)
-    references briar_organization_members (organization_id, user_id)
-    on delete cascade
-);
--- @statement
-CREATE TABLE briar_channel_thread_subscriptions (
-  root_message_id text not null
-    references briar_channel_messages (id) on delete cascade,
-  channel_id text not null
-    references briar_channels (id) on delete cascade,
-  organization_id text not null,
-  user_id text not null,
-  created_at text not null,
-  primary key (root_message_id, user_id),
   foreign key (organization_id, user_id)
     references briar_organization_members (organization_id, user_id)
     on delete cascade
@@ -2783,14 +1396,6 @@ CREATE TABLE briar_planning_projects (
   created_at text not null,
   updated_at text not null,
   unique (id, team_id)
-);
--- @statement
-CREATE TABLE briar_issue_key_aliases (
-  team_id text not null references briar_teams (id) on delete cascade,
-  issue_key text not null check (length(trim(issue_key)) between 3 and 32),
-  run_id text not null references briar_hunt_runs (id) on delete cascade,
-  created_at text not null,
-  primary key (team_id, issue_key)
 );
 -- @statement
 CREATE TABLE briar_agent_skill_execution_realtime_outbox (
@@ -2974,80 +1579,6 @@ CREATE TABLE briar_dm_memory_briefs (
   valid_through text,
   content_json text not null check (length(cast(content_json as blob)) <= 8192),
   created_at text not null
-);
--- @statement
-CREATE TABLE briar_issue_parent_links (
-  project_id text not null references briar_projects (id) on delete cascade,
-  parent_run_id text not null
-    references briar_hunt_runs (id) on delete cascade,
-  child_run_id text not null
-    references briar_hunt_runs (id) on delete cascade,
-  created_by_user_id text references "user" (id) on delete set null,
-  created_at text not null,
-  primary key (child_run_id),
-  check (parent_run_id <> child_run_id)
-);
--- @statement
-CREATE TABLE briar_issue_relations (
-  project_id text not null references briar_projects (id) on delete cascade,
-  first_run_id text not null
-    references briar_hunt_runs (id) on delete cascade,
-  second_run_id text not null
-    references briar_hunt_runs (id) on delete cascade,
-  relation_type text not null default 'related'
-    check (relation_type = 'related'),
-  created_by_user_id text references "user" (id) on delete set null,
-  created_at text not null,
-  primary key (first_run_id, second_run_id),
-  check (first_run_id < second_run_id)
-);
--- @statement
-CREATE TABLE briar_dm_memory_reply_fences (
-  job_id text primary key not null references briar_channel_agent_reply_jobs(id) on delete cascade,
-  claim_token_hash text not null,
-  space_id text not null,
-  revocation_epoch integer not null,
-  protocol integer not null check (protocol in (0, 1)),
-  created_at text not null
-);
--- @statement
-CREATE TABLE briar_channel_reply_lookups (
-  job_id text not null references briar_channel_agent_reply_jobs(id) on delete cascade,
-  claim_token_hash text not null,
-  request_id text not null,
-  kind text not null check (kind in ('memory', 'organization')),
-  request_hash text,
-  query_hashes_json text not null default '[]' check (json_valid(query_hashes_json)),
-  memory_revision integer,
-  revocation_epoch integer,
-  lease_token text not null,
-  lease_expires_at text not null,
-  attempts integer not null default 1,
-  response_json text check (response_json is null or (json_valid(response_json) and length(cast(response_json as blob)) <= 2097152)),
-  created_at text not null,
-  primary key (job_id, claim_token_hash, request_id)
-);
--- @statement
-CREATE TABLE briar_dm_memory_discovered_refs (
-  job_id text not null references briar_channel_agent_reply_jobs(id) on delete cascade,
-  claim_token_hash text not null,
-  document_id text not null references briar_dm_memory_documents(id) on delete cascade,
-  version integer not null,
-  primary key (job_id, claim_token_hash, document_id, version)
-);
--- @statement
-CREATE TABLE briar_dm_memory_activity_revocations (
-  id text not null references briar_channel_agent_reply_jobs(id) on delete cascade,
-  organization_id text not null, channel_id text not null, agent_id text not null,
-  trigger_message_id text not null, parent_message_id text not null,
-  attempts integer not null, primary key (id, attempts)
-);
--- @statement
-CREATE TABLE briar_dm_memory_reply_citations (
-  message_id text not null references briar_channel_messages(id) on delete cascade,
-  document_id text not null references briar_dm_memory_documents(id) on delete cascade,
-  version integer not null,
-  primary key (message_id, document_id, version)
 );
 -- @statement
 CREATE TABLE briar_dm_memory_source_events (
@@ -3303,6 +1834,678 @@ CREATE TABLE briar_upload_cleanup_queue (
   last_error text
 );
 -- @statement
+CREATE TABLE IF NOT EXISTS "account" (
+  "id" text primary key not null,
+  "issuer" text not null,
+  "accountId" text not null,
+  "providerId" text not null,
+  "userId" text not null references "user" ("id") on delete cascade,
+  "accessToken" text,
+  "refreshToken" text,
+  "idToken" text,
+  "accessTokenExpiresAt" text,
+  "refreshTokenExpiresAt" text,
+  "scope" text,
+  "password" text,
+  "createdAt" text not null,
+  "updatedAt" text not null
+);
+-- @statement
+CREATE TABLE briar_production_operation_leases (
+  name text primary key not null,
+  owner text not null,
+  head_sha text not null,
+  acquired_at integer not null,
+  expires_at integer not null,
+  constraint briar_production_operation_leases_name_check
+    check (length(name) between 1 and 80),
+  constraint briar_production_operation_leases_owner_check
+    check (length(owner) between 1 and 80),
+  constraint briar_production_operation_leases_head_sha_check
+    check (head_sha not glob '*[^0-9a-f]*' and length(head_sha) = 40),
+  constraint briar_production_operation_leases_expiry_check
+    check (expires_at > acquired_at)
+) strict;
+-- @statement
+CREATE TABLE briar_agent_skill_execution_approval_audit (
+  id text primary key not null,
+  proposal_id text not null unique,
+  organization_id text not null
+    references briar_organizations (id) on delete cascade,
+  project_id text not null,
+  source_kind text not null check (source_kind in ('channel', 'issue')),
+  channel_id text,
+  conversation_run_id text,
+  trigger_message_id text not null,
+  reply_message_id text not null,
+  source_reply_job_id text not null,
+  delegated_by_reply_job_id text,
+  agent_id text not null,
+  agent_name text not null,
+  agent_responsibility text not null,
+  skill_id text not null,
+  skill_name text not null,
+  skill_instructions text not null,
+  skill_kind text not null check (skill_kind in ('issue_processing', 'custom')),
+  provider text not null
+    check (provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex')),
+  model text,
+  effort text check (
+    effort is null or effort in ('low', 'medium', 'high', 'xhigh', 'max', 'ultra')
+  ),
+  request text not null,
+  worker_id text not null,
+  worker_label text not null,
+  result_session_id text not null unique,
+  approved_by_user_id text references "user" (id) on delete set null,
+  approved_at text not null,
+  delegated_by_agent_id text,
+  delegated_by_agent_name text,
+  created_at text not null
+, execution_mode text not null default 'task'
+  check (execution_mode in ('conversation', 'task')), approval_policy text not null default 'explicit'
+  check (approval_policy in ('invoke_is_consent', 'explicit')), thread_root_message_id text, result_reply_job_id text, result_message_id text);
+-- @statement
+CREATE TABLE briar_agent_skill_execution_proposals (
+  id text primary key not null,
+  organization_id text not null
+    references briar_organizations (id) on delete cascade,
+  project_id text not null references briar_projects (id) on delete cascade,
+  source_kind text not null check (source_kind in ('channel', 'issue')),
+  channel_id text,
+  conversation_run_id text,
+  trigger_message_id text not null,
+  reply_message_id text not null unique,
+  source_reply_job_id text not null,
+  delegated_by_reply_job_id text,
+  agent_id text not null,
+  agent_name text not null check (
+    length(trim(agent_name)) between 1 and 100
+  ),
+  agent_responsibility text not null check (
+    length(trim(agent_responsibility)) between 1 and 20000
+  ),
+  skill_id text not null,
+  skill_name text not null check (
+    length(trim(skill_name)) between 1 and 100
+  ),
+  skill_instructions text not null check (length(skill_instructions) <= 20000),
+  skill_kind text not null check (skill_kind in ('issue_processing', 'custom')),
+  provider text not null
+    check (provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex')),
+  model text check (
+    model is null or length(trim(model)) between 1 and 100
+  ),
+  effort text check (
+    effort is null or effort in ('low', 'medium', 'high', 'xhigh', 'max', 'ultra')
+  ),
+  request text not null check (length(trim(request)) between 1 and 10000),
+  delegated_by_agent_id text,
+  delegated_by_agent_name text check (
+    delegated_by_agent_name is null
+    or length(trim(delegated_by_agent_name)) between 1 and 100
+  ),
+  generation integer not null default 1 check (generation >= 1),
+  status text not null default 'pending'
+    check (status in ('pending', 'accepted', 'invalidated')),
+  requested_worker_id text,
+  requested_worker_label text,
+  result_session_id text unique,
+  accepted_by_user_id text references "user" (id) on delete set null,
+  accepted_at text,
+  created_at text not null,
+  updated_at text not null, execution_mode text not null default 'task'
+  check (execution_mode in ('conversation', 'task')), approval_policy text not null default 'explicit'
+  check (approval_policy in ('invoke_is_consent', 'explicit')), thread_root_message_id text, result_reply_job_id text, result_message_id text, materialized_session_payload_json text,
+  check (
+    (source_kind = 'channel' and channel_id is not null
+      and conversation_run_id is null)
+    or
+    (source_kind = 'issue' and channel_id is null
+      and conversation_run_id is not null)
+  ),
+  check (
+    (status = 'pending' and requested_worker_id is null
+      and requested_worker_label is null and result_session_id is null
+      and accepted_by_user_id is null and accepted_at is null)
+    or
+    (status = 'accepted' and requested_worker_id is not null
+      and requested_worker_label is not null and result_session_id is not null
+      and accepted_at is not null)
+    or status = 'invalidated'
+  )
+);
+-- @statement
+CREATE TABLE IF NOT EXISTS "briar_project_agents" (
+  id text primary key not null,
+  organization_id text not null
+    references briar_organizations (id) on delete cascade,
+
+  project_id text references briar_projects (id) on delete cascade,
+
+  handle text check (
+    handle is null
+    or (
+      length(handle) between 1 and 63
+      and handle not glob '*[^a-z0-9-]*'
+    )
+  ),
+  name text not null check (length(trim(name)) between 1 and 100),
+  provider text not null
+    check (provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex')),
+  model text check (
+    model is null or (model = trim(model) and length(model) between 1 and 100)
+  ),
+  responsibility text not null check (
+    responsibility = trim(responsibility)
+    and length(responsibility) between 1 and 20000
+  ),
+  created_at text not null,
+  updated_at text not null,
+  calendar_color text not null default '#3275d5'
+    check (length(calendar_color) = 7 and substr(calendar_color, 1, 1) = '#'),
+  skill_markdown text not null default '' check (length(skill_markdown) <= 25000),
+  avatar text check (
+    avatar is null or (
+      length(avatar) <= 400000 and (
+        substr(avatar, 1, 22) = 'data:image/png;base64,'
+        or substr(avatar, 1, 23) = 'data:image/jpeg;base64,'
+        or substr(avatar, 1, 23) = 'data:image/webp;base64,'
+      )
+    )
+  ),
+  avatar_pet_json text check (
+    avatar_pet_json is null or (
+      length(avatar_pet_json) <= 4000 and json_valid(avatar_pet_json)
+    )
+  ),
+  avatar_spritesheet_object_key text check (
+    avatar_spritesheet_object_key is null or (
+      length(avatar_spritesheet_object_key) <= 1000
+      and avatar_spritesheet_object_key like 'project-agent-spritesheets/%'
+    )
+  ),
+  effort text check (
+    effort is null or effort in ('low', 'medium', 'high', 'xhigh', 'max', 'ultra')
+  )
+, description text not null default '' check (
+  description = trim(description)
+  and length(description) <= 500
+), designated_worker_id text
+  references briar_execution_workers (id) on delete restrict, designated_worker_label text
+  check (
+    designated_worker_label is null
+    or length(trim(designated_worker_label)) between 1 and 100
+  ), computer_use_policy text not null default 'disabled'
+check (computer_use_policy in ('disabled', 'unattended')));
+-- @statement
+CREATE TABLE briar_agent_skills (
+  id text primary key not null,
+  agent_id text not null
+    references briar_project_agents (id) on delete cascade,
+  name text not null check (
+    name = trim(name) and length(name) between 1 and 100
+  ),
+  body text not null default '' check (length(body) <= 20000),
+  provider text not null
+    check (provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex')),
+  model text check (
+    model is null or (model = trim(model) and length(model) between 1 and 100)
+  ),
+  effort text check (
+    effort is null or effort in ('low', 'medium', 'high', 'xhigh', 'max', 'ultra')
+  ),
+  kind text not null default 'custom'
+    check (kind in ('issue_processing', 'custom')),
+  is_default integer not null default 0 check (is_default in (0, 1)),
+  position integer not null default 0 check (position >= 0),
+  created_at text not null,
+  updated_at text not null
+, description text not null default ''
+  check (length(description) <= 1000), execution_mode text not null
+  default 'task' check (execution_mode in ('conversation', 'task')), approval_policy text not null
+  default 'explicit' check (approval_policy in ('invoke_is_consent', 'explicit')));
+-- @statement
+CREATE TABLE IF NOT EXISTS "briar_hunt_runs" (
+  run_number integer primary key autoincrement,
+  id text not null unique,
+  project_id text not null references briar_projects (id) on delete cascade,
+  source text not null check (source in ('issue', 'error', 'feedback')),
+  source_key text not null check (
+    source_key = trim(source_key) and length(source_key) between 1 and 200
+  ),
+  title text not null check (length(trim(title)) between 1 and 300),
+  stage text not null check (stage in (
+    'queued', 'analyzing', 'implementing', 'pr_open', 'staging_qa',
+    'production_qa', 'completed', 'blocked', 'failed', 'cancelled'
+  )),
+  detail text check (detail is null or length(detail) <= 4000),
+  repository text not null check (length(trim(repository)) between 1 and 500),
+  branch text check (branch is null or length(trim(branch)) between 1 and 500),
+  commit_sha text check (
+    commit_sha is null or (
+      length(commit_sha) between 7 and 64
+      and commit_sha not glob '*[^0-9a-f]*'
+    )
+  ),
+  started_at text not null,
+  completed_at text,
+  last_event_at text not null,
+  created_at text not null,
+  updated_at text not null,
+  priority integer check (priority is null or priority between 1 and 4),
+  tracker_provider text
+    check (tracker_provider is null or length(trim(tracker_provider)) between 1 and 50),
+  tracker_issue_id text
+    check (tracker_issue_id is null or length(trim(tracker_issue_id)) between 1 and 200),
+  tracker_issue_identifier text
+    check (tracker_issue_identifier is null or length(trim(tracker_issue_identifier)) between 1 and 100),
+  tracker_issue_url text
+    check (tracker_issue_url is null or length(trim(tracker_issue_url)) between 1 and 1000),
+  tracker_issue_state text
+    check (tracker_issue_state is null or length(trim(tracker_issue_state)) between 1 and 100),
+  issue_description text
+    check (issue_description is null or length(issue_description) <= 100000),
+  result_summary text
+    check (result_summary is null or length(result_summary) <= 100000),
+  pull_request_urls text not null default '[]'
+    check (json_valid(pull_request_urls) and json_type(pull_request_urls) = 'array'),
+  target_sha text check (
+    target_sha is null or (
+      length(target_sha) between 7 and 64
+      and target_sha not glob '*[^0-9a-f]*'
+    )
+  ),
+  source_created_at text,
+  staging_qa_status text
+    check (staging_qa_status is null or staging_qa_status in ('pending', 'passed', 'skipped')),
+  production_qa_status text
+    check (production_qa_status is null or production_qa_status in ('pending', 'passed', 'skipped')),
+  staging_qa_detail text
+    check (staging_qa_detail is null or length(staging_qa_detail) <= 100000),
+  production_qa_detail text
+    check (production_qa_detail is null or length(production_qa_detail) <= 100000),
+  context_json text check (
+    context_json is null or (
+      json_valid(context_json) and json_type(context_json) = 'object'
+    )
+  ),
+  claim_token_hash text check (
+    claim_token_hash is null or (
+      length(claim_token_hash) = 64
+      and claim_token_hash not glob '*[^0-9a-f]*'
+    )
+  ),
+  claimed_by text
+    check (claimed_by is null or length(trim(claimed_by)) between 1 and 128),
+  claimed_at text,
+  lease_expires_at text,
+  claim_attempts integer not null default 0 check (claim_attempts >= 0),
+  current_attempt integer not null default 1 check (current_attempt >= 1),
+  workflow_stage text,
+  workflow_snapshot_json text not null
+    default '{"version":1,"stages":[{"id":"repository_workflow_pending","label":"Repository workflow pending","required":true}],"completion":{"requiredStages":["repository_workflow_pending"]},"release":{"enabled":false}}'
+    check (
+      json_valid(workflow_snapshot_json)
+      and json_type(workflow_snapshot_json) = 'object'
+    ),
+  worker_id text references briar_execution_workers (id) on delete set null,
+  status text not null default 'queued' check (status in (
+    'backlog', 'queued', 'running', 'blocked', 'failed', 'completed', 'cancelled'
+  )),
+  current_revision integer not null default 1 check (current_revision >= 1),
+  structured_result_json text,
+  agent_id text references briar_project_agents (id) on delete set null,
+  requested_worker_id text
+    references briar_execution_workers (id) on delete set null,
+  requested_by_user_id text references "user" (id) on delete set null,
+  dispatch_mode text check (dispatch_mode in ('any', 'specific')),
+  dispatch_request_id text,
+  dispatched_at text,
+  requested_agent_provider text check (
+    requested_agent_provider is null
+    or requested_agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex')
+  ),
+  preferred_agent_provider text check (
+    preferred_agent_provider is null
+    or preferred_agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex')
+  ),
+  preferred_agent_model text check (
+    preferred_agent_model is null
+    or length(trim(preferred_agent_model)) between 1 and 100
+  ),
+  preferred_agent_effort text check (
+    preferred_agent_effort is null
+    or preferred_agent_effort in ('low', 'medium', 'high', 'xhigh', 'max', 'ultra')
+  ),
+  requested_agent_model text check (
+    requested_agent_model is null
+    or length(trim(requested_agent_model)) between 1 and 100
+  ),
+  requested_agent_effort text check (
+    requested_agent_effort is null
+    or requested_agent_effort in ('low', 'medium', 'high', 'xhigh', 'max', 'ultra')
+  ),
+  event_count integer not null default 0 check (event_count >= 0),
+  execution_metrics_json text, paused_at text, waiting_checkpoint_key text, waiting_checkpoint_revision integer
+  check (waiting_checkpoint_revision is null or waiting_checkpoint_revision >= 1), resume_requested_at text, assignee_user_id text references "user" (id) on delete set null, issue_checkpoints_json text
+  not null default '[]' check (
+    json_valid(issue_checkpoints_json)
+    and json_type(issue_checkpoints_json) = 'array'
+  ), last_execution_id text, created_by_user_id text
+  references "user" (id) on delete set null, planned_update_resume integer not null
+  default 0 check (planned_update_resume in (0, 1)), difficulty text
+  check (difficulty in ('easy', 'normal', 'hard')), team_id text
+  references briar_teams (id) on delete cascade, planning_project_id text
+  references briar_planning_projects (id) on delete restrict, full_auto integer not null default 0
+  check (full_auto in (0, 1)), requires_claim_token integer not null default 0
+  check (requires_claim_token in (0, 1)),
+  unique (project_id, source, source_key),
+  check (
+    (stage in ('completed', 'cancelled') and completed_at is not null)
+    or (stage not in ('completed', 'cancelled') and completed_at is null)
+  )
+);
+-- @statement
+CREATE TABLE IF NOT EXISTS "briar_agent_transcript_sessions" (
+  session_id text primary key not null check (
+    session_id = trim(session_id) and length(session_id) between 1 and 128
+  ),
+  project_id text not null references briar_projects (id) on delete cascade,
+  run_id text references briar_hunt_runs (id) on delete cascade,
+  worker_id text references briar_execution_workers (id) on delete set null,
+  agent_provider text not null
+    check (agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex')),
+  started_at text not null,
+  last_event_at text not null,
+  event_count integer not null default 0 check (event_count >= 0),
+  byte_count integer not null default 0 check (byte_count >= 0)
+);
+-- @statement
+CREATE TABLE briar_agent_transcript_segments (
+  session_id text not null
+    references briar_agent_transcript_sessions (session_id) on delete cascade,
+  first_sequence integer not null check (first_sequence > 0),
+  last_sequence integer not null check (last_sequence >= first_sequence),
+  object_key text not null unique,
+  event_count integer not null check (event_count > 0),
+  uncompressed_bytes integer not null check (uncompressed_bytes > 0),
+  compressed_bytes integer not null check (compressed_bytes > 0),
+  sha256 text not null check (
+    length(sha256) = 64 and sha256 not glob '*[^0-9a-f]*'
+  ),
+  recorded_at text not null,
+  primary key (session_id, first_sequence, last_sequence)
+);
+-- @statement
+CREATE TABLE briar_agent_transcripts (
+  session_id text not null
+    references briar_agent_transcript_sessions (session_id) on delete cascade,
+  sequence integer not null check (sequence > 0),
+  direction text not null check (direction in ('client', 'server')),
+  payload_json text not null check (
+    json_valid(payload_json)
+    and length(payload_json) <= 32768
+  ),
+  recorded_at text not null,
+  primary key (session_id, sequence)
+);
+-- @statement
+CREATE TABLE briar_agent_worklog_entries (
+  session_id text not null
+    references briar_agent_transcript_sessions (session_id) on delete cascade,
+  entry_id text not null check (
+    entry_id = trim(entry_id) and length(entry_id) between 1 and 512
+  ),
+  sequence integer not null check (sequence > 0),
+  updated_sequence integer not null check (updated_sequence >= sequence),
+  entry_type text not null check (entry_type in ('message', 'activity')),
+  activity_kind text check (
+    activity_kind is null
+    or activity_kind in ('command', 'fileChange', 'webSearch', 'tool')
+  ),
+  phase text,
+  title text,
+  body text not null default '',
+  status text not null check (
+    status in (
+      'writing', 'completed', 'failed', 'cancelled', 'interrupted'
+    )
+  ),
+  started_at text not null,
+  updated_at text not null,
+  completed_at text,
+  primary key (session_id, entry_id)
+);
+-- @statement
+CREATE TABLE IF NOT EXISTS "briar_channel_action_proposals" (
+  id text primary key not null,
+  channel_id text not null references briar_channels (id) on delete cascade,
+  project_id text references briar_projects (id) on delete set null,
+  trigger_message_id text not null,
+  reply_message_id text not null unique,
+  action_type text not null check (
+    action_type in ('request_issue_create', 'request_plan_document')
+  ),
+  payload_json text not null check (json_valid(payload_json)),
+  status text not null default 'pending'
+    check (status in ('pending', 'accepted')),
+  accepted_by_user_id text references "user" (id) on delete set null,
+  accepted_at text,
+  result_run_id text references briar_hunt_runs (id) on delete set null,
+  created_at text not null,
+  updated_at text not null, issue_source_key text, execute_after_create integer not null default 0
+    check (execute_after_create in (0, 1)), execution_proposal_id text, declined_by_user_id text, declined_at text,
+  unique (channel_id, trigger_message_id)
+);
+-- @statement
+CREATE TABLE IF NOT EXISTS "briar_channel_messages" (
+  id text primary key not null,
+  channel_id text not null references briar_channels (id) on delete cascade,
+  parent_message_id text
+    references "briar_channel_messages" (id) on delete cascade,
+  author_user_id text references "user" (id) on delete set null,
+  author_agent_id text
+    references briar_project_agents (id) on delete set null,
+  author_agent_name text check (
+    author_agent_name is null
+    or length(trim(author_agent_name)) between 1 and 100
+  ),
+  author_agent_provider text check (
+    author_agent_provider is null
+    or author_agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex')
+  ),
+  author_webhook_id text
+    references briar_channel_webhooks (id) on delete set null,
+  author_webhook_name text check (
+    author_webhook_name is null
+    or length(trim(author_webhook_name)) between 1 and 100
+  ),
+  webhook_event_id text check (
+    webhook_event_id is null
+    or (webhook_event_id = trim(webhook_event_id)
+      and length(webhook_event_id) between 1 and 200)
+  ),
+  body text not null check (
+    body = trim(body) and length(body) between 1 and 10000
+  ),
+  created_at text not null,
+  updated_at text not null, blocks_json text check (
+    blocks_json is null
+    or (json_valid(blocks_json) and length(blocks_json) <= 65536)
+  ), deleted_at text, memory_source_version integer not null default 1,
+  check (parent_message_id is null or parent_message_id <> id),
+  check (
+    author_agent_name is not null
+    or (author_agent_id is null and author_agent_provider is null)
+  ),
+  check (author_webhook_name is not null or author_webhook_id is null),
+  check (
+    (author_user_id is not null)
+    + (author_agent_name is not null)
+    + (author_webhook_name is not null) = 1
+  ),
+  check (
+    (author_webhook_name is null and webhook_event_id is null)
+    or author_webhook_name is not null
+  )
+);
+-- @statement
+CREATE TABLE briar_channel_reply_sessions (
+  id text primary key not null,
+  organization_id text not null
+    references briar_organizations (id) on delete cascade,
+  channel_id text not null references briar_channels (id) on delete cascade,
+  thread_root_message_id text not null
+    references briar_channel_messages (id) on delete cascade,
+  project_id text references briar_projects (id) on delete set null,
+  agent_id text not null
+    references briar_project_agents (id) on delete cascade,
+  provider text not null check (
+    provider in (
+      'codex', 'claude', 'cursor', 'grok', 'agy', 'opencode', 'openrouter', 'vertex'
+    )
+  ),
+  model text,
+  effort text,
+  owner_device_id text
+    references briar_execution_worker_devices (id) on delete set null,
+  owner_worker_id text
+    references briar_execution_workers (id) on delete set null,
+  conversation_id text check (
+    conversation_id is null or length(conversation_id) between 1 and 1024
+  ),
+  last_activity_at text not null,
+  retained_until text not null,
+  created_at text not null,
+  updated_at text not null, owner_worker_label text
+  check (
+    owner_worker_label is null
+    or length(trim(owner_worker_label)) between 1 and 100
+  ), memory_space_id text, memory_revocation_epoch integer,
+  unique (channel_id, thread_root_message_id, agent_id),
+  check (retained_until >= last_activity_at),
+  check (
+    (owner_device_id is null and owner_worker_id is null)
+    or (owner_device_id is not null and owner_worker_id is not null)
+  )
+);
+-- @statement
+CREATE TABLE briar_channel_agent_reply_jobs (
+  id text primary key not null,
+  organization_id text not null
+    references briar_organizations (id) on delete cascade,
+  channel_id text not null references briar_channels (id) on delete cascade,
+  project_id text references briar_projects (id) on delete cascade,
+  agent_id text not null
+    references briar_project_agents (id) on delete cascade,
+  trigger_message_id text not null
+    references briar_channel_messages (id) on delete cascade,
+  parent_message_id text not null
+    references briar_channel_messages (id) on delete cascade,
+  reply_message_id text not null unique,
+  status text not null default 'queued'
+    check (status in ('queued', 'running', 'completed', 'failed')),
+  agent_provider text check (
+    agent_provider is null
+    or agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex')
+  ),
+  claimed_device_id text
+    references briar_execution_worker_devices (id) on delete set null,
+  claim_token_hash text,
+  claimed_at text,
+  lease_expires_at text,
+  attempts integer not null default 0 check (attempts >= 0),
+  error text check (error is null or length(error) <= 4000),
+  created_at text not null,
+  updated_at text not null,
+  completed_at text, skill_id text
+    references briar_agent_skills (id) on delete set null, claimed_worker_id text
+  references briar_execution_workers (id) on delete set null, delegated_by_reply_job_id text
+    references briar_channel_agent_reply_jobs (id) on delete cascade, delegation_request text check (
+    (delegated_by_reply_job_id is null and delegation_request is null)
+    or (
+      delegated_by_reply_job_id is not null
+      and delegation_request is not null
+      and length(delegation_request) between 1 and 10000
+    )
+  ), selected_skill_id_snapshot text check (
+    selected_skill_id_snapshot is null
+    or length(selected_skill_id_snapshot) = 36
+  ), execution_target_ids_json text not null default '[]'
+    check (
+      json_valid(execution_target_ids_json)
+      and json_type(execution_target_ids_json) = 'array'
+    ), selected_agent_name_snapshot text, selected_agent_responsibility_snapshot text, selected_skill_name_snapshot text, selected_skill_instructions_snapshot text, selected_skill_provider_snapshot text, selected_skill_kind_snapshot text, selected_skill_model_snapshot text, selected_skill_effort_snapshot text, skill_execution_request_snapshot text, preferred_device_id text
+  references briar_execution_worker_devices (id) on delete set null, planned_update_resume integer not null
+  default 0 check (planned_update_resume in (0, 1)), session_id text
+  references briar_channel_reply_sessions (id) on delete cascade, approved_skill_execution_proposal_id text, memory_restart_count integer not null default 0,
+  unique (channel_id, trigger_message_id, agent_id)
+);
+-- @statement
+CREATE TABLE briar_channel_agents (
+  channel_id text not null references briar_channels (id) on delete cascade,
+  agent_id text not null
+    references briar_project_agents (id) on delete cascade,
+  added_by_user_id text references "user" (id) on delete set null,
+  created_at text not null,
+  primary key (channel_id, agent_id)
+);
+-- @statement
+CREATE TABLE briar_channel_message_agent_mentions (
+  message_id text not null
+    references briar_channel_messages (id) on delete cascade,
+  agent_id text not null
+    references briar_project_agents (id) on delete cascade,
+  created_at text not null,
+  primary key (message_id, agent_id)
+);
+-- @statement
+CREATE TABLE briar_channel_message_attachments (
+  id text primary key not null,
+  organization_id text not null
+    references briar_organizations (id) on delete cascade,
+  channel_id text not null references briar_channels (id) on delete cascade,
+  message_id text not null
+    references briar_channel_messages (id) on delete cascade,
+  object_key text not null unique check (
+    object_key = trim(object_key)
+    and length(object_key) between 1 and 500
+  ),
+  filename text not null check (length(trim(filename)) between 1 and 255),
+  content_type text not null check (content_type in (
+    'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif',
+    'image/svg+xml', 'text/html', 'application/pdf'
+  )),
+  byte_size integer not null check (byte_size between 1 and 20971520),
+  created_at text not null
+, image_width integer check (
+  image_width is null or (typeof(image_width) = 'integer' and image_width > 0)
+), image_height integer check (
+  image_height is null or (typeof(image_height) = 'integer' and image_height > 0)
+));
+-- @statement
+CREATE TABLE IF NOT EXISTS "briar_channel_message_documents" (
+  message_id text primary key not null
+    references briar_channel_messages (id) on delete cascade,
+  channel_id text not null references briar_channels (id) on delete cascade,
+
+
+  project_id text references briar_projects (id) on delete set null,
+  title text not null check (length(trim(title)) between 1 and 300),
+  markdown text not null check (length(markdown) <= 200000),
+  created_at text not null,
+  updated_at text not null
+);
+-- @statement
+CREATE TABLE briar_channel_message_mentions (
+  message_id text not null
+    references briar_channel_messages (id) on delete cascade,
+  user_id text not null references "user" (id) on delete cascade,
+  created_at text not null,
+  primary key (message_id, user_id)
+);
+-- @statement
 CREATE TABLE briar_channel_message_mutation_receipts (
   message_id text primary key not null
     references briar_channel_messages (id) on delete cascade,
@@ -3317,11 +2520,264 @@ CREATE TABLE briar_channel_message_mutation_receipts (
   created_at text not null
 );
 -- @statement
-CREATE TABLE briar_run_evidence_images (
+CREATE TABLE briar_channel_message_reactions (
+  message_id text not null
+    references briar_channel_messages (id) on delete cascade,
+  user_id text not null references "user" (id) on delete cascade,
+  emoji text not null check (
+    emoji = trim(emoji)
+    and length(emoji) between 1 and 32
+  ),
+  created_at text not null,
+  primary key (message_id, user_id, emoji)
+);
+-- @statement
+CREATE TABLE IF NOT EXISTS "briar_channel_notification_inbox" (
+  user_id text not null references "user" (id) on delete cascade,
+  organization_id text not null,
+  message_id text not null
+    references briar_channel_messages (id) on delete cascade,
+  notification_reason text not null
+    check (notification_reason in ('mention', 'thread_reply', 'subscription')),
+  created_at text not null,
+  primary key (user_id, message_id)
+);
+-- @statement
+CREATE TABLE briar_channel_reply_lookups (
+  job_id text not null references briar_channel_agent_reply_jobs(id) on delete cascade,
+  claim_token_hash text not null,
+  request_id text not null,
+  kind text not null check (kind in ('memory', 'organization')),
+  request_hash text,
+  query_hashes_json text not null default '[]' check (json_valid(query_hashes_json)),
+  memory_revision integer,
+  revocation_epoch integer,
+  lease_token text not null,
+  lease_expires_at text not null,
+  attempts integer not null default 1,
+  response_json text check (response_json is null or (json_valid(response_json) and length(cast(response_json as blob)) <= 2097152)),
+  created_at text not null,
+  primary key (job_id, claim_token_hash, request_id)
+);
+-- @statement
+CREATE TABLE briar_channel_reply_session_events (
+  id text primary key not null,
+  session_id text not null
+    references briar_channel_reply_sessions (id) on delete cascade,
+  reply_job_id text
+    references briar_channel_agent_reply_jobs (id) on delete set null,
+  event_type text not null check (
+    event_type in ('claimed', 'checkpointed', 'ttl_renewed', 'cleaned')
+  ),
+  reason text not null check (length(reason) between 1 and 100),
+  from_worker_id text,
+  to_worker_id text,
+  retained_until text,
+  detail_json text not null default '{}'
+    check (json_valid(detail_json) and json_type(detail_json) = 'object'),
+  occurred_at text not null
+);
+-- @statement
+CREATE TABLE briar_channel_thread_subscriptions (
+  root_message_id text not null
+    references briar_channel_messages (id) on delete cascade,
+  channel_id text not null
+    references briar_channels (id) on delete cascade,
+  organization_id text not null,
+  user_id text not null,
+  created_at text not null,
+  primary key (root_message_id, user_id),
+  foreign key (organization_id, user_id)
+    references briar_organization_members (organization_id, user_id)
+    on delete cascade
+);
+-- @statement
+CREATE TABLE briar_dm_memory_activity_revocations (
+  id text not null references briar_channel_agent_reply_jobs(id) on delete cascade,
+  organization_id text not null, channel_id text not null, agent_id text not null,
+  trigger_message_id text not null, parent_message_id text not null,
+  attempts integer not null, primary key (id, attempts)
+);
+-- @statement
+CREATE TABLE briar_dm_memory_discovered_refs (
+  job_id text not null references briar_channel_agent_reply_jobs(id) on delete cascade,
+  claim_token_hash text not null,
+  document_id text not null references briar_dm_memory_documents(id) on delete cascade,
+  version integer not null,
+  primary key (job_id, claim_token_hash, document_id, version)
+);
+-- @statement
+CREATE TABLE briar_dm_memory_reply_citations (
+  message_id text not null references briar_channel_messages(id) on delete cascade,
+  document_id text not null references briar_dm_memory_documents(id) on delete cascade,
+  version integer not null,
+  primary key (message_id, document_id, version)
+);
+-- @statement
+CREATE TABLE briar_dm_memory_reply_fences (
+  job_id text primary key not null references briar_channel_agent_reply_jobs(id) on delete cascade,
+  claim_token_hash text not null,
+  space_id text not null,
+  revocation_epoch integer not null,
+  protocol integer not null check (protocol in (0, 1)),
+  created_at text not null
+);
+-- @statement
+CREATE TABLE briar_execution_audit_events (
+  id text primary key not null,
+  organization_id text not null
+    references briar_organizations (id) on delete cascade,
+  project_id text not null references briar_projects (id) on delete cascade,
+  run_id text references briar_hunt_runs (id) on delete cascade,
+  worker_id text references briar_execution_workers (id) on delete set null,
+  agent_id text references briar_project_agents (id) on delete set null,
+  actor_user_id text references "user" (id) on delete set null,
+  actor_device_id text
+    references briar_execution_worker_devices (id) on delete set null,
+  action text not null check (
+    action in (
+      'dispatched', 'reassigned', 'claimed', 'lease_lost', 'cancelled',
+      'requeued', 'blocked', 'completed', 'worker_readiness_changed'
+    )
+  ),
+  request_id text,
+  detail_json text not null default '{}' check (
+    json_valid(detail_json) and json_type(detail_json) = 'object'
+  ),
+  occurred_at text not null
+);
+-- @statement
+CREATE TABLE IF NOT EXISTS "briar_hunt_events" (
+  id text primary key not null,
+  run_id text not null references "briar_hunt_runs" (id) on delete cascade,
+  event_key text not null check (
+    event_key = trim(event_key)
+    and length(event_key) between 1 and 300
+  ),
+  stage text not null check (stage in (
+    'queued', 'analyzing', 'implementing', 'pr_open', 'staging_qa',
+    'production_qa', 'completed', 'blocked', 'failed', 'cancelled'
+  )),
+  detail text check (detail is null or length(detail) <= 4000),
+  actor text not null check (length(trim(actor)) between 1 and 128),
+  branch text,
+  commit_sha text check (
+    commit_sha is null or (
+      length(commit_sha) between 7 and 64
+      and commit_sha not glob '*[^0-9a-f]*'
+    )
+  ),
+  occurred_at text not null,
+  recorded_at text not null, qa_status text
+  check (qa_status is null or qa_status in ('pending', 'passed', 'skipped')), tracker_issue_state text
+  check (tracker_issue_state is null or length(trim(tracker_issue_state)) between 1 and 100), pull_request_urls text not null default '[]'
+  check (json_valid(pull_request_urls) and json_type(pull_request_urls) = 'array'), target_sha text
+  check (target_sha is null or (
+    length(target_sha) between 7 and 64
+    and target_sha not glob '*[^0-9a-f]*'
+  )), attempt integer not null default 1
+  check (attempt >= 1), workflow_stage text, status text not null
+  default 'queued'
+  check (status in (
+    'backlog', 'queued', 'running', 'blocked', 'failed', 'completed',
+    'cancelled'
+  )), revision integer not null default 1
+  check (revision >= 1),
+  unique (run_id, event_key)
+);
+-- @statement
+CREATE TABLE briar_issue_action_proposals (
+  id text primary key not null,
+  project_id text not null references briar_projects (id) on delete cascade,
+  conversation_run_id text not null references briar_hunt_runs (id) on delete cascade,
+  trigger_message_id text not null,
+  reply_message_id text not null unique,
+  action_type text not null
+    check (action_type in ('request_issue_update', 'request_issue_create')),
+  payload_json text not null check (json_valid(payload_json)),
+  expected_run_updated_at text,
+  status text not null default 'pending'
+    check (status in ('pending', 'accepted')),
+  accepted_by_user_id text references "user" (id) on delete set null,
+  accepted_at text,
+  result_run_id text references briar_hunt_runs (id) on delete set null,
+  created_at text not null,
+  updated_at text not null, approval_reserved_by_user_id text
+    references "user" (id) on delete set null, approval_reserved_at text, issue_source_key text, execute_after_create integer not null default 0
+    check (execute_after_create in (0, 1)), execution_proposal_id text,
+  unique (project_id, trigger_message_id)
+);
+-- @statement
+CREATE TABLE IF NOT EXISTS "briar_issue_messages" (
   id text primary key not null,
   project_id text not null references briar_projects (id) on delete cascade,
   run_id text not null references briar_hunt_runs (id) on delete cascade,
-  evidence_id text not null references briar_run_evidence (id) on delete cascade,
+  parent_message_id text,
+  author_user_id text references "user" (id) on delete set null,
+  author_agent_provider text check (
+    author_agent_provider is null
+    or author_agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex')
+  ),
+  body text not null check (
+    body = trim(body) and length(body) between 1 and 10000
+  ),
+  created_at text not null,
+  updated_at text not null, author_agent_id text
+  references briar_project_agents (id) on delete set null, author_agent_name text,
+  check (parent_message_id is null or parent_message_id <> id)
+);
+-- @statement
+CREATE TABLE briar_issue_agent_reply_jobs (
+  id text primary key not null,
+  project_id text not null references briar_projects (id) on delete cascade,
+  run_id text not null references briar_hunt_runs (id) on delete cascade,
+  trigger_message_id text not null
+    references briar_issue_messages (id) on delete cascade,
+  parent_message_id text not null
+    references briar_issue_messages (id) on delete cascade,
+  reply_message_id text not null unique,
+  agent_id text references briar_project_agents (id) on delete set null,
+  requires_preferred_worker integer not null default 0
+    check (requires_preferred_worker in (0, 1)),
+  agent_name_snapshot text,
+  agent_responsibility_snapshot text,
+  status text not null default 'queued'
+    check (status in ('queued', 'running', 'completed', 'failed')),
+  preferred_worker_id text
+    references briar_execution_workers (id) on delete set null,
+  claimed_worker_id text
+    references briar_execution_workers (id) on delete set null,
+  preferred_provider text
+    check (preferred_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex')),
+  agent_provider text
+    check (agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex')),
+  claim_token_hash text,
+  claimed_at text,
+  lease_expires_at text,
+  attempts integer not null default 0 check (attempts >= 0),
+  error text,
+  created_at text not null,
+  updated_at text not null,
+  completed_at text,
+  skill_id text references briar_agent_skills (id) on delete set null,
+  selected_skill_id_snapshot text,
+  selected_agent_name_snapshot text,
+  selected_agent_responsibility_snapshot text,
+  selected_skill_name_snapshot text,
+  selected_skill_instructions_snapshot text,
+  selected_skill_provider_snapshot text,
+  selected_skill_kind_snapshot text,
+  selected_skill_model_snapshot text,
+  selected_skill_effort_snapshot text,
+  skill_execution_request_snapshot text, planned_update_resume integer not null
+  default 0 check (planned_update_resume in (0, 1)),
+  unique (project_id, trigger_message_id, agent_id)
+);
+-- @statement
+CREATE TABLE briar_issue_attachments (
+  id text primary key not null,
+  run_id text not null references briar_hunt_runs (id) on delete cascade,
+  project_id text not null references briar_projects (id) on delete cascade,
   object_key text not null unique check (
     object_key = trim(object_key)
     and length(object_key) between 1 and 500
@@ -3329,15 +2785,10 @@ CREATE TABLE briar_run_evidence_images (
   filename text not null check (length(trim(filename)) between 1 and 255),
   content_type text not null check (content_type in (
     'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif',
-    'image/svg+xml'
+    'image/svg+xml', 'text/html', 'video/mp4', 'video/webm', 'video/quicktime'
   )),
   byte_size integer not null check (byte_size between 1 and 20971520),
-  sha256 text not null check (
-    length(sha256) = 64 and sha256 not glob '*[^0-9a-f]*'
-  ),
-  position integer not null check (position between 0 and 4),
-  created_at text not null,
-  unique (evidence_id, position)
+  created_at text not null
 );
 -- @statement
 CREATE TABLE briar_issue_create_mutation_receipts (
@@ -3368,6 +2819,230 @@ CREATE TABLE briar_issue_create_mutation_receipts (
   created_at text not null check (
     length(created_at) between 17 and 64 and created_at = trim(created_at)
   )
+);
+-- @statement
+CREATE TABLE briar_issue_dependencies (
+  project_id text not null references briar_projects (id) on delete cascade,
+  prerequisite_run_id text not null
+    references briar_hunt_runs (id) on delete cascade,
+  dependent_run_id text not null
+    references briar_hunt_runs (id) on delete cascade,
+  created_by_user_id text references "user" (id) on delete set null,
+  created_at text not null,
+  primary key (prerequisite_run_id, dependent_run_id),
+  check (prerequisite_run_id <> dependent_run_id)
+);
+-- @statement
+CREATE TABLE briar_issue_execution_approval_audit (
+  id text primary key not null,
+  proposal_id text not null,
+  organization_id text not null
+    references briar_organizations (id) on delete cascade,
+  project_id text not null,
+  source_kind text not null check (source_kind in ('channel', 'issue')),
+  channel_id text,
+  conversation_run_id text,
+  run_id text not null,
+  generation integer not null,
+  approved_by_user_id text references "user" (id) on delete set null,
+  approved_at text not null,
+  provider text not null
+    check (provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex')),
+  model text,
+  effort text check (
+    effort is null or effort in ('low', 'medium', 'high', 'xhigh', 'max', 'ultra')
+  ),
+  worker_id text,
+  dispatch_request_id text not null unique,
+  proposed_by_agent_id text,
+  delegated_by_agent_id text,
+  created_at text not null
+);
+-- @statement
+CREATE TABLE briar_issue_execution_proposals (
+  id text primary key not null,
+  organization_id text not null
+    references briar_organizations (id) on delete cascade,
+  project_id text not null references briar_projects (id) on delete cascade,
+  source_kind text not null check (source_kind in ('channel', 'issue')),
+  channel_id text references briar_channels (id) on delete set null,
+  conversation_run_id text references briar_hunt_runs (id) on delete set null,
+  trigger_message_id text not null,
+  reply_message_id text not null unique,
+  target_run_id text not null references briar_hunt_runs (id) on delete cascade,
+  target_title text not null check (length(trim(target_title)) between 1 and 300),
+  target_run_updated_at text not null,
+  proposed_by_agent_id text
+    references briar_project_agents (id) on delete set null,
+  delegated_by_agent_id text
+    references briar_project_agents (id) on delete set null,
+  delegated_by_agent_name text
+    check (
+      delegated_by_agent_name is null
+      or length(trim(delegated_by_agent_name)) between 1 and 100
+    ),
+  origin_create_proposal_id text,
+  generation integer not null default 1 check (generation >= 1),
+  status text not null default 'pending'
+    check (status in ('pending', 'accepted', 'invalidated')),
+  approval_reserved_by_user_id text
+    references "user" (id) on delete set null,
+  approval_reserved_at text,
+  requested_provider text check (
+    requested_provider is null
+    or requested_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex')
+  ),
+  requested_model text check (
+    requested_model is null
+    or length(trim(requested_model)) between 1 and 100
+  ),
+  requested_effort text check (
+    requested_effort is null
+    or requested_effort in ('low', 'medium', 'high', 'xhigh', 'max', 'ultra')
+  ),
+  requested_worker_id text
+    references briar_execution_workers (id) on delete set null,
+  dispatch_request_id text unique,
+  accepted_by_user_id text references "user" (id) on delete set null,
+  accepted_at text,
+  created_at text not null,
+  updated_at text not null,
+  check (
+    status = 'invalidated'
+    or (
+      source_kind = 'channel' and channel_id is not null
+      and conversation_run_id is null
+    )
+    or (
+      source_kind = 'issue' and channel_id is null
+      and conversation_run_id is not null
+    )
+  ),
+  check (
+    (approval_reserved_at is null
+      and requested_provider is null
+      and requested_model is null
+      and requested_effort is null
+      and requested_worker_id is null
+      and dispatch_request_id is null)
+    or
+    (approval_reserved_at is not null
+      and requested_provider is not null
+      and dispatch_request_id is not null)
+  )
+);
+-- @statement
+CREATE TABLE briar_issue_key_aliases (
+  team_id text not null references briar_teams (id) on delete cascade,
+  issue_key text not null check (length(trim(issue_key)) between 3 and 32),
+  run_id text not null references briar_hunt_runs (id) on delete cascade,
+  created_at text not null,
+  primary key (team_id, issue_key)
+);
+-- @statement
+CREATE TABLE briar_issue_message_mentions (
+  message_id text not null references briar_issue_messages (id) on delete cascade,
+  user_id text not null references "user" (id) on delete cascade,
+  created_at text not null,
+  primary key (message_id, user_id)
+);
+-- @statement
+CREATE TABLE briar_issue_message_mutation_receipts (
+  message_id text primary key not null
+    references briar_issue_messages (id) on delete cascade check (
+      length(message_id) between 1 and 128
+      and message_id not glob '*[^0-9A-Za-z_-]*'
+    ),
+  organization_id text not null
+    references briar_organizations (id) on delete cascade,
+  project_id text not null references briar_projects (id) on delete cascade,
+  run_id text not null references briar_hunt_runs (id) on delete cascade check (
+    length(run_id) between 1 and 128
+    and run_id not glob '*[^0-9A-Za-z_-]*'
+  ),
+  user_id text not null references "user" (id) on delete cascade,
+  request_hash text not null check (
+    length(request_hash) = 64
+    and request_hash not glob '*[^0-9a-f]*'
+  ),
+  attachment_upload_ids_json text not null check (
+    length(attachment_upload_ids_json) between 2 and 1024
+    and json_valid(attachment_upload_ids_json)
+    and json_type(attachment_upload_ids_json) = 'array'
+    and json_array_length(attachment_upload_ids_json) between 0 and 5
+  ),
+  response_json text not null check (
+    length(response_json) between 2 and 1000000
+    and json_valid(response_json)
+    and json_type(response_json) = 'object'
+  ),
+  created_at text not null check (
+    length(created_at) between 17 and 64 and created_at = trim(created_at)
+  )
+);
+-- @statement
+CREATE TABLE briar_issue_parent_links (
+  project_id text not null references briar_projects (id) on delete cascade,
+  parent_run_id text not null
+    references briar_hunt_runs (id) on delete cascade,
+  child_run_id text not null
+    references briar_hunt_runs (id) on delete cascade,
+  created_by_user_id text references "user" (id) on delete set null,
+  created_at text not null,
+  primary key (child_run_id),
+  check (parent_run_id <> child_run_id)
+);
+-- @statement
+CREATE TABLE briar_issue_relations (
+  project_id text not null references briar_projects (id) on delete cascade,
+  first_run_id text not null
+    references briar_hunt_runs (id) on delete cascade,
+  second_run_id text not null
+    references briar_hunt_runs (id) on delete cascade,
+  relation_type text not null default 'related'
+    check (relation_type = 'related'),
+  created_by_user_id text references "user" (id) on delete set null,
+  created_at text not null,
+  primary key (first_run_id, second_run_id),
+  check (first_run_id < second_run_id)
+);
+-- @statement
+CREATE TABLE briar_issue_result_reviews (
+  run_id text not null references briar_hunt_runs (id) on delete cascade,
+  reviewer_user_id text not null references "user" (id) on delete cascade,
+  completed_at text not null,
+  primary key (run_id, reviewer_user_id)
+);
+-- @statement
+CREATE TABLE briar_issue_rework_proposals (
+  id text primary key not null,
+  project_id text not null references briar_projects (id) on delete cascade,
+  run_id text not null references briar_hunt_runs (id) on delete cascade,
+  trigger_message_id text not null,
+  reply_message_id text not null unique,
+  workflow_stage text not null,
+  reason text not null,
+  expected_attempt integer not null check (expected_attempt > 0),
+  expected_revision integer not null check (expected_revision > 0),
+  status text not null default 'pending'
+    check (status in ('pending', 'accepted')),
+  accepted_by_user_id text references "user" (id) on delete set null,
+  accepted_at text,
+  applied_revision integer check (applied_revision is null or applied_revision > 0),
+  created_at text not null,
+  updated_at text not null,
+  unique (project_id, trigger_message_id)
+);
+-- @statement
+CREATE TABLE briar_issue_subscriptions (
+  run_id text not null references briar_hunt_runs (id) on delete cascade,
+  organization_id text not null,
+  user_id text not null,
+  created_at text not null,
+  primary key (run_id, user_id),
+  foreign key (organization_id, user_id)
+    references briar_organization_members (organization_id, user_id)
+    on delete cascade
 );
 -- @statement
 CREATE TABLE briar_issue_update_mutation_receipts (
@@ -3403,38 +3078,96 @@ CREATE TABLE briar_issue_update_mutation_receipts (
   )
 );
 -- @statement
-CREATE TABLE briar_issue_message_mutation_receipts (
-  message_id text primary key not null
-    references briar_issue_messages (id) on delete cascade check (
-      length(message_id) between 1 and 128
-      and message_id not glob '*[^0-9A-Za-z_-]*'
-    ),
-  organization_id text not null
-    references briar_organizations (id) on delete cascade,
+CREATE TABLE briar_log_archives (
+  id text primary key not null check (
+    length(id) = 64 and id not glob '*[^0-9a-f]*'
+  ),
   project_id text not null references briar_projects (id) on delete cascade,
-  run_id text not null references briar_hunt_runs (id) on delete cascade check (
-    length(run_id) between 1 and 128
-    and run_id not glob '*[^0-9A-Za-z_-]*'
+  run_id text references briar_hunt_runs (id) on delete cascade,
+  scope_id text not null check (
+    scope_id = trim(scope_id) and length(scope_id) between 1 and 128
   ),
-  user_id text not null references "user" (id) on delete cascade,
-  request_hash text not null check (
-    length(request_hash) = 64
-    and request_hash not glob '*[^0-9a-f]*'
+  archive_kind text not null check (archive_kind in (
+    'run_events', 'run_evidence', 'execution_audit',
+    'agent_transcript', 'issue_messages', 'project_agent_sessions'
+  )),
+  object_key text not null unique check (
+    object_key = trim(object_key) and length(object_key) between 1 and 1024
   ),
-  attachment_upload_ids_json text not null check (
-    length(attachment_upload_ids_json) between 2 and 1024
-    and json_valid(attachment_upload_ids_json)
-    and json_type(attachment_upload_ids_json) = 'array'
-    and json_array_length(attachment_upload_ids_json) between 0 and 5
+  format_version integer not null check (format_version = 1),
+  status text not null check (status in ('failed', 'verified', 'complete')),
+  row_count integer not null check (row_count > 0),
+  byte_size integer not null check (byte_size >= 0),
+  sha256 text not null check (
+    length(sha256) = 64 and sha256 not glob '*[^0-9a-f]*'
   ),
-  response_json text not null check (
-    length(response_json) between 2 and 1000000
-    and json_valid(response_json)
-    and json_type(response_json) = 'object'
+  content_sha256 text not null check (
+    length(content_sha256) = 64 and content_sha256 not glob '*[^0-9a-f]*'
   ),
-  created_at text not null check (
-    length(created_at) between 17 and 64 and created_at = trim(created_at)
+  period_start text not null,
+  period_end text not null,
+  created_at text not null,
+  verified_at text,
+  completed_at text,
+  expires_at text not null,
+  failure_count integer not null default 0 check (failure_count >= 0),
+  last_error text,
+  related_object_keys_json text not null default '[]' check (
+    json_valid(related_object_keys_json)
+    and json_type(related_object_keys_json) = 'array'
   )
+);
+-- @statement
+CREATE TABLE briar_merge_batch_candidates (
+  id text primary key not null,
+  project_id text not null references briar_projects (id) on delete cascade,
+  batch_id text references briar_merge_batches (id) on delete cascade,
+  run_id text not null references briar_hunt_runs (id) on delete cascade,
+  attempt integer not null check (attempt >= 1),
+  revision integer not null check (revision >= 1),
+  repository_id integer not null check (repository_id > 0),
+  repository text not null check (
+    repository = lower(trim(repository)) and length(repository) between 3 and 300
+  ),
+  base_branch text not null check (base_branch = 'main'),
+  pull_request_id integer not null check (pull_request_id > 0),
+  pull_request_node_id text not null check (
+    length(trim(pull_request_node_id)) between 1 and 200
+  ),
+  pull_request_number integer not null check (pull_request_number > 0),
+  pull_request_url text not null check (
+    pull_request_url = trim(pull_request_url) and pull_request_url like 'https://%'
+  ),
+  frozen_head_sha text not null check (
+    length(frozen_head_sha) = 40
+    and frozen_head_sha not glob '*[^0-9a-f]*'
+  ),
+  frozen_base_sha text not null check (
+    length(frozen_base_sha) = 40
+    and frozen_base_sha not glob '*[^0-9a-f]*'
+  ),
+  priority integer check (priority between 1 and 4),
+  ready_at text not null,
+  ordinal integer check (ordinal is null or ordinal between 1 and 5),
+  state text not null default 'ready' check (state in (
+    'ready', 'frozen', 'enqueued', 'merged', 'dequeued', 'failed'
+  )),
+  queue_entry_id text,
+  enqueued_at text,
+
+
+  merged_delivery_id text,
+  merged_at text,
+  failure_code text,
+  failure_detail text,
+  created_at text not null,
+  updated_at text not null,
+  unique (
+    run_id, attempt, revision, repository_id, pull_request_number
+  ),
+  unique (batch_id, ordinal),
+  unique (batch_id, repository_id, pull_request_number),
+  unique (queue_entry_id)
 );
 -- @statement
 CREATE TABLE briar_project_agent_schedules (
@@ -3496,6 +3229,247 @@ CREATE TABLE briar_project_agent_schedule_runs (
   unique (schedule_id, scheduled_for)
 );
 -- @statement
+CREATE TABLE briar_project_agent_task_jobs (
+  id text primary key not null,
+  project_id text not null references briar_projects (id) on delete cascade,
+  agent_id text not null references briar_project_agents (id) on delete cascade,
+  request text not null,
+  request_id text not null,
+  status text not null default 'queued'
+    check (status in ('queued', 'running', 'completed', 'failed')),
+  preferred_worker_id text not null
+    references briar_execution_workers (id) on delete cascade,
+  claimed_worker_id text
+    references briar_execution_workers (id) on delete set null,
+  claim_token_hash text,
+  claimed_at text,
+  lease_expires_at text,
+  attempts integer not null default 0 check (attempts >= 0),
+  error text,
+  created_at text not null,
+  updated_at text not null,
+  completed_at text, skill_id text
+    references briar_agent_skills (id) on delete set null, skill_execution_proposal_id text, result_summary text, result_conversation_id text, planned_update_resume integer not null
+  default 0 check (planned_update_resume in (0, 1)), cancel_requested_at text, cancelled_by_user_id text, resume_count integer not null default 0 check (resume_count >= 0),
+  unique (project_id, request_id)
+);
+-- @statement
+CREATE TABLE briar_run_checkpoint_progress (
+  run_id text not null references briar_hunt_runs(id) on delete cascade,
+  attempt integer not null check (attempt >= 1),
+  revision integer not null check (revision >= 1),
+  checkpoint_key text not null check (
+    length(checkpoint_key) between 1 and 64
+    and substr(checkpoint_key, 1, 1) glob '[a-z]'
+    and checkpoint_key not glob '*[^a-z0-9_-]*'
+  ),
+  stage_id text not null check (
+    length(stage_id) between 1 and 64
+    and substr(stage_id, 1, 1) glob '[a-z]'
+    and stage_id not glob '*[^a-z0-9_-]*'
+  ),
+  position text not null check (position in ('before', 'after')),
+  state text not null check (state in ('pending', 'waiting', 'approved', 'invalidated')),
+  reached_at text,
+  approved_at text,
+  approved_by text,
+  approved_request_id text,
+  primary key (run_id, attempt, revision, checkpoint_key),
+  check (
+    (state = 'pending'
+      and reached_at is null
+      and approved_at is null
+      and approved_by is null
+      and approved_request_id is null)
+    or (state = 'waiting'
+      and reached_at is not null
+      and approved_at is null
+      and approved_by is null
+      and approved_request_id is null)
+    or (state = 'approved'
+      and reached_at is not null
+      and approved_at is not null
+      and approved_by is not null
+      and approved_request_id is not null)
+    or (state = 'invalidated')
+  )
+);
+-- @statement
+CREATE TABLE briar_run_execution_attempts (
+  id text primary key not null check (
+    length(id) = 36
+    and substr(id, 9, 1) = '-'
+    and substr(id, 14, 1) = '-'
+    and substr(id, 19, 1) = '-'
+    and substr(id, 24, 1) = '-'
+  ),
+  organization_id text not null
+    references briar_organizations (id) on delete cascade,
+
+
+  project_id text not null,
+  run_id text not null
+    references briar_hunt_runs (id) on delete cascade,
+  run_attempt integer not null check (run_attempt > 0),
+  claim_attempt integer not null check (claim_attempt > 0),
+  worker_id text,
+  claimed_by text,
+  claimed_at text not null,
+  recorded_at text not null
+);
+-- @statement
+CREATE TABLE briar_run_cost_records (
+  execution_id text not null
+    references briar_run_execution_attempts (id) on delete cascade,
+  cost_key text not null check (length(trim(cost_key)) between 1 and 512),
+  usage_key text check (
+    usage_key is null or length(trim(usage_key)) between 1 and 512
+  ),
+  session_id text check (
+    session_id is null or length(trim(session_id)) between 1 and 512
+  ),
+  turn_id text check (
+    turn_id is null or length(trim(turn_id)) between 1 and 512
+  ),
+  scope_id text check (
+    scope_id is null or length(trim(scope_id)) between 1 and 512
+  ),
+  agent_provider text not null check (
+    agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex')
+  ),
+  model_provider text check (
+    model_provider is null or length(trim(model_provider)) between 1 and 256
+  ),
+  model text check (
+    model is null or length(trim(model)) between 1 and 512
+  ),
+  canonical_model text check (
+    canonical_model is null or length(trim(canonical_model)) between 1 and 512
+  ),
+  model_source text not null check (
+    model_source in (
+      'providerReported', 'providerConfig', 'configuredFallback', 'unknown'
+    )
+  ),
+  source text not null check (length(trim(source)) between 1 and 128),
+  amount_usd_ticks integer not null check (
+    typeof(amount_usd_ticks) = 'integer'
+    and amount_usd_ticks >= 0
+    and amount_usd_ticks <= 9007199254740991
+  ),
+  observed_at text not null,
+  recorded_at text not null,
+  primary key (execution_id, cost_key)
+);
+-- @statement
+CREATE TABLE briar_run_evidence (
+  id text primary key,
+  project_id text not null references briar_projects(id) on delete cascade,
+  run_id text not null references briar_hunt_runs(id) on delete cascade,
+  attempt integer not null,
+  evidence_key text not null,
+  workflow_stage text not null,
+  evidence_type text not null,
+  status text not null check (status in ('pending', 'passed', 'failed', 'skipped')),
+  detail text,
+  command text,
+  url text,
+  metadata_json text check (
+    metadata_json is null or (
+      json_valid(metadata_json) and json_type(metadata_json) = 'object'
+    )
+  ),
+  actor text not null,
+  observed_at text not null,
+  recorded_at text not null, revision integer not null default 1
+  check (revision >= 1), github_association_started_at text, image_upload_ids_json text not null default '[]'
+  check (
+    json_valid(image_upload_ids_json)
+    and json_type(image_upload_ids_json) = 'array'
+  ),
+  unique (run_id, attempt, evidence_key)
+);
+-- @statement
+CREATE TABLE briar_run_evidence_images (
+  id text primary key not null,
+  project_id text not null references briar_projects (id) on delete cascade,
+  run_id text not null references briar_hunt_runs (id) on delete cascade,
+  evidence_id text not null references briar_run_evidence (id) on delete cascade,
+  object_key text not null unique check (
+    object_key = trim(object_key)
+    and length(object_key) between 1 and 500
+  ),
+  filename text not null check (length(trim(filename)) between 1 and 255),
+  content_type text not null check (content_type in (
+    'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif',
+    'image/svg+xml'
+  )),
+  byte_size integer not null check (byte_size between 1 and 20971520),
+  sha256 text not null check (
+    length(sha256) = 64 and sha256 not glob '*[^0-9a-f]*'
+  ),
+  position integer not null check (position between 0 and 4),
+  created_at text not null,
+  unique (evidence_id, position)
+);
+-- @statement
+CREATE TABLE briar_run_pull_requests (
+  project_id text not null
+    references briar_projects (id) on delete cascade,
+  run_id text not null
+    references briar_hunt_runs (id) on delete cascade,
+  attempt integer not null check (attempt >= 1),
+  revision integer not null check (revision >= 1),
+  revision_started_at text not null,
+  url text not null check (
+    url = trim(url)
+    and length(url) between 1 and 1000
+    and url like 'https://%'
+  ),
+  installation_id integer check (installation_id is null or installation_id > 0),
+  repository_id integer not null check (repository_id > 0),
+  repository text not null check (
+    repository = lower(trim(repository))
+    and length(repository) between 3 and 300
+  ),
+  pull_request_id integer not null check (pull_request_id > 0),
+  pull_request_node_id text not null check (
+    length(trim(pull_request_node_id)) between 1 and 200
+  ),
+  pull_request_number integer not null check (pull_request_number > 0),
+  state text not null default 'unknown'
+    check (state in ('unknown', 'open', 'closed', 'merged')),
+  draft integer check (draft is null or draft in (0, 1)),
+  head_sha text check (
+    head_sha is null or (
+      length(head_sha) between 7 and 64
+      and head_sha not glob '*[^0-9a-f]*'
+    )
+  ),
+  base_sha text check (
+    base_sha is null or (
+      length(base_sha) between 7 and 64
+      and base_sha not glob '*[^0-9a-f]*'
+    )
+  ),
+  merge_commit_sha text check (
+    merge_commit_sha is null or (
+      length(merge_commit_sha) between 7 and 64
+      and merge_commit_sha not glob '*[^0-9a-f]*'
+    )
+  ),
+  opened_at text,
+  closed_at text,
+  merged_at text,
+  provider_updated_at text,
+  last_delivery_id text,
+  created_at text not null,
+  updated_at text not null, base_branch text,
+  primary key (
+    run_id, attempt, revision, repository_id, pull_request_number
+  )
+);
+-- @statement
 CREATE TABLE briar_run_evidence_pull_requests (
   evidence_id text primary key not null
     references briar_run_evidence (id) on delete cascade,
@@ -3517,62 +3491,88 @@ CREATE TABLE briar_run_evidence_pull_requests (
   ) on delete cascade
 );
 -- @statement
-CREATE TABLE briar_channel_message_attachments (
-  id text primary key not null,
-  organization_id text not null
-    references briar_organizations (id) on delete cascade,
-  channel_id text not null references briar_channels (id) on delete cascade,
-  message_id text not null
-    references briar_channel_messages (id) on delete cascade,
-  object_key text not null unique check (
-    object_key = trim(object_key)
-    and length(object_key) between 1 and 500
+CREATE TABLE briar_run_stage_progress (
+  run_id text not null references briar_hunt_runs(id) on delete cascade,
+  attempt integer not null check (attempt >= 1),
+  revision integer not null check (revision >= 1),
+  stage_id text not null check (
+    length(stage_id) between 1 and 64
+    and substr(stage_id, 1, 1) glob '[a-z]'
+    and stage_id not glob '*[^a-z0-9_-]*'
   ),
-  filename text not null check (length(trim(filename)) between 1 and 255),
-  content_type text not null check (content_type in (
-    'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif',
-    'image/svg+xml', 'text/html', 'application/pdf'
-  )),
-  byte_size integer not null check (byte_size between 1 and 20971520),
-  created_at text not null
-, image_width integer check (
-  image_width is null or (typeof(image_width) = 'integer' and image_width > 0)
-), image_height integer check (
-  image_height is null or (typeof(image_height) = 'integer' and image_height > 0)
-));
--- @statement
-CREATE TABLE IF NOT EXISTS "account" (
-  "id" text primary key not null,
-  "issuer" text not null,
-  "accountId" text not null,
-  "providerId" text not null,
-  "userId" text not null references "user" ("id") on delete cascade,
-  "accessToken" text,
-  "refreshToken" text,
-  "idToken" text,
-  "accessTokenExpiresAt" text,
-  "refreshTokenExpiresAt" text,
-  "scope" text,
-  "password" text,
-  "createdAt" text not null,
-  "updatedAt" text not null
+  state text not null check (state in ('pending', 'running', 'completed', 'skipped')),
+  started_at text,
+  finished_at text,
+  primary key (run_id, attempt, revision, stage_id),
+  check (
+    (state = 'pending' and started_at is null and finished_at is null)
+    or (state = 'running' and started_at is not null and finished_at is null)
+    or (state = 'completed' and started_at is not null and finished_at is not null)
+    or (state = 'skipped' and finished_at is not null)
+  )
 );
 -- @statement
-CREATE TABLE briar_production_operation_leases (
-  name text primary key not null,
-  owner text not null,
-  head_sha text not null,
-  acquired_at integer not null,
-  expires_at integer not null,
-  constraint briar_production_operation_leases_name_check
-    check (length(name) between 1 and 80),
-  constraint briar_production_operation_leases_owner_check
-    check (length(owner) between 1 and 80),
-  constraint briar_production_operation_leases_head_sha_check
-    check (head_sha not glob '*[^0-9a-f]*' and length(head_sha) = 40),
-  constraint briar_production_operation_leases_expiry_check
-    check (expires_at > acquired_at)
-) strict;
+CREATE TABLE briar_run_stage_revisions (
+  run_id text not null references briar_hunt_runs(id) on delete cascade,
+  attempt integer not null check (attempt >= 1),
+  workflow_stage text not null,
+  required_revision integer not null check (required_revision >= 1),
+  primary key (run_id, attempt, workflow_stage)
+);
+-- @statement
+CREATE TABLE briar_run_usage_records (
+  execution_id text not null
+    references briar_run_execution_attempts (id) on delete cascade,
+  usage_key text not null check (length(trim(usage_key)) between 1 and 512),
+  session_id text,
+  turn_id text,
+  scope_id text,
+  agent_provider text not null check (
+    agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex')
+  ),
+  model_provider text,
+  model text,
+  canonical_model text,
+  model_source text not null check (
+    model_source in (
+      'providerReported', 'providerConfig', 'configuredFallback', 'unknown'
+    )
+  ),
+  source text not null check (length(trim(source)) between 1 and 128),
+  uncached_input_tokens integer check (
+    uncached_input_tokens is null or uncached_input_tokens >= 0
+  ),
+  cache_read_tokens integer check (
+    cache_read_tokens is null or cache_read_tokens >= 0
+  ),
+  cache_write_tokens integer check (
+    cache_write_tokens is null or cache_write_tokens >= 0
+  ),
+  output_tokens integer check (output_tokens is null or output_tokens >= 0),
+  reasoning_output_tokens integer check (
+    reasoning_output_tokens is null or reasoning_output_tokens >= 0
+  ),
+  total_tokens integer check (total_tokens is null or total_tokens >= 0),
+  observed_at text not null,
+  recorded_at text not null,
+  check (
+    uncached_input_tokens is not null
+    or cache_read_tokens is not null
+    or cache_write_tokens is not null
+    or output_tokens is not null
+    or reasoning_output_tokens is not null
+    or total_tokens is not null
+  ),
+  check (
+    reasoning_output_tokens is null
+    or (
+      output_tokens is not null
+      and reasoning_output_tokens <= output_tokens
+    )
+  ),
+
+  primary key (execution_id, usage_key)
+);
 -- @statement
 INSERT INTO "briar_managed_computer_campaigns" ("id","code_key","name","active","created_at","updated_at") VALUES('getbriar-pilot','getbriar-pilot','GETBRIAR managed computer pilot',1,'2026-08-21T00:00:00.000Z','2026-08-21T00:00:00.000Z');
 -- @statement
@@ -3745,84 +3745,6 @@ CREATE VIEW briar_workflow_checkpoint_storage_validation as
 select cast(null as text) as owner, cast(null as text) as checkpoints_json
 where 0;
 -- @statement
-CREATE VIEW briar_execution_worker_healthy_providers as
-select worker.id as worker_id,
-       case json_extract(health.value, '$.provider')
-         when 'AGENT_PROVIDER_CODEX' then 'codex'
-         when 'AGENT_PROVIDER_CLAUDE' then 'claude'
-         when 'AGENT_PROVIDER_CURSOR' then 'cursor'
-         when 'AGENT_PROVIDER_GROK' then 'grok'
-         when 'AGENT_PROVIDER_AGY' then 'agy'
-         when 'AGENT_PROVIDER_OPENCODE' then 'opencode'
-         when 'AGENT_PROVIDER_OPENROUTER' then 'openrouter'
-       end as provider,
-       case json_extract(worker.runtime_proto_json, '$.agentProvider')
-         when 'AGENT_PROVIDER_CODEX' then 'codex'
-         when 'AGENT_PROVIDER_CLAUDE' then 'claude'
-         when 'AGENT_PROVIDER_CURSOR' then 'cursor'
-         when 'AGENT_PROVIDER_GROK' then 'grok'
-         when 'AGENT_PROVIDER_AGY' then 'agy'
-         when 'AGENT_PROVIDER_OPENCODE' then 'opencode'
-         when 'AGENT_PROVIDER_OPENROUTER' then 'openrouter'
-       end as agent_provider
-from briar_execution_workers worker,
-     json_each(worker.runtime_proto_json, '$.providerHealth') health
-where json_extract(health.value, '$.healthy') = 1
-  and json_extract(health.value, '$.provider') in (
-    'AGENT_PROVIDER_CODEX', 'AGENT_PROVIDER_CLAUDE',
-    'AGENT_PROVIDER_CURSOR', 'AGENT_PROVIDER_GROK', 'AGENT_PROVIDER_AGY',
-    'AGENT_PROVIDER_OPENCODE', 'AGENT_PROVIDER_OPENROUTER'
-  );
--- @statement
-CREATE VIEW briar_invalid_execution_worker_runtime as
-select worker.id
-from briar_execution_workers worker
-where not (
-  json_valid(worker.runtime_proto_json)
-  and json_type(worker.runtime_proto_json) = 'object'
-  and length(cast(worker.runtime_proto_json as blob)) <= 1048576
-  and json_extract(worker.runtime_proto_json, '$.agentProvider') in (
-    'AGENT_PROVIDER_CODEX', 'AGENT_PROVIDER_CLAUDE',
-    'AGENT_PROVIDER_CURSOR', 'AGENT_PROVIDER_GROK', 'AGENT_PROVIDER_AGY',
-    'AGENT_PROVIDER_OPENCODE', 'AGENT_PROVIDER_OPENROUTER'
-  )
-  and json_type(worker.runtime_proto_json, '$.providerHealth') = 'array'
-  and json_array_length(worker.runtime_proto_json, '$.providerHealth') = 7
-  and (
-    select count(distinct json_extract(health.value, '$.provider'))
-    from json_each(worker.runtime_proto_json, '$.providerHealth') health
-    where health.type = 'object'
-      and json_extract(health.value, '$.provider') in (
-        'AGENT_PROVIDER_CODEX', 'AGENT_PROVIDER_CLAUDE',
-        'AGENT_PROVIDER_CURSOR', 'AGENT_PROVIDER_GROK', 'AGENT_PROVIDER_AGY',
-        'AGENT_PROVIDER_OPENCODE', 'AGENT_PROVIDER_OPENROUTER'
-      )
-  ) = 7
-  and json_type(worker.runtime_proto_json, '$.capabilities') = 'object'
-  and json_type(
-    worker.runtime_proto_json, '$.capabilities.providerCapabilities'
-  ) = 'array'
-  and json_array_length(
-    worker.runtime_proto_json, '$.capabilities.providerCapabilities'
-  ) = 7
-  and (
-    select count(distinct json_extract(capability.value, '$.provider'))
-    from json_each(
-      worker.runtime_proto_json, '$.capabilities.providerCapabilities'
-    ) capability
-    where capability.type = 'object'
-      and json_extract(capability.value, '$.provider') in (
-        'AGENT_PROVIDER_CODEX', 'AGENT_PROVIDER_CLAUDE',
-        'AGENT_PROVIDER_CURSOR', 'AGENT_PROVIDER_GROK', 'AGENT_PROVIDER_AGY',
-        'AGENT_PROVIDER_OPENCODE', 'AGENT_PROVIDER_OPENROUTER'
-      )
-  ) = 7
-  and (
-    json_type(worker.runtime_proto_json, '$.versions') is null
-    or json_type(worker.runtime_proto_json, '$.versions') = 'object'
-  )
-);
--- @statement
 CREATE VIEW briar_invalid_project_agent_session_payload as
 select session.project_id, session.id
 from briar_project_agent_sessions session
@@ -3879,6 +3801,86 @@ where case
       1
     )
 end;
+-- @statement
+CREATE VIEW briar_execution_worker_healthy_providers as
+select worker.id as worker_id,
+       case json_extract(health.value, '$.provider')
+         when 'AGENT_PROVIDER_CODEX' then 'codex'
+         when 'AGENT_PROVIDER_CLAUDE' then 'claude'
+         when 'AGENT_PROVIDER_CURSOR' then 'cursor'
+         when 'AGENT_PROVIDER_GROK' then 'grok'
+         when 'AGENT_PROVIDER_AGY' then 'agy'
+         when 'AGENT_PROVIDER_OPENCODE' then 'opencode'
+         when 'AGENT_PROVIDER_OPENROUTER' then 'openrouter'
+         when 'AGENT_PROVIDER_VERTEX' then 'vertex'
+       end as provider,
+       case json_extract(worker.runtime_proto_json, '$.agentProvider')
+         when 'AGENT_PROVIDER_CODEX' then 'codex'
+         when 'AGENT_PROVIDER_CLAUDE' then 'claude'
+         when 'AGENT_PROVIDER_CURSOR' then 'cursor'
+         when 'AGENT_PROVIDER_GROK' then 'grok'
+         when 'AGENT_PROVIDER_AGY' then 'agy'
+         when 'AGENT_PROVIDER_OPENCODE' then 'opencode'
+         when 'AGENT_PROVIDER_OPENROUTER' then 'openrouter'
+         when 'AGENT_PROVIDER_VERTEX' then 'vertex'
+       end as agent_provider
+from briar_execution_workers worker,
+     json_each(worker.runtime_proto_json, '$.providerHealth') health
+where json_extract(health.value, '$.healthy') = 1
+  and json_extract(health.value, '$.provider') in (
+    'AGENT_PROVIDER_CODEX', 'AGENT_PROVIDER_CLAUDE',
+    'AGENT_PROVIDER_CURSOR', 'AGENT_PROVIDER_GROK', 'AGENT_PROVIDER_AGY',
+    'AGENT_PROVIDER_OPENCODE', 'AGENT_PROVIDER_OPENROUTER', 'AGENT_PROVIDER_VERTEX'
+  );
+-- @statement
+CREATE VIEW briar_invalid_execution_worker_runtime as
+select worker.id
+from briar_execution_workers worker
+where not (
+  json_valid(worker.runtime_proto_json)
+  and json_type(worker.runtime_proto_json) = 'object'
+  and length(cast(worker.runtime_proto_json as blob)) <= 1048576
+  and json_extract(worker.runtime_proto_json, '$.agentProvider') in (
+    'AGENT_PROVIDER_CODEX', 'AGENT_PROVIDER_CLAUDE',
+    'AGENT_PROVIDER_CURSOR', 'AGENT_PROVIDER_GROK', 'AGENT_PROVIDER_AGY',
+    'AGENT_PROVIDER_OPENCODE', 'AGENT_PROVIDER_OPENROUTER', 'AGENT_PROVIDER_VERTEX'
+  )
+  and json_type(worker.runtime_proto_json, '$.providerHealth') = 'array'
+  and json_array_length(worker.runtime_proto_json, '$.providerHealth') = 8
+  and (
+    select count(distinct json_extract(health.value, '$.provider'))
+    from json_each(worker.runtime_proto_json, '$.providerHealth') health
+    where health.type = 'object'
+      and json_extract(health.value, '$.provider') in (
+        'AGENT_PROVIDER_CODEX', 'AGENT_PROVIDER_CLAUDE',
+        'AGENT_PROVIDER_CURSOR', 'AGENT_PROVIDER_GROK', 'AGENT_PROVIDER_AGY',
+        'AGENT_PROVIDER_OPENCODE', 'AGENT_PROVIDER_OPENROUTER', 'AGENT_PROVIDER_VERTEX'
+      )
+  ) = 8
+  and json_type(worker.runtime_proto_json, '$.capabilities') = 'object'
+  and json_type(
+    worker.runtime_proto_json, '$.capabilities.providerCapabilities'
+  ) = 'array'
+  and json_array_length(
+    worker.runtime_proto_json, '$.capabilities.providerCapabilities'
+  ) = 8
+  and (
+    select count(distinct json_extract(capability.value, '$.provider'))
+    from json_each(
+      worker.runtime_proto_json, '$.capabilities.providerCapabilities'
+    ) capability
+    where capability.type = 'object'
+      and json_extract(capability.value, '$.provider') in (
+        'AGENT_PROVIDER_CODEX', 'AGENT_PROVIDER_CLAUDE',
+        'AGENT_PROVIDER_CURSOR', 'AGENT_PROVIDER_GROK', 'AGENT_PROVIDER_AGY',
+        'AGENT_PROVIDER_OPENCODE', 'AGENT_PROVIDER_OPENROUTER', 'AGENT_PROVIDER_VERTEX'
+      )
+  ) = 8
+  and (
+    json_type(worker.runtime_proto_json, '$.versions') is null
+    or json_type(worker.runtime_proto_json, '$.versions') = 'object'
+  )
+);
 -- @statement
 CREATE INDEX "session_userId_idx" on "session" ("userId");
 -- @statement
@@ -4025,6 +4027,278 @@ CREATE INDEX briar_channel_webhooks_channel_idx
 CREATE INDEX briar_channel_read_states_channel_idx
   on briar_channel_read_states (channel_id);
 -- @statement
+CREATE INDEX briar_project_execution_worker_allowlist_worker_idx
+  on briar_project_execution_worker_allowlist (worker_id, project_id);
+-- @statement
+CREATE INDEX briar_execution_workers_project_idx
+  on briar_execution_workers (project_id, last_heartbeat_at desc);
+-- @statement
+CREATE UNIQUE INDEX briar_execution_workers_project_device_idx
+  on briar_execution_workers (project_id, device_id);
+-- @statement
+CREATE INDEX briar_execution_workers_device_idx
+  on briar_execution_workers (device_id, project_id);
+-- @statement
+CREATE UNIQUE INDEX verification_sign_in_otp_unique_idx
+  on verification (identifier)
+  where identifier like 'sign-in-otp-%';
+-- @statement
+CREATE INDEX briar_auth_email_rate_limits_updated_idx
+  on briar_auth_email_rate_limits (updated_at);
+-- @statement
+CREATE INDEX briar_project_agent_session_summaries_requester_recent_idx
+  on briar_project_agent_session_summaries (
+    project_id,
+    json_extract(summary_json, '$.requestedByUserId'),
+    updated_at desc,
+    session_id
+  );
+-- @statement
+CREATE INDEX briar_execution_worker_update_handoffs_device_idx
+  on briar_execution_worker_update_handoffs (device_id, updated_at desc);
+-- @statement
+CREATE INDEX briar_execution_worker_update_handoffs_work_idx
+  on briar_execution_worker_update_handoffs (work_type, work_id, updated_at desc);
+-- @statement
+CREATE UNIQUE INDEX briar_merge_queue_profiles_enabled_lane_idx
+  on briar_merge_queue_profiles (repository_id, base_branch)
+  where enabled = 1;
+-- @statement
+CREATE UNIQUE INDEX briar_merge_batches_active_lane_idx
+  on briar_merge_batches (repository_id, base_branch)
+  where state in (
+    'collecting', 'frozen', 'enqueueing', 'waiting_tail', 'validating',
+    'publishing', 'awaiting_merge', 'blocked', 'draining'
+  );
+-- @statement
+CREATE INDEX briar_merge_batches_claim_idx
+  on briar_merge_batches (project_id, state, quiet_until, lease_expires_at);
+-- @statement
+CREATE INDEX briar_merge_queue_pull_request_observations_identity_idx
+  on briar_merge_queue_pull_request_observations (
+    repository_id, pull_request_number, received_at
+  );
+-- @statement
+CREATE UNIQUE INDEX briar_merge_group_heads_selected_batch_idx
+  on briar_merge_group_heads (batch_id)
+  where state = 'selected';
+-- @statement
+CREATE INDEX briar_merge_group_heads_pending_idx
+  on briar_merge_group_heads (
+    repository_id, base_branch, tail_pull_request_number, state, received_at
+  );
+-- @statement
+CREATE UNIQUE INDEX briar_channels_direct_message_key_idx
+  on briar_channels (organization_id, dm_key)
+  where kind = 'dm' and dm_key is not null;
+-- @statement
+CREATE INDEX briar_channels_kind_idx
+  on briar_channels (organization_id, kind, archived_at, updated_at desc);
+-- @statement
+CREATE INDEX briar_managed_computer_entitlements_requester_idx
+  on briar_managed_computer_entitlements
+    (requester_user_id, approved_at desc);
+-- @statement
+CREATE INDEX briar_managed_computer_redemptions_campaign_idx
+  on briar_managed_computer_promotion_redemptions
+    (campaign_id, redeemed_at desc);
+-- @statement
+CREATE INDEX briar_managed_computer_audit_organization_idx
+  on briar_managed_computer_audit_events
+    (organization_id, occurred_at desc);
+-- @statement
+CREATE INDEX briar_managed_computer_audit_computer_idx
+  on briar_managed_computer_audit_events
+    (managed_computer_id, occurred_at desc);
+-- @statement
+CREATE UNIQUE INDEX briar_managed_computer_remote_sessions_controller_idx
+  on briar_managed_computer_remote_sessions (managed_computer_id)
+  where state in ('created', 'connecting', 'connected', 'disconnected');
+-- @statement
+CREATE INDEX briar_managed_computer_remote_sessions_organization_idx
+  on briar_managed_computer_remote_sessions (organization_id, created_at desc);
+-- @statement
+CREATE INDEX briar_managed_computer_remote_sessions_user_rate_idx
+  on briar_managed_computer_remote_sessions
+    (controller_user_id, created_at desc);
+-- @statement
+CREATE INDEX briar_managed_computer_remote_sessions_expiry_idx
+  on briar_managed_computer_remote_sessions (state, max_expires_at);
+-- @statement
+CREATE INDEX briar_managed_computer_remote_audit_computer_idx
+  on briar_managed_computer_remote_audit_events
+    (managed_computer_id, occurred_at desc);
+-- @statement
+CREATE INDEX briar_managed_computer_remote_audit_session_idx
+  on briar_managed_computer_remote_audit_events
+    (remote_session_id, occurred_at desc);
+-- @statement
+CREATE INDEX briar_managed_computers_organization_idx
+  on briar_managed_computers (organization_id, created_at desc);
+-- @statement
+CREATE INDEX briar_managed_computers_fleet_idx
+  on briar_managed_computers (state, created_at);
+-- @statement
+CREATE INDEX briar_managed_computers_expiry_idx
+  on briar_managed_computers (expires_at, state);
+-- @statement
+CREATE INDEX briar_managed_computers_device_idx
+  on briar_managed_computers (briar_device_id, state);
+-- @statement
+CREATE INDEX briar_managed_computer_jobs_status_idx
+  on briar_managed_computer_provisioning_jobs (status, created_at);
+-- @statement
+CREATE INDEX briar_managed_computer_setup_sessions_expiry_idx
+  on briar_managed_computer_setup_sessions (status, expires_at);
+-- @statement
+CREATE INDEX briar_managed_computer_setup_sessions_computer_idx
+  on briar_managed_computer_setup_sessions
+    (managed_computer_id, created_at desc);
+-- @statement
+CREATE INDEX briar_managed_computer_setup_sessions_project_idx
+  on briar_managed_computer_setup_sessions (project_id, created_at desc);
+-- @statement
+CREATE INDEX briar_channel_issue_batch_items_proposal_idx
+  on briar_channel_issue_batch_items (proposal_id, position);
+-- @statement
+CREATE INDEX briar_channel_issue_batch_items_run_idx
+  on briar_channel_issue_batch_items (run_id, source_key);
+-- @statement
+CREATE INDEX briar_execution_worker_lifecycle_reason_idx
+  on briar_execution_worker_lifecycle_events (
+    reason, operation, created_at desc
+  );
+-- @statement
+CREATE INDEX briar_execution_worker_lifecycle_device_idx
+  on briar_execution_worker_lifecycle_events (device_id, created_at desc);
+-- @statement
+CREATE UNIQUE INDEX briar_projects_id_organization_unique
+  on briar_projects (id, organization_id);
+-- @statement
+CREATE INDEX briar_organization_members_user_idx
+  on briar_organization_members (user_id, organization_id);
+-- @statement
+CREATE INDEX briar_project_members_user_idx
+  on briar_project_members (user_id, project_id);
+-- @statement
+CREATE INDEX briar_organization_invitations_org_idx
+  on briar_organization_invitations (
+    organization_id, accepted_at, revoked_at, created_at desc
+  );
+-- @statement
+CREATE INDEX briar_organization_invitations_email_idx
+  on briar_organization_invitations (
+    email_normalized, accepted_at, revoked_at, expires_at
+  );
+-- @statement
+CREATE UNIQUE INDEX briar_organization_invitations_pending_idx
+  on briar_organization_invitations (organization_id, email_normalized)
+  where accepted_at is null and revoked_at is null;
+-- @statement
+CREATE INDEX briar_mobile_push_registrations_user_idx
+  on briar_mobile_push_registrations (user_id, updated_at desc);
+-- @statement
+CREATE INDEX briar_mobile_push_registration_scopes_organization_idx
+  on briar_mobile_push_registration_scopes (
+    organization_id, baseline_version, registration_id
+  );
+-- @statement
+CREATE INDEX briar_mobile_push_deliveries_delivered_idx
+  on briar_mobile_push_deliveries (delivered_at);
+-- @statement
+CREATE INDEX briar_teams_owner_idx
+  on briar_teams (owner_user_id, created_at);
+-- @statement
+CREATE INDEX briar_teams_organization_idx
+  on briar_teams (organization_id, created_at);
+-- @statement
+CREATE INDEX briar_teams_organization_context_idx
+  on briar_teams (organization_id, id, name, created_at);
+-- @statement
+CREATE UNIQUE INDEX briar_teams_id_organization_unique
+  on briar_teams (id, organization_id);
+-- @statement
+CREATE INDEX briar_planning_projects_team_sort_idx
+  on briar_planning_projects (team_id, sort_order, created_at, id);
+-- @statement
+CREATE UNIQUE INDEX briar_planning_projects_team_default_unique
+  on briar_planning_projects (team_id) where is_default = 1;
+-- @statement
+CREATE INDEX briar_agent_skill_execution_realtime_outbox_updated_idx
+  on briar_agent_skill_execution_realtime_outbox (updated_at, task_id);
+-- @statement
+CREATE INDEX briar_dm_memory_spaces_owner on briar_dm_memory_spaces
+  (organization_id, owner_user_id, channel_id, status);
+-- @statement
+CREATE INDEX briar_dm_memory_documents_page on briar_dm_memory_documents
+  (space_id, status, id);
+-- @statement
+CREATE INDEX briar_dm_memory_sources_origin on briar_dm_memory_sources
+  (source_type, source_id, space_id);
+-- @statement
+CREATE INDEX briar_dm_memory_jobs_claim on briar_dm_memory_jobs
+  (kind, status, available_at, id);
+-- @statement
+CREATE INDEX briar_dm_memory_chunks_document on briar_dm_memory_chunks
+  (space_id, document_id, document_version, start_bytes);
+-- @statement
+CREATE INDEX briar_dm_memory_vectors_cleanup on briar_dm_memory_vectors (state, available_at, id);
+-- @statement
+CREATE INDEX briar_dm_memory_vectors_document on briar_dm_memory_vectors (document_id, document_version);
+-- @statement
+CREATE UNIQUE INDEX briar_dm_memory_one_learning_claim on briar_dm_memory_jobs(space_id)
+where kind in ('extract', 'explicit_request', 'consolidate') and status = 'running';
+-- @statement
+CREATE INDEX briar_dm_memory_source_events_space on briar_dm_memory_source_events(space_id, sequence);
+-- @statement
+CREATE INDEX briar_dm_memory_learning_outbox_pending on briar_dm_memory_learning_outbox(space_id, settled, available_at);
+-- @statement
+CREATE INDEX briar_dm_memory_observation_events_space on briar_dm_memory_observation_events(space_id, sequence);
+-- @statement
+CREATE INDEX briar_dm_memory_learning_inputs_source on briar_dm_memory_learning_inputs(space_id, source_type, source_id);
+-- @statement
+CREATE INDEX briar_dm_memory_calls_organization on briar_dm_memory_model_calls(organization_id, created_at);
+-- @statement
+CREATE INDEX briar_dm_memory_calls_space on briar_dm_memory_model_calls(space_id, created_at);
+-- @statement
+CREATE INDEX briar_dm_memory_proposals_job on briar_dm_memory_proposals(job_id, created_at);
+-- @statement
+CREATE INDEX briar_dm_memory_document_links_source on briar_dm_memory_document_links(source_document_id, source_document_version);
+-- @statement
+CREATE INDEX briar_reply_completion_receipts_work_idx
+  on briar_reply_completion_receipts (reply_kind, work_id, created_at);
+-- @statement
+CREATE INDEX briar_upload_batches_expiry_idx
+  on briar_upload_batches (expires_at, request_id);
+-- @statement
+CREATE INDEX briar_upload_batches_scope_idx
+  on briar_upload_batches (
+    purpose, organization_id, project_id, channel_id, user_id, work_id,
+    run_id, claim_token_hash
+  );
+-- @statement
+CREATE INDEX briar_uploads_batch_idx
+  on briar_uploads (batch_request_id, position, upload_id);
+-- @statement
+CREATE INDEX briar_uploads_consumer_idx
+  on briar_uploads (consumer_kind, consumer_id, upload_id);
+-- @statement
+CREATE INDEX briar_upload_cleanup_queue_due_idx
+  on briar_upload_cleanup_queue (
+    next_attempt_at, attempts, queued_at, object_key
+  );
+-- @statement
+CREATE INDEX "account_userId_idx" on "account" ("userId");
+-- @statement
+CREATE UNIQUE INDEX "account_issuer_accountId_uidx"
+  on "account" ("issuer", "accountId");
+-- @statement
+CREATE UNIQUE INDEX "deviceCode_deviceCode_uidx"
+  on "deviceCode" ("deviceCode");
+-- @statement
+CREATE UNIQUE INDEX "deviceCode_userCode_uidx"
+  on "deviceCode" ("userCode");
+-- @statement
 CREATE INDEX briar_hunt_events_run_idx
   on briar_hunt_events (run_id, occurred_at desc, id desc);
 -- @statement
@@ -4043,9 +4317,6 @@ CREATE UNIQUE INDEX briar_execution_audit_request_idx
 -- @statement
 CREATE INDEX briar_execution_audit_project_idx
   on briar_execution_audit_events (project_id, occurred_at desc, id);
--- @statement
-CREATE INDEX briar_project_execution_worker_allowlist_worker_idx
-  on briar_project_execution_worker_allowlist (worker_id, project_id);
 -- @statement
 CREATE INDEX briar_issue_message_mentions_user_idx
   on briar_issue_message_mentions (user_id, created_at desc, message_id);
@@ -4078,15 +4349,6 @@ CREATE INDEX briar_issue_messages_run_idx
 -- @statement
 CREATE INDEX briar_issue_messages_parent_idx
   on briar_issue_messages (parent_message_id, created_at, id);
--- @statement
-CREATE INDEX briar_execution_workers_project_idx
-  on briar_execution_workers (project_id, last_heartbeat_at desc);
--- @statement
-CREATE UNIQUE INDEX briar_execution_workers_project_device_idx
-  on briar_execution_workers (project_id, device_id);
--- @statement
-CREATE INDEX briar_execution_workers_device_idx
-  on briar_execution_workers (device_id, project_id);
 -- @statement
 CREATE INDEX briar_agent_transcript_sessions_project_idx
   on briar_agent_transcript_sessions (project_id, last_event_at desc);
@@ -4392,41 +4654,6 @@ CREATE INDEX briar_issue_agent_reply_jobs_skill_idx
 CREATE INDEX briar_issue_agent_reply_jobs_agent_idx
   on briar_issue_agent_reply_jobs (agent_id, status, created_at);
 -- @statement
-CREATE UNIQUE INDEX verification_sign_in_otp_unique_idx
-  on verification (identifier)
-  where identifier like 'sign-in-otp-%';
--- @statement
-CREATE INDEX briar_auth_email_rate_limits_updated_idx
-  on briar_auth_email_rate_limits (updated_at);
--- @statement
-CREATE INDEX briar_project_agent_session_summaries_requester_recent_idx
-  on briar_project_agent_session_summaries (
-    project_id,
-    json_extract(summary_json, '$.requestedByUserId'),
-    updated_at desc,
-    session_id
-  );
--- @statement
-CREATE INDEX briar_execution_worker_update_handoffs_device_idx
-  on briar_execution_worker_update_handoffs (device_id, updated_at desc);
--- @statement
-CREATE INDEX briar_execution_worker_update_handoffs_work_idx
-  on briar_execution_worker_update_handoffs (work_type, work_id, updated_at desc);
--- @statement
-CREATE UNIQUE INDEX briar_merge_queue_profiles_enabled_lane_idx
-  on briar_merge_queue_profiles (repository_id, base_branch)
-  where enabled = 1;
--- @statement
-CREATE UNIQUE INDEX briar_merge_batches_active_lane_idx
-  on briar_merge_batches (repository_id, base_branch)
-  where state in (
-    'collecting', 'frozen', 'enqueueing', 'waiting_tail', 'validating',
-    'publishing', 'awaiting_merge', 'blocked', 'draining'
-  );
--- @statement
-CREATE INDEX briar_merge_batches_claim_idx
-  on briar_merge_batches (project_id, state, quiet_until, lease_expires_at);
--- @statement
 CREATE INDEX briar_merge_batch_candidates_ready_idx
   on briar_merge_batch_candidates (
     repository_id, base_branch, state, batch_id,
@@ -4443,99 +4670,9 @@ CREATE INDEX briar_merge_batch_candidates_pull_request_head_idx
     repository_id, pull_request_number, frozen_head_sha, state
   );
 -- @statement
-CREATE INDEX briar_merge_queue_pull_request_observations_identity_idx
-  on briar_merge_queue_pull_request_observations (
-    repository_id, pull_request_number, received_at
-  );
--- @statement
-CREATE UNIQUE INDEX briar_merge_group_heads_selected_batch_idx
-  on briar_merge_group_heads (batch_id)
-  where state = 'selected';
--- @statement
-CREATE INDEX briar_merge_group_heads_pending_idx
-  on briar_merge_group_heads (
-    repository_id, base_branch, tail_pull_request_number, state, received_at
-  );
--- @statement
-CREATE UNIQUE INDEX briar_channels_direct_message_key_idx
-  on briar_channels (organization_id, dm_key)
-  where kind = 'dm' and dm_key is not null;
--- @statement
-CREATE INDEX briar_channels_kind_idx
-  on briar_channels (organization_id, kind, archived_at, updated_at desc);
--- @statement
-CREATE INDEX briar_managed_computer_entitlements_requester_idx
-  on briar_managed_computer_entitlements
-    (requester_user_id, approved_at desc);
--- @statement
-CREATE INDEX briar_managed_computer_redemptions_campaign_idx
-  on briar_managed_computer_promotion_redemptions
-    (campaign_id, redeemed_at desc);
--- @statement
-CREATE INDEX briar_managed_computer_audit_organization_idx
-  on briar_managed_computer_audit_events
-    (organization_id, occurred_at desc);
--- @statement
-CREATE INDEX briar_managed_computer_audit_computer_idx
-  on briar_managed_computer_audit_events
-    (managed_computer_id, occurred_at desc);
--- @statement
-CREATE UNIQUE INDEX briar_managed_computer_remote_sessions_controller_idx
-  on briar_managed_computer_remote_sessions (managed_computer_id)
-  where state in ('created', 'connecting', 'connected', 'disconnected');
--- @statement
-CREATE INDEX briar_managed_computer_remote_sessions_organization_idx
-  on briar_managed_computer_remote_sessions (organization_id, created_at desc);
--- @statement
-CREATE INDEX briar_managed_computer_remote_sessions_user_rate_idx
-  on briar_managed_computer_remote_sessions
-    (controller_user_id, created_at desc);
--- @statement
-CREATE INDEX briar_managed_computer_remote_sessions_expiry_idx
-  on briar_managed_computer_remote_sessions (state, max_expires_at);
--- @statement
-CREATE INDEX briar_managed_computer_remote_audit_computer_idx
-  on briar_managed_computer_remote_audit_events
-    (managed_computer_id, occurred_at desc);
--- @statement
-CREATE INDEX briar_managed_computer_remote_audit_session_idx
-  on briar_managed_computer_remote_audit_events
-    (remote_session_id, occurred_at desc);
--- @statement
-CREATE INDEX briar_managed_computers_organization_idx
-  on briar_managed_computers (organization_id, created_at desc);
--- @statement
-CREATE INDEX briar_managed_computers_fleet_idx
-  on briar_managed_computers (state, created_at);
--- @statement
-CREATE INDEX briar_managed_computers_expiry_idx
-  on briar_managed_computers (expires_at, state);
--- @statement
-CREATE INDEX briar_managed_computers_device_idx
-  on briar_managed_computers (briar_device_id, state);
--- @statement
-CREATE INDEX briar_managed_computer_jobs_status_idx
-  on briar_managed_computer_provisioning_jobs (status, created_at);
--- @statement
 CREATE INDEX briar_channel_messages_deleted_idx
   on briar_channel_messages (channel_id, deleted_at)
   where deleted_at is not null;
--- @statement
-CREATE INDEX briar_managed_computer_setup_sessions_expiry_idx
-  on briar_managed_computer_setup_sessions (status, expires_at);
--- @statement
-CREATE INDEX briar_managed_computer_setup_sessions_computer_idx
-  on briar_managed_computer_setup_sessions
-    (managed_computer_id, created_at desc);
--- @statement
-CREATE INDEX briar_managed_computer_setup_sessions_project_idx
-  on briar_managed_computer_setup_sessions (project_id, created_at desc);
--- @statement
-CREATE INDEX briar_channel_issue_batch_items_proposal_idx
-  on briar_channel_issue_batch_items (proposal_id, position);
--- @statement
-CREATE INDEX briar_channel_issue_batch_items_run_idx
-  on briar_channel_issue_batch_items (run_id, source_key);
 -- @statement
 CREATE INDEX briar_channel_reply_sessions_owner_idx
   on briar_channel_reply_sessions (
@@ -4553,17 +4690,6 @@ CREATE INDEX briar_channel_agent_reply_jobs_session_idx
 CREATE INDEX briar_channel_reply_session_events_session_idx
   on briar_channel_reply_session_events (session_id, occurred_at desc, id);
 -- @statement
-CREATE INDEX briar_execution_worker_lifecycle_reason_idx
-  on briar_execution_worker_lifecycle_events (
-    reason, operation, created_at desc
-  );
--- @statement
-CREATE INDEX briar_execution_worker_lifecycle_device_idx
-  on briar_execution_worker_lifecycle_events (device_id, created_at desc);
--- @statement
-CREATE UNIQUE INDEX briar_projects_id_organization_unique
-  on briar_projects (id, organization_id);
--- @statement
 CREATE INDEX briar_agent_skill_execution_origin_idx
   on briar_agent_skill_execution_proposals (
     channel_id, thread_root_message_id, trigger_message_id, created_at
@@ -4578,12 +4704,6 @@ CREATE INDEX briar_issue_attachments_run_idx
 CREATE INDEX briar_issue_attachments_project_idx
   on briar_issue_attachments (project_id, run_id);
 -- @statement
-CREATE INDEX briar_organization_members_user_idx
-  on briar_organization_members (user_id, organization_id);
--- @statement
-CREATE INDEX briar_project_members_user_idx
-  on briar_project_members (user_id, project_id);
--- @statement
 CREATE INDEX briar_issue_subscriptions_user_idx
   on briar_issue_subscriptions (organization_id, user_id, created_at desc);
 -- @statement
@@ -4595,49 +4715,6 @@ CREATE INDEX briar_channel_thread_subscriptions_user_idx
 CREATE INDEX briar_channel_thread_subscriptions_channel_idx
   on briar_channel_thread_subscriptions (channel_id, root_message_id);
 -- @statement
-CREATE INDEX briar_organization_invitations_org_idx
-  on briar_organization_invitations (
-    organization_id, accepted_at, revoked_at, created_at desc
-  );
--- @statement
-CREATE INDEX briar_organization_invitations_email_idx
-  on briar_organization_invitations (
-    email_normalized, accepted_at, revoked_at, expires_at
-  );
--- @statement
-CREATE UNIQUE INDEX briar_organization_invitations_pending_idx
-  on briar_organization_invitations (organization_id, email_normalized)
-  where accepted_at is null and revoked_at is null;
--- @statement
-CREATE INDEX briar_mobile_push_registrations_user_idx
-  on briar_mobile_push_registrations (user_id, updated_at desc);
--- @statement
-CREATE INDEX briar_mobile_push_registration_scopes_organization_idx
-  on briar_mobile_push_registration_scopes (
-    organization_id, baseline_version, registration_id
-  );
--- @statement
-CREATE INDEX briar_mobile_push_deliveries_delivered_idx
-  on briar_mobile_push_deliveries (delivered_at);
--- @statement
-CREATE INDEX briar_teams_owner_idx
-  on briar_teams (owner_user_id, created_at);
--- @statement
-CREATE INDEX briar_teams_organization_idx
-  on briar_teams (organization_id, created_at);
--- @statement
-CREATE INDEX briar_teams_organization_context_idx
-  on briar_teams (organization_id, id, name, created_at);
--- @statement
-CREATE UNIQUE INDEX briar_teams_id_organization_unique
-  on briar_teams (id, organization_id);
--- @statement
-CREATE INDEX briar_planning_projects_team_sort_idx
-  on briar_planning_projects (team_id, sort_order, created_at, id);
--- @statement
-CREATE UNIQUE INDEX briar_planning_projects_team_default_unique
-  on briar_planning_projects (team_id) where is_default = 1;
--- @statement
 CREATE INDEX briar_hunt_runs_planning_project_idx
   on briar_hunt_runs (planning_project_id, last_event_at desc, id);
 -- @statement
@@ -4646,28 +4723,6 @@ CREATE INDEX briar_hunt_runs_team_hierarchy_idx
 -- @statement
 CREATE INDEX briar_issue_key_aliases_run_idx
   on briar_issue_key_aliases (run_id, created_at, team_id);
--- @statement
-CREATE INDEX briar_agent_skill_execution_realtime_outbox_updated_idx
-  on briar_agent_skill_execution_realtime_outbox (updated_at, task_id);
--- @statement
-CREATE INDEX briar_dm_memory_spaces_owner on briar_dm_memory_spaces
-  (organization_id, owner_user_id, channel_id, status);
--- @statement
-CREATE INDEX briar_dm_memory_documents_page on briar_dm_memory_documents
-  (space_id, status, id);
--- @statement
-CREATE INDEX briar_dm_memory_sources_origin on briar_dm_memory_sources
-  (source_type, source_id, space_id);
--- @statement
-CREATE INDEX briar_dm_memory_jobs_claim on briar_dm_memory_jobs
-  (kind, status, available_at, id);
--- @statement
-CREATE INDEX briar_dm_memory_chunks_document on briar_dm_memory_chunks
-  (space_id, document_id, document_version, start_bytes);
--- @statement
-CREATE INDEX briar_dm_memory_vectors_cleanup on briar_dm_memory_vectors (state, available_at, id);
--- @statement
-CREATE INDEX briar_dm_memory_vectors_document on briar_dm_memory_vectors (document_id, document_version);
 -- @statement
 CREATE INDEX briar_issue_parent_links_parent_idx
   on briar_issue_parent_links (project_id, parent_run_id, created_at);
@@ -4684,48 +4739,6 @@ CREATE INDEX briar_issue_relations_second_idx
 CREATE INDEX briar_dm_memory_reply_fences_space on briar_dm_memory_reply_fences(space_id);
 -- @statement
 CREATE INDEX briar_dm_memory_reply_citations_document on briar_dm_memory_reply_citations(document_id);
--- @statement
-CREATE UNIQUE INDEX briar_dm_memory_one_learning_claim on briar_dm_memory_jobs(space_id)
-where kind in ('extract', 'explicit_request', 'consolidate') and status = 'running';
--- @statement
-CREATE INDEX briar_dm_memory_source_events_space on briar_dm_memory_source_events(space_id, sequence);
--- @statement
-CREATE INDEX briar_dm_memory_learning_outbox_pending on briar_dm_memory_learning_outbox(space_id, settled, available_at);
--- @statement
-CREATE INDEX briar_dm_memory_observation_events_space on briar_dm_memory_observation_events(space_id, sequence);
--- @statement
-CREATE INDEX briar_dm_memory_learning_inputs_source on briar_dm_memory_learning_inputs(space_id, source_type, source_id);
--- @statement
-CREATE INDEX briar_dm_memory_calls_organization on briar_dm_memory_model_calls(organization_id, created_at);
--- @statement
-CREATE INDEX briar_dm_memory_calls_space on briar_dm_memory_model_calls(space_id, created_at);
--- @statement
-CREATE INDEX briar_dm_memory_proposals_job on briar_dm_memory_proposals(job_id, created_at);
--- @statement
-CREATE INDEX briar_dm_memory_document_links_source on briar_dm_memory_document_links(source_document_id, source_document_version);
--- @statement
-CREATE INDEX briar_reply_completion_receipts_work_idx
-  on briar_reply_completion_receipts (reply_kind, work_id, created_at);
--- @statement
-CREATE INDEX briar_upload_batches_expiry_idx
-  on briar_upload_batches (expires_at, request_id);
--- @statement
-CREATE INDEX briar_upload_batches_scope_idx
-  on briar_upload_batches (
-    purpose, organization_id, project_id, channel_id, user_id, work_id,
-    run_id, claim_token_hash
-  );
--- @statement
-CREATE INDEX briar_uploads_batch_idx
-  on briar_uploads (batch_request_id, position, upload_id);
--- @statement
-CREATE INDEX briar_uploads_consumer_idx
-  on briar_uploads (consumer_kind, consumer_id, upload_id);
--- @statement
-CREATE INDEX briar_upload_cleanup_queue_due_idx
-  on briar_upload_cleanup_queue (
-    next_attempt_at, attempts, queued_at, object_key
-  );
 -- @statement
 CREATE INDEX briar_channel_message_mutation_receipts_scope_idx
   on briar_channel_message_mutation_receipts (
@@ -4788,17 +4801,6 @@ CREATE INDEX briar_channel_message_attachments_message_idx
 CREATE INDEX briar_channel_message_attachments_channel_idx
   on briar_channel_message_attachments (organization_id, channel_id, message_id);
 -- @statement
-CREATE INDEX "account_userId_idx" on "account" ("userId");
--- @statement
-CREATE UNIQUE INDEX "account_issuer_accountId_uidx"
-  on "account" ("issuer", "accountId");
--- @statement
-CREATE UNIQUE INDEX "deviceCode_deviceCode_uidx"
-  on "deviceCode" ("deviceCode");
--- @statement
-CREATE UNIQUE INDEX "deviceCode_userCode_uidx"
-  on "deviceCode" ("userCode");
--- @statement
 CREATE TRIGGER briar_dashboard_settings_update_sync
 after update on briar_project_settings BEGIN
   insert into briar_dashboard_changes (
@@ -4830,6 +4832,32 @@ after insert on briar_channels BEGIN
   values (new.organization_id, last_insert_rowid())
   on conflict (organization_id) do update
     set current_version = excluded.current_version;
+  insert into briar_organization_inbox_sync_state (
+    organization_id, current_version
+  )
+  values (new.organization_id, 1)
+  on conflict (organization_id) do update set
+    current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id = new.organization_id
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id = new.organization_id
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
 END;
 -- @statement
 CREATE TRIGGER briar_channel_changes_channels_delete_sync
@@ -4843,6 +4871,32 @@ after delete on briar_channels BEGIN
   values (old.organization_id, last_insert_rowid())
   on conflict (organization_id) do update
     set current_version = excluded.current_version;
+  insert into briar_organization_inbox_sync_state (
+    organization_id, current_version
+  )
+  values (old.organization_id, 1)
+  on conflict (organization_id) do update set
+    current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id = old.organization_id
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id = old.organization_id
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
 END;
 -- @statement
 CREATE TRIGGER briar_project_settings_workflow_v2_insert
@@ -4986,6 +5040,26 @@ after insert on briar_projects BEGIN
   ) values (new.organization_id, 1)
   on conflict (organization_id) do update set
     current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id = new.organization_id
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id = new.organization_id
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
 END;
 -- @statement
 CREATE TRIGGER briar_inbox_projects_delete_sync
@@ -4995,6 +5069,26 @@ before delete on briar_projects BEGIN
   ) values (old.organization_id, 1)
   on conflict (organization_id) do update set
     current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id = old.organization_id
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id = old.organization_id
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
 END;
 -- @statement
 CREATE TRIGGER briar_inbox_dashboard_state_insert_sync
@@ -5007,6 +5101,34 @@ after insert on briar_dashboard_sync_state BEGIN
   where project.id = new.project_id
   on conflict (organization_id) do update set
     current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select project.organization_id
+    from briar_projects project
+    where project.id = new.project_id
+  )
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select project.organization_id
+    from briar_projects project
+    where project.id = new.project_id
+  )
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
 END;
 -- @statement
 CREATE TRIGGER briar_inbox_dashboard_state_update_sync
@@ -5020,6 +5142,34 @@ when new.current_version <> old.current_version BEGIN
   where project.id = new.project_id
   on conflict (organization_id) do update set
     current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select project.organization_id
+    from briar_projects project
+    where project.id = new.project_id
+  )
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select project.organization_id
+    from briar_projects project
+    where project.id = new.project_id
+  )
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
 END;
 -- @statement
 CREATE TRIGGER briar_inbox_agent_session_state_insert_sync
@@ -5032,6 +5182,34 @@ after insert on briar_project_agent_session_sync_state BEGIN
   where project.id = new.project_id
   on conflict (organization_id) do update set
     current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select project.organization_id
+    from briar_projects project
+    where project.id = new.project_id
+  )
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select project.organization_id
+    from briar_projects project
+    where project.id = new.project_id
+  )
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
 END;
 -- @statement
 CREATE TRIGGER briar_inbox_agent_session_state_update_sync
@@ -5045,25 +5223,34 @@ when new.current_version <> old.current_version BEGIN
   where project.id = new.project_id
   on conflict (organization_id) do update set
     current_version = briar_organization_inbox_sync_state.current_version + 1;
-END;
--- @statement
-CREATE TRIGGER briar_inbox_channel_state_insert_sync
-after insert on briar_channel_sync_state BEGIN
-  insert into briar_organization_inbox_sync_state (
-    organization_id, current_version
-  ) values (new.organization_id, 1)
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select project.organization_id
+    from briar_projects project
+    where project.id = new.project_id
+  )
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select project.organization_id
+    from briar_projects project
+    where project.id = new.project_id
+  )
   on conflict (organization_id) do update set
-    current_version = briar_organization_inbox_sync_state.current_version + 1;
-END;
--- @statement
-CREATE TRIGGER briar_inbox_channel_state_update_sync
-after update of current_version on briar_channel_sync_state
-when new.current_version <> old.current_version BEGIN
-  insert into briar_organization_inbox_sync_state (
-    organization_id, current_version
-  ) values (new.organization_id, 1)
-  on conflict (organization_id) do update set
-    current_version = briar_organization_inbox_sync_state.current_version + 1;
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
 END;
 -- @statement
 CREATE TRIGGER briar_inbox_channel_members_insert_sync
@@ -5076,6 +5263,34 @@ after insert on briar_channel_members BEGIN
   where channel.id = new.channel_id
   on conflict (organization_id) do update set
     current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select channel.organization_id
+    from briar_channels channel
+    where channel.id = new.channel_id
+  )
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select channel.organization_id
+    from briar_channels channel
+    where channel.id = new.channel_id
+  )
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
 END;
 -- @statement
 CREATE TRIGGER briar_inbox_channel_members_delete_sync
@@ -5088,6 +5303,34 @@ before delete on briar_channel_members BEGIN
   where channel.id = old.channel_id
   on conflict (organization_id) do update set
     current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select channel.organization_id
+    from briar_channels channel
+    where channel.id = old.channel_id
+  )
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select channel.organization_id
+    from briar_channels channel
+    where channel.id = old.channel_id
+  )
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
 END;
 -- @statement
 CREATE TRIGGER briar_inbox_user_name_update_sync
@@ -5101,27 +5344,28 @@ when new.name <> old.name BEGIN
   where membership.user_id = new.id
   on conflict (organization_id) do update set
     current_version = briar_organization_inbox_sync_state.current_version + 1;
-END;
--- @statement
-CREATE TRIGGER briar_inbox_realtime_state_insert
-after insert on briar_organization_inbox_sync_state BEGIN
-  insert into briar_organization_inbox_realtime_outbox (
-    organization_id, version, updated_at
-  ) values (new.organization_id, new.current_version, datetime('now'))
-  on conflict (organization_id) do update set
-    version = max(
-      briar_organization_inbox_realtime_outbox.version,
-      excluded.version
-    ),
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select membership.organization_id
+    from briar_organization_members membership
+    where membership.user_id = new.id
+  )
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
     updated_at = excluded.updated_at;
-END;
--- @statement
-CREATE TRIGGER briar_inbox_realtime_state_update
-after update of current_version on briar_organization_inbox_sync_state
-when new.current_version <> old.current_version BEGIN
   insert into briar_organization_inbox_realtime_outbox (
     organization_id, version, updated_at
-  ) values (new.organization_id, new.current_version, datetime('now'))
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select membership.organization_id
+    from briar_organization_members membership
+    where membership.user_id = new.id
+  )
   on conflict (organization_id) do update set
     version = max(
       briar_organization_inbox_realtime_outbox.version,
@@ -5602,6 +5846,39 @@ after insert on briar_channel_action_proposals BEGIN
   from briar_channels channel where channel.id = new.channel_id
   on conflict (organization_id) do update
     set current_version = excluded.current_version;
+  insert into briar_organization_inbox_sync_state (
+    organization_id, current_version
+  )
+  select channel.organization_id, 1
+  from briar_channels channel where channel.id = new.channel_id
+  on conflict (organization_id) do update set
+    current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select channel.organization_id
+    from briar_channels channel where channel.id = new.channel_id
+  )
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select channel.organization_id
+    from briar_channels channel where channel.id = new.channel_id
+  )
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
 END;
 -- @statement
 CREATE TRIGGER briar_channel_changes_proposals_update_sync
@@ -5616,6 +5893,39 @@ after update on briar_channel_action_proposals BEGIN
   from briar_channels channel where channel.id = new.channel_id
   on conflict (organization_id) do update
     set current_version = excluded.current_version;
+  insert into briar_organization_inbox_sync_state (
+    organization_id, current_version
+  )
+  select channel.organization_id, 1
+  from briar_channels channel where channel.id = new.channel_id
+  on conflict (organization_id) do update set
+    current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select channel.organization_id
+    from briar_channels channel where channel.id = new.channel_id
+  )
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select channel.organization_id
+    from briar_channels channel where channel.id = new.channel_id
+  )
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
 END;
 -- @statement
 CREATE TRIGGER briar_channel_create_execution_intent_insert_guard
@@ -5979,6 +6289,36 @@ after insert on briar_channel_message_mentions BEGIN
   where message.id = new.message_id
   on conflict (organization_id) do update set
     current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select channel.organization_id
+    from briar_channel_messages message
+    join briar_channels channel on channel.id = message.channel_id
+    where message.id = new.message_id
+  )
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select channel.organization_id
+    from briar_channel_messages message
+    join briar_channels channel on channel.id = message.channel_id
+    where message.id = new.message_id
+  )
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
 END;
 -- @statement
 CREATE TRIGGER briar_inbox_channel_mentions_delete_sync
@@ -5992,6 +6332,36 @@ before delete on briar_channel_message_mentions BEGIN
   where message.id = old.message_id
   on conflict (organization_id) do update set
     current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select channel.organization_id
+    from briar_channel_messages message
+    join briar_channels channel on channel.id = message.channel_id
+    where message.id = old.message_id
+  )
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select channel.organization_id
+    from briar_channel_messages message
+    join briar_channels channel on channel.id = message.channel_id
+    where message.id = old.message_id
+  )
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
 END;
 -- @statement
 CREATE TRIGGER briar_channel_changes_reactions_insert_sync
@@ -6010,6 +6380,45 @@ after insert on briar_channel_message_reactions BEGIN
   where message.id = new.message_id
   on conflict (organization_id) do update
     set current_version = excluded.current_version;
+  insert into briar_organization_inbox_sync_state (
+    organization_id, current_version
+  )
+  select channel.organization_id, 1
+  from briar_channel_messages message
+  join briar_channels channel on channel.id = message.channel_id
+  where message.id = new.message_id
+  on conflict (organization_id) do update set
+    current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select channel.organization_id
+    from briar_channel_messages message
+    join briar_channels channel on channel.id = message.channel_id
+    where message.id = new.message_id
+  )
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select channel.organization_id
+    from briar_channel_messages message
+    join briar_channels channel on channel.id = message.channel_id
+    where message.id = new.message_id
+  )
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
 END;
 -- @statement
 CREATE TRIGGER briar_channel_changes_reactions_delete_sync
@@ -6028,6 +6437,45 @@ after delete on briar_channel_message_reactions BEGIN
   where message.id = old.message_id
   on conflict (organization_id) do update
     set current_version = excluded.current_version;
+  insert into briar_organization_inbox_sync_state (
+    organization_id, current_version
+  )
+  select channel.organization_id, 1
+  from briar_channel_messages message
+  join briar_channels channel on channel.id = message.channel_id
+  where message.id = old.message_id
+  on conflict (organization_id) do update set
+    current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select channel.organization_id
+    from briar_channel_messages message
+    join briar_channels channel on channel.id = message.channel_id
+    where message.id = old.message_id
+  )
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select channel.organization_id
+    from briar_channel_messages message
+    join briar_channels channel on channel.id = message.channel_id
+    where message.id = old.message_id
+  )
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
 END;
 -- @statement
 CREATE TRIGGER briar_dashboard_issue_rework_proposals_insert_sync
@@ -6935,6 +7383,32 @@ BEGIN
   values (new.organization_id, last_insert_rowid())
   on conflict (organization_id) do update
     set current_version = excluded.current_version;
+  insert into briar_organization_inbox_sync_state (
+    organization_id, current_version
+  )
+  values (new.organization_id, 1)
+  on conflict (organization_id) do update set
+    current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id = new.organization_id
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id = new.organization_id
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
 END;
 -- @statement
 CREATE TRIGGER briar_channel_execution_proposals_update_sync
@@ -6951,6 +7425,32 @@ BEGIN
   values (new.organization_id, last_insert_rowid())
   on conflict (organization_id) do update
     set current_version = excluded.current_version;
+  insert into briar_organization_inbox_sync_state (
+    organization_id, current_version
+  )
+  values (new.organization_id, 1)
+  on conflict (organization_id) do update set
+    current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id = new.organization_id
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id = new.organization_id
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
 END;
 -- @statement
 CREATE TRIGGER briar_project_agent_task_completion_receipt_insert_guard
@@ -7520,6 +8020,32 @@ BEGIN
   values (new.organization_id, last_insert_rowid())
   on conflict (organization_id) do update
     set current_version = excluded.current_version;
+  insert into briar_organization_inbox_sync_state (
+    organization_id, current_version
+  )
+  values (new.organization_id, 1)
+  on conflict (organization_id) do update set
+    current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id = new.organization_id
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id = new.organization_id
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
 END;
 -- @statement
 CREATE TRIGGER briar_agent_skill_execution_channel_sync_update
@@ -7536,6 +8062,32 @@ BEGIN
   values (new.organization_id, last_insert_rowid())
   on conflict (organization_id) do update
     set current_version = excluded.current_version;
+  insert into briar_organization_inbox_sync_state (
+    organization_id, current_version
+  )
+  values (new.organization_id, 1)
+  on conflict (organization_id) do update set
+    current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id = new.organization_id
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id = new.organization_id
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
 END;
 -- @statement
 CREATE TRIGGER briar_dashboard_runs_update_sync
@@ -7566,6 +8118,32 @@ BEGIN
   values (new.organization_id, last_insert_rowid())
   on conflict (organization_id) do update
     set current_version = excluded.current_version;
+  insert into briar_organization_inbox_sync_state (
+    organization_id, current_version
+  )
+  values (new.organization_id, 1)
+  on conflict (organization_id) do update set
+    current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id = new.organization_id
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id = new.organization_id
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
 END;
 -- @statement
 CREATE TRIGGER briar_issue_subscriptions_run_insert
@@ -7611,6 +8189,39 @@ after insert on briar_channel_messages BEGIN
   from briar_channels channel where channel.id = new.channel_id
   on conflict (organization_id) do update
     set current_version = excluded.current_version;
+  insert into briar_organization_inbox_sync_state (
+    organization_id, current_version
+  )
+  select channel.organization_id, 1
+  from briar_channels channel where channel.id = new.channel_id
+  on conflict (organization_id) do update set
+    current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select channel.organization_id
+    from briar_channels channel where channel.id = new.channel_id
+  )
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select channel.organization_id
+    from briar_channels channel where channel.id = new.channel_id
+  )
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
 END;
 -- @statement
 CREATE TRIGGER briar_channel_changes_messages_delete_sync
@@ -7625,6 +8236,39 @@ after delete on briar_channel_messages BEGIN
   from briar_channels channel where channel.id = old.channel_id
   on conflict (organization_id) do update
     set current_version = excluded.current_version;
+  insert into briar_organization_inbox_sync_state (
+    organization_id, current_version
+  )
+  select channel.organization_id, 1
+  from briar_channels channel where channel.id = old.channel_id
+  on conflict (organization_id) do update set
+    current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select channel.organization_id
+    from briar_channels channel where channel.id = old.channel_id
+  )
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select channel.organization_id
+    from briar_channels channel where channel.id = old.channel_id
+  )
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
 END;
 -- @statement
 CREATE TRIGGER briar_agent_skill_execution_channel_message_invalidate
@@ -7660,6 +8304,32 @@ after insert on briar_channel_agent_reply_jobs BEGIN
   values (new.organization_id, last_insert_rowid())
   on conflict (organization_id) do update
     set current_version = excluded.current_version;
+  insert into briar_organization_inbox_sync_state (
+    organization_id, current_version
+  )
+  values (new.organization_id, 1)
+  on conflict (organization_id) do update set
+    current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id = new.organization_id
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id = new.organization_id
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
 END;
 -- @statement
 CREATE TRIGGER briar_channel_reply_skill_snapshot_insert
@@ -8411,12 +9081,6 @@ BEGIN
   select raise(abort, 'channel issue batch mapping is immutable');
 END;
 -- @statement
-CREATE TRIGGER briar_channel_reply_session_events_immutable_update
-before update on briar_channel_reply_session_events
-begin
-  select raise(abort, 'Channel reply session events are immutable');
-end;
--- @statement
 CREATE TRIGGER briar_agent_transcript_segments_totals_after_insert
 after insert on briar_agent_transcript_segments
 begin
@@ -8647,8 +9311,8 @@ when old.action_type = 'request_issue_create'
     or new.issue_source_key is not old.issue_source_key
   )
 begin
-  
-  
+
+
   select raise(ignore);
 end;
 -- @statement
@@ -8805,6 +9469,32 @@ after insert on briar_channel_thread_subscriptions BEGIN
   values (new.organization_id, last_insert_rowid())
   on conflict (organization_id) do update
     set current_version = excluded.current_version;
+  insert into briar_organization_inbox_sync_state (
+    organization_id, current_version
+  )
+  values (new.organization_id, 1)
+  on conflict (organization_id) do update set
+    current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id = new.organization_id
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id = new.organization_id
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
 END;
 -- @statement
 CREATE TRIGGER briar_channel_thread_subscriptions_delete_sync
@@ -8819,24 +9509,31 @@ before delete on briar_channel_thread_subscriptions BEGIN
   values (old.organization_id, last_insert_rowid())
   on conflict (organization_id) do update
     set current_version = excluded.current_version;
-END;
--- @statement
-CREATE TRIGGER briar_mobile_push_outbox_sync_insert
-after insert on briar_organization_inbox_sync_state BEGIN
+  insert into briar_organization_inbox_sync_state (
+    organization_id, current_version
+  )
+  values (old.organization_id, 1)
+  on conflict (organization_id) do update set
+    current_version = briar_organization_inbox_sync_state.current_version + 1;
   insert into briar_mobile_push_outbox (organization_id, version, updated_at)
-  values (new.organization_id, new.current_version, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id = old.organization_id
   on conflict(organization_id) do update set
     version = max(briar_mobile_push_outbox.version, excluded.version),
     updated_at = excluded.updated_at;
-END;
--- @statement
-CREATE TRIGGER briar_mobile_push_outbox_sync_update
-after update of current_version on briar_organization_inbox_sync_state
-when new.current_version > old.current_version BEGIN
-  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
-  values (new.organization_id, new.current_version, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-  on conflict(organization_id) do update set
-    version = max(briar_mobile_push_outbox.version, excluded.version),
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id = old.organization_id
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
     updated_at = excluded.updated_at;
 END;
 -- @statement
@@ -9429,9 +10126,9 @@ begin
     created_at = excluded.created_at,
     updated_at = excluded.updated_at;
 
-  
-  
-  
+
+
+
   insert into briar_channel_notification_inbox (
     user_id, organization_id, message_id, notification_reason, created_at
   )
@@ -9523,6 +10220,32 @@ BEGIN
   values (new.organization_id, last_insert_rowid())
   on conflict (organization_id) do update
     set current_version = excluded.current_version;
+  insert into briar_organization_inbox_sync_state (
+    organization_id, current_version
+  )
+  values (new.organization_id, 1)
+  on conflict (organization_id) do update set
+    current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id = new.organization_id
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id = new.organization_id
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
 END;
 -- @statement
 CREATE TRIGGER briar_channel_changes_messages_update_sync
@@ -9554,6 +10277,39 @@ BEGIN
   from briar_channels channel where channel.id = new.channel_id
   on conflict (organization_id) do update
     set current_version = excluded.current_version;
+  insert into briar_organization_inbox_sync_state (
+    organization_id, current_version
+  )
+  select channel.organization_id, 1
+  from briar_channels channel where channel.id = new.channel_id
+  on conflict (organization_id) do update set
+    current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select channel.organization_id
+    from briar_channels channel where channel.id = new.channel_id
+  )
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select channel.organization_id
+    from briar_channels channel where channel.id = new.channel_id
+  )
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
 END;
 -- @statement
 CREATE TRIGGER briar_dm_memory_close_roster
@@ -9613,8 +10369,8 @@ CREATE TRIGGER briar_dm_memory_channel_deleted before delete on briar_channels b
 end;
 -- @statement
 CREATE TRIGGER briar_dm_memory_owner_removed before delete on briar_organization_members begin
-  
-  
+
+
   update briar_channels set memory_roster_epoch = memory_roster_epoch + 1
   where organization_id = old.organization_id and id in (
     select channel_id from briar_channel_members where user_id = old.user_id
@@ -12484,4 +13240,23 @@ when not (
 )
 begin
   select raise(abort, 'invalid reply completion receipt');
+end;
+-- @statement
+CREATE TRIGGER briar_channel_reply_session_events_immutable_update
+before update on briar_channel_reply_session_events
+when not (
+  old.reply_job_id is not null
+  and new.reply_job_id is null
+  and new.id is old.id
+  and new.session_id is old.session_id
+  and new.event_type is old.event_type
+  and new.reason is old.reason
+  and new.from_worker_id is old.from_worker_id
+  and new.to_worker_id is old.to_worker_id
+  and new.retained_until is old.retained_until
+  and new.detail_json is old.detail_json
+  and new.occurred_at is old.occurred_at
+)
+begin
+  select raise(abort, 'Channel reply session events are immutable');
 end;

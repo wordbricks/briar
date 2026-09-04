@@ -635,6 +635,16 @@ pub struct LocalConfig {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub projects: ::buffa::alloc::vec::Vec<LocalProjectConfig>,
+    /// Field 9: `vertex_ai`
+    #[serde(
+        rename = "vertexAi",
+        alias = "vertex_ai",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub vertex_ai: ::buffa::MessageField<
+        LocalVertexAiCredential,
+        ::buffa::Inline<LocalVertexAiCredential>,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -650,6 +660,7 @@ impl ::core::fmt::Debug for LocalConfig {
             .field("worker_device_identity", &self.worker_device_identity)
             .field("managed_computer", &self.managed_computer)
             .field("projects", &self.projects)
+            .field("vertex_ai", &self.vertex_ai)
             .finish()
     }
 }
@@ -756,6 +767,14 @@ impl ::buffa::Message for LocalConfig {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if self.vertex_ai.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.vertex_ai.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -809,6 +828,14 @@ impl ::buffa::Message for LocalConfig {
                 buf,
             );
             v.write_to(__cache, buf);
+        }
+        if self.vertex_ai.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                9u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.vertex_ai.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -911,6 +938,17 @@ impl ::buffa::Message for LocalConfig {
                 ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
                 self.projects.push(elem);
             }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.vertex_ai.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -927,6 +965,7 @@ impl ::buffa::Message for LocalConfig {
         self.worker_device_identity = ::core::option::Option::None;
         self.managed_computer = ::buffa::MessageField::none();
         self.projects.clear();
+        self.vertex_ai = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -1014,6 +1053,13 @@ pub struct LocalAgentProviderSettings {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub openrouter: bool,
+    /// Field 8: `vertex`
+    #[serde(
+        rename = "vertex",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub vertex: bool,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -1028,6 +1074,7 @@ impl ::core::fmt::Debug for LocalAgentProviderSettings {
             .field("agy", &self.agy)
             .field("opencode", &self.opencode)
             .field("openrouter", &self.openrouter)
+            .field("vertex", &self.vertex)
             .finish()
     }
 }
@@ -1079,6 +1126,9 @@ impl ::buffa::Message for LocalAgentProviderSettings {
         if self.openrouter {
             size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
         }
+        if self.vertex {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -1109,6 +1159,9 @@ impl ::buffa::Message for LocalAgentProviderSettings {
         }
         if self.openrouter {
             ::buffa::types::put_bool_field(7u32, self.openrouter, buf);
+        }
+        if self.vertex {
+            ::buffa::types::put_bool_field(8u32, self.vertex, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1172,6 +1225,13 @@ impl ::buffa::Message for LocalAgentProviderSettings {
                 )?;
                 self.openrouter = ::buffa::types::decode_bool(buf)?;
             }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.vertex = ::buffa::types::decode_bool(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -1187,6 +1247,7 @@ impl ::buffa::Message for LocalAgentProviderSettings {
         self.agy = false;
         self.opencode = false;
         self.openrouter = false;
+        self.vertex = false;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -1217,6 +1278,157 @@ pub const __LOCAL_AGENT_PROVIDER_SETTINGS_JSON_ANY: ::buffa::type_registry::Json
     type_url: "type.googleapis.com/briar.local.v1.LocalAgentProviderSettings",
     to_json: ::buffa::type_registry::any_to_json::<LocalAgentProviderSettings>,
     from_json: ::buffa::type_registry::any_from_json::<LocalAgentProviderSettings>,
+    is_wkt: false,
+};
+/// Google Vertex AI is addressed by project and region; the credential itself
+/// is the machine's Application Default Credentials, which Briar never stores.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct LocalVertexAiCredential {
+    /// Field 1: `project_id`
+    #[serde(
+        rename = "projectId",
+        alias = "project_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub project_id: ::buffa::alloc::string::String,
+    /// Field 2: `location`
+    #[serde(
+        rename = "location",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub location: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for LocalVertexAiCredential {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("LocalVertexAiCredential")
+            .field("project_id", &self.project_id)
+            .field("location", &self.location)
+            .finish()
+    }
+}
+impl LocalVertexAiCredential {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.local.v1.LocalVertexAiCredential";
+}
+::buffa::impl_default_instance!(LocalVertexAiCredential);
+impl ::buffa::MessageName for LocalVertexAiCredential {
+    const PACKAGE: &'static str = "briar.local.v1";
+    const NAME: &'static str = "LocalVertexAiCredential";
+    const FULL_NAME: &'static str = "briar.local.v1.LocalVertexAiCredential";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.local.v1.LocalVertexAiCredential";
+}
+impl ::buffa::Message for LocalVertexAiCredential {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.project_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.project_id) as u64;
+        }
+        if !self.location.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.location) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.project_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.project_id, buf);
+        }
+        if !self.location.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.location, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.project_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.location, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.project_id.clear();
+        self.location.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for LocalVertexAiCredential {
+    const PROTO_FQN: &'static str = "briar.local.v1.LocalVertexAiCredential";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for LocalVertexAiCredential {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __LOCAL_VERTEX_AI_CREDENTIAL_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.local.v1.LocalVertexAiCredential",
+    to_json: ::buffa::type_registry::any_to_json::<LocalVertexAiCredential>,
+    from_json: ::buffa::type_registry::any_from_json::<LocalVertexAiCredential>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
@@ -5647,6 +5859,15 @@ pub struct LocalProviderUsageSnapshot {
         LocalProviderUsage,
         ::buffa::Inline<LocalProviderUsage>,
     >,
+    /// Field 9: `vertex`
+    #[serde(
+        rename = "vertex",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub vertex: ::buffa::MessageField<
+        LocalProviderUsage,
+        ::buffa::Inline<LocalProviderUsage>,
+    >,
     /// Field 8: `updated_at`
     #[serde(
         rename = "updatedAt",
@@ -5671,6 +5892,7 @@ impl ::core::fmt::Debug for LocalProviderUsageSnapshot {
             .field("agy", &self.agy)
             .field("opencode", &self.opencode)
             .field("openrouter", &self.openrouter)
+            .field("vertex", &self.vertex)
             .field("updated_at", &self.updated_at)
             .finish()
     }
@@ -5766,6 +5988,14 @@ impl ::buffa::Message for LocalProviderUsageSnapshot {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if self.vertex.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.vertex.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -5839,6 +6069,14 @@ impl ::buffa::Message for LocalProviderUsageSnapshot {
                 buf,
             );
             self.updated_at.write_to(__cache, buf);
+        }
+        if self.vertex.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                9u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.vertex.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -5941,6 +6179,17 @@ impl ::buffa::Message for LocalProviderUsageSnapshot {
                     ctx,
                 )?;
             }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.vertex.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -5957,6 +6206,7 @@ impl ::buffa::Message for LocalProviderUsageSnapshot {
         self.opencode = ::buffa::MessageField::none();
         self.openrouter = ::buffa::MessageField::none();
         self.updated_at = ::buffa::MessageField::none();
+        self.vertex = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -6689,6 +6939,15 @@ pub struct LocalProviderModelCatalog {
         LocalProviderModels,
         ::buffa::Inline<LocalProviderModels>,
     >,
+    /// Field 8: `vertex`
+    #[serde(
+        rename = "vertex",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub vertex: ::buffa::MessageField<
+        LocalProviderModels,
+        ::buffa::Inline<LocalProviderModels>,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -6703,6 +6962,7 @@ impl ::core::fmt::Debug for LocalProviderModelCatalog {
             .field("agy", &self.agy)
             .field("opencode", &self.opencode)
             .field("openrouter", &self.openrouter)
+            .field("vertex", &self.vertex)
             .finish()
     }
 }
@@ -6789,6 +7049,14 @@ impl ::buffa::Message for LocalProviderModelCatalog {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if self.vertex.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.vertex.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -6854,6 +7122,14 @@ impl ::buffa::Message for LocalProviderModelCatalog {
                 buf,
             );
             self.openrouter.write_to(__cache, buf);
+        }
+        if self.vertex.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                8u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.vertex.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -6945,6 +7221,17 @@ impl ::buffa::Message for LocalProviderModelCatalog {
                     ctx,
                 )?;
             }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.vertex.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -6960,6 +7247,7 @@ impl ::buffa::Message for LocalProviderModelCatalog {
         self.agy = ::buffa::MessageField::none();
         self.opencode = ::buffa::MessageField::none();
         self.openrouter = ::buffa::MessageField::none();
+        self.vertex = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -7722,6 +8010,9 @@ pub struct LocalProviderAuthSnapshot {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub openrouter: ::core::option::Option<bool>,
+    /// Field 8: `vertex`
+    #[serde(rename = "vertex", skip_serializing_if = "::core::option::Option::is_none")]
+    pub vertex: ::core::option::Option<bool>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -7736,6 +8027,7 @@ impl ::core::fmt::Debug for LocalProviderAuthSnapshot {
             .field("agy", &self.agy)
             .field("opencode", &self.opencode)
             .field("openrouter", &self.openrouter)
+            .field("vertex", &self.vertex)
             .finish()
     }
 }
@@ -7796,6 +8088,13 @@ impl LocalProviderAuthSnapshot {
         self.openrouter = Some(value);
         self
     }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::vertex`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_vertex(mut self, value: bool) -> Self {
+        self.vertex = Some(value);
+        self
+    }
 }
 ::buffa::impl_default_instance!(LocalProviderAuthSnapshot);
 impl ::buffa::MessageName for LocalProviderAuthSnapshot {
@@ -7838,6 +8137,9 @@ impl ::buffa::Message for LocalProviderAuthSnapshot {
         if self.openrouter.is_some() {
             size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
         }
+        if self.vertex.is_some() {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -7868,6 +8170,9 @@ impl ::buffa::Message for LocalProviderAuthSnapshot {
         }
         if let Some(v) = self.openrouter {
             ::buffa::types::put_bool_field(7u32, v, buf);
+        }
+        if let Some(v) = self.vertex {
+            ::buffa::types::put_bool_field(8u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -7945,6 +8250,15 @@ impl ::buffa::Message for LocalProviderAuthSnapshot {
                     ::buffa::types::decode_bool(buf)?,
                 );
             }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.vertex = ::core::option::Option::Some(
+                    ::buffa::types::decode_bool(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -7960,6 +8274,7 @@ impl ::buffa::Message for LocalProviderAuthSnapshot {
         self.agy = ::core::option::Option::None;
         self.opencode = ::core::option::Option::None;
         self.openrouter = ::core::option::Option::None;
+        self.vertex = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -8041,6 +8356,10 @@ pub mod __buffa {
             pub projects: ::buffa::RepeatedView<
                 'a,
                 super::super::__buffa::view::LocalProjectConfigView<'a>,
+            >,
+            /// Field 9: `vertex_ai`
+            pub vertex_ai: ::buffa::MessageFieldView<
+                super::super::__buffa::view::LocalVertexAiCredentialView<'a>,
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
@@ -8183,6 +8502,31 @@ pub mod __buffa {
                             }
                         }
                     }
+                    9u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.vertex_ai.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.vertex_ai = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::LocalVertexAiCredentialView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     8u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -8270,6 +8614,15 @@ pub mod __buffa {
                         .iter()
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    vertex_ai: match self.vertex_ai.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::LocalVertexAiCredential,
+                                ::buffa::Inline<super::super::LocalVertexAiCredential>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -8330,6 +8683,14 @@ pub mod __buffa {
                         += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                             + inner_size as u64;
                 }
+                if self.vertex_ai.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.vertex_ai.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -8384,6 +8745,14 @@ pub mod __buffa {
                         buf,
                     );
                     v.write_to(__cache, buf);
+                }
+                if self.vertex_ai.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        9u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.vertex_ai.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -8444,6 +8813,12 @@ pub mod __buffa {
                 }
                 if !self.projects.is_empty() {
                     __map.serialize_entry("projects", &*self.projects)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.vertex_ai.as_option()
+                    {
+                        __map.serialize_entry("vertexAi", __v)?;
+                    }
                 }
                 __map.end()
             }
@@ -8595,6 +8970,15 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().projects
             }
+            /// Field 9: `vertex_ai`
+            #[must_use]
+            pub fn vertex_ai(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::LocalVertexAiCredentialView<'_>,
+            > {
+                &self.0.reborrow().vertex_ai
+            }
         }
         impl ::core::convert::From<::buffa::OwnedView<LocalConfigView<'static>>>
         for LocalConfigOwnedView {
@@ -8644,6 +9028,8 @@ pub mod __buffa {
             pub opencode: bool,
             /// Field 7: `openrouter`
             pub openrouter: bool,
+            /// Field 8: `vertex`
+            pub vertex: bool,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for LocalAgentProviderSettingsView<'a> {
@@ -8727,6 +9113,13 @@ pub mod __buffa {
                         )?;
                         view.openrouter = ::buffa::types::decode_bool(&mut cur)?;
                     }
+                    8u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.vertex = ::buffa::types::decode_bool(&mut cur)?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -8763,6 +9156,7 @@ pub mod __buffa {
                     agy: self.agy,
                     opencode: self.opencode,
                     openrouter: self.openrouter,
+                    vertex: self.vertex,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -8798,6 +9192,9 @@ pub mod __buffa {
                 if self.openrouter {
                     size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
                 }
+                if self.vertex {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -8829,6 +9226,9 @@ pub mod __buffa {
                 }
                 if self.openrouter {
                     ::buffa::types::put_bool_field(7u32, self.openrouter, buf);
+                }
+                if self.vertex {
+                    ::buffa::types::put_bool_field(8u32, self.vertex, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -8871,6 +9271,9 @@ pub mod __buffa {
                 }
                 if self.openrouter {
                     __map.serialize_entry("openrouter", &self.openrouter)?;
+                }
+                if self.vertex {
+                    __map.serialize_entry("vertex", &self.vertex)?;
                 }
                 __map.end()
             }
@@ -9006,6 +9409,11 @@ pub mod __buffa {
             pub fn openrouter(&self) -> bool {
                 self.0.reborrow().openrouter
             }
+            /// Field 8: `vertex`
+            #[must_use]
+            pub fn vertex(&self) -> bool {
+                self.0.reborrow().vertex
+            }
         }
         impl ::core::convert::From<
             ::buffa::OwnedView<LocalAgentProviderSettingsView<'static>>,
@@ -9036,6 +9444,306 @@ pub mod __buffa {
             type ViewHandle = LocalAgentProviderSettingsOwnedView;
         }
         impl ::serde::Serialize for LocalAgentProviderSettingsOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// Google Vertex AI is addressed by project and region; the credential itself
+        /// is the machine's Application Default Credentials, which Briar never stores.
+        #[derive(Clone, Debug, Default)]
+        pub struct LocalVertexAiCredentialView<'a> {
+            /// Field 1: `project_id`
+            pub project_id: &'a str,
+            /// Field 2: `location`
+            pub location: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for LocalVertexAiCredentialView<'a> {
+            type Owned = super::super::LocalVertexAiCredential;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.project_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.location = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::LocalVertexAiCredential,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::LocalVertexAiCredential,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::LocalVertexAiCredential {
+                    project_id: self.project_id.to_string(),
+                    location: self.location.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for LocalVertexAiCredentialView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.project_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.project_id)
+                                as u64;
+                }
+                if !self.location.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.location) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.project_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.project_id, buf);
+                }
+                if !self.location.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.location, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for LocalVertexAiCredentialView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.project_id) {
+                    __map.serialize_entry("projectId", self.project_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.location) {
+                    __map.serialize_entry("location", self.location)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for LocalVertexAiCredentialView<'a> {
+            const PACKAGE: &'static str = "briar.local.v1";
+            const NAME: &'static str = "LocalVertexAiCredential";
+            const FULL_NAME: &'static str = "briar.local.v1.LocalVertexAiCredential";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.local.v1.LocalVertexAiCredential";
+        }
+        ::buffa::impl_default_view_instance!(LocalVertexAiCredentialView);
+        ::buffa::impl_view_reborrow!(LocalVertexAiCredentialView);
+        /** Self-contained, `'static` owned view of a `LocalVertexAiCredential` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`LocalVertexAiCredentialView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`LocalVertexAiCredentialView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct LocalVertexAiCredentialOwnedView(
+            ::buffa::OwnedView<LocalVertexAiCredentialView<'static>>,
+        );
+        impl LocalVertexAiCredentialOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    LocalVertexAiCredentialOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    LocalVertexAiCredentialOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::LocalVertexAiCredential,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    LocalVertexAiCredentialOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`LocalVertexAiCredentialView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &LocalVertexAiCredentialView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::LocalVertexAiCredential {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `project_id`
+            #[must_use]
+            pub fn project_id(&self) -> &'_ str {
+                self.0.reborrow().project_id
+            }
+            /// Field 2: `location`
+            #[must_use]
+            pub fn location(&self) -> &'_ str {
+                self.0.reborrow().location
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<LocalVertexAiCredentialView<'static>>,
+        > for LocalVertexAiCredentialOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<LocalVertexAiCredentialView<'static>>,
+            ) -> Self {
+                LocalVertexAiCredentialOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<LocalVertexAiCredentialOwnedView>
+        for ::buffa::OwnedView<LocalVertexAiCredentialView<'static>> {
+            fn from(wrapper: LocalVertexAiCredentialOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<LocalVertexAiCredentialView<'static>>,
+        > for LocalVertexAiCredentialOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<LocalVertexAiCredentialView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::LocalVertexAiCredential {
+            type View<'a> = LocalVertexAiCredentialView<'a>;
+            type ViewHandle = LocalVertexAiCredentialOwnedView;
+        }
+        impl ::serde::Serialize for LocalVertexAiCredentialOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -15581,6 +16289,10 @@ pub mod __buffa {
             pub openrouter: ::buffa::MessageFieldView<
                 super::super::__buffa::view::LocalProviderUsageView<'a>,
             >,
+            /// Field 9: `vertex`
+            pub vertex: ::buffa::MessageFieldView<
+                super::super::__buffa::view::LocalProviderUsageView<'a>,
+            >,
             /// Field 8: `updated_at`
             pub updated_at: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
@@ -15794,6 +16506,31 @@ pub mod __buffa {
                             }
                         }
                     }
+                    9u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.vertex.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.vertex = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::LocalProviderUsageView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     8u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -15911,6 +16648,15 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    vertex: match self.vertex.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::LocalProviderUsage,
+                                ::buffa::Inline<super::super::LocalProviderUsage>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     updated_at: match self.updated_at.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
@@ -15998,6 +16744,14 @@ pub mod __buffa {
                         += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                             + inner_size as u64;
                 }
+                if self.vertex.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.vertex.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -16073,6 +16827,14 @@ pub mod __buffa {
                     );
                     self.updated_at.write_to(__cache, buf);
                 }
+                if self.vertex.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        9u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.vertex.write_to(__cache, buf);
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -16131,6 +16893,11 @@ pub mod __buffa {
                         .as_option()
                     {
                         __map.serialize_entry("openrouter", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.vertex.as_option() {
+                        __map.serialize_entry("vertex", __v)?;
                     }
                 }
                 {
@@ -16302,6 +17069,15 @@ pub mod __buffa {
                 super::super::__buffa::view::LocalProviderUsageView<'_>,
             > {
                 &self.0.reborrow().openrouter
+            }
+            /// Field 9: `vertex`
+            #[must_use]
+            pub fn vertex(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::LocalProviderUsageView<'_>,
+            > {
+                &self.0.reborrow().vertex
             }
             /// Field 8: `updated_at`
             #[must_use]
@@ -17435,6 +18211,10 @@ pub mod __buffa {
             pub openrouter: ::buffa::MessageFieldView<
                 super::super::__buffa::view::LocalProviderModelsView<'a>,
             >,
+            /// Field 8: `vertex`
+            pub vertex: ::buffa::MessageFieldView<
+                super::super::__buffa::view::LocalProviderModelsView<'a>,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for LocalProviderModelCatalogView<'a> {
@@ -17644,6 +18424,31 @@ pub mod __buffa {
                             }
                         }
                     }
+                    8u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.vertex.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.vertex = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::LocalProviderModelsView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -17736,6 +18541,15 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    vertex: match self.vertex.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::LocalProviderModels,
+                                ::buffa::Inline<super::super::LocalProviderModels>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -17801,6 +18615,14 @@ pub mod __buffa {
                 if self.openrouter.is_set() {
                     let __slot = __cache.reserve();
                     let inner_size = self.openrouter.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                if self.vertex.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.vertex.compute_size(__cache);
                     __cache.set(__slot, inner_size);
                     size
                         += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
@@ -17873,6 +18695,14 @@ pub mod __buffa {
                     );
                     self.openrouter.write_to(__cache, buf);
                 }
+                if self.vertex.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        8u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.vertex.write_to(__cache, buf);
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -17931,6 +18761,11 @@ pub mod __buffa {
                         .as_option()
                     {
                         __map.serialize_entry("openrouter", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.vertex.as_option() {
+                        __map.serialize_entry("vertex", __v)?;
                     }
                 }
                 __map.end()
@@ -18094,6 +18929,15 @@ pub mod __buffa {
                 super::super::__buffa::view::LocalProviderModelsView<'_>,
             > {
                 &self.0.reborrow().openrouter
+            }
+            /// Field 8: `vertex`
+            #[must_use]
+            pub fn vertex(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::LocalProviderModelsView<'_>,
+            > {
+                &self.0.reborrow().vertex
             }
         }
         impl ::core::convert::From<
@@ -19302,6 +20146,8 @@ pub mod __buffa {
             pub opencode: ::core::option::Option<bool>,
             /// Field 7: `openrouter`
             pub openrouter: ::core::option::Option<bool>,
+            /// Field 8: `vertex`
+            pub vertex: ::core::option::Option<bool>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for LocalProviderAuthSnapshotView<'a> {
@@ -19385,6 +20231,13 @@ pub mod __buffa {
                         )?;
                         view.openrouter = Some(::buffa::types::decode_bool(&mut cur)?);
                     }
+                    8u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.vertex = Some(::buffa::types::decode_bool(&mut cur)?);
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -19421,6 +20274,7 @@ pub mod __buffa {
                     agy: self.agy,
                     opencode: self.opencode,
                     openrouter: self.openrouter,
+                    vertex: self.vertex,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -19456,6 +20310,9 @@ pub mod __buffa {
                 if self.openrouter.is_some() {
                     size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
                 }
+                if self.vertex.is_some() {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -19487,6 +20344,9 @@ pub mod __buffa {
                 }
                 if let Some(v) = self.openrouter {
                     ::buffa::types::put_bool_field(7u32, v, buf);
+                }
+                if let Some(v) = self.vertex {
+                    ::buffa::types::put_bool_field(8u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -19529,6 +20389,9 @@ pub mod __buffa {
                 }
                 if let ::core::option::Option::Some(__v) = self.openrouter {
                     __map.serialize_entry("openrouter", &__v)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.vertex {
+                    __map.serialize_entry("vertex", &__v)?;
                 }
                 __map.end()
             }
@@ -19664,6 +20527,11 @@ pub mod __buffa {
             pub fn openrouter(&self) -> ::core::option::Option<bool> {
                 self.0.reborrow().openrouter
             }
+            /// Field 8: `vertex`
+            #[must_use]
+            pub fn vertex(&self) -> ::core::option::Option<bool> {
+                self.0.reborrow().vertex
+            }
         }
         impl ::core::convert::From<
             ::buffa::OwnedView<LocalProviderAuthSnapshotView<'static>>,
@@ -19787,6 +20655,7 @@ pub mod __buffa {
     pub fn register_types(reg: &mut ::buffa::type_registry::TypeRegistry) {
         reg.register_json_any(super::__LOCAL_CONFIG_JSON_ANY);
         reg.register_json_any(super::__LOCAL_AGENT_PROVIDER_SETTINGS_JSON_ANY);
+        reg.register_json_any(super::__LOCAL_VERTEX_AI_CREDENTIAL_JSON_ANY);
         reg.register_json_any(super::__LOCAL_APP_SETTINGS_JSON_ANY);
         reg.register_json_any(super::__LOCAL_MANAGED_COMPUTER_CONFIG_JSON_ANY);
         reg.register_json_any(super::__LOCAL_PROJECT_CONFIG_JSON_ANY);
@@ -19821,6 +20690,10 @@ pub use self::__buffa::view::LocalConfigOwnedView;
 pub use self::__buffa::view::LocalAgentProviderSettingsView;
 #[doc(inline)]
 pub use self::__buffa::view::LocalAgentProviderSettingsOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::LocalVertexAiCredentialView;
+#[doc(inline)]
+pub use self::__buffa::view::LocalVertexAiCredentialOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::LocalAppSettingsView;
 #[doc(inline)]

@@ -46,6 +46,8 @@ export const workerAgentProviderFromProto = (
       return "opencode";
     case ProtoAgentProvider.OPENROUTER:
       return "openrouter";
+    case ProtoAgentProvider.VERTEX:
+      return "vertex";
     case ProtoAgentProvider.UNSPECIFIED:
       return invalid("Agent provider is required");
     default:

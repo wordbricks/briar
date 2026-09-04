@@ -48,8 +48,10 @@ import {
   loadAppProviderSettings,
   loadAgentProviderModels,
   loadOpenRouterCredentialStatus,
+  loadVertexAiCredentialStatus,
   updateAppProviderSettings,
   updateOpenRouterApiKey,
+  updateVertexAiSettings,
   type AgentProvider,
   type AgentProviderModelCatalogEntry,
   defaultAgentProviderModelCatalog,
@@ -76,6 +78,7 @@ import type {
   OnboardingPrerequisites,
   OpenCodeTerminalPathStatus,
   OpenRouterCredentialStatus,
+  VertexAiCredentialStatus,
   ProviderUsage,
   RepositoryReadiness,
 } from "../generated/tauri";
@@ -87,6 +90,7 @@ import {
   GrokIcon,
   OpenCodeIcon,
   OpenRouterIcon,
+  VertexAiIcon,
 } from "./AgentIcons";
 import { MacSecurePasswordInput } from "./MacSecurePasswordInput";
 import { AgentUsageSettings } from "./AgentUsageSettings";
@@ -242,6 +246,15 @@ export function AppSettings({
     useState<OpenRouterCredentialStatus>({ configured: false });
   const [openRouterApiKey, setOpenRouterApiKey] = useState("");
   const [openRouterKeySaving, setOpenRouterKeySaving] = useState(false);
+  const [vertexCredential, setVertexCredential] =
+    useState<VertexAiCredentialStatus>({
+      configured: false,
+      projectId: null,
+      location: null,
+    });
+  const [vertexProjectId, setVertexProjectId] = useState("");
+  const [vertexLocation, setVertexLocation] = useState("");
+  const [vertexSaving, setVertexSaving] = useState(false);
   const [runtimeSettings, setRuntimeSettings] =
     useState<AppRuntimeSettings | null>(null);
   const [runtimeSettingsLoading, setRuntimeSettingsLoading] = useState(false);
@@ -270,7 +283,15 @@ export function AppSettings({
     setProvidersLoading(true);
     setProviderError(null);
     try {
-      const [statuses, settings, usage, models, terminalPath, openRouterStatus] = await Promise.all([
+      const [
+        statuses,
+        settings,
+        usage,
+        models,
+        terminalPath,
+        openRouterStatus,
+        vertexStatus,
+      ] = await Promise.all([
         inspectOnboardingPrerequisites(),
         loadAppProviderSettings(),
         loadAgentUsage().catch(() => null),
@@ -279,6 +300,7 @@ export function AppSettings({
         ),
         inspectOpenCodeTerminalPath().catch(() => null),
         loadOpenRouterCredentialStatus(),
+        loadVertexAiCredentialStatus(),
       ]);
       setProviderStatuses(statuses);
       setProviderSettings(settings);
@@ -286,6 +308,9 @@ export function AppSettings({
       setProviderModels(models);
       setOpenCodeTerminalPath(terminalPath);
       setOpenRouterCredential(openRouterStatus);
+      setVertexCredential(vertexStatus);
+      setVertexProjectId(vertexStatus.projectId ?? "");
+      setVertexLocation(vertexStatus.location ?? "");
       setProvidersChecked(true);
     } catch (caught) {
       setProviderError(
@@ -444,6 +469,33 @@ export function AppSettings({
       );
     } finally {
       setOpenRouterKeySaving(false);
+    }
+  };
+
+  const saveVertexAiSettings = async (
+    projectId: string | null,
+    location: string | null,
+  ) => {
+    if (vertexSaving) return;
+    setVertexSaving(true);
+    setProviderError(null);
+    try {
+      const saved = await updateVertexAiSettings(projectId, location);
+      setVertexCredential(saved);
+      setVertexProjectId(saved.projectId ?? "");
+      setVertexLocation(saved.location ?? "");
+      setProviderStatuses(await inspectOnboardingPrerequisites());
+      setProviderModels(
+        await loadAgentProviderModels({ refresh: true }).catch(
+          () => defaultAgentProviderModelCatalog,
+        ),
+      );
+    } catch (caught) {
+      setProviderError(
+        caught instanceof Error ? caught.message : String(caught),
+      );
+    } finally {
+      setVertexSaving(false);
     }
   };
 
@@ -1291,6 +1343,92 @@ export function AppSettings({
                     ) : null
                   }
                 />
+                <ProviderRow
+                  available={Boolean(
+                    providerStatuses?.vertex.installed &&
+                      providerStatuses.vertex.authenticated,
+                  )}
+                  description={providerDescription({
+                    authenticated: providerStatuses?.vertex.authenticated,
+                    enabled: providerSettings?.vertex ?? false,
+                    installed: providerStatuses?.vertex.installed,
+                    loading: providersLoading && !providerStatuses,
+                    providerName: "Vertex AI",
+                    t,
+                  })}
+                  disabled={
+                    providerSaving !== null ||
+                    providerInstalling !== null ||
+                    vertexSaving
+                  }
+                  details={
+                    <VertexAiDetails
+                      {...providerModelPreferenceProps("vertex")}
+                      configured={vertexCredential.configured}
+                      installed={providerStatuses?.vertex.installed}
+                      loading={providersLoading && !providerStatuses}
+                      location={vertexLocation}
+                      models={providerModels.vertex}
+                      onLocationChange={setVertexLocation}
+                      onProjectIdChange={setVertexProjectId}
+                      onRemove={() => void saveVertexAiSettings(null, null)}
+                      onSave={() =>
+                        void saveVertexAiSettings(vertexProjectId, vertexLocation)}
+                      projectId={vertexProjectId}
+                      saving={vertexSaving}
+                    />
+                  }
+                  detailsId="provider-vertex-details"
+                  detailsLabel={t("appSettings.toggleProviderDetails", {
+                    provider: "Vertex AI",
+                  })}
+                  enabled={providerSettings?.vertex ?? false}
+                  expanded={expandedProvider === "vertex"}
+                  icon={
+                    <ProviderIcon tone="vertex">
+                      <VertexAiIcon size={20} />
+                    </ProviderIcon>
+                  }
+                  name="Vertex AI"
+                  onExpandedChange={(expanded) =>
+                    setExpandedProvider(expanded ? "vertex" : null)
+                  }
+                  onToggle={(enabled) => void toggleProvider("vertex", enabled)}
+                  title={
+                    <>
+                      Vertex AI
+                      {providerStatuses?.vertex.version ? (
+                        <code>{providerStatuses.vertex.version}</code>
+                      ) : null}
+                    </>
+                  }
+                  trailing={
+                    providerInstalling === "vertex" ? (
+                      <Button disabled size="sm" type="button" variant="outline">
+                        <Spinner className="size-[24px]" />
+                        {t("appSettings.installing")}
+                      </Button>
+                    ) : providerStatuses?.vertex.installed === false ? (
+                      <Button
+                        aria-label={t("appSettings.installProvider", {
+                          provider: "Vertex AI runtime",
+                        })}
+                        onClick={() => void installProvider("vertex")}
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                      >
+                        <Download />
+                        {t("appSettings.install")}
+                      </Button>
+                    ) : providerSaving === "vertex" || vertexSaving ? (
+                      <Spinner
+                        aria-label={t("common.saving")}
+                        className="size-[16px]"
+                      />
+                    ) : null
+                  }
+                />
               </SettingsCard>
 
               {providerError ? <SettingsAlert>{providerError}</SettingsAlert> : null}
@@ -1696,6 +1834,130 @@ function OpenRouterDetails({
               variant="outline"
             >
               {t("appSettings.openrouterApiKeyRemove")}
+            </Button>
+          ) : null}
+        </div>
+      </section>
+      <ProviderModelsSettings
+        loading={loading}
+        modelPreference={modelPreference}
+        models={models}
+        onDefaultModelChange={onDefaultModelChange}
+        onToggleFavorite={onToggleFavorite}
+      />
+    </div>
+  );
+}
+
+/**
+ * Vertex AI is addressed by project and region. It has no API key to store:
+ * authentication is the machine's Google Application Default Credentials, so
+ * the panel points at `gcloud auth application-default login` instead of asking
+ * for a secret.
+ */
+function VertexAiDetails({
+  configured,
+  installed,
+  loading,
+  location,
+  modelPreference,
+  models,
+  onDefaultModelChange,
+  onLocationChange,
+  onProjectIdChange,
+  onRemove,
+  onSave,
+  onToggleFavorite,
+  projectId,
+  saving,
+}: {
+  configured: boolean;
+  installed?: boolean;
+  loading: boolean;
+  location: string;
+  modelPreference: AgentProviderModelPreference;
+  models: AgentProviderModelCatalogEntry;
+  onDefaultModelChange: (model: string) => void;
+  onLocationChange: (value: string) => void;
+  onProjectIdChange: (value: string) => void;
+  onRemove: () => void;
+  onSave: () => void;
+  onToggleFavorite: (model: string) => void;
+  projectId: string;
+  saving: boolean;
+}) {
+  const { t } = useI18n();
+  const inputClassName =
+    "h-9 w-full rounded-md border border-input bg-background px-3 font-mono text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
+  return (
+    <div className="grid gap-5 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+      <section className="grid content-start gap-3">
+        <div>
+          <Typography as="h3" className="font-semibold" variant="bodySm">
+            {t("appSettings.vertexProject")}
+          </Typography>
+          <Typography as="p" className="mt-1" tone="muted" variant="caption">
+            {t("appSettings.vertexProjectHelp")}
+          </Typography>
+        </div>
+        <Typography
+          as="p"
+          tone={configured ? "default" : "muted"}
+          variant="caption"
+        >
+          {t(
+            configured
+              ? "appSettings.vertexProjectConfigured"
+              : "appSettings.vertexProjectMissing",
+          )}
+        </Typography>
+        <input
+          aria-label={t("appSettings.vertexProjectId")}
+          autoCapitalize="none"
+          autoComplete="off"
+          className={inputClassName}
+          disabled={!installed || saving}
+          onChange={(event) => onProjectIdChange(event.target.value)}
+          placeholder={t("appSettings.vertexProjectIdPlaceholder")}
+          spellCheck={false}
+          value={projectId}
+        />
+        <input
+          aria-label={t("appSettings.vertexLocation")}
+          autoCapitalize="none"
+          autoComplete="off"
+          className={inputClassName}
+          disabled={!installed || saving}
+          onChange={(event) => onLocationChange(event.target.value)}
+          placeholder={t("appSettings.vertexLocationPlaceholder")}
+          spellCheck={false}
+          value={location}
+        />
+        <Typography as="p" tone="muted" variant="caption">
+          {t("appSettings.vertexAdcHint")}
+        </Typography>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            disabled={
+              !installed || saving || projectId.trim().length < 6 ||
+              location.trim().length === 0
+            }
+            onClick={onSave}
+            size="sm"
+            type="button"
+          >
+            {saving ? <Spinner className="size-[24px]" /> : null}
+            {t("common.save")}
+          </Button>
+          {configured ? (
+            <Button
+              disabled={saving}
+              onClick={onRemove}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              {t("appSettings.vertexProjectRemove")}
             </Button>
           ) : null}
         </div>

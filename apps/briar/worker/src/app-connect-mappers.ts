@@ -394,6 +394,7 @@ const agentProvider = {
   agy: AgentProvider.AGY,
   opencode: AgentProvider.OPENCODE,
   openrouter: AgentProvider.OPENROUTER,
+  vertex: AgentProvider.VERTEX,
 } as const satisfies Record<AgentProviderName, AgentProvider>;
 
 const issueDifficulty = {

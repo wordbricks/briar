@@ -193,6 +193,7 @@ const provider = {
   agy: AgentProvider.AGY,
   opencode: AgentProvider.OPENCODE,
   openrouter: AgentProvider.OPENROUTER,
+  vertex: AgentProvider.VERTEX,
 } as const;
 
 const appProvider = (value: keyof typeof provider) => provider[value];

@@ -630,23 +630,61 @@ pub(super) fn openrouter_api_key_from(config_path: &Path) -> Result<Option<Strin
         .filter(|key| !key.is_empty()))
 }
 
-/// Credential an OpenCode upstream authenticates with. Credential shapes differ
-/// per upstream, so the match stays exhaustive over the provider enum.
-fn opencode_upstream_credential(
+/// Vertex AI project and region, saved together or not at all.
+pub(super) fn vertex_ai_settings_from(
+    config_path: &Path,
+) -> Result<Option<LocalVertexAiCredential>, String> {
+    Ok(read_cli_config(config_path)?
+        .vertex_ai
+        .into_option()
+        .filter(|saved| !saved.project_id.trim().is_empty() && !saved.location.trim().is_empty()))
+}
+
+/// Environment pairs an upstream's saved credential contributes. The match is
+/// exhaustive over the credential shape rather than over the provider, so a new
+/// upstream that reuses a shape needs nothing here. `None` means "not saved".
+fn opencode_upstream_credential_environment(
     config_path: &Path,
     upstream: &agent::OpenCodeUpstream,
-) -> Result<Option<String>, String> {
-    use agent::AgentProviderKind as Provider;
-    match upstream.provider {
-        Provider::Openrouter => openrouter_api_key_from(config_path),
-        // Not OpenCode upstreams; `opencode_upstream()` never returns them.
-        Provider::Codex
-        | Provider::Claude
-        | Provider::Cursor
-        | Provider::Grok
-        | Provider::Agy
-        | Provider::Opencode => Ok(None),
+) -> Result<Option<Vec<(String, String)>>, String> {
+    match &upstream.credential {
+        agent::OpenCodeUpstreamCredential::ApiKey {
+            environment_variable,
+        } => Ok(openrouter_api_key_from(config_path)?
+            .map(|key| vec![((*environment_variable).to_string(), key)])),
+        agent::OpenCodeUpstreamCredential::GoogleAdc {
+            project_environment_variable,
+            location_environment_variable,
+        } => Ok(vertex_ai_settings_from(config_path)?.map(|saved| {
+            vec![
+                (
+                    (*project_environment_variable).to_string(),
+                    saved.project_id.trim().to_string(),
+                ),
+                (
+                    (*location_environment_variable).to_string(),
+                    saved.location.trim().to_string(),
+                ),
+            ]
+        })),
     }
+}
+
+/// Every OpenCode upstream whose credential is saved, derived from the upstream
+/// table so no caller keeps a list of upstreams of its own.
+pub(super) fn configured_upstreams_from(
+    config_path: &Path,
+) -> Result<agent::ConfiguredUpstreams, String> {
+    let mut configured = Vec::new();
+    for provider in agent::AgentProviderKind::all() {
+        let Some(upstream) = provider.opencode_upstream() else {
+            continue;
+        };
+        if opencode_upstream_credential_environment(config_path, upstream)?.is_some() {
+            configured.push(provider);
+        }
+    }
+    Ok(agent::ConfiguredUpstreams::new(configured))
 }
 
 /// Environment additions a provider process needs. Only OpenCode upstreams have
@@ -659,22 +697,85 @@ pub(super) fn provider_environment_from(
     let Some(upstream) = provider.opencode_upstream() else {
         return Ok(Vec::new());
     };
-    let credential = opencode_upstream_credential(config_path, upstream)?
+    let mut environment = opencode_upstream_credential_environment(config_path, upstream)?
         .ok_or_else(|| upstream.missing_credential_error.to_string())?;
-    Ok(vec![
-        (
-            upstream.credential_environment_variable.to_string(),
-            credential,
-        ),
-        (
-            "OPENCODE_CONFIG_CONTENT".to_string(),
-            upstream.config_content.to_string(),
-        ),
-        (
-            agent::AGENT_PROVIDER_ENVIRONMENT_KEY.to_string(),
-            provider.wire_name().to_string(),
-        ),
-    ])
+    environment.push((
+        "OPENCODE_CONFIG_CONTENT".to_string(),
+        upstream.config_content.to_string(),
+    ));
+    environment.push((
+        agent::AGENT_PROVIDER_ENVIRONMENT_KEY.to_string(),
+        provider.wire_name().to_string(),
+    ));
+    Ok(environment)
+}
+
+/// Vertex AI is addressed by project and region; the credential itself is the
+/// machine's Application Default Credentials, so nothing secret is stored here.
+/// Both fields clear together, which is what "not configured" means.
+pub(super) fn update_vertex_ai_settings_at(
+    config_path: &Path,
+    project_id: Option<String>,
+    location: Option<String>,
+) -> Result<VertexAiCredentialStatus, String> {
+    let project_id = project_id.map(|value| value.trim().to_string());
+    let location = location.map(|value| value.trim().to_string());
+    let cleared = project_id.as_deref().is_none_or(str::is_empty)
+        && location.as_deref().is_none_or(str::is_empty);
+    let mut config = read_cli_config(config_path)?;
+    if cleared {
+        config.vertex_ai = None.into();
+        write_cli_config(config_path, &config)?;
+        return Ok(VertexAiCredentialStatus {
+            configured: false,
+            project_id: None,
+            location: None,
+        });
+    }
+    let project_id = project_id.unwrap_or_default();
+    let location = location.unwrap_or_default();
+    if !is_google_cloud_project_id(&project_id) {
+        return Err(
+            "Google Cloud 프로젝트 ID는 소문자로 시작하는 6~30자의 소문자·숫자·하이픈이어야 합니다."
+                .to_string(),
+        );
+    }
+    if !is_vertex_location(&location) {
+        return Err("Vertex AI 리전은 us-central1 처럼 입력하세요.".to_string());
+    }
+    config.vertex_ai = Some(LocalVertexAiCredential {
+        project_id: project_id.clone(),
+        location: location.clone(),
+        ..Default::default()
+    })
+    .into();
+    write_cli_config(config_path, &config)?;
+    Ok(VertexAiCredentialStatus {
+        configured: true,
+        project_id: Some(project_id),
+        location: Some(location),
+    })
+}
+
+/// Google's documented project-id rule: 6–30 characters, lowercase letter
+/// first, lowercase letters, digits and hyphens after, not ending in a hyphen.
+fn is_google_cloud_project_id(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    (6..=30).contains(&bytes.len())
+        && bytes[0].is_ascii_lowercase()
+        && bytes[bytes.len() - 1] != b'-'
+        && bytes
+            .iter()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || *byte == b'-')
+}
+
+/// A Vertex region token such as `us-central1`, or the multi-region `global`.
+fn is_vertex_location(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    (1..=40).contains(&bytes.len())
+        && bytes
+            .iter()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || *byte == b'-')
 }
 
 pub(super) fn update_openrouter_api_key_at(

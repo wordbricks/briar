@@ -204,6 +204,7 @@ const agentProvider = {
   agy: AgentProvider.AGY,
   opencode: AgentProvider.OPENCODE,
   openrouter: AgentProvider.OPENROUTER,
+  vertex: AgentProvider.VERTEX,
 } as const satisfies Record<DomainAgentProvider, AgentProvider>;
 
 const protoComputerUsePolicy = {
@@ -292,6 +293,8 @@ const domainAgentProvider = (value: AgentProvider): DomainAgentProvider => {
       return "opencode";
     case AgentProvider.OPENROUTER:
       return "openrouter";
+    case AgentProvider.VERTEX:
+      return "vertex";
     default:
       throw new ConnectError("provider is required", Code.InvalidArgument);
   }

@@ -2,13 +2,15 @@ import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import { applyD1Migrations } from "./test-helpers/d1";
 import { executeD1Sql } from "./test-helpers/d1-sql";
-import { workerRuntimeProtoJsonFixture } from "./test-helpers/worker-runtime";
+import { workerRuntimeProtoJsonFixtureBeforeVertex } from "./test-helpers/worker-runtime";
 
 describe("project agent task cancellation migration", () => {
   it("adds cancellation columns and a resume counter to task jobs", async () => {
     const db = env.DB;
     const now = "2026-09-04T00:00:00.000Z";
-    const runtimeProtoJson = workerRuntimeProtoJsonFixture()
+    // Pinned to 0179, whose runtime validation view only knows the seven
+    // providers that predate the Vertex migration.
+    const runtimeProtoJson = workerRuntimeProtoJsonFixtureBeforeVertex()
       .replaceAll("'", "''");
     await applyD1Migrations(db, {
       through: "0179_production_operation_leases.sql",

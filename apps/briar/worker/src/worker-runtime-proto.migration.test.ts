@@ -1,9 +1,8 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
-import { agentProviders } from "../../src/lib/agent-provider";
 import { applyD1Migrations } from "./test-helpers/d1";
 import { executeD1Sql } from "./test-helpers/d1-sql";
-import { workerRuntimeMetadataFromStoredProtoJson } from "./worker-runtime-mappers";
+import { providersBeforeVertexMigration } from "./test-helpers/worker-runtime";
 
 describe("Worker runtime ProtoJSON migration", () => {
   it("backfills complete advertisements and removes invalid bindings", async () => {
@@ -42,7 +41,10 @@ describe("Worker runtime ProtoJSON migration", () => {
          '${now}', '${now}');
     `);
 
-    const providerHealth = Object.fromEntries(agentProviders.map((provider) => [
+    // Pinned to 0165, so the advertisement has to describe exactly the
+    // providers migration 0166's validation view accepts.
+    const providerHealth = Object.fromEntries(
+      providersBeforeVertexMigration.map((provider) => [
       provider,
       {
         installed: provider === "codex",
@@ -54,7 +56,7 @@ describe("Worker runtime ProtoJSON migration", () => {
       },
     ]));
     const providerCapabilities = Object.fromEntries(
-      agentProviders.map((provider) => [provider, {
+      providersBeforeVertexMigration.map((provider) => [provider, {
         models: provider === "codex"
           ? [{
               id: "gpt-5",
@@ -172,16 +174,46 @@ describe("Worker runtime ProtoJSON migration", () => {
       `select runtime_proto_json from briar_execution_workers
        where id = 'runtime-worker'`,
     ).first<string>("runtime_proto_json");
-    const runtime = workerRuntimeMetadataFromStoredProtoJson(stored!);
-    expect(runtime.agentProvider).toBe("codex");
-    expect(runtime.providers).toEqual(["codex"]);
+    // Asserted against the stored ProtoJSON rather than through
+    // workerRuntimeMetadataFromStoredProtoJson: this test is pinned to the
+    // schema at migration 0166, whose advertisements describe seven providers,
+    // while the mapper validates against today's provider catalog.
+    const runtime = JSON.parse(stored!) as {
+      agentProvider: string;
+      versions: Record<string, string>;
+      providerHealth: {
+        provider: string;
+        healthy?: boolean;
+        maxUsedPercent?: number;
+      }[];
+      capabilities: {
+        worktrees?: boolean;
+        remoteUpdates?: { supported?: boolean; protocol?: number };
+        workflowRequirements?: { id: string; healthy?: boolean }[];
+        providerCapabilities: {
+          provider: string;
+          models?: { id: string; defaultEffortId?: string }[];
+        }[];
+      };
+    };
+    expect(runtime.agentProvider).toBe("AGENT_PROVIDER_CODEX");
     expect(runtime.versions).toEqual({ briar: "1.2.3", bun: "1.4.0" });
-    expect(runtime.providerHealth.codex?.maxUsedPercent).toBe(74.5);
-    expect(runtime.providerCapabilities.codex.models[0]).toMatchObject({
-      id: "gpt-5",
-      defaultEffortId: "high",
-    });
-    expect(runtime.proto.capabilities).toMatchObject({
+    expect(
+      runtime.providerHealth
+        .filter((entry) => entry.healthy)
+        .map((entry) => entry.provider),
+    ).toEqual(["AGENT_PROVIDER_CODEX"]);
+    expect(
+      runtime.providerHealth.find((entry) =>
+        entry.provider === "AGENT_PROVIDER_CODEX"
+      )?.maxUsedPercent,
+    ).toBe(74.5);
+    expect(
+      runtime.capabilities.providerCapabilities.find((entry) =>
+        entry.provider === "AGENT_PROVIDER_CODEX"
+      )?.models?.[0],
+    ).toMatchObject({ id: "gpt-5", defaultEffortId: "high" });
+    expect(runtime.capabilities).toMatchObject({
       worktrees: true,
       remoteUpdates: { supported: true, protocol: 1 },
       workflowRequirements: [{ id: "git", healthy: true }],
@@ -201,9 +233,10 @@ describe("Worker runtime ProtoJSON migration", () => {
       `update briar_execution_workers set runtime_proto_json = ?
        where id = 'runtime-worker'`,
     ).bind(JSON.stringify(withoutVersions)).run();
-    expect(workerRuntimeMetadataFromStoredProtoJson(
-      JSON.stringify(withoutVersions),
-    ).versions).toEqual({});
+    expect(await db.prepare(
+      `select json_type(runtime_proto_json, '$.versions') as versions
+       from briar_execution_workers where id = 'runtime-worker'`,
+    ).first<string | null>("versions")).toBeNull();
 
     const oversized = JSON.parse(stored!) as Record<string, unknown>;
     oversized.versions = { oversized: "x".repeat(1_048_576) };
@@ -232,7 +265,14 @@ describe("Worker runtime ProtoJSON migration", () => {
     expect((await db.prepare(`pragma foreign_key_check`).all()).results)
       .toEqual([]);
 
-    expect(runtime.proto.providerHealth.map((health) => health.provider))
-      .toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(runtime.providerHealth.map((health) => health.provider)).toEqual([
+      "AGENT_PROVIDER_CODEX",
+      "AGENT_PROVIDER_CLAUDE",
+      "AGENT_PROVIDER_CURSOR",
+      "AGENT_PROVIDER_GROK",
+      "AGENT_PROVIDER_AGY",
+      "AGENT_PROVIDER_OPENCODE",
+      "AGENT_PROVIDER_OPENROUTER",
+    ]);
   });
 });

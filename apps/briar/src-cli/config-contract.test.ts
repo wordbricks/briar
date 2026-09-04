@@ -21,6 +21,7 @@ const config = {
     agy: false,
     opencode: false,
     openrouter: false,
+    vertex: false,
   },
   appSettings: {
     preventSleepWhileRunning: true,

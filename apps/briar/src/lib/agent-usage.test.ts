@@ -79,6 +79,7 @@ describe("agent usage presentation", () => {
       agy: { ...provider, provider: "agy" as const },
       opencode: { ...provider, provider: "opencode" as const },
       openrouter: { ...provider, provider: "openrouter" as const },
+      vertex: { ...provider, provider: "vertex" as const },
       cursor: { ...provider, provider: "cursor" as const },
     };
     recordAgentUsageSnapshot(snapshot);

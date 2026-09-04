@@ -118,6 +118,12 @@ const providerCapabilities = {
     allowCustomModels: true,
     error: null,
   },
+  vertex: {
+    models: [],
+    defaultEfforts: [],
+    allowCustomModels: true,
+    error: null,
+  },
 };
 
 describe("channel issue proposal approval route", () => {

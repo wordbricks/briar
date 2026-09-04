@@ -71,11 +71,17 @@ export const commands = {
 } | null>("load_auto_hunt_dispatch", { dispatchGroupId, afterCursor }),
 	loadAppProviderSettings: () => __TAURI_INVOKE<AppProviderSettings>("load_app_provider_settings"),
 	loadOpenrouterCredentialStatus: () => __TAURI_INVOKE<OpenRouterCredentialStatus>("load_openrouter_credential_status"),
+	loadVertexAiCredentialStatus: () => __TAURI_INVOKE<VertexAiCredentialStatus>("load_vertex_ai_credential_status"),
 	loadAppRuntimeSettings: () => __TAURI_INVOKE<AppRuntimeSettings>("load_app_runtime_settings"),
 	loadBrowserAutomationSettings: () => __TAURI_INVOKE<BrowserAutomationSettings>("load_browser_automation_settings"),
 	loadAgentUsage: () => __TAURI_INVOKE<AgentUsageSnapshot>("load_agent_usage"),
 	updateAppProviderSettings: (settings: AppProviderSettings) => __TAURI_INVOKE<AppProviderSettings>("update_app_provider_settings", { settings }),
 	updateOpenrouterApiKey: (apiKey: string | null) => __TAURI_INVOKE<OpenRouterCredentialStatus>("update_openrouter_api_key", { apiKey }),
+	/**
+	 *  Vertex AI stores no secret: authentication is the machine's Google
+	 *  Application Default Credentials, and only the project and region are saved.
+	 */
+	updateVertexAiSettings: (projectId: string | null, location: string | null) => __TAURI_INVOKE<VertexAiCredentialStatus>("update_vertex_ai_settings", { projectId, location }),
 	updateAppRuntimeSettings: (settings: AppRuntimeSettingsUpdate) => __TAURI_INVOKE<AppRuntimeSettings>("update_app_runtime_settings", { settings }),
 	updateBrowserAutomationSettings: (settings: BrowserAutomationSettings) => __TAURI_INVOKE<BrowserAutomationSettings>("update_browser_automation_settings", { settings }),
 	loadProjectLlmSettings: (projectId: string) => __TAURI_INVOKE<ProjectLlmSettings_Serialize>("load_project_llm_settings", { projectId }),
@@ -88,7 +94,7 @@ export const commands = {
 	projectRepositoryReadiness: (projectId: string) => __TAURI_INVOKE<RepositoryReadiness>("project_repository_readiness", { projectId }),
 	prepareProjectRepository: (projectId: string, credential: ProjectGithubCredential) => __TAURI_INVOKE<PreparedProjectRepository>("prepare_project_repository", { projectId, credential }),
 	disconnectLocalProject: (projectId: string) => __TAURI_INVOKE<null>("disconnect_local_project", { projectId }),
-	connectLocalProject: (apiUrl: string, projectId: string, agentToken: string, repositoryPath: string, autoHunt: AutoHuntConfig_Deserialize, provider: "codex" | "claude" | "cursor" | "grok" | "agy" | "opencode" | "openrouter" | null) => __TAURI_INVOKE<ConnectedLocalProject_Serialize>("connect_local_project", { apiUrl, projectId, agentToken, repositoryPath, autoHunt, provider }),
+	connectLocalProject: (apiUrl: string, projectId: string, agentToken: string, repositoryPath: string, autoHunt: AutoHuntConfig_Deserialize, provider: "codex" | "claude" | "cursor" | "grok" | "agy" | "opencode" | "openrouter" | "vertex" | null) => __TAURI_INVOKE<ConnectedLocalProject_Serialize>("connect_local_project", { apiUrl, projectId, agentToken, repositoryPath, autoHunt, provider }),
 	inspectVelen: (org: string | null) => __TAURI_INVOKE<VelenInspection>("inspect_velen", { org }),
 	autoHuntHealth: (projectId: string) => __TAURI_INVOKE<AutoHuntHealth>("auto_hunt_health", { projectId }),
 	repairAutoHunt: (projectId: string) => __TAURI_INVOKE<AutoHuntHealth>("repair_auto_hunt", { projectId }),
@@ -163,7 +169,7 @@ export type AgentProviderEffort = {
 	isDefault: boolean,
 };
 
-export type AgentProviderKind = "codex" | "claude" | "cursor" | "grok" | "agy" | "opencode" | "openrouter";
+export type AgentProviderKind = "codex" | "claude" | "cursor" | "grok" | "agy" | "opencode" | "openrouter" | "vertex";
 
 export type AgentProviderModel = {
 	id: string,
@@ -181,6 +187,7 @@ export type AgentProviderModelCatalog = {
 	agy: AgentProviderModelCatalogEntry,
 	opencode: AgentProviderModelCatalogEntry,
 	openrouter: AgentProviderModelCatalogEntry,
+	vertex: AgentProviderModelCatalogEntry,
 };
 
 export type AgentProviderModelCatalogEntry = {
@@ -212,6 +219,7 @@ export type AgentUsageSnapshot = {
 	agy: ProviderUsage,
 	opencode: ProviderUsage,
 	openrouter: ProviderUsage,
+	vertex: ProviderUsage,
 	cursor: ProviderUsage,
 	updatedAt: number,
 };
@@ -234,6 +242,7 @@ export type AppProviderSettings = {
 	agy: boolean,
 	opencode: boolean,
 	openrouter: boolean,
+	vertex: boolean,
 };
 
 export type AppRuntimeSettings = {
@@ -539,7 +548,7 @@ export type LovableStack = "tanstack-start" | "vite-react";
 
 export type ModelEffort = string;
 
-export type OnboardingPrerequisite = "git" | "codex" | "claude" | "cursor" | "grok" | "agy" | "opencode" | "openrouter";
+export type OnboardingPrerequisite = "git" | "codex" | "claude" | "cursor" | "grok" | "agy" | "opencode" | "openrouter" | "vertex";
 
 export type OnboardingPrerequisiteStatus = {
 	installed: boolean,
@@ -556,6 +565,7 @@ export type OnboardingPrerequisites = {
 	agy: OnboardingPrerequisiteStatus,
 	opencode: OnboardingPrerequisiteStatus,
 	openrouter: OnboardingPrerequisiteStatus,
+	vertex: OnboardingPrerequisiteStatus,
 };
 
 export type OpenCodeTerminalPathStatus = {
@@ -880,6 +890,17 @@ export type VelenSource = {
 	sourceRef: string,
 	provider: string,
 	status: string,
+};
+
+/**
+ *  Vertex AI addressing the settings screen shows back to the user. Neither
+ *  field is a secret: the credential is the machine's Application Default
+ *  Credentials, which Briar never reads or stores.
+ */
+export type VertexAiCredentialStatus = {
+	configured: boolean,
+	projectId: string | null,
+	location: string | null,
 };
 
 export type WorkflowCheckpointConfig = {

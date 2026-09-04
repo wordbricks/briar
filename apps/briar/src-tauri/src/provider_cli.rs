@@ -1,3 +1,4 @@
+use crate::agent;
 use briar_contracts::proto::briar::local::v1 as local_proto;
 use serde::de::DeserializeOwned;
 use std::{
@@ -115,11 +116,17 @@ fn decode<T: DeserializeOwned>(stdout: &str) -> Result<T, String> {
 
 pub(crate) fn provider_usage_snapshot(
     home: &Path,
-    openrouter_configured: bool,
+    configured_upstreams: &agent::ConfiguredUpstreams,
 ) -> Result<local_proto::LocalProviderUsageSnapshot, String> {
     let execution_path = crate::cli_execution_path(home)?;
     let execution_path = execution_path.to_string_lossy().into_owned();
     let home_argument = home.to_string_lossy().into_owned();
+    // The desktop owns the upstream credentials, so it answers for them rather
+    // than handing them to the CLI. The flag name is derived from the provider.
+    let upstream_flags: Vec<String> = configured_upstreams
+        .iter()
+        .map(|provider| format!("--{}-configured", provider.wire_name()))
+        .collect();
     let mut arguments = vec![
         "provider",
         "usage",
@@ -129,9 +136,7 @@ pub(crate) fn provider_usage_snapshot(
         "--execution-path",
         &execution_path,
     ];
-    if openrouter_configured {
-        arguments.push("--openrouter-configured");
-    }
+    arguments.extend(upstream_flags.iter().map(String::as_str));
     decode(&run_briar_cli(home, &arguments, USAGE_TIMEOUT)?)
 }
 

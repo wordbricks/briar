@@ -44,6 +44,45 @@ pub(super) async fn update_openrouter_api_key(
 
 #[tauri::command]
 #[specta::specta]
+pub(super) async fn load_vertex_ai_credential_status(
+    app: tauri::AppHandle,
+) -> Result<VertexAiCredentialStatus, String> {
+    let config_path = cli_config_path(&app)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let saved = vertex_ai_settings_from(&config_path)?;
+        Ok(VertexAiCredentialStatus {
+            configured: saved.is_some(),
+            project_id: saved
+                .as_ref()
+                .map(|saved| saved.project_id.trim().to_string()),
+            location: saved
+                .as_ref()
+                .map(|saved| saved.location.trim().to_string()),
+        })
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+/// Vertex AI stores no secret: authentication is the machine's Google
+/// Application Default Credentials, and only the project and region are saved.
+#[tauri::command]
+#[specta::specta]
+pub(super) async fn update_vertex_ai_settings(
+    app: tauri::AppHandle,
+    project_id: Option<String>,
+    location: Option<String>,
+) -> Result<VertexAiCredentialStatus, String> {
+    let config_path = cli_config_path(&app)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        update_vertex_ai_settings_at(&config_path, project_id, location)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+#[specta::specta]
 pub(super) async fn load_app_runtime_settings(
     app: tauri::AppHandle,
 ) -> Result<AppRuntimeSettings, String> {
@@ -73,12 +112,11 @@ pub(super) async fn load_agent_usage(
 ) -> Result<agent_usage::AgentUsageSnapshot, String> {
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
     let config_path = cli_config_path(&app)?;
-    let openrouter_configured = tauri::async_runtime::spawn_blocking(move || {
-        openrouter_api_key_from(&config_path).map(|api_key| api_key.is_some())
-    })
-    .await
-    .map_err(|error| error.to_string())??;
-    Ok(agent_usage::load(home, openrouter_configured).await)
+    let configured_upstreams =
+        tauri::async_runtime::spawn_blocking(move || configured_upstreams_from(&config_path))
+            .await
+            .map_err(|error| error.to_string())??;
+    Ok(agent_usage::load(home, configured_upstreams).await)
 }
 
 #[tauri::command]
@@ -242,11 +280,11 @@ fn local_project_provider_availability(
     config_path: &Path,
     home: &Path,
 ) -> Result<Vec<AgentProviderAvailability>, String> {
-    let openrouter_configured = openrouter_api_key_from(config_path)?.is_some();
+    let configured_upstreams = configured_upstreams_from(config_path)?;
     Ok(agent_provider_availability(
-        &inspect_onboarding_prerequisites_sync(home, openrouter_configured),
+        &inspect_onboarding_prerequisites_sync(home, &configured_upstreams),
         app_provider_settings_from(config_path)?,
-        &agent_usage::local_quotas(home, openrouter_configured),
+        &agent_usage::local_quotas(home, &configured_upstreams),
     ))
 }
 

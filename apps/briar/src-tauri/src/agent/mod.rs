@@ -12,6 +12,7 @@ mod opencode;
 mod openrouter;
 mod project_agent;
 mod sidecar;
+mod vertex;
 
 use std::{
     ffi::OsStr,
@@ -46,6 +47,7 @@ pub(crate) enum AgentProviderKind {
     Agy,
     Opencode,
     Openrouter,
+    Vertex,
 }
 
 /// Marker naming the Briar provider a runner process executes for.
@@ -61,13 +63,49 @@ const OPENCODE_SKILL_DIRECTORY: &str = ".config/opencode";
 /// Bundled runner that drives OpenCode's local runtime.
 const OPENCODE_RUNNER_BUNDLE: &str = "opencode-runner.js";
 
+/// Credential shape an OpenCode upstream authenticates with. Upstreams do not
+/// share one shape, so the descriptor names the shape and the config reader
+/// produces the environment pairs it needs. Mirrors `OpenCodeUpstreamCredential`
+/// in `src/lib/agent-provider.ts`.
+pub(crate) enum OpenCodeUpstreamCredential {
+    /// One secret string Briar stores and hands to the child process.
+    ApiKey {
+        /// Environment variable OpenCode resolves the key from.
+        environment_variable: &'static str,
+    },
+    /// Briar stores only the addressing inputs. The secret is the machine's
+    /// Google Application Default Credentials, which Briar never reads,
+    /// stores, or transmits.
+    GoogleAdc {
+        project_environment_variable: &'static str,
+        location_environment_variable: &'static str,
+    },
+}
+
+impl OpenCodeUpstreamCredential {
+    /// Every environment variable this shape resolves through, in the order the
+    /// generated OpenCode config names them. Used by the test that pins each
+    /// upstream's config against its credential shape.
+    #[cfg(test)]
+    pub(crate) fn environment_variables(&self) -> Vec<&'static str> {
+        match self {
+            Self::ApiKey {
+                environment_variable,
+            } => vec![environment_variable],
+            Self::GoogleAdc {
+                project_environment_variable,
+                location_environment_variable,
+            } => vec![project_environment_variable, location_environment_variable],
+        }
+    }
+}
+
 /// A provider that is not its own CLI: it runs behind the OpenCode runner with
 /// a Briar-generated OpenCode config, which names the credential environment
-/// variable rather than carrying the credential itself.
+/// variables rather than carrying the credential itself.
 pub(crate) struct OpenCodeUpstream {
     pub(crate) provider: AgentProviderKind,
-    /// Environment variable OpenCode resolves this upstream's credential from.
-    pub(crate) credential_environment_variable: &'static str,
+    pub(crate) credential: OpenCodeUpstreamCredential,
     /// `OPENCODE_CONFIG_CONTENT` Briar generates for this upstream. Byte for
     /// byte what `openCodeUpstreamConfigJson` produces in TypeScript.
     pub(crate) config_content: &'static str,
@@ -77,12 +115,48 @@ pub(crate) struct OpenCodeUpstream {
 
 /// The single source of OpenCode upstreams. Everything that used to enumerate
 /// `Opencode | Openrouter` derives from this table instead.
-static OPENCODE_UPSTREAMS: &[OpenCodeUpstream] = &[OpenCodeUpstream {
-    provider: AgentProviderKind::Openrouter,
-    credential_environment_variable: "OPENROUTER_API_KEY",
-    config_content: r#"{"provider":{"openrouter":{"options":{"apiKey":"{env:OPENROUTER_API_KEY}"}}}}"#,
-    missing_credential_error: "앱 설정에서 OpenRouter API 키를 먼저 저장하세요.",
-}];
+static OPENCODE_UPSTREAMS: &[OpenCodeUpstream] = &[
+    OpenCodeUpstream {
+        provider: AgentProviderKind::Openrouter,
+        credential: OpenCodeUpstreamCredential::ApiKey {
+            environment_variable: "OPENROUTER_API_KEY",
+        },
+        config_content: r#"{"provider":{"openrouter":{"options":{"apiKey":"{env:OPENROUTER_API_KEY}"}}}}"#,
+        missing_credential_error: "앱 설정에서 OpenRouter API 키를 먼저 저장하세요.",
+    },
+    OpenCodeUpstream {
+        provider: AgentProviderKind::Vertex,
+        credential: OpenCodeUpstreamCredential::GoogleAdc {
+            project_environment_variable: "GOOGLE_VERTEX_PROJECT",
+            location_environment_variable: "GOOGLE_VERTEX_LOCATION",
+        },
+        config_content: r#"{"provider":{"google-vertex":{"options":{"project":"{env:GOOGLE_VERTEX_PROJECT}","location":"{env:GOOGLE_VERTEX_LOCATION}"}}}}"#,
+        missing_credential_error: "앱 설정에서 Vertex AI 프로젝트 ID와 리전을 먼저 저장하세요.",
+    },
+];
+
+/// OpenCode upstreams whose credential is saved in the local config.
+///
+/// Upstream credentials are read by the Briar CLI, not by the desktop, so the
+/// desktop answers "is it configured" for the upstreams it owns. Holding the
+/// providers themselves rather than one flag per upstream means a new upstream
+/// needs no new parameter on the call chain.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub(crate) struct ConfiguredUpstreams(Vec<AgentProviderKind>);
+
+impl ConfiguredUpstreams {
+    pub(crate) fn new(providers: Vec<AgentProviderKind>) -> Self {
+        Self(providers)
+    }
+
+    pub(crate) fn contains(&self, provider: AgentProviderKind) -> bool {
+        self.0.contains(&provider)
+    }
+
+    pub(crate) fn iter(&self) -> impl Iterator<Item = AgentProviderKind> + '_ {
+        self.0.iter().copied()
+    }
+}
 
 /// 대화 ID 네임스페이스의 단일 출처.
 ///
@@ -100,6 +174,7 @@ const CONVERSATION_NAMESPACES: &[(AgentProviderKind, &str)] = &[
     (AgentProviderKind::Opencode, "opencode"),
     (AgentProviderKind::Agy, "agy"),
     (AgentProviderKind::Openrouter, "openrouter"),
+    (AgentProviderKind::Vertex, "vertex"),
 ];
 
 impl AgentProviderKind {
@@ -146,6 +221,7 @@ impl AgentProviderKind {
             Self::Agy => "Antigravity",
             Self::Opencode => "OpenCode",
             Self::Openrouter => "OpenRouter",
+            Self::Vertex => "Vertex AI",
         }
     }
 
@@ -161,7 +237,7 @@ impl AgentProviderKind {
             Self::Cursor => ".cursor",
             Self::Grok => ".grok",
             Self::Agy => ".gemini/config",
-            Self::Opencode | Self::Openrouter => OPENCODE_SKILL_DIRECTORY,
+            Self::Opencode | Self::Openrouter | Self::Vertex => OPENCODE_SKILL_DIRECTORY,
         }
     }
 
@@ -177,7 +253,7 @@ impl AgentProviderKind {
             Self::Cursor => "cursor-runner.js",
             Self::Grok => "grok-runner.js",
             Self::Agy => "agy-runner.js",
-            Self::Opencode | Self::Openrouter => OPENCODE_RUNNER_BUNDLE,
+            Self::Opencode | Self::Openrouter | Self::Vertex => OPENCODE_RUNNER_BUNDLE,
         }
     }
 
@@ -191,6 +267,7 @@ impl AgentProviderKind {
             Self::Agy => "agy",
             Self::Opencode => "opencode",
             Self::Openrouter => "openrouter",
+            Self::Vertex => "vertex",
         }
     }
 
@@ -206,6 +283,7 @@ impl AgentProviderKind {
             Self::Agy => Wire::AGENT_PROVIDER_AGY,
             Self::Opencode => Wire::AGENT_PROVIDER_OPENCODE,
             Self::Openrouter => Wire::AGENT_PROVIDER_OPENROUTER,
+            Self::Vertex => Wire::AGENT_PROVIDER_VERTEX,
         }
     }
 
@@ -222,6 +300,7 @@ impl AgentProviderKind {
             Wire::AGENT_PROVIDER_AGY => Some(Self::Agy),
             Wire::AGENT_PROVIDER_OPENCODE => Some(Self::Opencode),
             Wire::AGENT_PROVIDER_OPENROUTER => Some(Self::Openrouter),
+            Wire::AGENT_PROVIDER_VERTEX => Some(Self::Vertex),
         }
     }
 
@@ -736,6 +815,10 @@ pub(crate) fn discover_backend(
             sidecar::SidecarBackend::discover(runner, &runners.path(provider), openrouter::CONFIG)
                 .map(AgentBackendHandle::Opencode)
         }
+        AgentProviderKind::Vertex => {
+            sidecar::SidecarBackend::discover(runner, &runners.path(provider), vertex::CONFIG)
+                .map(AgentBackendHandle::Opencode)
+        }
     }
 }
 
@@ -865,12 +948,13 @@ mod tests {
                 upstream.provider.runner_bundle_name(),
                 AgentProviderKind::Opencode.runner_bundle_name()
             );
-            // The generated config names the credential variable so the key
-            // itself only ever travels through the child environment.
-            assert!(upstream.config_content.contains(&format!(
-                "{{env:{}}}",
-                upstream.credential_environment_variable
-            )));
+            // The generated config names the credential variables so a saved
+            // secret only ever travels through the child environment.
+            for variable in upstream.credential.environment_variables() {
+                assert!(upstream
+                    .config_content
+                    .contains(&format!("{{env:{variable}}}")));
+            }
         }
     }
 

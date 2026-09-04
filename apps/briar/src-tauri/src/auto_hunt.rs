@@ -42,16 +42,12 @@ fn timestamp_text(seconds: i64, nanos: i32, field: &str) -> Result<String, Strin
 fn agent_provider(
     value: buffa::EnumValue<types_proto::AgentProvider>,
 ) -> Result<agent::AgentProviderKind, String> {
-    match value.as_known() {
-        Some(types_proto::AgentProvider::Codex) => Ok(agent::AgentProviderKind::Codex),
-        Some(types_proto::AgentProvider::Claude) => Ok(agent::AgentProviderKind::Claude),
-        Some(types_proto::AgentProvider::Cursor) => Ok(agent::AgentProviderKind::Cursor),
-        Some(types_proto::AgentProvider::Grok) => Ok(agent::AgentProviderKind::Grok),
-        Some(types_proto::AgentProvider::Agy) => Ok(agent::AgentProviderKind::Agy),
-        Some(types_proto::AgentProvider::Opencode) => Ok(agent::AgentProviderKind::Opencode),
-        Some(types_proto::AgentProvider::Openrouter) => Ok(agent::AgentProviderKind::Openrouter),
-        _ => Err("로컬 claim 결과의 Agent provider가 올바르지 않습니다.".to_string()),
-    }
+    // `from_wire` is exhaustive over the generated enum, so a provider added to
+    // the proto cannot be silently rejected here.
+    value
+        .as_known()
+        .and_then(agent::AgentProviderKind::from_wire)
+        .ok_or_else(|| "로컬 claim 결과의 Agent provider가 올바르지 않습니다.".to_string())
 }
 
 fn claimed_attachment(

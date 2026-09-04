@@ -101,9 +101,15 @@ const defaultDependencies: ProviderHealthDependencies = {
   upstreamConfigured: (provider) => {
     const upstream = openCodeUpstreamOf(provider);
     if (!upstream) return false;
-    return Boolean(
-      process.env[upstream.credential.environmentVariable]?.trim(),
-    );
+    const set = (name: string) => Boolean(process.env[name]?.trim());
+    const { credential } = upstream;
+    switch (credential.type) {
+      case "apiKey":
+        return set(credential.environmentVariable);
+      case "googleAdc":
+        return set(credential.projectEnvironmentVariable) &&
+          set(credential.locationEnvironmentVariable);
+    }
   },
   now: Date.now,
   which: (provider) => Bun.which(agentProviderBinaryName(provider)),

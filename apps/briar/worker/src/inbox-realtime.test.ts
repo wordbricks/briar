@@ -11,10 +11,19 @@ describe("organization Inbox realtime outbox", () => {
     await db
       .prepare(`delete from briar_organization_inbox_realtime_outbox`)
       .run();
+    // Migration 0184 folded the realtime mirror into every trigger that bumps
+    // briar_organization_inbox_sync_state, so an inbox writer now publishes the
+    // outbox row itself. This test drives the flush loop, so it seeds the same
+    // pair of rows those writers produce.
     await db.prepare(
       `insert into briar_organization_inbox_sync_state (
          organization_id, current_version
        ) values (?, 1)`,
+    ).bind(organizationId).run();
+    await db.prepare(
+      `insert into briar_organization_inbox_realtime_outbox (
+         organization_id, version, updated_at
+       ) values (?, 1, datetime('now'))`,
     ).bind(organizationId).run();
 
     const published: unknown[] = [];
@@ -42,6 +51,17 @@ describe("organization Inbox realtime outbox", () => {
               await db.prepare(
                 `update briar_organization_inbox_sync_state
                  set current_version = 2 where organization_id = ?`,
+              ).bind(organizationId).run();
+              await db.prepare(
+                `insert into briar_organization_inbox_realtime_outbox (
+                   organization_id, version, updated_at
+                 ) values (?, 2, datetime('now'))
+                 on conflict (organization_id) do update set
+                   version = max(
+                     briar_organization_inbox_realtime_outbox.version,
+                     excluded.version
+                   ),
+                   updated_at = excluded.updated_at`,
               ).bind(organizationId).run();
             }
             return new Response(null, { status: 204 });

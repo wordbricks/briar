@@ -142,6 +142,7 @@ const providerPointKeys: UsageAttribution[] = [
   "agy",
   "opencode",
   "openrouter",
+  "vertex",
   "unknown",
 ];
 
