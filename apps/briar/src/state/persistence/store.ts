@@ -89,22 +89,45 @@ export function createIndexedDbSnapshotStore(
   let connection: Promise<IDBDatabase> | null = null;
 
   const open = () => {
-    connection ??= new Promise<IDBDatabase>((resolve, reject) => {
-      const request = factory.open(DATABASE_NAME, DATABASE_VERSION);
-      request.onupgradeneeded = () => {
-        const database = request.result;
-        if (!database.objectStoreNames.contains(OBJECT_STORE)) {
-          database.createObjectStore(OBJECT_STORE);
-        }
-      };
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () =>
-        reject(request.error ?? new Error("IndexedDB open failed"));
-      // A second tab holding an older version open blocks the upgrade. Failing
-      // fast degrades to "no snapshot" instead of hanging the boot behind it.
-      request.onblocked = () =>
-        reject(new Error("IndexedDB upgrade is blocked by another tab"));
-    });
+    if (!connection) {
+      const pending = new Promise<IDBDatabase>((resolve, reject) => {
+        const request = factory.open(DATABASE_NAME, DATABASE_VERSION);
+        request.onupgradeneeded = () => {
+          const database = request.result;
+          if (!database.objectStoreNames.contains(OBJECT_STORE)) {
+            database.createObjectStore(OBJECT_STORE);
+          }
+        };
+        request.onsuccess = () => {
+          const database = request.result;
+          /*
+            The other half of the `onblocked` rule below: a connection nobody
+            lets go of is what blocks the upgrade in the first place. Briar's
+            desktop window stays open for days and opens a window per project,
+            so an older build holding this open would keep a newer one from
+            ever upgrading — and `onblocked` would hand that newer build "no
+            snapshot" for as long as the old window lives.
+
+            So this side lets go. Persistence is an optimisation: closing costs
+            the next access one reopen, and if that reopen cannot happen
+            (because the upgrade moved the database past this build), it fails
+            like any other open and degrades to booting without a record.
+          */
+          database.onversionchange = () => {
+            database.close();
+            if (connection === pending) connection = null;
+          };
+          resolve(database);
+        };
+        request.onerror = () =>
+          reject(request.error ?? new Error("IndexedDB open failed"));
+        // A second tab holding an older version open blocks the upgrade. Failing
+        // fast degrades to "no snapshot" instead of hanging the boot behind it.
+        request.onblocked = () =>
+          reject(new Error("IndexedDB upgrade is blocked by another tab"));
+      });
+      connection = pending;
+    }
     // A failed open must not be cached: the next call gets a fresh attempt.
     return connection.catch((error: unknown) => {
       connection = null;
