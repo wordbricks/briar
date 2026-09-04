@@ -86,7 +86,10 @@ export type TeamAgentTaskJobRow = {
   lease_expires_at: string | null;
   attempts: number;
   planned_update_resume: number;
+  resume_count: number;
   error: string | null;
+  cancel_requested_at: string | null;
+  cancelled_by_user_id: string | null;
   created_at: string;
   updated_at: string;
   completed_at: string | null;

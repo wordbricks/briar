@@ -61,6 +61,7 @@ function claimFixture(
     claimedAt: "2026-08-21T01:00:00+00:00",
     leaseExpiresAt: "2026-08-21T01:15:00+00:00",
     claimAttempts: 1,
+    resumeCount: 0,
     handoffContext: null,
     batch: {
       id: batchId,

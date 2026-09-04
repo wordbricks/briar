@@ -1411,6 +1411,18 @@ pub type OwnedRunProjectAgentTaskRequestView = ::buffa::view::OwnedView<
 pub type OwnedRunProjectAgentTaskResponseView = ::buffa::view::OwnedView<
     crate::proto::briar::app::v1::__buffa::view::RunProjectAgentTaskResponseView<'static>,
 >;
+///Shorthand for `OwnedView<CancelProjectAgentTaskRequestView<'static>>`.
+pub type OwnedCancelProjectAgentTaskRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CancelProjectAgentTaskRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<CancelProjectAgentTaskResponseView<'static>>`.
+pub type OwnedCancelProjectAgentTaskResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CancelProjectAgentTaskResponseView<
+        'static,
+    >,
+>;
 ///Shorthand for `OwnedView<GetProjectAgentTranscriptRequestView<'static>>`.
 pub type OwnedGetProjectAgentTranscriptRequestView = ::buffa::view::OwnedView<
     crate::proto::briar::app::v1::__buffa::view::GetProjectAgentTranscriptRequestView<
@@ -2260,6 +2272,46 @@ for ::buffa::view::OwnedView<
     }
 }
 impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::CancelProjectAgentTaskResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::CancelProjectAgentTaskResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::CancelProjectAgentTaskResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CancelProjectAgentTaskResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
     crate::proto::briar::app::v1::GetProjectAgentTranscriptResponse,
 >
 for crate::proto::briar::app::v1::__buffa::view::GetProjectAgentTranscriptResponseView<
@@ -2426,6 +2478,12 @@ pub const AGENT_SERVICE_PUT_PROJECT_AGENT_SESSION_SPEC: ::connectrpc::Spec = ::c
 /// Static [`Spec`](::connectrpc::Spec) for the `RunProjectAgentTask` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const AGENT_SERVICE_RUN_PROJECT_AGENT_TASK_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/briar.app.v1.AgentService/RunProjectAgentTask",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `CancelProjectAgentTask` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const AGENT_SERVICE_CANCEL_PROJECT_AGENT_TASK_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.AgentService/CancelProjectAgentTask",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -2966,6 +3024,29 @@ pub trait AgentService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::briar::app::v1::RunProjectAgentTaskResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the CancelProjectAgentTask RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn cancel_project_agent_task<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::CancelProjectAgentTaskRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::CancelProjectAgentTaskResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -3635,6 +3716,35 @@ impl<S: AgentService> AgentServiceExt for S {
             .with_spec(AGENT_SERVICE_RUN_PROJECT_AGENT_TASK_SPEC)
             .route_view(
                 AGENT_SERVICE_SERVICE_NAME,
+                "CancelProjectAgentTask",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::CancelProjectAgentTaskRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::CancelProjectAgentTaskRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.cancel_project_agent_task(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::CancelProjectAgentTaskResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(AGENT_SERVICE_CANCEL_PROJECT_AGENT_TASK_SPEC)
+            .route_view(
+                AGENT_SERVICE_SERVICE_NAME,
                 "GetProjectAgentTranscript",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
@@ -3842,6 +3952,12 @@ impl<T: AgentService> ::connectrpc::Dispatcher for AgentServiceServer<T> {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
                         .with_spec(AGENT_SERVICE_RUN_PROJECT_AGENT_TASK_SPEC),
+                )
+            }
+            "CancelProjectAgentTask" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(AGENT_SERVICE_CANCEL_PROJECT_AGENT_TASK_SPEC),
                 )
             }
             "GetProjectAgentTranscript" => {
@@ -4324,6 +4440,28 @@ impl<T: AgentService> ::connectrpc::Dispatcher for AgentServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::briar::app::v1::RunProjectAgentTaskResponse,
+                        >(format)
+                })
+            }
+            "CancelProjectAgentTask" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::CancelProjectAgentTaskRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::CancelProjectAgentTaskRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::CancelProjectAgentTaskRequest,
+                    >::from_parts(&req, &body);
+                    svc.cancel_project_agent_task(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::CancelProjectAgentTaskResponse,
                         >(format)
                 })
             }
@@ -5418,6 +5556,51 @@ where
                 &self.transport,
                 &self.config,
                 AGENT_SERVICE_RUN_PROJECT_AGENT_TASK_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the CancelProjectAgentTask RPC. Sends a request to /briar.app.v1.AgentService/CancelProjectAgentTask.
+    pub async fn cancel_project_agent_task(
+        &self,
+        request: crate::proto::briar::app::v1::CancelProjectAgentTaskRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::CancelProjectAgentTaskResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.cancel_project_agent_task_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the CancelProjectAgentTask RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn cancel_project_agent_task_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::CancelProjectAgentTaskRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::CancelProjectAgentTaskResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                AGENT_SERVICE_CANCEL_PROJECT_AGENT_TASK_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,

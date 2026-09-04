@@ -49,6 +49,7 @@ export const workerD1TestFiles = [
   "worker/src/merge-queue-profile.test.ts",
   "worker/src/mobile-push-repository.test.ts",
   "worker/src/organization-agent-context.test.ts",
+  "worker/src/team-agent-task-cancellation.test.ts",
   "worker/src/team-channel-messages.test.ts",
   "worker/src/slack-db.test.ts",
   "worker/src/worker-connect-execution.test.ts",

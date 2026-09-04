@@ -1053,6 +1053,22 @@ export async function runProjectAgentTaskOnWorker(
   );
 }
 
+export async function cancelProjectAgentTask(
+  token: string,
+  projectId: string,
+  sessionId: string,
+): Promise<AutoHuntSession> {
+  const client = requireAgentClient();
+  const response = await client.cancelProjectAgentTask(
+    { projectId, sessionId },
+    appCallOptions(token),
+  );
+  return projectAgentSessionFromMessage(
+    requiredMessage(response.session, "cancelProjectAgentTask.session"),
+    true,
+  );
+}
+
 export async function upsertProjectAgentSession(
   token: string,
   session: AutoHuntSession,

@@ -3,10 +3,13 @@ import { publishAgentSkillTaskResult } from "./agent-skill-execution-proposal-re
 import { getArchivedProjectAgentSession } from "./archive";
 import { sha256 } from "./crypto-digest";
 import {
+  cancelTeamAgentTaskJob,
   claimNextTeamAgentTask,
   completeTeamAgentTaskWithReceipt,
   getTeamAgentSession,
+  getTeamAgentTaskJob,
   reapTeamAgentTaskJobs,
+  teamAgentSessionIsApprovalOwned,
   upsertTeamAgentSessionSummary,
 } from "./db";
 import { HttpError } from "./http-response";
@@ -148,6 +151,7 @@ export async function claimNextTeamAgentTaskWork(input: {
         title: job.agent_name,
         claimToken,
         claimAttempts: job.attempts,
+        resumeCount: job.resume_count,
         claimedAt: job.claimed_at,
         leaseExpiresAt: job.lease_expires_at,
         request: job.request,
@@ -164,6 +168,52 @@ export async function claimNextTeamAgentTaskWork(input: {
           skills: job.agent_skills.map(agentSkillJson),
         },
     };
+}
+
+/** The stop reason stored on a task a member cancelled from its session. */
+export const teamAgentTaskCancelledError = "Agent 세션에서 실행을 중지했습니다.";
+
+/**
+ * Stop a Project Agent task from its session. Idempotent: cancelling an
+ * already terminal task returns the session it already has. The Worker that
+ * still holds the task loses its lease, so its late completion is rejected by
+ * `completeTeamAgentTaskWithReceipt`'s `status = 'running'` guard.
+ */
+export async function cancelTeamAgentTaskWork(input: {
+  db: D1Database;
+  env: Env;
+  context?: ExecutionContext;
+  projectId: string;
+  sessionId: string;
+  userId: string | null;
+}) {
+  const { db, env, context, projectId, sessionId, userId } = input;
+  if (await teamAgentSessionIsApprovalOwned(db, projectId, sessionId)) {
+    throw new HttpError(
+      409,
+      "Approved Agent Skill execution sessions are updated by their assigned Worker",
+      "AGENT_SKILL_EXECUTION_SESSION_SERVER_OWNED",
+    );
+  }
+  const job = await getTeamAgentTaskJob(db, projectId, sessionId);
+  if (!job) throw new HttpError(404, "Agent task not found for this session");
+  const currentSession = await getTeamAgentSession(db, projectId, sessionId);
+  if (!currentSession) throw new HttpError(404, "Agent task session is missing");
+  if (job.status === "completed" || job.status === "failed") {
+    return currentSession;
+  }
+  const observedAt = new Date().toISOString();
+  const cancelled = await cancelTeamAgentTaskJob(db, projectId, sessionId, {
+    userId,
+    observedAt,
+    error: teamAgentTaskCancelledError,
+  });
+  if (!cancelled) {
+    throw new HttpError(409, "Agent task could not be cancelled");
+  }
+  await syncTeamAgentTaskSession(db, cancelled, { error: null });
+  scheduleProjectAgentSessionRealtimePublish(env, db, projectId, context);
+  return (await getTeamAgentSession(db, projectId, sessionId)) ?? currentSession;
 }
 
 export async function completeTeamAgentTaskWork(input: {

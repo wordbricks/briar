@@ -22,6 +22,7 @@ import type {
   AutoHuntSessionIssueOutcome,
   AutoHuntSessionStatus,
 } from "../hooks/useAutoHuntSessions";
+import { canStopAutoHuntSession } from "../hooks/useAutoHuntSessions";
 import { useAutoHuntAppServerEvents } from "../hooks/useAutoHuntAppServerEvents";
 import { useProjectAgentWorkerEvents } from "../hooks/useProjectAgentWorkerEvents";
 import { useI18n } from "../i18n";
@@ -296,7 +297,7 @@ export function TeamAgentSessionDetail({
               <Download aria-hidden="true" />
               {t("agents.exportSessionLog")}
             </Button>
-            {session.status === "running" && session.localOwner !== false ? (
+            {session.status === "running" && canStopAutoHuntSession(session) ? (
               <Button
                 aria-label={t("agents.stopSession")}
                 className="auto-hunt-session-stop"

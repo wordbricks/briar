@@ -375,6 +375,9 @@ const common = (
   claimedAt: isoTimestamp(value.claimedAt, "claimedAt"),
   leaseExpiresAt: isoTimestamp(value.leaseExpiresAt, "leaseExpiresAt"),
   claimAttempts: value.claimAttempts,
+  // Planned worker updates only resume project Agent tasks, so every other
+  // claim keeps the initial resume count.
+  resumeCount: 0,
   handoffContext: handoffContext(value.handoffContext),
 });
 
@@ -436,6 +439,9 @@ const projectAgentTaskFromProto = (
 ) => ({
   ...common(value),
   workType: "projectAgentTask" as const,
+  // A planned Worker update hands the same claim attempt back to the queue, so
+  // the resume count is what keeps resumed transcript ranges distinct.
+  resumeCount: value.resumeCount ?? 0,
   request: value.request,
   agent: agent(required(value.agent, "projectAgentTask.agent")),
   activeSkill: value.activeSkill ? agentSkill(value.activeSkill) : null,

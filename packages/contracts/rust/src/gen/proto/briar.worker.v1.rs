@@ -32655,6 +32655,14 @@ pub struct ClaimedProjectAgentTask {
         ClaimedHandoffContext,
         ::buffa::Inline<ClaimedHandoffContext>,
     >,
+    /// Field 13: `resume_count`
+    #[serde(
+        rename = "resumeCount",
+        alias = "resume_count",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub resume_count: u32,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -32674,6 +32682,7 @@ impl ::core::fmt::Debug for ClaimedProjectAgentTask {
             .field("agent", &self.agent)
             .field("active_skill", &self.active_skill)
             .field("handoff_context", &self.handoff_context)
+            .field("resume_count", &self.resume_count)
             .finish()
     }
 }
@@ -32766,6 +32775,9 @@ impl ::buffa::Message for ClaimedProjectAgentTask {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if self.resume_count != 0u32 {
+            size += 1u64 + ::buffa::types::uint32_encoded_len(self.resume_count) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -32836,6 +32848,9 @@ impl ::buffa::Message for ClaimedProjectAgentTask {
                 buf,
             );
             self.handoff_context.write_to(__cache, buf);
+        }
+        if self.resume_count != 0u32 {
+            ::buffa::types::put_uint32_field(13u32, self.resume_count, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -32954,6 +32969,13 @@ impl ::buffa::Message for ClaimedProjectAgentTask {
                     ctx,
                 )?;
             }
+            13u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.resume_count = ::buffa::types::decode_uint32(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -32974,6 +32996,7 @@ impl ::buffa::Message for ClaimedProjectAgentTask {
         self.agent = ::buffa::MessageField::none();
         self.active_skill = ::buffa::MessageField::none();
         self.handoff_context = ::buffa::MessageField::none();
+        self.resume_count = 0u32;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -97257,6 +97280,8 @@ pub mod __buffa {
             pub handoff_context: ::buffa::MessageFieldView<
                 super::super::__buffa::view::ClaimedHandoffContextView<'a>,
             >,
+            /// Field 13: `resume_count`
+            pub resume_count: u32,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ClaimedProjectAgentTaskView<'a> {
@@ -97465,6 +97490,13 @@ pub mod __buffa {
                             }
                         }
                     }
+                    13u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.resume_count = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -97546,6 +97578,7 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    resume_count: self.resume_count,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -97637,6 +97670,12 @@ pub mod __buffa {
                         += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                             + inner_size as u64;
                 }
+                if self.resume_count != 0u32 {
+                    size
+                        += 1u64
+                            + ::buffa::types::uint32_encoded_len(self.resume_count)
+                                as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -97708,6 +97747,9 @@ pub mod __buffa {
                         buf,
                     );
                     self.handoff_context.write_to(__cache, buf);
+                }
+                if self.resume_count != 0u32 {
+                    ::buffa::types::put_uint32_field(13u32, self.resume_count, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -97791,6 +97833,13 @@ pub mod __buffa {
                     {
                         __map.serialize_entry("handoffContext", __v)?;
                     }
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.resume_count) {
+                    __map
+                        .serialize_entry(
+                            "resumeCount",
+                            &::buffa::json_helpers::ProtoJson(&self.resume_count),
+                        )?;
                 }
                 __map.end()
             }
@@ -97968,6 +98017,11 @@ pub mod __buffa {
                 super::super::__buffa::view::ClaimedHandoffContextView<'_>,
             > {
                 &self.0.reborrow().handoff_context
+            }
+            /// Field 13: `resume_count`
+            #[must_use]
+            pub fn resume_count(&self) -> u32 {
+                self.0.reborrow().resume_count
             }
         }
         impl ::core::convert::From<

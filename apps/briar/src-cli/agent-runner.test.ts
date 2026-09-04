@@ -206,8 +206,51 @@ describe("detached Agent runner", () => {
   it("appends retry and resume output in a distinct transcript sequence range", () => {
     expect(detachedTranscriptSequence(1, 1)).toBe(1);
     expect(detachedTranscriptSequence(1, 37)).toBe(37);
-    expect(detachedTranscriptSequence(2, 1)).toBe(1_000_001);
-    expect(detachedTranscriptSequence(3, 1)).toBe(2_000_001);
+    expect(detachedTranscriptSequence(2, 1)).toBe(1_000_000_001);
+    expect(detachedTranscriptSequence(3, 1)).toBe(2_000_000_001);
+  });
+
+  it("keeps planned-update resumes of one claim attempt in separate ranges", () => {
+    expect(detachedTranscriptSequence(1, 1, 0)).toBe(1);
+    expect(detachedTranscriptSequence(1, 1, 1)).toBe(1_000_001);
+    expect(detachedTranscriptSequence(1, 999, 2)).toBe(2_000_999);
+    expect(detachedTranscriptSequence(2, 1, 1)).toBe(1_001_000_001);
+
+    const seen = new Set<number>();
+    for (const claimAttempt of [1, 2, 3]) {
+      for (const resumeCount of [0, 1, 2, 999]) {
+        for (const localSequence of [1, 2, 999_999]) {
+          seen.add(
+            detachedTranscriptSequence(claimAttempt, localSequence, resumeCount),
+          );
+        }
+      }
+    }
+    expect(seen.size).toBe(3 * 4 * 3);
+  });
+
+  it("rejects transcript sequence coordinates it cannot keep unique", () => {
+    expect(() => detachedTranscriptSequence(0, 1)).toThrow(
+      "Detached transcript sequence is out of range",
+    );
+    expect(() => detachedTranscriptSequence(1, 0)).toThrow(
+      "Detached transcript sequence is out of range",
+    );
+    expect(() => detachedTranscriptSequence(1, 1_000_000)).toThrow(
+      "Detached transcript sequence is out of range",
+    );
+    expect(() => detachedTranscriptSequence(1, 1, -1)).toThrow(
+      "Detached transcript sequence is out of range",
+    );
+    expect(() => detachedTranscriptSequence(1, 1, 1_000)).toThrow(
+      "Detached transcript sequence is out of range",
+    );
+    expect(() => detachedTranscriptSequence(1, 1, 1.5)).toThrow(
+      "Detached transcript sequence is out of range",
+    );
+    expect(() => detachedTranscriptSequence(Number.MAX_SAFE_INTEGER, 1)).toThrow(
+      "Detached transcript sequence is out of range",
+    );
   });
 
   it("names transcript sessions by execution so transfer resets cannot collide", () => {
@@ -1068,6 +1111,18 @@ describe("detached Agent runner", () => {
       })),
     ).toBe(2);
     expect(sequencer.next()).toBe(3);
+  });
+
+  it("scopes a resumed sequencer to its planned-update resume range", () => {
+    const sequencer = createDetachedTranscriptSequencer(1, 2);
+    expect(sequencer.next()).toBe(2_000_001);
+    expect(sequencer.next()).toBe(2_000_002);
+    expect(
+      sequencer.nextForPayload(sidecarProviderEvent({
+        raw: {},
+        event: normalizedMessageDelta({ id: "message-1", delta: "x" }),
+      })),
+    ).toBe(2_000_003);
   });
 
   it("retries an ambiguous success completion without sending a failure", async () => {

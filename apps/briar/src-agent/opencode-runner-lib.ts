@@ -301,6 +301,25 @@ function openCodeErrorMessage(value: unknown, depth = 0): string | null {
   return null;
 }
 
+function openCodeErrorName(value: unknown): string | null {
+  if (!value || typeof value !== "object") return null;
+  const name = (value as { name?: unknown }).name;
+  return typeof name === "string" && name.trim() ? name.trim() : null;
+}
+
+/**
+ * Read a human message out of the OpenCode `session.error` payload, which is
+ * shaped like `{ name, data: { message } }` but degrades to plain strings and
+ * nested `error`/`message` objects depending on the provider.
+ */
+export function openCodeSessionErrorMessage(error: unknown): string {
+  return (
+    openCodeErrorMessage(error) ??
+    openCodeErrorName(error) ??
+    "OpenCode reported a session error without a message."
+  );
+}
+
 /** Convert transient OpenCode upstream HTTP failures into a resumable block. */
 export function openCodeTransientOverload(
   error: unknown,
@@ -371,6 +390,72 @@ export function openCodeBlockedRetry(
         ? nextRetryDate.toISOString()
         : null,
   };
+}
+
+export type OpenCodeTerminalOutcome =
+  | { type: "blocked"; blocker: OpenCodeBlockedRetry }
+  | { type: "failed"; message: string };
+
+/**
+ * Decide whether an OpenCode event must end the run and why.
+ *
+ * OpenCode reports fatal model failures (usage limits, auth, bad requests) as
+ * `session.error` and then never finishes the assistant message, so
+ * `session.prompt()` never resolves. Transient upstream overload still becomes
+ * a resumable block; every other session error for our session is terminal.
+ */
+export function openCodeTerminalOutcome(
+  raw: unknown,
+  sessionId: string,
+): OpenCodeTerminalOutcome | null {
+  const blocker = openCodeBlockedRetry(raw, sessionId);
+  if (blocker) return { type: "blocked", blocker };
+  if (!raw || typeof raw !== "object") return null;
+  const event = raw as Record<string, unknown>;
+  if (event.type !== "session.error") return null;
+  if (eventSessionId(event) !== sessionId) return null;
+  const properties = event.properties as Record<string, unknown>;
+  return {
+    type: "failed",
+    message: openCodeSessionErrorMessage(properties.error),
+  };
+}
+
+export type OpenCodeRunnerSignal = "SIGTERM" | "SIGINT";
+
+export type OpenCodeRunnerSignalHandlers = {
+  /** Registers a one-shot listener, normally `process.once`. */
+  on: (signal: OpenCodeRunnerSignal, listener: () => void) => void;
+  exit: (code: number) => void;
+  /** Terminates the `opencode serve` process group and temporary state. */
+  close: (signal: OpenCodeRunnerSignal) => void;
+};
+
+function openCodeRunnerSignalExitCode(signal: OpenCodeRunnerSignal): number {
+  return signal === "SIGINT" ? 130 : 143;
+}
+
+/**
+ * Stop the `opencode serve` child before the runner dies. Without this the
+ * worker's SIGTERM only kills the runner and leaves the OpenCode server (and
+ * its model calls) running forever.
+ */
+export function installOpenCodeRunnerSignalHandlers(
+  handlers: OpenCodeRunnerSignalHandlers,
+): void {
+  let handled = false;
+  for (const signal of ["SIGTERM", "SIGINT"] as const) {
+    handlers.on(signal, () => {
+      if (handled) return;
+      handled = true;
+      try {
+        handlers.close(signal);
+      } catch {
+        // A failed cleanup must never keep the runner alive.
+      }
+      handlers.exit(openCodeRunnerSignalExitCode(signal));
+    });
+  }
 }
 
 function rememberMessagePart(state: OpenCodeEventState, messageId: string, partId: string) {

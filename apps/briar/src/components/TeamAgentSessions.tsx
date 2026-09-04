@@ -10,7 +10,10 @@ import type {
   AutoHuntSession,
   AutoHuntSessionStatus,
 } from "../hooks/useAutoHuntSessions";
-import { collapseLinkedAutoHuntSessions } from "../hooks/useAutoHuntSessions";
+import {
+  canStopAutoHuntSession,
+  collapseLinkedAutoHuntSessions,
+} from "../hooks/useAutoHuntSessions";
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
 import type { ProjectAgent } from "../types";
@@ -90,7 +93,9 @@ export function TeamAgentSessions({
           {agentSessions.map((session) => {
             const isRunning = session.status === "running";
             const canStop =
-              isRunning && session.localOwner !== false && Boolean(onStopSession);
+              isRunning &&
+              canStopAutoHuntSession(session) &&
+              Boolean(onStopSession);
             const isStopping = stoppingSessionIds.has(session.id);
             return (
               <div

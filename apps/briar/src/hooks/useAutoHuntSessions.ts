@@ -11,6 +11,7 @@ import type {
 import { stopTeamAgentSession } from "../lib/team-llm";
 import {
   cancelHuntRun,
+  cancelProjectAgentTask,
   loadProjectAgentSessionChanges,
   upsertProjectAgentSession,
   type ProjectAgentSessionSyncState,
@@ -56,6 +57,28 @@ export function collapseLinkedAutoHuntSessions(
 }
 
 type AutoHuntStopper = typeof stopTeamAgentSession;
+type AutoHuntRemoteTaskCanceller = typeof cancelProjectAgentTask;
+
+/*
+  Remote worker task sessions run on an execution worker, so the desktop stop
+  command cannot reach them. The app server cancels the queued job instead,
+  which is why they keep a stop control even though `localOwner` is false.
+*/
+export function isRemoteAutoHuntTaskSession(
+  session: Pick<AutoHuntSession, "localOwner" | "sessionType">,
+) {
+  return session.localOwner === false && session.sessionType === "task";
+}
+
+export function canStopAutoHuntSession(
+  session: Pick<
+    AutoHuntSession,
+    "localOwner" | "sessionType" | "requestedWorkerId" | "workerId"
+  >,
+) {
+  if (!isRemoteAutoHuntTaskSession(session)) return session.localOwner !== false;
+  return Boolean(session.workerId ?? session.requestedWorkerId);
+}
 
 function event(type: AutoHuntSessionEventType, occurredAt: string) {
   return { id: crypto.randomUUID(), type, occurredAt };
@@ -289,6 +312,7 @@ export function applyProjectAgentSessionSync(
 
 export function useAutoHuntSessions(
   stopper: AutoHuntStopper = stopTeamAgentSession,
+  remoteTaskCanceller: AutoHuntRemoteTaskCanceller = cancelProjectAgentTask,
 ) {
   const [sessions, setSessions] = useState<AutoHuntSession[]>(readSessions);
   const sessionsRef = useRef(sessions);
@@ -770,6 +794,19 @@ export function useAutoHuntSessions(
       (candidate) => candidate.id === sessionId,
     );
     if (!session || session.status !== "running") return false;
+    if (isRemoteAutoHuntTaskSession(session) && syncContext) {
+      const remote = await remoteTaskCanceller(
+        syncContext.token,
+        session.projectId,
+        session.id,
+      );
+      const cancelled = mergeSynchronizedSessions(sessionsRef.current, [
+        { ...remote, localOwner: false },
+      ]);
+      sessionsRef.current = cancelled;
+      setSessions(cancelled);
+      return true;
+    }
     const pendingRunIds = session.sessionType === "dispatch"
       ? session.issues
           .filter((issue) => issue.outcome === "pending")
@@ -808,7 +845,7 @@ export function useAutoHuntSessions(
     sessionsRef.current = next;
     setSessions(next);
     return true;
-  }, [stopper, syncContext]);
+  }, [remoteTaskCanceller, stopper, syncContext]);
 
   const recordTaskSession = useCallback((
     projectId: string,

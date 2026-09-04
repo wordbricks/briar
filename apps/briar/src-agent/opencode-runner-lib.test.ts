@@ -19,13 +19,17 @@ import {
   buildOpenCodePrompt,
   completeOpenCodeMessages,
   createOpenCodeEventState,
+  installOpenCodeRunnerSignalHandlers,
   normalizeOpenCodeEvent,
   openCodeBlockedRetry,
+  openCodeSessionErrorMessage,
   openCodeSystemPrompt,
+  openCodeTerminalOutcome,
   openCodeTransientOverload,
   parseOpenCodeModel,
   parseOpenCodeServerUrl,
   shouldAutoApproveOpenCodePermission,
+  type OpenCodeRunnerSignal,
 } from "./opencode-runner-lib";
 import type { RunnerRequest } from "./runner-request";
 
@@ -603,5 +607,182 @@ describe("OpenCode runner helpers", () => {
         text: "최종 전체 응답",
       }),
     ]);
+  });
+});
+
+describe("OpenCode terminal session outcomes", () => {
+  const usageLimitError = {
+    type: "session.error",
+    properties: {
+      sessionID: "ses_1",
+      error: {
+        name: "APIError",
+        data: {
+          message: "AI_APICallError: Monthly usage limit reached",
+        },
+      },
+    },
+  };
+
+  it("reads a readable message out of the OpenCode error shape", () => {
+    expect(
+      openCodeSessionErrorMessage({
+        name: "APIError",
+        data: { message: "AI_APICallError: Monthly usage limit reached" },
+      }),
+    ).toBe("AI_APICallError: Monthly usage limit reached");
+    expect(openCodeSessionErrorMessage("  Session aborted  ")).toBe(
+      "Session aborted",
+    );
+    expect(
+      openCodeSessionErrorMessage({ error: { message: "nested failure" } }),
+    ).toBe("nested failure");
+    expect(
+      openCodeSessionErrorMessage({ data: { message: '"quoted failure"' } }),
+    ).toBe("quoted failure");
+    expect(openCodeSessionErrorMessage({ name: "UnknownError", data: {} }))
+      .toBe("UnknownError");
+    expect(openCodeSessionErrorMessage(undefined)).toBe(
+      "OpenCode reported a session error without a message.",
+    );
+  });
+
+  it("ends the run on a non-transient session error", () => {
+    expect(openCodeTerminalOutcome(usageLimitError, "ses_1")).toEqual({
+      type: "failed",
+      message: "AI_APICallError: Monthly usage limit reached",
+    });
+    expect(
+      openCodeTerminalOutcome(
+        {
+          type: "session.error",
+          properties: { sessionID: "ses_1", error: "Session aborted" },
+        },
+        "ses_1",
+      ),
+    ).toEqual({ type: "failed", message: "Session aborted" });
+    expect(
+      openCodeTerminalOutcome(
+        { type: "session.error", properties: { sessionID: "ses_1" } },
+        "ses_1",
+      ),
+    ).toEqual({
+      type: "failed",
+      message: "OpenCode reported a session error without a message.",
+    });
+  });
+
+  it("keeps transient and free-tier blockers resumable", () => {
+    expect(
+      openCodeTerminalOutcome(
+        {
+          type: "session.error",
+          properties: {
+            sessionID: "ses_1",
+            error: {
+              name: "UnknownError",
+              data: { message: "Streaming response failed: [503] queue full" },
+            },
+          },
+        },
+        "ses_1",
+      ),
+    ).toEqual({
+      type: "blocked",
+      blocker: {
+        reason: "upstream_overloaded",
+        provider: "opencode",
+        message: "Streaming response failed: [503] queue full",
+        nextRetryAt: null,
+        statusCode: 503,
+      },
+    });
+    expect(
+      openCodeTerminalOutcome(
+        {
+          type: "session.status",
+          properties: {
+            sessionID: "ses_1",
+            status: {
+              type: "retry",
+              message: "Free usage exceeded, subscribe to Go",
+              next: 1_785_974_400_864,
+            },
+          },
+        },
+        "ses_1",
+      ),
+    ).toMatchObject({ type: "blocked", blocker: { reason: "free_tier_limit" } });
+  });
+
+  it("ignores events that do not end this session", () => {
+    expect(
+      openCodeTerminalOutcome(
+        {
+          type: "session.error",
+          properties: { sessionID: "ses_2", error: { name: "APIError" } },
+        },
+        "ses_1",
+      ),
+    ).toBeNull();
+    expect(
+      openCodeTerminalOutcome(
+        { type: "session.idle", properties: { sessionID: "ses_1" } },
+        "ses_1",
+      ),
+    ).toBeNull();
+    expect(openCodeTerminalOutcome(null, "ses_1")).toBeNull();
+    expect(openCodeTerminalOutcome("session.error", "ses_1")).toBeNull();
+  });
+
+  it("still reports the failed turn before the runner throws", () => {
+    const state = createOpenCodeEventState();
+    expect(normalizeOpenCodeEvent(usageLimitError, "ses_1", state)).toEqual([
+      normalizedTurnCompleted("failed"),
+    ]);
+    expect(openCodeBlockedRetry(usageLimitError, "ses_1")).toBeNull();
+    expect(openCodeTerminalOutcome(usageLimitError, "ses_1")).toEqual({
+      type: "failed",
+      message: "AI_APICallError: Monthly usage limit reached",
+    });
+  });
+});
+
+describe("OpenCode runner signal handlers", () => {
+  const install = (close?: (signal: OpenCodeRunnerSignal) => void) => {
+    const listeners = new Map<OpenCodeRunnerSignal, () => void>();
+    const calls: string[] = [];
+    installOpenCodeRunnerSignalHandlers({
+      on: (signal, listener) => listeners.set(signal, listener),
+      exit: (code) => calls.push(`exit:${code}`),
+      close: (signal) => {
+        calls.push(`close:${signal}`);
+        close?.(signal);
+      },
+    });
+    return { listeners, calls };
+  };
+
+  it("closes the OpenCode server before exiting 143 on SIGTERM", () => {
+    const { listeners, calls } = install();
+    expect([...listeners.keys()]).toEqual(["SIGTERM", "SIGINT"]);
+    listeners.get("SIGTERM")?.();
+    expect(calls).toEqual(["close:SIGTERM", "exit:143"]);
+  });
+
+  it("exits 130 on SIGINT and ignores every later signal", () => {
+    const { listeners, calls } = install();
+    listeners.get("SIGINT")?.();
+    listeners.get("SIGINT")?.();
+    listeners.get("SIGTERM")?.();
+    expect(calls).toEqual(["close:SIGINT", "exit:130"]);
+  });
+
+  it("exits even when closing the OpenCode server fails", () => {
+    const { listeners, calls } = install(() => {
+      throw new Error("kill failed");
+    });
+    expect(() => listeners.get("SIGTERM")?.()).not.toThrow();
+    expect(calls).toEqual(["close:SIGTERM", "exit:143"]);
   });
 });

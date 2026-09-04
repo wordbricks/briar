@@ -5,6 +5,8 @@ import {
   AgentSkillApprovalPolicy,
   AgentSkillExecutionMode,
   AgentSkillKind,
+  ProjectAgentSessionEventType,
+  ProjectAgentSessionStatus,
 } from "@briar/contracts/gen/briar/app/v1/agent_pb";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
 import { env } from "cloudflare:workers";
@@ -328,5 +330,152 @@ describe("AgentService mutations", () => {
     expect(cleared.agent?.effort).toBeUndefined();
     expect(cleared.agent?.designatedWorkerId).toBeUndefined();
     expect(cleared.agent?.designatedWorkerLabel).toBeUndefined();
+  });
+  it("stops a remote Worker task session and rejects an unknown session", async () => {
+    const deviceId = "55555555-5555-4555-8555-555555555555";
+    const taskWorkerId = "cancel-task-worker";
+    const observedAt = new Date().toISOString();
+    const runtimeProtoJson = workerRuntimeProtoJsonFixture({
+      providers: ["codex"],
+    });
+    await db.batch([
+      db
+        .prepare(
+          `insert into briar_execution_worker_devices (
+           id, organization_id, owner_user_id, label, device_identity_hash,
+           state, last_heartbeat_at, created_at, updated_at
+         ) values (?, ?, ?, 'Cancel Mac', ?, 'online', ?, ?, ?)`,
+        )
+        .bind(
+          deviceId,
+          organizationId,
+          ownerId,
+          "1".repeat(64),
+          observedAt,
+          observedAt,
+          observedAt,
+        ),
+      db
+        .prepare(
+          `insert into briar_execution_worker_credentials (
+           device_id, token_hash, created_at
+         ) values (?, ?, ?)`,
+        )
+        .bind(deviceId, "2".repeat(64), observedAt),
+      db
+        .prepare(
+          `insert into briar_execution_workers (
+           id, project_id, device_id, label, host_fingerprint,
+           runtime_proto_json, state, accepting_work,
+           readiness_state, last_heartbeat_at, created_at, updated_at
+         ) values (?, ?, ?, 'Cancel Mac', ?, ?, 'online', 1, 'ready', ?, ?, ?)`,
+        )
+        .bind(
+          taskWorkerId,
+          projectId,
+          deviceId,
+          "3".repeat(64),
+          runtimeProtoJson,
+          observedAt,
+          observedAt,
+          observedAt,
+        ),
+    ]);
+
+    const ownerClient = client(tokens.owner);
+    const callOptions = options(tokens.owner);
+    const agent = await ownerClient.createProjectAgent(
+      {
+        ...createInput,
+        name: "Stoppable Agent",
+        responsibility: "Run a long task on a remote Worker.",
+        skills: [{
+          name: "Long task",
+          description: "Use for long running direct tasks.",
+          body: "Do the long running work.",
+          provider: AgentProvider.CODEX,
+          kind: AgentSkillKind.CUSTOM,
+          executionMode: AgentSkillExecutionMode.TASK,
+          approvalPolicy: AgentSkillApprovalPolicy.INVOKE_IS_CONSENT,
+          position: 0,
+        }],
+      },
+      callOptions,
+    );
+    const agentId = agent.agent?.id;
+    expect(agentId).toBeTruthy();
+
+    const started = await ownerClient.runProjectAgentTask(
+      {
+        projectId,
+        agentId: agentId!,
+        skillId: agent.agent?.skills[0]?.id ?? "",
+        request: "Investigate the flaky suite.",
+        workerId: taskWorkerId,
+        requestId: "66666666-6666-4666-8666-666666666666",
+      },
+      callOptions,
+    );
+    const sessionId = started.session?.id;
+    expect(started.session).toMatchObject({
+      status: ProjectAgentSessionStatus.RUNNING,
+      workerId: taskWorkerId,
+    });
+
+    for (const token of [tokens.editor, tokens.viewer]) {
+      const denied = await client(token)
+        .cancelProjectAgentTask(
+          { projectId, sessionId: sessionId! },
+          options(token),
+        )
+        .catch((cause: unknown) => cause);
+      expect(denied).toBeInstanceOf(ConnectError);
+      expect((denied as ConnectError).code).toBe(Code.PermissionDenied);
+    }
+
+    const stopped = await ownerClient.cancelProjectAgentTask(
+      { projectId, sessionId: sessionId! },
+      callOptions,
+    );
+    expect(stopped.session).toMatchObject({
+      id: sessionId,
+      status: ProjectAgentSessionStatus.INTERRUPTED,
+    });
+    expect(stopped.session?.error).toBeUndefined();
+    expect(stopped.session?.events.at(-1)).toMatchObject({
+      type: ProjectAgentSessionEventType.STOPPED,
+    });
+    expect(
+      await db
+        .prepare(
+          `select status, claim_token_hash, cancelled_by_user_id
+           from briar_project_agent_task_jobs where id = ?`,
+        )
+        .bind(sessionId)
+        .first(),
+    ).toMatchObject({
+      status: "failed",
+      claim_token_hash: null,
+      cancelled_by_user_id: ownerId,
+    });
+
+    // A second stop is a no-op that still returns the stopped session.
+    await expect(
+      ownerClient.cancelProjectAgentTask(
+        { projectId, sessionId: sessionId! },
+        callOptions,
+      ),
+    ).resolves.toMatchObject({
+      session: { id: sessionId, status: ProjectAgentSessionStatus.INTERRUPTED },
+    });
+
+    const missing = await ownerClient
+      .cancelProjectAgentTask(
+        { projectId, sessionId: "77777777-7777-4777-8777-777777777777" },
+        callOptions,
+      )
+      .catch((cause: unknown) => cause);
+    expect(missing).toBeInstanceOf(ConnectError);
+    expect((missing as ConnectError).code).toBe(Code.NotFound);
   });
 });

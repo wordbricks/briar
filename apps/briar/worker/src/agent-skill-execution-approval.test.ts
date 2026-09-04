@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { AgentService } from "@briar/contracts/gen/briar/app/v1/agent_pb";
-import { createClient } from "@connectrpc/connect";
+import { Code, createClient } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -730,6 +730,24 @@ describe("conversational Agent Skill execution approval", () => {
         id: acceptedBody.proposal.resultSessionId,
         requestedByUserId: ownerId,
       },
+    });
+    // Approval-owned sessions belong to their assigned Worker; the session
+    // stop control must not cancel one.
+    await expect(
+      agentClient.cancelProjectAgentTask(
+        { projectId, sessionId: acceptedBody.proposal.resultSessionId },
+        agentOptions,
+      ),
+    ).rejects.toMatchObject({
+      code: Code.FailedPrecondition,
+      message: expect.stringContaining("assigned Worker"),
+    });
+    expect(await db.prepare(
+      `select status, cancel_requested_at
+       from briar_project_agent_task_jobs where id = ?`,
+    ).bind(acceptedBody.proposal.resultSessionId).first()).toMatchObject({
+      status: "queued",
+      cancel_requested_at: null,
     });
 
     const retry = await acceptIssue(seeded.runId, seeded.proposal.id);

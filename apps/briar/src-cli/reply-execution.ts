@@ -18,6 +18,7 @@ import {
   createDetachedTranscriptSequencer,
   detachedChannelReplyPrompt,
   detachedIssueReplyPrompt,
+  detachedPlannedUpdateContinuationPrompt,
   detachedProjectAgentPrompt,
   shouldPersistDetachedTranscriptPayload,
   type DetachedAgent,
@@ -120,6 +121,8 @@ async function runClaimedProjectAgentTask(
     removeWorktree: typeof removeAnalysisWorktree;
     runProviderTurn: typeof runDetachedProviderTurn;
     git: typeof runGit;
+    // Tests observe the resume-scoped transcript range through this factory.
+    createTranscriptSequencer?: typeof createDetachedTranscriptSequencer;
   } = {
     allocateWorktree: allocateAnalysisWorktree,
     removeWorktree: removeAnalysisWorktree,
@@ -144,17 +147,29 @@ async function runClaimedProjectAgentTask(
       ...detachedAgentWithActiveSkill(task.agent, task.activeSkill),
       scope: { kind: "project", organizationId, projectId: project.id },
     };
-    const prompt = detachedProjectAgentPrompt({
+    const taskPrompt = detachedProjectAgentPrompt({
       agent,
       request: task.request,
       workspacePath,
     });
-    const transcriptSequencer = createDetachedTranscriptSequencer(
-      task.claimAttempts,
-    );
+    // A handed-off claim resumes the provider conversation that a planned
+    // Worker update interrupted. Replaying the original prompt verbatim makes
+    // the Agent redo finished work, so the resumed turn asks it to continue.
+    const resumedConversationId = task.handoffContext?.conversationId ?? null;
+    const prompt = resumedConversationId
+      ? detachedPlannedUpdateContinuationPrompt(taskPrompt)
+      : taskPrompt;
+    // Attempt and resume both scope the sequence range: a planned update hands
+    // the same attempt back, so only the resume count keeps the resumed
+    // transcript from reusing sequences the server already stored.
+    const transcriptSequencer =
+      (runtime.createTranscriptSequencer ?? createDetachedTranscriptSequencer)(
+        task.claimAttempts,
+        task.resumeCount,
+      );
     // Direct Agent tasks are not Hunt runs. Their task/session UUID is the
-    // durable transcript key, while attempt-scoped sequence ranges make Worker
-    // retries append safely without requiring a Hunt-run binding.
+    // durable transcript key, while attempt- and resume-scoped sequence ranges
+    // make Worker retries append safely without requiring a Hunt-run binding.
     const transcriptBatcher = createWorkerTranscriptBatcher({
       apiUrl: config.apiUrl,
       token: workerToken,
@@ -170,7 +185,7 @@ async function runClaimedProjectAgentTask(
         );
       },
     });
-    let conversationId: string | null = task.handoffContext?.conversationId ?? null;
+    let conversationId: string | null = resumedConversationId;
     if (conversationId) reportCheckpoint?.({ conversationId });
     const turn = await (async () => {
       try {

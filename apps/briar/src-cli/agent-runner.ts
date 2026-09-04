@@ -61,6 +61,11 @@ export async function runProjectAgentTaskCompletionFlow<TPayload, TResult>(
 // A claim may now contain several provider turns. Keep a wide range so long
 // transcripts can continue without colliding with the next claim attempt.
 const detachedTranscriptClaimStride = 1_000_000;
+// A planned Worker update resumes the same claim attempt, so each resume of an
+// attempt needs its own range too. Without it a resumed run replays sequence
+// numbers the server already stored for different content and the transcript
+// upload is rejected.
+const detachedTranscriptResumeStride = 1_000;
 
 export function detachedTranscriptSessionId(
   runId: string,
@@ -72,17 +77,27 @@ export function detachedTranscriptSessionId(
 export function detachedTranscriptSequence(
   claimAttempt: number,
   localSequence: number,
+  resumeCount = 0,
 ) {
   if (
     !Number.isSafeInteger(claimAttempt) ||
     claimAttempt < 1 ||
+    !Number.isSafeInteger(resumeCount) ||
+    resumeCount < 0 ||
+    resumeCount >= detachedTranscriptResumeStride ||
     !Number.isSafeInteger(localSequence) ||
     localSequence < 1 ||
     localSequence >= detachedTranscriptClaimStride
   ) {
     throw new Error("Detached transcript sequence is out of range");
   }
-  return (claimAttempt - 1) * detachedTranscriptClaimStride + localSequence;
+  const sequence =
+    ((claimAttempt - 1) * detachedTranscriptResumeStride + resumeCount) *
+      detachedTranscriptClaimStride + localSequence;
+  if (!Number.isSafeInteger(sequence)) {
+    throw new Error("Detached transcript sequence is out of range");
+  }
+  return sequence;
 }
 
 type DetachedAgentProvider = AgentProvider;
@@ -456,6 +471,21 @@ export function detachedProjectAgentPrompt(input: {
     "At the end, reply with a concise summary of what you did, what changed for the user, and any remaining limitation or follow-up.",
     `User request:\n\n${input.request}`,
   ].join("\n\n");
+}
+
+// Mirrors the desktop app's plannedUpdateContinuationMessage. The Worker CLI
+// cannot import from the app bundle, so the wording is duplicated here on
+// purpose: both paths resume the same provider conversation after a planned
+// update and must give the Agent the same instruction.
+export function detachedPlannedUpdateContinuationPrompt(originalRequest: string) {
+  return [
+    "Briar restarted briefly to install an app update while the previous turn was still running.",
+    "Continue the same request from the existing conversation and workspace.",
+    "First inspect the current files, Git state, and prior tool results. Do not repeat side effects or completed work. Resume only the remaining work, then validate and report the final result.",
+    "",
+    "Original request:",
+    originalRequest,
+  ].join("\n");
 }
 
 export type DetachedAgentSkillExecutionTarget = {
@@ -890,11 +920,14 @@ function shouldPersistDetachedProviderRaw(payload: unknown) {
   return !/(?:delta|progress)$/iu.test(method);
 }
 
-export function createDetachedTranscriptSequencer(claimAttempt: number) {
+export function createDetachedTranscriptSequencer(
+  claimAttempt: number,
+  resumeCount = 0,
+) {
   let persistedCount = 0;
   const next = () => {
     persistedCount += 1;
-    return detachedTranscriptSequence(claimAttempt, persistedCount);
+    return detachedTranscriptSequence(claimAttempt, persistedCount, resumeCount);
   };
   return {
     next,
