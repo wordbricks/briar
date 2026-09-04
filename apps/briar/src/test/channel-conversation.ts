@@ -3,6 +3,7 @@ import type {
   ChannelAgentSummary,
   ChannelMember,
   ChannelMessage,
+  ChannelSummary,
 } from "../lib/channels-contract";
 
 /*
@@ -99,6 +100,35 @@ export function testChannelAgent(
     responsibility: "",
     skills: [],
     createdAt: "2026-08-01T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
+/** A minimal public channel of `org-1`. */
+export function testChannelSummary(
+  id: string,
+  overrides: Partial<ChannelSummary> = {},
+): ChannelSummary {
+  return {
+    id,
+    organizationId: "org-1",
+    slug: id,
+    name: id,
+    topic: null,
+    visibility: "public",
+    defaultProjectId: null,
+    archivedAt: null,
+    memberCount: 1,
+    agentCount: 0,
+    kind: "channel",
+    createdByUserId: null,
+    createdAt: "2026-08-01T00:00:00.000Z",
+    updatedAt: "2026-08-01T00:00:00.000Z",
+    lastMessageAt: null,
+    lastMessagePreview: null,
+    lastReadAt: null,
+    hasUnread: false,
+    dmParticipants: [],
     ...overrides,
   };
 }

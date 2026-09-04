@@ -30,10 +30,14 @@ import {
   useChannelConversationView,
 } from "../state/channel-conversation/useChannelConversationStore";
 import {
+  writeChannelAgentReplies,
   writeChannelMessageCursor,
   writeChannelOpenThreadId,
+  writeChannelParticipants,
   writeChannelTimeline,
 } from "../state/channel-conversation/write";
+import { activeOrganizationIdAtom } from "../state/organization/atoms";
+import { tokenAtom } from "../state/session/atoms";
 import type { ChannelMessageImageCache } from "../components/ChannelImages";
 
 const api = {
@@ -189,12 +193,10 @@ function Harness({
   imageCache?: ChannelMessageImageCache | null;
 }) {
   const registry = useRegistry();
-  const [members, setMembers] = React.useState<ChannelMember[]>([member]);
-  const [agents, setAgents] = React.useState<ChannelAgentSummary[]>([]);
   /*
-    The timeline is the store's, so the harness seeds it once instead of
-    holding a `useState` copy. The replies are still a prop of the hook, so
-    they stay here.
+    Every value the conversation renders is the store's now — the participants
+    and the agent replies included — so the harness seeds it once instead of
+    holding `useState` copies beside it.
   */
   const seeded = React.useRef(false);
   if (!seeded.current) {
@@ -202,19 +204,24 @@ function Harness({
     if (initialMessages.length > 0) {
       writeChannelTimeline(registry, activeChannel.id, initialMessages);
     }
+    writeChannelParticipants(registry, activeChannel.id, {
+      members: [member],
+      agents: [],
+    });
+    writeChannelAgentReplies(registry, activeChannel.id, initialReplies);
     writeChannelMessageCursor(registry, activeChannel.id, initialNextCursor);
     writeChannelOpenThreadId(registry, activeChannel.id, initialThreadParentId);
   }
   const conversationStore = useChannelConversationStore(activeChannel.id);
   const {
+    agents,
+    members,
     messageNextCursor,
     messages,
+    replies,
     threadMessages,
     threadParentId,
   } = useChannelConversationView(activeChannel.id);
-  const [replies, setReplies] = React.useState<ChannelAgentReply[]>(
-    initialReplies,
-  );
   const catalogCursor = React.useRef(0);
   const conversation = useChannelConversation({
     token: "token",
@@ -230,11 +237,7 @@ function Harness({
     pageSize: 20,
     updateRootMessages: conversationStore.updateRootMessages,
     updateThreadMessages: conversationStore.updateThreadMessages,
-    setMembers,
-    setAgents,
-    setReplies,
     setThreadParentId: conversationStore.setThreadParentId,
-    setMessageNextCursor: conversationStore.setMessageNextCursor,
     dependencies,
     activityEnabled: false,
     realtime: realtimeEnabled
@@ -261,7 +264,7 @@ function Harness({
 
 async function renderHarness(props: React.ComponentProps<typeof Harness>) {
   const { cleanup, root } = createReactTestRoot();
-  const registry = createTestRegistry();
+  const registry = createSignedInTestRegistry();
   await renderReactTestRoot(
     root,
     <RegistryContext.Provider value={registry}>
@@ -279,7 +282,7 @@ async function renderHarness(props: React.ComponentProps<typeof Harness>) {
 
 async function renderToastHarness(props: React.ComponentProps<typeof Harness>) {
   const { cleanup, root } = createReactTestRoot({ attachToDocument: true });
-  const registry = createTestRegistry();
+  const registry = createSignedInTestRegistry();
   await renderReactTestRoot(
     root,
     <RegistryContext.Provider value={registry}>
@@ -301,6 +304,17 @@ const current = () => {
   if (!latest) throw new Error("Harness has not rendered");
   return latest;
 };
+
+/**
+ * The loader reads its credentials from the registry rather than from props, so
+ * every harness registry starts signed in to the organization the fixtures use.
+ */
+function createSignedInTestRegistry() {
+  return createTestRegistry([
+    [tokenAtom, "token"],
+    [activeOrganizationIdAtom, "org-1"],
+  ]);
+}
 
 describe("useChannelConversation", () => {
   let cleanup: (() => Promise<void>) | null = null;

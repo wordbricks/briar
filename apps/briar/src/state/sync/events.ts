@@ -88,12 +88,16 @@ export type SyncEvent =
    * timeline. `merge` keeps what the store already had for the channel, which
    * is how a cached channel refreshes without blanking first; without it the
    * page replaces the timeline outright.
+   *
+   * `members` and `agents` are absent for a response that does not carry them —
+   * an older cursor page is the same merge with the same cursor write, and it
+   * must not be read as "this channel has no members".
    */
   | {
       readonly kind: "channel-conversation-snapshot";
       readonly channelId: string;
-      readonly members: readonly ChannelMember[];
-      readonly agents: readonly ChannelAgentSummary[];
+      readonly members?: readonly ChannelMember[];
+      readonly agents?: readonly ChannelAgentSummary[];
       readonly messages: readonly ChannelMessage[];
       readonly nextCursor: string | null;
       readonly merge: boolean;

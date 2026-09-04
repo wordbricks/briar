@@ -73,15 +73,40 @@ import {
 } from "../lib/channel-realtime";
 import { useRegistry } from "../state/registry";
 import {
+  channelAgentRepliesAtom,
+  channelEarlierMessagesLoadingAtom,
   channelMessageCursorAtom,
   channelRootMessagesAtom,
+  channelThreadLoadingAtom,
 } from "../state/channel-conversation/atoms";
+import {
+  createChannelConversationLoader,
+  getChannelConversationLoader,
+  type ChannelSurfaceContext,
+  type LoadChannelConversationOptions,
+  type LoadEarlierMessagesResult,
+} from "../state/channel-conversation/loader";
+import { channelConversationFailureAtom } from "../state/channel-conversation/errors";
+import { getChannelReplyLedger } from "../state/channel-conversation/reply-ledger";
+import { applySyncEvent } from "../state/sync/apply";
+import { writeChannelAgentReplies } from "../state/channel-conversation/write";
+import { useAtomValue } from "@effect/atom-react";
+import {
+  activityForReplies,
+  appendReplySummary,
+  channelConversationError,
+  channelReplyIsTerminal,
+  typingAgentNamesForReplies,
+} from "../state/channel-conversation/model";
 
-export type ChannelSurfaceContext = {
-  generation: number;
-  channelId: string | null;
-  threadParentId: string | null;
-};
+export type {
+  ChannelConversationSnapshot,
+  ChannelSurfaceContext,
+  LoadChannelConversationOptions,
+  LoadEarlierMessagesResult,
+  RequestedChannelMessage,
+} from "../state/channel-conversation/loader";
+
 
 type MessageUpdater = (update: (current: ChannelMessage[]) => ChannelMessage[]) => void;
 
@@ -98,13 +123,8 @@ type UseChannelConversationOptions = {
   pageSize: number;
   updateRootMessages: MessageUpdater;
   updateThreadMessages: MessageUpdater;
-  setMembers: Dispatch<SetStateAction<ChannelMember[]>>;
-  setAgents: Dispatch<SetStateAction<ChannelAgentSummary[]>>;
-  setReplies: Dispatch<SetStateAction<ChannelAgentReply[]>>;
   setThreadParentId: Dispatch<SetStateAction<string | null>>;
-  setMessageNextCursor: Dispatch<SetStateAction<string | null>>;
   onChannelLoaded?: (channel: ChannelSummary) => void;
-  onConversationLoaded?: (snapshot: ChannelConversationSnapshot) => void;
   onIssueOpen?: (projectId: string, runId: string) => void | Promise<void>;
   onSkillSessionAccepted?: (session: AutoHuntSession) => void;
   onRootMessagePending?: () => void;
@@ -168,133 +188,10 @@ export const defaultChannelConversationDependencies: ChannelConversationDependen
   updateChannelThreadSubscription,
 };
 
-export type RequestedChannelMessage = {
-  channelId: string;
-  messageId: string;
-  rootMessageId: string;
-};
-
-export type ChannelConversationSnapshot = {
-  channel: ChannelSummary;
-  members: ChannelMember[];
-  agents: ChannelAgentSummary[];
-  messages: ChannelMessage[];
-  nextCursor: string | null;
-};
-
-export type LoadChannelConversationOptions = {
-  channelId: string;
-  messageLimit: number;
-  mergeWithCurrentMessages: boolean;
-  requestedMessage?: RequestedChannelMessage | null;
-  signal?: AbortSignal;
-};
-
-export type LoadEarlierMessagesResult = {
-  applied: boolean;
-  nextCursor: string | null;
-};
-
-export function channelConversationError(cause: unknown) {
-  return cause instanceof Error ? cause.message : String(cause);
-}
-
-export function mergeChannelReplies(
-  current: ChannelAgentReply[],
-  incoming: ChannelAgentReply[],
-  tombstones: ReadonlySet<string> = new Set(),
-) {
-  const byId = new Map(current.map((item) => [item.id, item]));
-  for (const item of incoming) {
-    if (tombstones.has(item.id) && !channelReplyIsTerminal(item)) continue;
-    const previous = byId.get(item.id);
-    if (!previous || channelReplyShouldReplace(previous, item)) {
-      byId.set(item.id, item);
-    }
-  }
-  return [...byId.values()];
-}
-
-const channelReplyIsTerminal = (reply: ChannelAgentReply) =>
-  reply.status === "completed" || reply.status === "failed";
-
-const channelReplyStatusRank = (reply: ChannelAgentReply) => {
-  if (channelReplyIsTerminal(reply)) return 2;
-  return reply.status === "running" ? 1 : 0;
-};
-
-const channelReplyShouldReplace = (
-  current: ChannelAgentReply,
-  incoming: ChannelAgentReply,
-) => {
-  const currentTerminal = channelReplyIsTerminal(current);
-  const incomingTerminal = channelReplyIsTerminal(incoming);
-  if (currentTerminal !== incomingTerminal) return incomingTerminal;
-  if (incoming.updatedAt !== current.updatedAt) {
-    return incoming.updatedAt > current.updatedAt;
-  }
-  return channelReplyStatusRank(incoming) > channelReplyStatusRank(current);
-};
-
-const channelAuthorId = (author: ChannelMessage["author"]) =>
-  author.type === "user"
-    ? `user:${author.id || author.email || author.name}`
-    : `${author.type}:${author.id ?? author.name}`;
-
-const appendReplySummary = (
-  parent: ChannelMessage,
-  reply: ChannelMessage,
-): ChannelMessage => {
-  const replyAuthors: ChannelMessage["replyAuthors"] = [];
-  const seen = new Set<string>();
-  for (const author of [reply.author, ...parent.replyAuthors]) {
-    const id = channelAuthorId(author);
-    if (seen.has(id)) continue;
-    seen.add(id);
-    replyAuthors.push(author);
-    if (replyAuthors.length === 3) break;
-  }
-  return {
-    ...parent,
-    replyCount: parent.replyCount + 1,
-    lastReplyAt: reply.createdAt,
-    replyAuthors,
-  };
-};
-
-const typingAgentNamesForReplies = (
-  replies: ChannelAgentReply[],
-  agents: ChannelAgentSummary[],
-  messageIds: ReadonlySet<string>,
-  fallbackName: string,
-) => [
-  ...new Set(
-    replies
-      .filter((reply) => messageIds.has(reply.parentMessageId))
-      .map(
-        (reply) =>
-          agents.find((agent) => agent.agentId === reply.agentId)?.name ??
-          fallbackName,
-      ),
-  ),
-];
-
-const activityForReplies = (
-  replies: ChannelAgentReply[],
-  agents: ChannelAgentSummary[],
-  activity: ReadonlyMap<string, ChannelAgentActivityFrame>,
-  fallbackName: string,
-) => {
-  const result: Record<string, ChannelAgentActivityDescriptor> = {};
-  for (const reply of replies) {
-    const frame = activity.get(reply.id);
-    if (!frame?.activity || frame.attempt !== reply.attempts) continue;
-    const name = agents.find((agent) => agent.agentId === reply.agentId)?.name ??
-      fallbackName;
-    result[name] = frame.activity;
-  }
-  return result;
-};
+export {
+  channelConversationError,
+  mergeChannelReplies,
+} from "../state/channel-conversation/model";
 
 export function useChannelConversation({
   token,
@@ -309,13 +206,8 @@ export function useChannelConversation({
   pageSize,
   updateRootMessages,
   updateThreadMessages,
-  setMembers,
-  setAgents,
-  setReplies,
   setThreadParentId,
-  setMessageNextCursor,
   onChannelLoaded,
-  onConversationLoaded,
   onIssueOpen,
   onSkillSessionAccepted,
   onRootMessagePending,
@@ -334,12 +226,23 @@ export function useChannelConversation({
     left as props is what the hook needs *during* a render — the replies the
     typing strips derive from, and the thread on screen.
   */
+  /*
+    The request ordering, the reads and the proposal history are
+    `state/channel-conversation/loader.ts`'s now, so what is left here is the
+    writes and the render-time derivations. The loader is the registry's own
+    unless a test injected reads, which is the one case that needs an instance
+    of its own.
+  */
+  const loader = useMemo(
+    () =>
+      dependencies === defaultChannelConversationDependencies
+        ? getChannelConversationLoader(registry)
+        : createChannelConversationLoader(registry, dependencies),
+    [dependencies, registry],
+  );
+  const replyLedger = useMemo(() => getChannelReplyLedger(registry), [registry]);
   const storedMessages = useCallback(
     () => registry.get(channelRootMessagesAtom(channelIdRef.current ?? "")),
-    [registry],
-  );
-  const storedCursor = useCallback(
-    () => registry.get(channelMessageCursorAtom(channelIdRef.current ?? "")),
     [registry],
   );
   const [busy, setBusy] = useState(false);
@@ -354,49 +257,32 @@ export function useChannelConversation({
     null,
   );
   const [threadSubscriptionPending, setThreadSubscriptionPending] = useState(false);
-  const [loadingEarlierMessages, setLoadingEarlierMessages] = useState(false);
-  const [threadLoading, setThreadLoading] = useState(false);
   const [proposalProjects, setProposalProjects] = useState<Record<string, string>>(
     {},
   );
 
   const channelId = channel?.id ?? null;
-  const channelSurfaceGeneration = useRef(0);
+  const loadingEarlierMessages = useAtomValue(
+    channelEarlierMessagesLoadingAtom(channelId ?? ""),
+  );
+  const threadLoading = useAtomValue(channelThreadLoadingAtom(channelId ?? ""));
   const channelIdRef = useRef(channelId);
   const threadParentIdRef = useRef(threadParentId);
-  const renderedSurface = useRef({ channelId, threadParentId });
-  const proposalVersions = useRef(new Map<string, number>());
-  const latestProposals = useRef(
-    new Map<string, NonNullable<ChannelMessage["proposal"]>>(),
-  );
-  const executionHistoryDashboards = useRef(
-    new Map<string, ReturnType<typeof loadDashboard>>(),
-  );
   const optimisticThreadMessageIds = useRef(new Set<string>());
-  const earlierMessagesPending = useRef(false);
-  const requestVersion = useRef(0);
   const repliesRef = useRef(replies);
-  const replyTombstones = useRef(new Set<string>());
-  const replyVersions = useRef(new Map<string, number>());
-  const replyVersion = useRef(0);
   const realtimeRef = useRef(realtime);
   const dependenciesRef = useRef(dependencies);
 
-  if (
-    renderedSurface.current.channelId !== channelId ||
-    renderedSurface.current.threadParentId !== threadParentId
-  ) {
-    channelSurfaceGeneration.current += 1;
-    renderedSurface.current = { channelId, threadParentId };
-  }
+  /*
+    The surface the loader compares a response against is what this render is
+    showing, so it is published during the render rather than from an effect: a
+    request started in a layout effect below has to already see the channel the
+    view is drawing.
+  */
+  loader.syncSurface(channelId, threadParentId);
   channelIdRef.current = channelId;
   threadParentIdRef.current = threadParentId;
   repliesRef.current = replies;
-  for (const reply of replies) {
-    if (!replyVersions.current.has(reply.id)) {
-      replyVersions.current.set(reply.id, replyVersion.current);
-    }
-  }
   realtimeRef.current = realtime;
   dependenciesRef.current = dependencies;
 
@@ -406,41 +292,19 @@ export function useChannelConversation({
     activityEnabled ? channelId : null,
   );
 
-  const captureChannelSurface = useCallback(
-    (): ChannelSurfaceContext => ({
-      generation: channelSurfaceGeneration.current,
-      channelId: channelIdRef.current,
-      threadParentId: threadParentIdRef.current,
-    }),
-    [],
-  );
-
-  const channelSurfaceIsCurrent = useCallback(
-    (context: ChannelSurfaceContext) =>
-      context.generation === channelSurfaceGeneration.current &&
-      context.channelId === channelIdRef.current &&
-      context.threadParentId === threadParentIdRef.current,
-    [],
-  );
+  const captureChannelSurface = loader.captureSurface;
+  const channelSurfaceIsCurrent = loader.surfaceIsCurrent;
 
   const invalidateChannelSurface = useCallback(
     (nextChannelId: string | null, nextThreadParentId: string | null) => {
-      channelSurfaceGeneration.current += 1;
-      requestVersion.current += 1;
+      loader.invalidateSurface(nextChannelId, nextThreadParentId);
       channelIdRef.current = nextChannelId;
       threadParentIdRef.current = nextThreadParentId;
-      renderedSurface.current = {
-        channelId: nextChannelId,
-        threadParentId: nextThreadParentId,
-      };
       setBusy(false);
       setAcceptingProposalId(null);
       setDecliningProposalId(null);
-      setThreadLoading(false);
-      earlierMessagesPending.current = false;
-      setLoadingEarlierMessages(false);
     },
-    [],
+    [loader],
   );
 
   useEffect(() => {
@@ -450,42 +314,39 @@ export function useChannelConversation({
   }, [channelId, threadParentId]);
 
   useEffect(() => {
-    executionHistoryDashboards.current.clear();
-  }, [token]);
+    loader.clearExecutionHistory();
+  }, [loader, token]);
 
   useEffect(
     () => () => {
-      channelSurfaceGeneration.current += 1;
-      requestVersion.current += 1;
+      loader.invalidateSurface(null, null);
       channelIdRef.current = null;
       threadParentIdRef.current = null;
     },
-    [],
+    [loader],
   );
 
-  const recordProposalMessages = useCallback((incoming: ChannelMessage[]) => {
-    const recorded = new Set<string>();
-    for (const item of incoming) {
-      const proposal = item.proposal;
-      if (!proposal || recorded.has(proposal.id)) continue;
-      recorded.add(proposal.id);
-      const previous = latestProposals.current.get(proposal.id);
-      latestProposals.current.set(proposal.id, proposal);
-      if (previous && JSON.stringify(previous) === JSON.stringify(proposal)) {
-        continue;
-      }
-      proposalVersions.current.set(
-        proposal.id,
-        (proposalVersions.current.get(proposal.id) ?? 0) + 1,
-      );
-    }
-  }, []);
+  /*
+    A failed read publishes its message rather than raising a toast, because the
+    loader has no provider context to raise one from. Subscribing rather than
+    reading keeps a failure from re-rendering the conversation: nothing here
+    draws it.
+  */
+  useEffect(() => {
+    let seen = registry.get(channelConversationFailureAtom)?.id ?? 0;
+    return registry.subscribe(channelConversationFailureAtom, (failure) => {
+      if (!failure || failure.id <= seen) return;
+      seen = failure.id;
+      toast(failure.message, { tone: "error" });
+    });
+  }, [registry, toast]);
+
+  const recordProposalMessages = loader.recordProposalMessages;
 
   const clearProposalHistory = useCallback(() => {
-    proposalVersions.current.clear();
-    latestProposals.current.clear();
+    loader.clearProposalHistory(null);
     setProposalProjects({});
-  }, []);
+  }, [loader]);
 
   const replyFailureMessage = useCallback(
     (reply: ChannelAgentReply) =>
@@ -499,85 +360,37 @@ export function useChannelConversation({
     [t],
   );
 
+  /*
+    The tombstones and the observation versions moved to the store and to
+    `reply-ledger.ts`, so this is the entry point plus the one thing the store
+    cannot decide: whether a failure is *new*, which is what earns a toast.
+  */
   const applyAgentReplies = useCallback(
     (incoming: ChannelAgentReply[], reset = false) => {
+      const activeId = channelIdRef.current;
+      if (!activeId) return;
       if (incoming.length === 0 && !reset) return;
       const previousById = new Map(
-        repliesRef.current.map((item) => [item.id, item]),
+        registry
+          .get(channelAgentRepliesAtom(activeId))
+          .map((item) => [item.id, item]),
       );
-      for (const reply of incoming) {
-        replyVersion.current += 1;
-        replyVersions.current.set(reply.id, replyVersion.current);
-        if (channelReplyIsTerminal(reply)) replyTombstones.current.add(reply.id);
-      }
-      setReplies((current) => {
-        const next = reset
-          ? [...incoming]
-          : mergeChannelReplies(current, incoming, replyTombstones.current);
-        repliesRef.current = next;
-        return next;
+      replyLedger.note(activeId, incoming);
+      applySyncEvent(registry, {
+        kind: "channel-agent-replies-changed",
+        channelId: activeId,
+        replies: incoming,
+        reset,
       });
       const failed = incoming.find(
-        (reply) =>
-          reply.channelId === channelIdRef.current && reply.status === "failed",
+        (reply) => reply.channelId === activeId && reply.status === "failed",
       );
       if (!failed) return;
       const previous = previousById.get(failed.id);
       if (previous?.status === "failed") return;
       toast(replyFailureMessage(failed), { tone: "error" });
     },
-    [replyFailureMessage, setReplies, toast],
-  );
-
-  const applyAuthoritativeAgentReplies = useCallback(
-    (
-      incoming: ChannelAgentReply[],
-      selectedChannelId: string,
-      observedReplyVersion: number,
-    ) => {
-      const authoritative = incoming.filter(
-        (reply) => reply.channelId === selectedChannelId,
-      );
-      const incomingIds = new Set(authoritative.map((reply) => reply.id));
-      const recordTombstones = (current: ChannelAgentReply[]) => {
-        for (const reply of current) {
-          if (
-            reply.channelId === selectedChannelId &&
-            (replyVersions.current.get(reply.id) ?? 0) <= observedReplyVersion &&
-            !incomingIds.has(reply.id)
-          ) {
-            replyTombstones.current.add(reply.id);
-          }
-        }
-        for (const reply of authoritative) {
-          if (channelReplyIsTerminal(reply)) replyTombstones.current.add(reply.id);
-        }
-      };
-      recordTombstones(repliesRef.current);
-      setReplies((current) => {
-        recordTombstones(current);
-        const concurrent = current.filter(
-          (reply) =>
-            reply.channelId === selectedChannelId &&
-            (replyVersions.current.get(reply.id) ?? 0) > observedReplyVersion,
-        );
-        const next = [
-          ...current.filter((reply) => reply.channelId !== selectedChannelId),
-          ...mergeChannelReplies(
-            mergeChannelReplies(
-              [],
-              authoritative,
-              replyTombstones.current,
-            ),
-            concurrent,
-            replyTombstones.current,
-          ),
-        ];
-        repliesRef.current = next;
-        return next;
-      });
-    },
-    [setReplies],
+    [registry, replyFailureMessage, replyLedger, toast],
   );
 
   const applyIncomingMessages = useCallback(
@@ -667,7 +480,7 @@ export function useChannelConversation({
             const currentOptions = realtimeRef.current;
             if (!currentOptions) return;
             const requestedCursor = currentOptions.catalogCursor.current;
-            const requestedVersion = requestVersion.current;
+            const requestedVersion = loader.readRequestVersion();
             const delta = await dependenciesRef.current.loadChannelDelta(
               token,
               organizationId,
@@ -677,7 +490,7 @@ export function useChannelConversation({
             if (
               stopped ||
               requestedCursor !== currentOptions.catalogCursor.current ||
-              requestedVersion !== requestVersion.current ||
+              requestedVersion !== loader.readRequestVersion() ||
               currentOptions.isBlocked?.()
             ) return;
             currentOptions.catalogCursor.current = delta.cursor;
@@ -777,6 +590,7 @@ export function useChannelConversation({
     applyIncomingMessages,
     channelId,
     invalidateChannelSurface,
+    loader,
     organizationId,
     realtime?.catalogReady,
     realtime?.enabled,
@@ -786,253 +600,40 @@ export function useChannelConversation({
   ]);
 
   const loadChannelConversation = useCallback(
-    async ({
+    ({
       channelId: requestedChannelId,
       messageLimit,
       mergeWithCurrentMessages,
       requestedMessage,
-      signal,
-    }: LoadChannelConversationOptions) => {
-      const context = captureChannelSurface();
-      const version = ++requestVersion.current;
-      const observedReplyVersion = replyVersion.current;
-      try {
-        const result = await dependenciesRef.current.loadChannel(
-          token,
-          organizationId,
-          requestedChannelId,
-          { messageLimit, signal },
-        );
-        if (
-          signal?.aborted ||
-          version !== requestVersion.current ||
-          !channelSurfaceIsCurrent(context)
-        ) return null;
-
-        onChannelLoaded?.(result.channel);
-        setMembers(result.members);
-        setAgents(result.agents);
-        applyAuthoritativeAgentReplies(
-          result.agentReplies ?? [],
-          requestedChannelId,
-          observedReplyVersion,
-        );
-        recordProposalMessages(result.messages);
-        const currentMessages = storedMessages();
-        let appliedMessages = mergeWithCurrentMessages
-          ? mergeChannelMessages(currentMessages, result.messages, [])
-          : result.messages;
-        updateRootMessages(() => appliedMessages);
-        const nextCursor =
-          mergeWithCurrentMessages &&
-            currentMessages.length > result.messages.length
-            ? storedCursor()
-            : result.nextCursor ?? null;
-        setMessageNextCursor(nextCursor);
-
-        const target = requestedMessage?.channelId === requestedChannelId
-          ? requestedMessage
-          : null;
-        let requestedThreadResult: Awaited<
-          ReturnType<typeof listChannelMessages>
-        > | null = null;
-        if (
-          target &&
-          !appliedMessages.some((item) => item.id === target.rootMessageId)
-        ) {
-          requestedThreadResult = await dependenciesRef.current.listChannelMessages(
-            token,
-            organizationId,
-            requestedChannelId,
-            target.rootMessageId,
-            { signal },
-          );
-          if (
-            signal?.aborted ||
-            version !== requestVersion.current ||
-            !channelSurfaceIsCurrent(context)
-          ) return null;
-          const roots = requestedThreadResult.messages.filter(
-            (item) => item.parentMessageId === null,
-          );
-          recordProposalMessages(roots);
-          appliedMessages = mergeChannelMessages(appliedMessages, roots, []);
-          updateRootMessages(() => appliedMessages);
-        }
-        if (target && target.rootMessageId !== target.messageId) {
-          const threadResult = requestedThreadResult ??
-            await dependenciesRef.current.listChannelMessages(
-              token,
-              organizationId,
-              requestedChannelId,
-              target.rootMessageId,
-              { signal },
-            );
-          if (
-            signal?.aborted ||
-            version !== requestVersion.current ||
-            !channelSurfaceIsCurrent(context)
-          ) return null;
-          recordProposalMessages(threadResult.messages);
-          invalidateChannelSurface(requestedChannelId, target.rootMessageId);
-          setThreadParentId(target.rootMessageId);
-          updateThreadMessages((current) =>
-            mergeChannelMessageSnapshot(current, threadResult.messages)
-          );
-        } else if (target) {
-          setThreadParentId(null);
-          updateThreadMessages(() => []);
-        }
-        const snapshot = {
-          channel: result.channel,
-          members: result.members,
-          agents: result.agents,
-          messages: appliedMessages,
-          nextCursor,
-        };
-        onConversationLoaded?.(snapshot);
-        return { ...snapshot, requestedMessage: target };
-      } catch (cause) {
-        if (
-          !signal?.aborted &&
-          version === requestVersion.current &&
-          channelSurfaceIsCurrent(context)
-        ) {
-          reportConversationError(cause);
-        }
-        return null;
-      }
-    },
-    [
-      applyAuthoritativeAgentReplies,
-      captureChannelSurface,
-      channelSurfaceIsCurrent,
-      invalidateChannelSurface,
-      onChannelLoaded,
-      onConversationLoaded,
-      organizationId,
-      recordProposalMessages,
-      reportConversationError,
-      setAgents,
-      setMembers,
-      setMessageNextCursor,
-      setThreadParentId,
-      token,
-      updateRootMessages,
-      updateThreadMessages,
-    ],
+    }: LoadChannelConversationOptions & { channelId: string }) =>
+      loader.loadConversation(requestedChannelId, {
+        messageLimit,
+        mergeWithCurrentMessages,
+        requestedMessage,
+        onChannelLoaded,
+      }),
+    [loader, onChannelLoaded],
   );
 
   const loadEarlierChannelMessages = useCallback(
-    async (signal?: AbortSignal): Promise<LoadEarlierMessagesResult> => {
+    (): Promise<LoadEarlierMessagesResult> => {
       const activeId = channelIdRef.current;
-      const cursor = storedCursor();
-      if (
-        !activeId ||
-        !cursor ||
-        earlierMessagesPending.current
-      ) {
-        return { applied: false, nextCursor: cursor };
+      if (!activeId) {
+        return Promise.resolve({ applied: false, nextCursor: null });
       }
-      const context = captureChannelSurface();
-      earlierMessagesPending.current = true;
-      setLoadingEarlierMessages(true);
-      try {
-        const result = await dependenciesRef.current.listChannelMessages(
-          token,
-          organizationId,
-          activeId,
-          undefined,
-          { limit: pageSize, cursor, signal },
-        );
-        if (!channelSurfaceIsCurrent(context)) {
-          return { applied: false, nextCursor: cursor };
-        }
-        recordProposalMessages(result.messages);
-        updateRootMessages((current) =>
-          mergeChannelMessages(current, result.messages, [])
-        );
-        const nextCursor = result.nextCursor ?? null;
-        setMessageNextCursor(nextCursor);
-        return { applied: true, nextCursor };
-      } catch (cause) {
-        if (!signal?.aborted && channelSurfaceIsCurrent(context)) {
-          reportConversationError(cause);
-        }
-        return { applied: false, nextCursor: cursor };
-      } finally {
-        earlierMessagesPending.current = false;
-        if (channelSurfaceIsCurrent(context)) setLoadingEarlierMessages(false);
-      }
+      return loader.loadEarlier(activeId, pageSize);
     },
-    [
-      captureChannelSurface,
-      channelSurfaceIsCurrent,
-      organizationId,
-      pageSize,
-      recordProposalMessages,
-      reportConversationError,
-      setMessageNextCursor,
-      token,
-      updateRootMessages,
-    ],
+    [loader, pageSize],
   );
 
   const openThread = useCallback(
     async (parentMessageId: string, cachedMessages: ChannelMessage[] = []) => {
       const activeId = channelIdRef.current;
       if (!activeId) return false;
-      invalidateChannelSurface(activeId, parentMessageId);
-      const version = requestVersion.current;
-      const context = captureChannelSurface();
-      setThreadParentId(parentMessageId);
-      updateThreadMessages(() => cachedMessages);
-      setThreadLoading(cachedMessages.length === 0);
       setError(null);
-      try {
-        const result = await dependenciesRef.current.listChannelMessages(
-          token,
-          organizationId,
-          activeId,
-          parentMessageId,
-        );
-        if (
-          version !== requestVersion.current ||
-          !channelSurfaceIsCurrent(context)
-        ) return false;
-        recordProposalMessages(result.messages);
-        updateThreadMessages((current) =>
-          mergeChannelMessageSnapshot(current, result.messages)
-        );
-        return true;
-      } catch (cause) {
-        if (
-          version === requestVersion.current &&
-          channelSurfaceIsCurrent(context)
-        ) {
-          reportConversationError(cause);
-        }
-        return false;
-      } finally {
-        if (
-          version === requestVersion.current &&
-          channelSurfaceIsCurrent(context)
-        ) {
-          setThreadLoading(false);
-        }
-      }
+      return loader.loadThread(activeId, parentMessageId, cachedMessages);
     },
-    [
-      captureChannelSurface,
-      channelSurfaceIsCurrent,
-      invalidateChannelSurface,
-      organizationId,
-      recordProposalMessages,
-      reportConversationError,
-      setThreadParentId,
-      token,
-      updateThreadMessages,
-    ],
+    [loader],
   );
 
   const closeThread = useCallback(() => {
@@ -1248,73 +849,11 @@ export function useChannelConversation({
     [captureChannelSurface, channelSurfaceIsCurrent, onIssueOpen, reportConversationError],
   );
 
-  const loadExecutionProposalContext = useCallback(
-    async (proposal: ChannelExecutionProposal) => {
-      const cacheHistory = proposal.status === "accepted";
-      let dashboardRequest = cacheHistory
-        ? executionHistoryDashboards.current.get(proposal.projectId)
-        : undefined;
-      if (!dashboardRequest) {
-        dashboardRequest = dependenciesRef.current.loadDashboard(
-          token,
-          proposal.projectId,
-        );
-        if (cacheHistory) {
-          executionHistoryDashboards.current.set(
-            proposal.projectId,
-            dashboardRequest,
-          );
-        }
-      }
-      try {
-        const dashboard = await dashboardRequest;
-        return {
-          run: dashboard.runs.find((run) => run.id === proposal.runId) ?? null,
-          workers: dashboard.workers ?? [],
-          policy: dashboard.executionPolicy,
-        };
-      } catch (cause) {
-        if (
-          cacheHistory &&
-          executionHistoryDashboards.current.get(proposal.projectId) ===
-            dashboardRequest
-        ) {
-          executionHistoryDashboards.current.delete(proposal.projectId);
-        }
-        throw cause;
-      }
-    },
-    [token],
-  );
-
-  const loadCreateExecutionProposalContext = useCallback(
-    async (projectId: string) => {
-      const dashboard = await dependenciesRef.current.loadDashboard(
-        token,
-        projectId,
-      );
-      return {
-        run: null,
-        workers: dashboard.workers ?? [],
-        policy: dashboard.executionPolicy,
-      };
-    },
-    [token],
-  );
-
-  const loadSkillExecutionProposalContext = useCallback(
-    async (proposal: AgentSkillExecutionProposal) => {
-      const dashboard = await dependenciesRef.current.loadDashboard(
-        token,
-        proposal.projectId,
-      );
-      return {
-        workers: dashboard.workers ?? [],
-        policy: dashboard.executionPolicy,
-      };
-    },
-    [token],
-  );
+  const loadExecutionProposalContext = loader.loadExecutionProposalContext;
+  const loadCreateExecutionProposalContext =
+    loader.loadCreateExecutionProposalContext;
+  const loadSkillExecutionProposalContext =
+    loader.loadSkillExecutionProposalContext;
 
   const acceptExecutionProposal = useCallback(
     async (item: ChannelMessage, input: IssueExecutionApprovalInput) => {
@@ -1394,62 +933,14 @@ export function useChannelConversation({
     async (item: ChannelMessage, proposalId: string) => {
       const activeId = channelIdRef.current;
       if (!activeId) return null;
-      const context = captureChannelSurface();
-      const version = ++requestVersion.current;
-      try {
-        if (item.parentMessageId) {
-          const result = await dependenciesRef.current.listChannelMessages(
-            token,
-            organizationId,
-            activeId,
-            item.parentMessageId,
-          );
-          if (
-            version !== requestVersion.current ||
-            !channelSurfaceIsCurrent(context)
-          ) return latestProposals.current.get(proposalId) ?? null;
-          recordProposalMessages(result.messages);
-          updateThreadMessages((current) =>
-            mergeChannelMessageSnapshot(current, result.messages)
-          );
-        } else {
-          const result = await dependenciesRef.current.loadChannel(
-            token,
-            organizationId,
-            activeId,
-            { messageLimit: pageSize },
-          );
-          if (
-            version !== requestVersion.current ||
-            !channelSurfaceIsCurrent(context)
-          ) return latestProposals.current.get(proposalId) ?? null;
-          recordProposalMessages(result.messages);
-          setMembers(result.members);
-          setAgents(result.agents);
-          updateRootMessages((current) =>
-            mergeChannelMessages(current, result.messages, [])
-          );
-          onChannelLoaded?.(result.channel);
-        }
-        return latestProposals.current.get(proposalId) ?? null;
-      } finally {
-        // Request version intentionally remains advanced: any response that
-        // started before this authoritative refresh must not overwrite it.
-      }
+      return loader.refresh(activeId, {
+        item,
+        proposalId,
+        pageSize,
+        onChannelLoaded,
+      });
     },
-    [
-      captureChannelSurface,
-      channelSurfaceIsCurrent,
-      onChannelLoaded,
-      organizationId,
-      pageSize,
-      recordProposalMessages,
-      setAgents,
-      setMembers,
-      token,
-      updateRootMessages,
-      updateThreadMessages,
-    ],
+    [loader, onChannelLoaded, pageSize],
   );
 
   const acceptProposal = useCallback(
@@ -1478,7 +969,7 @@ export function useChannelConversation({
         approvalContext.channelId === activeId &&
         approvalContext.threadParentId === threadParentIdRef.current &&
         channelSurfaceIsCurrent(approvalContext);
-      const approvalProposalVersion = proposalVersions.current.get(proposalId) ?? 0;
+      const approvalProposalVersion = loader.proposalVersion(proposalId);
       setBusy(true);
       setAcceptingProposalId(proposalId);
       setError(null);
@@ -1522,16 +1013,13 @@ export function useChannelConversation({
           updateThreadMessages((current) => current.map(applyResult));
           recordProposalMessages([applyResult(item)]);
         };
-        if (
-          (proposalVersions.current.get(proposalId) ?? 0) ===
-            approvalProposalVersion
-        ) {
+        if (loader.proposalVersion(proposalId) === approvalProposalVersion) {
           applySuccessfulResponse();
           if (hasExecutionFollowUp && !result.executionProposal) {
             await refreshProposalState(applyResult(item), proposalId);
           }
         } else {
-          let latest = latestProposals.current.get(proposalId);
+          let latest = loader.latestProposal(proposalId) ?? undefined;
           if (latest?.status !== "accepted") {
             latest = (await refreshProposalState(item, proposalId)) ?? undefined;
           }
@@ -1570,6 +1058,7 @@ export function useChannelConversation({
       captureChannelSurface,
       channel?.defaultProjectId,
       channelSurfaceIsCurrent,
+      loader,
       organizationId,
       proposalProjects,
       recordProposalMessages,
@@ -1712,10 +1201,16 @@ export function useChannelConversation({
           applyChannelMessageDeletion(current, item.id, result)
         );
         if (result.deleted) {
-          setReplies((current) => current.filter((reply) =>
-            reply.triggerMessageId !== item.id &&
-            reply.replyMessageId !== item.id
-          ));
+          writeChannelAgentReplies(
+            registry,
+            activeId,
+            registry
+              .get(channelAgentRepliesAtom(activeId))
+              .filter((reply) =>
+                reply.triggerMessageId !== item.id &&
+                reply.replyMessageId !== item.id
+              ),
+          );
           if (threadParentIdRef.current === item.id && !result.message) {
             closeThread();
           }
@@ -1733,7 +1228,7 @@ export function useChannelConversation({
       channelSurfaceIsCurrent,
       closeThread,
       organizationId,
-      setReplies,
+      registry,
       t,
       toast,
       token,

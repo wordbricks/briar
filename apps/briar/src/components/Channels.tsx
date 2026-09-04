@@ -169,6 +169,8 @@ import {
   channelThreadMessagesAtom,
 } from "../state/channel-conversation/atoms";
 import type { ChannelMessageSummary } from "../state/channel-conversation/model";
+import { useChannelConversationLoader } from "../state/channel-conversation/loader";
+import { writeChannelParticipants } from "../state/channel-conversation/write";
 import {
   useChannelConversationStore,
   useChannelConversationView,
@@ -370,6 +372,7 @@ export function Channels({
   */
   const registry = useRegistry();
   const conversationStore = useChannelConversationStore(activeChannelId);
+  const conversationLoader = useChannelConversationLoader();
   const {
     agents,
     members,
@@ -428,7 +431,6 @@ export function Channels({
   const threadMessagesScrollRef = useRef<HTMLDivElement | null>(null);
   const initialInviteHandledChannelId = useRef<string | null>(null);
   const activeChannelIdRef = useRef(activeChannelId);
-  const channelLoadAbortController = useRef<AbortController | null>(null);
   const preparedChannelId = useRef<string | null>(null);
   const requestedMessageFocusKeyRef = useRef<string | null>(null);
   const suppressEarlierLoadOnNextScroll = useRef(false);
@@ -541,11 +543,7 @@ export function Channels({
     pageSize: desktopChannelMessagePageSize,
     updateRootMessages: conversationStore.updateRootMessages,
     updateThreadMessages: conversationStore.updateThreadMessages,
-    setMembers: conversationStore.setMembers,
-    setAgents: conversationStore.setAgents,
-    setReplies: conversationStore.setReplies,
     setThreadParentId: conversationStore.setThreadParentId,
-    setMessageNextCursor: conversationStore.setMessageNextCursor,
     onChannelLoaded: applyLoadedChannel,
     onIssueOpen: onIssueCreated,
     onSkillSessionAccepted,
@@ -814,8 +812,10 @@ export function Channels({
           activeChannelId,
           { messageLimit: 1 },
         );
-        conversationStore.setMembers(refreshed.members);
-        conversationStore.setAgents(refreshed.agents);
+        writeChannelParticipants(registry, activeChannelId, {
+          members: refreshed.members,
+          agents: refreshed.agents,
+        });
         onChannelsChange((current) =>
           current.map((channel) =>
             channel.id === refreshed.channel.id ? refreshed.channel : channel,
@@ -929,7 +929,7 @@ export function Channels({
     if (preparedChannelId.current === activeChannelId) return;
     preparedChannelId.current = activeChannelId;
     invalidateChannelSurface(activeChannelId, null);
-    channelLoadAbortController.current?.abort();
+    conversationLoader.cancel(activeChannelId);
     const stored = registry.get(channelRootMessageIdsAtom(activeChannelId));
     displaySource.current = stored ? "cache" : "network";
     requestStickToBottom();
@@ -952,9 +952,6 @@ export function Channels({
   useEffect(() => {
     if (!activeChannelId || !channelListReady) return;
     let cancelled = false;
-    const abortController = new AbortController();
-    channelLoadAbortController.current?.abort();
-    channelLoadAbortController.current = abortController;
     const loadVersion = ++channelDataVersion.current;
     authoritativeLoadVersion.current = loadVersion;
     void (async () => {
@@ -965,7 +962,6 @@ export function Channels({
           messageLimit: desktopChannelMessagePageSize,
           mergeWithCurrentMessages: stored !== null,
           requestedMessage,
-          signal: abortController.signal,
         });
         if (
           !loaded ||
@@ -1038,20 +1034,18 @@ export function Channels({
     })();
     return () => {
       cancelled = true;
-      abortController.abort();
+      conversationLoader.cancel(activeChannelId);
       if (loadVersion === channelDataVersion.current) {
         channelDataVersion.current += 1;
       }
       if (authoritativeLoadVersion.current === loadVersion) {
         authoritativeLoadVersion.current = null;
       }
-      if (channelLoadAbortController.current === abortController) {
-        channelLoadAbortController.current = null;
-      }
     };
   }, [
     activeChannelId,
     channelListReady,
+    conversationLoader,
     loadChannelConversation,
     onRequestedMessageOpen,
     requestedMessage,
@@ -1161,7 +1155,7 @@ export function Channels({
       if (!activeChannelId) return;
       const loadVersion = ++channelDataVersion.current;
       authoritativeLoadVersion.current = loadVersion;
-      channelLoadAbortController.current?.abort();
+      conversationLoader.cancel(activeChannelId);
       try {
         // What the store holds for the thread renders while its authoritative
         // page loads, the same way the timeline does.
@@ -1177,7 +1171,7 @@ export function Channels({
         }
       }
     },
-    [activeChannelId, openConversationThread, registry],
+    [activeChannelId, conversationLoader, openConversationThread, registry],
   );
 
   /*
