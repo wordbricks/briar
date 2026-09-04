@@ -1,6 +1,5 @@
 import * as Atom from "effect/unstable/reactivity/Atom";
 
-import type { CompanionChannelCache } from "../../components/CompanionChannels";
 import type { ChannelSummary } from "../../lib/channels-contract";
 import { organizationChannelsAtom } from "../entities/channels";
 import { shallowArrayEqual } from "../entities/upsert";
@@ -200,31 +199,4 @@ export function resetChannelSelection(registry: AtomRegistry): void {
       registry.set(stored, { organizationId: null, value: held.value });
     }
   });
-}
-
-/*
-  The companion channel cache lives per registry rather than per view.
-
-  It was a `useRef` on the app shell handed down as a prop, which is why it
-  survived the companion view remounting. A `WeakMap` keyed by the registry
-  keeps that lifetime without the shell having to hold it, and clearing it in
-  place preserves the identity the view compares against.
-*/
-const companionChannelCaches = new WeakMap<AtomRegistry, CompanionChannelCache>();
-
-/** The companion channel cache for this registry, created on first use. */
-export function getCompanionChannelCache(
-  registry: AtomRegistry,
-): CompanionChannelCache {
-  let cache = companionChannelCaches.get(registry);
-  if (!cache) {
-    cache = new Map();
-    companionChannelCaches.set(registry, cache);
-  }
-  return cache;
-}
-
-/** Empties the companion cache without replacing it. */
-export function clearCompanionChannelCache(registry: AtomRegistry): void {
-  companionChannelCaches.get(registry)?.clear();
 }
