@@ -27,8 +27,6 @@ import {
 import {
   resetChannelConversationViewState,
   writeChannelAgentReplies,
-  writeChannelDeltaToStoredThreads,
-  writeChannelMessageCursor,
   writeChannelOpenThreadId,
   writeChannelParticipants,
   writeChannelThreadMessages,
@@ -132,34 +130,6 @@ describe("conversation store writers", () => {
     ).toBe("accepted");
   });
 
-  it("applies a delta to a thread that is not on screen", () => {
-    const registry = createTestRegistry();
-    writeChannelTimeline(registry, channelId, [testChannelMessage("root")]);
-    writeChannelThreadMessages(registry, channelId, "root", [
-      testChannelMessage("root"),
-    ]);
-
-    writeChannelDeltaToStoredThreads(
-      registry,
-      channelId,
-      [
-        testChannelMessage("reply", {
-          parentMessageId: "root",
-          createdAt: "2026-08-01T02:00:00.000Z",
-        }),
-        testChannelMessage("elsewhere", { channelId: "channel-2" }),
-      ],
-      [],
-      false,
-    );
-
-    expect(
-      registry
-        .get(channelThreadMessagesAtom(channelThreadKey(channelId, "root")))
-        .map((m) => m.id),
-    ).toEqual(["root", "reply"]);
-  });
-
   it("replaces participants, keeping the entry of anyone unchanged", () => {
     const registry = createTestRegistry();
     writeChannelParticipants(registry, channelId, {
@@ -182,18 +152,16 @@ describe("conversation store writers", () => {
     ).toEqual(["agent-1"]);
   });
 
-  it("replaces agent replies and the cursor", () => {
+  it("replaces agent replies", () => {
     const registry = createTestRegistry();
 
     writeChannelAgentReplies(registry, channelId, [
       testChannelAgentReply("reply-1"),
     ]);
-    writeChannelMessageCursor(registry, channelId, "older");
 
     expect(
       registry.get(channelAgentRepliesAtom(channelId)).map((r) => r.id),
     ).toEqual(["reply-1"]);
-    expect(registry.get(channelMessageCursorAtom(channelId))).toBe("older");
 
     writeChannelAgentReplies(registry, channelId, []);
     expect(registry.get(channelAgentRepliesAtom(channelId))).toEqual([]);

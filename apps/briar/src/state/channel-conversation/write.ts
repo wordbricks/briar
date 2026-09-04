@@ -426,15 +426,14 @@ export function applyAuthoritativeChannelAgentReplies(
 }
 
 /*
-  The writes the conversation views still make themselves.
+  The writes the conversation's own actions make.
 
-  `hooks/use-channel-conversation.ts` computes the next timeline with the merge
-  helpers in `model.ts` and hands it to an updater it is given, which until now
-  was a `useState` setter inside each view. The updater is these functions now,
-  so the two per-view caches are gone and the store is the only copy. The hook
-  still decides *what* the next list is, which is the half F5-3 moves; the
-  ordering, the identity preservation and the retention bound are here, so
-  there is still one implementation of each.
+  `state/channel-conversation/actions.ts` computes the next timeline with the
+  merge helpers in `model.ts` and hands the result here, which is what the
+  optimistic paths need: a send, a rollback, a reaction and an approval all
+  patch messages the server has not answered for yet, so there is no event to
+  apply. The ordering, the identity preservation and the retention bound stay
+  in this module, so there is still one implementation of each.
 */
 
 /** Replaces one channel's root timeline. */
@@ -486,19 +485,11 @@ export function writeChannelParticipants(
   });
 }
 
-/** Sets the cursor the next page of older messages resumes from. */
-export function writeChannelMessageCursor(
-  registry: AtomRegistry,
-  channelId: string,
-  cursor: string | null,
-): void {
-  registry.set(channelMessageCursorAtom(channelId), cursor);
-}
-
 /**
- * Replaces the channel's agent replies. The hook owns the tombstone rules for
- * now, so this is a plain replace that keeps the object of every reply that did
- * not move.
+ * Replaces the channel's agent replies outright, keeping the object of every
+ * reply that did not move. The tombstone rules belong to the entry points
+ * above; this is for the two places that drop replies rather than merge them —
+ * opening a channel, and deleting the message a reply answered.
  */
 export function writeChannelAgentReplies(
   registry: AtomRegistry,
@@ -508,30 +499,6 @@ export function writeChannelAgentReplies(
   registry.update(channelAgentRepliesAtom(channelId), (stored) =>
     replaceEntities(stored, replies),
   );
-}
-
-/**
- * Applies a delta page to the threads the channel holds but is not showing.
- * The companion cache walked its stored threads by hand for this reason: a
- * thread reopened from cache must not be missing the replies that arrived
- * while another screen was up.
- */
-export function writeChannelDeltaToStoredThreads(
-  registry: AtomRegistry,
-  channelId: string,
-  messages: readonly ChannelMessage[],
-  removedMessageIds: readonly string[],
-  reset: boolean,
-): void {
-  Atom.batch(() => {
-    applyChannelPageToThreads(
-      registry,
-      channelId,
-      messages.filter((message) => message.channelId === channelId),
-      removedMessageIds,
-      reset,
-    );
-  });
 }
 
 /** The thread open in one channel, which the views reset as a channel opens. */
