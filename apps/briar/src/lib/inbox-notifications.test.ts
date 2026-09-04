@@ -433,6 +433,50 @@ describe("inbox notification content", () => {
     },
   );
 
+  it("shows the issue identity with the structured result summary", () => {
+    const issue: InboxMessage = {
+      ...message,
+      status: "paused",
+      structuredResult: {
+        summary: " First summary line \n\nSecond line\r\n Third line \nFourth line",
+        outcome: "partial",
+        importance: "important",
+        urgency: "normal",
+        impact: "issue",
+        humanActionRequired: true,
+        nextAction: "Approve the paused stage",
+        dueAt: null,
+      },
+    };
+
+    expect(inboxNotificationContent(issue, "Awaiting review")).toEqual({
+      title: "Briar · Awaiting review",
+      body: "Briar · Notification test\nFirst summary line\nSecond line",
+    });
+  });
+
+  it("falls back to the next action when the result has no summary", () => {
+    const issue: InboxMessage = {
+      ...message,
+      status: "blocked",
+      structuredResult: {
+        summary: "  ",
+        outcome: "blocked",
+        importance: "routine",
+        urgency: "normal",
+        impact: "issue",
+        humanActionRequired: true,
+        nextAction: "A maintainer should review the failing check",
+        dueAt: null,
+      },
+    };
+
+    expect(inboxNotificationContent(issue, "Blocked")).toEqual({
+      title: "Briar · Blocked",
+      body: "Briar · Notification test\nA maintainer should review the failing check",
+    });
+  });
+
   it("shows the agent, completed status, and at most three final-message lines", () => {
     const session: InboxMessage = {
       id: "session:session-1",

@@ -73,6 +73,28 @@ describe("mobile push Inbox adapter", () => {
     expect(classifyMobilePushInboxMessage(baseMessage)).toBe("activity");
   });
 
+  it("carries the structured result into issue alert bodies", () => {
+    const content = mobilePushNotificationContent({
+      ...baseMessage,
+      status: "paused",
+      structuredResult: {
+        summary: "First summary line\n\nSecond line\r\nThird line\nFourth line",
+        outcome: "partial",
+        importance: "important",
+        urgency: "normal",
+        impact: "issue",
+        humanActionRequired: true,
+        nextAction: "Approve the paused stage",
+        dueAt: null,
+      },
+    }, "ko");
+
+    expect(content.title).toBe("Briar · 검토 대기");
+    expect(content.body).toBe(
+      "Mobile · Background notifications\nFirst summary line\nSecond line",
+    );
+  });
+
   it("roundtrips the generated destination oneof through provider base64", () => {
     const content = mobilePushNotificationContent({
       ...baseMessage,

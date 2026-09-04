@@ -1906,6 +1906,7 @@ struct RunDetailView: View {
             }
             .disabled(projects.isEmpty || mutations.isActive("transfer-\(run.id)"))
             .accessibilityIdentifier("issue-team-picker")
+        }
 
         if localStatus == .backlog || localStatus == .queued {
             dependenciesControl

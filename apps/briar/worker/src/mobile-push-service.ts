@@ -157,7 +157,13 @@ export function mobilePushNotificationContent(
   let body = message.projectName
     ? `${message.projectName} · ${message.title}`
     : message.title;
-  if (message.kind === "session") {
+  if (message.kind === "issue") {
+    const summary = preview(message.structuredResult?.summary ?? "");
+    const nextAction = message.structuredResult?.humanActionRequired
+      ? preview(message.structuredResult.nextAction ?? "")
+      : "";
+    body = [body, summary || nextAction].filter(Boolean).join("\n");
+  } else if (message.kind === "session") {
     title = `${message.agentName?.trim() || "Briar"} · ${status}`;
     body = preview(message.summary ?? message.error ?? message.title) || status;
   } else if (message.kind === "conversation" || message.kind === "channel") {

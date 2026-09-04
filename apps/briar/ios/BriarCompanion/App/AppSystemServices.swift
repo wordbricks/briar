@@ -441,6 +441,22 @@ enum InboxNotificationPresentationBuilder {
         } else {
             title = message.title
         }
+        if message.kind == .issue {
+            let identity = message.projectName.isEmpty
+                ? message.title
+                : "\(message.projectName) · \(message.title)"
+            var detail = preview(message.structuredResult?.summary ?? "")
+            if detail.isEmpty, message.structuredResult?.humanActionRequired == true {
+                detail = preview(message.structuredResult?.nextAction ?? "")
+            }
+            let body = preview([identity, detail].filter { !$0.isEmpty }.joined(separator: "\n"))
+            return InboxNotificationPresentation(
+                title: title,
+                body: body.isEmpty
+                    ? (message.statusLabel ?? L10n.text("새 알림"))
+                    : body
+            )
+        }
         return InboxNotificationPresentation(
             title: title,
             body: fallbackBody?.isEmpty == false

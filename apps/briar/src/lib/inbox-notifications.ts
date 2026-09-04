@@ -732,6 +732,22 @@ export function inboxNotificationContent(
     };
   }
 
+  if (message.kind === "issue") {
+    const identity = message.projectName
+      ? `${message.projectName} · ${message.title}`
+      : message.title;
+    const summary = notificationPreview(
+      message.structuredResult?.summary?.trim() ?? "",
+    );
+    const nextAction = message.structuredResult?.humanActionRequired
+      ? notificationPreview(message.structuredResult.nextAction?.trim() ?? "")
+      : "";
+    return {
+      title: `Briar · ${notificationLabel}`,
+      body: notificationPreview([identity, summary || nextAction].filter(Boolean).join("\n")),
+    };
+  }
+
   return {
     title: `Briar · ${notificationLabel}`,
     body: message.projectName

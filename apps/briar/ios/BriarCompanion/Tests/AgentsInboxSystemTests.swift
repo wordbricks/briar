@@ -961,8 +961,11 @@ final class AgentsInboxSystemTests: XCTestCase {
         )
         XCTAssertEqual(InboxMessageBuilder.classify(blockedMessage), .urgent)
         XCTAssertEqual(
-            InboxNotificationPresentationBuilder.content(for: blockedMessage).title,
-            "Briar · 차단"
+            InboxNotificationPresentationBuilder.content(for: blockedMessage),
+            InboxNotificationPresentation(
+                title: "Briar · 차단",
+                body: "Briar · Needs help\nBlocked"
+            )
         )
         let mention = try XCTUnwrap(messages.first { $0.kind == .conversation })
         XCTAssertEqual(InboxMessageBuilder.classify(mention), .actionRequired)
@@ -1090,8 +1093,8 @@ final class AgentsInboxSystemTests: XCTestCase {
             messages.first { $0.kind == .issue && $0.title == "Done" }
         )
         XCTAssertEqual(
-            InboxNotificationPresentationBuilder.content(for: completedMessage).title,
-            "Briar · 완료"
+            InboxNotificationPresentationBuilder.content(for: completedMessage),
+            InboxNotificationPresentation(title: "Briar · 완료", body: "Briar · Done")
         )
 
         // Importance filter keeps chronological order and drops excluded categories.
