@@ -30,6 +30,20 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.193",
+        date: "2026년 9월 4일",
+        title: "macOS 상태 트레이 깜빡임을 고치고 새 관리형 컴퓨터에 부팅 자동 갱신 이미지를 적용합니다",
+        summary:
+          "메뉴 막대 트레이가 부팅 직후 '실행 중인 작업 없음'으로 깜빡이던 문제를 고치고, 새 관리형 컴퓨터가 최신 런타임으로 스스로 갱신하는 이미지를 기본으로 쓰게 했습니다.",
+        items: [
+          "macOS 상태 트레이가 앱을 다시 열거나 창을 띄울 때 목록을 비웠다가 채우는 한 패스 동안 '실행 중인 작업 없음'으로 깜빡이던 문제를 고쳤습니다. 폴이 시작할 때 열린 팀의 실행 상태를 먼저 씨앗으로 놓습니다.",
+          "트레이 갱신이 React 렌더를 거치지 않고 저장소 구독으로 직행해, 상태 표시줄 갱신이 다른 화면을 다시 그리지 않습니다.",
+          "채널 메시지가 채널 목록과 열린 스레드 양쪽에 그려질 때 한쪽만 닿은 갱신으로 같은 메시지가 두 판본으로 보일 수 있던 경로를 하나의 쓰기 규칙으로 합쳤습니다. 낙관 전송·롤백·삭제 처리도 같은 규칙을 따릅니다.",
+          "알림 하나에 읽음 처리가 두 번 호출되던 중복을 정리해, 첫 패스에서 이미 읽은 메시지를 둘째 패스가 다시 묻지 않습니다.",
+          "새 관리형 컴퓨터가 부팅 때 최신 런타임으로 스스로 갱신하는 이미지(Launch Template 버전 15)를 Worker 설정에 반영했습니다.",
+        ],
+      },
+      {
         version: "1.2.192",
         date: "2026년 9월 4일",
         title: "새 관리형 컴퓨터가 최신 런타임으로 부팅하고 이슈 보드 반응 속도를 높입니다",
@@ -1607,6 +1621,20 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.193",
+        date: "September 4, 2026",
+        title: "Fix the macOS status tray flash and ship the boot-time self-update image to new managed computers",
+        summary:
+          "Stop the menu-bar tray from flashing 'nothing running' right after boot or remount, and point the managed-computer launch template at the image that self-updates its runtime at boot.",
+        items: [
+          "Fix the macOS status tray briefly showing 'nothing running' for one pass after reopening the app or remounting a window; the poll now seeds from the open team's run state instead of starting empty.",
+          "Route tray updates through store subscriptions instead of React renders so status-bar refreshes no longer redraw unrelated views.",
+          "Fold the channel message write paths into one rule covering both the channel list and an open thread, so a patch touching one surface can no longer show two versions of the same message; optimistic sends, rollbacks, and deletions follow the same rule.",
+          "Stop routing an already-read notification through markRead a second time; the second pass no longer asks about messages the first pass already read.",
+          "Record managed-computer Launch Template version 15 in the Worker config so new managed computers boot from the image that installs the latest runtime before starting.",
+        ],
+      },
       {
         version: "1.2.192",
         date: "September 4, 2026",
