@@ -209,7 +209,9 @@ async function invokeAgentDmLearningModel(input: {
       },
     });
     if (freeTierLimited) throw new DmLearningClientError("budget_exhausted");
-    if (result.exitCode !== 0 || result.runnerError || !result.completed || !result.resultText) {
+    // A delivered result frame settles the turn; a nonzero exit afterwards only
+    // describes how the runner process shut down.
+    if (result.runnerError || !result.completed || !result.resultText) {
       throw new DmLearningClientError("model_unavailable");
     }
     const inputTokens = Math.ceil(new TextEncoder().encode(instructions + prompt).length / 4);

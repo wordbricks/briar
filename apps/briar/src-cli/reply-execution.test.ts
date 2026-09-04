@@ -175,6 +175,45 @@ describe("Project Agent task worktrees", () => {
     });
   });
 
+  it("completes the task when the runner crashed after delivering its result", async () => {
+    // A runner that emitted its terminal result frame and then died while
+    // shutting down already finished the work. Failing the task here made the
+    // server requeue it and re-run side effects up to three times.
+    const isolatedPath = `/worktrees/${projectId}/analysis/analysis-${workId}`;
+
+    const result = await runClaimedProjectAgentTask(
+      config,
+      project,
+      task,
+      "worker-token",
+      "worker-1",
+      new AbortController().signal,
+      undefined,
+      {
+        allocateWorktree: async () => ({
+          path: isolatedPath,
+          baseRef: "origin/main",
+          baseSha: "a".repeat(40),
+          includedPaths: [],
+        }),
+        removeWorktree: async () => {},
+        runProviderTurn: async () =>
+          successfulTurn({
+            exitCode: 1,
+            stderr: "AbortError: The operation was aborted\n",
+          }),
+        git,
+      },
+    );
+
+    expect(result).toMatchObject({
+      projectId,
+      workerId: "worker-1",
+      summary: "Release Skill completed",
+      conversationId: "codex:conversation-1",
+    });
+  });
+
   it("keeps the original prompt and attempt range for a first claim", async () => {
     const prompts: string[] = [];
     const sequencerArguments: Array<[number, number | undefined]> = [];
