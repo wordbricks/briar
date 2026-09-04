@@ -72,6 +72,7 @@ import {
   syncDashboard,
 } from "./app-rpc/dashboard";
 export {
+  cancelProjectAgentTask,
   claimProjectAgentScheduleRuns,
   completeProjectAgentScheduleRun,
   createOrganizationAgent,

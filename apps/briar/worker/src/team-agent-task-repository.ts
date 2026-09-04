@@ -92,31 +92,88 @@ export async function getTeamAgentTaskJobByRequest(
     .first<TeamAgentTaskJobRow>();
 }
 
+/**
+ * A task whose lease expired this long ago is failed even when it still has
+ * attempts left: a Worker that never came back cannot resume it, and the
+ * session would otherwise stay `running` forever.
+ */
+export const STALE_TASK_LEASE_GRACE_MS = 24 * 60 * 60_000;
+
+export const STALE_TASK_LEASE_ERROR =
+  "Worker lease expired and the task was not resumed within 24 hours.";
+
 export async function reapTeamAgentTaskJobs(
   db: D1Database,
   projectId: string,
   input: { observedAt: string; error: string },
 ) {
+  const staleBefore = new Date(
+    new Date(input.observedAt).getTime() - STALE_TASK_LEASE_GRACE_MS,
+  ).toISOString();
   const result = await db
     .prepare(
       `update briar_project_agent_task_jobs
        set status = 'failed',
-           error = coalesce(error, ?),
+           error = coalesce(
+             error,
+             case when attempts >= 3 then ? else ? end
+           ),
            claim_token_hash = null, claimed_at = null, lease_expires_at = null,
            completed_at = ?, updated_at = ?
        where project_id = ? and status = 'running'
-         and attempts >= 3 and lease_expires_at <= ?
+         and lease_expires_at <= ?
+         and (attempts >= 3 or lease_expires_at <= ?)
+       returning *`,
+    )
+    .bind(
+      input.error,
+      STALE_TASK_LEASE_ERROR,
+      input.observedAt,
+      input.observedAt,
+      projectId,
+      input.observedAt,
+      staleBefore,
+    )
+    .all<TeamAgentTaskJobRow>();
+  return result.results ?? [];
+}
+
+/**
+ * Stop a task a member asked to cancel. `status` keeps its
+ * queued/running/completed/failed check constraint, so cancellation is a
+ * terminal `failed` row tagged with `cancel_requested_at`. Approval-owned jobs
+ * (`skill_execution_proposal_id`) are excluded: their lifecycle belongs to the
+ * assigned Worker and the table's approval triggers.
+ */
+export async function cancelTeamAgentTaskJob(
+  db: D1Database,
+  projectId: string,
+  jobId: string,
+  input: { userId: string | null; observedAt: string; error: string },
+) {
+  return db
+    .prepare(
+      `update briar_project_agent_task_jobs
+       set status = 'failed', error = ?,
+           cancel_requested_at = ?, cancelled_by_user_id = ?,
+           claim_token_hash = null, claimed_worker_id = null,
+           claimed_at = null, lease_expires_at = null,
+           completed_at = ?, updated_at = ?
+       where id = ? and project_id = ?
+         and status in ('queued', 'running')
+         and skill_execution_proposal_id is null
        returning *`,
     )
     .bind(
       input.error,
       input.observedAt,
+      input.userId,
       input.observedAt,
+      input.observedAt,
+      jobId,
       projectId,
-      input.observedAt,
     )
-    .all<TeamAgentTaskJobRow>();
-  return result.results ?? [];
+    .first<TeamAgentTaskJobRow>();
 }
 
 export async function claimNextTeamAgentTask(
@@ -153,6 +210,8 @@ export async function claimNextTeamAgentTask(
        set status = 'running', claimed_worker_id = ?,
            claim_token_hash = ?, claimed_at = ?, lease_expires_at = ?,
            attempts = attempts + case when planned_update_resume = 1 then 0 else 1 end,
+           resume_count = resume_count
+             + case when planned_update_resume = 1 then 1 else 0 end,
            planned_update_resume = 0, error = null, updated_at = ?
        where id = (
          select job.id
@@ -391,6 +450,7 @@ export async function renewTeamAgentTaskLease(
        set lease_expires_at = ?
        where id = ? and project_id = ? and status = 'running'
          and claimed_worker_id = ? and claim_token_hash = ?
+         and cancel_requested_at is null
        returning *`,
     )
     .bind(

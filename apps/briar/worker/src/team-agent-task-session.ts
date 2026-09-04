@@ -9,7 +9,7 @@ import {
 } from "./team-request-contract";
 
 export const teamAgentTaskSessionEvent = (
-  type: "started" | "completed" | "failed",
+  type: "started" | "completed" | "failed" | "stopped",
   occurredAt: string,
 ) => ({
   id: crypto.randomUUID(),
@@ -29,6 +29,7 @@ export async function syncTeamAgentTaskSession(
     updated_at: string;
     completed_at: string | null;
     error: string | null;
+    cancel_requested_at?: string | null;
   },
   input: {
     summary?: string | null;
@@ -40,22 +41,31 @@ export async function syncTeamAgentTaskSession(
   if (!current) return null;
   const payload = decodeStoredTeamAgentSessionPayload(current.payload_json);
   const terminal = job.status === "completed" || job.status === "failed";
+  // A cancelled job is stored as `failed`; the session reports the member's
+  // own stop instead of a Worker failure.
+  const cancelled = terminal && job.cancel_requested_at != null;
   const nextPayload: StoredTeamAgentSessionPayload = {
     ...payload,
-    status: job.status === "queued" || job.status === "running"
-      ? "running"
-      : job.status,
+    status: cancelled
+      ? "interrupted"
+      : job.status === "queued" || job.status === "running"
+        ? "running"
+        : job.status,
     requestedWorkerId: payload.requestedWorkerId ?? job.preferred_worker_id,
     workerId: job.claimed_worker_id ?? payload.workerId ?? job.preferred_worker_id,
     conversationId: input.conversationId ?? payload.conversationId ?? null,
     summary: input.summary ?? payload.summary ?? null,
-    error: terminal ? (input.error ?? job.error ?? null) : null,
+    error: cancelled ? null : terminal ? (input.error ?? job.error ?? null) : null,
     completedAt: terminal ? job.completed_at : null,
     updatedAt: job.updated_at,
     events: [
       ...payload.events,
       teamAgentTaskSessionEvent(
-        terminal ? (job.status === "completed" ? "completed" : "failed") : "started",
+        cancelled
+          ? "stopped"
+          : terminal
+            ? (job.status === "completed" ? "completed" : "failed")
+            : "started",
         job.updated_at,
       ),
     ],

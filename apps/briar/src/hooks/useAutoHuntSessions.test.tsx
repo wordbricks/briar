@@ -16,15 +16,17 @@ type SessionsHook = ReturnType<typeof useAutoHuntSessions>;
 
 let sessionsHook: SessionsHook;
 let stopper: Parameters<typeof useAutoHuntSessions>[0] | undefined;
+let remoteTaskCanceller: Parameters<typeof useAutoHuntSessions>[1] | undefined;
 
 function Harness() {
-  sessionsHook = useAutoHuntSessions(stopper);
+  sessionsHook = useAutoHuntSessions(stopper, remoteTaskCanceller);
   return null;
 }
 
 beforeEach(() => {
   window.localStorage.clear();
   stopper = undefined;
+  remoteTaskCanceller = undefined;
 });
 
 describe("useAutoHuntSessions", () => {
@@ -418,6 +420,138 @@ describe("useAutoHuntSessions", () => {
       error: null,
     });
     expect(sessionsHook.sessions[0]?.events.at(-1)?.type).toBe("stopped");
+
+    await cleanup();
+  });
+
+  it("cancels a remote worker task session through the app server", async () => {
+    const cancelCalls: {
+      token: string;
+      projectId: string;
+      sessionId: string;
+    }[] = [];
+    const remoteSession: AutoHuntSession = {
+      id: "remote-task-session",
+      dispatchGroupId: "remote-task-session",
+      projectId: "project-1",
+      agentId: "agent-1",
+      sessionType: "task",
+      request: "Audit the release worker",
+      status: "running",
+      issues: [],
+      startedAt: "2026-07-28T01:00:00.000Z",
+      completedAt: null,
+      conversationId: null,
+      workspaceRoot: null,
+      requestedWorkerId: "worker-1",
+      workerId: "worker-1",
+      summary: null,
+      error: null,
+      events: [{
+        id: "remote-task-session-started",
+        type: "started",
+        occurredAt: "2026-07-28T01:00:00.000Z",
+      }],
+      dispatchEvents: [],
+      workers: [],
+      updatedAt: "2026-07-28T01:00:00.000Z",
+      localOwner: false,
+      detailLoaded: true,
+    };
+    stopper = async () => {
+      throw new Error("The desktop stop command cannot reach a worker session.");
+    };
+    remoteTaskCanceller = async (token, projectId, sessionId) => {
+      cancelCalls.push({ token, projectId, sessionId });
+      return {
+        ...remoteSession,
+        status: "interrupted",
+        completedAt: "2026-07-28T01:05:00.000Z",
+        updatedAt: "2026-07-28T01:05:00.000Z",
+        events: [...remoteSession.events, {
+          id: "remote-task-session-stopped",
+          type: "stopped",
+          occurredAt: "2026-07-28T01:05:00.000Z",
+        }],
+      };
+    };
+
+    const { cleanup, container, root } = createReactTestRoot();
+    await renderReactTestRoot(root, <Harness />);
+
+    await act(async () => {
+      sessionsHook.adoptRemoteSession(remoteSession);
+      sessionsHook.configureSync("token-1", [{ id: "project-1" }]);
+    });
+
+    let stopped = false;
+    await act(async () => {
+      stopped = await sessionsHook.stopSession("remote-task-session");
+    });
+
+    expect(stopped).toBe(true);
+    expect(cancelCalls).toEqual([{
+      token: "token-1",
+      projectId: "project-1",
+      sessionId: "remote-task-session",
+    }]);
+    expect(sessionsHook.sessions[0]).toMatchObject({
+      id: "remote-task-session",
+      status: "interrupted",
+      localOwner: false,
+      error: null,
+    });
+    expect(sessionsHook.sessions[0]?.events.at(-1)?.type).toBe("stopped");
+
+    await cleanup();
+  });
+
+  it("reports a failed remote cancel to the caller", async () => {
+    const remoteSession: AutoHuntSession = {
+      id: "remote-task-session",
+      dispatchGroupId: "remote-task-session",
+      projectId: "project-1",
+      agentId: "agent-1",
+      sessionType: "task",
+      request: "Audit the release worker",
+      status: "running",
+      issues: [],
+      startedAt: "2026-07-28T01:00:00.000Z",
+      completedAt: null,
+      conversationId: null,
+      workspaceRoot: null,
+      requestedWorkerId: "worker-1",
+      workerId: "worker-1",
+      summary: null,
+      error: null,
+      events: [],
+      dispatchEvents: [],
+      workers: [],
+      updatedAt: "2026-07-28T01:00:00.000Z",
+      localOwner: false,
+      detailLoaded: true,
+    };
+    remoteTaskCanceller = async () => {
+      throw new Error("Agent task not found for this session");
+    };
+
+    const { cleanup, container, root } = createReactTestRoot();
+    await renderReactTestRoot(root, <Harness />);
+
+    await act(async () => {
+      sessionsHook.adoptRemoteSession(remoteSession);
+      sessionsHook.configureSync("token-1", [{ id: "project-1" }]);
+    });
+
+    const failures: string[] = [];
+    await act(async () => {
+      await sessionsHook.stopSession("remote-task-session").catch((error) => {
+        failures.push(error instanceof Error ? error.message : String(error));
+      });
+    });
+
+    expect(failures).toEqual(["Agent task not found for this session"]);
+    expect(sessionsHook.sessions[0]?.status).toBe("running");
 
     await cleanup();
   });

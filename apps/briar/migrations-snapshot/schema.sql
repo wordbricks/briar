@@ -5,8 +5,8 @@
 -- Whenever a migration changes the schema or seeds rows, run
 -- `bun run d1:snapshot` and commit the result; `bun run d1:snapshot:check`
 -- fails in CI otherwise.
--- migrations-digest: b6d8aeeecddd33fefa59a76b203a94a379c7384ec8942e9890b9a35cbf9e60c8
--- snapshot-digest: 81f3e82ccee59724d37b311236b01f5e35768b47b649045e854c139fe68b63c5
+-- migrations-digest: 10deea3b8a4aeb7fcd56c613682343da19abf73fd08c6bff61fd9bfdc99bc97c
+-- snapshot-digest: 711dd4d1be8b54e92cecbc33c84d4e14be24fcd43439468018366b73816d7acb
 -- @statement
 CREATE TABLE IF NOT EXISTS "d1_migrations"(
 		id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1630,7 +1630,7 @@ CREATE TABLE briar_project_agent_task_jobs (
   updated_at text not null,
   completed_at text, skill_id text
     references briar_agent_skills (id) on delete set null, skill_execution_proposal_id text, result_summary text, result_conversation_id text, planned_update_resume integer not null
-  default 0 check (planned_update_resume in (0, 1)),
+  default 0 check (planned_update_resume in (0, 1)), cancel_requested_at text, cancelled_by_user_id text, resume_count integer not null default 0 check (resume_count >= 0),
   unique (project_id, request_id)
 );
 -- @statement

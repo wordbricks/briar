@@ -1,4 +1,8 @@
 import { describe, expect, it } from "vitest";
+import {
+  createDetachedTranscriptSequencer,
+  detachedProjectAgentPrompt,
+} from "./agent-runner";
 import type { Config, ProjectConfig } from "./config-contract";
 import type { DetachedProviderTurnResult } from "./detached-provider-turn";
 import { runClaimedProjectAgentTask } from "./reply-execution";
@@ -60,6 +64,7 @@ const task: ClaimedProjectAgentTask = {
   title: "Run release Skill",
   claimToken: "briar_agent_task_claim_test",
   claimAttempts: 1,
+  resumeCount: 0,
   claimedAt: "2026-08-22T08:00:00+00:00",
   leaseExpiresAt: "2026-08-22T08:15:00+00:00",
   handoffContext: null,
@@ -78,6 +83,21 @@ const task: ClaimedProjectAgentTask = {
 };
 
 const git: GitRunner = () => ({ exitCode: 0, stdout: "", stderr: "" });
+
+const handoffContext = (
+  conversationId: string,
+): ClaimedProjectAgentTask["handoffContext"] => ({
+  requestId: "66666666-6666-4666-8666-666666666666",
+  workType: "projectAgentTask",
+  workId,
+  runId,
+  conversationId,
+  workspacePath: null,
+  createdAt: "2026-08-22T08:10:00+00:00",
+});
+
+const continuationPreamble =
+  "Briar restarted briefly to install an app update while the previous turn was still running.";
 
 function successfulTurn(
   overrides: Partial<DetachedProviderTurnResult> = {},
@@ -153,6 +173,117 @@ describe("Project Agent task worktrees", () => {
       summary: "Release Skill completed",
       conversationId: "codex:conversation-1",
     });
+  });
+
+  it("keeps the original prompt and attempt range for a first claim", async () => {
+    const prompts: string[] = [];
+    const sequencerArguments: Array<[number, number | undefined]> = [];
+    const isolatedPath = `/worktrees/${projectId}/analysis/analysis-${workId}`;
+
+    await runClaimedProjectAgentTask(
+      config,
+      project,
+      { ...task, claimAttempts: 2 },
+      "worker-token",
+      "worker-1",
+      new AbortController().signal,
+      undefined,
+      {
+        allocateWorktree: async () => ({
+          path: isolatedPath,
+          baseRef: "origin/main",
+          baseSha: "a".repeat(40),
+          includedPaths: [],
+        }),
+        removeWorktree: async () => {},
+        runProviderTurn: async (input) => {
+          prompts.push(input.prompt);
+          expect(input.conversationId).toBeNull();
+          return successfulTurn();
+        },
+        git,
+        createTranscriptSequencer: (claimAttempt, resumeCount) => {
+          sequencerArguments.push([claimAttempt, resumeCount]);
+          return createDetachedTranscriptSequencer(claimAttempt, resumeCount);
+        },
+      },
+    );
+
+    expect(sequencerArguments).toEqual([[2, 0]]);
+    const prompt = prompts[0] ?? "";
+    expect(prompt).not.toContain(continuationPreamble);
+    expect(prompt).toBe(
+      detachedProjectAgentPrompt({
+        agent: {
+          ...task.agent,
+          scope: { kind: "project", organizationId, projectId },
+        },
+        request: task.request,
+        workspacePath: isolatedPath,
+      }),
+    );
+  });
+
+  it("resumes a planned-update handoff with a continuation prompt and its own sequence range", async () => {
+    const prompts: string[] = [];
+    const conversationIds: Array<string | null | undefined> = [];
+    const sequencerArguments: Array<[number, number | undefined]> = [];
+    const isolatedPath = `/worktrees/${projectId}/analysis/analysis-${workId}`;
+    const resumed: ClaimedProjectAgentTask = {
+      ...task,
+      claimAttempts: 1,
+      resumeCount: 2,
+      handoffContext: handoffContext("codex:conversation-1"),
+    };
+
+    await runClaimedProjectAgentTask(
+      config,
+      project,
+      resumed,
+      "worker-token",
+      "worker-1",
+      new AbortController().signal,
+      undefined,
+      {
+        allocateWorktree: async () => ({
+          path: isolatedPath,
+          baseRef: "origin/main",
+          baseSha: "a".repeat(40),
+          includedPaths: [],
+        }),
+        removeWorktree: async () => {},
+        runProviderTurn: async (input) => {
+          prompts.push(input.prompt);
+          conversationIds.push(input.conversationId);
+          return successfulTurn();
+        },
+        git,
+        createTranscriptSequencer: (claimAttempt, resumeCount) => {
+          sequencerArguments.push([claimAttempt, resumeCount]);
+          return createDetachedTranscriptSequencer(claimAttempt, resumeCount);
+        },
+      },
+    );
+
+    // The resumed claim keeps attempt 1, so only the resume count stops the new
+    // transcript from reusing sequences the server already stored.
+    expect(sequencerArguments).toEqual([[1, 2]]);
+    expect(createDetachedTranscriptSequencer(1, 2).next()).toBe(2_000_001);
+    expect(conversationIds).toEqual(["codex:conversation-1"]);
+    const prompt = prompts[0] ?? "";
+    expect(prompt.startsWith(continuationPreamble)).toBe(true);
+    expect(prompt).toContain("Do not repeat side effects or completed work.");
+    expect(prompt).toContain(task.request);
+    expect(prompt).toContain(
+      detachedProjectAgentPrompt({
+        agent: {
+          ...task.agent,
+          scope: { kind: "project", organizationId, projectId },
+        },
+        request: task.request,
+        workspacePath: isolatedPath,
+      }),
+    );
   });
 
   it("removes the detached worktree when the provider fails", async () => {

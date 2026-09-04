@@ -449,6 +449,7 @@ const projectAgentTask = (
       title: value.title,
       claimToken: value.claimToken,
       claimAttempts: value.claimAttempts,
+      resumeCount: value.resumeCount,
       claimedAt: requiredTimestamp(value.claimedAt, "claimedAt"),
       leaseExpiresAt: requiredTimestamp(value.leaseExpiresAt, "leaseExpiresAt"),
       request: value.request,

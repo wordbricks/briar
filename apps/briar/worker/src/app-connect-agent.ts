@@ -106,6 +106,7 @@ import {
   teamAgentScheduleRunJson,
 } from "./team-agent-schedule-json";
 import { teamAgentTaskSessionEvent } from "./team-agent-task-session";
+import { cancelTeamAgentTaskWork } from "./team-agent-task-worker";
 import {
   createTeamAgentTaskJob,
   getTeamAgentTaskJobByRequest,
@@ -1886,6 +1887,31 @@ export const createAppAgentService = (
     }
     scheduleProjectAgentSessionRealtimePublish(env, db, project.id, context);
     return { session: rowToProjectAgentSession(createdSession) };
+  },
+
+  cancelProjectAgentTask: async (input) => {
+    const sessionId = decodeSessionId(input.sessionId);
+    const session = await services.requireSession(auth, request);
+    const project = await requireProject(
+      db,
+      input.projectId,
+      session.user.id,
+      services.getTeam,
+    );
+    if (
+      !hasOrganizationCapability(project.member_role, "development:manage")
+    ) {
+      throw new HttpError(403, "Development management permission required");
+    }
+    const cancelled = await cancelTeamAgentTaskWork({
+      db,
+      env,
+      context,
+      projectId: project.id,
+      sessionId,
+      userId: session.user.id,
+    });
+    return { session: rowToProjectAgentSession(cancelled) };
   },
 });
 

@@ -128,4 +128,21 @@ describe("Worker claim protobuf mapper", () => {
       triggerAttachments: channelReply.triggerAttachments,
     });
   });
+
+  it("carries the planned-update resume count on an Agent task claim", () => {
+    const message = workerClaimMessage({
+      ...common,
+      workType: "projectAgentTask",
+      request: "Investigate the flaky suite.",
+      resumeCount: 2,
+      activeSkill: null,
+      agent,
+    } as unknown as WorkerQueueClaim);
+    expect(message.work.case).toBe("projectAgentTask");
+    if (message.work.case !== "projectAgentTask") return;
+    expect(message.work.value).toMatchObject({
+      claimAttempts: 1,
+      resumeCount: 2,
+    });
+  });
 });

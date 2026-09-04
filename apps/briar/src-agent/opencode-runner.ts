@@ -13,10 +13,11 @@ import {
   buildOpenCodeParts,
   completeOpenCodeMessages,
   createOpenCodeEventState,
+  installOpenCodeRunnerSignalHandlers,
   isOpenCodeWritePermission,
   mapEffortToOpenCode,
   normalizeOpenCodeEvent,
-  openCodeBlockedRetry,
+  openCodeTerminalOutcome,
   openCodeTransientOverload,
   openCodePermissionInput,
   openCodeQuestionInput,
@@ -36,7 +37,10 @@ import {
   readOnlySeatbeltProfile,
   readOnlySeatbeltSpawnSpec,
 } from "./read-only-seatbelt";
-import { prepareComputerUseMcp } from "./computer-use-mcp-config";
+import {
+  prepareComputerUseMcp,
+  type PreparedComputerUseMcp,
+} from "./computer-use-mcp-config";
 import { openCodeComputerUseEnvironment } from
   "./computer-use-provider-adapters";
 
@@ -298,6 +302,27 @@ export function openCodeFinalTurnOutputs(
 
 type OpenCodeRunnerIo = ReturnType<typeof createRunnerIo>;
 
+/**
+ * Resources a signal handler must release before the runner exits. They live
+ * outside `main` because SIGTERM arrives while `main` is still awaiting.
+ */
+type OpenCodeRunnerResources = {
+  server?: OpenCodeServer;
+  computerUseMcp?: PreparedComputerUseMcp;
+};
+
+const activeResources: OpenCodeRunnerResources = {};
+
+function closeOpenCodeRunnerResources() {
+  const { server, computerUseMcp } = activeResources;
+  activeResources.server = undefined;
+  activeResources.computerUseMcp = undefined;
+  // Killing the opencode process group is synchronous; the Computer Use
+  // temporary directory removal is best effort so it never delays the exit.
+  server?.close();
+  void computerUseMcp?.cleanup().catch(() => undefined);
+}
+
 async function main(runnerIo: OpenCodeRunnerIo) {
   const { emit, request: requestPromise, waitForApproval } = runnerIo;
   emitRunnerDiagnostic("runner.request_waiting");
@@ -310,6 +335,7 @@ async function main(runnerIo: OpenCodeRunnerIo) {
     attachmentCount: request.attachments?.length ?? 0,
   });
   const computerUseMcp = await prepareComputerUseMcp(request);
+  activeResources.computerUseMcp = computerUseMcp;
   let server: OpenCodeServer | undefined;
   try {
     server = await OpenCodeServer.start(
@@ -319,6 +345,7 @@ async function main(runnerIo: OpenCodeRunnerIo) {
       request.sandboxMode === "readOnly",
       emitRunnerDiagnostic,
     );
+    activeResources.server = server;
     const client = createOpencodeClient({
       baseUrl: server.url,
       directory: request.workspaceRoot,
@@ -341,8 +368,16 @@ async function main(runnerIo: OpenCodeRunnerIo) {
             emit.event({ raw, event });
           }
         }
-        const blockedRetry = openCodeBlockedRetry(raw, sessionId);
-        if (blockedRetry) throw new OpenCodeBlockedError(blockedRetry);
+        // OpenCode leaves the assistant message unfinished after a fatal
+        // session error, so the pump must end the run itself; the prompt
+        // request would otherwise stay open forever.
+        const outcome = openCodeTerminalOutcome(raw, sessionId);
+        if (outcome) {
+          if (outcome.type === "blocked") {
+            throw new OpenCodeBlockedError(outcome.blocker);
+          }
+          throw new Error(`OpenCode session error: ${outcome.message}`);
+        }
         if (!raw || typeof raw !== "object") continue;
         const event = raw as { type?: unknown; properties?: unknown };
         const properties =
@@ -441,6 +476,8 @@ async function main(runnerIo: OpenCodeRunnerIo) {
     }
     emit.result({ sessionId, message });
   } finally {
+    activeResources.server = undefined;
+    activeResources.computerUseMcp = undefined;
     server?.close();
     await computerUseMcp.cleanup();
   }
@@ -451,6 +488,17 @@ export async function runOpenCodeRunner() {
   const runnerIo = createRunnerIo({
     closeError: "Briar closed the OpenCode runner input.",
     onClose: () => emitRunnerDiagnostic("runner.input_closed"),
+  });
+  installOpenCodeRunnerSignalHandlers({
+    on: (signal, listener) => {
+      process.once(signal, listener);
+    },
+    exit: (code) => process.exit(code),
+    close: (signal) => {
+      emitRunnerDiagnostic("runner.signal", { signal });
+      closeOpenCodeRunnerResources();
+      runnerIo.close();
+    },
   });
   const { emit } = runnerIo;
   try {

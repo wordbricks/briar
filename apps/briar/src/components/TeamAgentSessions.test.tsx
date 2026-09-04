@@ -196,7 +196,49 @@ describe("TeamAgentSessions", () => {
     await cleanup();
   });
 
-  it("does not render stop button for non-running or remote sessions", async () => {
+  it("renders stop button for a remote worker task session", async () => {
+    const onSessionOpen = vi.fn();
+    const onStopSession = vi.fn().mockResolvedValue(true);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    const remoteWorkerSession: AutoHuntSession = {
+      ...taskSession,
+      id: "remote-worker-session",
+      status: "running",
+      completedAt: null,
+      localOwner: false,
+      requestedWorkerId: "worker-1",
+      workerId: "worker-1",
+    };
+
+    await renderReactTestRoot(
+      root,
+      <TeamAgentSessions
+        agent={agent}
+        onSessionOpen={onSessionOpen}
+        onStopSession={onStopSession}
+        projectId="project-1"
+        sessions={[remoteWorkerSession]}
+      />,
+    );
+
+    const stopButton = container.querySelector<HTMLButtonElement>(
+      ".auto-hunt-session-row-stop",
+    );
+    expect(stopButton).not.toBeNull();
+
+    await act(async () => {
+      stopButton?.click();
+    });
+
+    expect(onStopSession).toHaveBeenCalledWith("remote-worker-session");
+    expect(onSessionOpen).not.toHaveBeenCalled();
+
+    await cleanup();
+  });
+
+  it("does not render stop button for non-running or unassigned remote sessions", async () => {
     const onSessionOpen = vi.fn();
     const onStopSession = vi.fn().mockResolvedValue(true);
     const { cleanup, container, root } = createReactTestRoot({

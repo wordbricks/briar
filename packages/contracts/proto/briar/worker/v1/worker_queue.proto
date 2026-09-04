@@ -1078,6 +1078,7 @@ message ClaimedProjectAgentTask {
   DetachedAgentClaim agent = 10;
   optional DetachedAgentSkill active_skill = 11;
   optional ClaimedHandoffContext handoff_context = 12;
+  uint32 resume_count = 13;
 }
 
 message ChannelActivityCredential {

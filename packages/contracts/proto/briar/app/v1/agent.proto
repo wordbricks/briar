@@ -33,6 +33,7 @@ service AgentService {
   rpc GetProjectAgentSession(GetProjectAgentSessionRequest) returns (GetProjectAgentSessionResponse);
   rpc PutProjectAgentSession(PutProjectAgentSessionRequest) returns (PutProjectAgentSessionResponse);
   rpc RunProjectAgentTask(RunProjectAgentTaskRequest) returns (RunProjectAgentTaskResponse);
+  rpc CancelProjectAgentTask(CancelProjectAgentTaskRequest) returns (CancelProjectAgentTaskResponse);
   rpc GetProjectAgentTranscript(GetProjectAgentTranscriptRequest) returns (GetProjectAgentTranscriptResponse);
 }
 
@@ -333,6 +334,15 @@ message RunProjectAgentTaskRequest {
 }
 
 message RunProjectAgentTaskResponse {
+  ProjectAgentSession session = 1;
+}
+
+message CancelProjectAgentTaskRequest {
+  string project_id = 1;
+  string session_id = 2;
+}
+
+message CancelProjectAgentTaskResponse {
   ProjectAgentSession session = 1;
 }
 

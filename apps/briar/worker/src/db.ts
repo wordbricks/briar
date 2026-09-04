@@ -318,6 +318,7 @@ export {
   createTeamAgentTaskJob,
   getTeamAgentTaskJob,
   getTeamAgentTaskJobByRequest,
+  cancelTeamAgentTaskJob,
   reapTeamAgentTaskJobs,
   claimNextTeamAgentTask,
   getClaimedTeamAgentTask,
