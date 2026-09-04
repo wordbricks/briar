@@ -3,6 +3,7 @@ import {
   type Config,
   decodeConfig,
   decodeConfigJson,
+  enabledAgentProviders,
   encodeConfigJson,
 } from "./config-contract";
 
@@ -23,6 +24,7 @@ const config = {
     openrouter: false,
     vertex: false,
   },
+  addedProviders: [],
   appSettings: {
     preventSleepWhileRunning: true,
     browserAutomationProvider: "ego-browser",
@@ -105,5 +107,82 @@ describe("CLI config contract", () => {
       }
       expect(() => decodeConfig(invalid)).toThrow();
     }
+  });
+});
+
+describe("added providers", () => {
+  const withProviders = (
+    settings: Partial<Config["agentProviders"]>,
+    rest: Partial<Config> = {},
+  ) => ({
+    ...config,
+    agentProviders: { ...config.agentProviders, ...settings },
+    addedProviders: undefined,
+    ...rest,
+  }) as Config;
+
+  it("backfills a config written before the added list existed", () => {
+    const persisted = JSON.parse(
+      encodeConfigJson(withProviders({ codex: true, grok: true })),
+    );
+    // Absence, not an empty list, is what marks a config as never initialised.
+    delete persisted.addedProviders;
+
+    const decoded = decodeConfig(persisted);
+    expect(decoded.addedProviders).toEqual(["grok"]);
+    // Built-in providers are never listed: they need no add step.
+    expect(enabledAgentProviders(decoded)).toMatchObject({
+      codex: true,
+      grok: true,
+      cursor: false,
+    });
+  });
+
+  it("backfills an upstream whose credential is saved but switch is off", () => {
+    const persisted = JSON.parse(
+      encodeConfigJson(
+        withProviders({}, {
+          openrouterApiKey: "sk-or-v1-saved-key",
+          vertexAi: { projectId: "briar-dummy", location: "us-central1" },
+        }),
+      ),
+    );
+    delete persisted.addedProviders;
+
+    expect(decodeConfig(persisted).addedProviders).toEqual([
+      "openrouter",
+      "vertex",
+    ]);
+  });
+
+  it("keeps an empty stored list empty instead of backfilling it", () => {
+    const persisted = JSON.parse(
+      encodeConfigJson({
+        ...withProviders({ grok: true }),
+        addedProviders: [],
+      }),
+    );
+    expect(persisted.addedProviders).toEqual({});
+
+    const decoded = decodeConfig(persisted);
+    expect(decoded.addedProviders).toEqual([]);
+    // A provider that was never added reads as disabled, switch or not.
+    expect(enabledAgentProviders(decoded).grok).toBe(false);
+  });
+
+  it("ignores built-in and duplicate entries in a stored list", () => {
+    const persisted = JSON.parse(
+      encodeConfigJson({ ...config, addedProviders: ["vertex", "grok"] }),
+    );
+    persisted.addedProviders.providers = [
+      "AGENT_PROVIDER_VERTEX",
+      "AGENT_PROVIDER_CODEX",
+      "AGENT_PROVIDER_VERTEX",
+      "AGENT_PROVIDER_GROK",
+    ];
+    expect(decodeConfig(persisted).addedProviders).toEqual([
+      "grok",
+      "vertex",
+    ]);
   });
 });

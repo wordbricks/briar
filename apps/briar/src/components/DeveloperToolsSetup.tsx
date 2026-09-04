@@ -19,7 +19,7 @@ import type {
   OnboardingPrerequisites,
   OpenCodeTerminalPathStatus,
 } from "../generated/tauri";
-import { agentProviders } from "../lib/agent-provider";
+import { builtInProviders } from "../lib/agent-provider";
 import {
   AntigravityIcon,
   ClaudeIcon,
@@ -29,7 +29,12 @@ import {
   OpenCodeIcon,
 } from "./AgentIcons";
 
-const prerequisiteIds: OnboardingPrerequisite[] = ["git", ...agentProviders];
+/**
+ * Onboarding only asks for the built-in providers. Everything else is added
+ * from settings when the user wants it, so setup does not push a machine to
+ * install a CLI it has not asked for.
+ */
+const prerequisiteIds: OnboardingPrerequisite[] = ["git", ...builtInProviders];
 
 export function DeveloperToolsSetup({
   onContinue,
@@ -109,7 +114,7 @@ export function DeveloperToolsSetup({
   const gitReady =
     prerequisites?.git.installed === true &&
     prerequisites.git.authenticated === true;
-  const agentReady = agentProviders.some(
+  const agentReady = builtInProviders.some(
     (provider) =>
       prerequisites?.[provider].installed === true &&
       prerequisites[provider].authenticated === true,

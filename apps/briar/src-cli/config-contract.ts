@@ -41,7 +41,14 @@ import {
   workflowFromProto,
   workflowToProto,
 } from "../src/lib/app-rpc/team-configuration-mappers";
-import { agentProviders } from "../src/lib/agent-provider";
+import {
+  agentProviders,
+  backfilledAddedProviders,
+  effectiveEnabledProviders,
+  normalizeAddedProviders,
+  openCodeUpstreamOf,
+  type AgentProvider,
+} from "../src/lib/agent-provider";
 import { IsoDateTimeWithOffset } from "../src/lib/date-time-schema";
 
 const rejectExcessProperties = { onExcessProperty: "error" } as const;
@@ -306,6 +313,17 @@ export const Config = strict(Schema.Struct({
   apiUrl: Schema.mutableKey(UrlString),
   userToken: Schema.mutableKey(Schema.optional(Schema.String)),
   agentProviders: Schema.mutableKey(AgentProviderSettings),
+  /**
+   * Providers this machine added on top of the built-in set.
+   *
+   * Optional here because a config written before the list existed has none,
+   * and because in-memory configs are built without it. Every consumer reads
+   * it through `addedAgentProviders`, which applies the backfill rule, so the
+   * absent case is answered in exactly one place.
+   */
+  addedProviders: Schema.mutableKey(
+    Schema.optional(mutableArray(Schema.Literals(agentProviders))),
+  ),
   openrouterApiKey: Schema.mutableKey(
     Schema.optional(Schema.Trim.check(Schema.isLengthBetween(10, 500))),
   ),
@@ -331,6 +349,49 @@ export const Config = strict(Schema.Struct({
 export type Config = typeof Config.Type;
 
 const decodeDomainConfig = Schema.decodeUnknownSync(Config, { errors: "all" });
+
+/**
+ * Whether this config already holds the credential an upstream provider needs.
+ * Only the backfill asks, and it asks so a machine that was already talking to
+ * an upstream keeps it after the built-in/added split.
+ */
+const hasSavedUpstreamCredential = (
+  config: Pick<Config, "openrouterApiKey" | "vertexAi">,
+  provider: AgentProvider,
+) => {
+  const upstream = openCodeUpstreamOf(provider);
+  if (!upstream) return false;
+  switch (upstream.credential.type) {
+    case "apiKey":
+      return (config[upstream.credential.configField] ?? "").trim().length > 0;
+    case "googleAdc":
+      return config[upstream.credential.configField] !== undefined;
+  }
+};
+
+/**
+ * Providers this machine has added. A config written before the list existed
+ * reports every non-built-in provider it was already enabled for or holds a
+ * credential for, so existing installations see no change; the value is
+ * persisted the next time the config is written.
+ */
+export const addedAgentProviders = (config: Config): AgentProvider[] =>
+  config.addedProviders === undefined
+    ? backfilledAddedProviders(
+      config.agentProviders,
+      (provider) => hasSavedUpstreamCredential(config, provider),
+    )
+    : normalizeAddedProviders(config.addedProviders);
+
+/**
+ * The enabled record the CLI and the Worker decide provider availability from.
+ * A provider this machine has not added reads as disabled, so it is reported
+ * and skipped exactly like one whose switch is off.
+ */
+export const enabledAgentProviders = (
+  config: Config,
+): Record<AgentProvider, boolean> =>
+  effectiveEnabledProviders(config.agentProviders, addedAgentProviders(config));
 
 const browserAutomationProviderFromProto = (
   value: LocalBrowserAutomationProvider | undefined,
@@ -518,30 +579,52 @@ const projectFromProto = (value: LocalProjectConfig) => ({
     ? undefined
     : activeClaimFromProto(value.activeClaim),
 });
+/** Known providers of a stored added list, ignoring values this build cannot name. */
+const knownProtoAgentProviders = new Set(
+  agentProviders.map((provider) => agentProviderToProto(provider)),
+);
+
 const configFromProto = (value: LocalConfig): Config => {
   const agentProviderSettings = requiredMessage(
     value.agentProviders,
     "config.agentProviders",
   );
   const appSettings = requiredMessage(value.appSettings, "config.appSettings");
+  const settings = {
+    codex: agentProviderSettings.codex,
+    claude: agentProviderSettings.claude,
+    cursor: agentProviderSettings.cursor,
+    grok: agentProviderSettings.grok,
+    agy: agentProviderSettings.agy,
+    opencode: agentProviderSettings.opencode,
+    openrouter: agentProviderSettings.openrouter,
+    vertex: agentProviderSettings.vertex,
+  };
+  const openrouterApiKey = value.openrouterApiKey;
+  const vertexAi = value.vertexAi === undefined ? undefined : {
+    projectId: value.vertexAi.projectId,
+    location: value.vertexAi.location,
+  };
   return decodeDomainConfig({
     apiUrl: value.apiUrl,
     userToken: value.userToken,
-    agentProviders: {
-      codex: agentProviderSettings.codex,
-      claude: agentProviderSettings.claude,
-      cursor: agentProviderSettings.cursor,
-      grok: agentProviderSettings.grok,
-      agy: agentProviderSettings.agy,
-      opencode: agentProviderSettings.opencode,
-      openrouter: agentProviderSettings.openrouter,
-      vertex: agentProviderSettings.vertex,
-    },
-    openrouterApiKey: value.openrouterApiKey,
-    vertexAi: value.vertexAi === undefined ? undefined : {
-      projectId: value.vertexAi.projectId,
-      location: value.vertexAi.location,
-    },
+    agentProviders: settings,
+    // Message presence is the "never initialised" marker: absent means this
+    // config predates the built-in/added split and is backfilled from what the
+    // machine was already using.
+    addedProviders: value.addedProviders === undefined
+      ? backfilledAddedProviders(
+        settings,
+        (provider) =>
+          hasSavedUpstreamCredential({ openrouterApiKey, vertexAi }, provider),
+      )
+      : normalizeAddedProviders(
+        value.addedProviders.providers
+          .filter((provider) => knownProtoAgentProviders.has(provider))
+          .map(agentProviderFromProto),
+      ),
+    openrouterApiKey,
+    vertexAi,
     appSettings: {
       preventSleepWhileRunning: appSettings.preventSleepWhileRunning,
       browserAutomationProvider: browserAutomationProviderFromProto(
@@ -646,6 +729,10 @@ const configToProto = (input: Config): LocalConfig => {
     apiUrl: value.apiUrl,
     userToken: value.userToken,
     agentProviders: { ...value.agentProviders },
+    // Always written, so a backfilled list stops being a backfill.
+    addedProviders: {
+      providers: addedAgentProviders(value).map(agentProviderToProto),
+    },
     openrouterApiKey: value.openrouterApiKey,
     vertexAi: value.vertexAi === undefined
       ? undefined

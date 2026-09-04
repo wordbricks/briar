@@ -123,6 +123,16 @@ type AgentProviderCatalogEntryBase = {
   readonly managedComputerSetup: boolean;
   /** Provider accepts model ids it never advertised in its capability report. */
   readonly allowsCustomModels: boolean;
+  /**
+   * Provider every machine lists in settings and enables on a new config.
+   *
+   * A provider that is not built in stays hidden until the user adds it from
+   * the "Add provider" list, and until then behaves exactly like a disabled
+   * one — see `isProviderActive`.
+   */
+  readonly builtIn: boolean;
+  /** Where the "Install instructions" link of the add list points. */
+  readonly installUrl: string;
 };
 
 /**
@@ -151,6 +161,8 @@ export const agentProviderCatalog = {
     binaryName: "codex",
     managedComputerSetup: true,
     allowsCustomModels: false,
+    builtIn: true,
+    installUrl: "https://developers.openai.com/codex/cli",
   },
   claude: {
     kind: "sidecarCli",
@@ -158,6 +170,8 @@ export const agentProviderCatalog = {
     binaryName: "claude",
     managedComputerSetup: true,
     allowsCustomModels: true,
+    builtIn: true,
+    installUrl: "https://docs.claude.com/en/docs/claude-code/setup",
   },
   cursor: {
     kind: "acpAgent",
@@ -165,6 +179,8 @@ export const agentProviderCatalog = {
     binaryName: "cursor-agent",
     managedComputerSetup: false,
     allowsCustomModels: true,
+    builtIn: false,
+    installUrl: "https://cursor.com/docs/cli/installation",
   },
   grok: {
     kind: "acpAgent",
@@ -172,6 +188,8 @@ export const agentProviderCatalog = {
     binaryName: "grok",
     managedComputerSetup: true,
     allowsCustomModels: false,
+    builtIn: false,
+    installUrl: "https://docs.x.ai/docs/cli",
   },
   agy: {
     kind: "sidecarCli",
@@ -179,6 +197,8 @@ export const agentProviderCatalog = {
     binaryName: "agy",
     managedComputerSetup: false,
     allowsCustomModels: false,
+    builtIn: true,
+    installUrl: "https://antigravity.google/docs/cli",
   },
   opencode: {
     kind: "sidecarCli",
@@ -186,6 +206,8 @@ export const agentProviderCatalog = {
     binaryName: "opencode",
     managedComputerSetup: true,
     allowsCustomModels: true,
+    builtIn: true,
+    installUrl: "https://opencode.ai/docs",
   },
   openrouter: {
     kind: "openCodeUpstream",
@@ -193,6 +215,8 @@ export const agentProviderCatalog = {
     binaryName: "opencode",
     managedComputerSetup: false,
     allowsCustomModels: true,
+    builtIn: false,
+    installUrl: "https://openrouter.ai/docs/quickstart",
     upstream: {
       openCodeProviderId: "openrouter",
       environmentPrefixes: ["OPENROUTER_"],
@@ -214,6 +238,8 @@ export const agentProviderCatalog = {
     binaryName: "opencode",
     managedComputerSetup: false,
     allowsCustomModels: true,
+    builtIn: false,
+    installUrl: "https://cloud.google.com/vertex-ai/generative-ai/docs/start/quickstarts/api-quickstart",
     upstream: {
       openCodeProviderId: "google-vertex",
       // `CLOUDSDK_` carries the gcloud config root the Application Default
@@ -240,6 +266,72 @@ export const agentProviderCatalog = {
   AgentProvider,
   AgentProviderCatalogEntry
 >;
+
+/**
+ * Providers every machine lists in settings. They need no add step and are
+ * enabled on a new config.
+ */
+export const builtInProviders: readonly AgentProvider[] = agentProviders
+  .filter((provider) => agentProviderCatalog[provider].builtIn);
+
+/**
+ * Providers a machine only sees after adding them. Until then they behave
+ * exactly like a disabled provider everywhere.
+ */
+export const addableProviders: readonly AgentProvider[] = agentProviders
+  .filter((provider) => !agentProviderCatalog[provider].builtIn);
+
+export function isAgentProviderBuiltIn(provider: AgentProvider) {
+  return agentProviderCatalog[provider].builtIn;
+}
+
+/** Whether a provider is enabled *and* this machine may use it at all. */
+export function isProviderActive(
+  provider: AgentProvider,
+  settings: Readonly<Record<AgentProvider, boolean>>,
+  added: readonly AgentProvider[],
+) {
+  return settings[provider] &&
+    (isAgentProviderBuiltIn(provider) || added.includes(provider));
+}
+
+/**
+ * The enabled record every consumer decides availability from: the saved
+ * switches, with a provider this machine has not added forced off. One rule,
+ * so the desktop, the CLI and the Worker cannot disagree about what "enabled"
+ * means.
+ */
+export function effectiveEnabledProviders(
+  settings: Readonly<Record<AgentProvider, boolean>>,
+  added: readonly AgentProvider[],
+): Record<AgentProvider, boolean> {
+  return Object.fromEntries(
+    agentProviders.map((provider) =>
+      [provider, isProviderActive(provider, settings, added)] as const
+    ),
+  ) as Record<AgentProvider, boolean>;
+}
+
+/**
+ * The added list of a config written before the list existed. A provider the
+ * machine was already using — enabled, or holding a saved credential — counts
+ * as added, so nothing an existing user relies on disappears.
+ */
+export function backfilledAddedProviders(
+  settings: Readonly<Record<AgentProvider, boolean>>,
+  hasSavedCredential: (provider: AgentProvider) => boolean,
+): AgentProvider[] {
+  return addableProviders.filter((provider) =>
+    settings[provider] || hasSavedCredential(provider)
+  );
+}
+
+/** Added providers in menu order, without duplicates or built-in entries. */
+export function normalizeAddedProviders(
+  added: readonly AgentProvider[],
+): AgentProvider[] {
+  return addableProviders.filter((provider) => added.includes(provider));
+}
 
 export type ManagedComputerSetupProvider = {
   [Provider in AgentProvider]: (typeof agentProviderCatalog)[Provider][

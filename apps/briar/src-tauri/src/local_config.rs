@@ -4,25 +4,21 @@ use briar_contracts::proto::briar::{local::v1 as local_proto, types::v1 as types
 #[cfg(test)]
 pub(super) use local_proto::LocalWorktreeConfig;
 pub(super) use local_proto::{
-    LocalAgentProviderSettings, LocalAppSettings, LocalAutoHuntConfig, LocalConfig,
-    LocalExecutionWorkerConfig, LocalLinearConfig, LocalProjectConfig, LocalProjectLlmConfig,
-    LocalSandboxConfig, LocalVertexAiCredential,
+    LocalAddedProviders, LocalAgentProviderSettings, LocalAppSettings, LocalAutoHuntConfig,
+    LocalConfig, LocalExecutionWorkerConfig, LocalLinearConfig, LocalProjectConfig,
+    LocalProjectLlmConfig, LocalSandboxConfig, LocalVertexAiCredential,
 };
 
 const DEFAULT_API_URL: &str = "http://127.0.0.1:8787";
 
+/// A new config enables the built-in providers and nothing else. Everything
+/// else stays inactive until the user adds it in settings.
 pub(super) fn default_agent_provider_settings() -> LocalAgentProviderSettings {
-    LocalAgentProviderSettings {
-        codex: true,
-        claude: true,
-        cursor: true,
-        grok: true,
-        agy: true,
-        opencode: true,
-        openrouter: true,
-        vertex: true,
-        ..Default::default()
+    let mut settings = LocalAgentProviderSettings::default();
+    for provider in agent::AgentProviderKind::all().filter(|provider| provider.built_in()) {
+        set_provider_enabled(&mut settings, provider, true);
     }
+    settings
 }
 
 pub(super) fn default_app_settings() -> LocalAppSettings {
@@ -40,6 +36,9 @@ pub(super) fn default_local_config(api_url: impl Into<String>) -> LocalConfig {
         api_url: api_url.into(),
         agent_providers: default_agent_provider_settings().into(),
         app_settings: default_app_settings().into(),
+        // Present and empty: this config has been initialised and has added
+        // nothing, which is not the same as never having been initialised.
+        added_providers: LocalAddedProviders::default().into(),
         ..Default::default()
     }
 }
@@ -51,15 +50,66 @@ pub(super) fn read_cli_config(config_path: &Path) -> Result<LocalConfig, String>
     let contents = fs::read_to_string(config_path)
         .map_err(|error| format!("Briar 로컬 설정을 읽지 못했습니다: {error}"))?;
     match decode_local_config_json(&contents) {
-        Ok(config) => Ok(config),
+        Ok(mut config) => {
+            backfill_added_providers(&mut config);
+            Ok(config)
+        }
         Err(original_error) => {
-            let Some(config) = migrate_pre_protojson_local_config(&contents)? else {
+            let Some(mut config) = migrate_pre_protojson_local_config(&contents)? else {
                 return Err(original_error);
             };
+            backfill_added_providers(&mut config);
             write_cli_config(config_path, &config)?;
             Ok(config)
         }
     }
+}
+
+/// Whether this config already holds the credential an upstream provider needs.
+/// The backfill asks so a machine that was already talking to an upstream keeps
+/// it after the built-in/added split.
+fn has_saved_upstream_credential(config: &LocalConfig, provider: agent::AgentProviderKind) -> bool {
+    let Some(upstream) = provider.opencode_upstream() else {
+        return false;
+    };
+    match upstream.credential {
+        agent::OpenCodeUpstreamCredential::ApiKey { .. } => config
+            .openrouter_api_key
+            .as_deref()
+            .is_some_and(|key| !key.trim().is_empty()),
+        agent::OpenCodeUpstreamCredential::GoogleAdc { .. } => config.vertex_ai.is_set(),
+    }
+}
+
+/// Give a config written before the added list existed the list it implies.
+///
+/// Absence of the message means "never initialised", so every non-built-in
+/// provider this machine was already enabled for, or holds a credential for,
+/// counts as added. Existing installations therefore see no change; the value
+/// is persisted the next time the config is written. Mirrors
+/// `addedAgentProviders` in `src-cli/config-contract.ts`.
+fn backfill_added_providers(config: &mut LocalConfig) {
+    if config.added_providers.is_set() {
+        return;
+    }
+    let settings = config
+        .agent_providers
+        .as_option()
+        .cloned()
+        .unwrap_or_default();
+    let providers = agent::AgentProviderKind::all()
+        .filter(|provider| !provider.built_in())
+        .filter(|provider| {
+            provider_is_enabled(&settings, *provider)
+                || has_saved_upstream_credential(config, *provider)
+        })
+        .map(|provider| types_proto::AgentProvider::from(provider).into())
+        .collect();
+    config.added_providers = LocalAddedProviders {
+        providers,
+        ..Default::default()
+    }
+    .into();
 }
 
 fn replace_legacy_enum(
@@ -837,8 +887,69 @@ pub(super) fn provider_is_enabled(
     }
 }
 
+pub(super) fn set_provider_enabled(
+    settings: &mut LocalAgentProviderSettings,
+    provider: agent::AgentProviderKind,
+    enabled: bool,
+) {
+    match provider {
+        agent::AgentProviderKind::Codex => settings.codex = enabled,
+        agent::AgentProviderKind::Claude => settings.claude = enabled,
+        agent::AgentProviderKind::Cursor => settings.cursor = enabled,
+        agent::AgentProviderKind::Grok => settings.grok = enabled,
+        agent::AgentProviderKind::Agy => settings.agy = enabled,
+        agent::AgentProviderKind::Opencode => settings.opencode = enabled,
+        agent::AgentProviderKind::Openrouter => settings.openrouter = enabled,
+        agent::AgentProviderKind::Vertex => settings.vertex = enabled,
+    }
+}
+
 pub(super) fn providers_any_enabled(settings: &LocalAgentProviderSettings) -> bool {
     agent::AgentProviderKind::all().any(|provider| provider_is_enabled(settings, provider))
+}
+
+/// Providers this machine has added, in wire order. Values a build cannot name
+/// are ignored rather than failing the read.
+pub(super) fn added_providers(config: &LocalConfig) -> Vec<agent::AgentProviderKind> {
+    let stored = config
+        .added_providers
+        .as_option()
+        .map(|added| {
+            added
+                .providers
+                .iter()
+                .filter_map(|provider| provider.as_known())
+                .filter_map(agent::AgentProviderKind::from_wire)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    agent::AgentProviderKind::all()
+        .filter(|provider| !provider.built_in() && stored.contains(provider))
+        .collect()
+}
+
+/// Whether a provider is enabled *and* this machine may use it at all.
+pub(super) fn provider_is_active(config: &LocalConfig, provider: agent::AgentProviderKind) -> bool {
+    let Some(settings) = config.agent_providers.as_option() else {
+        return false;
+    };
+    provider_is_enabled(settings, provider)
+        && (provider.built_in() || added_providers(config).contains(&provider))
+}
+
+/// The enabled record every availability decision is made from: the saved
+/// switches, with a provider this machine has not added forced off. Mirrors
+/// `effectiveEnabledProviders` in `src/lib/agent-provider.ts`.
+pub(super) fn effective_provider_settings(config: &LocalConfig) -> LocalAgentProviderSettings {
+    let mut settings = LocalAgentProviderSettings::default();
+    for provider in agent::AgentProviderKind::all() {
+        set_provider_enabled(
+            &mut settings,
+            provider,
+            provider_is_active(config, provider),
+        );
+    }
+    settings
 }
 
 #[cfg(test)]

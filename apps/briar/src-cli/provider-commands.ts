@@ -15,15 +15,23 @@ import {
   type LocalProviderModels,
   type LocalProviderUsage,
 } from "@briar/contracts/gen/briar/local/v1/local_pb";
+import { LocalAddedProvidersSchema } from "@briar/contracts/gen/briar/local/v1/config_pb";
 import {
+  addableProviders,
   agentProviderBinaryName,
   agentProviderExecutionEnvironment,
   agentProviders,
+  isAgentProviderBuiltIn,
   isOpenCodeUpstreamProvider,
+  normalizeAddedProviders,
   openCodeUpstreamOf,
   type AgentProvider,
   type OpenCodeUpstreamCredentialValue,
 } from "../src/lib/agent-provider";
+import { agentProviderToProto } from "../src/lib/app-rpc/mappers";
+import {
+  addedAgentProviders,
+} from "./config-contract";
 import type {
   AgentEffortCapability,
   AgentProviderCapability,
@@ -32,6 +40,7 @@ import {
   has,
   loadConfig,
   openCodeUpstreamCredential,
+  saveConfig,
   value,
   values,
 } from "./command-support";
@@ -321,4 +330,65 @@ async function providerAuthCommand() {
   console.log(toJsonString(LocalProviderAuthSnapshotSchema, message));
 }
 
-export { providerAuthCommand, providerModelsCommand, providerUsageCommand };
+/**
+ * `briar provider add|remove` is how a headless machine changes its added set,
+ * since the add list lives in the desktop settings screen. Adding also enables
+ * the provider and removing also disables it, exactly like the desktop's own
+ * buttons, so both surfaces leave the same config behind.
+ */
+const updateAddedProviders = async (
+  update: (
+    added: readonly AgentProvider[],
+    provider: AgentProvider,
+  ) => AgentProvider[],
+) => {
+  const requested = requestedAddableProvider();
+  const config = await loadConfig();
+  const added = update(addedAgentProviders(config), requested);
+  config.addedProviders = added;
+  config.agentProviders[requested] = added.includes(requested);
+  await saveConfig(config);
+  console.log(
+    toJsonString(
+      LocalAddedProvidersSchema,
+      create(LocalAddedProvidersSchema, {
+        providers: added.map(agentProviderToProto),
+      }),
+    ),
+  );
+};
+
+/** The one provider `--provider` names, refusing a built-in or a missing one. */
+const requestedAddableProvider = (): AgentProvider => {
+  const requested = requestedProviders();
+  if (requested.length !== 1 || requested.length === providerOrder.length) {
+    throw new Error("--provider must name exactly one provider");
+  }
+  const [provider] = requested;
+  if (provider === undefined || isAgentProviderBuiltIn(provider)) {
+    throw new Error(
+      `${provider} is a built-in provider and is always available. Addable providers: ${
+        addableProviders.join(", ")
+      }`,
+    );
+  }
+  return provider;
+};
+
+const providerAddCommand = () =>
+  updateAddedProviders((added, provider) =>
+    normalizeAddedProviders([...added, provider])
+  );
+
+const providerRemoveCommand = () =>
+  updateAddedProviders((added, provider) =>
+    added.filter((candidate) => candidate !== provider)
+  );
+
+export {
+  providerAddCommand,
+  providerAuthCommand,
+  providerModelsCommand,
+  providerRemoveCommand,
+  providerUsageCommand,
+};

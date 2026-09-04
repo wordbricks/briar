@@ -66,8 +66,10 @@ import {
 } from "./managed-computer-commands";
 import { managedComputerEnrollCommand } from "./managed-computer-enrollment";
 import {
+  providerAddCommand,
   providerAuthCommand,
   providerModelsCommand,
+  providerRemoveCommand,
   providerUsageCommand,
 } from "./provider-commands";
 import {
@@ -832,6 +834,18 @@ const providerCommand = Command.make("provider").pipe(
       { ...providerFlags, ...switches("openrouter-configured") },
       providerAuthCommand,
       "Report which providers are signed in on this machine",
+    ),
+    leaf(
+      "add",
+      { ...repeatedStrings("provider") },
+      providerAddCommand,
+      "Add a provider on this machine, which also enables it",
+    ),
+    leaf(
+      "remove",
+      { ...repeatedStrings("provider") },
+      providerRemoveCommand,
+      "Remove a provider from this machine, which also disables it",
     ),
   ]),
 );

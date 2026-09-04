@@ -4,6 +4,7 @@ import {
 } from "@briar/contracts/gen/briar/worker/v1/managed_computer_setup_pb";
 import {
   agentProviders,
+  normalizeAddedProviders,
   type AgentProvider,
 } from "../src/lib/agent-provider";
 import {
@@ -16,6 +17,10 @@ import {
   saveConfig,
   value,
 } from "./command-support";
+import {
+  addedAgentProviders,
+  enabledAgentProviders,
+} from "./config-contract";
 import { dashboardWorkerFromProto } from "../src/lib/app-rpc/fleet-mappers";
 import { requiredMessage } from "../src/lib/app-rpc/mappers";
 import {
@@ -205,8 +210,16 @@ export async function managedComputerSetupCommand() {
 
   const existingProject = config.projects.find((project) => project.id === projectId);
   const provider = providerFromFlag(existingProject?.llm?.provider ?? "codex");
+  // `--provider` names the provider this managed computer runs on, so setup
+  // adds it the way the desktop's "Add provider" button would. A headless
+  // machine has no add screen; naming the provider is the same gesture.
+  config.addedProviders = normalizeAddedProviders([
+    ...addedAgentProviders(config),
+    provider,
+  ]);
+  config.agentProviders[provider] = true;
   const providerHealth = await inspectWorkerProviderHealth(
-    config.agentProviders,
+    enabledAgentProviders(config),
     {
       upstreamConfigured: (provider) =>
         openCodeUpstreamConfigured(config, provider),
@@ -225,7 +238,7 @@ export async function managedComputerSetupCommand() {
     );
   }
   const providerCapabilities = await discoverWorkerProviderCapabilities(
-    config.agentProviders,
+    enabledAgentProviders(config),
     { refresh: true },
   );
   const requestId = value("--request-id")?.trim() || crypto.randomUUID();

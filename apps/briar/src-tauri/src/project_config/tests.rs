@@ -5,6 +5,15 @@ use crate::test_support::{
 };
 use std::time::{SystemTime, UNIX_EPOCH};
 
+/// The switches as they are stored, before the added list masks them.
+fn saved_provider_settings(config_path: &Path) -> LocalAgentProviderSettings {
+    read_cli_config(config_path)
+        .expect("config should be readable")
+        .agent_providers
+        .into_option()
+        .expect("provider settings should exist")
+}
+
 #[test]
 fn selects_an_issue_worktree_by_recorded_branch() {
     let output = "\
@@ -430,15 +439,20 @@ fn stores_project_settings_as_canonical_protojson() {
 fn initializes_provider_settings_when_local_config_is_missing() {
     let config_path = test_config_path("missing-provider-settings");
 
-    let defaults = app_provider_settings_from(&config_path)
-        .expect("missing provider settings should use defaults");
+    // A new config enables the built-in providers and nothing else; the rest
+    // stay inactive until the user adds them in settings.
+    let defaults = saved_provider_settings(&config_path);
     assert!(defaults.codex);
     assert!(defaults.claude);
-    assert!(defaults.cursor);
-    assert!(defaults.grok);
     assert!(defaults.agy);
     assert!(defaults.opencode);
-    assert!(defaults.openrouter);
+    assert!(!defaults.cursor);
+    assert!(!defaults.grok);
+    assert!(!defaults.openrouter);
+    assert!(!defaults.vertex);
+    assert!(added_providers_from(&config_path)
+        .expect("missing config should report an added list")
+        .is_empty());
 
     update_app_provider_settings_at(
         &config_path,
@@ -467,6 +481,119 @@ fn initializes_provider_settings_when_local_config_is_missing() {
     assert!(!saved.agy);
     assert!(!saved.opencode);
     assert!(!saved.openrouter);
+
+    fs::remove_dir_all(
+        config_path
+            .parent()
+            .expect("test config should have a parent directory"),
+    )
+    .expect("test config directory should be removed");
+}
+
+/// A config written before the added list existed keeps every provider the
+/// machine was already using, so an upgrade changes nothing the user can see.
+#[test]
+fn backfills_the_added_list_of_a_config_written_before_it_existed() {
+    let config_path = test_config_path("added-providers-backfill");
+    let directory = config_path
+        .parent()
+        .expect("test config should have a parent directory");
+    fs::create_dir_all(directory).expect("test config directory should be created");
+    fs::write(
+        &config_path,
+        serde_json::json!({
+            "apiUrl": "https://briar.example.com",
+            "agentProviders": { "codex": true, "grok": true },
+            "openrouterApiKey": "sk-or-v1-saved-key",
+            "appSettings": { "preventSleepWhileRunning": false, "browserAutomationProvider": "LOCAL_BROWSER_AUTOMATION_PROVIDER_AGENT_BROWSER" },
+        })
+        .to_string(),
+    )
+    .expect("legacy config should be written");
+
+    // Enabled but not built in, plus an upstream whose credential is saved.
+    assert_eq!(
+        added_providers_from(&config_path).expect("added list should be backfilled"),
+        vec![
+            agent::AgentProviderKind::Grok,
+            agent::AgentProviderKind::Openrouter,
+        ]
+    );
+    let effective = effective_app_provider_settings_from(&config_path)
+        .expect("effective settings should be readable");
+    assert!(effective.codex);
+    assert!(effective.grok);
+    assert!(!effective.cursor);
+
+    fs::remove_dir_all(directory).expect("test config directory should be removed");
+}
+
+/// An empty stored list means "added nothing", which is not the same as the
+/// absent list the backfill answers.
+#[test]
+fn keeps_an_empty_added_list_empty() {
+    let config_path = test_config_path("added-providers-empty");
+    let directory = config_path
+        .parent()
+        .expect("test config should have a parent directory");
+    fs::create_dir_all(directory).expect("test config directory should be created");
+    fs::write(
+        &config_path,
+        serde_json::json!({
+            "apiUrl": "https://briar.example.com",
+            "agentProviders": { "codex": true, "grok": true },
+            "addedProviders": {},
+            "appSettings": { "preventSleepWhileRunning": false, "browserAutomationProvider": "LOCAL_BROWSER_AUTOMATION_PROVIDER_AGENT_BROWSER" },
+        })
+        .to_string(),
+    )
+    .expect("config should be written");
+
+    assert!(added_providers_from(&config_path)
+        .expect("added list should be readable")
+        .is_empty());
+    // The switch is on, but the machine never added Grok, so it is inactive.
+    assert!(
+        !effective_app_provider_settings_from(&config_path)
+            .expect("effective settings should be readable")
+            .grok
+    );
+
+    fs::remove_dir_all(directory).expect("test config directory should be removed");
+}
+
+#[test]
+fn adds_and_removes_a_provider_on_this_machine() {
+    let config_path = test_config_path("added-providers-add-remove");
+
+    assert_eq!(
+        add_provider_at(&config_path, agent::AgentProviderKind::Vertex)
+            .expect("vertex should be added"),
+        vec![agent::AgentProviderKind::Vertex]
+    );
+    // Adding also enables, so the provider is usable straight away.
+    assert!(
+        effective_app_provider_settings_from(&config_path)
+            .expect("effective settings should be readable")
+            .vertex
+    );
+
+    // Adding a built-in provider only enables it; it is always listed.
+    add_provider_at(&config_path, agent::AgentProviderKind::Codex)
+        .expect("codex should stay out of the added list");
+    assert_eq!(
+        added_providers_from(&config_path).expect("added list should be readable"),
+        vec![agent::AgentProviderKind::Vertex]
+    );
+
+    assert!(
+        remove_provider_at(&config_path, agent::AgentProviderKind::Vertex)
+            .expect("vertex should be removed")
+            .is_empty()
+    );
+    // Removing also switches the provider off, not only out of the list.
+    assert!(!saved_provider_settings(&config_path).vertex);
+    assert!(remove_provider_at(&config_path, agent::AgentProviderKind::Codex).is_err());
 
     fs::remove_dir_all(
         config_path

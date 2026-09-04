@@ -21,6 +21,8 @@ import {
 import packageJson from "../../../package.json";
 import {
   agentProviderExecutionEnvironment,
+  agentProviders,
+  isAgentProviderBuiltIn,
   openCodeUpstreamOf,
   type AgentProvider,
   type OpenCodeUpstreamCredentialValue,
@@ -153,16 +155,13 @@ async function loadConfig(): Promise<Config> {
       return {
         apiUrl: managedCredential?.apiOrigin ??
           process.env.BRIAR_API_URL ?? defaultApiUrl,
-        agentProviders: {
-          codex: true,
-          claude: true,
-          cursor: true,
-          grok: true,
-          agy: true,
-          opencode: true,
-          openrouter: true,
-          vertex: true,
-        },
+        // A new config enables the built-in providers and adds nothing else.
+        agentProviders: Object.fromEntries(
+          agentProviders.map((provider) =>
+            [provider, isAgentProviderBuiltIn(provider)] as const
+          ),
+        ) as Config["agentProviders"],
+        addedProviders: [],
         appSettings: {
           preventSleepWhileRunning: false,
           browserAutomationProvider: "agent-browser",
