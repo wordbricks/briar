@@ -36,6 +36,55 @@ context publishes its own final status as it finishes. Do not precede signoff
 with a separate `bun run check`; that check is already part of
 `signoff/app-worker`.
 
+### The release bump fast path
+
+A full signoff takes about seven minutes while `main` receives dozens of merges
+a day, so a `chore: prepare Briar vX.Y.Z` pull request almost never finished
+before its base moved. `bun run ci:signoff` therefore recognizes a release
+version bump and publishes all four contexts directly, in seconds, without
+running any CI context.
+
+`scripts/release-bump-fast-path.ts` decides eligibility. Every rule must hold,
+and any unexpected Git output or error makes the commit ineligible:
+
+- `HEAD` has exactly one parent, and that parent is an ancestor of the recorded
+  `origin/main` (`git merge-base --is-ancestor`).
+- `git diff --name-status <parent> HEAD` is non-empty, every entry is a
+  modification (`M`, never `A`, `D`, or any other status), and every path is one
+  of `package.json`, `apps/briar/src-tauri/tauri.conf.json`,
+  `apps/briar/src-tauri/Cargo.toml`, `apps/briar/src-tauri/Cargo.lock`,
+  `config/release.env`, `apps/landing/app/views/changelog.tsx`, or
+  `skills/<name>/VERSION`.
+- For the five release-impact files, `releaseImpactReasons` (the same function
+  the candidate-build gate uses, in `apps/briar/src-cli/release-impact.ts`)
+  returns no reasons — that is, each file differs from its parent only in the
+  release version field.
+- Every changed `skills/<name>/VERSION` holds exactly one `x.y.z` line.
+- The versions in `package.json`, `tauri.conf.json`, and Cargo.toml `[package]`
+  at `HEAD` are all equal, and every changed skill VERSION equals them.
+
+When the changelog changed, the fast path still runs
+`turbo run lint typecheck --filter=@briar/landing` and fails the signoff if that
+fails; the changelog is the one hand-written file a bump may touch. It then
+re-verifies the signoff target (clean worktree, `HEAD` still pushed,
+`origin/main` unmoved) immediately before publishing, prints the commit, version,
+and parent it accepted, and publishes each context as `success` with the
+description `Release bump fast path: version-only change on main parent <sha7>`.
+An ineligible commit prints `Release bump fast path not applicable: <reason>` and
+falls through to the unchanged full flow, worktree CI lock included.
+
+This is sound because the parent is already a commit on `origin/main`, which
+branch protection gated with a full signoff; the diff is mechanically restricted
+to version fields plus the changelog, so it cannot change any code the four
+contexts test; and the published status description records the parent commit, so
+the audit trail says exactly which gated revision the signoff was inherited from.
+
+Set `BRIAR_CI_SIGNOFF_FULL=true` to skip the fast path and run the full suite:
+
+```sh
+BRIAR_CI_SIGNOFF_FULL=true bun run ci:signoff
+```
+
 `signoff/app-worker` builds the frontend twice, not three times: `build:release`
 is the authoritative desktop bundle (`apps/briar/dist`) and `web:build` is the
 Worker asset bundle (`apps/briar/dist-web`, served through `wrangler.jsonc`).

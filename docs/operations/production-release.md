@@ -75,8 +75,15 @@ user-installed Bun.
 
 1. Confirm local CI, the ad-hoc RC artifacts, and cross-version lifecycle QA.
 2. Bump all app, CLI, and skill versions and set `BRIAR_PREVIOUS_VERSION`.
+   `bun run ci:signoff` on the bump pull request takes the release bump fast
+   path (see "The release bump fast path" in `docs/operations/ci-release.md`)
+   and publishes all four contexts in seconds instead of about seven minutes, so
+   if `main` moves first, update the branch and rerun signoff rather than waiting
+   out a full run.
 3. Create and push an annotated, signed `vX.Y.Z` tag on a commit contained in
-   `origin/main`.
+   `origin/main`. The fast path only applies while the bump sits directly on a
+   commit already in `origin/main`; a merge commit or an extra file in the pull
+   request falls back to the full signoff.
 4. Check out that exact tag on the trusted macOS release host.
 5. Ensure the ignored `.env.keys` file is present on the trusted release host.
    Without it the release command exits immediately.
