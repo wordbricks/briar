@@ -24,7 +24,13 @@ import {
   type IssueActionApi,
   type IssueActions,
 } from "./actions";
-import { pendingIssueMutationAtom, recoveryErrorAtom } from "./atoms";
+import {
+  deleteIssueAction,
+  deletingIssueIdAtom,
+  recoverRunAction,
+  runRecoveryFailureAtom,
+  updatingIssueIdAtom,
+} from "./atoms";
 
 const teamId = "team-a";
 const otherTeamId = "team-b";
@@ -224,7 +230,7 @@ describe("guards", () => {
       "로그인이 필요합니다.",
     );
     expect(registry.get(sessionErrorAtom)).toBe("로그인이 필요합니다.");
-    expect(registry.get(pendingIssueMutationAtom)).toBeNull();
+    expect(registry.get(deletingIssueIdAtom)).toBeNull();
   });
 
   it("refuses to transfer an issue into the team it is already in", async () => {
@@ -236,31 +242,42 @@ describe("guards", () => {
 });
 
 describe("pending mutation", () => {
-  it("marks the mutation in flight and clears it when it settles", async () => {
+  it("walks Initial → waiting → Success and names the run while it runs", async () => {
     const { actions, registry } = harness({ runs: [runOf("run-1")] });
-    const seen: unknown[] = [];
-    const unsubscribe = registry.subscribe(pendingIssueMutationAtom, (value) => {
-      seen.push(value);
-    });
+    const results: string[] = [];
+    const unsubscribeResult = registry.subscribe(
+      deleteIssueAction.result,
+      (value) => results.push(`${value._tag}${value.waiting ? "/waiting" : ""}`),
+      { immediate: true },
+    );
+    const targets: (string | null)[] = [];
+    const unsubscribeTarget = registry.subscribe(
+      deletingIssueIdAtom,
+      (value) => targets.push(value),
+      { immediate: true },
+    );
 
     await actions.removeIssue("run-1");
 
-    expect(seen).toEqual([{ kind: "deleting", runId: "run-1" }, null]);
-    unsubscribe();
+    expect(results).toEqual(["Initial", "Initial/waiting", "Success"]);
+    expect(targets).toEqual([null, "run-1", null]);
+    unsubscribeResult();
+    unsubscribeTarget();
   });
 
-  it("leaves a later mutation's marker alone when an earlier one settles", async () => {
+  it("does not wake the group a mutation does not belong to", async () => {
     const { actions, registry } = harness({ runs: [runOf("run-1")] });
-    const removal = actions.removeIssue("run-1");
-    registry.set(pendingIssueMutationAtom, {
-      kind: "updating",
-      runId: "run-2",
-    });
-    await removal;
-    expect(registry.get(pendingIssueMutationAtom)).toEqual({
-      kind: "updating",
-      runId: "run-2",
-    });
+    const seen: (string | null)[] = [];
+    const unsubscribe = registry.subscribe(
+      updatingIssueIdAtom,
+      (value) => seen.push(value),
+      { immediate: true },
+    );
+
+    await actions.removeIssue("run-1");
+
+    expect(seen).toEqual([null]);
+    unsubscribe();
   });
 });
 
@@ -353,7 +370,7 @@ describe("recoverRun", () => {
     await expect(actions.recoverRun("run-1", "cancel")).rejects.toThrow(
       "서버가 거절했습니다.",
     );
-    expect(registry.get(recoveryErrorAtom)).toBe("서버가 거절했습니다.");
+    expect(registry.get(runRecoveryFailureAtom)).toBe("서버가 거절했습니다.");
     expect(registry.get(sessionErrorAtom)).toBeNull();
   });
 

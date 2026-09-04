@@ -8,10 +8,10 @@ import { teamEntityAtom } from "../../state/entities/teams";
 import { teamWorkersAtom } from "../../state/entities/workers";
 import { useIssueActions } from "../../state/issues/actions";
 import {
-  deletingIssueIdAtom,
-  recoveringRunIdAtom,
-  recoveryErrorAtom,
-  updatingIssueIdAtom,
+  runIsDeletingAtom,
+  runIsRecoveringAtom,
+  runIsUpdatingAtom,
+  runRecoveryFailureAtom,
 } from "../../state/issues/atoms";
 import { useRunDetailActions } from "../../state/run-detail/actions";
 import { tokenAtom, userAtom } from "../../state/session/atoms";
@@ -110,10 +110,14 @@ export function RunPageWithRun({ runId, ...props }: RunPageWithRunProps) {
   const teams = useAtomValue(teamsAtom);
   const user = useAtomValue(userAtom);
   const token = useAtomValue(tokenAtom);
-  const updatingIssueId = useAtomValue(updatingIssueIdAtom);
-  const deletingIssueId = useAtomValue(deletingIssueIdAtom);
-  const recoveringRunId = useAtomValue(recoveringRunIdAtom);
-  const recoveryError = useAtomValue(recoveryErrorAtom);
+  /*
+    The three flags are read per run rather than as "which run is being edited",
+    so a mutation of another run does not commit this page.
+  */
+  const isUpdatingIssue = useAtomValue(runIsUpdatingAtom(runId));
+  const isDeletingIssue = useAtomValue(runIsDeletingAtom(runId));
+  const isRecovering = useAtomValue(runIsRecoveringAtom(runId));
+  const recoveryError = useAtomValue(runRecoveryFailureAtom);
   const issueActions = useIssueActions();
   const runDetailActions = useRunDetailActions();
 
@@ -211,9 +215,9 @@ export function RunPageWithRun({ runId, ...props }: RunPageWithRunProps) {
       error={recoveryError}
       executionPolicy={executionPolicy ?? undefined}
       executionWorkers={workers ?? []}
-      isDeletingIssue={deletingIssueId === runId}
-      isRecovering={recoveringRunId === runId}
-      isUpdatingIssue={updatingIssueId === runId}
+      isDeletingIssue={isDeletingIssue}
+      isRecovering={isRecovering}
+      isUpdatingIssue={isUpdatingIssue}
       issueKeyPrefix={team?.issueKeyPrefix}
       mentionMembers={members ?? []}
       organizationId={
