@@ -43,6 +43,7 @@ const changelogCopyByLocale = {
           "채널 메시지 목록과 상태 트레이, 딥링크 처리가 각자 필요한 상태만 구독하도록 정리했습니다.",
           "릴리즈 승격을 서버에서 버전 순서대로만 받아들여, 늦게 끝난 예전 빌드가 최신 업데이트를 덮어쓰지 못하게 합니다.",
           "프로덕션 워커 배포와 원격 D1 마이그레이션을 하나의 임대(lease)로 직렬화해 두 배포가 동시에 진행되지 않게 합니다.",
+          "저장된 스냅샷으로 부팅할 때 복원된 팀 설정 때문에 워크플로 자동 생성이 한 번 더 실행되던 문제를 고칩니다.",
         ],
       },
       {
@@ -1561,6 +1562,7 @@ const changelogCopyByLocale = {
           "Subscribe the channel message list, status tray, and deep-link handling to only the state each one needs.",
           "Accept release promotion on the server only in version order, so a newer update always wins over a slower older build.",
           "Serialize production Worker deploys and remote D1 migrations behind a single lease so two deployments cannot run at the same time.",
+          "Fix a boot from a stored snapshot starting a second workflow auto-generation run because the restored team settings still held the pending placeholder.",
         ],
       },
       {
