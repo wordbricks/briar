@@ -224,10 +224,7 @@ pub(crate) async fn load(
         })
 }
 
-fn load_sync(
-    home: &Path,
-    configured_upstreams: &agent::ConfiguredUpstreams,
-) -> AgentUsageSnapshot {
+fn load_sync(home: &Path, configured_upstreams: &agent::ConfiguredUpstreams) -> AgentUsageSnapshot {
     match provider_cli::provider_usage_snapshot(home, configured_upstreams) {
         Ok(snapshot) => AgentUsageSnapshot {
             codex: provider_usage(

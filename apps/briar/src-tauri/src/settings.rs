@@ -55,7 +55,9 @@ pub(super) async fn load_vertex_ai_credential_status(
             project_id: saved
                 .as_ref()
                 .map(|saved| saved.project_id.trim().to_string()),
-            location: saved.as_ref().map(|saved| saved.location.trim().to_string()),
+            location: saved
+                .as_ref()
+                .map(|saved| saved.location.trim().to_string()),
         })
     })
     .await

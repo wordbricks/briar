@@ -637,9 +637,7 @@ pub(super) fn vertex_ai_settings_from(
     Ok(read_cli_config(config_path)?
         .vertex_ai
         .into_option()
-        .filter(|saved| {
-            !saved.project_id.trim().is_empty() && !saved.location.trim().is_empty()
-        }))
+        .filter(|saved| !saved.project_id.trim().is_empty() && !saved.location.trim().is_empty()))
 }
 
 /// Environment pairs an upstream's saved credential contributes. The match is
