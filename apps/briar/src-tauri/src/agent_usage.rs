@@ -1,34 +1,15 @@
-use crate::agent;
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
-use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, USER_AGENT};
-use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
-#[cfg(target_os = "macos")]
-use sha2::{Digest, Sha256};
+use crate::{agent, provider_cli};
+use briar_contracts::proto::briar::local::v1 as local_proto;
+use serde::Serialize;
 use std::{
-    env,
-    ffi::OsStr,
-    fs,
-    io::{BufRead, BufReader, Write},
     path::{Path, PathBuf},
-    process::{Child, Command, Stdio},
-    sync::mpsc,
-    thread,
-    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+    time::{SystemTime, UNIX_EPOCH},
 };
 
-const CODEX_TIMEOUT: Duration = Duration::from_secs(10);
-const CLAUDE_TIMEOUT: Duration = Duration::from_secs(10);
-const GROK_TIMEOUT: Duration = Duration::from_secs(10);
-const AGY_TIMEOUT: Duration = Duration::from_secs(10);
-const CLAUDE_USAGE_URL: &str = "https://api.anthropic.com/api/oauth/usage";
-const AGY_LOAD_ASSIST_URL: &str = "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist";
-const AGY_QUOTA_URL: &str = "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuota";
-const GROK_DEFAULT_PROXY_BASE: &str = "https://cli-chat-proxy.grok.com/v1";
-const GROK_WEEKLY_MINUTES: u64 = 10_080;
-const GROK_MONTHLY_MINUTES: u64 = 43_200;
-const GROK_TOKEN_SKEW_MILLIS: u64 = 5 * 60 * 1_000;
-const CLAUDE_TOKEN_SKEW_MILLIS: u64 = 5 * 60 * 1_000;
+// Provider quota and sign-in state are read by `briar provider usage|auth`.
+// The credential stores, provider endpoints and provider CLI protocols behind
+// them have a single implementation in the Briar CLI, so the desktop app and
+// the Bun execution workers can never drift apart.
 
 #[derive(Clone, Debug, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
@@ -78,982 +59,130 @@ pub(crate) struct AgentUsageSnapshot {
     updated_at: u64,
 }
 
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct CodexRateLimitWindow {
-    used_percent: Option<f64>,
-    #[serde(alias = "windowDurationMins")]
-    window_minutes: Option<u64>,
-    resets_at: Option<u64>,
-}
-
-#[derive(Deserialize)]
-struct ClaudeCredentials {
-    #[serde(rename = "claudeAiOauth")]
-    oauth: Option<ClaudeOauthCredentials>,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct ClaudeOauthCredentials {
-    access_token: Option<String>,
-    expires_at: Option<u64>,
-    refresh_token: Option<String>,
-    refresh_token_expires_at: Option<u64>,
-    email: Option<String>,
-    #[serde(alias = "emailAddress")]
-    email_address: Option<String>,
-    #[serde(alias = "subscriptionType")]
-    subscription_type: Option<String>,
-}
-
-struct ClaudeAccountCredentials {
-    access_token: String,
-    expires_at: Option<u64>,
-    has_refresh_token: bool,
-    refresh_token_expires_at: Option<u64>,
-    account_label: Option<String>,
-    plan_type: Option<String>,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum ClaudeTokenState {
-    /// The stored access token is still valid.
-    Usable,
-    /// The access token lapsed, but Claude Code refreshes it on its next run.
-    Stale,
-    /// Neither the access token nor the refresh token can be used again.
-    Expired,
-}
-
-struct ClaudeUsageError {
-    message: String,
-    reauthentication_required: bool,
-}
-
-impl ClaudeUsageError {
-    fn transient(message: String) -> Self {
-        Self {
-            message,
-            reauthentication_required: false,
-        }
-    }
-}
-
-#[derive(Deserialize)]
-struct ClaudeUsageResponse {
-    five_hour: Option<ClaudeUsageWindow>,
-    seven_day: Option<ClaudeUsageWindow>,
-}
-
-#[derive(Deserialize)]
-struct ClaudeUsageWindow {
-    utilization: Option<f64>,
-    used_percentage: Option<f64>,
-    resets_at: Option<Value>,
-}
-
-#[derive(Clone, Debug)]
-struct GrokAuthSession {
-    access_token: String,
-    user_id: Option<String>,
-    expires_at: Option<u64>,
-    account_label: Option<String>,
-}
-
-#[derive(Deserialize)]
-struct GrokAuthEntry {
-    key: Option<String>,
-    user_id: Option<String>,
-    expires_at: Option<String>,
-    email: Option<String>,
-    #[serde(alias = "teamId")]
-    team_id: Option<String>,
-}
-
-#[derive(Clone, Debug, Default, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct GrokBillingConfig {
-    credit_usage_percent: Option<f64>,
-    current_period: Option<GrokUsagePeriod>,
-    billing_period_start: Option<String>,
-    billing_period_end: Option<String>,
-    subscription_tier: Option<String>,
-    monthly_limit: Option<GrokMoneyValue>,
-    used: Option<GrokMoneyValue>,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-struct GrokUsagePeriod {
-    #[serde(rename = "type")]
-    kind: Option<String>,
-    start: Option<String>,
-    end: Option<String>,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-struct GrokMoneyValue {
-    val: Option<Value>,
+/// Provider sign-in state for the onboarding prerequisite list.
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct ProviderAuthentication {
+    pub(crate) codex: bool,
+    pub(crate) claude: bool,
+    pub(crate) cursor: bool,
+    pub(crate) grok: bool,
+    pub(crate) agy: bool,
 }
 
 pub(crate) async fn load(home: PathBuf, openrouter_configured: bool) -> AgentUsageSnapshot {
-    let codex_home = home.clone();
-    let claude_home = home.clone();
-    let grok_home = home.clone();
-    let agy_home = home.clone();
-    let opencode_home = home.clone();
-    let cursor_home = home;
-    let codex = tauri::async_runtime::spawn_blocking(move || load_codex(&codex_home));
-    let claude = tauri::async_runtime::spawn(async move { load_claude(&claude_home).await });
-    let grok = tauri::async_runtime::spawn(async move { load_grok(&grok_home).await });
-    let agy = tauri::async_runtime::spawn(async move { load_agy(&agy_home).await });
-    let opencode = tauri::async_runtime::spawn_blocking(move || load_opencode(&opencode_home));
-    let cursor = tauri::async_runtime::spawn_blocking(move || load_cursor(&cursor_home));
-    let codex = codex.await.unwrap_or_else(|error| {
-        failed_provider(
-            agent::AgentProviderKind::Codex,
-            format!("Codex usage task failed: {error}"),
-        )
-    });
-    let claude = claude.await.unwrap_or_else(|error| {
-        failed_provider(
-            agent::AgentProviderKind::Claude,
-            format!("Claude usage task failed: {error}"),
-        )
-    });
-    let grok = grok.await.unwrap_or_else(|error| {
-        failed_provider(
-            agent::AgentProviderKind::Grok,
-            format!("Grok usage task failed: {error}"),
-        )
-    });
-    let agy = agy.await.unwrap_or_else(|error| {
-        failed_provider(
-            agent::AgentProviderKind::Agy,
-            format!("Antigravity usage task failed: {error}"),
-        )
-    });
-    let opencode = opencode.await.unwrap_or_else(|error| {
-        failed_provider(
-            agent::AgentProviderKind::Opencode,
-            format!("OpenCode usage task failed: {error}"),
-        )
-    });
-    let cursor = cursor.await.unwrap_or_else(|error| {
-        failed_provider(
-            agent::AgentProviderKind::Cursor,
-            format!("Cursor usage task failed: {error}"),
-        )
-    });
-    let openrouter = load_openrouter(openrouter_configured);
-    AgentUsageSnapshot {
-        codex,
-        claude,
-        grok,
-        agy,
-        opencode,
-        openrouter,
-        cursor,
-        updated_at: now_millis(),
-    }
-}
-
-fn load_openrouter(configured: bool) -> ProviderUsage {
-    if configured {
-        return connected_provider_without_windows(agent::AgentProviderKind::Openrouter, None);
-    }
-    provider_without_usage(
-        agent::AgentProviderKind::Openrouter,
-        ProviderUsageStatus::Unavailable,
-        "OpenRouter API 키가 필요합니다.".to_string(),
-    )
-}
-
-pub(crate) fn codex_locally_authenticated(home: &Path) -> bool {
-    read_codex_account_identity(home).0
-}
-
-fn parse_claude_auth_status(stdout: &[u8]) -> bool {
-    serde_json::from_slice::<Value>(stdout)
-        .ok()
-        .and_then(|status| status.get("loggedIn").and_then(Value::as_bool))
-        == Some(true)
-}
-
-pub(crate) fn claude_locally_authenticated(
-    home: &Path,
-    binary: &Path,
-    execution_path: &OsStr,
-) -> bool {
-    Command::new(binary)
-        .args(["auth", "status"])
-        .env("HOME", home)
-        .env("PATH", execution_path)
-        .env_remove("AGY_ADC_AUTH")
-        .env_remove("GEMINI_API_KEY")
-        .env_remove("GOOGLE_API_KEY")
-        .env_remove("GOOGLE_APPLICATION_CREDENTIALS")
-        .output()
-        .ok()
-        .is_some_and(|output| parse_claude_auth_status(&output.stdout))
-}
-
-pub(crate) fn grok_locally_authenticated(home: &Path) -> bool {
-    read_grok_auth_session(home).is_ok_and(|session| {
-        session
-            .expires_at
-            .is_none_or(|expires_at| expires_at > now_millis() + GROK_TOKEN_SKEW_MILLIS)
-    })
-}
-
-pub(crate) fn agy_locally_authenticated(
-    home: &Path,
-    binary: &Path,
-    execution_path: &OsStr,
-) -> bool {
-    Command::new(binary)
-        .args(["--output-format", "json", "models"])
-        .env("HOME", home)
-        .env("PATH", execution_path)
-        .output()
-        .ok()
-        .is_some_and(|output| output.status.success())
-}
-
-pub(crate) fn cursor_locally_authenticated(home: &Path, binary: &Path) -> bool {
-    env::var("CURSOR_API_KEY").is_ok_and(|value| !value.trim().is_empty())
-        || read_cursor_account_identity(home, binary).0
-}
-
-fn load_codex(home: &Path) -> ProviderUsage {
-    let (authenticated, account_label) = read_codex_account_identity(home);
-    match fetch_codex(home) {
-        Ok(mut usage) => {
-            usage.account_label = account_label;
-            usage.authenticated = true;
-            usage
-        }
-        Err(error) => {
-            let status = if error.contains("CLI") || error.contains("로그인") {
-                ProviderUsageStatus::Unavailable
-            } else {
-                ProviderUsageStatus::Error
-            };
-            provider_without_usage_with_account(
-                agent::AgentProviderKind::Codex,
-                status,
-                error,
-                account_label,
-                authenticated,
-            )
-        }
-    }
-}
-
-fn read_codex_account_identity(home: &Path) -> (bool, Option<String>) {
-    let codex_home = env::var_os("CODEX_HOME")
-        .filter(|value| !value.is_empty())
-        .map(PathBuf::from)
-        .unwrap_or_else(|| home.join(".codex"));
-    let Ok(contents) = fs::read_to_string(codex_home.join("auth.json")) else {
-        return (false, None);
-    };
-    let Ok(auth) = serde_json::from_str::<Value>(&contents) else {
-        return (false, None);
-    };
-    let has_api_key = auth
-        .get("OPENAI_API_KEY")
-        .and_then(Value::as_str)
-        .is_some_and(|value| !value.trim().is_empty());
-    let tokens = auth.get("tokens");
-    let id_token = tokens
-        .and_then(|value| value.get("id_token").or_else(|| value.get("idToken")))
-        .and_then(Value::as_str);
-    let has_tokens = tokens.is_some_and(Value::is_object);
-    let account_label = id_token.and_then(jwt_email);
-    (has_api_key || has_tokens, account_label)
-}
-
-fn jwt_email(token: &str) -> Option<String> {
-    let payload = token.split('.').nth(1)?;
-    let decoded = URL_SAFE_NO_PAD.decode(payload).ok()?;
-    let value = serde_json::from_slice::<Value>(&decoded).ok()?;
-    value
-        .get("email")
-        .and_then(Value::as_str)
-        .or_else(|| {
-            value
-                .pointer("/https:~1~1api.openai.com~1profile/email")
-                .and_then(Value::as_str)
+    tauri::async_runtime::spawn_blocking(move || load_sync(&home, openrouter_configured))
+        .await
+        .unwrap_or_else(|error| {
+            unavailable_snapshot(format!("Usage 조회 작업에 실패했습니다: {error}"))
         })
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(str::to_string)
 }
 
-fn fetch_codex(home: &Path) -> Result<ProviderUsage, String> {
-    let execution_path = crate::cli_execution_path(home)?;
-    let binary = crate::agent::codex_binary(home, &execution_path)?;
-    let mut child = Command::new(binary)
-        .args(["app-server", "--listen", "stdio://"])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .map_err(|error| format!("Codex CLI를 시작하지 못했습니다: {error}"))?;
-    let result = fetch_codex_from_child(&mut child);
-    let _ = child.kill();
-    let _ = child.wait();
-    result
-}
-
-fn fetch_codex_from_child(child: &mut Child) -> Result<ProviderUsage, String> {
-    let mut stdin = child
-        .stdin
-        .take()
-        .ok_or_else(|| "Codex App Server 입력을 열지 못했습니다.".to_string())?;
-    let stdout = child
-        .stdout
-        .take()
-        .ok_or_else(|| "Codex App Server 출력을 열지 못했습니다.".to_string())?;
-    let (sender, receiver) = mpsc::channel();
-    thread::spawn(move || {
-        for line in BufReader::new(stdout).lines() {
-            if sender.send(line).is_err() {
-                break;
-            }
-        }
-    });
-
-    write_rpc(
-        &mut stdin,
-        &json!({
-            "method": "initialize",
-            "id": 1,
-            "params": {
-                "clientInfo": {
-                    "name": "briar",
-                    "title": "Briar",
-                    "version": env!("CARGO_PKG_VERSION")
-                }
-            }
-        }),
-    )?;
-
-    let deadline = Instant::now() + CODEX_TIMEOUT;
-    loop {
-        let remaining = deadline.saturating_duration_since(Instant::now());
-        if remaining.is_zero() {
-            break Err("Codex usage 조회 시간이 초과되었습니다.".to_string());
-        }
-        let line = match receiver.recv_timeout(remaining) {
-            Ok(Ok(line)) => line,
-            Ok(Err(error)) => {
-                break Err(format!("Codex usage 응답을 읽지 못했습니다: {error}"));
-            }
-            Err(mpsc::RecvTimeoutError::Timeout) => {
-                break Err("Codex usage 조회 시간이 초과되었습니다.".to_string());
-            }
-            Err(mpsc::RecvTimeoutError::Disconnected) => {
-                break Err("Codex App Server가 usage를 반환하지 않았습니다.".to_string());
-            }
-        };
-        let Ok(message) = serde_json::from_str::<Value>(&line) else {
-            continue;
-        };
-        match message.get("id").and_then(Value::as_u64) {
-            Some(1) => {
-                write_rpc(
-                    &mut stdin,
-                    &json!({ "method": "initialized", "params": {} }),
-                )?;
-                write_rpc(
-                    &mut stdin,
-                    &json!({
-                        "method": "account/rateLimits/read",
-                        "id": 2,
-                        "params": {}
-                    }),
-                )?;
-            }
-            Some(2) => break parse_codex_response(&message),
-            _ => {}
-        }
-    }
-}
-
-fn write_rpc(stdin: &mut impl Write, message: &Value) -> Result<(), String> {
-    serde_json::to_writer(&mut *stdin, message)
-        .map_err(|error| format!("Codex usage 요청을 만들지 못했습니다: {error}"))?;
-    stdin
-        .write_all(b"\n")
-        .and_then(|_| stdin.flush())
-        .map_err(|error| format!("Codex usage 요청을 보내지 못했습니다: {error}"))
-}
-
-fn parse_codex_response(message: &Value) -> Result<ProviderUsage, String> {
-    if let Some(error) = message.pointer("/error/message").and_then(Value::as_str) {
-        return Err(error.to_string());
-    }
-    let rate_limits = message.pointer("/result/rateLimits").ok_or_else(|| {
-        "Codex 계정에 usage 정보가 없습니다. 로그인 상태를 확인하세요.".to_string()
-    })?;
-    let primary = parse_codex_window(rate_limits.get("primary"), 300);
-    let secondary = parse_codex_window(rate_limits.get("secondary"), 10_080);
-    let (session, weekly) = classify_codex_windows(primary, secondary);
-    if session.is_none() && weekly.is_none() {
-        return Err("Codex 계정에 usage 정보가 없습니다. 로그인 상태를 확인하세요.".to_string());
-    }
-    Ok(ProviderUsage {
-        provider: agent::AgentProviderKind::Codex,
-        status: ProviderUsageStatus::Ok,
-        session,
-        weekly,
-        monthly: None,
-        plan_type: rate_limits
-            .get("planType")
-            .and_then(Value::as_str)
-            .map(str::to_string),
-        account_label: None,
-        authenticated: true,
-        reauthentication_required: false,
-        updated_at: now_millis(),
-        error: None,
-    })
-}
-
-fn classify_codex_windows(
-    primary: Option<AgentUsageWindow>,
-    secondary: Option<AgentUsageWindow>,
-) -> (Option<AgentUsageWindow>, Option<AgentUsageWindow>) {
-    let mut session = None;
-    let mut weekly = None;
-    for window in [primary, secondary].into_iter().flatten() {
-        if window.window_minutes >= 24 * 60 {
-            weekly.get_or_insert(window);
-        } else {
-            session.get_or_insert(window);
-        }
-    }
-    (session, weekly)
-}
-
-fn parse_codex_window(value: Option<&Value>, fallback_minutes: u64) -> Option<AgentUsageWindow> {
-    let raw = serde_json::from_value::<CodexRateLimitWindow>(value?.clone()).ok()?;
-    Some(AgentUsageWindow {
-        used_percent: clamp_percent(raw.used_percent?),
-        window_minutes: raw.window_minutes.unwrap_or(fallback_minutes),
-        resets_at: raw.resets_at.map(epoch_to_millis),
-    })
-}
-
-async fn load_claude(home: &Path) -> ProviderUsage {
-    let credentials = match read_claude_credentials(home) {
-        Ok(credentials) => credentials,
-        Err(error) => {
-            return provider_without_usage(
+fn load_sync(home: &Path, openrouter_configured: bool) -> AgentUsageSnapshot {
+    match provider_cli::provider_usage_snapshot(home, openrouter_configured) {
+        Ok(snapshot) => AgentUsageSnapshot {
+            codex: provider_usage(
+                agent::AgentProviderKind::Codex,
+                snapshot.codex.into_option(),
+            ),
+            claude: provider_usage(
                 agent::AgentProviderKind::Claude,
-                ProviderUsageStatus::Unavailable,
-                error,
-            )
-        }
-    };
-    // Claude Code refreshes its access token lazily, so a lapsed token in the
-    // credential store says nothing about whether the login itself is still
-    // good. Only report an expired login once the refresh token is gone too.
-    match claude_token_state(&credentials, now_millis()) {
-        ClaudeTokenState::Usable => {}
-        ClaudeTokenState::Stale => {
-            return provider_without_usage_with_account(
-                agent::AgentProviderKind::Claude,
-                ProviderUsageStatus::Unavailable,
-                "Claude 액세스 토큰이 만료되어 usage를 불러오지 못했습니다. Claude Code를 실행하면 자동으로 갱신됩니다."
-                    .to_string(),
-                credentials.account_label,
-                true,
-            );
-        }
-        ClaudeTokenState::Expired => {
-            return requires_reauthentication(provider_without_usage_with_account(
-                agent::AgentProviderKind::Claude,
-                ProviderUsageStatus::Error,
-                "Claude 로그인이 만료되었습니다. `claude` 를 실행해 다시 로그인하세요.".to_string(),
-                credentials.account_label,
-                false,
-            ));
-        }
-    }
-    match fetch_claude_usage(&credentials.access_token).await {
-        Ok(mut usage) => {
-            usage.account_label = credentials.account_label;
-            usage.plan_type = credentials.plan_type;
-            usage.authenticated = true;
-            usage
-        }
-        Err(error) => {
-            let usage = provider_without_usage_with_account(
-                agent::AgentProviderKind::Claude,
-                ProviderUsageStatus::Error,
-                error.message,
-                credentials.account_label,
-                !error.reauthentication_required,
-            );
-            if error.reauthentication_required {
-                requires_reauthentication(usage)
-            } else {
-                usage
-            }
-        }
-    }
-}
-
-fn claude_token_state(credentials: &ClaudeAccountCredentials, now: u64) -> ClaudeTokenState {
-    let expired = credentials
-        .expires_at
-        .is_some_and(|expires_at| expires_at <= now + CLAUDE_TOKEN_SKEW_MILLIS);
-    if !expired {
-        return ClaudeTokenState::Usable;
-    }
-    let refreshable = credentials.has_refresh_token
-        && credentials
-            .refresh_token_expires_at
-            .is_none_or(|expires_at| expires_at > now);
-    if refreshable {
-        ClaudeTokenState::Stale
-    } else {
-        ClaudeTokenState::Expired
-    }
-}
-
-fn read_claude_credentials(home: &Path) -> Result<ClaudeAccountCredentials, String> {
-    #[cfg(target_os = "macos")]
-    if let Some(credentials) = read_claude_keychain(home) {
-        return parse_claude_account_credentials(&credentials);
-    }
-    let config_directory = env::var_os("CLAUDE_CONFIG_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| home.join(".claude"));
-    let path = config_directory.join(".credentials.json");
-    let credentials =
-        fs::read_to_string(path).map_err(|_| "Claude 로그인이 필요합니다.".to_string())?;
-    parse_claude_account_credentials(&credentials)
-}
-
-#[cfg(target_os = "macos")]
-fn read_claude_keychain(home: &Path) -> Option<String> {
-    let account = env::var("USER")
-        .or_else(|_| env::var("USERNAME"))
-        .unwrap_or_else(|_| "user".to_string());
-    let config_directory = env::var_os("CLAUDE_CONFIG_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| home.join(".claude"));
-    let digest = Sha256::digest(config_directory.to_string_lossy().as_bytes());
-    let suffix = digest[..4]
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect::<String>();
-    for service in [
-        format!("Claude Code-credentials-{suffix}"),
-        "Claude Code-credentials".to_string(),
-    ] {
-        let output = Command::new("/usr/bin/security")
-            .args([
-                "find-generic-password",
-                "-s",
-                &service,
-                "-a",
-                &account,
-                "-w",
-            ])
-            .output()
-            .ok()?;
-        if output.status.success() {
-            let value = String::from_utf8(output.stdout).ok()?.trim().to_string();
-            if !value.is_empty() {
-                return Some(value);
-            }
-        }
-    }
-    None
-}
-
-#[cfg(test)]
-fn extract_claude_access_token(credentials: &str) -> Result<String, String> {
-    parse_claude_account_credentials(credentials).map(|value| value.access_token)
-}
-
-fn parse_claude_account_credentials(credentials: &str) -> Result<ClaudeAccountCredentials, String> {
-    let oauth = serde_json::from_str::<ClaudeCredentials>(credentials)
-        .ok()
-        .and_then(|value| value.oauth)
-        .ok_or_else(|| "Claude 로그인이 필요합니다.".to_string())?;
-    let access_token = oauth
-        .access_token
-        .filter(|value| !value.trim().is_empty())
-        .ok_or_else(|| "Claude 로그인이 필요합니다.".to_string())?;
-    Ok(ClaudeAccountCredentials {
-        access_token,
-        expires_at: oauth.expires_at,
-        has_refresh_token: oauth
-            .refresh_token
-            .as_ref()
-            .is_some_and(|value| !value.trim().is_empty()),
-        refresh_token_expires_at: oauth.refresh_token_expires_at,
-        account_label: oauth
-            .email_address
-            .or(oauth.email)
-            .map(|value| value.trim().to_string())
-            .filter(|value| !value.is_empty()),
-        plan_type: oauth
-            .subscription_type
-            .map(|value| value.trim().to_string())
-            .filter(|value| !value.is_empty()),
-    })
-}
-
-async fn fetch_claude_usage(access_token: &str) -> Result<ProviderUsage, ClaudeUsageError> {
-    let _ = rustls::crypto::ring::default_provider().install_default();
-    let mut headers = HeaderMap::new();
-    let authorization = HeaderValue::from_str(&format!("Bearer {access_token}")).map_err(|_| {
-        ClaudeUsageError::transient("Claude 인증 정보를 읽지 못했습니다.".to_string())
-    })?;
-    headers.insert(AUTHORIZATION, authorization);
-    headers.insert(
-        "anthropic-beta",
-        HeaderValue::from_static("oauth-2025-04-20"),
-    );
-    headers.insert(USER_AGENT, HeaderValue::from_static("claude-code/2.1.0"));
-    let response = reqwest::Client::builder()
-        .timeout(CLAUDE_TIMEOUT)
-        .default_headers(headers)
-        .build()
-        .map_err(|error| {
-            ClaudeUsageError::transient(format!("Claude usage 연결을 만들지 못했습니다: {error}"))
-        })?
-        .get(CLAUDE_USAGE_URL)
-        .send()
-        .await
-        .map_err(|error| {
-            ClaudeUsageError::transient(format!("Claude usage를 불러오지 못했습니다: {error}"))
-        })?;
-    if !response.status().is_success() {
-        return Err(claude_usage_error_for_status(response.status().as_u16()));
-    }
-    let body = response
-        .json::<ClaudeUsageResponse>()
-        .await
-        .map_err(|error| {
-            ClaudeUsageError::transient(format!("Claude usage 응답을 읽지 못했습니다: {error}"))
-        })?;
-    let session = body
-        .five_hour
-        .as_ref()
-        .and_then(|window| map_claude_window(window, 300));
-    let weekly = body
-        .seven_day
-        .as_ref()
-        .and_then(|window| map_claude_window(window, 10_080));
-    if session.is_none() && weekly.is_none() {
-        return Err(ClaudeUsageError::transient(
-            "Claude 계정에 usage 정보가 없습니다.".to_string(),
-        ));
-    }
-    Ok(ProviderUsage {
-        provider: agent::AgentProviderKind::Claude,
-        status: ProviderUsageStatus::Ok,
-        session,
-        weekly,
-        monthly: None,
-        plan_type: None,
-        account_label: None,
-        authenticated: true,
-        reauthentication_required: false,
-        updated_at: now_millis(),
-        error: None,
-    })
-}
-
-fn claude_usage_error_for_status(status: u16) -> ClaudeUsageError {
-    match status {
-        // The token was not expired locally, so the API rejecting it means the
-        // credentials were revoked rather than simply gone stale.
-        401 | 403 => ClaudeUsageError {
-            message: "Claude 인증이 거부되었습니다. `claude` 를 실행해 다시 로그인하세요."
-                .to_string(),
-            reauthentication_required: true,
+                snapshot.claude.into_option(),
+            ),
+            grok: provider_usage(agent::AgentProviderKind::Grok, snapshot.grok.into_option()),
+            agy: provider_usage(agent::AgentProviderKind::Agy, snapshot.agy.into_option()),
+            opencode: provider_usage(
+                agent::AgentProviderKind::Opencode,
+                snapshot.opencode.into_option(),
+            ),
+            openrouter: provider_usage(
+                agent::AgentProviderKind::Openrouter,
+                snapshot.openrouter.into_option(),
+            ),
+            cursor: provider_usage(
+                agent::AgentProviderKind::Cursor,
+                snapshot.cursor.into_option(),
+            ),
+            updated_at: snapshot
+                .updated_at
+                .as_option()
+                .map(|value| timestamp_millis(value.seconds, value.nanos))
+                .unwrap_or_else(now_millis),
         },
-        429 => ClaudeUsageError::transient(
-            "Claude usage 조회 한도에 도달했습니다. 잠시 후 다시 시도하세요.".to_string(),
-        ),
-        status => ClaudeUsageError::transient(format!(
-            "Claude usage를 불러오지 못했습니다. HTTP {status}"
-        )),
+        // A CLI that cannot run is reported the way a missing provider always
+        // has been: connected accounts are never invented from a failure.
+        Err(error) => unavailable_snapshot(error),
     }
 }
 
-fn map_claude_window(raw: &ClaudeUsageWindow, minutes: u64) -> Option<AgentUsageWindow> {
-    let used_percent = raw.utilization.or(raw.used_percentage)?;
-    Some(AgentUsageWindow {
-        used_percent: clamp_percent(used_percent),
-        window_minutes: minutes,
-        resets_at: raw.resets_at.as_ref().and_then(parse_reset_timestamp),
-    })
-}
-
-async fn load_grok(home: &Path) -> ProviderUsage {
-    let session = match read_grok_auth_session(home) {
-        Ok(session) => session,
-        Err(error) => {
-            let status = if error.contains("로그인") {
-                ProviderUsageStatus::Unavailable
-            } else {
-                ProviderUsageStatus::Error
-            };
-            return provider_without_usage(agent::AgentProviderKind::Grok, status, error);
-        }
+/// Which providers are signed in on this machine, for onboarding prerequisites.
+pub(crate) fn local_authentication(home: &Path) -> ProviderAuthentication {
+    let snapshot = provider_cli::provider_auth_snapshot(home).ok();
+    let read = |select: fn(&local_proto::LocalProviderAuthSnapshot) -> Option<bool>| {
+        snapshot.as_ref().and_then(select).unwrap_or(false)
     };
-    if session
-        .expires_at
-        .is_some_and(|expires_at| expires_at <= now_millis() + GROK_TOKEN_SKEW_MILLIS)
-    {
-        return provider_without_usage_with_account(
-            agent::AgentProviderKind::Grok,
-            ProviderUsageStatus::Error,
-            "Grok 로그인이 만료되었습니다. Grok CLI를 실행해 인증을 갱신하세요.".to_string(),
-            session.account_label,
-            true,
+    ProviderAuthentication {
+        codex: read(|snapshot| snapshot.codex),
+        claude: read(|snapshot| snapshot.claude),
+        cursor: read(|snapshot| snapshot.cursor),
+        grok: read(|snapshot| snapshot.grok),
+        agy: read(|snapshot| snapshot.agy),
+    }
+}
+
+fn provider_usage(
+    provider: agent::AgentProviderKind,
+    value: Option<local_proto::LocalProviderUsage>,
+) -> ProviderUsage {
+    let Some(value) = value else {
+        return provider_without_usage(
+            provider,
+            ProviderUsageStatus::Unavailable,
+            "Briar CLI가 이 provider의 usage를 반환하지 않았습니다.".to_string(),
         );
-    }
-    match fetch_grok_usage(&session).await {
-        Ok(mut usage) => {
-            usage.account_label = session.account_label;
-            usage.authenticated = true;
-            usage
-        }
-        Err(error) => provider_without_usage_with_account(
-            agent::AgentProviderKind::Grok,
-            ProviderUsageStatus::Error,
-            error,
-            session.account_label,
-            true,
-        ),
-    }
-}
-
-fn read_grok_auth_session(home: &Path) -> Result<GrokAuthSession, String> {
-    let grok_home = env::var_os("GROK_HOME")
-        .filter(|value| !value.is_empty())
-        .map(PathBuf::from)
-        .unwrap_or_else(|| home.join(".grok"));
-    let contents = fs::read_to_string(grok_home.join("auth.json")).map_err(|error| {
-        if error.kind() == std::io::ErrorKind::NotFound {
-            "Grok 로그인이 필요합니다. `grok login`을 실행하세요.".to_string()
-        } else {
-            "Grok 인증 파일을 읽지 못했습니다.".to_string()
-        }
-    })?;
-    parse_grok_auth_session(&contents)
-}
-
-fn parse_grok_auth_session(contents: &str) -> Result<GrokAuthSession, String> {
-    let entries = serde_json::from_str::<serde_json::Map<String, Value>>(contents)
-        .map_err(|_| "Grok 인증 파일이 올바르지 않습니다.".to_string())?;
-    let mut preferred_seen = false;
-    let mut expired_preferred = None;
-    let mut fallback = None;
-    for (issuer, value) in entries {
-        let preferred = issuer == "https://auth.x.ai" || issuer.starts_with("https://auth.x.ai::");
-        preferred_seen |= preferred;
-        let Ok(entry) = serde_json::from_value::<GrokAuthEntry>(value) else {
-            continue;
-        };
-        let Some(access_token) = entry.key.filter(|value| !value.is_empty()) else {
-            continue;
-        };
-        let session = GrokAuthSession {
-            account_label: entry
-                .email
-                .or_else(|| jwt_email(&access_token))
-                .or(entry.team_id)
-                .map(|value| value.trim().to_string())
-                .filter(|value| !value.is_empty()),
-            access_token,
-            user_id: entry.user_id.filter(|value| !value.is_empty()),
-            expires_at: entry.expires_at.as_deref().and_then(parse_iso_millis),
-        };
-        if preferred {
-            if session
-                .expires_at
-                .is_none_or(|expires_at| expires_at > now_millis() + GROK_TOKEN_SKEW_MILLIS)
-            {
-                return Ok(session);
+    };
+    ProviderUsage {
+        provider,
+        status: match value.status.as_known() {
+            Some(local_proto::LocalProviderUsageStatus::LOCAL_PROVIDER_USAGE_STATUS_OK) => {
+                ProviderUsageStatus::Ok
             }
-            expired_preferred.get_or_insert(session);
-        } else {
-            fallback.get_or_insert(session);
-        }
+            Some(
+                local_proto::LocalProviderUsageStatus::LOCAL_PROVIDER_USAGE_STATUS_UNAVAILABLE,
+            ) => ProviderUsageStatus::Unavailable,
+            _ => ProviderUsageStatus::Error,
+        },
+        session: usage_window(value.session.into_option()),
+        weekly: usage_window(value.weekly.into_option()),
+        monthly: usage_window(value.monthly.into_option()),
+        plan_type: value.plan_type,
+        account_label: value.account_label,
+        authenticated: value.authenticated,
+        reauthentication_required: value.reauthentication_required,
+        updated_at: value
+            .updated_at
+            .as_option()
+            .map(|value| timestamp_millis(value.seconds, value.nanos))
+            .unwrap_or_else(now_millis),
+        error: value.error,
     }
-    expired_preferred
-        .or_else(|| (!preferred_seen).then_some(fallback).flatten())
-        .ok_or_else(|| "Grok 로그인이 필요합니다. `grok login`을 실행하세요.".to_string())
 }
 
-async fn fetch_grok_usage(session: &GrokAuthSession) -> Result<ProviderUsage, String> {
-    let _ = rustls::crypto::ring::default_provider().install_default();
-    let proxy_base = env::var("GROK_CLI_CHAT_PROXY_BASE_URL")
-        .ok()
-        .filter(|value| !value.trim().is_empty())
-        .map(|value| value.trim().trim_end_matches('/').to_string())
-        .unwrap_or_else(|| GROK_DEFAULT_PROXY_BASE.to_string());
-    let client = reqwest::Client::builder()
-        .timeout(GROK_TIMEOUT)
-        .build()
-        .map_err(|error| format!("Grok usage 연결을 만들지 못했습니다: {error}"))?;
-    let credits = fetch_grok_billing(
-        &client,
-        &format!("{proxy_base}/billing?format=credits"),
-        session,
-    )
-    .await?;
-    let weekly = map_grok_weekly(&credits);
-    let monthly = if weekly.is_none() {
-        let default =
-            fetch_grok_billing(&client, &format!("{proxy_base}/billing"), session).await?;
-        map_grok_monthly(&default)
-    } else {
-        None
-    };
-    if weekly.is_none() && monthly.is_none() {
-        return Err("Grok 계정에 usage 정보가 없습니다.".to_string());
-    }
-    Ok(ProviderUsage {
-        provider: agent::AgentProviderKind::Grok,
-        status: ProviderUsageStatus::Ok,
-        session: None,
-        weekly,
-        monthly,
-        plan_type: credits
-            .subscription_tier
-            .filter(|value| !value.trim().is_empty()),
-        account_label: None,
-        authenticated: true,
-        reauthentication_required: false,
-        updated_at: now_millis(),
-        error: None,
-    })
-}
-
-async fn fetch_grok_billing(
-    client: &reqwest::Client,
-    url: &str,
-    session: &GrokAuthSession,
-) -> Result<GrokBillingConfig, String> {
-    let mut request = client
-        .get(url)
-        .header(AUTHORIZATION, format!("Bearer {}", session.access_token))
-        .header("X-XAI-Token-Auth", "xai-grok-cli")
-        .header("Accept", "application/json");
-    if let Some(user_id) = session.user_id.as_deref() {
-        request = request.header("x-userid", user_id);
-    }
-    let response = request
-        .send()
-        .await
-        .map_err(|error| format!("Grok usage를 불러오지 못했습니다: {error}"))?;
-    if !response.status().is_success() {
-        return Err(match response.status().as_u16() {
-            401 | 403 => "Grok 로그인이 만료되었습니다.".to_string(),
-            status => format!("Grok usage를 불러오지 못했습니다. HTTP {status}"),
-        });
-    }
-    let value = response
-        .json::<Value>()
-        .await
-        .map_err(|error| format!("Grok usage 응답을 읽지 못했습니다: {error}"))?;
-    let config = value.get("config").unwrap_or(&value);
-    serde_json::from_value(config.clone())
-        .map_err(|error| format!("Grok usage 응답을 해석하지 못했습니다: {error}"))
-}
-
-fn map_grok_weekly(config: &GrokBillingConfig) -> Option<AgentUsageWindow> {
-    let confirmed_zero = config.credit_usage_percent.is_none()
-        && config.current_period.as_ref()?.kind.as_deref() == Some("USAGE_PERIOD_TYPE_WEEKLY")
-        && timestamps_match(
-            config.current_period.as_ref()?.start.as_deref(),
-            config.billing_period_start.as_deref(),
-        )
-        && timestamps_match(
-            config.current_period.as_ref()?.end.as_deref(),
-            config.billing_period_end.as_deref(),
-        );
-    let used_percent = config
-        .credit_usage_percent
-        .or_else(|| confirmed_zero.then_some(0.0))?;
+fn usage_window(value: Option<local_proto::LocalProviderUsageWindow>) -> Option<AgentUsageWindow> {
+    let value = value?;
     Some(AgentUsageWindow {
-        used_percent: clamp_percent(used_percent),
-        window_minutes: GROK_WEEKLY_MINUTES,
-        resets_at: config
-            .current_period
-            .as_ref()
-            .and_then(|period| period.end.as_deref())
-            .or(config.billing_period_end.as_deref())
-            .and_then(parse_iso_millis),
+        used_percent: clamp_percent(value.used_percent),
+        window_minutes: value.window_minutes,
+        resets_at: value
+            .resets_at
+            .as_option()
+            .map(|value| timestamp_millis(value.seconds, value.nanos)),
     })
 }
 
-fn map_grok_monthly(config: &GrokBillingConfig) -> Option<AgentUsageWindow> {
-    let limit = parse_grok_money(config.monthly_limit.as_ref())?;
-    let used = parse_grok_money(config.used.as_ref())?;
-    if limit <= 0.0 {
-        return None;
-    }
-    Some(AgentUsageWindow {
-        used_percent: clamp_percent(used / limit * 100.0),
-        window_minutes: GROK_MONTHLY_MINUTES,
-        resets_at: config
-            .current_period
-            .as_ref()
-            .and_then(|period| period.end.as_deref())
-            .or(config.billing_period_end.as_deref())
-            .and_then(parse_iso_millis),
-    })
-}
-
-fn parse_grok_money(value: Option<&GrokMoneyValue>) -> Option<f64> {
-    let value = value?.val.as_ref()?;
-    value
-        .as_f64()
-        .or_else(|| value.as_str()?.parse::<f64>().ok())
-        .filter(|value| value.is_finite())
-}
-
-fn parse_iso_millis(value: &str) -> Option<u64> {
-    chrono::DateTime::parse_from_rfc3339(value)
-        .ok()?
-        .timestamp_millis()
-        .try_into()
-        .ok()
-}
-
-fn timestamps_match(left: Option<&str>, right: Option<&str>) -> bool {
-    left.and_then(parse_iso_millis)
-        .zip(right.and_then(parse_iso_millis))
-        .is_some_and(|(left, right)| left == right)
-}
-
-fn parse_reset_timestamp(value: &Value) -> Option<u64> {
-    let raw = value
-        .as_u64()
-        .or_else(|| value.as_str()?.parse::<u64>().ok())?;
-    Some(epoch_to_millis(raw))
-}
-
-fn epoch_to_millis(value: u64) -> u64 {
-    if value < 10_000_000_000 {
-        value.saturating_mul(1_000)
-    } else {
-        value
-    }
+fn timestamp_millis(seconds: i64, nanos: i32) -> u64 {
+    (seconds.max(0) as u64)
+        .saturating_mul(1_000)
+        .saturating_add((nanos.max(0) as u64) / 1_000_000)
 }
 
 fn clamp_percent(value: f64) -> f64 {
@@ -1064,578 +193,26 @@ fn clamp_percent(value: f64) -> f64 {
     }
 }
 
-fn parse_cli_reset_time(value: &Value) -> Option<u64> {
-    if let Some(s) = value.as_str() {
-        if let Some(ms) = parse_iso_millis(s) {
-            return Some(ms);
-        }
-        if let Ok(u) = s.parse::<u64>() {
-            return Some(epoch_to_millis(u));
-        }
-    }
-    if let Some(u) = value.as_u64() {
-        return Some(epoch_to_millis(u));
-    }
-    None
-}
-
-fn read_gemini_oauth_email_any(home: &Path) -> Option<String> {
-    let path = env::var_os("GEMINI_OAUTH_CREDS")
-        .filter(|value| !value.is_empty())
-        .map(PathBuf::from)
-        .unwrap_or_else(|| home.join(".gemini/oauth_creds.json"));
-    let contents = fs::read_to_string(path).ok()?;
-    let value = serde_json::from_str::<Value>(&contents).ok()?;
-    usable_account_email(value.get("email").and_then(Value::as_str))
-}
-
-fn parse_agy_cli_quota(value: &Value) -> Result<ProviderUsage, String> {
-    let cmd_name = value
-        .pointer("/command/name")
-        .and_then(Value::as_str)
-        .ok_or_else(|| {
-            "올바르지 않은 CLI quota 형식입니다: command name이 누락되었습니다.".to_string()
-        })?;
-
-    if cmd_name != "usage" {
-        return Err(format!(
-            "올바르지 않은 command name입니다: 'usage'를 예상했으나 '{}'를 받았습니다.",
-            cmd_name
-        ));
-    }
-
-    let groups = value
-        .pointer("/command/data/groups")
-        .and_then(Value::as_array)
-        .ok_or_else(|| {
-            "올바르지 않은 CLI quota 형식입니다: groups 형식이 잘못되었습니다.".to_string()
-        })?;
-    let gemini_buckets = groups
-        .iter()
-        .find(|group| {
-            group
-                .get("name")
-                .and_then(Value::as_str)
-                .is_some_and(|name| name.eq_ignore_ascii_case("gemini models"))
-        })
-        .and_then(|group| group.get("buckets"))
-        .and_then(Value::as_array)
-        .ok_or_else(|| "quota에서 Gemini Models 그룹을 찾을 수 없습니다.".to_string())?;
-
-    let mut session = None;
-    let mut weekly = None;
-
-    for bucket_val in gemini_buckets {
-        let remaining_fraction = bucket_val.get("remaining_fraction").and_then(Value::as_f64);
-
-        let window = bucket_val.get("window").and_then(Value::as_str);
-
-        let reset_val = bucket_val.get("reset_time");
-
-        if let (Some(rem), Some(win)) = (remaining_fraction, window) {
-            let used_percent = clamp_percent((1.0 - rem) * 100.0);
-            let resets_at = reset_val.and_then(parse_cli_reset_time);
-
-            if win == "5h" {
-                session = Some(AgentUsageWindow {
-                    used_percent,
-                    window_minutes: 300,
-                    resets_at,
-                });
-            } else if win == "weekly" {
-                weekly = Some(AgentUsageWindow {
-                    used_percent,
-                    window_minutes: 10080,
-                    resets_at,
-                });
-            }
-        }
-    }
-
-    Ok(ProviderUsage {
-        provider: agent::AgentProviderKind::Agy,
-        status: ProviderUsageStatus::Ok,
-        session,
-        weekly,
-        monthly: None,
-        plan_type: None,
-        account_label: None,
-        authenticated: true,
-        reauthentication_required: false,
+fn unavailable_snapshot(error: String) -> AgentUsageSnapshot {
+    let provider = |provider| {
+        provider_without_usage(provider, ProviderUsageStatus::Unavailable, error.clone())
+    };
+    AgentUsageSnapshot {
+        codex: provider(agent::AgentProviderKind::Codex),
+        claude: provider(agent::AgentProviderKind::Claude),
+        grok: provider(agent::AgentProviderKind::Grok),
+        agy: provider(agent::AgentProviderKind::Agy),
+        opencode: provider(agent::AgentProviderKind::Opencode),
+        openrouter: provider(agent::AgentProviderKind::Openrouter),
+        cursor: provider(agent::AgentProviderKind::Cursor),
         updated_at: now_millis(),
-        error: None,
-    })
-}
-
-fn fetch_agy_usage_cli(
-    home: &Path,
-    binary: &Path,
-    execution_path: &OsStr,
-) -> Result<ProviderUsage, String> {
-    let mut child = Command::new(binary)
-        .args(["--print", "/quota", "--output-format", "json"])
-        .env("HOME", home)
-        .env("PATH", execution_path)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|error| format!("Antigravity CLI를 시작하지 못했습니다: {error}"))?;
-
-    let deadline = Instant::now() + AGY_TIMEOUT;
-    let mut exited = false;
-    while Instant::now() < deadline {
-        match child.try_wait() {
-            Ok(Some(_)) => {
-                exited = true;
-                break;
-            }
-            Ok(None) => {
-                thread::sleep(Duration::from_millis(50));
-            }
-            Err(error) => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return Err(format!(
-                    "Antigravity CLI 상태 확인 중 오류가 발생했습니다: {error}"
-                ));
-            }
-        }
     }
-
-    if !exited {
-        let _ = child.kill();
-        let _ = child.wait();
-        return Err("Antigravity CLI usage 조회 시간이 초과되었습니다.".to_string());
-    }
-
-    let output = child
-        .wait_with_output()
-        .map_err(|error| format!("Antigravity CLI 출력을 읽지 못했습니다: {error}"))?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!(
-            "Antigravity CLI가 오류를 반환했습니다 (exit code: {:?}): {}",
-            output.status.code(),
-            stderr.trim()
-        ));
-    }
-
-    let parsed = serde_json::from_slice::<Value>(&output.stdout)
-        .map_err(|error| format!("Antigravity CLI JSON 파싱에 실패했습니다: {error}"))?;
-
-    let mut usage = parse_agy_cli_quota(&parsed)?;
-    usage.account_label = read_gemini_oauth_email_any(home);
-    Ok(usage)
-}
-
-async fn load_agy(home: &Path) -> ProviderUsage {
-    let execution_path = crate::cli_execution_path(home).unwrap_or_default();
-    let binary = match crate::agent::agy_binary(home, &execution_path) {
-        Ok(path) => path,
-        Err(error) => {
-            return provider_without_usage(
-                agent::AgentProviderKind::Agy,
-                ProviderUsageStatus::Unavailable,
-                error,
-            )
-        }
-    };
-    let authenticated = agy_locally_authenticated(home, &binary, &execution_path);
-
-    // Try CLI path first if locally authenticated
-    let cli_result = if authenticated {
-        fetch_agy_usage_cli(home, &binary, &execution_path)
-    } else {
-        Err("Antigravity CLI가 인증되지 않았습니다.".to_string())
-    };
-
-    match cli_result {
-        Ok(mut usage) => {
-            usage.authenticated = true;
-            return usage;
-        }
-        Err(cli_error) => {
-            // Fallback to direct API path
-            let credentials = read_gemini_oauth_access(home);
-            if let Some(credentials) = credentials.as_ref() {
-                match fetch_agy_usage(&credentials.access_token).await {
-                    Ok(mut usage) => {
-                        usage.account_label = credentials.email.clone();
-                        usage.authenticated = true;
-                        return usage;
-                    }
-                    Err(api_error) => {
-                        // Both failed
-                        return provider_without_usage_with_account(
-                            agent::AgentProviderKind::Agy,
-                            if authenticated {
-                                ProviderUsageStatus::Error
-                            } else {
-                                ProviderUsageStatus::Unavailable
-                            },
-                            format!("CLI 오류: {}; API 오류: {}", cli_error, api_error),
-                            credentials.email.clone(),
-                            authenticated,
-                        );
-                    }
-                }
-            }
-
-            // CLI failed and API fallback is unavailable
-            if authenticated {
-                return provider_without_usage_with_account(
-                    agent::AgentProviderKind::Agy,
-                    ProviderUsageStatus::Error,
-                    format!("CLI 오류: {}", cli_error),
-                    read_gemini_oauth_email_any(home),
-                    true,
-                );
-            }
-        }
-    }
-
-    provider_without_usage(
-        agent::AgentProviderKind::Agy,
-        ProviderUsageStatus::Unavailable,
-        "Antigravity 로그인이 필요합니다.".to_string(),
-    )
-}
-
-fn load_opencode(home: &Path) -> ProviderUsage {
-    let (authenticated, account_label) = read_opencode_account_identity(home);
-    if authenticated {
-        return connected_provider_without_windows(
-            agent::AgentProviderKind::Opencode,
-            account_label,
-        );
-    }
-    provider_without_usage(
-        agent::AgentProviderKind::Opencode,
-        ProviderUsageStatus::Unavailable,
-        "OpenCode CLI가 필요합니다.".to_string(),
-    )
-}
-
-fn load_cursor(home: &Path) -> ProviderUsage {
-    if env::var("CURSOR_API_KEY").is_ok_and(|value| !value.trim().is_empty()) {
-        return connected_provider_without_windows(agent::AgentProviderKind::Cursor, None);
-    }
-    let execution_path = crate::cli_execution_path(home).unwrap_or_default();
-    let binary = match crate::agent::cursor_binary(home, &execution_path) {
-        Ok(path) => path,
-        Err(error) => {
-            return provider_without_usage(
-                agent::AgentProviderKind::Cursor,
-                ProviderUsageStatus::Unavailable,
-                error,
-            )
-        }
-    };
-    let (authenticated, account_label) = read_cursor_account_identity(home, &binary);
-    if authenticated {
-        return connected_provider_without_windows(agent::AgentProviderKind::Cursor, account_label);
-    }
-    provider_without_usage(
-        agent::AgentProviderKind::Cursor,
-        ProviderUsageStatus::Unavailable,
-        "Cursor 로그인이 필요합니다.".to_string(),
-    )
-}
-
-fn read_cursor_account_identity(home: &Path, binary: &Path) -> (bool, Option<String>) {
-    let execution_path = crate::cli_execution_path(home).unwrap_or_default();
-    let output = Command::new(binary)
-        .env("HOME", home)
-        .env("PATH", execution_path)
-        .args(["about", "--format", "json"])
-        .output()
-        .ok();
-    if let Some(output) = output.filter(|output| output.status.success()) {
-        if let Some(email) = parse_cursor_about_email(&output.stdout) {
-            return (true, Some(email));
-        }
-    }
-    let output = Command::new(binary)
-        .env("HOME", home)
-        .args(["about"])
-        .output()
-        .ok();
-    output
-        .filter(|output| output.status.success())
-        .and_then(|output| {
-            parse_cursor_about_text(String::from_utf8_lossy(&output.stdout).as_ref())
-        })
-        .map(|email| (true, Some(email)))
-        .unwrap_or((false, None))
-}
-
-fn parse_cursor_about_email(stdout: &[u8]) -> Option<String> {
-    let value = serde_json::from_slice::<Value>(stdout).ok()?;
-    usable_account_email(value.get("userEmail").and_then(Value::as_str))
-}
-
-fn parse_cursor_about_text(stdout: &str) -> Option<String> {
-    stdout.lines().find_map(|line| {
-        usable_account_email(line.trim().strip_prefix("User Email").map(str::trim))
-    })
-}
-
-fn usable_account_email(value: Option<&str>) -> Option<String> {
-    let email = value?.trim();
-    let lowered = email.to_ascii_lowercase();
-    if email.is_empty()
-        || lowered == "not logged in"
-        || lowered.contains("login required")
-        || lowered.contains("authentication required")
-    {
-        return None;
-    }
-    Some(email.to_string())
-}
-
-fn read_opencode_account_identity(home: &Path) -> (bool, Option<String>) {
-    let mut candidates = vec![
-        home.join(".local/share/opencode/auth.json"),
-        home.join("Library/Application Support/opencode/auth.json"),
-    ];
-    if let Some(xdg) = env::var_os("XDG_DATA_HOME") {
-        candidates.insert(0, PathBuf::from(xdg).join("opencode/auth.json"));
-    }
-    if let Some(appdata) = env::var_os("APPDATA") {
-        candidates.insert(0, PathBuf::from(appdata).join("opencode/auth.json"));
-    }
-    for path in candidates {
-        let Ok(contents) = fs::read_to_string(path) else {
-            continue;
-        };
-        if let Some(label) = parse_opencode_auth_label(&contents) {
-            return (true, Some(label));
-        }
-        if serde_json::from_str::<Value>(&contents)
-            .ok()
-            .and_then(|value| value.as_object().map(|object| !object.is_empty()))
-            == Some(true)
-        {
-            return (true, None);
-        }
-    }
-    let execution_path = crate::cli_execution_path(home).unwrap_or_default();
-    (
-        crate::agent::opencode_binary(home, &execution_path).is_ok(),
-        None,
-    )
-}
-
-fn parse_opencode_auth_label(contents: &str) -> Option<String> {
-    let value = serde_json::from_str::<Value>(contents).ok()?;
-    collect_account_label(&value)
-}
-
-fn collect_account_label(value: &Value) -> Option<String> {
-    match value {
-        Value::Object(map) => {
-            for key in ["email", "emailAddress", "account", "user"] {
-                if let Some(label) = map.get(key).and_then(|item| match item {
-                    Value::String(raw) => usable_account_email(Some(raw)),
-                    other => collect_account_label(other),
-                }) {
-                    return Some(label);
-                }
-            }
-            map.values().find_map(collect_account_label)
-        }
-        Value::Array(items) => items.iter().find_map(collect_account_label),
-        _ => None,
-    }
-}
-
-struct GeminiOauthAccess {
-    access_token: String,
-    email: Option<String>,
-}
-
-fn read_gemini_oauth_access(home: &Path) -> Option<GeminiOauthAccess> {
-    let path = env::var_os("GEMINI_OAUTH_CREDS")
-        .filter(|value| !value.is_empty())
-        .map(PathBuf::from)
-        .unwrap_or_else(|| home.join(".gemini/oauth_creds.json"));
-    let contents = fs::read_to_string(path).ok()?;
-    parse_gemini_oauth_access(&contents)
-}
-
-fn parse_gemini_oauth_access(contents: &str) -> Option<GeminiOauthAccess> {
-    let value = serde_json::from_str::<Value>(contents).ok()?;
-    let access_token = value
-        .get("access_token")
-        .and_then(Value::as_str)
-        .map(str::trim)
-        .filter(|token| !token.is_empty())?
-        .to_string();
-    if let Some(expiry) = value.get("expiry_date").and_then(Value::as_i64) {
-        if expiry <= now_millis() as i64 {
-            return None;
-        }
-    }
-    Some(GeminiOauthAccess {
-        access_token,
-        email: usable_account_email(value.get("email").and_then(Value::as_str)),
-    })
-}
-
-async fn fetch_agy_usage(access_token: &str) -> Result<ProviderUsage, String> {
-    let _ = rustls::crypto::ring::default_provider().install_default();
-    let client = reqwest::Client::builder()
-        .timeout(AGY_TIMEOUT)
-        .build()
-        .map_err(|error| format!("Antigravity usage 연결을 만들지 못했습니다: {error}"))?;
-    let project_id = fetch_agy_project_id(&client, access_token).await?;
-    let response = client
-        .post(AGY_QUOTA_URL)
-        .header(AUTHORIZATION, format!("Bearer {access_token}"))
-        .json(&json!({ "project": project_id }))
-        .send()
-        .await
-        .map_err(|error| format!("Antigravity usage를 불러오지 못했습니다: {error}"))?;
-    if !response.status().is_success() {
-        return Err(match response.status().as_u16() {
-            401 | 403 => "Antigravity 로그인이 만료되었습니다.".to_string(),
-            status => format!("Antigravity usage를 불러오지 못했습니다. HTTP {status}"),
-        });
-    }
-    let body = response
-        .json::<Value>()
-        .await
-        .map_err(|error| format!("Antigravity usage 응답을 읽지 못했습니다: {error}"))?;
-    parse_agy_quota(&body)
-}
-
-async fn fetch_agy_project_id(
-    client: &reqwest::Client,
-    access_token: &str,
-) -> Result<String, String> {
-    if let Ok(project) = env::var("GOOGLE_CLOUD_PROJECT") {
-        let project = project.trim();
-        if !project.is_empty() {
-            return Ok(project.to_string());
-        }
-    }
-    let response = client
-        .post(AGY_LOAD_ASSIST_URL)
-        .header(AUTHORIZATION, format!("Bearer {access_token}"))
-        .json(&json!({
-            "metadata": {
-                "ideType": "GEMINI_CLI",
-                "pluginType": "GEMINI"
-            }
-        }))
-        .send()
-        .await
-        .map_err(|error| format!("Antigravity 프로젝트를 불러오지 못했습니다: {error}"))?;
-    if !response.status().is_success() {
-        return Err(match response.status().as_u16() {
-            401 | 403 => "Antigravity 로그인이 만료되었습니다.".to_string(),
-            status => format!("Antigravity 프로젝트를 불러오지 못했습니다. HTTP {status}"),
-        });
-    }
-    let body = response
-        .json::<Value>()
-        .await
-        .map_err(|error| format!("Antigravity 프로젝트 응답을 읽지 못했습니다: {error}"))?;
-    body.get("cloudaicompanionProject")
-        .and_then(Value::as_str)
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(str::to_string)
-        .ok_or_else(|| "Antigravity 프로젝트 ID를 찾지 못했습니다.".to_string())
-}
-
-fn parse_agy_quota(body: &Value) -> Result<ProviderUsage, String> {
-    let buckets = parse_agy_quota_buckets(body);
-    let session = buckets.into_iter().max_by(|left, right| {
-        left.used_percent
-            .partial_cmp(&right.used_percent)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
-    Ok(ProviderUsage {
-        provider: agent::AgentProviderKind::Agy,
-        status: ProviderUsageStatus::Ok,
-        session,
-        weekly: None,
-        monthly: None,
-        plan_type: None,
-        account_label: None,
-        authenticated: true,
-        reauthentication_required: false,
-        updated_at: now_millis(),
-        error: None,
-    })
-}
-
-fn parse_agy_quota_buckets(body: &Value) -> Vec<AgentUsageWindow> {
-    let raw = if let Some(buckets) = body.get("buckets").and_then(Value::as_array) {
-        buckets.clone()
-    } else if let Some(array) = body.as_array() {
-        array.clone()
-    } else {
-        Vec::new()
-    };
-    raw.iter().filter_map(map_agy_quota_bucket).collect()
-}
-
-fn map_agy_quota_bucket(value: &Value) -> Option<AgentUsageWindow> {
-    let remaining = value.get("remainingFraction").and_then(Value::as_f64)?;
-    if !remaining.is_finite() {
-        return None;
-    }
-    let reset = value
-        .get("resetTime")
-        .and_then(Value::as_str)
-        .and_then(parse_iso_millis);
-    Some(AgentUsageWindow {
-        used_percent: clamp_percent((1.0 - remaining) * 100.0),
-        window_minutes: 60,
-        resets_at: reset,
-    })
-}
-
-fn connected_provider_without_windows(
-    provider: agent::AgentProviderKind,
-    account_label: Option<String>,
-) -> ProviderUsage {
-    ProviderUsage {
-        provider,
-        status: ProviderUsageStatus::Ok,
-        session: None,
-        weekly: None,
-        monthly: None,
-        plan_type: None,
-        account_label,
-        authenticated: true,
-        reauthentication_required: false,
-        updated_at: now_millis(),
-        error: None,
-    }
-}
-
-fn failed_provider(provider: agent::AgentProviderKind, error: String) -> ProviderUsage {
-    provider_without_usage(provider, ProviderUsageStatus::Error, error)
 }
 
 fn provider_without_usage(
     provider: agent::AgentProviderKind,
     status: ProviderUsageStatus,
     error: String,
-) -> ProviderUsage {
-    provider_without_usage_with_account(provider, status, error, None, false)
-}
-
-fn provider_without_usage_with_account(
-    provider: agent::AgentProviderKind,
-    status: ProviderUsageStatus,
-    error: String,
-    account_label: Option<String>,
-    authenticated: bool,
 ) -> ProviderUsage {
     ProviderUsage {
         provider,
@@ -1644,17 +221,12 @@ fn provider_without_usage_with_account(
         weekly: None,
         monthly: None,
         plan_type: None,
-        account_label,
-        authenticated,
+        account_label: None,
+        authenticated: false,
         reauthentication_required: false,
         updated_at: now_millis(),
         error: Some(error),
     }
-}
-
-fn requires_reauthentication(mut usage: ProviderUsage) -> ProviderUsage {
-    usage.reauthentication_required = true;
-    usage
 }
 
 fn now_millis() -> u64 {
@@ -1668,550 +240,54 @@ fn now_millis() -> u64 {
 mod tests {
     use super::*;
 
-    #[test]
-    fn reflects_openrouter_credential_status_without_quota_windows() {
-        let configured = load_openrouter(true);
-        assert_eq!(configured.status, ProviderUsageStatus::Ok);
-        assert!(configured.authenticated);
-        assert!(configured.session.is_none());
-        assert!(configured.weekly.is_none());
-        assert!(configured.monthly.is_none());
-        assert!(configured.error.is_none());
-
-        let missing = load_openrouter(false);
-        assert_eq!(missing.status, ProviderUsageStatus::Unavailable);
-        assert!(!missing.authenticated);
-        assert!(missing.error.is_some());
+    fn usage_from(json: &str) -> ProviderUsage {
+        provider_usage(
+            agent::AgentProviderKind::Codex,
+            Some(serde_json::from_str(json).expect("provider usage should decode")),
+        )
     }
 
     #[test]
-    fn parses_codex_rate_limit_response() {
-        let response = json!({
-            "id": 2,
-            "result": {
-                "rateLimits": {
-                    "primary": {
-                        "usedPercent": 81,
-                        "windowDurationMins": 10080,
-                        "resetsAt": 1_800_000_000
-                    },
-                    "secondary": {
-                        "usedPercent": 37.5,
-                        "windowDurationMins": 300,
-                        "resetsAt": 1_800_086_400
-                    },
-                    "planType": "plus"
-                }
-            }
-        });
-        let usage = parse_codex_response(&response).unwrap();
+    fn maps_cli_usage_windows_and_account_metadata() {
+        let usage = usage_from(
+            r#"{"status":"LOCAL_PROVIDER_USAGE_STATUS_OK","session":{"usedPercent":37.5,"windowMinutes":"300"},"weekly":{"usedPercent":81,"windowMinutes":"10080","resetsAt":"2027-01-15T22:40:00Z"},"planType":"plus","accountLabel":"dev@example.com","authenticated":true,"updatedAt":"2026-09-04T02:14:48.100Z"}"#,
+        );
         assert_eq!(usage.status, ProviderUsageStatus::Ok);
-        assert_eq!(usage.session.unwrap().used_percent, 37.5);
-        assert_eq!(usage.weekly.unwrap().window_minutes, 10_080);
+        assert_eq!(usage.session.as_ref().unwrap().used_percent, 37.5);
+        let weekly = usage.weekly.as_ref().unwrap();
+        assert_eq!(weekly.window_minutes, 10_080);
+        assert_eq!(weekly.resets_at, Some(1_800_052_800_000));
         assert_eq!(usage.plan_type.as_deref(), Some("plus"));
-    }
-
-    #[test]
-    fn maps_claude_percent_and_epoch_units() {
-        let window = ClaudeUsageWindow {
-            utilization: Some(104.0),
-            used_percentage: None,
-            resets_at: Some(json!("1800000000")),
-        };
-        let mapped = map_claude_window(&window, 300).unwrap();
-        assert_eq!(mapped.used_percent, 100.0);
-        assert_eq!(mapped.resets_at, Some(1_800_000_000_000));
-    }
-
-    #[test]
-    fn reads_claude_oauth_token_without_exposing_other_fields() {
-        let token = extract_claude_access_token(
-            r#"{"claudeAiOauth":{"accessToken":"secret","refreshToken":"refresh"}}"#,
-        )
-        .unwrap();
-        assert_eq!(token, "secret");
-    }
-
-    #[test]
-    fn treats_lapsed_claude_access_token_with_live_refresh_token_as_stale() {
-        let now = 1_800_000_000_000;
-        let credentials = parse_claude_account_credentials(&format!(
-            r#"{{"claudeAiOauth":{{"accessToken":"secret","refreshToken":"refresh","expiresAt":{}}}}}"#,
-            now - 1_000
-        ))
-        .unwrap();
-        assert!(credentials.has_refresh_token);
-        assert_eq!(
-            claude_token_state(&credentials, now),
-            ClaudeTokenState::Stale
-        );
-    }
-
-    #[test]
-    fn treats_claude_login_as_expired_only_without_a_usable_refresh_token() {
-        let now = 1_800_000_000_000;
-        let without_refresh = parse_claude_account_credentials(&format!(
-            r#"{{"claudeAiOauth":{{"accessToken":"secret","expiresAt":{}}}}}"#,
-            now - 1_000
-        ))
-        .unwrap();
-        assert_eq!(
-            claude_token_state(&without_refresh, now),
-            ClaudeTokenState::Expired
-        );
-
-        let stale_refresh = parse_claude_account_credentials(&format!(
-            r#"{{"claudeAiOauth":{{"accessToken":"secret","refreshToken":"refresh","expiresAt":{},"refreshTokenExpiresAt":{}}}}}"#,
-            now - 1_000,
-            now - 1_000
-        ))
-        .unwrap();
-        assert_eq!(
-            claude_token_state(&stale_refresh, now),
-            ClaudeTokenState::Expired
-        );
-    }
-
-    #[test]
-    fn keeps_using_a_claude_access_token_that_has_not_lapsed() {
-        let now = 1_800_000_000_000;
-        let fresh = parse_claude_account_credentials(&format!(
-            r#"{{"claudeAiOauth":{{"accessToken":"secret","refreshToken":"refresh","expiresAt":{}}}}}"#,
-            now + CLAUDE_TOKEN_SKEW_MILLIS + 1_000
-        ))
-        .unwrap();
-        assert_eq!(claude_token_state(&fresh, now), ClaudeTokenState::Usable);
-
-        let undated = parse_claude_account_credentials(
-            r#"{"claudeAiOauth":{"accessToken":"secret","refreshToken":"refresh"}}"#,
-        )
-        .unwrap();
-        assert_eq!(claude_token_state(&undated, now), ClaudeTokenState::Usable);
-    }
-
-    #[test]
-    fn asks_for_reauthentication_only_when_claude_rejects_the_token() {
-        let rejected = claude_usage_error_for_status(401);
-        assert!(rejected.reauthentication_required);
-        assert!(!rejected.message.contains("로그인이 만료"));
-
-        let throttled = claude_usage_error_for_status(429);
-        assert!(!throttled.reauthentication_required);
-
-        let server_error = claude_usage_error_for_status(500);
-        assert!(!server_error.reauthentication_required);
-        assert!(server_error.message.contains("HTTP 500"));
-    }
-
-    #[test]
-    fn parses_claude_cli_login_status() {
-        assert!(parse_claude_auth_status(br#"{"loggedIn":true}"#));
-        assert!(!parse_claude_auth_status(br#"{"loggedIn":false}"#));
-        assert!(!parse_claude_auth_status(b"not json"));
-    }
-
-    #[test]
-    fn reads_provider_account_labels_from_auth_metadata() {
-        let credentials = parse_claude_account_credentials(
-            r#"{"claudeAiOauth":{"accessToken":"secret","emailAddress":"dev@example.com","subscriptionType":"max"}}"#,
-        )
-        .unwrap();
-        assert_eq!(
-            credentials.account_label.as_deref(),
-            Some("dev@example.com")
-        );
-        assert_eq!(credentials.plan_type.as_deref(), Some("max"));
-
-        let payload = URL_SAFE_NO_PAD.encode(r#"{"email":"codex@example.com"}"#);
-        assert_eq!(
-            jwt_email(&format!("header.{payload}.signature")).as_deref(),
-            Some("codex@example.com")
-        );
-    }
-
-    #[test]
-    fn prefers_fresh_xai_grok_auth_session() {
-        let session = parse_grok_auth_session(
-            r#"{
-                "https://alternate.example.com::client": {
-                    "key": "stale-token",
-                    "user_id": "stale-user"
-                },
-                "https://auth.x.ai::client": {
-                    "key": "live-token",
-                    "user_id": "live-user",
-                    "expires_at": "2099-01-01T00:00:00Z"
-                }
-            }"#,
-        )
-        .unwrap();
-        assert_eq!(session.access_token, "live-token");
-        assert_eq!(session.user_id.as_deref(), Some("live-user"));
-        assert_eq!(session.account_label, None);
-    }
-
-    #[test]
-    fn maps_grok_weekly_and_confirmed_zero_usage() {
-        let config = GrokBillingConfig {
-            current_period: Some(GrokUsagePeriod {
-                kind: Some("USAGE_PERIOD_TYPE_WEEKLY".to_string()),
-                start: Some("2026-07-17T19:38:56Z".to_string()),
-                end: Some("2026-07-24T19:38:56Z".to_string()),
-            }),
-            billing_period_start: Some("2026-07-17T19:38:56+00:00".to_string()),
-            billing_period_end: Some("2026-07-24T19:38:56+00:00".to_string()),
-            ..Default::default()
-        };
-        let window = map_grok_weekly(&config).unwrap();
-        assert_eq!(window.used_percent, 0.0);
-        assert_eq!(window.window_minutes, GROK_WEEKLY_MINUTES);
-        assert_eq!(window.resets_at, parse_iso_millis("2026-07-24T19:38:56Z"));
-    }
-
-    #[test]
-    fn maps_grok_monthly_money_values() {
-        let config: GrokBillingConfig = serde_json::from_value(json!({
-            "monthlyLimit": { "val": "150000" },
-            "used": { "val": 75000 },
-            "billingPeriodEnd": "2026-08-01T00:00:00Z"
-        }))
-        .unwrap();
-        let window = map_grok_monthly(&config).unwrap();
-        assert_eq!(window.used_percent, 50.0);
-        assert_eq!(window.window_minutes, GROK_MONTHLY_MINUTES);
-    }
-
-    #[test]
-    fn parses_cursor_about_email_and_rejects_login_placeholders() {
-        assert_eq!(
-            parse_cursor_about_email(br#"{"userEmail":"dev@example.com"}"#).as_deref(),
-            Some("dev@example.com")
-        );
-        assert_eq!(
-            parse_cursor_about_email(br#"{"userEmail":"Not logged in"}"#),
-            None
-        );
-        assert_eq!(
-            parse_cursor_about_text("Version 1.0\nUser Email  team@example.com\n"),
-            Some("team@example.com".to_string())
-        );
-    }
-
-    #[test]
-    fn reads_opencode_account_email_from_nested_auth() {
-        let label =
-            parse_opencode_auth_label(r#"{"google":{"type":"oauth","email":"agy@example.com"}}"#);
-        assert_eq!(label.as_deref(), Some("agy@example.com"));
-    }
-
-    #[test]
-    fn maps_antigravity_quota_buckets_to_the_tightest_window() {
-        let usage = parse_agy_quota(&json!({
-            "buckets": [
-                {
-                    "remainingFraction": 0.8,
-                    "resetTime": "2026-08-18T12:00:00Z",
-                    "modelId": "gemini-3.1-flash"
-                },
-                {
-                    "remainingFraction": 0.25,
-                    "resetTime": "2026-08-18T11:00:00Z",
-                    "modelId": "gemini-3.1-pro"
-                }
-            ]
-        }))
-        .unwrap();
-        assert_eq!(usage.status, ProviderUsageStatus::Ok);
-        let session = usage.session.unwrap();
-        assert_eq!(session.used_percent, 75.0);
-        assert_eq!(session.window_minutes, 60);
-        assert_eq!(session.resets_at, parse_iso_millis("2026-08-18T11:00:00Z"));
-    }
-
-    #[test]
-    fn ignores_expired_gemini_oauth_access() {
-        assert!(
-            parse_gemini_oauth_access(r#"{"access_token":"secret","expiry_date":1}"#).is_none()
-        );
-        assert!(parse_gemini_oauth_access(
-            r#"{"access_token":"secret","expiry_date":4102444800000}"#
-        )
-        .is_some());
-    }
-
-    #[test]
-    fn parses_agy_cli_quota() {
-        let output = json!({
-            "command": {
-                "name": "usage",
-                "data": {
-                    "description": "Current quota usage",
-                    "groups": [
-                        {
-                            "name": "Gemini Models",
-                            "description": "Gemini model quotas",
-                            "buckets": [
-                                {
-                                    "id": "gemini-weekly",
-                                    "name": "Weekly",
-                                    "window": "weekly",
-                                    "remaining_fraction": 0.6,
-                                    "reset_time": "2026-08-25T12:00:00Z"
-                                },
-                                {
-                                    "id": "gemini-5h",
-                                    "name": "5 hour",
-                                    "window": "5h",
-                                    "remaining_fraction": 0.1,
-                                    "reset_time": "2026-08-19T12:00:00Z"
-                                }
-                            ]
-                        },
-                        {
-                            "name": "Claude and GPT models",
-                            "buckets": []
-                        }
-                    ]
-                }
-            }
-        });
-
-        let usage = parse_agy_cli_quota(&output).unwrap();
-        let session = usage.session.unwrap();
-        assert_eq!(session.window_minutes, 300);
-        assert!((session.used_percent - 90.0).abs() < 0.0001);
-        assert_eq!(session.resets_at, parse_iso_millis("2026-08-19T12:00:00Z"));
-
-        let weekly = usage.weekly.unwrap();
-        assert_eq!(weekly.window_minutes, 10080);
-        assert!((weekly.used_percent - 40.0).abs() < 0.0001);
-        assert_eq!(weekly.resets_at, parse_iso_millis("2026-08-25T12:00:00Z"));
-    }
-
-    #[test]
-    fn parses_agy_cli_quota_malformed() {
-        let output_no_gemini = json!({
-            "command": {
-                "name": "usage",
-                "data": {
-                    "groups": [
-                        {
-                            "name": "Claude and GPT models",
-                            "buckets": [
-                                {
-                                    "window": "weekly",
-                                    "remaining_fraction": 0.5
-                                }
-                            ]
-                        }
-                    ]
-                }
-            }
-        });
-        assert!(parse_agy_cli_quota(&output_no_gemini).is_err());
-
-        let output_bad_cmd = json!({
-            "command": {
-                "name": "not-usage",
-                "data": {
-                    "groups": []
-                }
-            }
-        });
-        assert!(parse_agy_cli_quota(&output_bad_cmd).is_err());
-
-        let output_malformed_bucket = json!({
-            "command": {
-                "name": "usage",
-                "data": {
-                    "groups": [
-                        {
-                            "name": "Gemini Models",
-                            "buckets": [
-                                {
-                                    "window": "weekly"
-                                },
-                                {
-                                    "remaining_fraction": 0.25
-                                }
-                            ]
-                        }
-                    ]
-                }
-            }
-        });
-        let usage = parse_agy_cli_quota(&output_malformed_bucket).unwrap();
-        assert!(usage.session.is_none());
-        assert!(usage.weekly.is_none());
-    }
-
-    #[test]
-    fn test_parse_cli_reset_time() {
-        assert_eq!(
-            parse_cli_reset_time(&json!("2026-08-18T12:00:00Z")),
-            parse_iso_millis("2026-08-18T12:00:00Z")
-        );
-        assert_eq!(
-            parse_cli_reset_time(&json!(1800000000u64)),
-            Some(1800000000000u64)
-        );
-        assert_eq!(
-            parse_cli_reset_time(&json!("1800000000")),
-            Some(1800000000000u64)
-        );
-        assert_eq!(parse_cli_reset_time(&json!("not-a-date")), None);
-    }
-
-    #[test]
-    fn test_agy_cli_execution_and_fail() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let home = temp_dir.path();
-
-        let bin_dir = home.join("bin");
-        fs::create_dir_all(&bin_dir).unwrap();
-        let mock_agy = bin_dir.join("agy");
-
-        let mock_json = json!({
-            "command": {
-                "name": "usage",
-                "data": {
-                    "groups": [
-                        {
-                            "name": "Gemini Models",
-                            "buckets": [
-                                {
-                                    "window": "5h",
-                                    "remaining_fraction": 0.5,
-                                    "reset_time": "2026-08-18T12:00:00Z"
-                                }
-                            ]
-                        }
-                    ]
-                }
-            }
-        });
-
-        let script_content = format!(
-            "#!/bin/sh\necho '{}'\nexit 0\n",
-            serde_json::to_string(&mock_json).unwrap()
-        );
-        fs::write(&mock_agy, script_content).unwrap();
-
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            fs::set_permissions(&mock_agy, fs::Permissions::from_mode(0o755)).unwrap();
-        }
-
-        let execution_path = bin_dir.into_os_string();
-        let usage = fetch_agy_usage_cli(home, &mock_agy, &execution_path).unwrap();
-        assert_eq!(usage.status, ProviderUsageStatus::Ok);
-        let session = usage.session.unwrap();
-        assert_eq!(session.window_minutes, 300);
-        assert_eq!(session.used_percent, 50.0);
-
-        let script_content_fail = "#!/bin/sh\necho 'some error' >&2\nexit 1\n";
-        fs::write(&mock_agy, script_content_fail).unwrap();
-
-        let err = fetch_agy_usage_cli(home, &mock_agy, &execution_path).unwrap_err();
-        assert!(err.contains("exit code"));
-    }
-
-    #[test]
-    fn test_load_agy_regression_and_fallback() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let home = temp_dir.path();
-
-        let bin_dir = home.join("bin");
-        fs::create_dir_all(&bin_dir).unwrap();
-        let mock_agy = bin_dir.join("agy");
-
-        let script_content = r#"#!/bin/sh
-for arg in "$@"; do
-    if [ "$arg" = "models" ]; then
-        exit 0
-    fi
-done
-exit 1
-"#;
-        fs::write(&mock_agy, script_content).unwrap();
-
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            fs::set_permissions(&mock_agy, fs::Permissions::from_mode(0o755)).unwrap();
-        }
-
-        let local_bin_dir = home.join(".local/bin");
-        fs::create_dir_all(&local_bin_dir).unwrap();
-        let target_mock_agy = local_bin_dir.join("agy");
-        fs::copy(&mock_agy, &target_mock_agy).unwrap();
-
-        let gemini_dir = home.join(".gemini");
-        fs::create_dir_all(&gemini_dir).unwrap();
-        let oauth_file = gemini_dir.join("oauth_creds.json");
-        let expired_oauth = json!({
-            "access_token": "expired-token",
-            "expiry_date": 1,
-            "email": "user@example.com"
-        });
-        fs::write(&oauth_file, serde_json::to_string(&expired_oauth).unwrap()).unwrap();
-
-        let usage = tauri::async_runtime::block_on(async { load_agy(home).await });
-
-        assert_eq!(usage.status, ProviderUsageStatus::Error);
+        assert_eq!(usage.account_label.as_deref(), Some("dev@example.com"));
         assert!(usage.authenticated);
-        assert_eq!(usage.account_label.as_deref(), Some("user@example.com"));
-        let err = usage.error.unwrap();
-        assert!(err.contains("CLI 오류"));
+        assert_eq!(usage.updated_at, 1_788_488_088_100);
     }
 
     #[test]
-    fn test_load_agy_fallback_both_fail() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let home = temp_dir.path();
+    fn reports_an_unreadable_cli_as_an_unavailable_provider() {
+        let snapshot = unavailable_snapshot(provider_cli::MISSING_CLI_ERROR.to_string());
+        assert_eq!(snapshot.codex.status, ProviderUsageStatus::Unavailable);
+        assert!(!snapshot.cursor.authenticated);
+        assert_eq!(
+            snapshot.claude.error.as_deref(),
+            Some(provider_cli::MISSING_CLI_ERROR)
+        );
+    }
 
-        let bin_dir = home.join("bin");
-        fs::create_dir_all(&bin_dir).unwrap();
-        let mock_agy = bin_dir.join("agy");
+    #[test]
+    fn treats_a_provider_the_cli_did_not_report_as_unavailable() {
+        let usage = provider_usage(agent::AgentProviderKind::Cursor, None);
+        assert_eq!(usage.status, ProviderUsageStatus::Unavailable);
+        assert!(usage.error.is_some());
+    }
 
-        let script_content = r#"#!/bin/sh
-for arg in "$@"; do
-    if [ "$arg" = "models" ]; then
-        exit 0
-    fi
-done
-exit 1
-"#;
-        fs::write(&mock_agy, script_content).unwrap();
-
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            fs::set_permissions(&mock_agy, fs::Permissions::from_mode(0o755)).unwrap();
-        }
-
-        let local_bin_dir = home.join(".local/bin");
-        fs::create_dir_all(&local_bin_dir).unwrap();
-        let target_mock_agy = local_bin_dir.join("agy");
-        fs::copy(&mock_agy, &target_mock_agy).unwrap();
-
-        let gemini_dir = home.join(".gemini");
-        fs::create_dir_all(&gemini_dir).unwrap();
-        let oauth_file = gemini_dir.join("oauth_creds.json");
-        let valid_oauth = json!({
-            "access_token": "valid-token-but-will-fail-network",
-            "expiry_date": now_millis() + 1000000,
-            "email": "fallback@example.com"
-        });
-        fs::write(&oauth_file, serde_json::to_string(&valid_oauth).unwrap()).unwrap();
-
-        let usage = tauri::async_runtime::block_on(async { load_agy(home).await });
-
+    #[test]
+    fn clamps_out_of_range_percentages() {
+        let usage = usage_from(
+            r#"{"status":"LOCAL_PROVIDER_USAGE_STATUS_ERROR","session":{"usedPercent":104,"windowMinutes":"300"},"error":"boom"}"#,
+        );
         assert_eq!(usage.status, ProviderUsageStatus::Error);
-        assert!(usage.authenticated);
-        assert_eq!(usage.account_label.as_deref(), Some("fallback@example.com"));
-        let err = usage.error.unwrap();
-        assert!(err.contains("CLI 오류") && err.contains("API 오류"));
+        assert_eq!(usage.session.as_ref().unwrap().used_percent, 100.0);
+        assert_eq!(usage.error.as_deref(), Some("boom"));
     }
 }

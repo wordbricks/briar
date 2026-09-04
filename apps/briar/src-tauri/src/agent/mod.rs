@@ -6,7 +6,6 @@
 mod agy;
 mod claude;
 mod codex;
-mod codex_models;
 mod cursor;
 mod grok;
 mod opencode;
@@ -554,14 +553,6 @@ impl BundledRunnerFile {
 
 pub(crate) fn codex_binary(home: &Path, execution_path: &OsStr) -> Result<PathBuf, String> {
     codex::codex_binary(home, execution_path)
-}
-
-pub(crate) fn codex_models(
-    runner: Arc<dyn CommandRunner>,
-    binary: &str,
-    workspace: &Path,
-) -> Result<Vec<codex_models::ModelListEntry>, String> {
-    codex_models::list_models(runner, binary, workspace)
 }
 
 pub(crate) fn claude_binary(home: &Path, execution_path: &OsStr) -> Result<PathBuf, String> {

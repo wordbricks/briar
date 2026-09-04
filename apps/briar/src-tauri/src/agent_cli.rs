@@ -1,4 +1,5 @@
 use super::*;
+use briar_contracts::proto::briar::local::v1 as local_proto;
 
 pub(super) fn git_repository_root(
     runner: &dyn host::CommandRunner,
@@ -152,31 +153,22 @@ pub(super) fn inspect_onboarding_prerequisites_sync(
 ) -> OnboardingPrerequisites {
     let execution_path = cli_execution_path(home).unwrap_or_default();
     let mut codex = inspect_cli(agent::codex_binary(home, &execution_path), &execution_path);
-    let claude_binary = agent::claude_binary(home, &execution_path);
-    let mut claude = inspect_cli(claude_binary.clone(), &execution_path);
-    let cursor_binary = agent::cursor_binary(home, &execution_path);
-    let mut cursor = inspect_cli(cursor_binary.clone(), &execution_path);
+    let mut claude = inspect_cli(agent::claude_binary(home, &execution_path), &execution_path);
+    let mut cursor = inspect_cli(agent::cursor_binary(home, &execution_path), &execution_path);
     let mut grok = inspect_cli(agent::grok_binary(home, &execution_path), &execution_path);
-    let agy_binary = agent::agy_binary(home, &execution_path);
-    let mut agy = inspect_cli(agy_binary.clone(), &execution_path);
+    let mut agy = inspect_cli(agent::agy_binary(home, &execution_path), &execution_path);
     let mut opencode = inspect_cli(
         agent::opencode_binary(home, &execution_path),
         &execution_path,
     );
-    codex.authenticated = codex.installed && agent_usage::codex_locally_authenticated(home);
-    claude.authenticated = claude.installed
-        && claude_binary.as_deref().is_ok_and(|binary| {
-            agent_usage::claude_locally_authenticated(home, binary, &execution_path)
-        });
-    cursor.authenticated = cursor.installed
-        && cursor_binary
-            .as_deref()
-            .is_ok_and(|binary| agent_usage::cursor_locally_authenticated(home, binary));
-    grok.authenticated = grok.installed && agent_usage::grok_locally_authenticated(home);
-    agy.authenticated = agy.installed
-        && agy_binary.as_deref().is_ok_and(|binary| {
-            agent_usage::agy_locally_authenticated(home, binary, &execution_path)
-        });
+    // One CLI call reads every provider credential store instead of five
+    // separate probes reimplemented here.
+    let authenticated = agent_usage::local_authentication(home);
+    codex.authenticated = codex.installed && authenticated.codex;
+    claude.authenticated = claude.installed && authenticated.claude;
+    cursor.authenticated = cursor.installed && authenticated.cursor;
+    grok.authenticated = grok.installed && authenticated.grok;
+    agy.authenticated = agy.installed && authenticated.agy;
     // OpenCode delegates authentication to its configured model providers. A
     // healthy installed CLI is enough to launch; the server reports any
     // provider-specific authentication error during the request.
@@ -198,648 +190,87 @@ pub(super) fn inspect_onboarding_prerequisites_sync(
     }
 }
 
-pub(super) fn provider_model_entry(
-    result: Result<Vec<AgentProviderModel>, String>,
-    default_efforts: Vec<AgentProviderEffort>,
+/// Provider model and effort discovery lives in `briar provider models`: one
+/// implementation of the provider CLI protocols, help parsing and on-disk
+/// catalogs, shared with the Bun execution workers.
+pub(super) fn load_agent_provider_models_sync(home: &Path) -> AgentProviderModelCatalog {
+    match provider_cli::provider_model_catalog(home) {
+        Ok(catalog) => AgentProviderModelCatalog {
+            codex: provider_model_entry(catalog.codex.into_option(), false),
+            claude: provider_model_entry(catalog.claude.into_option(), true),
+            // Cursor model ids are provider-owned and accepted by the ACP
+            // runtime. Keep the selector open so users can choose one or leave
+            // the runtime on Cursor's provider default.
+            cursor: provider_model_entry(catalog.cursor.into_option(), true),
+            grok: provider_model_entry(catalog.grok.into_option(), false),
+            agy: provider_model_entry(catalog.agy.into_option(), false),
+            opencode: provider_model_entry(catalog.opencode.into_option(), true),
+            openrouter: provider_model_entry(catalog.openrouter.into_option(), true),
+        },
+        // A CLI that cannot run reports the same missing-provider surface the
+        // app has always shown, with the selector policy left intact.
+        Err(error) => AgentProviderModelCatalog {
+            codex: unavailable_model_entry(&error, false),
+            claude: unavailable_model_entry(&error, true),
+            cursor: unavailable_model_entry(&error, true),
+            grok: unavailable_model_entry(&error, false),
+            agy: unavailable_model_entry(&error, false),
+            opencode: unavailable_model_entry(&error, true),
+            openrouter: unavailable_model_entry(&error, true),
+        },
+    }
+}
+
+fn provider_model_entry(
+    value: Option<local_proto::LocalProviderModels>,
     allow_custom_models: bool,
 ) -> AgentProviderModelCatalogEntry {
-    match result {
-        Ok(models) if !models.is_empty() || allow_custom_models => AgentProviderModelCatalogEntry {
-            models,
-            default_efforts,
+    let Some(value) = value else {
+        return unavailable_model_entry(
+            "Briar CLI가 이 provider의 모델 목록을 반환하지 않았습니다.",
             allow_custom_models,
-            error: None,
-        },
-        Ok(_) => AgentProviderModelCatalogEntry {
-            models: Vec::new(),
-            default_efforts,
-            allow_custom_models,
-            error: Some("CLI가 지원 모델을 반환하지 않았습니다.".to_string()),
-        },
-        Err(error) => AgentProviderModelCatalogEntry {
-            models: Vec::new(),
-            default_efforts,
-            allow_custom_models,
-            error: Some(error),
-        },
+        );
+    };
+    AgentProviderModelCatalogEntry {
+        models: value.models.into_iter().map(provider_model).collect(),
+        default_efforts: value
+            .default_efforts
+            .into_iter()
+            .map(provider_effort)
+            .collect(),
+        allow_custom_models: value.allow_custom_models,
+        error: value.error,
     }
 }
 
-pub(super) fn provider_model_entry_with_fallback(
-    result: Result<Vec<AgentProviderModel>, String>,
-    fallback: Result<Vec<AgentProviderModel>, String>,
-    default_efforts: Vec<AgentProviderEffort>,
+fn unavailable_model_entry(
+    error: &str,
     allow_custom_models: bool,
 ) -> AgentProviderModelCatalogEntry {
-    match result {
-        Err(error) => AgentProviderModelCatalogEntry {
-            models: fallback.unwrap_or_default(),
-            default_efforts,
-            allow_custom_models,
-            error: Some(error),
-        },
-        result => provider_model_entry(result, default_efforts, allow_custom_models),
+    AgentProviderModelCatalogEntry {
+        models: Vec::new(),
+        default_efforts: Vec::new(),
+        allow_custom_models,
+        error: Some(error.to_string()),
     }
 }
 
-pub(super) fn parse_grok_models(output: &str) -> Vec<AgentProviderModel> {
-    output
-        .lines()
-        .filter_map(|line| {
-            let line = line.trim();
-            let value = line
-                .strip_prefix("* ")
-                .or_else(|| line.strip_prefix("- "))?
-                .trim();
-            let id = value.strip_suffix(" (default)").unwrap_or(value).trim();
-            (!id.is_empty()).then(|| AgentProviderModel {
-                id: id.to_string(),
-                label: id.to_string(),
-                is_default: value.ends_with(" (default)"),
-                default_effort_id: None,
-                efforts: Vec::new(),
-            })
-        })
-        .take(500)
-        .collect()
-}
-
-pub(super) fn parse_opencode_models_verbose(output: &str) -> Vec<AgentProviderModel> {
-    let mut models = Vec::new();
-    let mut lines = output.lines().peekable();
-    while let Some(line) = lines.next() {
-        let id = line.trim();
-        if id.is_empty() || id.chars().any(char::is_whitespace) {
-            continue;
-        }
-        if lines.peek().is_none_or(|line| line.trim() != "{") {
-            continue;
-        }
-        let mut json = String::new();
-        for line in lines.by_ref() {
-            json.push_str(line);
-            json.push('\n');
-            if line == "}" {
-                break;
-            }
-        }
-        let Ok(value) = serde_json::from_str::<serde_json::Value>(&json) else {
-            continue;
-        };
-        let label = value
-            .get("name")
-            .and_then(serde_json::Value::as_str)
-            .unwrap_or(id);
-        let efforts = value
-            .get("variants")
-            .and_then(serde_json::Value::as_object)
-            .into_iter()
-            .flat_map(|variants| variants.keys())
-            .take(20)
-            .map(|effort| AgentProviderEffort {
-                id: effort.clone(),
-                label: effort.clone(),
-                description: None,
-                is_default: false,
-            })
-            .collect();
-        models.push(AgentProviderModel {
-            id: id.to_string(),
-            label: label.to_string(),
-            is_default: false,
-            default_effort_id: None,
-            efforts,
-        });
-        if models.len() >= 500 {
-            break;
-        }
+fn provider_model(value: local_proto::LocalProviderModel) -> AgentProviderModel {
+    AgentProviderModel {
+        id: value.id,
+        label: value.label,
+        is_default: value.is_default,
+        default_effort_id: value.default_effort_id,
+        efforts: value.efforts.into_iter().map(provider_effort).collect(),
     }
-    models
 }
 
-pub(super) fn parse_opencode_cached_models(
-    contents: &str,
-) -> Result<Vec<AgentProviderModel>, String> {
-    let catalog: serde_json::Value = serde_json::from_str(contents)
-        .map_err(|error| format!("OpenCode 모델 캐시가 올바르지 않습니다: {error}"))?;
-    let models = catalog
-        .get("opencode")
-        .and_then(|provider| provider.get("models"))
-        .and_then(serde_json::Value::as_object)
-        .ok_or_else(|| "OpenCode 모델 캐시에 opencode.models가 없습니다.".to_string())?;
-    let mut output = models
-        .iter()
-        .filter_map(|(key, value)| {
-            if value
-                .get("status")
-                .and_then(serde_json::Value::as_str)
-                .is_some_and(|status| status != "active")
-            {
-                return None;
-            }
-            let cost = value.get("cost")?;
-            if cost.get("input").and_then(serde_json::Value::as_f64) != Some(0.0)
-                || cost.get("output").and_then(serde_json::Value::as_f64) != Some(0.0)
-            {
-                return None;
-            }
-            let id = value
-                .get("id")
-                .and_then(serde_json::Value::as_str)
-                .unwrap_or(key)
-                .trim();
-            if id.is_empty() || id.len() > 200 || id.chars().any(char::is_whitespace) {
-                return None;
-            }
-            let label = value
-                .get("name")
-                .and_then(serde_json::Value::as_str)
-                .unwrap_or(id);
-            let mut efforts = Vec::new();
-            for option in value
-                .get("reasoning_options")
-                .and_then(serde_json::Value::as_array)
-                .into_iter()
-                .flatten()
-            {
-                if efforts.len() >= 20 {
-                    break;
-                }
-                if option.get("type").and_then(serde_json::Value::as_str) != Some("effort") {
-                    continue;
-                }
-                for effort in option
-                    .get("values")
-                    .and_then(serde_json::Value::as_array)
-                    .into_iter()
-                    .flatten()
-                    .filter_map(serde_json::Value::as_str)
-                    .filter(|effort| !effort.is_empty() && effort.len() <= 50)
-                {
-                    if efforts.len() >= 20 {
-                        break;
-                    }
-                    if efforts
-                        .iter()
-                        .any(|candidate: &AgentProviderEffort| candidate.id == effort)
-                    {
-                        continue;
-                    }
-                    efforts.push(AgentProviderEffort {
-                        id: effort.to_string(),
-                        label: effort.to_string(),
-                        description: None,
-                        is_default: false,
-                    });
-                }
-            }
-            Some(AgentProviderModel {
-                id: format!("opencode/{id}"),
-                label: label.to_string(),
-                is_default: false,
-                default_effort_id: None,
-                efforts,
-            })
-        })
-        .take(500)
-        .collect::<Vec<_>>();
-    output.sort_by(|left, right| left.label.cmp(&right.label).then(left.id.cmp(&right.id)));
-    Ok(output)
-}
-
-pub(super) fn opencode_cached_models(home: &Path) -> Result<Vec<AgentProviderModel>, String> {
-    let cache_root = std::env::var_os("XDG_CACHE_HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| home.join(".cache"));
-    let path = cache_root.join("opencode/models.json");
-    let contents = fs::read_to_string(&path)
-        .map_err(|error| format!("OpenCode 모델 캐시를 읽지 못했습니다: {error}"))?;
-    parse_opencode_cached_models(&contents)
-}
-
-pub(super) fn parse_claude_efforts(output: &str) -> Vec<AgentProviderEffort> {
-    let Some(line) = output.lines().find(|line| line.contains("--effort")) else {
-        return Vec::new();
-    };
-    let Some(values) = line
-        .rsplit_once('(')
-        .and_then(|(_, rest)| rest.split_once(')').map(|(values, _)| values))
-    else {
-        return Vec::new();
-    };
-    values
-        .split(',')
-        .map(str::trim)
-        .filter(|value| !value.is_empty() && value.len() <= 50)
-        .take(20)
-        .map(|value| AgentProviderEffort {
-            id: value.to_string(),
-            label: value.to_string(),
-            description: None,
-            is_default: false,
-        })
-        .collect()
-}
-
-pub(super) fn parse_claude_models(output: &str) -> Vec<AgentProviderModel> {
-    let mut in_model_help = false;
-    let mut block = String::new();
-    for line in output.lines() {
-        if line.contains("--model <model>") {
-            in_model_help = true;
-        } else if in_model_help && line.trim_start().starts_with('-') {
-            break;
-        }
-        if in_model_help {
-            block.push_str(line);
-            block.push(' ');
-        }
-    }
-    let mut models = Vec::new();
-    for (index, value) in block.split('\'').enumerate() {
-        if index % 2 == 0 {
-            continue;
-        }
-        let id = value.trim();
-        if id.is_empty()
-            || id.len() > 100
-            || !id
-                .chars()
-                .all(|character| character.is_ascii_alphanumeric() || "._-/".contains(character))
-            || models
-                .iter()
-                .any(|model: &AgentProviderModel| model.id == id)
-        {
-            continue;
-        }
-        models.push(AgentProviderModel {
-            id: id.to_string(),
-            label: id.to_string(),
-            is_default: false,
-            default_effort_id: None,
-            efforts: Vec::new(),
-        });
-        if models.len() >= 500 {
-            break;
-        }
-    }
-    models
-}
-
-pub(super) fn grok_cached_models(home: &Path) -> Result<Vec<AgentProviderModel>, String> {
-    let path = home.join(".grok/models_cache.json");
-    let contents = fs::read_to_string(&path)
-        .map_err(|error| format!("Grok 모델 캐시를 읽지 못했습니다: {error}"))?;
-    let value: serde_json::Value = serde_json::from_str(&contents)
-        .map_err(|error| format!("Grok 모델 캐시가 올바르지 않습니다: {error}"))?;
-    let models = value
-        .get("models")
-        .and_then(serde_json::Value::as_object)
-        .ok_or_else(|| "Grok 모델 캐시에 models가 없습니다.".to_string())?;
-    Ok(models
-        .iter()
-        .filter_map(|(key, value)| {
-            let info = value.get("info").unwrap_or(value);
-            if info.get("hidden").and_then(serde_json::Value::as_bool) == Some(true)
-                || info
-                    .get("supported_in_api")
-                    .and_then(serde_json::Value::as_bool)
-                    == Some(false)
-            {
-                return None;
-            }
-            let id = info
-                .get("id")
-                .and_then(serde_json::Value::as_str)
-                .unwrap_or(key);
-            if id.is_empty() || id.len() > 100 {
-                return None;
-            }
-            let label = info
-                .get("name")
-                .and_then(serde_json::Value::as_str)
-                .unwrap_or(id);
-            let mut efforts = info
-                .get("reasoning_efforts")
-                .and_then(serde_json::Value::as_array)
-                .into_iter()
-                .flatten()
-                .filter_map(|effort| {
-                    let id = effort.get("id").or_else(|| effort.get("value"))?.as_str()?;
-                    Some(AgentProviderEffort {
-                        id: id.to_string(),
-                        label: effort
-                            .get("label")
-                            .and_then(serde_json::Value::as_str)
-                            .unwrap_or(id)
-                            .to_string(),
-                        description: effort
-                            .get("description")
-                            .and_then(serde_json::Value::as_str)
-                            .map(str::to_string),
-                        is_default: effort
-                            .get("default")
-                            .and_then(serde_json::Value::as_bool)
-                            .unwrap_or(false),
-                    })
-                })
-                .take(20)
-                .collect::<Vec<_>>();
-            let default_effort_id = info
-                .get("reasoning_effort")
-                .and_then(serde_json::Value::as_str)
-                .map(str::to_string)
-                .or_else(|| {
-                    efforts
-                        .iter()
-                        .find(|effort| effort.is_default)
-                        .map(|effort| effort.id.clone())
-                });
-            for effort in &mut efforts {
-                effort.is_default = default_effort_id.as_deref() == Some(effort.id.as_str());
-            }
-            Some(AgentProviderModel {
-                id: id.to_string(),
-                label: label.to_string(),
-                is_default: false,
-                default_effort_id,
-                efforts,
-            })
-        })
-        .take(500)
-        .collect())
-}
-
-pub(super) fn parse_agy_models(output: &str) -> Vec<AgentProviderModel> {
-    fn collect(value: &serde_json::Value, output: &mut Vec<AgentProviderModel>) {
-        match value {
-            serde_json::Value::Array(values) => {
-                for value in values {
-                    if let Some(id) = value.as_str().map(str::trim).filter(|id| !id.is_empty()) {
-                        output.push(AgentProviderModel {
-                            id: id.to_string(),
-                            label: id.to_string(),
-                            is_default: false,
-                            default_effort_id: None,
-                            efforts: Vec::new(),
-                        });
-                    } else {
-                        collect(value, output);
-                    }
-                }
-            }
-            serde_json::Value::Object(object) => {
-                let id = object
-                    .get("id")
-                    .or_else(|| object.get("model_id"))
-                    .or_else(|| object.get("modelId"))
-                    .and_then(serde_json::Value::as_str);
-                if let Some(id) = id.map(str::trim).filter(|id| !id.is_empty()) {
-                    let label = object
-                        .get("display_name")
-                        .or_else(|| object.get("displayName"))
-                        .or_else(|| object.get("label"))
-                        .or_else(|| object.get("name"))
-                        .and_then(serde_json::Value::as_str)
-                        .map(str::trim)
-                        .filter(|label| !label.is_empty())
-                        .unwrap_or(id);
-                    output.push(AgentProviderModel {
-                        id: id.to_string(),
-                        label: label.to_string(),
-                        is_default: object
-                            .get("is_default")
-                            .or_else(|| object.get("isDefault"))
-                            .and_then(serde_json::Value::as_bool)
-                            .unwrap_or(false),
-                        default_effort_id: None,
-                        efforts: Vec::new(),
-                    });
-                    return;
-                }
-                for value in object.values() {
-                    collect(value, output);
-                }
-            }
-            _ => {}
-        }
-    }
-
-    let Ok(value) = serde_json::from_str::<serde_json::Value>(output) else {
-        return Vec::new();
-    };
-    let mut models = Vec::new();
-    collect(&value, &mut models);
-    models.sort_by(|left, right| left.id.cmp(&right.id));
-    models.dedup_by(|left, right| left.id == right.id);
-    models.truncate(500);
-    models
-}
-
-pub(super) fn parse_agy_efforts(output: &str) -> Vec<AgentProviderEffort> {
-    let Some(line) = output.lines().find(|line| line.contains("--effort")) else {
-        return Vec::new();
-    };
-    let Some(values) = line
-        .rsplit_once('(')
-        .and_then(|(_, rest)| rest.split_once(')').map(|(values, _)| values))
-    else {
-        return Vec::new();
-    };
-    values
-        .split(['|', ','])
-        .map(str::trim)
-        .filter(|value| !value.is_empty() && value.len() <= 50)
-        .take(20)
-        .map(|value| AgentProviderEffort {
-            id: value.to_string(),
-            label: value.to_string(),
-            description: None,
-            is_default: false,
-        })
-        .collect()
-}
-
-pub(super) fn command_agy_models(
-    home: &Path,
-    binary: Result<PathBuf, String>,
-) -> Result<Vec<AgentProviderModel>, String> {
-    let binary = binary?;
-    let output = Command::new(binary)
-        .args(["--output-format", "json", "models"])
-        .env("PATH", cli_execution_path(home)?)
-        .env("HOME", home)
-        .env_remove("AGY_ADC_AUTH")
-        .env_remove("GEMINI_API_KEY")
-        .env_remove("GOOGLE_API_KEY")
-        .env_remove("GOOGLE_APPLICATION_CREDENTIALS")
-        .output()
-        .map_err(|error| format!("Antigravity 지원 모델 목록을 가져오지 못했습니다: {error}"))?;
-    if !output.status.success() {
-        let message = [output.stderr.as_slice(), output.stdout.as_slice()]
-            .into_iter()
-            .map(String::from_utf8_lossy)
-            .map(|value| value.trim().to_string())
-            .find(|value| !value.is_empty())
-            .unwrap_or_else(|| "Antigravity 지원 모델 목록 명령이 실패했습니다.".to_string());
-        return Err(message);
-    }
-    Ok(parse_agy_models(&String::from_utf8_lossy(&output.stdout)))
-}
-
-pub(super) fn command_provider_models(
-    home: &Path,
-    binary: Result<PathBuf, String>,
-    args: &[&str],
-    parser: fn(&str) -> Vec<AgentProviderModel>,
-    environment: &[(String, String)],
-) -> Result<Vec<AgentProviderModel>, String> {
-    let binary = binary?;
-    let mut command = Command::new(binary);
-    command
-        .args(args)
-        .env("PATH", cli_execution_path(home)?)
-        .env("HOME", home);
-    for (key, value) in environment {
-        command.env(key, value);
-    }
-    let output = command
-        .output()
-        .map_err(|error| format!("지원 모델 목록을 가져오지 못했습니다: {error}"))?;
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        return Err(if stderr.is_empty() {
-            "지원 모델 목록 명령이 실패했습니다.".to_string()
-        } else {
-            stderr
-        });
-    }
-    Ok(parser(&String::from_utf8_lossy(&output.stdout)))
-}
-
-pub(super) fn command_help(home: &Path, binary: Result<PathBuf, String>) -> Result<String, String> {
-    let output = Command::new(binary?)
-        .arg("--help")
-        .env("PATH", cli_execution_path(home)?)
-        .env("HOME", home)
-        .output()
-        .map_err(|error| format!("CLI capability를 가져오지 못했습니다: {error}"))?;
-    let mut text = String::from_utf8_lossy(&output.stdout).into_owned();
-    text.push_str(&String::from_utf8_lossy(&output.stderr));
-    Ok(text)
-}
-
-pub(super) fn load_agent_provider_models_sync(
-    home: &Path,
-    config_path: &Path,
-) -> AgentProviderModelCatalog {
-    let execution_path = cli_execution_path(home).unwrap_or_default();
-    let runner: Arc<dyn host::CommandRunner> = Arc::new(host::LocalRunner::new(
-        execution_path.clone(),
-        home.to_path_buf(),
-    ));
-    let codex = agent::codex_binary(home, &execution_path).and_then(|binary| {
-        let binary = binary
-            .to_str()
-            .ok_or_else(|| "Codex CLI 경로가 올바르지 않습니다.".to_string())?;
-        agent::codex_models(runner, binary, home).map(|models| {
-            models
-                .into_iter()
-                .map(
-                    |(id, label, is_default, default_effort_id, efforts)| AgentProviderModel {
-                        id,
-                        label,
-                        is_default,
-                        default_effort_id,
-                        efforts: efforts
-                            .into_iter()
-                            .map(|(id, label, description, is_default)| AgentProviderEffort {
-                                id,
-                                label,
-                                description,
-                                is_default,
-                            })
-                            .collect(),
-                    },
-                )
-                .collect()
-        })
-    });
-    let claude_help = command_help(home, agent::claude_binary(home, &execution_path));
-    let claude_efforts = claude_help
-        .as_ref()
-        .map(|output| parse_claude_efforts(output))
-        .unwrap_or_default();
-    let claude = claude_help.map(|output| parse_claude_models(&output));
-    let grok_cli = command_provider_models(
-        home,
-        agent::grok_binary(home, &execution_path),
-        &["models"],
-        parse_grok_models,
-        &[],
-    );
-    let agy_help = command_help(home, agent::agy_binary(home, &execution_path));
-    let agy_efforts = agy_help
-        .as_ref()
-        .map(|output| parse_agy_efforts(output))
-        .unwrap_or_default();
-    let agy = command_agy_models(home, agent::agy_binary(home, &execution_path));
-    let grok = grok_cached_models(home)
-        .map(|mut cached| {
-            if let Ok(reported) = &grok_cli {
-                for model in &mut cached {
-                    model.is_default = reported
-                        .iter()
-                        .any(|candidate| candidate.id == model.id && candidate.is_default);
-                }
-                for model in reported {
-                    if !cached.iter().any(|candidate| candidate.id == model.id) {
-                        cached.push(model.clone());
-                    }
-                }
-            }
-            cached
-        })
-        .or(grok_cli);
-    let opencode = command_provider_models(
-        home,
-        agent::opencode_binary(home, &execution_path),
-        &["models", "--verbose"],
-        parse_opencode_models_verbose,
-        &[],
-    );
-    let openrouter = provider_environment_from(config_path, agent::AgentProviderKind::Openrouter)
-        .and_then(|environment| {
-            command_provider_models(
-                home,
-                agent::opencode_binary(home, &execution_path),
-                &["models", "--verbose"],
-                parse_opencode_models_verbose,
-                &environment,
-            )
-        })
-        .map(|models| {
-            models
-                .into_iter()
-                .filter(|model| model.id.starts_with("openrouter/"))
-                .collect()
-        });
-    AgentProviderModelCatalog {
-        codex: provider_model_entry(codex, Vec::new(), false),
-        claude: provider_model_entry(claude, claude_efforts, true),
-        // Cursor model ids are provider-owned and accepted by the ACP runtime.
-        // Keep the selector open so users can choose one or leave the runtime
-        // on Cursor's provider default.
-        cursor: provider_model_entry(Ok(Vec::new()), Vec::new(), true),
-        grok: provider_model_entry(grok, Vec::new(), false),
-        agy: provider_model_entry(agy, agy_efforts, false),
-        opencode: provider_model_entry_with_fallback(
-            opencode,
-            opencode_cached_models(home),
-            Vec::new(),
-            true,
-        ),
-        openrouter: provider_model_entry(openrouter, Vec::new(), true),
+fn provider_effort(value: local_proto::LocalProviderEffort) -> AgentProviderEffort {
+    AgentProviderEffort {
+        id: value.id,
+        label: value.label,
+        description: value.description,
+        is_default: value.is_default,
     }
 }
 
@@ -1038,9 +469,9 @@ pub(super) async fn load_agent_provider_models(
     app: tauri::AppHandle,
 ) -> Result<AgentProviderModelCatalog, String> {
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
-    let config_path = cli_config_path(&app)?;
     tauri::async_runtime::spawn_blocking(move || {
-        load_agent_provider_models_sync(&home, &config_path)
+        // The CLI reads the OpenRouter credential from the config file it owns.
+        load_agent_provider_models_sync(&home)
     })
     .await
     .map_err(|error| error.to_string())

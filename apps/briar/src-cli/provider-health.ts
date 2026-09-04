@@ -1,17 +1,35 @@
-import { spawnSync } from "node:child_process";
-import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join } from "node:path";
 import {
-  agentProviderBinaryName,
   agentProviders,
+  agentProviderBinaryName,
   type AgentProvider,
 } from "../src/lib/agent-provider";
+import {
+  agyAuthenticated,
+  claudeAuthenticated,
+  codexAuthenticated,
+  cursorAuthenticated,
+  grokAuthenticated,
+  opencodeAuthenticated,
+  parseClaudeAuthStatus,
+  parseCursorAboutEmail,
+} from "./provider-credentials";
 import {
   probeWorkerProviderUsage,
   type ProviderUsageProbe,
   type ProviderUsageProbeDependencies,
 } from "./provider-usage";
+
+export {
+  agyAuthenticated,
+  claudeAuthenticated,
+  codexAuthenticated,
+  cursorAuthenticated,
+  grokAuthenticated,
+  opencodeAuthenticated,
+  parseClaudeAuthStatus,
+  parseCursorAboutEmail,
+};
 
 export const workerProviderIds = agentProviders;
 export type WorkerProvider = AgentProvider;
@@ -63,125 +81,6 @@ type ProviderHealthDependencies = {
   ) => Promise<ProviderUsageProbe>;
 };
 
-const commandResult = (binary: string, args: string[]) =>
-  spawnSync(binary, args, {
-    encoding: "utf8",
-    env: process.env,
-    timeout: 10_000,
-  });
-
-const agyCommandResult = (binary: string, args: string[]) => {
-  const env = { ...process.env };
-  for (const key of [
-    "AGY_ADC_AUTH",
-    "GEMINI_API_KEY",
-    "GOOGLE_API_KEY",
-    "GOOGLE_APPLICATION_CREDENTIALS",
-  ]) {
-    delete env[key];
-  }
-  return spawnSync(binary, args, { encoding: "utf8", env, timeout: 10_000 });
-};
-
-const codexAuthenticated = (binary: string) => {
-  const result = commandResult(binary, ["login", "status"]);
-  return result.status === 0 && !result.error;
-};
-
-export const parseClaudeAuthStatus = (stdout: string) => {
-  try {
-    const status = JSON.parse(stdout) as { loggedIn?: unknown };
-    return status.loggedIn === true;
-  } catch {
-    return false;
-  }
-};
-
-export const claudeAuthenticated = async (binary: string) => {
-  const result = commandResult(binary, ["auth", "status"]);
-  return parseClaudeAuthStatus(result.stdout);
-};
-
-const cursorEmailIsAuthenticated = (value: unknown) => {
-  if (typeof value !== "string") return false;
-  const email = value.trim().toLowerCase();
-  return Boolean(
-    email && email !== "not logged in" &&
-      !email.includes("login required") &&
-      !email.includes("authentication required"),
-  );
-};
-
-export const parseCursorAuthStatus = (stdout: string) => {
-  try {
-    const status = JSON.parse(stdout) as { userEmail?: unknown };
-    return cursorEmailIsAuthenticated(status.userEmail);
-  } catch {
-    const line = stdout.split(/\r?\n/u).find((candidate) =>
-      candidate.trimStart().startsWith("User Email"),
-    );
-    return cursorEmailIsAuthenticated(
-      line?.trimStart().slice("User Email".length).trim(),
-    );
-  }
-};
-
-export const cursorAuthenticated = async (binary: string) => {
-  if (process.env.CURSOR_API_KEY?.trim()) return true;
-  const json = commandResult(binary, ["about", "--format", "json"]);
-  if (json.status === 0 && parseCursorAuthStatus(json.stdout)) return true;
-  const plain = commandResult(binary, ["about"]);
-  return plain.status === 0 && parseCursorAuthStatus(plain.stdout);
-};
-
-export const agyAuthenticated = async (binary: string) => {
-  const result = agyCommandResult(binary, ["--output-format", "json", "models"]);
-  return result.status === 0 && !result.error;
-};
-
-const validGrokSession = (value: unknown, now: number) => {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-  const entry = value as Record<string, unknown>;
-  if (typeof entry.key !== "string" || entry.key.length === 0) return false;
-  if (typeof entry.expiresAt !== "string") return true;
-  const expiresAt = Date.parse(entry.expiresAt);
-  return Number.isFinite(expiresAt) && expiresAt > now + 5 * 60_000;
-};
-
-export const grokAuthenticated = async (home: string, now: number) => {
-  const grokHome =
-    process.env.GROK_HOME?.trim() || join(home, ".grok");
-  try {
-    const parsed = JSON.parse(
-      await readFile(join(grokHome, "auth.json"), "utf8"),
-    ) as Record<string, unknown>;
-    const preferred = Object.entries(parsed).filter(
-      ([issuer]) =>
-        issuer === "https://auth.x.ai" ||
-        issuer.startsWith("https://auth.x.ai::"),
-    );
-    const candidates =
-      preferred.length > 0 ? preferred : Object.entries(parsed);
-    return candidates.some(([, value]) => validGrokSession(value, now));
-  } catch {
-    return false;
-  }
-};
-
-export const opencodeAuthenticated = async (home: string) => {
-  try {
-    const parsed = JSON.parse(
-      await readFile(join(home, ".local", "share", "opencode", "auth.json"), "utf8"),
-    ) as unknown;
-    return Boolean(
-      parsed && typeof parsed === "object" && !Array.isArray(parsed) &&
-        Object.keys(parsed).length > 0,
-    );
-  } catch {
-    return false;
-  }
-};
-
 const defaultDependencies: ProviderHealthDependencies = {
   home: homedir(),
   openrouterApiKey: process.env.OPENROUTER_API_KEY?.trim() || null,
@@ -189,7 +88,7 @@ const defaultDependencies: ProviderHealthDependencies = {
   which: (provider) => Bun.which(agentProviderBinaryName(provider)),
   authenticated: async (provider, binary, home, now, openrouterApiKey) => {
     if (provider === "codex") {
-      return codexAuthenticated(binary);
+      return codexAuthenticated(home);
     }
     if (provider === "claude") {
       return claudeAuthenticated(binary);

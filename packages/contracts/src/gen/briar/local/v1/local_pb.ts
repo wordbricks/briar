@@ -6,13 +6,15 @@ import type { GenEnum, GenFile, GenMessage } from "@bufbuild/protobuf/codegenv2"
 import { enumDesc, fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
 import type { ClaimedIssuePayload, QueuedAttachment } from "../../worker/v1/worker_queue_pb";
 import { file_briar_worker_v1_worker_queue } from "../../worker/v1/worker_queue_pb";
+import type { Timestamp } from "@bufbuild/protobuf/wkt";
+import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file briar/local/v1/local.proto.
  */
 export const file_briar_local_v1_local: GenFile = /*@__PURE__*/
-  fileDesc("Chpicmlhci9sb2NhbC92MS9sb2NhbC5wcm90bxIOYnJpYXIubG9jYWwudjEigQEKEExvY2FsQ2xhaW1SZXN1bHQSMgoHY2xhaW1lZBgBIAEoCzIfLmJyaWFyLmxvY2FsLnYxLkxvY2FsQ2xhaW1lZFJ1bkgAEi4KB25vX3dvcmsYAiABKAsyGy5icmlhci5sb2NhbC52MS5Mb2NhbE5vV29ya0gAQgkKB291dGNvbWUiDQoLTG9jYWxOb1dvcmsilQIKD0xvY2FsQ2xhaW1lZFJ1bhI1CgdwYXlsb2FkGAEgASgLMiQuYnJpYXIud29ya2VyLnYxLkNsYWltZWRJc3N1ZVBheWxvYWQSOgoLYXR0YWNobWVudHMYAiADKAsyJS5icmlhci5sb2NhbC52MS5Mb2NhbFF1ZXVlZEF0dGFjaG1lbnQSFwoPYnJpYXJfaXNzdWVfdXJsGAMgASgJEjYKCXdvcmtzcGFjZRgEIAEoCzIeLmJyaWFyLmxvY2FsLnYxLkxvY2FsV29ya3NwYWNlSACIAQESHAoPd29ya3NwYWNlX2Vycm9yGAUgASgJSAGIAQFCDAoKX3dvcmtzcGFjZUISChBfd29ya3NwYWNlX2Vycm9yIqYBChVMb2NhbFF1ZXVlZEF0dGFjaG1lbnQSNQoKYXR0YWNobWVudBgBIAEoCzIhLmJyaWFyLndvcmtlci52MS5RdWV1ZWRBdHRhY2htZW50EhcKCmxvY2FsX3BhdGgYAiABKAlIAIgBARIbCg5kb3dubG9hZF9lcnJvchgDIAEoCUgBiAEBQg0KC19sb2NhbF9wYXRoQhEKD19kb3dubG9hZF9lcnJvciL8AgoOTG9jYWxXb3Jrc3BhY2USMQoEa2luZBgBIAEoDjIjLmJyaWFyLmxvY2FsLnYxLkxvY2FsV29ya3NwYWNlLktpbmQSDAoEcGF0aBgCIAEoCRITCgZicmFuY2gYAyABKAlIAIgBARIVCghiYXNlX3JlZhgEIAEoCUgBiAEBEh4KEWJhc2VfcmVmX3Jlc29sdmVkGAUgASgJSAKIAQESFQoIYmFzZV9zaGEYBiABKAlIA4gBARIOCgZyZXVzZWQYByABKAgSFgoOaW5jbHVkZWRfcGF0aHMYCCADKAkSFAoHd2FybmluZxgJIAEoCUgEiAEBIkEKBEtpbmQSFAoQS0lORF9VTlNQRUNJRklFRBAAEhAKDEtJTkRfQ1VSUkVOVBABEhEKDUtJTkRfV09SS1RSRUUQAkIJCgdfYnJhbmNoQgsKCV9iYXNlX3JlZkIUChJfYmFzZV9yZWZfcmVzb2x2ZWRCCwoJX2Jhc2Vfc2hhQgoKCF93YXJuaW5nQg66AgtCcmlhckxvY2FsX2IGcHJvdG8z", [file_briar_worker_v1_worker_queue]);
+  fileDesc("Chpicmlhci9sb2NhbC92MS9sb2NhbC5wcm90bxIOYnJpYXIubG9jYWwudjEigQEKEExvY2FsQ2xhaW1SZXN1bHQSMgoHY2xhaW1lZBgBIAEoCzIfLmJyaWFyLmxvY2FsLnYxLkxvY2FsQ2xhaW1lZFJ1bkgAEi4KB25vX3dvcmsYAiABKAsyGy5icmlhci5sb2NhbC52MS5Mb2NhbE5vV29ya0gAQgkKB291dGNvbWUiDQoLTG9jYWxOb1dvcmsilQIKD0xvY2FsQ2xhaW1lZFJ1bhI1CgdwYXlsb2FkGAEgASgLMiQuYnJpYXIud29ya2VyLnYxLkNsYWltZWRJc3N1ZVBheWxvYWQSOgoLYXR0YWNobWVudHMYAiADKAsyJS5icmlhci5sb2NhbC52MS5Mb2NhbFF1ZXVlZEF0dGFjaG1lbnQSFwoPYnJpYXJfaXNzdWVfdXJsGAMgASgJEjYKCXdvcmtzcGFjZRgEIAEoCzIeLmJyaWFyLmxvY2FsLnYxLkxvY2FsV29ya3NwYWNlSACIAQESHAoPd29ya3NwYWNlX2Vycm9yGAUgASgJSAGIAQFCDAoKX3dvcmtzcGFjZUISChBfd29ya3NwYWNlX2Vycm9yIqYBChVMb2NhbFF1ZXVlZEF0dGFjaG1lbnQSNQoKYXR0YWNobWVudBgBIAEoCzIhLmJyaWFyLndvcmtlci52MS5RdWV1ZWRBdHRhY2htZW50EhcKCmxvY2FsX3BhdGgYAiABKAlIAIgBARIbCg5kb3dubG9hZF9lcnJvchgDIAEoCUgBiAEBQg0KC19sb2NhbF9wYXRoQhEKD19kb3dubG9hZF9lcnJvciL8AgoOTG9jYWxXb3Jrc3BhY2USMQoEa2luZBgBIAEoDjIjLmJyaWFyLmxvY2FsLnYxLkxvY2FsV29ya3NwYWNlLktpbmQSDAoEcGF0aBgCIAEoCRITCgZicmFuY2gYAyABKAlIAIgBARIVCghiYXNlX3JlZhgEIAEoCUgBiAEBEh4KEWJhc2VfcmVmX3Jlc29sdmVkGAUgASgJSAKIAQESFQoIYmFzZV9zaGEYBiABKAlIA4gBARIOCgZyZXVzZWQYByABKAgSFgoOaW5jbHVkZWRfcGF0aHMYCCADKAkSFAoHd2FybmluZxgJIAEoCUgEiAEBIkEKBEtpbmQSFAoQS0lORF9VTlNQRUNJRklFRBAAEhAKDEtJTkRfQ1VSUkVOVBABEhEKDUtJTkRfV09SS1RSRUUQAkIJCgdfYnJhbmNoQgsKCV9iYXNlX3JlZkIUChJfYmFzZV9yZWZfcmVzb2x2ZWRCCwoJX2Jhc2Vfc2hhQgoKCF93YXJuaW5nIrgDChpMb2NhbFByb3ZpZGVyVXNhZ2VTbmFwc2hvdBIxCgVjb2RleBgBIAEoCzIiLmJyaWFyLmxvY2FsLnYxLkxvY2FsUHJvdmlkZXJVc2FnZRIyCgZjbGF1ZGUYAiABKAsyIi5icmlhci5sb2NhbC52MS5Mb2NhbFByb3ZpZGVyVXNhZ2USMgoGY3Vyc29yGAMgASgLMiIuYnJpYXIubG9jYWwudjEuTG9jYWxQcm92aWRlclVzYWdlEjAKBGdyb2sYBCABKAsyIi5icmlhci5sb2NhbC52MS5Mb2NhbFByb3ZpZGVyVXNhZ2USLwoDYWd5GAUgASgLMiIuYnJpYXIubG9jYWwudjEuTG9jYWxQcm92aWRlclVzYWdlEjQKCG9wZW5jb2RlGAYgASgLMiIuYnJpYXIubG9jYWwudjEuTG9jYWxQcm92aWRlclVzYWdlEjYKCm9wZW5yb3V0ZXIYByABKAsyIi5icmlhci5sb2NhbC52MS5Mb2NhbFByb3ZpZGVyVXNhZ2USLgoKdXBkYXRlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAijAQKEkxvY2FsUHJvdmlkZXJVc2FnZRI4CgZzdGF0dXMYASABKA4yKC5icmlhci5sb2NhbC52MS5Mb2NhbFByb3ZpZGVyVXNhZ2VTdGF0dXMSPgoHc2Vzc2lvbhgCIAEoCzIoLmJyaWFyLmxvY2FsLnYxLkxvY2FsUHJvdmlkZXJVc2FnZVdpbmRvd0gAiAEBEj0KBndlZWtseRgDIAEoCzIoLmJyaWFyLmxvY2FsLnYxLkxvY2FsUHJvdmlkZXJVc2FnZVdpbmRvd0gBiAEBEj4KB21vbnRobHkYBCABKAsyKC5icmlhci5sb2NhbC52MS5Mb2NhbFByb3ZpZGVyVXNhZ2VXaW5kb3dIAogBARIWCglwbGFuX3R5cGUYBSABKAlIA4gBARIaCg1hY2NvdW50X2xhYmVsGAYgASgJSASIAQESFQoNYXV0aGVudGljYXRlZBgHIAEoCBIhChlyZWF1dGhlbnRpY2F0aW9uX3JlcXVpcmVkGAggASgIEi4KCnVwZGF0ZWRfYXQYCSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhIKBWVycm9yGAogASgJSAWIAQFCCgoIX3Nlc3Npb25CCQoHX3dlZWtseUIKCghfbW9udGhseUIMCgpfcGxhbl90eXBlQhAKDl9hY2NvdW50X2xhYmVsQggKBl9lcnJvciKKAQoYTG9jYWxQcm92aWRlclVzYWdlV2luZG93EhQKDHVzZWRfcGVyY2VudBgBIAEoARIWCg53aW5kb3dfbWludXRlcxgCIAEoBBIyCglyZXNldHNfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wSACIAQFCDAoKX3Jlc2V0c19hdCKOAwoZTG9jYWxQcm92aWRlck1vZGVsQ2F0YWxvZxIyCgVjb2RleBgBIAEoCzIjLmJyaWFyLmxvY2FsLnYxLkxvY2FsUHJvdmlkZXJNb2RlbHMSMwoGY2xhdWRlGAIgASgLMiMuYnJpYXIubG9jYWwudjEuTG9jYWxQcm92aWRlck1vZGVscxIzCgZjdXJzb3IYAyABKAsyIy5icmlhci5sb2NhbC52MS5Mb2NhbFByb3ZpZGVyTW9kZWxzEjEKBGdyb2sYBCABKAsyIy5icmlhci5sb2NhbC52MS5Mb2NhbFByb3ZpZGVyTW9kZWxzEjAKA2FneRgFIAEoCzIjLmJyaWFyLmxvY2FsLnYxLkxvY2FsUHJvdmlkZXJNb2RlbHMSNQoIb3BlbmNvZGUYBiABKAsyIy5icmlhci5sb2NhbC52MS5Mb2NhbFByb3ZpZGVyTW9kZWxzEjcKCm9wZW5yb3V0ZXIYByABKAsyIy5icmlhci5sb2NhbC52MS5Mb2NhbFByb3ZpZGVyTW9kZWxzIsIBChNMb2NhbFByb3ZpZGVyTW9kZWxzEjIKBm1vZGVscxgBIAMoCzIiLmJyaWFyLmxvY2FsLnYxLkxvY2FsUHJvdmlkZXJNb2RlbBI8Cg9kZWZhdWx0X2VmZm9ydHMYAiADKAsyIy5icmlhci5sb2NhbC52MS5Mb2NhbFByb3ZpZGVyRWZmb3J0EhsKE2FsbG93X2N1c3RvbV9tb2RlbHMYAyABKAgSEgoFZXJyb3IYBCABKAlIAIgBAUIICgZfZXJyb3IirwEKEkxvY2FsUHJvdmlkZXJNb2RlbBIKCgJpZBgBIAEoCRINCgVsYWJlbBgCIAEoCRISCgppc19kZWZhdWx0GAMgASgIEh4KEWRlZmF1bHRfZWZmb3J0X2lkGAQgASgJSACIAQESNAoHZWZmb3J0cxgFIAMoCzIjLmJyaWFyLmxvY2FsLnYxLkxvY2FsUHJvdmlkZXJFZmZvcnRCFAoSX2RlZmF1bHRfZWZmb3J0X2lkIm4KE0xvY2FsUHJvdmlkZXJFZmZvcnQSCgoCaWQYASABKAkSDQoFbGFiZWwYAiABKAkSGAoLZGVzY3JpcHRpb24YAyABKAlIAIgBARISCgppc19kZWZhdWx0GAQgASgIQg4KDF9kZXNjcmlwdGlvbiL7AQoZTG9jYWxQcm92aWRlckF1dGhTbmFwc2hvdBISCgVjb2RleBgBIAEoCEgAiAEBEhMKBmNsYXVkZRgCIAEoCEgBiAEBEhMKBmN1cnNvchgDIAEoCEgCiAEBEhEKBGdyb2sYBCABKAhIA4gBARIQCgNhZ3kYBSABKAhIBIgBARIVCghvcGVuY29kZRgGIAEoCEgFiAEBEhcKCm9wZW5yb3V0ZXIYByABKAhIBogBAUIICgZfY29kZXhCCQoHX2NsYXVkZUIJCgdfY3Vyc29yQgcKBV9ncm9rQgYKBF9hZ3lCCwoJX29wZW5jb2RlQg0KC19vcGVucm91dGVyKr8BChhMb2NhbFByb3ZpZGVyVXNhZ2VTdGF0dXMSKwonTE9DQUxfUFJPVklERVJfVVNBR0VfU1RBVFVTX1VOU1BFQ0lGSUVEEAASIgoeTE9DQUxfUFJPVklERVJfVVNBR0VfU1RBVFVTX09LEAESJQohTE9DQUxfUFJPVklERVJfVVNBR0VfU1RBVFVTX0VSUk9SEAISKwonTE9DQUxfUFJPVklERVJfVVNBR0VfU1RBVFVTX1VOQVZBSUxBQkxFEANCDroCC0JyaWFyTG9jYWxfYgZwcm90bzM", [file_briar_worker_v1_worker_queue, file_google_protobuf_timestamp]);
 
 /**
  * Stable ProtoJSON written by `briar queue claim` for local process consumers.
@@ -206,4 +208,395 @@ export enum LocalWorkspace_Kind {
  */
 export const LocalWorkspace_KindSchema: GenEnum<LocalWorkspace_Kind> = /*@__PURE__*/
   enumDesc(file_briar_local_v1_local, 4, 0);
+
+/**
+ * Stable ProtoJSON written by `briar provider usage --json`. Provider
+ * credentials are read by the CLI alone; only the derived quota windows and
+ * the account label a user already sees in the UI cross this boundary.
+ *
+ * @generated from message briar.local.v1.LocalProviderUsageSnapshot
+ */
+export type LocalProviderUsageSnapshot = Message<"briar.local.v1.LocalProviderUsageSnapshot"> & {
+  /**
+   * @generated from field: briar.local.v1.LocalProviderUsage codex = 1;
+   */
+  codex?: LocalProviderUsage | undefined;
+
+  /**
+   * @generated from field: briar.local.v1.LocalProviderUsage claude = 2;
+   */
+  claude?: LocalProviderUsage | undefined;
+
+  /**
+   * @generated from field: briar.local.v1.LocalProviderUsage cursor = 3;
+   */
+  cursor?: LocalProviderUsage | undefined;
+
+  /**
+   * @generated from field: briar.local.v1.LocalProviderUsage grok = 4;
+   */
+  grok?: LocalProviderUsage | undefined;
+
+  /**
+   * @generated from field: briar.local.v1.LocalProviderUsage agy = 5;
+   */
+  agy?: LocalProviderUsage | undefined;
+
+  /**
+   * @generated from field: briar.local.v1.LocalProviderUsage opencode = 6;
+   */
+  opencode?: LocalProviderUsage | undefined;
+
+  /**
+   * @generated from field: briar.local.v1.LocalProviderUsage openrouter = 7;
+   */
+  openrouter?: LocalProviderUsage | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp updated_at = 8;
+   */
+  updatedAt?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message briar.local.v1.LocalProviderUsageSnapshot.
+ * Use `create(LocalProviderUsageSnapshotSchema)` to create a new message.
+ */
+export const LocalProviderUsageSnapshotSchema: GenMessage<LocalProviderUsageSnapshot> = /*@__PURE__*/
+  messageDesc(file_briar_local_v1_local, 5);
+
+/**
+ * @generated from message briar.local.v1.LocalProviderUsage
+ */
+export type LocalProviderUsage = Message<"briar.local.v1.LocalProviderUsage"> & {
+  /**
+   * @generated from field: briar.local.v1.LocalProviderUsageStatus status = 1;
+   */
+  status: LocalProviderUsageStatus;
+
+  /**
+   * @generated from field: optional briar.local.v1.LocalProviderUsageWindow session = 2;
+   */
+  session?: LocalProviderUsageWindow | undefined;
+
+  /**
+   * @generated from field: optional briar.local.v1.LocalProviderUsageWindow weekly = 3;
+   */
+  weekly?: LocalProviderUsageWindow | undefined;
+
+  /**
+   * @generated from field: optional briar.local.v1.LocalProviderUsageWindow monthly = 4;
+   */
+  monthly?: LocalProviderUsageWindow | undefined;
+
+  /**
+   * @generated from field: optional string plan_type = 5;
+   */
+  planType?: string | undefined;
+
+  /**
+   * @generated from field: optional string account_label = 6;
+   */
+  accountLabel?: string | undefined;
+
+  /**
+   * @generated from field: bool authenticated = 7;
+   */
+  authenticated: boolean;
+
+  /**
+   * True when the stored credentials cannot be used again without a fresh
+   * sign-in, so the UI must stop reporting the account as connected.
+   *
+   * @generated from field: bool reauthentication_required = 8;
+   */
+  reauthenticationRequired: boolean;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp updated_at = 9;
+   */
+  updatedAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: optional string error = 10;
+   */
+  error?: string | undefined;
+};
+
+/**
+ * Describes the message briar.local.v1.LocalProviderUsage.
+ * Use `create(LocalProviderUsageSchema)` to create a new message.
+ */
+export const LocalProviderUsageSchema: GenMessage<LocalProviderUsage> = /*@__PURE__*/
+  messageDesc(file_briar_local_v1_local, 6);
+
+/**
+ * @generated from message briar.local.v1.LocalProviderUsageWindow
+ */
+export type LocalProviderUsageWindow = Message<"briar.local.v1.LocalProviderUsageWindow"> & {
+  /**
+   * @generated from field: double used_percent = 1;
+   */
+  usedPercent: number;
+
+  /**
+   * @generated from field: uint64 window_minutes = 2;
+   */
+  windowMinutes: bigint;
+
+  /**
+   * @generated from field: optional google.protobuf.Timestamp resets_at = 3;
+   */
+  resetsAt?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message briar.local.v1.LocalProviderUsageWindow.
+ * Use `create(LocalProviderUsageWindowSchema)` to create a new message.
+ */
+export const LocalProviderUsageWindowSchema: GenMessage<LocalProviderUsageWindow> = /*@__PURE__*/
+  messageDesc(file_briar_local_v1_local, 7);
+
+/**
+ * Stable ProtoJSON written by `briar provider models --json`.
+ *
+ * @generated from message briar.local.v1.LocalProviderModelCatalog
+ */
+export type LocalProviderModelCatalog = Message<"briar.local.v1.LocalProviderModelCatalog"> & {
+  /**
+   * @generated from field: briar.local.v1.LocalProviderModels codex = 1;
+   */
+  codex?: LocalProviderModels | undefined;
+
+  /**
+   * @generated from field: briar.local.v1.LocalProviderModels claude = 2;
+   */
+  claude?: LocalProviderModels | undefined;
+
+  /**
+   * @generated from field: briar.local.v1.LocalProviderModels cursor = 3;
+   */
+  cursor?: LocalProviderModels | undefined;
+
+  /**
+   * @generated from field: briar.local.v1.LocalProviderModels grok = 4;
+   */
+  grok?: LocalProviderModels | undefined;
+
+  /**
+   * @generated from field: briar.local.v1.LocalProviderModels agy = 5;
+   */
+  agy?: LocalProviderModels | undefined;
+
+  /**
+   * @generated from field: briar.local.v1.LocalProviderModels opencode = 6;
+   */
+  opencode?: LocalProviderModels | undefined;
+
+  /**
+   * @generated from field: briar.local.v1.LocalProviderModels openrouter = 7;
+   */
+  openrouter?: LocalProviderModels | undefined;
+};
+
+/**
+ * Describes the message briar.local.v1.LocalProviderModelCatalog.
+ * Use `create(LocalProviderModelCatalogSchema)` to create a new message.
+ */
+export const LocalProviderModelCatalogSchema: GenMessage<LocalProviderModelCatalog> = /*@__PURE__*/
+  messageDesc(file_briar_local_v1_local, 8);
+
+/**
+ * @generated from message briar.local.v1.LocalProviderModels
+ */
+export type LocalProviderModels = Message<"briar.local.v1.LocalProviderModels"> & {
+  /**
+   * @generated from field: repeated briar.local.v1.LocalProviderModel models = 1;
+   */
+  models: LocalProviderModel[];
+
+  /**
+   * Efforts a provider advertises for every model instead of per model.
+   *
+   * @generated from field: repeated briar.local.v1.LocalProviderEffort default_efforts = 2;
+   */
+  defaultEfforts: LocalProviderEffort[];
+
+  /**
+   * True when the provider accepts a model id it did not advertise.
+   *
+   * @generated from field: bool allow_custom_models = 3;
+   */
+  allowCustomModels: boolean;
+
+  /**
+   * @generated from field: optional string error = 4;
+   */
+  error?: string | undefined;
+};
+
+/**
+ * Describes the message briar.local.v1.LocalProviderModels.
+ * Use `create(LocalProviderModelsSchema)` to create a new message.
+ */
+export const LocalProviderModelsSchema: GenMessage<LocalProviderModels> = /*@__PURE__*/
+  messageDesc(file_briar_local_v1_local, 9);
+
+/**
+ * @generated from message briar.local.v1.LocalProviderModel
+ */
+export type LocalProviderModel = Message<"briar.local.v1.LocalProviderModel"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string label = 2;
+   */
+  label: string;
+
+  /**
+   * @generated from field: bool is_default = 3;
+   */
+  isDefault: boolean;
+
+  /**
+   * @generated from field: optional string default_effort_id = 4;
+   */
+  defaultEffortId?: string | undefined;
+
+  /**
+   * @generated from field: repeated briar.local.v1.LocalProviderEffort efforts = 5;
+   */
+  efforts: LocalProviderEffort[];
+};
+
+/**
+ * Describes the message briar.local.v1.LocalProviderModel.
+ * Use `create(LocalProviderModelSchema)` to create a new message.
+ */
+export const LocalProviderModelSchema: GenMessage<LocalProviderModel> = /*@__PURE__*/
+  messageDesc(file_briar_local_v1_local, 10);
+
+/**
+ * @generated from message briar.local.v1.LocalProviderEffort
+ */
+export type LocalProviderEffort = Message<"briar.local.v1.LocalProviderEffort"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string label = 2;
+   */
+  label: string;
+
+  /**
+   * @generated from field: optional string description = 3;
+   */
+  description?: string | undefined;
+
+  /**
+   * @generated from field: bool is_default = 4;
+   */
+  isDefault: boolean;
+};
+
+/**
+ * Describes the message briar.local.v1.LocalProviderEffort.
+ * Use `create(LocalProviderEffortSchema)` to create a new message.
+ */
+export const LocalProviderEffortSchema: GenMessage<LocalProviderEffort> = /*@__PURE__*/
+  messageDesc(file_briar_local_v1_local, 11);
+
+/**
+ * Stable ProtoJSON written by `briar provider auth --json`. Only the sign-in
+ * state crosses this boundary; tokens stay in the provider credential stores
+ * the CLI reads. A provider the command was not asked about stays unset
+ * instead of reporting a sign-out it never checked.
+ *
+ * @generated from message briar.local.v1.LocalProviderAuthSnapshot
+ */
+export type LocalProviderAuthSnapshot = Message<"briar.local.v1.LocalProviderAuthSnapshot"> & {
+  /**
+   * @generated from field: optional bool codex = 1;
+   */
+  codex?: boolean | undefined;
+
+  /**
+   * @generated from field: optional bool claude = 2;
+   */
+  claude?: boolean | undefined;
+
+  /**
+   * @generated from field: optional bool cursor = 3;
+   */
+  cursor?: boolean | undefined;
+
+  /**
+   * @generated from field: optional bool grok = 4;
+   */
+  grok?: boolean | undefined;
+
+  /**
+   * @generated from field: optional bool agy = 5;
+   */
+  agy?: boolean | undefined;
+
+  /**
+   * @generated from field: optional bool opencode = 6;
+   */
+  opencode?: boolean | undefined;
+
+  /**
+   * @generated from field: optional bool openrouter = 7;
+   */
+  openrouter?: boolean | undefined;
+};
+
+/**
+ * Describes the message briar.local.v1.LocalProviderAuthSnapshot.
+ * Use `create(LocalProviderAuthSnapshotSchema)` to create a new message.
+ */
+export const LocalProviderAuthSnapshotSchema: GenMessage<LocalProviderAuthSnapshot> = /*@__PURE__*/
+  messageDesc(file_briar_local_v1_local, 12);
+
+/**
+ * @generated from enum briar.local.v1.LocalProviderUsageStatus
+ */
+export enum LocalProviderUsageStatus {
+  /**
+   * @generated from enum value: LOCAL_PROVIDER_USAGE_STATUS_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * Usage was read, even when the provider publishes no quota window.
+   *
+   * @generated from enum value: LOCAL_PROVIDER_USAGE_STATUS_OK = 1;
+   */
+  OK = 1,
+
+  /**
+   * The provider is connected but its usage could not be read right now.
+   *
+   * @generated from enum value: LOCAL_PROVIDER_USAGE_STATUS_ERROR = 2;
+   */
+  ERROR = 2,
+
+  /**
+   * The provider is not installed or not signed in.
+   *
+   * @generated from enum value: LOCAL_PROVIDER_USAGE_STATUS_UNAVAILABLE = 3;
+   */
+  UNAVAILABLE = 3,
+}
+
+/**
+ * Describes the enum briar.local.v1.LocalProviderUsageStatus.
+ */
+export const LocalProviderUsageStatusSchema: GenEnum<LocalProviderUsageStatus> = /*@__PURE__*/
+  enumDesc(file_briar_local_v1_local, 0);
 

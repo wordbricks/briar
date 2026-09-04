@@ -88,6 +88,7 @@ const REPOSITORY_ICON_SOURCE_FILES: &[&str] = &[
 // - project_config: connected-project configuration, worktrees, workflows, and bundled assets
 // - execution_worker: worker configuration, health, and installed-runtime synchronization
 // - project_execution: project chat, agent sessions, cancellation, and sandbox selection
+// - provider_cli: `briar provider …` ProtoJSON reads for usage, models, and sign-in state
 // - auto_hunt: run claiming, dispatch, retry/recovery, evidence, and event logs
 // - settings: Tauri commands that expose persisted project/application settings
 // - native_ui: windows, menus, tray, notifications, updates, and macOS integration
@@ -102,6 +103,7 @@ mod local_config;
 mod native_ui;
 mod project_config;
 mod project_execution;
+mod provider_cli;
 mod repository;
 mod settings;
 mod worker_connect;

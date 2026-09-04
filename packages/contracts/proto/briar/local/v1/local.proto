@@ -3,6 +3,7 @@ syntax = "proto3";
 package briar.local.v1;
 
 import "briar/worker/v1/worker_queue.proto";
+import "google/protobuf/timestamp.proto";
 
 option swift_prefix = "BriarLocal_";
 
@@ -48,4 +49,98 @@ message LocalWorkspace {
   bool reused = 7;
   repeated string included_paths = 8;
   optional string warning = 9;
+}
+
+// Stable ProtoJSON written by `briar provider usage --json`. Provider
+// credentials are read by the CLI alone; only the derived quota windows and
+// the account label a user already sees in the UI cross this boundary.
+message LocalProviderUsageSnapshot {
+  LocalProviderUsage codex = 1;
+  LocalProviderUsage claude = 2;
+  LocalProviderUsage cursor = 3;
+  LocalProviderUsage grok = 4;
+  LocalProviderUsage agy = 5;
+  LocalProviderUsage opencode = 6;
+  LocalProviderUsage openrouter = 7;
+  google.protobuf.Timestamp updated_at = 8;
+}
+
+enum LocalProviderUsageStatus {
+  LOCAL_PROVIDER_USAGE_STATUS_UNSPECIFIED = 0;
+  // Usage was read, even when the provider publishes no quota window.
+  LOCAL_PROVIDER_USAGE_STATUS_OK = 1;
+  // The provider is connected but its usage could not be read right now.
+  LOCAL_PROVIDER_USAGE_STATUS_ERROR = 2;
+  // The provider is not installed or not signed in.
+  LOCAL_PROVIDER_USAGE_STATUS_UNAVAILABLE = 3;
+}
+
+message LocalProviderUsage {
+  LocalProviderUsageStatus status = 1;
+  optional LocalProviderUsageWindow session = 2;
+  optional LocalProviderUsageWindow weekly = 3;
+  optional LocalProviderUsageWindow monthly = 4;
+  optional string plan_type = 5;
+  optional string account_label = 6;
+  bool authenticated = 7;
+  // True when the stored credentials cannot be used again without a fresh
+  // sign-in, so the UI must stop reporting the account as connected.
+  bool reauthentication_required = 8;
+  google.protobuf.Timestamp updated_at = 9;
+  optional string error = 10;
+}
+
+message LocalProviderUsageWindow {
+  double used_percent = 1;
+  uint64 window_minutes = 2;
+  optional google.protobuf.Timestamp resets_at = 3;
+}
+
+// Stable ProtoJSON written by `briar provider models --json`.
+message LocalProviderModelCatalog {
+  LocalProviderModels codex = 1;
+  LocalProviderModels claude = 2;
+  LocalProviderModels cursor = 3;
+  LocalProviderModels grok = 4;
+  LocalProviderModels agy = 5;
+  LocalProviderModels opencode = 6;
+  LocalProviderModels openrouter = 7;
+}
+
+message LocalProviderModels {
+  repeated LocalProviderModel models = 1;
+  // Efforts a provider advertises for every model instead of per model.
+  repeated LocalProviderEffort default_efforts = 2;
+  // True when the provider accepts a model id it did not advertise.
+  bool allow_custom_models = 3;
+  optional string error = 4;
+}
+
+message LocalProviderModel {
+  string id = 1;
+  string label = 2;
+  bool is_default = 3;
+  optional string default_effort_id = 4;
+  repeated LocalProviderEffort efforts = 5;
+}
+
+message LocalProviderEffort {
+  string id = 1;
+  string label = 2;
+  optional string description = 3;
+  bool is_default = 4;
+}
+
+// Stable ProtoJSON written by `briar provider auth --json`. Only the sign-in
+// state crosses this boundary; tokens stay in the provider credential stores
+// the CLI reads. A provider the command was not asked about stays unset
+// instead of reporting a sign-out it never checked.
+message LocalProviderAuthSnapshot {
+  optional bool codex = 1;
+  optional bool claude = 2;
+  optional bool cursor = 3;
+  optional bool grok = 4;
+  optional bool agy = 5;
+  optional bool opencode = 6;
+  optional bool openrouter = 7;
 }
