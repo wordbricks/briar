@@ -645,6 +645,16 @@ pub struct LocalConfig {
         LocalVertexAiCredential,
         ::buffa::Inline<LocalVertexAiCredential>,
     >,
+    /// Field 10: `added_providers`
+    #[serde(
+        rename = "addedProviders",
+        alias = "added_providers",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub added_providers: ::buffa::MessageField<
+        LocalAddedProviders,
+        ::buffa::Inline<LocalAddedProviders>,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -661,6 +671,7 @@ impl ::core::fmt::Debug for LocalConfig {
             .field("managed_computer", &self.managed_computer)
             .field("projects", &self.projects)
             .field("vertex_ai", &self.vertex_ai)
+            .field("added_providers", &self.added_providers)
             .finish()
     }
 }
@@ -775,6 +786,14 @@ impl ::buffa::Message for LocalConfig {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if self.added_providers.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.added_providers.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -836,6 +855,14 @@ impl ::buffa::Message for LocalConfig {
                 buf,
             );
             self.vertex_ai.write_to(__cache, buf);
+        }
+        if self.added_providers.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                10u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.added_providers.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -949,6 +976,17 @@ impl ::buffa::Message for LocalConfig {
                     ctx,
                 )?;
             }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.added_providers.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -966,6 +1004,7 @@ impl ::buffa::Message for LocalConfig {
         self.managed_computer = ::buffa::MessageField::none();
         self.projects.clear();
         self.vertex_ai = ::buffa::MessageField::none();
+        self.added_providers = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -996,6 +1035,185 @@ pub const __LOCAL_CONFIG_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buff
     type_url: "type.googleapis.com/briar.local.v1.LocalConfig",
     to_json: ::buffa::type_registry::any_to_json::<LocalConfig>,
     from_json: ::buffa::type_registry::any_from_json::<LocalConfig>,
+    is_wkt: false,
+};
+/// Providers this machine added on top of the always-listed built-in set.
+///
+/// Message presence is load-bearing: an absent message means "never
+/// initialised" and is backfilled from the enabled providers and saved
+/// credentials on first read, while a present-but-empty message means the user
+/// has added nothing. A provider that is not built in and not listed here is
+/// inactive everywhere, exactly like a disabled one.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct LocalAddedProviders {
+    /// Field 1: `providers`
+    #[serde(
+        rename = "providers",
+        with = "::buffa::json_helpers::repeated_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
+    )]
+    pub providers: ::buffa::alloc::vec::Vec<
+        ::buffa::EnumValue<super::super::types::v1::AgentProvider>,
+    >,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for LocalAddedProviders {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("LocalAddedProviders")
+            .field("providers", &self.providers)
+            .finish()
+    }
+}
+impl LocalAddedProviders {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.local.v1.LocalAddedProviders";
+}
+::buffa::impl_default_instance!(LocalAddedProviders);
+impl ::buffa::MessageName for LocalAddedProviders {
+    const PACKAGE: &'static str = "briar.local.v1";
+    const NAME: &'static str = "LocalAddedProviders";
+    const FULL_NAME: &'static str = "briar.local.v1.LocalAddedProviders";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.local.v1.LocalAddedProviders";
+}
+impl ::buffa::Message for LocalAddedProviders {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.providers.is_empty() {
+            let payload: u64 = self
+                .providers
+                .iter()
+                .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u64)
+                .sum::<u64>();
+            size += 1u64 + ::buffa::encoding::varint_len(payload) as u64 + payload;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.providers.is_empty() {
+            let payload: u64 = self
+                .providers
+                .iter()
+                .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u64)
+                .sum::<u64>();
+            ::buffa::types::put_len_delimited_header(1u32, payload, buf);
+            for v in &self.providers {
+                ::buffa::types::encode_int32(v.to_i32(), buf);
+            }
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                if tag.wire_type() == ::buffa::encoding::WireType::LengthDelimited {
+                    let len = ::buffa::encoding::decode_varint(buf)?;
+                    let len = usize::try_from(len)
+                        .map_err(|_| ::buffa::DecodeError::MessageTooLarge)?;
+                    if buf.remaining() < len {
+                        return ::core::result::Result::Err(
+                            ::buffa::DecodeError::UnexpectedEof,
+                        );
+                    }
+                    self.providers.reserve(len);
+                    let mut limited = buf.take(len);
+                    while limited.has_remaining() {
+                        self.providers
+                            .push(
+                                ::buffa::EnumValue::from(
+                                    ::buffa::types::decode_int32_packed(&mut limited)?,
+                                ),
+                            );
+                    }
+                    let leftover = limited.remaining();
+                    if leftover > 0 {
+                        limited.advance(leftover);
+                    }
+                } else if tag.wire_type() == ::buffa::encoding::WireType::Varint {
+                    self.providers
+                        .push(
+                            ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?),
+                        );
+                } else {
+                    return ::core::result::Result::Err(
+                        ::buffa::encoding::wire_type_mismatch(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        ),
+                    );
+                }
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.providers.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for LocalAddedProviders {
+    const PROTO_FQN: &'static str = "briar.local.v1.LocalAddedProviders";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for LocalAddedProviders {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __LOCAL_ADDED_PROVIDERS_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.local.v1.LocalAddedProviders",
+    to_json: ::buffa::type_registry::any_to_json::<LocalAddedProviders>,
+    from_json: ::buffa::type_registry::any_from_json::<LocalAddedProviders>,
     is_wkt: false,
 };
 /// Omitted boolean fields are disabled. New configs explicitly enable the
@@ -8361,6 +8579,10 @@ pub mod __buffa {
             pub vertex_ai: ::buffa::MessageFieldView<
                 super::super::__buffa::view::LocalVertexAiCredentialView<'a>,
             >,
+            /// Field 10: `added_providers`
+            pub added_providers: ::buffa::MessageFieldView<
+                super::super::__buffa::view::LocalAddedProvidersView<'a>,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for LocalConfigView<'a> {
@@ -8527,6 +8749,31 @@ pub mod __buffa {
                             }
                         }
                     }
+                    10u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.added_providers.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.added_providers = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::LocalAddedProvidersView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     8u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -8623,6 +8870,15 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    added_providers: match self.added_providers.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::LocalAddedProviders,
+                                ::buffa::Inline<super::super::LocalAddedProviders>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -8691,6 +8947,14 @@ pub mod __buffa {
                         += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                             + inner_size as u64;
                 }
+                if self.added_providers.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.added_providers.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -8753,6 +9017,14 @@ pub mod __buffa {
                         buf,
                     );
                     self.vertex_ai.write_to(__cache, buf);
+                }
+                if self.added_providers.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        10u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.added_providers.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -8818,6 +9090,14 @@ pub mod __buffa {
                     if let ::core::option::Option::Some(__v) = self.vertex_ai.as_option()
                     {
                         __map.serialize_entry("vertexAi", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .added_providers
+                        .as_option()
+                    {
+                        __map.serialize_entry("addedProviders", __v)?;
                     }
                 }
                 __map.end()
@@ -8979,6 +9259,15 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().vertex_ai
             }
+            /// Field 10: `added_providers`
+            #[must_use]
+            pub fn added_providers(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::LocalAddedProvidersView<'_>,
+            > {
+                &self.0.reborrow().added_providers
+            }
         }
         impl ::core::convert::From<::buffa::OwnedView<LocalConfigView<'static>>>
         for LocalConfigOwnedView {
@@ -9003,6 +9292,329 @@ pub mod __buffa {
             type ViewHandle = LocalConfigOwnedView;
         }
         impl ::serde::Serialize for LocalConfigOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// Providers this machine added on top of the always-listed built-in set.
+        ///
+        /// Message presence is load-bearing: an absent message means "never
+        /// initialised" and is backfilled from the enabled providers and saved
+        /// credentials on first read, while a present-but-empty message means the user
+        /// has added nothing. A provider that is not built in and not listed here is
+        /// inactive everywhere, exactly like a disabled one.
+        #[derive(Clone, Debug, Default)]
+        pub struct LocalAddedProvidersView<'a> {
+            /// Field 1: `providers`
+            pub providers: ::buffa::RepeatedView<
+                'a,
+                ::buffa::EnumValue<super::super::super::super::types::v1::AgentProvider>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for LocalAddedProvidersView<'a> {
+            type Owned = super::super::LocalAddedProviders;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        if tag.wire_type()
+                            == ::buffa::encoding::WireType::LengthDelimited
+                        {
+                            let payload = ::buffa::types::borrow_bytes(&mut cur)?;
+                            view.providers
+                                .reserve(::buffa::encoding::count_varints(payload));
+                            let mut pcur: &[u8] = payload;
+                            while !pcur.is_empty() {
+                                view.providers
+                                    .push(
+                                        ::buffa::EnumValue::from(
+                                            ::buffa::types::decode_int32_packed(&mut pcur)?,
+                                        ),
+                                    );
+                            }
+                        } else if tag.wire_type() == ::buffa::encoding::WireType::Varint
+                        {
+                            view.providers
+                                .push(
+                                    ::buffa::EnumValue::from(
+                                        ::buffa::types::decode_int32(&mut cur)?,
+                                    ),
+                                );
+                        } else {
+                            return Err(
+                                ::buffa::encoding::wire_type_mismatch(
+                                    tag,
+                                    ::buffa::encoding::WireType::LengthDelimited,
+                                ),
+                            );
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::LocalAddedProviders,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::LocalAddedProviders,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::LocalAddedProviders {
+                    providers: self.providers.to_vec(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for LocalAddedProvidersView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.providers.is_empty() {
+                    let payload: u64 = self
+                        .providers
+                        .iter()
+                        .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u64)
+                        .sum::<u64>();
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(payload) as u64
+                            + payload;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.providers.is_empty() {
+                    let payload: u64 = self
+                        .providers
+                        .iter()
+                        .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u64)
+                        .sum::<u64>();
+                    ::buffa::types::put_len_delimited_header(1u32, payload, buf);
+                    for v in &self.providers {
+                        ::buffa::types::encode_int32(v.to_i32(), buf);
+                    }
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for LocalAddedProvidersView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !self.providers.is_empty() {
+                    __map
+                        .serialize_entry(
+                            "providers",
+                            &::buffa::json_helpers::EnumSeqJson(&self.providers),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for LocalAddedProvidersView<'a> {
+            const PACKAGE: &'static str = "briar.local.v1";
+            const NAME: &'static str = "LocalAddedProviders";
+            const FULL_NAME: &'static str = "briar.local.v1.LocalAddedProviders";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.local.v1.LocalAddedProviders";
+        }
+        ::buffa::impl_default_view_instance!(LocalAddedProvidersView);
+        ::buffa::impl_view_reborrow!(LocalAddedProvidersView);
+        /** Self-contained, `'static` owned view of a `LocalAddedProviders` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`LocalAddedProvidersView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`LocalAddedProvidersView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct LocalAddedProvidersOwnedView(
+            ::buffa::OwnedView<LocalAddedProvidersView<'static>>,
+        );
+        impl LocalAddedProvidersOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    LocalAddedProvidersOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    LocalAddedProvidersOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::LocalAddedProviders,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    LocalAddedProvidersOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`LocalAddedProvidersView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &LocalAddedProvidersView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::LocalAddedProviders {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `providers`
+            #[must_use]
+            pub fn providers(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                ::buffa::EnumValue<super::super::super::super::types::v1::AgentProvider>,
+            > {
+                &self.0.reborrow().providers
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<LocalAddedProvidersView<'static>>>
+        for LocalAddedProvidersOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<LocalAddedProvidersView<'static>>,
+            ) -> Self {
+                LocalAddedProvidersOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<LocalAddedProvidersOwnedView>
+        for ::buffa::OwnedView<LocalAddedProvidersView<'static>> {
+            fn from(wrapper: LocalAddedProvidersOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<LocalAddedProvidersView<'static>>>
+        for LocalAddedProvidersOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<LocalAddedProvidersView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::LocalAddedProviders {
+            type View<'a> = LocalAddedProvidersView<'a>;
+            type ViewHandle = LocalAddedProvidersOwnedView;
+        }
+        impl ::serde::Serialize for LocalAddedProvidersOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -20654,6 +21266,7 @@ pub mod __buffa {
     /// Register this package's `Any` type entries and extension entries.
     pub fn register_types(reg: &mut ::buffa::type_registry::TypeRegistry) {
         reg.register_json_any(super::__LOCAL_CONFIG_JSON_ANY);
+        reg.register_json_any(super::__LOCAL_ADDED_PROVIDERS_JSON_ANY);
         reg.register_json_any(super::__LOCAL_AGENT_PROVIDER_SETTINGS_JSON_ANY);
         reg.register_json_any(super::__LOCAL_VERTEX_AI_CREDENTIAL_JSON_ANY);
         reg.register_json_any(super::__LOCAL_APP_SETTINGS_JSON_ANY);
@@ -20686,6 +21299,10 @@ pub mod __buffa {
 pub use self::__buffa::view::LocalConfigView;
 #[doc(inline)]
 pub use self::__buffa::view::LocalConfigOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::LocalAddedProvidersView;
+#[doc(inline)]
+pub use self::__buffa::view::LocalAddedProvidersOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::LocalAgentProviderSettingsView;
 #[doc(inline)]

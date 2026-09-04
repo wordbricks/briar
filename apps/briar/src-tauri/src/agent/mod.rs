@@ -304,6 +304,20 @@ impl AgentProviderKind {
         }
     }
 
+    /// Whether every machine lists this provider in settings and enables it on
+    /// a new config.
+    ///
+    /// Mirrors the `builtIn` column of `agentProviderCatalog` in
+    /// `src/lib/agent-provider.ts`; `built_in_providers_match_the_catalog`
+    /// fails if the two tables drift. A provider that is not built in stays
+    /// inactive until this machine adds it, exactly like a disabled one.
+    pub(crate) fn built_in(self) -> bool {
+        match self {
+            Self::Codex | Self::Claude | Self::Agy | Self::Opencode => true,
+            Self::Cursor | Self::Grok | Self::Openrouter | Self::Vertex => false,
+        }
+    }
+
     /// Every provider in wire declaration order, derived from the generated
     /// enum so no caller keeps a provider list of its own.
     pub(crate) fn all() -> impl Iterator<Item = Self> {
@@ -1236,6 +1250,25 @@ mod tests {
                 "{value:?} missing from all()"
             );
         }
+    }
+
+    /// The desktop's built-in set has to stay the same as the TypeScript
+    /// catalog's, so a provider promoted in one table and not the other fails
+    /// here instead of quietly disappearing from settings.
+    #[test]
+    fn built_in_providers_match_the_catalog() {
+        let built_in = AgentProviderKind::all()
+            .filter(|provider| provider.built_in())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            built_in,
+            vec![
+                AgentProviderKind::Codex,
+                AgentProviderKind::Claude,
+                AgentProviderKind::Agy,
+                AgentProviderKind::Opencode,
+            ]
+        );
     }
 
     #[test]

@@ -69,7 +69,22 @@ export const commands = {
 	workers: AutoHuntDispatchWorker[],
 	events: AutoHuntDispatchEvent_Serialize[],
 } | null>("load_auto_hunt_dispatch", { dispatchGroupId, afterCursor }),
+	/**
+	 *  The provider switches as everything else sees them: a provider this machine
+	 *  has not added reads as off, so no screen can offer one the runtime refuses.
+	 *  For a built-in or added provider this is the saved value.
+	 */
 	loadAppProviderSettings: () => __TAURI_INVOKE<AppProviderSettings>("load_app_provider_settings"),
+	/**
+	 *  Providers this machine added on top of the built-in set. The settings screen
+	 *  lists the built-in providers plus these, and offers the rest under "Add
+	 *  provider".
+	 */
+	loadAddedProviders: () => __TAURI_INVOKE<AgentProviderKind[]>("load_added_providers"),
+	/**  Add a provider on this machine, which also enables it. */
+	addProvider: (provider: AgentProviderKind) => __TAURI_INVOKE<AgentProviderKind[]>("add_provider", { provider }),
+	/**  Un-add a provider, which also disables it everywhere. */
+	removeProvider: (provider: AgentProviderKind) => __TAURI_INVOKE<AgentProviderKind[]>("remove_provider", { provider }),
 	loadOpenrouterCredentialStatus: () => __TAURI_INVOKE<OpenRouterCredentialStatus>("load_openrouter_credential_status"),
 	loadVertexAiCredentialStatus: () => __TAURI_INVOKE<VertexAiCredentialStatus>("load_vertex_ai_credential_status"),
 	loadAppRuntimeSettings: () => __TAURI_INVOKE<AppRuntimeSettings>("load_app_runtime_settings"),

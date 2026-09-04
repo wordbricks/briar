@@ -2,13 +2,17 @@ import {
   CircleCheck,
   ChevronDown,
   Download,
+  ExternalLink,
   Github,
   GitBranch,
   Moon,
+  Plus,
   RefreshCw,
+  Search,
   Settings2,
   SquareTerminal,
   Star,
+  Trash2,
 } from "lucide-react";
 import { Spinner } from "./ui/spinner";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
@@ -45,10 +49,13 @@ import {
   installOnboardingPrerequisite,
 } from "../lib/initial-onboarding";
 import {
+  addProvider,
+  loadAddedProviders,
   loadAppProviderSettings,
   loadAgentProviderModels,
   loadOpenRouterCredentialStatus,
   loadVertexAiCredentialStatus,
+  removeProvider,
   updateAppProviderSettings,
   updateOpenRouterApiKey,
   updateVertexAiSettings,
@@ -57,6 +64,15 @@ import {
   defaultAgentProviderModelCatalog,
   sortAgentModelsByPreference,
 } from "../lib/team-llm";
+import {
+  addableProviders,
+  agentProviderCatalog,
+  agentProviderLabels,
+  agentProviders,
+  isAgentProviderBuiltIn,
+  sortAgentProviders,
+} from "../lib/agent-provider";
+import type { MessageKey } from "../i18n/messages";
 import {
   readAgentProviderModelPreferences,
   writeAgentProviderModelPreference,
@@ -82,16 +98,7 @@ import type {
   ProviderUsage,
   RepositoryReadiness,
 } from "../generated/tauri";
-import {
-  AntigravityIcon,
-  ClaudeIcon,
-  CodexIcon,
-  CursorIcon,
-  GrokIcon,
-  OpenCodeIcon,
-  OpenRouterIcon,
-  VertexAiIcon,
-} from "./AgentIcons";
+import { AgentProviderIcon } from "./AgentIcons";
 import { MacSecurePasswordInput } from "./MacSecurePasswordInput";
 import { AgentUsageSettings } from "./AgentUsageSettings";
 import { AppearanceSettings } from "./AppearanceSettings";
@@ -115,6 +122,93 @@ import {
 export type { SettingsSection } from "./app-settings-navigation";
 
 type ProviderToggle = "git" | "github";
+
+/**
+ * How one provider is drawn in settings: the artwork size its icon needs, the
+ * names the status line and install button use, its one-line description, and
+ * which expanded panel it gets.
+ *
+ * A total record over the proto enum, so a provider added to the catalog fails
+ * typecheck here instead of reaching the list without a panel.
+ */
+type ProviderPresentation = {
+  /** Size that matches this provider's artwork in a 30px tile. */
+  readonly iconSize: number;
+  /** How the status line names the provider ("Codex CLI"). */
+  readonly cliName: string;
+  /** How the install button names it; an upstream installs OpenCode. */
+  readonly installName: string;
+  readonly descriptionKey: MessageKey;
+} & (
+  | { readonly details: "account"; readonly loginProvider: AgentLoginProvider }
+  | { readonly details: "openrouter" }
+  | { readonly details: "vertex" }
+);
+
+const providerPresentation = {
+  codex: {
+    details: "account",
+    loginProvider: "codex",
+    iconSize: 20,
+    cliName: "Codex CLI",
+    installName: "Codex",
+    descriptionKey: "providers.codex.description",
+  },
+  claude: {
+    details: "account",
+    loginProvider: "claude",
+    iconSize: 19,
+    cliName: "Claude Code",
+    installName: "Claude",
+    descriptionKey: "providers.claude.description",
+  },
+  cursor: {
+    details: "account",
+    loginProvider: "cursor",
+    iconSize: 19,
+    cliName: "Cursor CLI",
+    installName: "Cursor",
+    descriptionKey: "providers.cursor.description",
+  },
+  grok: {
+    details: "account",
+    loginProvider: "grok",
+    iconSize: 19,
+    cliName: "Grok CLI",
+    installName: "Grok",
+    descriptionKey: "providers.grok.description",
+  },
+  agy: {
+    details: "account",
+    loginProvider: "agy",
+    iconSize: 19,
+    cliName: "Google Antigravity CLI",
+    installName: "Antigravity",
+    descriptionKey: "providers.agy.description",
+  },
+  opencode: {
+    details: "account",
+    loginProvider: "opencode",
+    iconSize: 19,
+    cliName: "OpenCode CLI",
+    installName: "OpenCode",
+    descriptionKey: "providers.opencode.description",
+  },
+  openrouter: {
+    details: "openrouter",
+    iconSize: 20,
+    cliName: "OpenRouter",
+    installName: "OpenRouter runtime",
+    descriptionKey: "providers.openrouter.description",
+  },
+  vertex: {
+    details: "vertex",
+    iconSize: 20,
+    cliName: "Vertex AI",
+    installName: "Vertex AI runtime",
+    descriptionKey: "providers.vertex.description",
+  },
+} as const satisfies Record<AgentProvider, ProviderPresentation>;
 
 type NavItem = {
   id: SettingsSection;
@@ -220,6 +314,13 @@ export function AppSettings({
     useState<OnboardingPrerequisites | null>(null);
   const [providerSettings, setProviderSettings] =
     useState<AppProviderSettings | null>(null);
+  const [addedProviders, setAddedProviders] = useState<AgentProvider[]>([]);
+  const [addProviderQuery, setAddProviderQuery] = useState("");
+  const [providerAdding, setProviderAdding] = useState<AgentProvider | null>(null);
+  const [providerRemoving, setProviderRemoving] =
+    useState<AgentProvider | null>(null);
+  const [providerRemoveConfirm, setProviderRemoveConfirm] =
+    useState<AgentProvider | null>(null);
   const [providersLoading, setProvidersLoading] = useState(false);
   const [providerSaving, setProviderSaving] =
     useState<AgentProvider | null>(null);
@@ -286,6 +387,7 @@ export function AppSettings({
       const [
         statuses,
         settings,
+        added,
         usage,
         models,
         terminalPath,
@@ -294,6 +396,7 @@ export function AppSettings({
       ] = await Promise.all([
         inspectOnboardingPrerequisites(),
         loadAppProviderSettings(),
+        loadAddedProviders(),
         loadAgentUsage().catch(() => null),
         loadAgentProviderModels({ refresh: true }).catch(
           () => defaultAgentProviderModelCatalog,
@@ -304,6 +407,7 @@ export function AppSettings({
       ]);
       setProviderStatuses(statuses);
       setProviderSettings(settings);
+      setAddedProviders(added);
       setProviderUsage(usage);
       setProviderModels(models);
       setOpenCodeTerminalPath(terminalPath);
@@ -366,6 +470,72 @@ export function AppSettings({
       );
     } finally {
       setProviderSaving(null);
+    }
+  };
+
+  const addedProviderSet = useMemo(
+    () => new Set(addedProviders),
+    [addedProviders],
+  );
+
+  /** Built-in providers plus the ones this machine added, in menu order. */
+  const visibleProviders = useMemo(
+    () =>
+      sortAgentProviders(
+        agentProviders.filter((provider) =>
+          isAgentProviderBuiltIn(provider) || addedProviderSet.has(provider),
+        ),
+      ),
+    [addedProviderSet],
+  );
+
+  const addableMatches = useMemo(() => {
+    const query = addProviderQuery.trim().toLocaleLowerCase();
+    return addableProviders.filter((provider) => {
+      if (addedProviderSet.has(provider)) return false;
+      if (!query) return true;
+      const haystack = `${agentProviderLabels[provider]} ${
+        t(providerPresentation[provider].descriptionKey)
+      }`;
+      return haystack.toLocaleLowerCase().includes(query);
+    });
+  }, [addProviderQuery, addedProviderSet, t]);
+
+  const addProviderToMachine = async (provider: AgentProvider) => {
+    if (providerAdding || providerRemoving) return;
+    setProviderAdding(provider);
+    setProviderError(null);
+    try {
+      setAddedProviders(await addProvider(provider));
+      setProviderSettings(await loadAppProviderSettings());
+      setAddProviderQuery("");
+      setExpandedProvider(provider);
+    } catch (caught) {
+      setProviderError(
+        caught instanceof Error ? caught.message : String(caught),
+      );
+    } finally {
+      setProviderAdding(null);
+    }
+  };
+
+  const removeProviderFromMachine = async (provider: AgentProvider) => {
+    if (providerAdding || providerRemoving) return;
+    setProviderRemoving(provider);
+    setProviderError(null);
+    try {
+      setAddedProviders(await removeProvider(provider));
+      setProviderSettings(await loadAppProviderSettings());
+      setProviderRemoveConfirm(null);
+      setExpandedProvider((current) =>
+        current === provider ? null : current
+      );
+    } catch (caught) {
+      setProviderError(
+        caught instanceof Error ? caught.message : String(caught),
+      );
+    } finally {
+      setProviderRemoving(null);
     }
   };
 
@@ -522,6 +692,198 @@ export function AppSettings({
     } finally {
       setRuntimeSettingsSaving(false);
     }
+  };
+
+  /**
+   * The expanded panel of one provider. The renderer is chosen by the
+   * provider's presentation entry, which is a total record over the proto
+   * enum, so a new provider cannot reach the list without a panel.
+   */
+  const providerDetailsNode = (provider: AgentProvider) => {
+    const presentation = providerPresentation[provider];
+    const status = providerStatuses?.[provider];
+    const loading = providersLoading && !providerStatuses;
+    const preferences = providerModelPreferenceProps(provider);
+    switch (presentation.details) {
+      case "openrouter":
+        return (
+          <OpenRouterDetails
+            {...preferences}
+            apiKey={openRouterApiKey}
+            configured={openRouterCredential.configured}
+            installed={status?.installed}
+            loading={loading}
+            models={providerModels[provider]}
+            onApiKeyChange={setOpenRouterApiKey}
+            onRemove={() => void saveOpenRouterApiKey(null)}
+            onSave={() => void saveOpenRouterApiKey(openRouterApiKey)}
+            saving={openRouterKeySaving}
+          />
+        );
+      case "vertex":
+        return (
+          <VertexAiDetails
+            {...preferences}
+            configured={vertexCredential.configured}
+            installed={status?.installed}
+            loading={loading}
+            location={vertexLocation}
+            models={providerModels[provider]}
+            onLocationChange={setVertexLocation}
+            onProjectIdChange={setVertexProjectId}
+            onRemove={() => void saveVertexAiSettings(null, null)}
+            onSave={() =>
+              void saveVertexAiSettings(vertexProjectId, vertexLocation)}
+            projectId={vertexProjectId}
+            saving={vertexSaving}
+          />
+        );
+      case "account":
+        return (
+          <ProviderDetails
+            {...preferences}
+            authenticated={status?.authenticated}
+            installed={status?.installed}
+            loading={loading}
+            loginOpening={providerLoginOpening === provider}
+            models={providerModels[provider]}
+            onLogin={() => void openProviderLogin(presentation.loginProvider)}
+            providerName={agentProviderLabels[provider]}
+            usage={providerUsage?.[provider]}
+          />
+        );
+    }
+  };
+
+  const providerRow = (provider: AgentProvider) => {
+    const presentation = providerPresentation[provider];
+    const status = providerStatuses?.[provider];
+    const label = agentProviderLabels[provider];
+    const loading = providersLoading && !providerStatuses;
+    const credentialSaving = presentation.details === "openrouter"
+      ? openRouterKeySaving
+      : presentation.details === "vertex"
+        ? vertexSaving
+        : false;
+    const terminalPathSupported = provider === "opencode" &&
+      openCodeTerminalPath?.supported === true;
+    const terminalPathHint = terminalPathSupported && status?.installed
+      ? ` ${t(
+        openCodeTerminalPath?.configured
+          ? "appSettings.terminalPathReady"
+          : "appSettings.terminalPathNeeded",
+      )}`
+      : "";
+    return (
+      <ProviderRow
+        available={Boolean(status?.installed && status.authenticated)}
+        description={providerDescription({
+          authenticated: status?.authenticated,
+          enabled: providerSettings?.[provider] ?? false,
+          installed: status?.installed,
+          loading,
+          providerName: presentation.cliName,
+          t,
+        }) + terminalPathHint}
+        details={
+          <div className="grid gap-5">
+            {providerDetailsNode(provider)}
+            {addedProviderSet.has(provider) ? (
+              <ProviderRemoveSection
+                confirming={providerRemoveConfirm === provider}
+                label={label}
+                onCancel={() => setProviderRemoveConfirm(null)}
+                onConfirm={() => void removeProviderFromMachine(provider)}
+                onRequest={() => setProviderRemoveConfirm(provider)}
+                removing={providerRemoving === provider}
+              />
+            ) : null}
+          </div>
+        }
+        detailsId={`provider-${provider}-details`}
+        detailsLabel={t("appSettings.toggleProviderDetails", {
+          provider: label,
+        })}
+        disabled={
+          providerSaving !== null ||
+          providerInstalling !== null ||
+          providerRemoving !== null ||
+          credentialSaving
+        }
+        enabled={providerSettings?.[provider] ?? false}
+        expanded={expandedProvider === provider}
+        icon={
+          <ProviderIcon tone={provider}>
+            <AgentProviderIcon provider={provider} size={presentation.iconSize} />
+          </ProviderIcon>
+        }
+        key={provider}
+        name={label}
+        onExpandedChange={(expanded) => {
+          setExpandedProvider(expanded ? provider : null);
+          setProviderRemoveConfirm(null);
+        }}
+        onToggle={(enabled) => void toggleProvider(provider, enabled)}
+        title={
+          <>
+            {label}
+            {status?.version ? <code>{status.version}</code> : null}
+          </>
+        }
+        trailing={providerInstalling === provider ? (
+          <Button
+            aria-label={t("appSettings.installingProvider", {
+              provider: presentation.installName,
+            })}
+            disabled
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            <Spinner className="size-[24px]" />
+            {t("appSettings.installing")}
+          </Button>
+        ) : status?.installed === false ? (
+          <Button
+            aria-label={t("appSettings.installProvider", {
+              provider: presentation.installName,
+            })}
+            onClick={() => void installProvider(provider)}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            <Download />
+            {t("appSettings.install")}
+          </Button>
+        ) : terminalPathSupported && !openCodeTerminalPath?.configured ? (
+          <Button
+            aria-label={t("appSettings.configureTerminalPathLabel")}
+            disabled={terminalPathSaving}
+            onClick={() => void configureTerminalPath()}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            {terminalPathSaving ? (
+              <Spinner className="size-[24px]" />
+            ) : (
+              <SquareTerminal />
+            )}
+            {t(
+              terminalPathSaving
+                ? "appSettings.configuringTerminalPath"
+                : "appSettings.configureTerminalPath",
+            )}
+          </Button>
+        ) : providerSaving === provider || credentialSaving ? (
+          <Spinner
+            aria-label={t("common.saving")}
+            className="size-[16px]"
+          />
+        ) : null}
+      />
+    );
   };
 
   const navigationGroups: NavGroup[] = useMemo(
@@ -706,729 +1068,61 @@ export function AppSettings({
                 aria-busy={
                   providersLoading ||
                   providerSaving !== null ||
-                  providerInstalling !== null
+                  providerInstalling !== null ||
+                  providerAdding !== null ||
+                  providerRemoving !== null
                 }
               >
-                <ProviderRow
-                  available={Boolean(
-                    providerStatuses?.codex.installed &&
-                      providerStatuses.codex.authenticated,
-                  )}
-                  description={providerDescription({
-                    authenticated: providerStatuses?.codex.authenticated,
-                    enabled: providerSettings?.codex ?? false,
-                    installed: providerStatuses?.codex.installed,
-                    loading: providersLoading && !providerStatuses,
-                    providerName: "Codex CLI",
-                    t,
-                  })}
-                  disabled={
-                    providerSaving !== null || providerInstalling !== null
-                  }
-                  details={
-                    <ProviderDetails
-                      {...providerModelPreferenceProps("codex")}
-                      authenticated={providerStatuses?.codex.authenticated}
-                      installed={providerStatuses?.codex.installed}
-                      loading={providersLoading && !providerStatuses}
-                      loginOpening={providerLoginOpening === "codex"}
-                      models={providerModels.codex}
-                      onLogin={() => void openProviderLogin("codex")}
-                      providerName="Codex"
-                      usage={providerUsage?.codex}
+                {visibleProviders.map((provider) => providerRow(provider))}
+              </SettingsCard>
+
+              <SettingsGroupHeading title={t("appSettings.addProvider")} />
+              <SettingsCard aria-busy={providerAdding !== null}>
+                <div className="border-b border-border/80 px-[18px] py-3">
+                  <Typography as="p" tone="muted" variant="bodySm">
+                    {t("appSettings.addProviderDescription")}
+                  </Typography>
+                  <label className="mt-3 flex h-[34px] items-center gap-2 rounded-md border border-border bg-background px-2.5 text-muted-foreground focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/20">
+                    <Search aria-hidden="true" className="size-3.5 shrink-0" strokeWidth={1.9} />
+                    <input
+                      aria-label={t("appSettings.addProviderSearch")}
+                      autoCapitalize="none"
+                      autoComplete="off"
+                      className="h-full w-full border-0 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                      onChange={(event) => setAddProviderQuery(event.target.value)}
+                      placeholder={t("appSettings.addProviderSearchPlaceholder")}
+                      spellCheck={false}
+                      type="search"
+                      value={addProviderQuery}
                     />
-                  }
-                  detailsId="provider-codex-details"
-                  detailsLabel={t("appSettings.toggleProviderDetails", { provider: "Codex" })}
-                  enabled={providerSettings?.codex ?? false}
-                  expanded={expandedProvider === "codex"}
-                  icon={
-                    <ProviderIcon tone="codex">
-                      <CodexIcon size={20} />
-                    </ProviderIcon>
-                  }
-                  name="Codex"
-                  onExpandedChange={(expanded) =>
-                    setExpandedProvider(expanded ? "codex" : null)
-                  }
-                  onToggle={(enabled) => void toggleProvider("codex", enabled)}
-                  title={
-                    <>
-                      Codex
-                      {providerStatuses?.codex.version ? (
-                        <code>{providerStatuses.codex.version}</code>
-                      ) : null}
-                    </>
-                  }
-                  trailing={
-                    providerInstalling === "codex" ? (
-                      <Button
-                        aria-label={t("appSettings.installingProvider", {
-                          provider: "Codex",
-                        })}
-                        disabled
-                        size="sm"
-                        type="button"
-                        variant="outline"
-                      >
-                        <Spinner className="size-[24px]" />
-                        {t("appSettings.installing")}
-                      </Button>
-                    ) : providerStatuses?.codex.installed === false ? (
-                      <Button
-                        aria-label={t("appSettings.installProvider", {
-                          provider: "Codex",
-                        })}
-                        onClick={() => void installProvider("codex")}
-                        size="sm"
-                        type="button"
-                        variant="outline"
-                      >
-                        <Download />
-                        {t("appSettings.install")}
-                      </Button>
-                    ) : providerSaving === "codex" ? (
-                      <Spinner
-                        aria-label={t("common.saving")}
-                        className="size-[16px]"
-                      />
-                    ) : null
-                  }
-                />
-                <ProviderRow
-                  available={Boolean(
-                    providerStatuses?.claude.installed &&
-                      providerStatuses.claude.authenticated,
-                  )}
-                  description={providerDescription({
-                    authenticated: providerStatuses?.claude.authenticated,
-                    enabled: providerSettings?.claude ?? false,
-                    installed: providerStatuses?.claude.installed,
-                    loading: providersLoading && !providerStatuses,
-                    providerName: "Claude Code",
-                    t,
-                  })}
-                  disabled={
-                    providerSaving !== null || providerInstalling !== null
-                  }
-                  details={
-                    <ProviderDetails
-                      {...providerModelPreferenceProps("claude")}
-                      authenticated={providerStatuses?.claude.authenticated}
-                      installed={providerStatuses?.claude.installed}
-                      loading={providersLoading && !providerStatuses}
-                      loginOpening={providerLoginOpening === "claude"}
-                      models={providerModels.claude}
-                      onLogin={() => void openProviderLogin("claude")}
-                      providerName="Claude"
-                      usage={providerUsage?.claude}
+                  </label>
+                </div>
+                {addableMatches.length === 0 ? (
+                  <div className="px-[18px] py-4">
+                    <Typography as="p" tone="muted" variant="bodySm">
+                      {t(
+                        addableProviders.every((provider) =>
+                          addedProviderSet.has(provider),
+                        )
+                          ? "appSettings.addProviderEmpty"
+                          : "appSettings.addProviderNoMatch",
+                      )}
+                    </Typography>
+                  </div>
+                ) : (
+                  addableMatches.map((provider) => (
+                    <AddProviderRow
+                      adding={providerAdding === provider}
+                      description={t(providerPresentation[provider].descriptionKey)}
+                      disabled={providerAdding !== null || providerRemoving !== null}
+                      installUrl={agentProviderCatalog[provider].installUrl}
+                      key={provider}
+                      label={agentProviderLabels[provider]}
+                      onAdd={() => void addProviderToMachine(provider)}
+                      provider={provider}
                     />
-                  }
-                  detailsId="provider-claude-details"
-                  detailsLabel={t("appSettings.toggleProviderDetails", { provider: "Claude" })}
-                  enabled={providerSettings?.claude ?? false}
-                  expanded={expandedProvider === "claude"}
-                  icon={
-                    <ProviderIcon tone="claude">
-                      <ClaudeIcon size={19} />
-                    </ProviderIcon>
-                  }
-                  name="Claude"
-                  onExpandedChange={(expanded) =>
-                    setExpandedProvider(expanded ? "claude" : null)
-                  }
-                  onToggle={(enabled) => void toggleProvider("claude", enabled)}
-                  title={
-                    <>
-                      Claude
-                      {providerStatuses?.claude.version ? (
-                        <code>{providerStatuses.claude.version}</code>
-                      ) : null}
-                    </>
-                  }
-                  trailing={
-                    providerInstalling === "claude" ? (
-                      <Button
-                        aria-label={t("appSettings.installingProvider", {
-                          provider: "Claude",
-                        })}
-                        disabled
-                        size="sm"
-                        type="button"
-                        variant="outline"
-                      >
-                        <Spinner className="size-[24px]" />
-                        {t("appSettings.installing")}
-                      </Button>
-                    ) : providerStatuses?.claude.installed === false ? (
-                      <Button
-                        aria-label={t("appSettings.installProvider", {
-                          provider: "Claude",
-                        })}
-                        onClick={() => void installProvider("claude")}
-                        size="sm"
-                        type="button"
-                        variant="outline"
-                      >
-                        <Download />
-                        {t("appSettings.install")}
-                      </Button>
-                    ) : providerSaving === "claude" ? (
-                      <Spinner
-                        aria-label={t("common.saving")}
-                        className="size-[16px]"
-                      />
-                    ) : null
-                  }
-                />
-                <ProviderRow
-                  available={Boolean(
-                    providerStatuses?.cursor.installed &&
-                      providerStatuses.cursor.authenticated,
-                  )}
-                  description={providerDescription({
-                    authenticated: providerStatuses?.cursor.authenticated,
-                    enabled: providerSettings?.cursor ?? false,
-                    installed: providerStatuses?.cursor.installed,
-                    loading: providersLoading && !providerStatuses,
-                    providerName: "Cursor CLI",
-                    t,
-                  })}
-                  disabled={
-                    providerSaving !== null || providerInstalling !== null
-                  }
-                  details={
-                    <ProviderDetails
-                      {...providerModelPreferenceProps("cursor")}
-                      authenticated={providerStatuses?.cursor.authenticated}
-                      installed={providerStatuses?.cursor.installed}
-                      loading={providersLoading && !providerStatuses}
-                      loginOpening={providerLoginOpening === "cursor"}
-                      models={providerModels.cursor}
-                      onLogin={() => void openProviderLogin("cursor")}
-                      providerName="Cursor"
-                      usage={providerUsage?.cursor}
-                    />
-                  }
-                  detailsId="provider-cursor-details"
-                  detailsLabel={t("appSettings.toggleProviderDetails", { provider: "Cursor" })}
-                  enabled={providerSettings?.cursor ?? false}
-                  expanded={expandedProvider === "cursor"}
-                  icon={
-                    <ProviderIcon tone="cursor">
-                      <CursorIcon size={19} />
-                    </ProviderIcon>
-                  }
-                  name="Cursor"
-                  onExpandedChange={(expanded) =>
-                    setExpandedProvider(expanded ? "cursor" : null)
-                  }
-                  onToggle={(enabled) => void toggleProvider("cursor", enabled)}
-                  title={
-                    <>
-                      Cursor
-                      {providerStatuses?.cursor.version ? (
-                        <code>{providerStatuses.cursor.version}</code>
-                      ) : null}
-                    </>
-                  }
-                  trailing={
-                    providerInstalling === "cursor" ? (
-                      <Button
-                        aria-label={t("appSettings.installingProvider", {
-                          provider: "Cursor",
-                        })}
-                        disabled
-                        size="sm"
-                        type="button"
-                        variant="outline"
-                      >
-                        <Spinner className="size-[24px]" />
-                        {t("appSettings.installing")}
-                      </Button>
-                    ) : providerStatuses?.cursor.installed === false ? (
-                      <Button
-                        aria-label={t("appSettings.installProvider", {
-                          provider: "Cursor",
-                        })}
-                        onClick={() => void installProvider("cursor")}
-                        size="sm"
-                        type="button"
-                        variant="outline"
-                      >
-                        <Download />
-                        {t("appSettings.install")}
-                      </Button>
-                    ) : providerSaving === "cursor" ? (
-                      <Spinner
-                        aria-label={t("common.saving")}
-                        className="size-[16px]"
-                      />
-                    ) : null
-                  }
-                />
-                <ProviderRow
-                  available={Boolean(
-                    providerStatuses?.grok.installed &&
-                      providerStatuses.grok.authenticated,
-                  )}
-                  description={providerDescription({
-                    authenticated: providerStatuses?.grok.authenticated,
-                    enabled: providerSettings?.grok ?? false,
-                    installed: providerStatuses?.grok.installed,
-                    loading: providersLoading && !providerStatuses,
-                    providerName: "Grok CLI",
-                    t,
-                  })}
-                  disabled={
-                    providerSaving !== null || providerInstalling !== null
-                  }
-                  details={
-                    <ProviderDetails
-                      {...providerModelPreferenceProps("grok")}
-                      authenticated={providerStatuses?.grok.authenticated}
-                      installed={providerStatuses?.grok.installed}
-                      loading={providersLoading && !providerStatuses}
-                      loginOpening={providerLoginOpening === "grok"}
-                      models={providerModels.grok}
-                      onLogin={() => void openProviderLogin("grok")}
-                      providerName="Grok"
-                      usage={providerUsage?.grok}
-                    />
-                  }
-                  detailsId="provider-grok-details"
-                  detailsLabel={t("appSettings.toggleProviderDetails", { provider: "Grok" })}
-                  enabled={providerSettings?.grok ?? false}
-                  expanded={expandedProvider === "grok"}
-                  icon={
-                    <ProviderIcon tone="grok">
-                      <GrokIcon size={19} />
-                    </ProviderIcon>
-                  }
-                  name="Grok"
-                  onExpandedChange={(expanded) =>
-                    setExpandedProvider(expanded ? "grok" : null)
-                  }
-                  onToggle={(enabled) => void toggleProvider("grok", enabled)}
-                  title={
-                    <>
-                      Grok
-                      {providerStatuses?.grok.version ? (
-                        <code>{providerStatuses.grok.version}</code>
-                      ) : null}
-                    </>
-                  }
-                  trailing={
-                    providerInstalling === "grok" ? (
-                      <Button
-                        aria-label={t("appSettings.installingProvider", {
-                          provider: "Grok",
-                        })}
-                        disabled
-                        size="sm"
-                        type="button"
-                        variant="outline"
-                      >
-                        <Spinner className="size-[24px]" />
-                        {t("appSettings.installing")}
-                      </Button>
-                    ) : providerStatuses?.grok.installed === false ? (
-                      <Button
-                        aria-label={t("appSettings.installProvider", {
-                          provider: "Grok",
-                        })}
-                        onClick={() => void installProvider("grok")}
-                        size="sm"
-                        type="button"
-                        variant="outline"
-                      >
-                        <Download />
-                        {t("appSettings.install")}
-                      </Button>
-                    ) : providerSaving === "grok" ? (
-                      <Spinner
-                        aria-label={t("common.saving")}
-                        className="size-[16px]"
-                      />
-                    ) : null
-                  }
-                />
-                <ProviderRow
-                  available={Boolean(
-                    providerStatuses?.agy.installed &&
-                      providerStatuses.agy.authenticated,
-                  )}
-                  description={providerDescription({
-                    authenticated: providerStatuses?.agy.authenticated,
-                    enabled: providerSettings?.agy ?? false,
-                    installed: providerStatuses?.agy.installed,
-                    loading: providersLoading && !providerStatuses,
-                    providerName: "Google Antigravity CLI",
-                    t,
-                  })}
-                  disabled={
-                    providerSaving !== null || providerInstalling !== null
-                  }
-                  details={
-                    <ProviderDetails
-                      {...providerModelPreferenceProps("agy")}
-                      authenticated={providerStatuses?.agy.authenticated}
-                      installed={providerStatuses?.agy.installed}
-                      loading={providersLoading && !providerStatuses}
-                      loginOpening={providerLoginOpening === "agy"}
-                      models={providerModels.agy}
-                      onLogin={() => void openProviderLogin("agy")}
-                      providerName="Antigravity"
-                      usage={providerUsage?.agy}
-                    />
-                  }
-                  detailsId="provider-agy-details"
-                  detailsLabel={t("appSettings.toggleProviderDetails", {
-                    provider: "Antigravity",
-                  })}
-                  enabled={providerSettings?.agy ?? false}
-                  expanded={expandedProvider === "agy"}
-                  icon={
-                    <ProviderIcon tone="agy">
-                      <AntigravityIcon size={19} />
-                    </ProviderIcon>
-                  }
-                  name="Antigravity"
-                  onExpandedChange={(expanded) =>
-                    setExpandedProvider(expanded ? "agy" : null)
-                  }
-                  onToggle={(enabled) => void toggleProvider("agy", enabled)}
-                  title={
-                    <>
-                      Antigravity
-                      {providerStatuses?.agy.version ? (
-                        <code>{providerStatuses.agy.version}</code>
-                      ) : null}
-                    </>
-                  }
-                  trailing={
-                    providerInstalling === "agy" ? (
-                      <Button
-                        aria-label={t("appSettings.installingProvider", {
-                          provider: "Antigravity",
-                        })}
-                        disabled
-                        size="sm"
-                        type="button"
-                        variant="outline"
-                      >
-                        <Spinner className="size-[24px]" />
-                        {t("appSettings.installing")}
-                      </Button>
-                    ) : providerStatuses?.agy.installed === false ? (
-                      <Button
-                        aria-label={t("appSettings.installProvider", {
-                          provider: "Antigravity",
-                        })}
-                        onClick={() => void installProvider("agy")}
-                        size="sm"
-                        type="button"
-                        variant="outline"
-                      >
-                        <Download />
-                        {t("appSettings.install")}
-                      </Button>
-                    ) : providerSaving === "agy" ? (
-                      <Spinner
-                        aria-label={t("common.saving")}
-                        className="size-[16px]"
-                      />
-                    ) : null
-                  }
-                />
-                <ProviderRow
-                  available={Boolean(
-                    providerStatuses?.opencode.installed &&
-                      providerStatuses.opencode.authenticated,
-                  )}
-                  description={providerDescription({
-                    authenticated: providerStatuses?.opencode.authenticated,
-                    enabled: providerSettings?.opencode ?? false,
-                    installed: providerStatuses?.opencode.installed,
-                    loading: providersLoading && !providerStatuses,
-                    providerName: "OpenCode CLI",
-                    t,
-                  }) +
-                    (providerStatuses?.opencode.installed &&
-                    openCodeTerminalPath?.supported
-                      ? ` ${t(
-                          openCodeTerminalPath.configured
-                            ? "appSettings.terminalPathReady"
-                            : "appSettings.terminalPathNeeded",
-                        )}`
-                      : "")}
-                  disabled={
-                    providerSaving !== null || providerInstalling !== null
-                  }
-                  details={
-                    <ProviderDetails
-                      {...providerModelPreferenceProps("opencode")}
-                      authenticated={providerStatuses?.opencode.authenticated}
-                      installed={providerStatuses?.opencode.installed}
-                      loading={providersLoading && !providerStatuses}
-                      loginOpening={providerLoginOpening === "opencode"}
-                      models={providerModels.opencode}
-                      onLogin={() => void openProviderLogin("opencode")}
-                      providerName="OpenCode"
-                      usage={providerUsage?.opencode}
-                    />
-                  }
-                  detailsId="provider-opencode-details"
-                  detailsLabel={t("appSettings.toggleProviderDetails", { provider: "OpenCode" })}
-                  enabled={providerSettings?.opencode ?? false}
-                  expanded={expandedProvider === "opencode"}
-                  icon={
-                    <ProviderIcon tone="opencode">
-                      <OpenCodeIcon size={19} />
-                    </ProviderIcon>
-                  }
-                  name="OpenCode"
-                  onExpandedChange={(expanded) =>
-                    setExpandedProvider(expanded ? "opencode" : null)
-                  }
-                  onToggle={(enabled) =>
-                    void toggleProvider("opencode", enabled)
-                  }
-                  title={
-                    <>
-                      OpenCode
-                      {providerStatuses?.opencode.version ? (
-                        <code>{providerStatuses.opencode.version}</code>
-                      ) : null}
-                    </>
-                  }
-                  trailing={
-                    providerInstalling === "opencode" ? (
-                      <Button
-                        aria-label={t("appSettings.installingProvider", {
-                          provider: "OpenCode",
-                        })}
-                        disabled
-                        size="sm"
-                        type="button"
-                        variant="outline"
-                      >
-                        <Spinner className="size-[24px]" />
-                        {t("appSettings.installing")}
-                      </Button>
-                    ) : providerStatuses?.opencode.installed === false ? (
-                      <Button
-                        aria-label={t("appSettings.installProvider", {
-                          provider: "OpenCode",
-                        })}
-                        onClick={() => void installProvider("opencode")}
-                        size="sm"
-                        type="button"
-                        variant="outline"
-                      >
-                        <Download />
-                        {t("appSettings.install")}
-                      </Button>
-                    ) : openCodeTerminalPath?.supported &&
-                      !openCodeTerminalPath.configured ? (
-                      <Button
-                        aria-label={t("appSettings.configureTerminalPathLabel")}
-                        disabled={terminalPathSaving}
-                        onClick={() => void configureTerminalPath()}
-                        size="sm"
-                        type="button"
-                        variant="outline"
-                      >
-                        {terminalPathSaving ? (
-                          <Spinner className="size-[24px]" />
-                        ) : (
-                          <SquareTerminal />
-                        )}
-                        {t(
-                          terminalPathSaving
-                            ? "appSettings.configuringTerminalPath"
-                            : "appSettings.configureTerminalPath",
-                        )}
-                      </Button>
-                    ) : providerSaving === "opencode" ? (
-                      <Spinner
-                        aria-label={t("common.saving")}
-                        className="size-[16px]"
-                      />
-                    ) : null
-                  }
-                />
-                <ProviderRow
-                  available={Boolean(
-                    providerStatuses?.openrouter.installed &&
-                      providerStatuses.openrouter.authenticated,
-                  )}
-                  description={providerDescription({
-                    authenticated: providerStatuses?.openrouter.authenticated,
-                    enabled: providerSettings?.openrouter ?? false,
-                    installed: providerStatuses?.openrouter.installed,
-                    loading: providersLoading && !providerStatuses,
-                    providerName: "OpenRouter",
-                    t,
-                  })}
-                  disabled={
-                    providerSaving !== null ||
-                    providerInstalling !== null ||
-                    openRouterKeySaving
-                  }
-                  details={
-                    <OpenRouterDetails
-                      {...providerModelPreferenceProps("openrouter")}
-                      apiKey={openRouterApiKey}
-                      configured={openRouterCredential.configured}
-                      installed={providerStatuses?.openrouter.installed}
-                      loading={providersLoading && !providerStatuses}
-                      models={providerModels.openrouter}
-                      onApiKeyChange={setOpenRouterApiKey}
-                      onRemove={() => void saveOpenRouterApiKey(null)}
-                      onSave={() => void saveOpenRouterApiKey(openRouterApiKey)}
-                      saving={openRouterKeySaving}
-                    />
-                  }
-                  detailsId="provider-openrouter-details"
-                  detailsLabel={t("appSettings.toggleProviderDetails", {
-                    provider: "OpenRouter",
-                  })}
-                  enabled={providerSettings?.openrouter ?? false}
-                  expanded={expandedProvider === "openrouter"}
-                  icon={
-                    <ProviderIcon tone="openrouter">
-                      <OpenRouterIcon size={20} />
-                    </ProviderIcon>
-                  }
-                  name="OpenRouter"
-                  onExpandedChange={(expanded) =>
-                    setExpandedProvider(expanded ? "openrouter" : null)
-                  }
-                  onToggle={(enabled) =>
-                    void toggleProvider("openrouter", enabled)
-                  }
-                  title={
-                    <>
-                      OpenRouter
-                      {providerStatuses?.openrouter.version ? (
-                        <code>{providerStatuses.openrouter.version}</code>
-                      ) : null}
-                    </>
-                  }
-                  trailing={
-                    providerInstalling === "openrouter" ? (
-                      <Button disabled size="sm" type="button" variant="outline">
-                        <Spinner className="size-[24px]" />
-                        {t("appSettings.installing")}
-                      </Button>
-                    ) : providerStatuses?.openrouter.installed === false ? (
-                      <Button
-                        aria-label={t("appSettings.installProvider", {
-                          provider: "OpenRouter runtime",
-                        })}
-                        onClick={() => void installProvider("openrouter")}
-                        size="sm"
-                        type="button"
-                        variant="outline"
-                      >
-                        <Download />
-                        {t("appSettings.install")}
-                      </Button>
-                    ) : providerSaving === "openrouter" || openRouterKeySaving ? (
-                      <Spinner
-                        aria-label={t("common.saving")}
-                        className="size-[16px]"
-                      />
-                    ) : null
-                  }
-                />
-                <ProviderRow
-                  available={Boolean(
-                    providerStatuses?.vertex.installed &&
-                      providerStatuses.vertex.authenticated,
-                  )}
-                  description={providerDescription({
-                    authenticated: providerStatuses?.vertex.authenticated,
-                    enabled: providerSettings?.vertex ?? false,
-                    installed: providerStatuses?.vertex.installed,
-                    loading: providersLoading && !providerStatuses,
-                    providerName: "Vertex AI",
-                    t,
-                  })}
-                  disabled={
-                    providerSaving !== null ||
-                    providerInstalling !== null ||
-                    vertexSaving
-                  }
-                  details={
-                    <VertexAiDetails
-                      {...providerModelPreferenceProps("vertex")}
-                      configured={vertexCredential.configured}
-                      installed={providerStatuses?.vertex.installed}
-                      loading={providersLoading && !providerStatuses}
-                      location={vertexLocation}
-                      models={providerModels.vertex}
-                      onLocationChange={setVertexLocation}
-                      onProjectIdChange={setVertexProjectId}
-                      onRemove={() => void saveVertexAiSettings(null, null)}
-                      onSave={() =>
-                        void saveVertexAiSettings(vertexProjectId, vertexLocation)}
-                      projectId={vertexProjectId}
-                      saving={vertexSaving}
-                    />
-                  }
-                  detailsId="provider-vertex-details"
-                  detailsLabel={t("appSettings.toggleProviderDetails", {
-                    provider: "Vertex AI",
-                  })}
-                  enabled={providerSettings?.vertex ?? false}
-                  expanded={expandedProvider === "vertex"}
-                  icon={
-                    <ProviderIcon tone="vertex">
-                      <VertexAiIcon size={20} />
-                    </ProviderIcon>
-                  }
-                  name="Vertex AI"
-                  onExpandedChange={(expanded) =>
-                    setExpandedProvider(expanded ? "vertex" : null)
-                  }
-                  onToggle={(enabled) => void toggleProvider("vertex", enabled)}
-                  title={
-                    <>
-                      Vertex AI
-                      {providerStatuses?.vertex.version ? (
-                        <code>{providerStatuses.vertex.version}</code>
-                      ) : null}
-                    </>
-                  }
-                  trailing={
-                    providerInstalling === "vertex" ? (
-                      <Button disabled size="sm" type="button" variant="outline">
-                        <Spinner className="size-[24px]" />
-                        {t("appSettings.installing")}
-                      </Button>
-                    ) : providerStatuses?.vertex.installed === false ? (
-                      <Button
-                        aria-label={t("appSettings.installProvider", {
-                          provider: "Vertex AI runtime",
-                        })}
-                        onClick={() => void installProvider("vertex")}
-                        size="sm"
-                        type="button"
-                        variant="outline"
-                      >
-                        <Download />
-                        {t("appSettings.install")}
-                      </Button>
-                    ) : providerSaving === "vertex" || vertexSaving ? (
-                      <Spinner
-                        aria-label={t("common.saving")}
-                        className="size-[16px]"
-                      />
-                    ) : null
-                  }
-                />
+                  ))
+                )}
               </SettingsCard>
 
               {providerError ? <SettingsAlert>{providerError}</SettingsAlert> : null}
@@ -2071,6 +1765,149 @@ function ProviderDetails({
         onToggleFavorite={onToggleFavorite}
       />
     </div>
+  );
+}
+
+/**
+ * One provider the machine has not added yet. The row is deliberately quieter
+ * than an installed provider's: it carries no switch and no status dot, only
+ * what the provider is, where its install instructions live, and the button
+ * that adds it.
+ */
+function AddProviderRow({
+  adding,
+  description,
+  disabled,
+  installUrl,
+  label,
+  onAdd,
+  provider,
+}: {
+  adding: boolean;
+  description: string;
+  disabled: boolean;
+  installUrl: string;
+  label: string;
+  onAdd: () => void;
+  provider: AgentProvider;
+}) {
+  const { t } = useI18n();
+  return (
+    <div className="grid min-h-[72px] grid-cols-[34px_minmax(0,1fr)_auto] items-center gap-x-3 border-b border-border/80 px-[18px] py-4 last:border-b-0">
+      <ProviderIcon tone={provider}>
+        <AgentProviderIcon
+          provider={provider}
+          size={providerPresentation[provider].iconSize}
+        />
+      </ProviderIcon>
+      <div className="grid min-w-0 gap-1">
+        <Typography as="strong" className="tracking-tight" variant="body">
+          {label}
+        </Typography>
+        <Typography as="p" tone="muted" variant="bodySm">
+          {description}
+        </Typography>
+        <a
+          className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground underline underline-offset-2"
+          href={installUrl}
+          rel="noreferrer"
+          target="_blank"
+        >
+          {t("appSettings.providerInstallGuide")}
+          <ExternalLink aria-hidden="true" size={11} />
+        </a>
+      </div>
+      <Button
+        aria-label={t("appSettings.addProviderActionLabel", { provider: label })}
+        disabled={disabled}
+        onClick={onAdd}
+        size="sm"
+        type="button"
+        variant="outline"
+      >
+        {adding ? <Spinner className="size-[24px]" /> : <Plus />}
+        {t(adding ? "appSettings.addingProvider" : "appSettings.addProviderAction")}
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * Un-adds a provider from the machine. Confirmation is inline rather than a
+ * modal: removing only hides and disables the provider, and every saved
+ * credential survives, so the step back is cheap.
+ */
+function ProviderRemoveSection({
+  confirming,
+  label,
+  onCancel,
+  onConfirm,
+  onRequest,
+  removing,
+}: {
+  confirming: boolean;
+  label: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+  onRequest: () => void;
+  removing: boolean;
+}) {
+  const { t } = useI18n();
+  return (
+    <section className="grid content-start gap-3 border-t border-border/70 pt-4">
+      <div>
+        <Typography as="h3" className="font-semibold" variant="bodySm">
+          {t("appSettings.removeProvider")}
+        </Typography>
+        <Typography as="p" className="mt-1" tone="muted" variant="caption">
+          {t("appSettings.removeProviderDescription", { provider: label })}
+        </Typography>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {confirming ? (
+          <>
+            <Typography as="p" variant="caption">
+              {t("appSettings.removeProviderConfirm")}
+            </Typography>
+            <Button
+              aria-label={t("appSettings.removeProviderConfirmAction")}
+              disabled={removing}
+              onClick={onConfirm}
+              size="sm"
+              type="button"
+              variant="destructive"
+            >
+              {removing ? <Spinner className="size-[24px]" /> : null}
+              {t(
+                removing
+                  ? "appSettings.removingProvider"
+                  : "appSettings.removeProviderAction",
+              )}
+            </Button>
+            <Button
+              disabled={removing}
+              onClick={onCancel}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              {t("common.cancel")}
+            </Button>
+          </>
+        ) : (
+          <Button
+            disabled={removing}
+            onClick={onRequest}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            <Trash2 />
+            {t("appSettings.removeProviderAction")}
+          </Button>
+        )}
+      </div>
+    </section>
   );
 }
 

@@ -24,6 +24,18 @@ message LocalConfig {
   optional LocalManagedComputerConfig managed_computer = 7;
   repeated LocalProjectConfig projects = 8;
   optional LocalVertexAiCredential vertex_ai = 9;
+  LocalAddedProviders added_providers = 10;
+}
+
+// Providers this machine added on top of the always-listed built-in set.
+//
+// Message presence is load-bearing: an absent message means "never
+// initialised" and is backfilled from the enabled providers and saved
+// credentials on first read, while a present-but-empty message means the user
+// has added nothing. A provider that is not built in and not listed here is
+// inactive everywhere, exactly like a disabled one.
+message LocalAddedProviders {
+  repeated briar.types.v1.AgentProvider providers = 1;
 }
 
 // Omitted boolean fields are disabled. New configs explicitly enable the

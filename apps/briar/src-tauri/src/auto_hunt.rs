@@ -716,7 +716,7 @@ pub(super) async fn start_project_auto_hunt(
             WorkerExecutionServiceClient::new(worker_transport, worker_config);
         let settings = project_llm_settings_from(&config_path, &project_id)?;
         let provider = request.agent_provider;
-        if !provider_is_enabled(&app_provider_settings_from(&config_path)?, provider) {
+        if !provider_is_enabled(&effective_app_provider_settings_from(&config_path)?, provider) {
             return Err(
                 "선택한 에이전트 프로바이더가 앱 설정에서 비활성화되어 있습니다.".to_string(),
             );

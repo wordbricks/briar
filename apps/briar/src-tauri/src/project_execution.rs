@@ -80,7 +80,10 @@ pub(super) async fn project_llm_chat(
                 agent::AgentProviderKind::for_conversation_id(&project_id, conversation_id)
             })
             .unwrap_or(settings.provider);
-        if !provider_is_enabled(&app_provider_settings_from(&config_path)?, provider) {
+        if !provider_is_enabled(
+            &effective_app_provider_settings_from(&config_path)?,
+            provider,
+        ) {
             return Err(
                 "이 대화의 에이전트 프로바이더가 앱 설정에서 비활성화되어 있습니다.".to_string(),
             );
@@ -297,7 +300,10 @@ pub(super) async fn run_project_agent(
         let (runner, connected_workspace) =
             connected_project_runtime(&config_path, &project_id, &home)?;
         let provider = request.agent_provider;
-        if !provider_is_enabled(&app_provider_settings_from(&config_path)?, provider) {
+        if !provider_is_enabled(
+            &effective_app_provider_settings_from(&config_path)?,
+            provider,
+        ) {
             return Err(
                 "선택한 에이전트 프로바이더가 앱 설정에서 비활성화되어 있습니다.".to_string(),
             );

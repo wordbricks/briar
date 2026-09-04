@@ -4,7 +4,11 @@ import {
   type AgentModelCapability,
   type ModelEffort,
 } from "./agent-provider-contract";
-import type { AgentProvider } from "./agent-provider";
+import {
+  agentProviders as agentProviderList,
+  isAgentProviderBuiltIn,
+  type AgentProvider,
+} from "./agent-provider";
 import {
   commands,
   events,
@@ -33,16 +37,15 @@ export type JsonSchema = Record<string, unknown> | boolean;
 
 export const approvalPolicies = ["untrusted", "on-request", "never"] as const;
 
-export const defaultAppProviderSettings = {
-  codex: true,
-  claude: true,
-  cursor: true,
-  grok: true,
-  agy: true,
-  opencode: true,
-  openrouter: true,
-  vertex: true,
-} satisfies AppProviderSettings;
+/**
+ * What a machine with no saved settings reports: the built-in providers on and
+ * everything else off. Derived from the catalog, so it cannot drift from it.
+ */
+export const defaultAppProviderSettings = Object.fromEntries(
+  agentProviderList.map((provider) =>
+    [provider, isAgentProviderBuiltIn(provider)] as const
+  ),
+) as AppProviderSettings;
 
 export type AgentModelOption = {
   value: string;
@@ -453,6 +456,26 @@ export async function updateAppProviderSettings(
 ): Promise<AppProviderSettings> {
   if (!isTauri()) return settings;
   return commands.updateAppProviderSettings(settings);
+}
+
+/** Providers this machine added on top of the built-in set. */
+export async function loadAddedProviders(): Promise<AgentProvider[]> {
+  if (!isTauri()) return [];
+  return commands.loadAddedProviders();
+}
+
+export async function addProvider(
+  provider: AgentProvider,
+): Promise<AgentProvider[]> {
+  if (!isTauri()) return [provider];
+  return commands.addProvider(provider);
+}
+
+export async function removeProvider(
+  provider: AgentProvider,
+): Promise<AgentProvider[]> {
+  if (!isTauri()) return [];
+  return commands.removeProvider(provider);
 }
 
 export async function loadOpenRouterCredentialStatus(): Promise<OpenRouterCredentialStatus> {

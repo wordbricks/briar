@@ -1,9 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
+  addableProviders,
   agentProviderCatalog,
   agentProviderEnvironmentKey,
   agentProviderExecutionEnvironment,
   agentProviders,
+  backfilledAddedProviders,
+  builtInProviders,
+  effectiveEnabledProviders,
+  isProviderActive,
+  normalizeAddedProviders,
   openCodeUpstreamConfigJson,
   openCodeUpstreamModelPrefix,
   openCodeUpstreamOf,
@@ -37,6 +43,74 @@ describe("agent provider catalog", () => {
       );
       expect(upstream.environmentPrefixes.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("built-in and added providers", () => {
+  const allEnabled = Object.fromEntries(
+    agentProviders.map((provider) => [provider, true] as const),
+  ) as Record<(typeof agentProviders)[number], boolean>;
+
+  it("splits every provider into exactly one of the two lists", () => {
+    expect(builtInProviders).toEqual(["codex", "claude", "agy", "opencode"]);
+    expect(addableProviders).toEqual([
+      "cursor",
+      "grok",
+      "openrouter",
+      "vertex",
+    ]);
+    expect([...builtInProviders, ...addableProviders].sort()).toEqual(
+      [...agentProviders].sort(),
+    );
+  });
+
+  it("treats a provider this machine has not added as disabled", () => {
+    expect(isProviderActive("vertex", allEnabled, [])).toBe(false);
+    expect(isProviderActive("vertex", allEnabled, ["vertex"])).toBe(true);
+    // A built-in provider needs no add step, only its switch.
+    expect(isProviderActive("codex", allEnabled, [])).toBe(true);
+    expect(
+      isProviderActive("codex", { ...allEnabled, codex: false }, []),
+    ).toBe(false);
+    // Adding a provider does not switch it on by itself.
+    expect(
+      isProviderActive("grok", { ...allEnabled, grok: false }, ["grok"]),
+    ).toBe(false);
+  });
+
+  it("reports the effective record every consumer decides from", () => {
+    expect(effectiveEnabledProviders(allEnabled, ["grok"])).toEqual({
+      codex: true,
+      claude: true,
+      cursor: false,
+      grok: true,
+      agy: true,
+      opencode: true,
+      openrouter: false,
+      vertex: false,
+    });
+  });
+
+  it("backfills a machine that was already using a provider", () => {
+    const settings = { ...allEnabled, cursor: false, grok: false };
+    expect(
+      backfilledAddedProviders(settings, () => false),
+    ).toEqual(["openrouter", "vertex"]);
+    // A saved credential counts even when the switch is off.
+    expect(
+      backfilledAddedProviders(
+        Object.fromEntries(
+          agentProviders.map((provider) => [provider, false] as const),
+        ) as typeof allEnabled,
+        (provider) => provider === "openrouter",
+      ),
+    ).toEqual(["openrouter"]);
+  });
+
+  it("normalizes a stored list to menu order without built-ins", () => {
+    expect(
+      normalizeAddedProviders(["vertex", "codex", "grok", "vertex"]),
+    ).toEqual(["grok", "vertex"]);
   });
 });
 

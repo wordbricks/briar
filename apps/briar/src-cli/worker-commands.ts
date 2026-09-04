@@ -68,6 +68,7 @@ import {
   openCodeUpstreamConfigured,
   providerExecutionEnvironment,
 } from "./command-support";
+import { enabledAgentProviders } from "./config-contract";
 import {
   maintainRecordedCompletedWorktrees,
   syncCompletedWorktreeRecordsFromDashboard,
@@ -247,14 +248,14 @@ async function workerRegisterCommand() {
   const label = value("--label") ?? defaultWorkerLabel();
   const configuredProvider = project.llm?.provider ?? "codex";
   const providerHealth = await inspectWorkerProviderHealth(
-    config.agentProviders,
+    enabledAgentProviders(config),
     {
       upstreamConfigured: (provider) =>
         openCodeUpstreamConfigured(config, provider),
     },
   );
   const providerCapabilities = await discoverWorkerProviderCapabilities(
-    config.agentProviders,
+    enabledAgentProviders(config),
     { refresh: true },
   );
   const providers = healthyWorkerProviders(providerHealth);
@@ -566,14 +567,14 @@ async function workerCommand() {
 
   if (readinessProblem) {
     const providerHealth = await inspectWorkerProviderHealth(
-      config.agentProviders,
+      enabledAgentProviders(config),
       {
         upstreamConfigured: (provider) =>
           openCodeUpstreamConfigured(config, provider),
       },
     );
     const providerCapabilities = await discoverWorkerProviderCapabilities(
-      config.agentProviders,
+      enabledAgentProviders(config),
     );
     const providers = healthyWorkerProviders(providerHealth);
     const computerUse = await inspectComputerUseCapability(config, providers);
@@ -716,14 +717,14 @@ async function workerCommand() {
           }
         }
         const providerHealth = await inspectWorkerProviderHealth(
-          config.agentProviders,
+          enabledAgentProviders(config),
           {
             upstreamConfigured: (provider) =>
               openCodeUpstreamConfigured(config, provider),
           },
         );
         const providerCapabilities = await discoverWorkerProviderCapabilities(
-          config.agentProviders,
+          enabledAgentProviders(config),
         );
         const providers = healthyWorkerProviders(providerHealth);
         const computerUse = await inspectComputerUseCapability(

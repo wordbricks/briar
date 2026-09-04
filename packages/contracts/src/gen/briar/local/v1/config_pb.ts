@@ -16,7 +16,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file briar/local/v1/config.proto.
  */
 export const file_briar_local_v1_config: GenFile = /*@__PURE__*/
-  fileDesc("Chticmlhci9sb2NhbC92MS9jb25maWcucHJvdG8SDmJyaWFyLmxvY2FsLnYxIqAECgtMb2NhbENvbmZpZxIPCgdhcGlfdXJsGAEgASgJEhcKCnVzZXJfdG9rZW4YAiABKAlIAIgBARJDCg9hZ2VudF9wcm92aWRlcnMYAyABKAsyKi5icmlhci5sb2NhbC52MS5Mb2NhbEFnZW50UHJvdmlkZXJTZXR0aW5ncxIfChJvcGVucm91dGVyX2FwaV9rZXkYBCABKAlIAYgBARI2CgxhcHBfc2V0dGluZ3MYBSABKAsyIC5icmlhci5sb2NhbC52MS5Mb2NhbEFwcFNldHRpbmdzEiMKFndvcmtlcl9kZXZpY2VfaWRlbnRpdHkYBiABKAlIAogBARJJChBtYW5hZ2VkX2NvbXB1dGVyGAcgASgLMiouYnJpYXIubG9jYWwudjEuTG9jYWxNYW5hZ2VkQ29tcHV0ZXJDb25maWdIA4gBARI0Cghwcm9qZWN0cxgIIAMoCzIiLmJyaWFyLmxvY2FsLnYxLkxvY2FsUHJvamVjdENvbmZpZxI/Cgl2ZXJ0ZXhfYWkYCSABKAsyJy5icmlhci5sb2NhbC52MS5Mb2NhbFZlcnRleEFpQ3JlZGVudGlhbEgEiAEBQg0KC191c2VyX3Rva2VuQhUKE19vcGVucm91dGVyX2FwaV9rZXlCGQoXX3dvcmtlcl9kZXZpY2VfaWRlbnRpdHlCEwoRX21hbmFnZWRfY29tcHV0ZXJCDAoKX3ZlcnRleF9haSKcAQoaTG9jYWxBZ2VudFByb3ZpZGVyU2V0dGluZ3MSDQoFY29kZXgYASABKAgSDgoGY2xhdWRlGAIgASgIEg4KBmN1cnNvchgDIAEoCBIMCgRncm9rGAQgASgIEgsKA2FneRgFIAEoCBIQCghvcGVuY29kZRgGIAEoCBISCgpvcGVucm91dGVyGAcgASgIEg4KBnZlcnRleBgIIAEoCCI/ChdMb2NhbFZlcnRleEFpQ3JlZGVudGlhbBISCgpwcm9qZWN0X2lkGAEgASgJEhAKCGxvY2F0aW9uGAIgASgJIrEBChBMb2NhbEFwcFNldHRpbmdzEiMKG3ByZXZlbnRfc2xlZXBfd2hpbGVfcnVubmluZxgBIAEoCBJYChticm93c2VyX2F1dG9tYXRpb25fcHJvdmlkZXIYAiABKA4yLi5icmlhci5sb2NhbC52MS5Mb2NhbEJyb3dzZXJBdXRvbWF0aW9uUHJvdmlkZXJIAIgBAUIeChxfYnJvd3Nlcl9hdXRvbWF0aW9uX3Byb3ZpZGVyIn4KGkxvY2FsTWFuYWdlZENvbXB1dGVyQ29uZmlnEhsKE21hbmFnZWRfY29tcHV0ZXJfaWQYASABKAkSEQoJZGV2aWNlX2lkGAIgASgJEhcKD29yZ2FuaXphdGlvbl9pZBgDIAEoCRIXCg9jcmVkZW50aWFsX2ZpbGUYBCABKAki6gMKEkxvY2FsUHJvamVjdENvbmZpZxIKCgJpZBgBIAEoCRIXCg9yZXBvc2l0b3J5X3BhdGgYAiABKAkSGAoLYWdlbnRfdG9rZW4YAyABKAlIAIgBARIPCgdhcGlfdXJsGAQgASgJEh4KEXJlcG9zaXRvcnlfcmVtb3RlGAUgASgJSAGIAQESNwoDbGxtGAYgASgLMiUuYnJpYXIubG9jYWwudjEuTG9jYWxQcm9qZWN0TGxtQ29uZmlnSAKIAQESOwoJYXV0b19odW50GAcgASgLMiMuYnJpYXIubG9jYWwudjEuTG9jYWxBdXRvSHVudENvbmZpZ0gDiAEBEkkKEGV4ZWN1dGlvbl93b3JrZXIYCCABKAsyKi5icmlhci5sb2NhbC52MS5Mb2NhbEV4ZWN1dGlvbldvcmtlckNvbmZpZ0gEiAEBEkEKDGFjdGl2ZV9jbGFpbRgJIAEoCzImLmJyaWFyLmxvY2FsLnYxLkxvY2FsQWN0aXZlQ2xhaW1Db25maWdIBYgBAUIOCgxfYWdlbnRfdG9rZW5CFAoSX3JlcG9zaXRvcnlfcmVtb3RlQgYKBF9sbG1CDAoKX2F1dG9faHVudEITChFfZXhlY3V0aW9uX3dvcmtlckIPCg1fYWN0aXZlX2NsYWltIu8BChVMb2NhbFByb2plY3RMbG1Db25maWcSNAoIcHJvdmlkZXIYASABKA4yHS5icmlhci50eXBlcy52MS5BZ2VudFByb3ZpZGVySACIAQESEgoFbW9kZWwYAiABKAlIAYgBARITCgZlZmZvcnQYAyABKAlIAogBARJBCg9hcHByb3ZhbF9wb2xpY3kYBCABKA4yIy5icmlhci5sb2NhbC52MS5Mb2NhbEFwcHJvdmFsUG9saWN5SAOIAQFCCwoJX3Byb3ZpZGVyQggKBl9tb2RlbEIJCgdfZWZmb3J0QhIKEF9hcHByb3ZhbF9wb2xpY3ki8QMKE0xvY2FsQXV0b0h1bnRDb25maWcSFgoJdmVsZW5fb3JnGAEgASgJSACIAQESGAoLZGF0YV9zb3VyY2UYAiABKAlIAYgBARI7Cgl3b3JrdHJlZXMYAyABKAsyIy5icmlhci5sb2NhbC52MS5Mb2NhbFdvcmt0cmVlQ29uZmlnSAKIAQESOAoHc2FuZGJveBgEIAEoCzIiLmJyaWFyLmxvY2FsLnYxLkxvY2FsU2FuZGJveENvbmZpZ0gDiAEBEjYKBmxpbmVhchgFIAEoCzIhLmJyaWFyLmxvY2FsLnYxLkxvY2FsTGluZWFyQ29uZmlnSASIAQESHgoRZ2l0aHViX3JlcG9zaXRvcnkYBiABKAlIBYgBARIhChRnaXRodWJfcmVwb3NpdG9yeV9pZBgHIAEoBEgGiAEBEjcKCHdvcmtmbG93GAggASgLMiAuYnJpYXIudHlwZXMudjEuQXV0b0h1bnRXb3JrZmxvd0gHiAEBQgwKCl92ZWxlbl9vcmdCDgoMX2RhdGFfc291cmNlQgwKCl93b3JrdHJlZXNCCgoIX3NhbmRib3hCCQoHX2xpbmVhckIUChJfZ2l0aHViX3JlcG9zaXRvcnlCFwoVX2dpdGh1Yl9yZXBvc2l0b3J5X2lkQgsKCV93b3JrZmxvdyKBAQoTTG9jYWxXb3JrdHJlZUNvbmZpZxIUCgdlbmFibGVkGAEgASgISACIAQESEQoEcm9vdBgCIAEoCUgBiAEBEhoKDWJyYW5jaF9wcmVmaXgYAyABKAlIAogBAUIKCghfZW5hYmxlZEIHCgVfcm9vdEIQCg5fYnJhbmNoX3ByZWZpeCI+ChJMb2NhbFNhbmRib3hDb25maWcSGAoLZnVsbF9hY2Nlc3MYASABKAhIAIgBAUIOCgxfZnVsbF9hY2Nlc3MiaAoRTG9jYWxMaW5lYXJDb25maWcSDwoHZW5hYmxlZBgBIAEoCBITCgZzb3VyY2UYAiABKAlIAIgBARIVCgh0ZWFtX2tleRgDIAEoCUgBiAEBQgkKB19zb3VyY2VCCwoJX3RlYW1fa2V5IqkBChpMb2NhbEV4ZWN1dGlvbldvcmtlckNvbmZpZxIRCglkZXZpY2VfaWQYASABKAkSEQoJd29ya2VyX2lkGAIgASgJEhcKD29yZ2FuaXphdGlvbl9pZBgDIAEoCRISCgV0b2tlbhgEIAEoCUgAiAEBEg0KBWxhYmVsGAUgASgJEh8KF21heF9jb25jdXJyZW50X3Nlc3Npb25zGAYgASgNQggKBl90b2tlbiKkAwoWTG9jYWxBY3RpdmVDbGFpbUNvbmZpZxIOCgZydW5faWQYASABKAkSEgoKc291cmNlX2tleRgCIAEoCRISCgV0b2tlbhgDIAEoCUgAiAEBEjQKEGxlYXNlX2V4cGlyZXNfYXQYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEj8KCHdvcmt0cmVlGAUgASgLMiguYnJpYXIubG9jYWwudjEuTG9jYWxDbGFpbVdvcmt0cmVlQ29uZmlnSAGIAQESFQoIZmluaXNoZWQYBiABKAhIAogBARJGCg90ZXJtaW5hbF9zdGF0dXMYByABKA4yKC5icmlhci5sb2NhbC52MS5Mb2NhbENsYWltVGVybWluYWxTdGF0dXNIA4gBARI0CgtmaW5pc2hlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBIBIgBAUIICgZfdG9rZW5CCwoJX3dvcmt0cmVlQgsKCV9maW5pc2hlZEISChBfdGVybWluYWxfc3RhdHVzQg4KDF9maW5pc2hlZF9hdCJcChhMb2NhbENsYWltV29ya3RyZWVDb25maWcSDAoEcGF0aBgBIAEoCRIOCgZicmFuY2gYAiABKAkSEAoIYmFzZV9yZWYYAyABKAkSEAoIYmFzZV9zaGEYBCABKAkq6AEKHkxvY2FsQnJvd3NlckF1dG9tYXRpb25Qcm92aWRlchIxCi1MT0NBTF9CUk9XU0VSX0FVVE9NQVRJT05fUFJPVklERVJfVU5TUEVDSUZJRUQQABIxCi1MT0NBTF9CUk9XU0VSX0FVVE9NQVRJT05fUFJPVklERVJfRUdPX0JST1dTRVIQARIzCi9MT0NBTF9CUk9XU0VSX0FVVE9NQVRJT05fUFJPVklERVJfQUdFTlRfQlJPV1NFUhACEisKJ0xPQ0FMX0JST1dTRVJfQVVUT01BVElPTl9QUk9WSURFUl9BU0lERRADKqgBChNMb2NhbEFwcHJvdmFsUG9saWN5EiUKIUxPQ0FMX0FQUFJPVkFMX1BPTElDWV9VTlNQRUNJRklFRBAAEiMKH0xPQ0FMX0FQUFJPVkFMX1BPTElDWV9VTlRSVVNURUQQARIkCiBMT0NBTF9BUFBST1ZBTF9QT0xJQ1lfT05fUkVRVUVTVBACEh8KG0xPQ0FMX0FQUFJPVkFMX1BPTElDWV9ORVZFUhADKu4BChhMb2NhbENsYWltVGVybWluYWxTdGF0dXMSKwonTE9DQUxfQ0xBSU1fVEVSTUlOQUxfU1RBVFVTX1VOU1BFQ0lGSUVEEAASKQolTE9DQUxfQ0xBSU1fVEVSTUlOQUxfU1RBVFVTX0NPTVBMRVRFRBABEikKJUxPQ0FMX0NMQUlNX1RFUk1JTkFMX1NUQVRVU19DQU5DRUxMRUQQAhInCiNMT0NBTF9DTEFJTV9URVJNSU5BTF9TVEFUVVNfQkxPQ0tFRBADEiYKIkxPQ0FMX0NMQUlNX1RFUk1JTkFMX1NUQVRVU19GQUlMRUQQBEIOugILQnJpYXJMb2NhbF9iBnByb3RvMw", [file_briar_types_v1_provider, file_briar_types_v1_workflow, file_google_protobuf_timestamp]);
+  fileDesc("Chticmlhci9sb2NhbC92MS9jb25maWcucHJvdG8SDmJyaWFyLmxvY2FsLnYxIt4ECgtMb2NhbENvbmZpZxIPCgdhcGlfdXJsGAEgASgJEhcKCnVzZXJfdG9rZW4YAiABKAlIAIgBARJDCg9hZ2VudF9wcm92aWRlcnMYAyABKAsyKi5icmlhci5sb2NhbC52MS5Mb2NhbEFnZW50UHJvdmlkZXJTZXR0aW5ncxIfChJvcGVucm91dGVyX2FwaV9rZXkYBCABKAlIAYgBARI2CgxhcHBfc2V0dGluZ3MYBSABKAsyIC5icmlhci5sb2NhbC52MS5Mb2NhbEFwcFNldHRpbmdzEiMKFndvcmtlcl9kZXZpY2VfaWRlbnRpdHkYBiABKAlIAogBARJJChBtYW5hZ2VkX2NvbXB1dGVyGAcgASgLMiouYnJpYXIubG9jYWwudjEuTG9jYWxNYW5hZ2VkQ29tcHV0ZXJDb25maWdIA4gBARI0Cghwcm9qZWN0cxgIIAMoCzIiLmJyaWFyLmxvY2FsLnYxLkxvY2FsUHJvamVjdENvbmZpZxI/Cgl2ZXJ0ZXhfYWkYCSABKAsyJy5icmlhci5sb2NhbC52MS5Mb2NhbFZlcnRleEFpQ3JlZGVudGlhbEgEiAEBEjwKD2FkZGVkX3Byb3ZpZGVycxgKIAEoCzIjLmJyaWFyLmxvY2FsLnYxLkxvY2FsQWRkZWRQcm92aWRlcnNCDQoLX3VzZXJfdG9rZW5CFQoTX29wZW5yb3V0ZXJfYXBpX2tleUIZChdfd29ya2VyX2RldmljZV9pZGVudGl0eUITChFfbWFuYWdlZF9jb21wdXRlckIMCgpfdmVydGV4X2FpIkcKE0xvY2FsQWRkZWRQcm92aWRlcnMSMAoJcHJvdmlkZXJzGAEgAygOMh0uYnJpYXIudHlwZXMudjEuQWdlbnRQcm92aWRlciKcAQoaTG9jYWxBZ2VudFByb3ZpZGVyU2V0dGluZ3MSDQoFY29kZXgYASABKAgSDgoGY2xhdWRlGAIgASgIEg4KBmN1cnNvchgDIAEoCBIMCgRncm9rGAQgASgIEgsKA2FneRgFIAEoCBIQCghvcGVuY29kZRgGIAEoCBISCgpvcGVucm91dGVyGAcgASgIEg4KBnZlcnRleBgIIAEoCCI/ChdMb2NhbFZlcnRleEFpQ3JlZGVudGlhbBISCgpwcm9qZWN0X2lkGAEgASgJEhAKCGxvY2F0aW9uGAIgASgJIrEBChBMb2NhbEFwcFNldHRpbmdzEiMKG3ByZXZlbnRfc2xlZXBfd2hpbGVfcnVubmluZxgBIAEoCBJYChticm93c2VyX2F1dG9tYXRpb25fcHJvdmlkZXIYAiABKA4yLi5icmlhci5sb2NhbC52MS5Mb2NhbEJyb3dzZXJBdXRvbWF0aW9uUHJvdmlkZXJIAIgBAUIeChxfYnJvd3Nlcl9hdXRvbWF0aW9uX3Byb3ZpZGVyIn4KGkxvY2FsTWFuYWdlZENvbXB1dGVyQ29uZmlnEhsKE21hbmFnZWRfY29tcHV0ZXJfaWQYASABKAkSEQoJZGV2aWNlX2lkGAIgASgJEhcKD29yZ2FuaXphdGlvbl9pZBgDIAEoCRIXCg9jcmVkZW50aWFsX2ZpbGUYBCABKAki6gMKEkxvY2FsUHJvamVjdENvbmZpZxIKCgJpZBgBIAEoCRIXCg9yZXBvc2l0b3J5X3BhdGgYAiABKAkSGAoLYWdlbnRfdG9rZW4YAyABKAlIAIgBARIPCgdhcGlfdXJsGAQgASgJEh4KEXJlcG9zaXRvcnlfcmVtb3RlGAUgASgJSAGIAQESNwoDbGxtGAYgASgLMiUuYnJpYXIubG9jYWwudjEuTG9jYWxQcm9qZWN0TGxtQ29uZmlnSAKIAQESOwoJYXV0b19odW50GAcgASgLMiMuYnJpYXIubG9jYWwudjEuTG9jYWxBdXRvSHVudENvbmZpZ0gDiAEBEkkKEGV4ZWN1dGlvbl93b3JrZXIYCCABKAsyKi5icmlhci5sb2NhbC52MS5Mb2NhbEV4ZWN1dGlvbldvcmtlckNvbmZpZ0gEiAEBEkEKDGFjdGl2ZV9jbGFpbRgJIAEoCzImLmJyaWFyLmxvY2FsLnYxLkxvY2FsQWN0aXZlQ2xhaW1Db25maWdIBYgBAUIOCgxfYWdlbnRfdG9rZW5CFAoSX3JlcG9zaXRvcnlfcmVtb3RlQgYKBF9sbG1CDAoKX2F1dG9faHVudEITChFfZXhlY3V0aW9uX3dvcmtlckIPCg1fYWN0aXZlX2NsYWltIu8BChVMb2NhbFByb2plY3RMbG1Db25maWcSNAoIcHJvdmlkZXIYASABKA4yHS5icmlhci50eXBlcy52MS5BZ2VudFByb3ZpZGVySACIAQESEgoFbW9kZWwYAiABKAlIAYgBARITCgZlZmZvcnQYAyABKAlIAogBARJBCg9hcHByb3ZhbF9wb2xpY3kYBCABKA4yIy5icmlhci5sb2NhbC52MS5Mb2NhbEFwcHJvdmFsUG9saWN5SAOIAQFCCwoJX3Byb3ZpZGVyQggKBl9tb2RlbEIJCgdfZWZmb3J0QhIKEF9hcHByb3ZhbF9wb2xpY3ki8QMKE0xvY2FsQXV0b0h1bnRDb25maWcSFgoJdmVsZW5fb3JnGAEgASgJSACIAQESGAoLZGF0YV9zb3VyY2UYAiABKAlIAYgBARI7Cgl3b3JrdHJlZXMYAyABKAsyIy5icmlhci5sb2NhbC52MS5Mb2NhbFdvcmt0cmVlQ29uZmlnSAKIAQESOAoHc2FuZGJveBgEIAEoCzIiLmJyaWFyLmxvY2FsLnYxLkxvY2FsU2FuZGJveENvbmZpZ0gDiAEBEjYKBmxpbmVhchgFIAEoCzIhLmJyaWFyLmxvY2FsLnYxLkxvY2FsTGluZWFyQ29uZmlnSASIAQESHgoRZ2l0aHViX3JlcG9zaXRvcnkYBiABKAlIBYgBARIhChRnaXRodWJfcmVwb3NpdG9yeV9pZBgHIAEoBEgGiAEBEjcKCHdvcmtmbG93GAggASgLMiAuYnJpYXIudHlwZXMudjEuQXV0b0h1bnRXb3JrZmxvd0gHiAEBQgwKCl92ZWxlbl9vcmdCDgoMX2RhdGFfc291cmNlQgwKCl93b3JrdHJlZXNCCgoIX3NhbmRib3hCCQoHX2xpbmVhckIUChJfZ2l0aHViX3JlcG9zaXRvcnlCFwoVX2dpdGh1Yl9yZXBvc2l0b3J5X2lkQgsKCV93b3JrZmxvdyKBAQoTTG9jYWxXb3JrdHJlZUNvbmZpZxIUCgdlbmFibGVkGAEgASgISACIAQESEQoEcm9vdBgCIAEoCUgBiAEBEhoKDWJyYW5jaF9wcmVmaXgYAyABKAlIAogBAUIKCghfZW5hYmxlZEIHCgVfcm9vdEIQCg5fYnJhbmNoX3ByZWZpeCI+ChJMb2NhbFNhbmRib3hDb25maWcSGAoLZnVsbF9hY2Nlc3MYASABKAhIAIgBAUIOCgxfZnVsbF9hY2Nlc3MiaAoRTG9jYWxMaW5lYXJDb25maWcSDwoHZW5hYmxlZBgBIAEoCBITCgZzb3VyY2UYAiABKAlIAIgBARIVCgh0ZWFtX2tleRgDIAEoCUgBiAEBQgkKB19zb3VyY2VCCwoJX3RlYW1fa2V5IqkBChpMb2NhbEV4ZWN1dGlvbldvcmtlckNvbmZpZxIRCglkZXZpY2VfaWQYASABKAkSEQoJd29ya2VyX2lkGAIgASgJEhcKD29yZ2FuaXphdGlvbl9pZBgDIAEoCRISCgV0b2tlbhgEIAEoCUgAiAEBEg0KBWxhYmVsGAUgASgJEh8KF21heF9jb25jdXJyZW50X3Nlc3Npb25zGAYgASgNQggKBl90b2tlbiKkAwoWTG9jYWxBY3RpdmVDbGFpbUNvbmZpZxIOCgZydW5faWQYASABKAkSEgoKc291cmNlX2tleRgCIAEoCRISCgV0b2tlbhgDIAEoCUgAiAEBEjQKEGxlYXNlX2V4cGlyZXNfYXQYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEj8KCHdvcmt0cmVlGAUgASgLMiguYnJpYXIubG9jYWwudjEuTG9jYWxDbGFpbVdvcmt0cmVlQ29uZmlnSAGIAQESFQoIZmluaXNoZWQYBiABKAhIAogBARJGCg90ZXJtaW5hbF9zdGF0dXMYByABKA4yKC5icmlhci5sb2NhbC52MS5Mb2NhbENsYWltVGVybWluYWxTdGF0dXNIA4gBARI0CgtmaW5pc2hlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBIBIgBAUIICgZfdG9rZW5CCwoJX3dvcmt0cmVlQgsKCV9maW5pc2hlZEISChBfdGVybWluYWxfc3RhdHVzQg4KDF9maW5pc2hlZF9hdCJcChhMb2NhbENsYWltV29ya3RyZWVDb25maWcSDAoEcGF0aBgBIAEoCRIOCgZicmFuY2gYAiABKAkSEAoIYmFzZV9yZWYYAyABKAkSEAoIYmFzZV9zaGEYBCABKAkq6AEKHkxvY2FsQnJvd3NlckF1dG9tYXRpb25Qcm92aWRlchIxCi1MT0NBTF9CUk9XU0VSX0FVVE9NQVRJT05fUFJPVklERVJfVU5TUEVDSUZJRUQQABIxCi1MT0NBTF9CUk9XU0VSX0FVVE9NQVRJT05fUFJPVklERVJfRUdPX0JST1dTRVIQARIzCi9MT0NBTF9CUk9XU0VSX0FVVE9NQVRJT05fUFJPVklERVJfQUdFTlRfQlJPV1NFUhACEisKJ0xPQ0FMX0JST1dTRVJfQVVUT01BVElPTl9QUk9WSURFUl9BU0lERRADKqgBChNMb2NhbEFwcHJvdmFsUG9saWN5EiUKIUxPQ0FMX0FQUFJPVkFMX1BPTElDWV9VTlNQRUNJRklFRBAAEiMKH0xPQ0FMX0FQUFJPVkFMX1BPTElDWV9VTlRSVVNURUQQARIkCiBMT0NBTF9BUFBST1ZBTF9QT0xJQ1lfT05fUkVRVUVTVBACEh8KG0xPQ0FMX0FQUFJPVkFMX1BPTElDWV9ORVZFUhADKu4BChhMb2NhbENsYWltVGVybWluYWxTdGF0dXMSKwonTE9DQUxfQ0xBSU1fVEVSTUlOQUxfU1RBVFVTX1VOU1BFQ0lGSUVEEAASKQolTE9DQUxfQ0xBSU1fVEVSTUlOQUxfU1RBVFVTX0NPTVBMRVRFRBABEikKJUxPQ0FMX0NMQUlNX1RFUk1JTkFMX1NUQVRVU19DQU5DRUxMRUQQAhInCiNMT0NBTF9DTEFJTV9URVJNSU5BTF9TVEFUVVNfQkxPQ0tFRBADEiYKIkxPQ0FMX0NMQUlNX1RFUk1JTkFMX1NUQVRVU19GQUlMRUQQBEIOugILQnJpYXJMb2NhbF9iBnByb3RvMw", [file_briar_types_v1_provider, file_briar_types_v1_workflow, file_google_protobuf_timestamp]);
 
 /**
  * Canonical ProtoJSON persisted at ~/.config/briar/config.json.
@@ -73,6 +73,11 @@ export type LocalConfig = Message<"briar.local.v1.LocalConfig"> & {
    * @generated from field: optional briar.local.v1.LocalVertexAiCredential vertex_ai = 9;
    */
   vertexAi?: LocalVertexAiCredential | undefined;
+
+  /**
+   * @generated from field: briar.local.v1.LocalAddedProviders added_providers = 10;
+   */
+  addedProviders?: LocalAddedProviders | undefined;
 };
 
 /**
@@ -81,6 +86,31 @@ export type LocalConfig = Message<"briar.local.v1.LocalConfig"> & {
  */
 export const LocalConfigSchema: GenMessage<LocalConfig> = /*@__PURE__*/
   messageDesc(file_briar_local_v1_config, 0);
+
+/**
+ * Providers this machine added on top of the always-listed built-in set.
+ *
+ * Message presence is load-bearing: an absent message means "never
+ * initialised" and is backfilled from the enabled providers and saved
+ * credentials on first read, while a present-but-empty message means the user
+ * has added nothing. A provider that is not built in and not listed here is
+ * inactive everywhere, exactly like a disabled one.
+ *
+ * @generated from message briar.local.v1.LocalAddedProviders
+ */
+export type LocalAddedProviders = Message<"briar.local.v1.LocalAddedProviders"> & {
+  /**
+   * @generated from field: repeated briar.types.v1.AgentProvider providers = 1;
+   */
+  providers: AgentProvider[];
+};
+
+/**
+ * Describes the message briar.local.v1.LocalAddedProviders.
+ * Use `create(LocalAddedProvidersSchema)` to create a new message.
+ */
+export const LocalAddedProvidersSchema: GenMessage<LocalAddedProviders> = /*@__PURE__*/
+  messageDesc(file_briar_local_v1_config, 1);
 
 /**
  * Omitted boolean fields are disabled. New configs explicitly enable the
@@ -135,7 +165,7 @@ export type LocalAgentProviderSettings = Message<"briar.local.v1.LocalAgentProvi
  * Use `create(LocalAgentProviderSettingsSchema)` to create a new message.
  */
 export const LocalAgentProviderSettingsSchema: GenMessage<LocalAgentProviderSettings> = /*@__PURE__*/
-  messageDesc(file_briar_local_v1_config, 1);
+  messageDesc(file_briar_local_v1_config, 2);
 
 /**
  * Google Vertex AI is addressed by project and region; the credential itself
@@ -160,7 +190,7 @@ export type LocalVertexAiCredential = Message<"briar.local.v1.LocalVertexAiCrede
  * Use `create(LocalVertexAiCredentialSchema)` to create a new message.
  */
 export const LocalVertexAiCredentialSchema: GenMessage<LocalVertexAiCredential> = /*@__PURE__*/
-  messageDesc(file_briar_local_v1_config, 2);
+  messageDesc(file_briar_local_v1_config, 3);
 
 /**
  * @generated from message briar.local.v1.LocalAppSettings
@@ -182,7 +212,7 @@ export type LocalAppSettings = Message<"briar.local.v1.LocalAppSettings"> & {
  * Use `create(LocalAppSettingsSchema)` to create a new message.
  */
 export const LocalAppSettingsSchema: GenMessage<LocalAppSettings> = /*@__PURE__*/
-  messageDesc(file_briar_local_v1_config, 3);
+  messageDesc(file_briar_local_v1_config, 4);
 
 /**
  * @generated from message briar.local.v1.LocalManagedComputerConfig
@@ -214,7 +244,7 @@ export type LocalManagedComputerConfig = Message<"briar.local.v1.LocalManagedCom
  * Use `create(LocalManagedComputerConfigSchema)` to create a new message.
  */
 export const LocalManagedComputerConfigSchema: GenMessage<LocalManagedComputerConfig> = /*@__PURE__*/
-  messageDesc(file_briar_local_v1_config, 4);
+  messageDesc(file_briar_local_v1_config, 5);
 
 /**
  * @generated from message briar.local.v1.LocalProjectConfig
@@ -271,7 +301,7 @@ export type LocalProjectConfig = Message<"briar.local.v1.LocalProjectConfig"> & 
  * Use `create(LocalProjectConfigSchema)` to create a new message.
  */
 export const LocalProjectConfigSchema: GenMessage<LocalProjectConfig> = /*@__PURE__*/
-  messageDesc(file_briar_local_v1_config, 5);
+  messageDesc(file_briar_local_v1_config, 6);
 
 /**
  * @generated from message briar.local.v1.LocalProjectLlmConfig
@@ -303,7 +333,7 @@ export type LocalProjectLlmConfig = Message<"briar.local.v1.LocalProjectLlmConfi
  * Use `create(LocalProjectLlmConfigSchema)` to create a new message.
  */
 export const LocalProjectLlmConfigSchema: GenMessage<LocalProjectLlmConfig> = /*@__PURE__*/
-  messageDesc(file_briar_local_v1_config, 6);
+  messageDesc(file_briar_local_v1_config, 7);
 
 /**
  * @generated from message briar.local.v1.LocalAutoHuntConfig
@@ -355,7 +385,7 @@ export type LocalAutoHuntConfig = Message<"briar.local.v1.LocalAutoHuntConfig"> 
  * Use `create(LocalAutoHuntConfigSchema)` to create a new message.
  */
 export const LocalAutoHuntConfigSchema: GenMessage<LocalAutoHuntConfig> = /*@__PURE__*/
-  messageDesc(file_briar_local_v1_config, 7);
+  messageDesc(file_briar_local_v1_config, 8);
 
 /**
  * @generated from message briar.local.v1.LocalWorktreeConfig
@@ -384,7 +414,7 @@ export type LocalWorktreeConfig = Message<"briar.local.v1.LocalWorktreeConfig"> 
  * Use `create(LocalWorktreeConfigSchema)` to create a new message.
  */
 export const LocalWorktreeConfigSchema: GenMessage<LocalWorktreeConfig> = /*@__PURE__*/
-  messageDesc(file_briar_local_v1_config, 8);
+  messageDesc(file_briar_local_v1_config, 9);
 
 /**
  * @generated from message briar.local.v1.LocalSandboxConfig
@@ -403,7 +433,7 @@ export type LocalSandboxConfig = Message<"briar.local.v1.LocalSandboxConfig"> & 
  * Use `create(LocalSandboxConfigSchema)` to create a new message.
  */
 export const LocalSandboxConfigSchema: GenMessage<LocalSandboxConfig> = /*@__PURE__*/
-  messageDesc(file_briar_local_v1_config, 9);
+  messageDesc(file_briar_local_v1_config, 10);
 
 /**
  * @generated from message briar.local.v1.LocalLinearConfig
@@ -430,7 +460,7 @@ export type LocalLinearConfig = Message<"briar.local.v1.LocalLinearConfig"> & {
  * Use `create(LocalLinearConfigSchema)` to create a new message.
  */
 export const LocalLinearConfigSchema: GenMessage<LocalLinearConfig> = /*@__PURE__*/
-  messageDesc(file_briar_local_v1_config, 10);
+  messageDesc(file_briar_local_v1_config, 11);
 
 /**
  * @generated from message briar.local.v1.LocalExecutionWorkerConfig
@@ -472,7 +502,7 @@ export type LocalExecutionWorkerConfig = Message<"briar.local.v1.LocalExecutionW
  * Use `create(LocalExecutionWorkerConfigSchema)` to create a new message.
  */
 export const LocalExecutionWorkerConfigSchema: GenMessage<LocalExecutionWorkerConfig> = /*@__PURE__*/
-  messageDesc(file_briar_local_v1_config, 11);
+  messageDesc(file_briar_local_v1_config, 12);
 
 /**
  * @generated from message briar.local.v1.LocalActiveClaimConfig
@@ -524,7 +554,7 @@ export type LocalActiveClaimConfig = Message<"briar.local.v1.LocalActiveClaimCon
  * Use `create(LocalActiveClaimConfigSchema)` to create a new message.
  */
 export const LocalActiveClaimConfigSchema: GenMessage<LocalActiveClaimConfig> = /*@__PURE__*/
-  messageDesc(file_briar_local_v1_config, 12);
+  messageDesc(file_briar_local_v1_config, 13);
 
 /**
  * @generated from message briar.local.v1.LocalClaimWorktreeConfig
@@ -556,7 +586,7 @@ export type LocalClaimWorktreeConfig = Message<"briar.local.v1.LocalClaimWorktre
  * Use `create(LocalClaimWorktreeConfigSchema)` to create a new message.
  */
 export const LocalClaimWorktreeConfigSchema: GenMessage<LocalClaimWorktreeConfig> = /*@__PURE__*/
-  messageDesc(file_briar_local_v1_config, 13);
+  messageDesc(file_briar_local_v1_config, 14);
 
 /**
  * @generated from enum briar.local.v1.LocalBrowserAutomationProvider

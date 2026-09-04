@@ -1,4 +1,5 @@
 use super::*;
+use briar_contracts::proto::briar::types::v1 as types_proto;
 
 pub(super) struct LocalProjectAgentConfig {
     pub(super) llm: agent::ProjectLlmSettings,
@@ -614,13 +615,80 @@ pub(super) fn project_llm_settings_from(
         .map(|settings| settings.unwrap_or_default())
 }
 
-pub(super) fn app_provider_settings_from(
+/// The switches with a provider this machine has not added forced off. Every
+/// availability decision reads this, so a provider that was never added is
+/// refused exactly like a disabled one.
+pub(super) fn effective_app_provider_settings_from(
     config_path: &Path,
 ) -> Result<LocalAgentProviderSettings, String> {
-    read_cli_config(config_path)?
+    let config = read_cli_config(config_path)?;
+    config
         .agent_providers
-        .into_option()
-        .ok_or_else(|| "Briar 로컬 설정의 agentProviders 값이 없습니다.".to_string())
+        .as_option()
+        .ok_or_else(|| "Briar 로컬 설정의 agentProviders 값이 없습니다.".to_string())?;
+    Ok(effective_provider_settings(&config))
+}
+
+pub(super) fn added_providers_from(
+    config_path: &Path,
+) -> Result<Vec<agent::AgentProviderKind>, String> {
+    Ok(added_providers(&read_cli_config(config_path)?))
+}
+
+/// Add a provider on this machine, which also enables it. Adding a built-in
+/// provider only enables it: built-ins are always listed.
+pub(super) fn add_provider_at(
+    config_path: &Path,
+    provider: agent::AgentProviderKind,
+) -> Result<Vec<agent::AgentProviderKind>, String> {
+    let mut config = read_cli_config(config_path)?;
+    let mut stored = added_providers(&config);
+    if !provider.built_in() && !stored.contains(&provider) {
+        stored.push(provider);
+    }
+    write_added_providers(&mut config, &stored, provider, true);
+    write_cli_config(config_path, &config)?;
+    Ok(added_providers(&config))
+}
+
+/// Un-add a provider, which also disables it. A built-in provider cannot be
+/// removed; the settings screen only offers this on an added one.
+pub(super) fn remove_provider_at(
+    config_path: &Path,
+    provider: agent::AgentProviderKind,
+) -> Result<Vec<agent::AgentProviderKind>, String> {
+    if provider.built_in() {
+        return Err("기본 지원 프로바이더는 삭제할 수 없습니다.".to_string());
+    }
+    let mut config = read_cli_config(config_path)?;
+    let stored = added_providers(&config)
+        .into_iter()
+        .filter(|candidate| *candidate != provider)
+        .collect::<Vec<_>>();
+    write_added_providers(&mut config, &stored, provider, false);
+    write_cli_config(config_path, &config)?;
+    Ok(added_providers(&config))
+}
+
+fn write_added_providers(
+    config: &mut LocalConfig,
+    added: &[agent::AgentProviderKind],
+    provider: agent::AgentProviderKind,
+    enabled: bool,
+) {
+    config.added_providers = LocalAddedProviders {
+        providers: added
+            .iter()
+            .map(|provider| types_proto::AgentProvider::from(*provider).into())
+            .collect(),
+        ..Default::default()
+    }
+    .into();
+    set_provider_enabled(
+        config.agent_providers.get_or_insert_default(),
+        provider,
+        enabled,
+    );
 }
 
 pub(super) fn openrouter_api_key_from(config_path: &Path) -> Result<Option<String>, String> {
@@ -853,11 +921,13 @@ pub(super) fn update_app_provider_settings_at(
     config_path: &Path,
     settings: LocalAgentProviderSettings,
 ) -> Result<LocalAgentProviderSettings, String> {
-    if !providers_any_enabled(&settings) {
-        return Err("하나 이상의 에이전트 프로바이더를 활성화해야 합니다.".to_string());
-    }
     let mut config = read_cli_config(config_path)?;
     config.agent_providers = settings.clone().into();
+    // "At least one" counts only providers this machine can actually use, so a
+    // switch left on for a provider that was never added does not pass for one.
+    if !providers_any_enabled(&effective_provider_settings(&config)) {
+        return Err("하나 이상의 에이전트 프로바이더를 활성화해야 합니다.".to_string());
+    }
     write_cli_config(config_path, &config)?;
     Ok(settings)
 }
@@ -920,13 +990,7 @@ pub(super) fn update_project_llm_settings_at(
         return Err("모델 ID는 공백 없이 128자 이하여야 합니다.".to_string());
     }
     let mut config = read_cli_config(config_path)?;
-    if !provider_is_enabled(
-        config
-            .agent_providers
-            .as_option()
-            .expect("validated provider settings"),
-        settings.provider,
-    ) {
+    if !provider_is_active(&config, settings.provider) {
         return Err("앱 설정에서 먼저 이 에이전트 프로바이더를 활성화하세요.".to_string());
     }
     let project = config

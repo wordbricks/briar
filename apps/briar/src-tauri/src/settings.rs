@@ -2,15 +2,58 @@ use super::*;
 
 #[tauri::command]
 #[specta::specta]
+/// The provider switches as everything else sees them: a provider this machine
+/// has not added reads as off, so no screen can offer one the runtime refuses.
+/// For a built-in or added provider this is the saved value.
 pub(super) async fn load_app_provider_settings(
     app: tauri::AppHandle,
 ) -> Result<AppProviderSettings, String> {
     let config_path = cli_config_path(&app)?;
     tauri::async_runtime::spawn_blocking(move || {
-        app_provider_settings_from(&config_path).map(AppProviderSettings::from)
+        effective_app_provider_settings_from(&config_path).map(AppProviderSettings::from)
     })
     .await
     .map_err(|error| error.to_string())?
+}
+
+/// Providers this machine added on top of the built-in set. The settings screen
+/// lists the built-in providers plus these, and offers the rest under "Add
+/// provider".
+#[tauri::command]
+#[specta::specta]
+pub(super) async fn load_added_providers(
+    app: tauri::AppHandle,
+) -> Result<Vec<agent::AgentProviderKind>, String> {
+    let config_path = cli_config_path(&app)?;
+    tauri::async_runtime::spawn_blocking(move || added_providers_from(&config_path))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+/// Add a provider on this machine, which also enables it.
+#[tauri::command]
+#[specta::specta]
+pub(super) async fn add_provider(
+    app: tauri::AppHandle,
+    provider: agent::AgentProviderKind,
+) -> Result<Vec<agent::AgentProviderKind>, String> {
+    let config_path = cli_config_path(&app)?;
+    tauri::async_runtime::spawn_blocking(move || add_provider_at(&config_path, provider))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+/// Un-add a provider, which also disables it everywhere.
+#[tauri::command]
+#[specta::specta]
+pub(super) async fn remove_provider(
+    app: tauri::AppHandle,
+    provider: agent::AgentProviderKind,
+) -> Result<Vec<agent::AgentProviderKind>, String> {
+    let config_path = cli_config_path(&app)?;
+    tauri::async_runtime::spawn_blocking(move || remove_provider_at(&config_path, provider))
+        .await
+        .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
@@ -283,7 +326,7 @@ fn local_project_provider_availability(
     let configured_upstreams = configured_upstreams_from(config_path)?;
     Ok(agent_provider_availability(
         &inspect_onboarding_prerequisites_sync(home, &configured_upstreams),
-        app_provider_settings_from(config_path)?,
+        effective_app_provider_settings_from(config_path)?,
         &agent_usage::local_quotas(home, &configured_upstreams),
     ))
 }

@@ -5,8 +5,16 @@ import { createReactTestRoot } from "../test/react";
 import { describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../i18n";
 import type { AgentUsageSnapshot } from "../generated/tauri";
-import { defaultAppProviderSettings } from "../lib/team-llm";
+import { agentProviders } from "../lib/agent-provider";
+import type { AppProviderSettings } from "../generated/tauri";
 import { AgentUsageStatusBar } from "./AgentUsageStatusBar";
+
+// The status bar only shows providers this machine has enabled, and a fresh
+// machine enables the built-in ones only. The roster under test covers every
+// provider, so it runs with them all enabled.
+const everyProviderEnabled = Object.fromEntries(
+  agentProviders.map((provider) => [provider, true] as const),
+) as AppProviderSettings;
 
 const snapshot: AgentUsageSnapshot = {
   updatedAt: 1,
@@ -158,6 +166,7 @@ describe("AgentUsageStatusBar", () => {
       root.render(
         <I18nProvider>
           <AgentUsageStatusBar
+            loadProviderSettings={async () => everyProviderEnabled}
             loadUsage={loadUsage}
             onManageAccounts={onManageAccounts}
             onOpenUsageDetails={onOpenUsageDetails}
