@@ -5,18 +5,31 @@ import {
   useRef,
   useState,
   type KeyboardEventHandler,
+  type MouseEventHandler,
   type PointerEventHandler,
   type RefObject,
 } from "react";
 import type { PersistedWidth } from "../lib/persisted-width";
 
 type HorizontalPaneResizeOptions = PersistedWidth & {
-  /** CSS custom property (e.g. "--inbox-detail-pane-width") the hook writes on the container. */
+  /** CSS custom property (e.g. "--inbox-detail-pane-width", "--sidebar-width") the hook writes on the container. */
   cssVariable: string;
   defaultWidth: number;
   keyboardStep?: number;
   max: number;
   min: number;
+  /**
+   * Which side of the container the pane is on.
+   * "right" (default): pane extends from right edge inward (e.g. inbox pane, thread pane)
+   * "left": pane extends from left edge inward (e.g. primary sidebar)
+   */
+  side?: "left" | "right";
+  /**
+   * Unit for CSS property and value calculations.
+   * "%" (default when side === "right"): width is percentage of container.
+   * "px" (default when side === "left"): width is absolute pixels.
+   */
+  unit?: "%" | "px";
 };
 
 type HorizontalPaneResizeResult = {
@@ -24,6 +37,7 @@ type HorizontalPaneResizeResult = {
   effectiveWidth: number;
   isResizing: boolean;
   separatorProps: {
+    onDoubleClick: MouseEventHandler<HTMLDivElement>;
     onKeyDown: KeyboardEventHandler<HTMLDivElement>;
     onPointerCancel: PointerEventHandler<HTMLDivElement>;
     onPointerDown: PointerEventHandler<HTMLDivElement>;
@@ -34,11 +48,11 @@ type HorizontalPaneResizeResult = {
 };
 
 /**
- * Controls a right-hand pane whose width is expressed as a percentage of its
- * container. The caller owns the separator markup so its accessible label
- * and visual treatment remain specific to the screen; the hook owns writing
- * `cssVariable` onto the container so the caller never needs an inline style
- * for it.
+ * Controls a left-hand or right-hand pane whose width is expressed in pixels or
+ * as a percentage of its container. The caller owns the separator markup so its
+ * accessible label and visual treatment remain specific to the screen; the
+ * hook owns writing `cssVariable` onto the container so the caller never needs
+ * an inline style for it.
  *
  * While dragging, the width is written straight to the CSS custom property
  * on `pointermove` (coalesced into one write per animation frame) instead of
@@ -55,7 +69,10 @@ export function useHorizontalPaneResize({
   max,
   min,
   save,
+  side = "right",
+  unit,
 }: HorizontalPaneResizeOptions): HorizontalPaneResizeResult {
+  const resolvedUnit = unit ?? (side === "left" ? "px" : "%");
   const [width, setWidth] = useState<number | null>(() => load());
   const [isResizing, setIsResizing] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -80,9 +97,9 @@ export function useHorizontalPaneResize({
     if (width === null) {
       container.style.removeProperty(cssVariable);
     } else {
-      container.style.setProperty(cssVariable, `${width}%`);
+      container.style.setProperty(cssVariable, `${width}${resolvedUnit}`);
     }
-  }, [cssVariable, width]);
+  }, [cssVariable, resolvedUnit, width]);
 
   // Discard (without applying) any frame still queued when the hook unmounts.
   useEffect(
@@ -103,11 +120,28 @@ export function useHorizontalPaneResize({
     if (!container) return;
     const bounds = container.getBoundingClientRect();
     const availableWidth = Math.max(1, bounds.width);
-    const paneRatio = Math.max(0, (bounds.right - clientX) / availableWidth);
-    const nextWidth = clamp(paneRatio * 100);
+
+    let nextRawWidth: number;
+    if (side === "left") {
+      if (resolvedUnit === "px") {
+        nextRawWidth = clientX - bounds.left;
+      } else {
+        const paneRatio = Math.max(0, (clientX - bounds.left) / availableWidth);
+        nextRawWidth = paneRatio * 100;
+      }
+    } else {
+      if (resolvedUnit === "px") {
+        nextRawWidth = bounds.right - clientX;
+      } else {
+        const paneRatio = Math.max(0, (bounds.right - clientX) / availableWidth);
+        nextRawWidth = paneRatio * 100;
+      }
+    }
+
+    const nextWidth = clamp(nextRawWidth);
     widthRef.current = nextWidth;
-    container.style.setProperty(cssVariable, `${nextWidth}%`);
-  }, [clamp, cssVariable]);
+    container.style.setProperty(cssVariable, `${nextWidth}${resolvedUnit}`);
+  }, [clamp, cssVariable, resolvedUnit, side]);
 
   const updateWidthFromPointer = useCallback(
     (clientX: number) => {
@@ -166,6 +200,17 @@ export function useHorizontalPaneResize({
     [applyPendingFrame, save],
   );
 
+  const onDoubleClick = useCallback<MouseEventHandler<HTMLDivElement>>(
+    (event) => {
+      event.preventDefault();
+      setWidth(null);
+      widthRef.current = null;
+      save(defaultWidth);
+      containerRef.current?.style.removeProperty(cssVariable);
+    },
+    [cssVariable, defaultWidth, save],
+  );
+
   const onKeyDown = useCallback<KeyboardEventHandler<HTMLDivElement>>(
     (event) => {
       let nextWidth: number | null = null;
@@ -193,6 +238,7 @@ export function useHorizontalPaneResize({
     effectiveWidth,
     isResizing,
     separatorProps: {
+      onDoubleClick,
       onKeyDown,
       onPointerCancel: finishPointerResize,
       onPointerDown,

@@ -39,8 +39,13 @@ import type {
   ProjectAgent,
   SessionUser,
 } from "../types";
+import {
+  sidebarWidthDefault,
+  sidebarWidthMax,
+  sidebarWidthMin,
+} from "../lib/sidebar-width";
 import { TeamAgentAvatar } from "./TeamAgentAvatar";
-import { TeamIcon } from "./TeamIcon";
+import { TeamIcon, teamIconComponent } from "./TeamIcon";
 import {
   SidebarCollapsibleSection,
   SidebarOrganizationChannels,
@@ -109,6 +114,8 @@ export function Sidebar({
   projectReadinessError,
   projectWindowProjectId = null,
   sessions,
+  sidebarResizeProps,
+  sidebarWidth,
   token,
   unreadInboxCount,
   unreadDmCount = 0,
@@ -160,6 +167,15 @@ export function Sidebar({
   projectReadinessError: Record<string, string>;
   projectWindowProjectId?: string | null;
   sessions: AutoHuntSession[];
+  sidebarResizeProps?: {
+    onDoubleClick?: (event: React.MouseEvent<HTMLDivElement>) => void;
+    onKeyDown?: (event: React.KeyboardEvent<HTMLDivElement>) => void;
+    onPointerCancel?: (event: React.PointerEvent<HTMLDivElement>) => void;
+    onPointerDown?: (event: React.PointerEvent<HTMLDivElement>) => void;
+    onPointerMove?: (event: React.PointerEvent<HTMLDivElement>) => void;
+    onPointerUp?: (event: React.PointerEvent<HTMLDivElement>) => void;
+  };
+  sidebarWidth?: number;
   token: string | null;
   unreadInboxCount: number;
   unreadDmCount?: number;
@@ -998,11 +1014,23 @@ export function Sidebar({
                                 }
                                 type="button"
                               >
-                                <FolderKanban
-                                  aria-hidden="true"
-                                  size={14}
-                                  strokeWidth={1.7}
-                                />
+                                {(() => {
+                                  const PlanningProjectIcon = planningProject.icon
+                                    ? teamIconComponent(planningProject.icon)
+                                    : FolderKanban;
+                                  return (
+                                    <PlanningProjectIcon
+                                      aria-hidden="true"
+                                      size={14}
+                                      strokeWidth={1.7}
+                                      style={
+                                        planningProject.color
+                                          ? { color: planningProject.color }
+                                          : undefined
+                                      }
+                                    />
+                                  );
+                                })()}
                                 <span>{planningProject.name}</span>
                               </button>
                               {onPlanningProjectEdit ? (
@@ -1295,6 +1323,19 @@ export function Sidebar({
           <UpdateControl />
         </div>
       </div>
+      {isOpen && sidebarResizeProps ? (
+        <div
+          aria-label={t("sidebar.resizeSidebar")}
+          aria-orientation="vertical"
+          aria-valuemax={sidebarWidthMax}
+          aria-valuemin={sidebarWidthMin}
+          aria-valuenow={sidebarWidth ?? sidebarWidthDefault}
+          className="sidebar-resizer"
+          role="separator"
+          tabIndex={0}
+          {...sidebarResizeProps}
+        />
+      ) : null}
     </aside>
   );
 }

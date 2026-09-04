@@ -498,6 +498,32 @@ export const opencodeAuthenticated = async (home: string) => {
   return false;
 };
 
+/** OpenCode stores the paid Go plan key under the `opencode-go` entry. */
+export const parseOpencodeGoKey = (contents: string): string | null => {
+  try {
+    const parsed = objectOrNull(JSON.parse(contents));
+    const entry = objectOrNull(parsed?.["opencode-go"]);
+    const key = typeof entry?.key === "string" ? entry.key.trim() : "";
+    return key || null;
+  } catch {
+    return null;
+  }
+};
+
+export async function readOpencodeGoKey(home: string): Promise<string | null> {
+  for (const path of opencodeAuthPaths(home)) {
+    let contents: string;
+    try {
+      contents = await readFile(path, "utf8");
+    } catch {
+      continue;
+    }
+    const key = parseOpencodeGoKey(contents);
+    if (key) return key;
+  }
+  return null;
+}
+
 export const parseCursorAboutEmail = (stdout: string) => {
   try {
     return usableAccountLabel(

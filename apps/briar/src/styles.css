@@ -186,7 +186,7 @@ body { overflow: hidden; font-synthesis: none; }
    Only compositor-friendly properties (opacity/transform) animate on the
    sidebar itself; width/flex-basis transitions are zero-duration and merely
    delayed so they fire after (collapse) or before (expand) the fade. */
-.sidebar { width: 252px; flex: 0 0 252px; height: 100%; position:relative; z-index:10; overflow:visible; display: flex; flex-direction: column; border-right: 1px solid var(--sidebar-border); color:var(--sidebar-foreground); background:var(--sidebar-fallback); box-shadow:var(--sidebar-shadow); opacity:1; visibility:visible; transform:translateX(0); transition: border-color .2s ease; }
+.sidebar { width: var(--sidebar-width, 252px); flex: 0 0 var(--sidebar-width, 252px); height: 100%; position:relative; z-index:10; overflow:visible; display: flex; flex-direction: column; border-right: 1px solid var(--sidebar-border); color:var(--sidebar-foreground); background:var(--sidebar-fallback); box-shadow:var(--sidebar-shadow); opacity:1; visibility:visible; transform:translateX(0); transition: border-color .2s ease; }
 .sidebar:not(.sidebar-collapsed) {
   transition:
     width 0s linear,
@@ -228,6 +228,68 @@ body { overflow: hidden; font-synthesis: none; }
     flex-basis 0s linear .16s,
     visibility 0s linear .16s,
     border-color .2s ease;
+}
+.app-shell.is-resizing-sidebar {
+  cursor: col-resize;
+  user-select: none;
+}
+.sidebar-resizer {
+  width: 8px;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: -4px;
+  z-index: 50;
+  cursor: col-resize;
+  touch-action: none;
+  outline: none;
+  background: transparent;
+}
+.sidebar-resizer::before {
+  content: "";
+  width: 1px;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  background: var(--border);
+  opacity: 0;
+  transform: translateX(-50%);
+  transition: opacity .12s ease-out, background-color .12s ease-out, box-shadow .12s ease-out;
+}
+.sidebar-resizer::after {
+  content: "";
+  width: 5px;
+  height: 34px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  transition: opacity .12s ease-out, border-color .12s ease-out, background-color .12s ease-out;
+}
+.sidebar-resizer:hover::before,
+.sidebar-resizer:focus-visible::before,
+.app-shell.is-resizing-sidebar .sidebar-resizer::before {
+  opacity: 1;
+  background: #a997df;
+  box-shadow: 0 0 0 1px rgba(128, 104, 206, .08);
+}
+.sidebar-resizer:hover::after,
+.sidebar-resizer:focus-visible::after,
+.app-shell.is-resizing-sidebar .sidebar-resizer::after {
+  opacity: 1;
+  border-color: #a997df;
+  background: #f1edfc;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-resizer::before,
+  .sidebar-resizer::after {
+    transition: none;
+  }
 }
 .sidebar-toolbar { height: 46px; flex: 0 0 46px; padding-left: var(--traffic-light-safe-inset); display: flex; align-items: center; }
 .window-navigation-controls { height:46px; position:absolute; z-index:30; top:0; left:0; padding-left:var(--traffic-light-safe-inset); display:flex; align-items:center; gap:2px; }
@@ -1434,9 +1496,10 @@ body { overflow: hidden; font-synthesis: none; }
 .completed-issue-summary h2 { padding-bottom:.35em; border-bottom:1px solid color-mix(in srgb,#4baa86 28%,var(--border)); font-size:var(--text-sm); }
 .completed-issue-summary h3,.completed-issue-summary h4 { font-size:var(--text-xs); }
 .completed-issue-summary p,.completed-issue-summary ul,.completed-issue-summary ol,.completed-issue-summary blockquote,.completed-issue-summary pre { margin:.65em 0; }
-.completed-issue-summary ul { list-style:disc; }
-.completed-issue-summary ol { list-style:decimal; }
+.completed-issue-summary ul { list-style:none; }
+.completed-issue-summary ol { list-style:none; }
 .completed-issue-summary ul,.completed-issue-summary ol { padding-left:1.5em; }
+.completed-issue-summary ul > li::before,.completed-issue-summary ol > li::before { width:1.5em; margin-left:-1.5em; }
 .completed-issue-summary li + li { margin-top:.3em; }
 .completed-issue-summary strong { color:var(--foreground); font-weight:750; }
 .completed-issue-summary a { color:#2d725b; font-weight:650; text-decoration-thickness:1px; text-underline-offset:2px; }
@@ -1632,12 +1695,15 @@ button.paused-review-state { width:100%; border:0; border-radius:8px; cursor:poi
 .markdown-content code { padding:.14em .38em; border:1px solid var(--border); border-radius:5px; color:var(--accent-foreground); background:var(--accent); font:500 .92em var(--font-mono,"DM Mono",ui-monospace,monospace); overflow-wrap:anywhere; }
 .markdown-content pre { max-width:100%; margin:.75em 0; overflow-x:auto; padding:12px 14px; border:1px solid var(--border); border-radius:9px; color:var(--foreground); background:var(--muted); font:var(--text-xs)/1.55 var(--font-mono,"DM Mono",ui-monospace,monospace); }
 .markdown-content pre code { display:block; min-width:max-content; padding:0; border:0; border-radius:0; color:inherit; background:transparent; font:inherit; white-space:pre; overflow-wrap:normal; }
-.markdown-content ul { margin:.65em 0; padding-left:1.65em; list-style:disc; }
-.markdown-content ol { margin:.65em 0; padding-left:1.65em; list-style:decimal; }
+.markdown-content ul { margin:.65em 0; padding-left:1.65em; list-style:none; }
+.markdown-content ol { margin:.65em 0; padding-left:1.65em; list-style:none; counter-reset:md-ol; }
 .markdown-content li > ul, .markdown-content li > ol { margin:.2em 0; }
 .markdown-content li + li { margin-top:.28em; }
 .markdown-content li > p { margin:.25em 0; }
-.markdown-content li::marker { color:var(--muted-foreground); }
+.markdown-content ol > li { counter-increment:md-ol; }
+.markdown-content ul > li::before { content:"\2022"; display:inline-block; width:1.65em; margin-left:-1.65em; color:var(--muted-foreground); -webkit-user-select:none; user-select:none; pointer-events:none; }
+.markdown-content ol > li::before { content:counter(md-ol) "."; display:inline-block; width:1.65em; margin-left:-1.65em; color:var(--muted-foreground); -webkit-user-select:none; user-select:none; pointer-events:none; }
+.markdown-content li:has(> input[type="checkbox"])::before { content:none; }
 .markdown-content blockquote { margin:.8em 0; padding:.55em .9em; border-left:3px solid var(--accent-foreground); border-radius:0 8px 8px 0; color:var(--muted-foreground); background:color-mix(in srgb,var(--accent) 55%,transparent); overflow-wrap:anywhere; }
 .markdown-content blockquote > :first-child { margin-top:0; }
 .markdown-content blockquote > :last-child { margin-bottom:0; }
@@ -1656,8 +1722,9 @@ button.paused-review-state { width:100%; border:0; border-radius:8px; cursor:poi
 .issue-description-markdown h3 { font-size:15px; }
 .issue-description-markdown h4 { font-size:15px; }
 .issue-description-markdown p,.issue-description-markdown ul,.issue-description-markdown ol,.issue-description-markdown blockquote,.issue-description-markdown pre { margin:.7em 0; }
-.issue-description-markdown ul { padding-left:1.6em; list-style:disc; }
-.issue-description-markdown ol { padding-left:1.6em; list-style:decimal; }
+.issue-description-markdown ul { padding-left:1.6em; list-style:none; }
+.issue-description-markdown ol { padding-left:1.6em; list-style:none; }
+.issue-description-markdown ul > li::before,.issue-description-markdown ol > li::before { width:1.6em; margin-left:-1.6em; }
 .issue-description-markdown li + li { margin-top:.25em; }
 .issue-description-markdown a { color:var(--accent-foreground); text-decoration-thickness:1px; text-underline-offset:2px; }
 .issue-description-markdown blockquote { padding:.35em 0 .35em 1em; border-left:3px solid var(--border); color:var(--muted-foreground); }
@@ -1737,7 +1804,8 @@ button.conversation-reply-summary:focus-visible { outline:2px solid var(--ring);
 .mention-composer-field > textarea { overflow:hidden; }
 .mention-composer-field > input::placeholder,
 .mention-composer-field > textarea::placeholder { -webkit-text-fill-color:var(--muted-foreground); }
-.issue-message-body ul,.issue-message-body ol { margin:.45em 0; padding-left:1.45em; }
+.issue-message-body ul,.issue-message-body ol { margin:.45em 0; padding-left:1.45em; list-style:none; }
+.issue-message-body ul > li::before,.issue-message-body ol > li::before { width:1.45em; margin-left:-1.45em; }
 .issue-message-body li + li { margin-top:.2em; }
 .issue-message-body blockquote { margin:.45em 0; padding:.25em 0 .25em .8em; border-left:3px solid var(--border); color:var(--muted-foreground); overflow-wrap:anywhere; }
 .issue-message-body code { padding:.12em .3em; border-radius:5px; color:var(--accent-foreground); background:var(--accent); font:500 .92em "DM Mono",monospace; overflow-wrap:anywhere; }
@@ -5510,7 +5578,11 @@ button.issue-message-state { width:100%; cursor:pointer; }
   gap: 6px;
 }
 .channel-message-block-rich-text ul,
-.channel-message-block-rich-text ol { padding-left: 22px; }
+.channel-message-block-rich-text ol { padding-left: 22px; list-style: none; }
+.channel-message-block-rich-text ol { counter-reset: md-ol; }
+.channel-message-block-rich-text ol > li { counter-increment: md-ol; }
+.channel-message-block-rich-text ul > li::before { content:"\2022"; display:inline-block; width:22px; margin-left:-22px; color:var(--muted-foreground); -webkit-user-select:none; user-select:none; pointer-events:none; }
+.channel-message-block-rich-text ol > li::before { content:counter(md-ol) "."; display:inline-block; width:22px; margin-left:-22px; color:var(--muted-foreground); -webkit-user-select:none; user-select:none; pointer-events:none; }
 .channel-message-block-rich-text blockquote {
   border-left: 3px solid var(--border, #c9c2b7);
   padding-left: 10px;
@@ -6255,11 +6327,10 @@ button.issue-message-state { width:100%; cursor:pointer; }
   white-space:pre;
   overflow-wrap:normal;
 }
-.channel-message-text ul { margin:.65em 0; padding-left:1.65em; list-style:disc; }
-.channel-message-text ol { margin:.65em 0; padding-left:1.65em; list-style:decimal; }
+.channel-message-text ul { margin:.65em 0; padding-left:1.65em; list-style:none; }
+.channel-message-text ol { margin:.65em 0; padding-left:1.65em; list-style:none; }
 .channel-message-text li + li { margin-top:.28em; }
 .channel-message-text li > p { margin:.25em 0; }
-.channel-message-text li::marker { color:var(--muted-foreground); }
 .channel-message-text blockquote {
   margin:.8em 0;
   padding:.55em .9em;

@@ -1428,4 +1428,71 @@ describe("Sidebar", () => {
 
     await cleanup();
   });
+
+  it("renders the sidebar resizer with correct accessible attributes when open and omits it when closed", async () => {
+    const onDoubleClick = vi.fn();
+    const onKeyDown = vi.fn();
+    const onPointerDown = vi.fn();
+    const onPointerMove = vi.fn();
+    const onPointerUp = vi.fn();
+    const onPointerCancel = vi.fn();
+
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <Sidebar
+        {...sidebarProps}
+        isOpen={true}
+        sidebarResizeProps={{
+          onDoubleClick,
+          onKeyDown,
+          onPointerCancel,
+          onPointerDown,
+          onPointerMove,
+          onPointerUp,
+        }}
+        sidebarWidth={280}
+      />,
+    );
+
+    const resizer = container.querySelector<HTMLDivElement>(".sidebar-resizer");
+    expect(resizer).not.toBeNull();
+    expect(resizer?.getAttribute("role")).toBe("separator");
+    expect(resizer?.getAttribute("aria-orientation")).toBe("vertical");
+    expect(resizer?.getAttribute("aria-label")).toBe("사이드바 크기 조절");
+    expect(resizer?.getAttribute("aria-valuenow")).toBe("280");
+    expect(resizer?.getAttribute("aria-valuemin")).toBe("200");
+    expect(resizer?.getAttribute("aria-valuemax")).toBe("480");
+
+    await act(async () => {
+      resizer?.dispatchEvent(
+        new MouseEvent("dblclick", { bubbles: true, cancelable: true }),
+      );
+    });
+    expect(onDoubleClick).toHaveBeenCalledTimes(1);
+
+    // When sidebar is closed (isOpen: false)
+    await renderReactTestRoot(
+      root,
+      <Sidebar
+        {...sidebarProps}
+        isOpen={false}
+        sidebarResizeProps={{
+          onDoubleClick,
+          onKeyDown,
+          onPointerCancel,
+          onPointerDown,
+          onPointerMove,
+          onPointerUp,
+        }}
+      />,
+    );
+
+    expect(container.querySelector(".sidebar-resizer")).toBeNull();
+
+    await cleanup();
+  });
 });
+

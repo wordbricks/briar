@@ -376,4 +376,96 @@ describe("useHorizontalPaneResize", () => {
 
     await cleanup();
   });
+
+  it("supports left-side pixel resizing and writes px unit to the CSS variable", async () => {
+    const { cleanup, container, root } = createReactTestRoot();
+    const save = vi.fn();
+
+    function LeftProbe() {
+      const resize = useHorizontalPaneResize({
+        clamp: (val) => Math.min(480, Math.max(200, Math.round(val))),
+        cssVariable: "--sidebar-width",
+        defaultWidth: 252,
+        load: () => null,
+        max: 480,
+        min: 200,
+        save,
+        side: "left",
+        unit: "px",
+      });
+
+      return (
+        <div
+          data-resizing={String(resize.isResizing)}
+          data-width={resize.width ?? ""}
+          ref={resize.containerRef}
+        >
+          <div
+            aria-orientation="vertical"
+            aria-valuemax={480}
+            aria-valuemin={200}
+            aria-valuenow={resize.effectiveWidth}
+            role="separator"
+            tabIndex={0}
+            {...resize.separatorProps}
+          />
+        </div>
+      );
+    }
+
+    await renderReactTestRoot(root, <LeftProbe />);
+
+    const layout = container.firstElementChild as HTMLDivElement;
+    const separator = layout.firstElementChild as HTMLDivElement;
+    const setPointerCapture = vi.fn();
+    const releasePointerCapture = vi.fn();
+    Object.defineProperties(separator, {
+      hasPointerCapture: { configurable: true, value: vi.fn(() => true) },
+      releasePointerCapture: { configurable: true, value: releasePointerCapture },
+      setPointerCapture: { configurable: true, value: setPointerCapture },
+    });
+    vi.spyOn(layout, "getBoundingClientRect").mockReturnValue({
+      bottom: 800,
+      height: 800,
+      left: 10,
+      right: 1_010,
+      top: 0,
+      width: 1_000,
+      x: 10,
+      y: 0,
+      toJSON: () => ({}),
+    });
+
+    expect(separator.getAttribute("aria-valuenow")).toBe("252");
+
+    const down = pointerEvent("pointerdown", 1, 262);
+    await act(async () => separator.dispatchEvent(down));
+    expect(layout.dataset.resizing).toBe("true");
+
+    await act(async () =>
+      separator.dispatchEvent(pointerEvent("pointermove", 1, 310)),
+    );
+    await flushFrames();
+    // 310 - 10 (bounds.left) = 300px
+    expect(layout.style.getPropertyValue("--sidebar-width")).toBe("300px");
+
+    await act(async () =>
+      separator.dispatchEvent(pointerEvent("pointerup", 1, 310)),
+    );
+    expect(layout.dataset.resizing).toBe("false");
+    expect(layout.dataset.width).toBe("300");
+    expect(save).toHaveBeenCalledWith(300);
+
+    // Double-click resets width
+    await act(async () => {
+      separator.dispatchEvent(
+        new MouseEvent("dblclick", { bubbles: true, cancelable: true }),
+      );
+    });
+    expect(layout.dataset.width).toBe("");
+    expect(layout.style.getPropertyValue("--sidebar-width")).toBe("");
+    expect(save).toHaveBeenLastCalledWith(252);
+
+    await cleanup();
+  });
 });
