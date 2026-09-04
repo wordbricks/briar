@@ -213,7 +213,7 @@ import {
   normalizeAutoHuntWorkflow,
   type AutoHuntWorkflow,
 } from "./auto-hunt-contract";
-import type { InboxMessage } from "../hooks/useInbox";
+import type { InboxMessage } from "../state/inbox/model";
 import type { ChannelMessageAttachment } from "./channels-contract";
 import type {
   DashboardPayload,

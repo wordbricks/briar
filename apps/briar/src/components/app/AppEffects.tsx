@@ -2,6 +2,8 @@ import { useStatusTray } from "../../hooks/useStatusTray";
 import { useAgentSessionPersistence } from "../../state/agent-sessions/useAgentSessionPersistence";
 import { useAgentSessionSync } from "../../state/agent-sessions/useAgentSessionSync";
 import { useChannelCatalogSync } from "../../state/channels/useChannelCatalogSync";
+import { useInboxNotifications } from "../../state/inbox/useInboxNotifications";
+import { useInboxSync } from "../../state/inbox/useInboxSync";
 import { useNavigationReconciliation } from "../../state/navigation/useNavigationReconciliation";
 import { useActiveOrganizationPersistence } from "../../state/organization/useActiveOrganizationPersistence";
 import { useHydration } from "../../state/persistence/useHydration";
@@ -49,8 +51,13 @@ export function AppEffects() {
   // than to the snapshot store: it only observes, and the sessions it records
   // are the ones the sync above has just settled.
   useAgentSessionPersistence();
-  // Last, because the reconciliation used to be one of `App`'s own effects and
+  // Then the reconciliation, which used to be one of `App`'s own effects and
   // therefore ran after every hook mounted here.
   useNavigationReconciliation();
+  // The inbox is last because `InboxBridge` was: it rendered as this
+  // component's sibling, so its effects started after everything above,
+  // including the two transports whose responses it reads.
+  useInboxSync();
+  useInboxNotifications();
   return null;
 }

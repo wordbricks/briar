@@ -31,8 +31,8 @@ import {
   createRenderCounter,
   type RenderCounter,
 } from "../../test/render-count";
+import { inboxMessagesAtom } from "../../state/inbox/atoms";
 import { DesktopPages, type DesktopPagesProps } from "./DesktopPages";
-import { InboxBridge } from "./InboxBridge";
 import { SidebarWithSession } from "./SidebarWithSession";
 import { WindowNavigationControlsWithHistory } from "./WindowNavigationControlsWithHistory";
 import { ConnectionHealthWithWorkspace } from "./WorkspaceViews";
@@ -146,6 +146,12 @@ function RunProbe({ renders }: { renders: RenderCounter }) {
   return <output>{value?.title ?? ""}</output>;
 }
 
+/** What the inbox derivation is allowed to be woken by. */
+function InboxMessagesProbe() {
+  const messages = useAtomValue(inboxMessagesAtom);
+  return <output>{messages.length}</output>;
+}
+
 /** What a settings write is allowed to reach. */
 function SettingsProbe({ renders }: { renders: RenderCounter }) {
   renders.useRenderCount("settings-probe");
@@ -182,7 +188,7 @@ const mountInboxPage = async () => {
                 "window-controls",
                 <WindowNavigationControlsWithHistory />,
               )}
-              {renders.profile("inbox-bridge", <InboxBridge />)}
+              {renders.profile("inbox-messages", <InboxMessagesProbe />)}
               <RunProbe renders={renders} />
               <SettingsProbe renders={renders} />
             </TooltipProvider>
@@ -295,9 +301,8 @@ describe("desktop page slot", () => {
       The run's own subscriber saw it, and nothing else did: not the page (the
       inbox detail pane reads only the run its notification points at, and none
       is open), not the window's history popover (it labels only the runs the
-      visit stack points at), and not the inbox bridge (a running run produces
-      no message, and the dispatch reconciliation subscribes in an effect
-      instead of during render).
+      visit stack points at), and not the inbox derivation (a running run
+      produces no message, so the source atom keeps the references it had).
     */
     renders.expectRenderCounts({ "run-probe": 1 });
     expect(registry.get(runAtom(run.id))?.title).toBe("Desktop issue edited");

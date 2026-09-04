@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { demoDashboard } from "../lib/demo-data";
-import type { AutoHuntSession } from "../types";
+import { demoDashboard } from "../../lib/demo-data";
+import type { AutoHuntSession } from "../../types";
 import {
   buildCurrentInboxMessages,
   classifyInboxMessage,
@@ -9,7 +9,7 @@ import {
   isInboxMessageUnread,
   mergeInboxMessages,
   mergeInboxReadVersions,
-} from "./useInbox";
+} from "./model";
 
 const project = demoDashboard.team;
 

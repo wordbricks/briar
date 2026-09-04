@@ -6,7 +6,7 @@ import {
   type MobilePushNotificationTarget,
 } from "@briar/contracts/gen/briar/app/v1/inbox_pb";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { InboxMessage } from "../hooks/useInbox";
+import type { InboxMessage } from "../state/inbox/model";
 import {
   decodeMobilePushNotificationOpen,
   inboxNotificationContent,

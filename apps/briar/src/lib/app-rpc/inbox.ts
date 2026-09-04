@@ -4,7 +4,7 @@ import {
   InboxSessionMessage_Status,
   type InboxFeedMessage,
 } from "@briar/contracts/gen/briar/app/v1/inbox_pb";
-import type { InboxMessage } from "../../hooks/useInbox";
+import type { InboxMessage } from "../../state/inbox/model";
 import {
   appCallOptions,
   appTransport,

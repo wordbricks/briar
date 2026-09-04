@@ -37,9 +37,10 @@ import {
   requestedRunMessageIdAtom,
   requestedSessionIdAtom,
 } from "../state/navigation/atoms";
+import { readInboxMessageIds, seedInboxMessages } from "../test/inbox";
 import { createReactTestRoot, flush } from "../test/react";
 import type { Organization, Project, SessionUser } from "../types";
-import { setInboxCallbacks } from "../state/inbox/actions";
+import type { InboxMessage } from "../state/inbox/model";
 import {
   deepLinkListenerApiAtom,
   type DeepLinkListenerApi,
@@ -101,11 +102,22 @@ const channel = (overrides: Partial<ChannelSummary> = {}): ChannelSummary => ({
   ...overrides,
 });
 
-interface Recorder {
-  readonly inboxReads: string[];
-}
-
-const recorder = (): Recorder => ({ inboxReads: [] });
+/** The notification a case routes on, as the inbox stores it. */
+const inboxMessage = (projectId: string): InboxMessage => ({
+  id: "message-9",
+  kind: "issue",
+  projectId,
+  projectName: projectId,
+  targetId: "run-9",
+  title: "Fix it",
+  occurredAt: "2026-09-01T00:00:00.000Z",
+  version: "1",
+  runNumber: 9,
+  status: "failed",
+  workflowStage: null,
+  priority: null,
+  structuredResult: null,
+});
 
 /** Where the resolver left the user, as the navigation atoms report it. */
 const destination = (registry: AtomRegistry) => ({
@@ -181,21 +193,15 @@ const harness = (
     // and the cases below drive the resolver by writing the pending target.
     [deepLinkListenerApiAtom, inertListeners],
   ]);
-  const calls = recorder();
   /*
-    The team and organization selections are real actions now, so the store is
-    where they are observed. What still needs a stand-in is the inbox: marking a
-    notification read belongs to `useInbox`, which the bridge installs and no
-    test here mounts.
+    Every side effect a case observes is now a store write: the team and
+    organization selections are real actions, and so is the read receipt. The
+    inbox is seeded with the notification the cases route on, because a read
+    receipt for a message the inbox does not have is a no-op.
   */
-  setInboxCallbacks(registry, {
-    markAllRead: () => undefined,
-    markIssueRead: () => undefined,
-    markRead: (messageId) => calls.inboxReads.push(messageId),
-    markUnread: () => undefined,
-  });
+  seedInboxMessages(registry, [inboxMessage(teamB.id)]);
   const input: UseDeepLinksInput = {};
-  return { calls, input, registry };
+  return { input, registry };
 };
 
 const loadCatalog = (registry: AtomRegistry, channels: ChannelSummary[]) => {
@@ -387,7 +393,7 @@ describe("useDeepLinks", () => {
   });
 
   it("selects the team a notification points at before routing to it", async () => {
-    const { calls, input, registry } = harness({ activeTeamId: teamA.id });
+    const { input, registry } = harness({ activeTeamId: teamA.id });
     const view = await mount(registry, input);
 
     await act(async () => {
@@ -401,8 +407,9 @@ describe("useDeepLinks", () => {
     await flush();
 
     // The read receipt is sent before the team check, so the pass that
-    // switches teams and the pass that routes both send it.
-    expect(calls.inboxReads).toEqual(["message-9", "message-9"]);
+    // switches teams already recorded it and the pass that routes finds it
+    // read.
+    expect(readInboxMessageIds(registry)).toEqual(["message-9"]);
     expect(registry.get(activeTeamIdAtom)).toBe(teamB.id);
     expect(destination(registry)).toMatchObject({
       page: "issues",
@@ -437,7 +444,7 @@ describe("useDeepLinks", () => {
   });
 
   it("ignores a notification for a team this account cannot open", async () => {
-    const { calls, input, registry } = harness();
+    const { input, registry } = harness();
     const view = await mount(registry, input);
 
     await act(async () => {
@@ -450,7 +457,7 @@ describe("useDeepLinks", () => {
     });
     await flush();
 
-    expect(calls.inboxReads).toEqual([]);
+    expect(readInboxMessageIds(registry)).toEqual([]);
     expect(registry.get(pendingInboxNotificationTargetAtom)).not.toBeNull();
 
     await view.cleanup();
