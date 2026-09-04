@@ -225,7 +225,7 @@ describe("inboxDetailLabel", () => {
       inboxDetailLabel({
         fallback: "Notifications",
         messages: [{ id: "message-1", title: "Stale title" }],
-        runs: [run],
+        runTitle: run.title,
         target: issueTarget,
       }),
     ).toBe(run.title);
@@ -236,7 +236,7 @@ describe("inboxDetailLabel", () => {
       inboxDetailLabel({
         fallback: "Notifications",
         messages: [{ id: "message-2", title: "Channel message" }],
-        runs: [],
+        runTitle: null,
         target: channelTarget,
       }),
     ).toBe("Channel message");
@@ -244,7 +244,7 @@ describe("inboxDetailLabel", () => {
       inboxDetailLabel({
         fallback: "Notifications",
         messages: [],
-        runs: undefined,
+        runTitle: null,
         target: channelTarget,
       }),
     ).toBe("Notifications");

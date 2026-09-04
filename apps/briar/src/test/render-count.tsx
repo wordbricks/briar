@@ -1,4 +1,10 @@
-import { createElement, type ComponentType } from "react";
+import {
+  createElement,
+  Profiler,
+  type ComponentType,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 import { expect } from "vitest";
 
 /**
@@ -24,6 +30,18 @@ export interface RenderCounter {
     name: string,
     Component: ComponentType<Props>,
   ) => ComponentType<Props>;
+  /**
+   * Counts every commit `children` takes part in, which is the only way to see
+   * a render an atom pushed **into** a component rather than through its props.
+   * {@link track} cannot: its wrapper re-renders only when a parent hands it
+   * new props, so a subscribing component under it can render all it likes
+   * without the wrapper noticing.
+   *
+   * It counts the whole subtree, so a count of zero means "nothing in here
+   * rendered" — exactly the assertion a subscription boundary needs — while a
+   * positive count says only that something inside did.
+   */
+  readonly profile: (name: string, children: ReactNode) => ReactElement;
   /** Forgets every counter, e.g. between the phases of one test. */
   readonly reset: () => void;
   /**
@@ -61,6 +79,14 @@ export function createRenderCounter(): RenderCounter {
     return value;
   }
 
+  function profile(name: string, children: ReactNode): ReactElement {
+    return createElement(
+      Profiler,
+      { id: name, onRender: () => increment(name) },
+      children,
+    );
+  }
+
   return {
     count(name) {
       return counts.get(name) ?? 0;
@@ -69,6 +95,7 @@ export function createRenderCounter(): RenderCounter {
     expectRenderCounts(expected) {
       expect(snapshot()).toEqual(expected);
     },
+    profile,
     record,
     reset() {
       counts.clear();

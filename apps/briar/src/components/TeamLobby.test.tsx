@@ -44,7 +44,8 @@ describe("TeamLobby", () => {
         <TeamLobby
           companionMode
           connectionState="connected"
-          dashboard={demoDashboard}
+          runs={demoDashboard.runs}
+          settingsRepository={demoDashboard.settings.githubRepository}
           isSidebarOpen={false}
           onBack={onBack}
           onLoadUsageSummary={async () => emptyUsageSummary}
@@ -88,7 +89,8 @@ describe("TeamLobby", () => {
       <I18nProvider>
         <TeamLobby
           connectionState="connected"
-          dashboard={demoDashboard}
+          runs={demoDashboard.runs}
+          settingsRepository={demoDashboard.settings.githubRepository}
           isSidebarOpen
           onLoadUsageSummary={loadUsage}
           onOpenAgents={() => undefined}
@@ -156,7 +158,8 @@ describe("TeamLobby", () => {
       <I18nProvider>
         <TeamLobby
           connectionState="connected"
-          dashboard={demoDashboard}
+          runs={demoDashboard.runs}
+          settingsRepository={demoDashboard.settings.githubRepository}
           isSidebarOpen
           onLoadUsageSummary={async () => null}
           onOpenAgents={() => undefined}
@@ -216,7 +219,8 @@ describe("TeamLobby", () => {
       <I18nProvider>
         <TeamLobby
           connectionState={connectionState}
-          dashboard={demoDashboard}
+          runs={demoDashboard.runs}
+          settingsRepository={demoDashboard.settings.githubRepository}
           isSidebarOpen
           onLoadUsageSummary={async () => emptyUsageSummary}
           onOpenAgents={() => undefined}
@@ -247,13 +251,8 @@ describe("TeamLobby", () => {
       <I18nProvider>
         <TeamLobby
           connectionState="unknown"
-          dashboard={{
-            ...demoDashboard,
-            settings: {
-              ...demoDashboard.settings,
-              githubRepository: null,
-            },
-          }}
+          runs={demoDashboard.runs}
+          settingsRepository={null}
           isSidebarOpen
           onLoadUsageSummary={async () => emptyUsageSummary}
           onOpenAgents={() => undefined}
@@ -286,10 +285,8 @@ describe("TeamLobby", () => {
       <I18nProvider>
         <TeamLobby
           connectionState="connected"
-          dashboard={{
-            ...demoDashboard,
-            settings: { ...demoDashboard.settings, githubRepository: null },
-          }}
+          runs={demoDashboard.runs}
+          settingsRepository={null}
           isSidebarOpen
           onLoadUsageSummary={async () => emptyUsageSummary}
           onOpenAgents={() => undefined}

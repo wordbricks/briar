@@ -14,10 +14,10 @@ import {
   canGoForwardAtom,
   navigationHistoryEntriesAtom,
   navigationHistoryIndexAtom,
+  navigationHistoryRunLabelsAtom,
 } from "../../state/navigation/atoms";
 import { organizationsAtom } from "../../state/organization/atoms";
 import { userAtom } from "../../state/session/atoms";
-import { activeDashboardAtom } from "../../state/sync/view";
 import { teamsAtom } from "../../state/team/atoms";
 import { WindowNavigationControls } from "../WindowNavigationControls";
 
@@ -26,9 +26,10 @@ import { WindowNavigationControls } from "../WindowNavigationControls";
 
   Every value here used to be assembled in `App.tsx` and threaded through the
   desktop shell — including the two hundred line `useMemo` that resolves each
-  history entry's label against the teams, organizations, channels and the open
-  dashboard. Reading it here means a visit changes this row and nothing above
-  it.
+  history entry's label against the teams, organizations, channels and the runs
+  it visited. Reading it here means a visit changes this row and nothing above
+  it — and the run labels come from an atom that only changes when a *visited*
+  run's key or title does, so a board edit does not reach this row either.
 */
 export function WindowNavigationControlsWithHistory() {
   const { t } = useI18n();
@@ -38,7 +39,7 @@ export function WindowNavigationControlsWithHistory() {
   const entries = useAtomValue(navigationHistoryEntriesAtom);
   const historyIndex = useAtomValue(navigationHistoryIndexAtom);
   const channels = useAtomValue(activeOrganizationChannelsAtom);
-  const dashboard = useAtomValue(activeDashboardAtom);
+  const runLabels = useAtomValue(navigationHistoryRunLabelsAtom);
   const organizations = useAtomValue(organizationsAtom);
   const teams = useAtomValue(teamsAtom);
   const user = useAtomValue(userAtom);
@@ -51,13 +52,13 @@ export function WindowNavigationControlsWithHistory() {
       buildNavigationHistoryItems({
         channels,
         currentUserId: user?.id ?? null,
-        dashboard,
         entries,
         organizations,
+        runLabels,
         t,
         teams,
       }),
-    [channels, dashboard, entries, organizations, t, teams, user?.id],
+    [channels, entries, organizations, runLabels, t, teams, user?.id],
   );
 
   return (

@@ -1,7 +1,11 @@
 import { useAtomValue } from "@effect/atom-react";
 import { lazy, useMemo, type ComponentProps } from "react";
 
-import { runAtom } from "../../state/entities/runs";
+import { teamMembersAtom } from "../../state/entities/members";
+import { teamOrganizationProvidersAtom } from "../../state/entities/providers";
+import { runAtom, teamRunsAtom } from "../../state/entities/runs";
+import { teamEntityAtom } from "../../state/entities/teams";
+import { teamWorkersAtom } from "../../state/entities/workers";
 import { useIssueActions } from "../../state/issues/actions";
 import {
   deletingIssueIdAtom,
@@ -11,8 +15,11 @@ import {
 } from "../../state/issues/atoms";
 import { useRunDetailActions } from "../../state/run-detail/actions";
 import { tokenAtom, userAtom } from "../../state/session/atoms";
-import { activeDashboardAtom } from "../../state/sync/view";
-import { teamsAtom } from "../../state/team/atoms";
+import {
+  activeTeamIdAtom,
+  teamExecutionPolicyAtom,
+  teamsAtom,
+} from "../../state/team/atoms";
 import type { AgentProvider } from "../../lib/team-llm";
 // The detail page pulls the whole markdown stack, so it keeps the code split
 // boundary `App.tsx` gave it; the type import below is erased at build time.
@@ -86,7 +93,20 @@ export type RunPageWithRunProps = Omit<
 
 export function RunPageWithRun({ runId, ...props }: RunPageWithRunProps) {
   const run = useAtomValue(runAtom(runId));
-  const dashboard = useAtomValue(activeDashboardAtom);
+  /*
+    Six projections of the open team, each read on its own. The page used to
+    take the whole payload, so a worker heartbeat re-rendered it to hand it a
+    run list it already had; now only the projection that changed does.
+  */
+  const teamId = useAtomValue(activeTeamIdAtom) ?? "";
+  const team = useAtomValue(teamEntityAtom(teamId));
+  const runs = useAtomValue(teamRunsAtom(teamId));
+  const workers = useAtomValue(teamWorkersAtom(teamId));
+  const members = useAtomValue(teamMembersAtom(teamId));
+  const executionPolicy = useAtomValue(teamExecutionPolicyAtom(teamId));
+  const organizationProviders = useAtomValue(
+    teamOrganizationProvidersAtom(teamId),
+  );
   const teams = useAtomValue(teamsAtom);
   const user = useAtomValue(userAtom);
   const token = useAtomValue(tokenAtom);
@@ -102,12 +122,13 @@ export function RunPageWithRun({ runId, ...props }: RunPageWithRunProps) {
    * payload carries one, and otherwise whatever the team's workers advertise.
    */
   const availableProviders = useMemo((): AgentProvider[] => {
-    const organizationProviders = dashboard?.organizationProviders ?? [];
-    if (organizationProviders.length > 0) return organizationProviders;
+    if (organizationProviders && organizationProviders.length > 0) {
+      return organizationProviders;
+    }
     return [
-      ...new Set((dashboard?.workers ?? []).flatMap((worker) => worker.providers)),
+      ...new Set((workers ?? []).flatMap((worker) => worker.providers)),
     ];
-  }, [dashboard?.organizationProviders, dashboard?.workers]);
+  }, [organizationProviders, workers]);
 
   const callbacks = useMemo(
     () => ({
@@ -185,16 +206,16 @@ export function RunPageWithRun({ runId, ...props }: RunPageWithRunProps) {
       {...props}
       {...callbacks}
       availableProviders={availableProviders}
-      availableRuns={dashboard?.runs ?? []}
+      availableRuns={runs ?? []}
       currentUserId={user?.id ?? null}
       error={recoveryError}
-      executionPolicy={dashboard?.executionPolicy}
-      executionWorkers={dashboard?.workers ?? []}
+      executionPolicy={executionPolicy ?? undefined}
+      executionWorkers={workers ?? []}
       isDeletingIssue={deletingIssueId === runId}
       isRecovering={recoveringRunId === runId}
       isUpdatingIssue={updatingIssueId === runId}
-      issueKeyPrefix={dashboard?.team.issueKeyPrefix}
-      mentionMembers={dashboard?.members ?? []}
+      issueKeyPrefix={team?.issueKeyPrefix}
+      mentionMembers={members ?? []}
       organizationId={
         teams.find((team) => team.id === props.projectId)?.organizationId ?? null
       }

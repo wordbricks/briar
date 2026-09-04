@@ -29,15 +29,16 @@ import {
 import type { ChannelSummary } from "./channels-contract";
 import { directMessageDisplayName } from "./direct-messages";
 import { formatIssueKey } from "./issue-key";
-import type { DashboardPayload, Organization, Project } from "../types";
+import type { NavigationHistoryRunLabel } from "../state/navigation/atoms";
+import type { Organization, Project } from "../types";
 
 /*
   Turning navigation history entries into the labels the window controls show.
 
   A location is only ids, so every row has to be resolved against the teams,
-  organizations, channels and the open dashboard — which is why this was a
-  200 line `useMemo` in the app shell. It is pure, so it lives here with the
-  other navigation helpers and is tested directly.
+  organizations, channels and the runs the visit stack points at — which is why
+  this was a 200 line `useMemo` in the app shell. It is pure, so it lives here
+  with the other navigation helpers and is tested directly.
 */
 
 export interface NavigationHistoryItemsInput {
@@ -46,8 +47,8 @@ export interface NavigationHistoryItemsInput {
   readonly teams: readonly Project[];
   readonly organizations: readonly Organization[];
   readonly channels: readonly ChannelSummary[];
-  /** The payload on screen, which is the only place run titles can come from. */
-  readonly dashboard: DashboardPayload | null;
+  /** Issue key and title per visited run, keyed by run id. */
+  readonly runLabels: ReadonlyMap<string, NavigationHistoryRunLabel>;
   readonly currentUserId: string | null;
   readonly t: (key: MessageKey) => string;
 }
@@ -57,7 +58,7 @@ export function buildNavigationHistoryItems({
   teams,
   organizations,
   channels,
-  dashboard,
+  runLabels,
   currentUserId,
   t,
 }: NavigationHistoryItemsInput): WindowNavigationHistoryItem[] {
@@ -128,9 +129,7 @@ export function buildNavigationHistoryItems({
       : undefined;
     const runId = runIdFromNavigationLocation(location);
     if (runId) {
-      const run = projectId && dashboard?.team.id === projectId
-        ? dashboard.runs.find((candidate) => candidate.id === runId)
-        : undefined;
+      const run = runLabels.get(runId);
       return createItem(index, location, {
         context: project?.name ?? null,
         eyebrow: run

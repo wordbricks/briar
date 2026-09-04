@@ -12,7 +12,7 @@ import {
   type AppNavigationLocation,
 } from "./app-navigation";
 import { buildNavigationHistoryItems } from "./navigation-history-items";
-import type { DashboardPayload, Organization, Project } from "../types";
+import type { Organization, Project } from "../types";
 
 /*
   A history entry is only ids, so every label is a lookup that can miss. What
@@ -43,11 +43,10 @@ const organization: Organization = {
 
 const run = { ...demoDashboard.runs[0]!, id: "run-1", title: "Fix the thing", runNumber: 42 };
 
-const dashboard: DashboardPayload = {
-  ...demoDashboard,
-  team,
-  runs: [run],
-};
+/** What `navigationHistoryRunLabelsAtom` publishes for the run above. */
+const runLabels = new Map([
+  [run.id, { runNumber: run.runNumber, title: run.title }],
+]);
 
 const channel = (overrides: Partial<ChannelSummary> = {}): ChannelSummary => ({
   id: "channel-1",
@@ -76,14 +75,14 @@ const build = (
   entries: AppNavigationLocation[],
   overrides: {
     channels?: ChannelSummary[];
-    dashboard?: DashboardPayload | null;
+    runLabels?: ReadonlyMap<string, { runNumber: number; title: string }>;
     currentUserId?: string | null;
   } = {},
 ) =>
   buildNavigationHistoryItems({
     channels: overrides.channels ?? [],
     currentUserId: overrides.currentUserId ?? "user-1",
-    dashboard: overrides.dashboard === undefined ? dashboard : overrides.dashboard,
+    runLabels: overrides.runLabels ?? runLabels,
     entries,
     organizations: [organization],
     t,
@@ -110,9 +109,10 @@ describe("buildNavigationHistoryItems", () => {
     expect(item?.eyebrow).toBe("sidebar.issues");
   });
 
-  it("falls back the same way when another team's payload is open", () => {
+  it("falls back the same way when the run has no label", () => {
+    // What the atom publishes when another team's board is the one on screen.
     const [item] = build([issueNavigationLocation(team.id, run.id)], {
-      dashboard: { ...dashboard, team: { ...team, id: "team-b" } },
+      runLabels: new Map(),
     });
     expect(item?.label).toBe("sidebar.issues");
   });

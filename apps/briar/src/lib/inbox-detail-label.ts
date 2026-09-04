@@ -1,6 +1,5 @@
 import { isInboxRunDetailTarget } from "./inbox-notifications";
 import type { InboxNotificationTarget } from "../generated/tauri";
-import type { HuntRun } from "../types";
 
 /** The one field the label needs from an inbox message. */
 type LabelledMessage = {
@@ -10,8 +9,12 @@ type LabelledMessage = {
 
 export interface InboxDetailLabelInput {
   readonly target: InboxNotificationTarget;
-  /** Runs of the team on screen, if it is the one the target belongs to. */
-  readonly runs: readonly HuntRun[] | undefined;
+  /**
+   * Title of the run the target points at, when that run is on the board this
+   * window has open. `null` for every other target and for a team that is not
+   * on screen.
+   */
+  readonly runTitle: string | null;
   readonly messages: readonly LabelledMessage[];
   /** Shown when neither the run nor the message is on this device yet. */
   readonly fallback: string;
@@ -26,13 +29,11 @@ export interface InboxDetailLabelInput {
 export function inboxDetailLabel({
   fallback,
   messages,
-  runs,
+  runTitle,
   target,
 }: InboxDetailLabelInput): string {
   return (
-    (isInboxRunDetailTarget(target)
-      ? runs?.find((run) => run.id === target.targetId)?.title
-      : null) ??
+    (isInboxRunDetailTarget(target) ? runTitle : null) ??
     messages.find((message) => message.id === target.messageId)?.title ??
     fallback
   );

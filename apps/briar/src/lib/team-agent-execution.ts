@@ -89,7 +89,8 @@ export async function executeTeamAgentTask(
   dependencies: TeamAgentTaskExecutionDependencies,
   input: {
     agent: TeamAgentRunInput["agent"];
-    dashboard: DashboardPayload;
+    /** The team the task acts in, and the runs a dispatch may pick from. */
+    board: Pick<DashboardPayload, "team" | "runs">;
     message: string;
     skillId?: string | null;
     sessionId?: string;
@@ -117,7 +118,7 @@ export async function executeTeamAgentTask(
       {
         runAgent: dependencies.runAgent,
         dispatchAutoHunt: (decision) =>
-          dependencies.startAutoHunt(input.dashboard.runs, {
+          dependencies.startAutoHunt(input.board.runs, {
             coordinatorConversationId: decision.conversationId,
             parentSessionId: sessionId,
             maxIssues: decision.maxIssues ?? undefined,
@@ -130,14 +131,14 @@ export async function executeTeamAgentTask(
           }),
       },
       {
-        projectId: input.dashboard.team.id,
+        projectId: input.board.team.id,
         agent: input.agent,
         message: input.recoveringAfterUpdate
           ? plannedUpdateContinuationMessage(input.message)
           : input.message,
         conversationId: input.conversationId ?? null,
         sessionId,
-        runs: teamAgentRunSnapshots(input.dashboard.runs),
+        runs: teamAgentRunSnapshots(input.board.runs),
         resumeAfterUpdate: true,
       },
     );

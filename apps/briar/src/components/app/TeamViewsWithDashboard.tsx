@@ -11,12 +11,14 @@ import {
 import { localTeamReadiness } from "../../lib/local-team-connection";
 import { remoteMode } from "../../state/platform";
 import {
-  teamExecutionPolicyAtom,
   activeTeamIdAtom,
+  teamAgentBoardAtom,
+  teamExecutionPolicyAtom,
+  teamSettingsAtom,
 } from "../../state/team/atoms";
+import { teamRunsAtom } from "../../state/entities/runs";
 import { teamWorkersAtom } from "../../state/entities/workers";
 import { useIntegrationActions } from "../../state/integrations/actions";
-import { activeDashboardAtom } from "../../state/sync/view";
 import { useWorkflowActions } from "../../state/workflow/actions";
 import { useWorkspaceActions } from "../../state/workspace/actions";
 import {
@@ -35,8 +37,14 @@ import { velenAtom } from "../../state/integrations/atoms";
   hand them a payload they mostly ignore. Reading it here keeps the tick inside
   the view that displays it.
 
-  Everything else these views take — health, readiness, workflow, workers and
-  the navigation callbacks — is still a prop; Phase 3 owns those.
+  Each page now reads the projections it actually draws rather than the whole
+  payload: the settings page never wakes for a run, and the lobby never wakes
+  for a worker heartbeat. The Agents page is the one that needs a set of four
+  at once — a dispatch picks runs, checks them against the workers and the
+  policy, and reports in the team's issue key — so it takes `teamAgentBoardAtom`.
+
+  Everything else these views take — health, readiness, workflow and the
+  navigation callbacks — is still a prop; Phase 3 owns those.
 */
 
 const TeamAgents = lazy(() =>
@@ -55,10 +63,11 @@ const WorkerDispatchDialog = lazy(() =>
 );
 
 export function TeamAgentsWithDashboard(
-  props: Omit<ComponentProps<typeof TeamAgents>, "dashboard">,
+  props: Omit<ComponentProps<typeof TeamAgents>, "board">,
 ) {
-  const dashboard = useAtomValue(activeDashboardAtom);
-  return <TeamAgents {...props} dashboard={dashboard} />;
+  const teamId = useAtomValue(activeTeamIdAtom);
+  const board = useAtomValue(teamAgentBoardAtom(teamId ?? ""));
+  return <TeamAgents {...props} board={board} />;
 }
 
 /**
@@ -70,22 +79,27 @@ export function TeamLobbyWithDashboard(
   props: Omit<
     ComponentProps<typeof TeamLobby>,
     | "connectionState"
-    | "dashboard"
     | "readiness"
     | "requiresLocalReadiness"
+    | "runs"
+    | "settingsRepository"
   >,
 ) {
-  const dashboard = useAtomValue(activeDashboardAtom);
   const connectionState = useAtomValue(activeTeamConnectionStateAtom);
   const teamId = useAtomValue(activeTeamIdAtom);
   const readiness = useAtomValue(teamReadinessAtom(teamId ?? ""));
+  // The stat tiles and the usage summary are built from the runs; the
+  // repository panel is the only thing the lobby reads out of team settings.
+  const runs = useAtomValue(teamRunsAtom(teamId ?? ""));
+  const settings = useAtomValue(teamSettingsAtom(teamId ?? ""));
   return (
     <TeamLobby
       {...props}
       connectionState={connectionState}
-      dashboard={dashboard}
       readiness={readiness.readiness}
       requiresLocalReadiness={!remoteMode}
+      runs={runs ?? []}
+      settingsRepository={settings?.githubRepository ?? null}
     />
   );
 }
@@ -100,7 +114,7 @@ export function TeamLobbyWithDashboard(
 export function TeamSettingsWithDashboard(
   props: Omit<
     ComponentProps<typeof TeamSettings>,
-    | "dashboard"
+    | "executionPolicy"
     | "githubRepository"
     | "health"
     | "onAnalyzeWorkflowRequirements"
@@ -114,11 +128,15 @@ export function TeamSettingsWithDashboard(
     | "onSaveCheckpointPolicy"
     | "onUpdateVelenOrg"
     | "repositoryConnected"
+    | "settings"
     | "velen"
+    | "workers"
   >,
 ) {
   const teamId = useAtomValue(activeTeamIdAtom);
-  const dashboard = useAtomValue(activeDashboardAtom);
+  const settings = useAtomValue(teamSettingsAtom(teamId ?? ""));
+  const executionPolicy = useAtomValue(teamExecutionPolicyAtom(teamId ?? ""));
+  const workers = useAtomValue(teamWorkersAtom(teamId ?? ""));
   const connectedTeamIds = useAtomValue(connectedTeamIdsAtom);
   const connectionState = useAtomValue(activeTeamConnectionStateAtom);
   const health = useAtomValue(healthAtom);
@@ -142,7 +160,7 @@ export function TeamSettingsWithDashboard(
   return (
     <TeamSettings
       {...props}
-      dashboard={dashboard}
+      executionPolicy={executionPolicy ?? undefined}
       /*
         The repository the team is wired to comes from team settings, and falls
         back to what this device's checkout reports — but only while that
@@ -150,7 +168,7 @@ export function TeamSettingsWithDashboard(
         enforces.
       */
       githubRepository={
-        dashboard?.settings.githubRepository ??
+        settings?.githubRepository ??
         localTeamReadiness(connectionState, readiness.readiness)
           ?.githubRepository ??
         null
@@ -186,10 +204,12 @@ export function TeamSettingsWithDashboard(
       repositoryConnected={isRepositoryConnectedForImport({
         projectId: settingsTeamId,
         connectedTeamIds,
-        githubRepository: dashboard?.settings.githubRepository,
+        githubRepository: settings?.githubRepository,
         repositoryPath: health.value?.repositoryPath,
       })}
+      settings={settings}
       velen={velen}
+      workers={workers ?? []}
     />
   );
 }

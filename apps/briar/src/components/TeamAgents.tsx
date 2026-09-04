@@ -61,11 +61,11 @@ import { useMobileBackHandler } from "../hooks/useMobileNavigation";
 import { useAgentProviderModels } from "../hooks/useAgentProviderModels";
 import type {
   CreateProjectAgentInput,
-  DashboardPayload,
   ExecutionWorker,
   HuntRun,
   Project,
   ProjectAgent,
+  TeamAgentBoard,
   TeamAgentSkillInput,
   ProjectExecutionWorkerPolicy,
   UpdateProjectAgentInput,
@@ -86,8 +86,8 @@ import { ComputerUsePolicySwitch } from "./ComputerUsePolicySwitch";
 
 export function TeamAgents({
   agentListRequestKey = 0,
+  board,
   companionMode = false,
-  dashboard,
   error: appError,
   isSidebarOpen,
   onIssueOpen,
@@ -103,8 +103,9 @@ export function TeamAgents({
   token,
 }: {
   agentListRequestKey?: number;
+  /** The team's board, or `null` while none is on screen. */
+  board: TeamAgentBoard | null;
   companionMode?: boolean;
-  dashboard: DashboardPayload | null;
   error: string | null;
   isSidebarOpen: boolean;
   onIssueOpen: (runId: string) => void;
@@ -253,7 +254,7 @@ export function TeamAgents({
             input,
             project.id,
             createdAt,
-            dashboard?.workers ?? [],
+            board?.workers ?? [],
           );
       setAgents((current) => [...current, agent]);
       setIsDialogOpen(false);
@@ -284,7 +285,7 @@ export function TeamAgents({
             : input.designatedWorkerId,
           designatedWorkerLabel: input.designatedWorkerId === undefined
             ? agent.designatedWorkerLabel
-            : dashboard?.workers?.find(
+            : board?.workers?.find(
                 (worker) => worker.id === input.designatedWorkerId,
               )?.label ?? null,
           description: input.description?.trim() ?? "",
@@ -337,7 +338,7 @@ export function TeamAgents({
     agent: ProjectAgent,
     input: TeamAgentTaskDialogSubmit,
   ) => {
-    if (!dashboard || startingAgentIds.has(agent.id)) {
+    if (!board || startingAgentIds.has(agent.id)) {
       return;
     }
     setStartingAgentIds((current) => new Set(current).add(agent.id));
@@ -371,7 +372,7 @@ export function TeamAgents({
         },
         {
           agent: runtimeAgent,
-          dashboard,
+          board,
           message: input.request,
           skillId: input.skill.id,
         },
@@ -398,9 +399,9 @@ export function TeamAgents({
         onBack={() => setSettingsAgent(null)}
         onDelete={() => removeAgent(settingsAgent)}
         onSave={(input) => editAgent(settingsAgent, input)}
-        policy={dashboard?.executionPolicy}
+        policy={board?.executionPolicy}
         project={project}
-        workers={dashboard?.workers ?? []}
+        workers={board?.workers ?? []}
       />
     );
   }
@@ -409,8 +410,8 @@ export function TeamAgents({
     return (
       <TeamAgentDetail
         agent={selectedAgent}
+        board={board}
         companionMode={companionMode}
-        dashboard={dashboard}
         isSidebarOpen={isSidebarOpen}
         onBack={() => setSelectedAgent(null)}
         onIssueOpen={onIssueOpen}
@@ -666,7 +667,7 @@ export function TeamAgents({
                           className="w-[34px] justify-center px-0! not-disabled:text-primary"
                           disabled={
                             isStarting ||
-                            !dashboard ||
+                            !board ||
                             agent.skills.length === 0
                           }
                           onClick={() => {
@@ -727,13 +728,13 @@ export function TeamAgents({
           key="create"
           onClose={closeDialog}
           onSubmit={addAgent}
-          policy={dashboard?.executionPolicy}
-          workers={dashboard?.workers ?? []}
+          policy={board?.executionPolicy}
+          workers={board?.workers ?? []}
         />
       )}
       <TeamAgentTaskDialog
         agent={taskDialogAgent}
-        dashboard={dashboard}
+        board={board}
         isOpen={taskDialogAgent !== null}
         isSubmitting={
           taskDialogAgent ? startingAgentIds.has(taskDialogAgent.id) : false

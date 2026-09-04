@@ -14,9 +14,9 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useI18n } from "../i18n";
 import type {
-  DashboardPayload,
   ProjectAgent,
   ProjectAgentSkill,
+  TeamAgentBoard,
 } from "../types";
 import { NativeSelect } from "./NativeSelect";
 
@@ -27,10 +27,10 @@ export type TeamAgentTaskDialogSubmit = {
 };
 
 function availableWorkersForProvider(
-  dashboard: DashboardPayload | null,
+  board: TeamAgentBoard | null,
   provider: ProjectAgent["provider"],
 ) {
-  return (dashboard?.workers ?? []).filter(
+  return (board?.workers ?? []).filter(
     (worker) =>
       worker.providers.includes(provider) &&
       worker.acceptingWork &&
@@ -39,17 +39,17 @@ function availableWorkersForProvider(
 }
 
 export function hasAvailableWorkerForAgentSkills(
-  dashboard: DashboardPayload | null,
+  board: TeamAgentBoard | null,
   agent: ProjectAgent,
 ) {
   return agent.skills.some(
-    (skill) => availableWorkersForProvider(dashboard, skill.provider).length > 0,
+    (skill) => availableWorkersForProvider(board, skill.provider).length > 0,
   );
 }
 
 export function TeamAgentTaskDialog({
   agent,
-  dashboard,
+  board,
   isOpen,
   isSubmitting,
   onOpenChange,
@@ -57,7 +57,8 @@ export function TeamAgentTaskDialog({
   workerSelectionRequired = false,
 }: {
   agent: ProjectAgent | null;
-  dashboard: DashboardPayload | null;
+  /** The board the task will run against; `null` disables the dialog. */
+  board: TeamAgentBoard | null;
   isOpen: boolean;
   isSubmitting: boolean;
   onOpenChange: (open: boolean) => void;
@@ -74,13 +75,13 @@ export function TeamAgentTaskDialog({
   );
   const availableWorkers = useMemo(
     () => selectedSkill
-      ? availableWorkersForProvider(dashboard, selectedSkill.provider)
+      ? availableWorkersForProvider(board, selectedSkill.provider)
       : [],
-    [dashboard, selectedSkill],
+    [board, selectedSkill],
   );
   const hasWorkerForAnySkill = useMemo(
-    () => agent ? hasAvailableWorkerForAgentSkills(dashboard, agent) : false,
-    [agent, dashboard],
+    () => agent ? hasAvailableWorkerForAgentSkills(board, agent) : false,
+    [agent, board],
   );
 
   useEffect(() => {
@@ -176,7 +177,7 @@ export function TeamAgentTaskDialog({
               !selectedSkill ||
               !message ||
               isSubmitting ||
-              !dashboard ||
+              !board ||
               (workerSelectionRequired && !selectedWorkerId)
             ) return;
             const submission = onSubmit({
@@ -204,7 +205,7 @@ export function TeamAgentTaskDialog({
               !selectedSkill ||
               isSubmitting ||
               request.trim().length === 0 ||
-              !dashboard ||
+              !board ||
               (workerSelectionRequired && !selectedWorkerId)
             }
             form="project-agent-task-form"
