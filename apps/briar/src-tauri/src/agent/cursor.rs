@@ -16,6 +16,7 @@ pub(super) const CONFIG: SidecarProviderConfig = SidecarProviderConfig {
     },
     missing_bun_error: "Cursor Agent runner 실행에 필요한 Bun을 로컬 환경에서 찾지 못했습니다.",
     forwards_additional_directories: false,
+    accepts_legacy_conversation_id: false,
     empty_session_error: "Cursor Agent가 빈 대화 ID를 반환했습니다.",
     missing_session_error: "Cursor Agent가 대화 ID를 반환하지 않았습니다.",
     request_failure_prefix: "Cursor Agent 요청에 실패했습니다",

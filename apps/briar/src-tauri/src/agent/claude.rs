@@ -16,6 +16,7 @@ pub(super) const CONFIG: SidecarProviderConfig = SidecarProviderConfig {
     },
     missing_bun_error: "Claude Agent SDK 실행에 필요한 Bun을 로컬 환경에서 찾지 못했습니다.",
     forwards_additional_directories: true,
+    accepts_legacy_conversation_id: false,
     empty_session_error: "Claude Agent SDK가 빈 대화 ID를 반환했습니다.",
     missing_session_error: "Claude Agent SDK가 대화 ID를 반환하지 않았습니다.",
     request_failure_prefix: "Claude Agent SDK 요청에 실패했습니다",

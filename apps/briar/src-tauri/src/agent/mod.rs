@@ -6,10 +6,12 @@
 mod agy;
 mod claude;
 mod codex;
+mod codex_models;
 mod cursor;
 mod grok;
 mod opencode;
 mod openrouter;
+mod project_agent;
 mod sidecar;
 
 use std::{
@@ -20,7 +22,7 @@ use std::{
 
 use crate::host::CommandRunner;
 
-pub(crate) use codex::{
+pub(crate) use project_agent::{
     AutoHuntCliEnvironment, AutoHuntCoordinatorResponse, ProjectAgentRunRequest,
     ProjectAgentRunResponse, ProjectAutoHuntIssue, ProjectAutoHuntIssueAttachment,
     ProjectAutoHuntIssueMessage, ProjectAutoHuntIssueMessageAuthor, ProjectAutoHuntIssueResult,
@@ -47,11 +49,12 @@ pub(crate) enum AgentProviderKind {
 ///
 /// 여기 등록된 provider는 대화 ID를 `briar:<네임스페이스>:<프로젝트 id>:<세션 id>`
 /// 형태로 주고받는다. 표에 없는 provider는
-/// [`AgentProviderKind::conversation_namespace`]가 `None`을 돌려주며, 네임스페이스가
-/// 없던 시절의 레거시 형식만 사용한다(현재 Codex). provider가 네임스페이스를 갖게
-/// 되면 이 표에 한 줄만 추가하면 되고, [`AgentProviderKind::for_conversation_id`]의
-/// 레거시 폴백은 표와 무관하게 남아 있으므로 기존 대화 ID도 계속 인식된다.
+/// [`AgentProviderKind::conversation_namespace`]가 `None`을 돌려준다. Codex는
+/// 네임스페이스가 없던 시절 `briar:<프로젝트 id>:<세션 id>` 형식을 썼으므로
+/// [`AgentProviderKind::for_conversation_id`]의 레거시 폴백이 표와 무관하게 남아
+/// 있고, 그때 저장된 대화 ID도 계속 인식된다.
 const CONVERSATION_NAMESPACES: &[(AgentProviderKind, &str)] = &[
+    (AgentProviderKind::Codex, "codex"),
     (AgentProviderKind::Claude, "claude"),
     (AgentProviderKind::Grok, "grok"),
     (AgentProviderKind::Cursor, "cursor"),
@@ -190,16 +193,6 @@ pub(crate) enum SandboxMode {
     DangerFullAccess,
 }
 
-impl SandboxMode {
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::ReadOnly => "read-only",
-            Self::WorkspaceWrite => "workspace-write",
-            Self::DangerFullAccess => "danger-full-access",
-        }
-    }
-}
-
 #[derive(
     Clone, Copy, Debug, Default, PartialEq, serde::Deserialize, serde::Serialize, specta::Type,
 )]
@@ -209,16 +202,6 @@ pub(crate) enum ApprovalPolicy {
     OnRequest,
     #[default]
     Never,
-}
-
-impl ApprovalPolicy {
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::Untrusted => "untrusted",
-            Self::OnRequest => "on-request",
-            Self::Never => "never",
-        }
-    }
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize, specta::Type)]
@@ -382,43 +365,8 @@ pub(crate) trait AgentBackend {
     ) -> Result<ProjectLlmResponse, String>;
 }
 
-pub(crate) struct CodexBackend {
-    binary: String,
-    runner: Arc<dyn CommandRunner>,
-}
-
-impl CodexBackend {
-    pub(crate) fn discover(runner: Arc<dyn CommandRunner>) -> Result<Self, String> {
-        Ok(Self {
-            binary: runner.resolve_binary("codex")?,
-            runner,
-        })
-    }
-}
-
-impl AgentBackend for CodexBackend {
-    fn run(
-        &self,
-        project_id: &str,
-        workspace_root: &Path,
-        execution: ChatExecution,
-        request: ProjectLlmRequest,
-        approve: &dyn Fn(&str, &serde_json::Value) -> bool,
-    ) -> Result<ProjectLlmResponse, String> {
-        codex::chat(
-            self.runner.clone(),
-            &self.binary,
-            project_id,
-            workspace_root,
-            execution,
-            request,
-            approve,
-        )
-    }
-}
-
 pub(crate) enum AgentBackendHandle {
-    Codex(CodexBackend),
+    Codex(sidecar::SidecarBackend),
     Claude(sidecar::SidecarBackend),
     Cursor(sidecar::SidecarBackend),
     Grok(sidecar::SidecarBackend),
@@ -437,10 +385,8 @@ impl AgentBackend for AgentBackendHandle {
     ) -> Result<ProjectLlmResponse, String> {
         let request = request.with_briar_skill_instruction();
         match self {
-            Self::Codex(backend) => {
-                backend.run(project_id, workspace_root, execution, request, approve)
-            }
-            Self::Claude(backend)
+            Self::Codex(backend)
+            | Self::Claude(backend)
             | Self::Cursor(backend)
             | Self::Grok(backend)
             | Self::Agy(backend)
@@ -452,6 +398,7 @@ impl AgentBackend for AgentBackendHandle {
 }
 
 pub(crate) struct AgentRunnerBundles<'a> {
+    pub(crate) codex: &'a Path,
     pub(crate) claude: &'a Path,
     pub(crate) cursor: &'a Path,
     pub(crate) grok: &'a Path,
@@ -465,7 +412,10 @@ pub(crate) fn discover_backend(
     runners: AgentRunnerBundles<'_>,
 ) -> Result<AgentBackendHandle, String> {
     match provider {
-        AgentProviderKind::Codex => CodexBackend::discover(runner).map(AgentBackendHandle::Codex),
+        AgentProviderKind::Codex => {
+            sidecar::SidecarBackend::discover(runner, runners.codex, codex::CONFIG)
+                .map(AgentBackendHandle::Codex)
+        }
         AgentProviderKind::Claude => {
             sidecar::SidecarBackend::discover(runner, runners.claude, claude::CONFIG)
                 .map(AgentBackendHandle::Claude)
@@ -523,8 +473,8 @@ pub(crate) fn codex_models(
     runner: Arc<dyn CommandRunner>,
     binary: &str,
     workspace: &Path,
-) -> Result<Vec<codex::ModelListEntry>, String> {
-    codex::list_models(runner, binary, workspace)
+) -> Result<Vec<codex_models::ModelListEntry>, String> {
+    codex_models::list_models(runner, binary, workspace)
 }
 
 pub(crate) fn claude_binary(home: &Path, execution_path: &OsStr) -> Result<PathBuf, String> {
@@ -556,7 +506,7 @@ pub(crate) fn start_auto_hunt_worker(
     issue: ProjectAutoHuntIssue,
     approve: &dyn Fn(&str, &serde_json::Value) -> bool,
 ) -> Result<ProjectAutoHuntResponse, String> {
-    codex::start_auto_hunt_worker_with(
+    project_agent::start_auto_hunt_worker_with(
         backend,
         project_id,
         workspace_root,
@@ -576,7 +526,7 @@ pub(crate) fn run_project_agent(
     request: ProjectAgentRunRequest,
     approve: &dyn Fn(&str, &serde_json::Value) -> bool,
 ) -> Result<ProjectAgentRunResponse, String> {
-    codex::run_project_agent_with(
+    project_agent::run_project_agent_with(
         backend,
         project_id,
         workspace_root,
@@ -596,7 +546,7 @@ pub(crate) fn summarize_auto_hunt_dispatch(
     workers: &[ProjectAutoHuntWorkerResponse],
     approve: &dyn Fn(&str, &serde_json::Value) -> bool,
 ) -> Result<AutoHuntCoordinatorResponse, String> {
-    codex::summarize_auto_hunt_dispatch_with(
+    project_agent::summarize_auto_hunt_dispatch_with(
         backend,
         project_id,
         workspace_root,
@@ -615,6 +565,11 @@ mod tests {
     };
     #[test]
     fn resolves_the_original_provider_from_a_project_conversation() {
+        assert_eq!(
+            AgentProviderKind::for_conversation_id("project-1", "briar:codex:project-1:thread-1"),
+            Some(AgentProviderKind::Codex)
+        );
+        // Codex conversations stored before provider namespaces still resolve.
         assert_eq!(
             AgentProviderKind::for_conversation_id("project-1", "briar:project-1:thread-1"),
             Some(AgentProviderKind::Codex)
@@ -713,8 +668,11 @@ mod tests {
             AgentProviderKind::for_conversation_id("project-1", "briar:foo:project-1:session-1"),
             None
         );
-        // Codex는 아직 네임스페이스를 등록하지 않았으므로 레거시 형식만 인식한다.
-        assert_eq!(AgentProviderKind::Codex.conversation_namespace(), None);
+        // Codex는 이제 네임스페이스를 쓰지만, 네임스페이스 이전에 저장된 대화 ID도 계속 인식한다.
+        assert_eq!(
+            AgentProviderKind::Codex.conversation_namespace(),
+            Some("codex")
+        );
         assert_eq!(
             AgentProviderKind::for_conversation_id("project-1", "briar:project-1:thread-1"),
             Some(AgentProviderKind::Codex)

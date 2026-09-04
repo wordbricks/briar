@@ -158,9 +158,9 @@ async function runCodexAttempt(
       if (transition.completed) {
         completed = true;
         child.stdin.end();
-        // The desktop backend drops the App Server child as soon as the turn
-        // has completed. Detached workers must do the same so a persistent
-        // App Server process cannot keep the worker stuck after its result.
+        // Drop the App Server child as soon as the turn has completed so a
+        // persistent App Server process cannot keep the caller — a detached
+        // worker or the desktop sidecar — stuck after its result.
         if (child.exitCode === null) child.kill("SIGTERM");
         break;
       }

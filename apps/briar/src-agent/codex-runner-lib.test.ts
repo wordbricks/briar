@@ -153,6 +153,108 @@ describe("Codex App Server runner", () => {
     });
   });
 
+  it("keeps the desktop sandbox, resume, and structured-output contract", () => {
+    // Auto Hunt worktrees live outside the checkout, so their roots ride on
+    // their own `--config` and leave network_access intact.
+    expect(
+      codexAppServerArgs({
+        networkAccess: true,
+        additionalDirectories: [
+          "/Users/dev/briar/worktrees/project-1",
+          '/tmp/other "root"',
+        ],
+      }),
+    ).toEqual([
+      "app-server",
+      "--listen",
+      "stdio://",
+      "--config",
+      "sandbox_workspace_write.network_access=true",
+      "--config",
+      'sandbox_workspace_write.writable_roots=["/Users/dev/briar/worktrees/project-1","/tmp/other \\"root\\""]',
+    ]);
+
+    expect(
+      codexThreadRequest({
+        ...request,
+        sandboxMode: "readOnly",
+        approvalPolicy: "on-request",
+      }),
+    ).toMatchObject({
+      method: "thread/start",
+      params: {
+        cwd: "/worktree",
+        sandbox: "read-only",
+        approvalPolicy: "on-request",
+        developerInstructions: "Use the Briar workflow.",
+      },
+    });
+    expect(
+      codexThreadRequest({
+        ...request,
+        conversationId: "thread-1",
+        instructions: undefined,
+        sandboxMode: "dangerFullAccess",
+      }),
+    ).toMatchObject({
+      method: "thread/resume",
+      params: {
+        threadId: "thread-1",
+        cwd: "/worktree",
+        sandbox: "danger-full-access",
+        approvalPolicy: "never",
+      },
+    });
+
+    expect(
+      codexTurnRequest(
+        { ...request, outputSchema: { type: "object" } },
+        "thread-1",
+      ),
+    ).toMatchObject({
+      method: "turn/start",
+      params: {
+        threadId: "thread-1",
+        cwd: "/worktree",
+        approvalPolicy: "never",
+        input: [{ type: "text", text: "Inspect the repository" }],
+        outputSchema: { type: "object" },
+      },
+    });
+
+    // An App Server request Briar cannot answer is declined, not accepted.
+    expect(
+      codexServerRequestResponse(
+        { id: 11, method: "item/tool/requestUserInput", params: {} },
+        true,
+      ),
+    ).toMatchObject({ id: 11, error: { code: -32601 } });
+  });
+
+  it("prefers the final answer over commentary in a completed turn", () => {
+    const state = createCodexAppServerState();
+    state.threadId = "thread-1";
+    state.turnId = "turn-1";
+
+    const completed = consumeCodexAppServerMessage(state, request, {
+      method: "turn/completed",
+      params: {
+        threadId: "thread-1",
+        turn: {
+          id: "turn-1",
+          status: "completed",
+          items: [
+            { type: "agentMessage", phase: "commentary", text: "Working" },
+            { type: "agentMessage", phase: "final_answer", text: "Done" },
+          ],
+        },
+      },
+    });
+
+    expect(completed.completed).toBe(true);
+    expect(codexFinalMessage(state)).toBe("Done");
+  });
+
   it("maps App Server messages to the shared Agent event contract", () => {
     expect(
       normalizeCodexAppServerMessage({
