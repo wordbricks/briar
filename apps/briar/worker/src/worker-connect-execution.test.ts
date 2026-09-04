@@ -330,7 +330,7 @@ describe("WorkerExecutionService execution credential boundary", () => {
     );
     expect(prepared.uploads?.[0]).toMatchObject({
       reference: { uploadId },
-      uploadUrl: `https://briar.example/uploads/${uploadId}`,
+      uploadUrl: `https://briar.example/app-api/uploads/${uploadId}`,
     });
     expect(prepare).toHaveBeenCalledOnce();
     const prepareInput = prepare.mock.calls[0]?.[0];

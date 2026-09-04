@@ -100,7 +100,7 @@ export class AgentActivityRealtimeTransport<Frame> {
       });
       socket.addEventListener("close", finish);
       socket.addEventListener("error", () => {
-        socket.close(1011, `${adapter.label} activity socket failed`);
+        socket.close(4011, `${adapter.label} activity socket failed`);
         finish();
       });
     } catch (error) {

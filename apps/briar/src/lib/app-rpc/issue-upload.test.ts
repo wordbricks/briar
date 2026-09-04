@@ -28,7 +28,7 @@ const client = createClient(IssueService, createRouterTransport((router) => {
         uploads: [{
           clientId: request.attachments[0]?.clientId,
           reference: { uploadId: "upload-screen" },
-          uploadUrl: "https://api.briar.test/uploads/upload-screen",
+          uploadUrl: "https://api.briar.test/app-api/uploads/upload-screen",
           uploadCapability: "capability-screen",
         }],
       };
@@ -100,7 +100,7 @@ describe("Issue prepared upload boundary", () => {
     expect(observed.finalUploadIds).toEqual(["upload-screen"]);
     expect(upload).toHaveBeenCalledOnce();
     const [url, init] = upload.mock.calls[0]!;
-    expect(String(url)).toBe("https://api.briar.test/uploads/upload-screen");
+    expect(String(url)).toBe("https://api.briar.test/app-api/uploads/upload-screen");
     expect(init).toMatchObject({ method: "PUT", body: file });
     expect(new Headers(init?.headers).get("authorization")).toBe(
       "Bearer capability-screen",
