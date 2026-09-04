@@ -53,6 +53,13 @@ for argument in "$@"; do
 done
 url="${!#}"
 case "$url" in
+  *latest.json)
+    if [[ "${LATEST_MANIFEST_UNREACHABLE:-}" == "1" ]]; then
+      echo "curl: (22) latest manifest is unavailable" >&2
+      exit 22
+    fi
+    cp "$ARTIFACT_DIRECTORY/latest.json" "$output"
+    ;;
   *.tar.gz.sig)
     cp "$ARTIFACT_DIRECTORY/runtime.tar.gz.sig" "$output"
     ;;
@@ -92,6 +99,10 @@ EOF
 cat > "$fake_bin/minisign" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
+if [[ "${FAIL_SIGNATURE:-}" == "1" ]]; then
+  echo "Signature verification failed" >&2
+  exit 1
+fi
 exit 0
 EOF
 
@@ -137,6 +148,31 @@ make_release() {
     > "$stage/manifest.json"
   tar -czf "$artifact_directory/runtime.tar.gz" -C "$stage" .
   printf 'signature\n' > "$artifact_directory/runtime.tar.gz.sig"
+}
+
+publish_latest() {
+  jq -n --arg version "$1" '{version: $version}' \
+    > "$artifact_directory/latest.json"
+}
+
+run_bootstrap() {
+  export ARTIFACT_DIRECTORY="$artifact_directory"
+  export LATEST_MANIFEST_UNREACHABLE="${LATEST_MANIFEST_UNREACHABLE:-0}"
+  export FAIL_SIGNATURE="${FAIL_SIGNATURE:-0}"
+  export ACTIVATED_FILE="$fixture/activated"
+  export SYSTEMCTL_LOG="$fixture/systemctl.log"
+  rm -f -- "$ACTIVATED_FILE"
+  BRIAR_RUNTIME_ROOT="$runtime_root" \
+  BRIAR_RUNTIME_UPDATE_REQUEST_DIR="$fixture/missing-request-directory" \
+  BRIAR_RUNTIME_UPDATE_STATE_DIR="$state_directory" \
+  BRIAR_RUNTIME_CREDENTIAL_FILE="$fixture/credential.json" \
+  BRIAR_RUNTIME_UPDATE_PUBLIC_KEY="$fixture/runtime-updater.pub" \
+  BRIAR_RUNTIME_CURL="$fake_bin/curl" \
+  BRIAR_RUNTIME_BRIAR="$fake_bin/briar-control" \
+  BRIAR_RUNTIME_MINISIGN="$fake_bin/minisign" \
+  BRIAR_RUNTIME_SYSTEMCTL="$fake_bin/systemctl" \
+    /workspace/infrastructure/managed-computers/briar-managed-runtime-updater \
+    --bootstrap
 }
 
 run_update() {
@@ -210,6 +246,53 @@ if /workspace/infrastructure/managed-computers/prepare-image-for-capture \
 fi
 rm -f /home/briar/.cursor/session.json
 /workspace/infrastructure/managed-computers/prepare-image-for-capture >/dev/null
+
+# Bootstrap installs the published release when the baked runtime is older, and
+# never touches the Worker handoff, health confirmation or service restarts.
+make_release 2.1.0
+publish_latest 2.1.0
+rm -f -- "$fixture/systemctl.log"
+run_bootstrap
+test "$(readlink -f "$runtime_root/current")" = "$runtime_root/releases/2.1.0"
+test ! -e "$fixture/systemctl.log"
+test ! -e "$fixture/activated"
+jq -e '.outcome == "bootstrap_completed" and .targetVersion == "2.1.0" and
+   (.requestId | startswith("bootstrap-"))' \
+  "$state_directory/last-result.json" >/dev/null
+
+# A published release that matches or trails the baked runtime is a no-op.
+publish_latest 2.1.0
+run_bootstrap
+test "$(readlink -f "$runtime_root/current")" = "$runtime_root/releases/2.1.0"
+jq -e '.outcome == "bootstrap_skipped" and .targetVersion == "2.1.0"' \
+  "$state_directory/last-result.json" >/dev/null
+
+publish_latest 2.0.0
+run_bootstrap
+test "$(readlink -f "$runtime_root/current")" = "$runtime_root/releases/2.1.0"
+jq -e '.outcome == "bootstrap_skipped" and .targetVersion == "2.0.0"' \
+  "$state_directory/last-result.json" >/dev/null
+
+# An unreachable manifest must leave the baked runtime in place and still exit 0.
+make_release 2.2.0
+publish_latest 2.2.0
+LATEST_MANIFEST_UNREACHABLE=1
+run_bootstrap
+LATEST_MANIFEST_UNREACHABLE=0
+test "$(readlink -f "$runtime_root/current")" = "$runtime_root/releases/2.1.0"
+jq -e '.outcome == "bootstrap_failed" and
+   (.detail | contains("latest managed runtime release manifest"))' \
+  "$state_directory/last-result.json" >/dev/null
+
+# So must a bundle that fails signature verification.
+FAIL_SIGNATURE=1
+run_bootstrap
+FAIL_SIGNATURE=0
+test "$(readlink -f "$runtime_root/current")" = "$runtime_root/releases/2.1.0"
+test ! -e "$runtime_root/releases/2.2.0"
+jq -e '.outcome == "bootstrap_failed" and
+   (.detail | contains("signature verification failed"))' \
+  "$state_directory/last-result.json" >/dev/null
 
 echo "managed runtime updater lifecycle QA passed"
 CONTAINER

@@ -2,6 +2,7 @@
 Description=Briar managed computer runtime
 Wants=network-online.target
 Requires=briar-managed-enroll.service
+Wants=briar-managed-runtime-bootstrap.service
 Requires=briar-managed-runtime-updater.service
 Requires=briar-managed-worker.service
 Requires=briar-box-exec.service
@@ -9,6 +10,7 @@ Requires=briar-remote-desktop.service
 Requires=briar-remote-session-agent.service
 After=network-online.target
 After=briar-managed-enroll.service
+After=briar-managed-runtime-bootstrap.service
 After=briar-managed-runtime-updater.service
 After=briar-managed-worker.service
 After=briar-box-exec.service

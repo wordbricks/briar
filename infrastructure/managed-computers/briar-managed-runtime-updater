@@ -14,42 +14,61 @@ poll_seconds="${BRIAR_RUNTIME_UPDATE_POLL_SECONDS:-5}"
 handoff_timeout_seconds="${BRIAR_RUNTIME_UPDATE_HANDOFF_TIMEOUT_SECONDS:-900}"
 health_timeout_seconds="${BRIAR_RUNTIME_UPDATE_HEALTH_TIMEOUT_SECONDS:-180}"
 run_once=false
-if [[ "${1:-}" == "--once" ]]; then
-  run_once=true
-elif [[ $# -gt 0 ]]; then
-  echo "Usage: briar-managed-runtime-updater [--once]" >&2
+bootstrap_mode=false
+if [[ $# -gt 1 ]]; then
+  echo "Usage: briar-managed-runtime-updater [--once|--bootstrap]" >&2
   exit 2
 fi
+case "${1:-}" in
+  "") ;;
+  --once) run_once=true ;;
+  --bootstrap) bootstrap_mode=true ;;
+  *)
+    echo "Usage: briar-managed-runtime-updater [--once|--bootstrap]" >&2
+    exit 2
+    ;;
+esac
+
+# Bootstrap runs before the managed services start, so a broken environment must
+# never keep the computer from booting.
+abort_startup() {
+  echo "$1" >&2
+  if [[ "$bootstrap_mode" == true ]]; then
+    exit 0
+  fi
+  exit 1
+}
 
 if [[ "$(id -u)" != "0" ]]; then
   if [[ "${BRIAR_RUNTIME_UPDATER_TEST_MODE:-}" != "1" ||
     "$runtime_root" != /tmp/briar-runtime-updater-test.* ]]; then
-    echo "briar-managed-runtime-updater must run as root" >&2
-    exit 1
+    abort_startup "briar-managed-runtime-updater must run as root"
   fi
 fi
 
-for directory in "$runtime_root" "$request_directory" "$state_directory"; do
+required_directories=("$runtime_root" "$state_directory")
+if [[ "$bootstrap_mode" != true ]]; then
+  # Bootstrap never reads update requests, and the request directory only
+  # appears once the long-running updater unit creates it.
+  required_directories+=("$request_directory")
+fi
+for directory in "${required_directories[@]}"; do
   if [[ "$directory" != /* || ! -d "$directory" ]]; then
-    echo "runtime updater directory is unavailable: $directory" >&2
-    exit 1
+    abort_startup "runtime updater directory is unavailable: $directory"
   fi
 done
 for binary in "$curl_binary" "$briar_binary" "$minisign_binary" "$systemctl_binary"; do
   if [[ "$binary" != /* || ! -x "$binary" ]]; then
-    echo "runtime updater dependency is unavailable: $binary" >&2
-    exit 1
+    abort_startup "runtime updater dependency is unavailable: $binary"
   fi
 done
 if [[ ! -s "$credential_file" || ! -s "$public_key" ]]; then
-  echo "runtime updater credential or public key is unavailable" >&2
-  exit 1
+  abort_startup "runtime updater credential or public key is unavailable"
 fi
 if [[ ! "$poll_seconds" =~ ^[1-9][0-9]*$ ||
   ! "$handoff_timeout_seconds" =~ ^[1-9][0-9]*$ ||
   ! "$health_timeout_seconds" =~ ^[1-9][0-9]*$ ]]; then
-  echo "runtime updater timeout configuration is invalid" >&2
-  exit 1
+  abort_startup "runtime updater timeout configuration is invalid"
 fi
 
 release_root="$runtime_root/releases"
@@ -66,6 +85,7 @@ request_id=""
 target_version=""
 worker_id=""
 installed_release=""
+bootstrap_outcome=""
 
 fail_update() {
   last_error="$1"
@@ -227,13 +247,19 @@ install_release() {
   installed_release="$release"
 }
 
-activate_release() {
+link_release() {
   local release="$1"
   local temporary_link="$runtime_root/.current-${request_id}"
   previous_release="$(readlink -f "$current_link" 2>/dev/null || true)"
+  rm -f -- "$temporary_link"
   ln -s -- "$release" "$temporary_link" || return 1
   mv -Tf -- "$temporary_link" "$current_link" || return 1
   activated=true
+}
+
+activate_release() {
+  local release="$1"
+  link_release "$release" || return 1
   "$systemctl_binary" restart briar-remote-session-agent.service || return 1
   "$systemctl_binary" restart briar-box-exec.service || return 1
   "$systemctl_binary" restart briar-managed-worker.service || return 1
@@ -334,6 +360,107 @@ process_request() {
   }
   wait_for_health
 }
+
+# Boot-time self-update. A managed computer created from an older AMI still
+# carries the runtime that was baked into the image, so the very first boot asks
+# the public release manifest for the latest version and installs it before any
+# managed service starts. There is no Worker to hand off from and no server-side
+# update request, so handoff, health confirmation and failure reporting are all
+# skipped; every failure leaves the baked runtime in place.
+run_bootstrap() {
+  local work_directory current_version latest_manifest release token skip
+  activated=false
+  previous_release=""
+  last_error=""
+  bootstrap_outcome=""
+  worker_id=""
+  target_version=""
+  token="$(cat /proc/sys/kernel/random/uuid 2>/dev/null || true)"
+  if [[ ! "$token" =~ ^[0-9a-f-]{36}$ ]]; then
+    token="$(date -u +%Y%m%d%H%M%S)-$$"
+  fi
+  request_id="bootstrap-$token"
+
+  api_origin="$(jq -r '.apiOrigin // ""' "$credential_file" 2>/dev/null)"
+  if [[ ! "$api_origin" =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?$ ]]; then
+    fail_update "Managed computer credential is invalid"
+    return 1
+  fi
+
+  work_directory="$(mktemp -d "/tmp/briar-runtime-bootstrap.XXXXXX")" || {
+    fail_update "Could not create a runtime bootstrap workspace"
+    return 1
+  }
+  latest_manifest="$work_directory/latest.json"
+  # The release manifest is public, so bootstrap never sends the credential.
+  "$curl_binary" --fail --silent --show-error --location \
+    --retry 3 --retry-all-errors --connect-timeout 20 --max-time 60 \
+    "$api_origin/releases/latest.json" --output "$latest_manifest" || {
+      rm -rf -- "$work_directory"
+      fail_update "Could not read the latest managed runtime release manifest"
+      return 1
+    }
+  target_version="$(jq -r '.version // ""' "$latest_manifest" 2>/dev/null)"
+  if [[ ! "$target_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    rm -rf -- "$work_directory"
+    fail_update "Latest managed runtime release manifest is invalid"
+    return 1
+  fi
+
+  current_version=""
+  if [[ -s "$current_link/briar-version" ]]; then
+    current_version="$(tr -d '\r\n' < "$current_link/briar-version")"
+  fi
+  skip=false
+  if [[ "$current_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    if [[ "$current_version" == "$target_version" ]]; then
+      skip=true
+    elif [[ "$(printf '%s\n%s\n' "$current_version" "$target_version" |
+      LC_ALL=C sort -V | head -n 1)" == "$target_version" ]]; then
+      # The baked runtime is newer than the published release; never downgrade.
+      skip=true
+    fi
+  fi
+  if [[ "$skip" == true ]]; then
+    rm -rf -- "$work_directory"
+    bootstrap_outcome=skipped
+    return 0
+  fi
+
+  if ! install_release "$work_directory"; then
+    rm -rf -- "$work_directory"
+    return 1
+  fi
+  release="$installed_release"
+  rm -rf -- "$work_directory"
+  # No service restart: the managed services are ordered after this unit and
+  # have not started yet, so they pick up the new release on their first start.
+  link_release "$release" || {
+    fail_update "Could not activate the verified runtime release"
+    return 1
+  }
+  bootstrap_outcome=completed
+}
+
+if [[ "$bootstrap_mode" == true ]]; then
+  if run_bootstrap; then
+    if [[ "$bootstrap_outcome" == skipped ]]; then
+      write_result bootstrap_skipped \
+        "Managed runtime already matches the latest release" || true
+      echo "managed runtime bootstrap skipped: version=$target_version"
+    else
+      write_result bootstrap_completed \
+        "Managed runtime activated the latest release before startup" || true
+      echo "managed runtime bootstrap completed: version=$target_version"
+    fi
+  else
+    bootstrap_error="${last_error:-Runtime bootstrap failed}"
+    write_result bootstrap_failed "$bootstrap_error" || true
+    echo "managed runtime bootstrap failed: version=$target_version error=$bootstrap_error" >&2
+  fi
+  # Boot continues on the baked runtime whatever happened above.
+  exit 0
+fi
 
 while true; do
   shopt -s nullglob

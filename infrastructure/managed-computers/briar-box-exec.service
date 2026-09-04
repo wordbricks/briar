@@ -1,7 +1,7 @@
 [Unit]
 Description=Briar Computer Use box executor
-After=network-online.target briar-managed-enroll.service
-Wants=network-online.target
+After=network-online.target briar-managed-enroll.service briar-managed-runtime-bootstrap.service
+Wants=network-online.target briar-managed-runtime-bootstrap.service
 Requires=briar-managed-enroll.service
 
 [Service]
