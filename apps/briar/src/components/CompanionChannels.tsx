@@ -111,20 +111,26 @@ import {
   copyChannelMessageText,
   copyChannelShareLink,
 } from "../lib/issue-links";
-import {
-  channelConversationError,
-  useChannelConversation,
-} from "../hooks/use-channel-conversation";
+import { channelConversationError } from "../state/channel-conversation/model";
 import { useRegistry } from "../state/registry";
+import { useAtomValue } from "@effect/atom-react";
 import { applySyncEvent } from "../state/sync/apply";
 import {
+  channelAcceptingProposalIdAtom,
+  channelConversationBusyAtom,
+  channelDecliningProposalIdAtom,
+  channelEarlierMessagesLoadingAtom,
+  channelProposalProjectsAtom,
   channelThreadKey,
+  channelThreadLoadingAtom,
   channelThreadMessagesAtom,
+  channelThreadSubscriptionPendingAtom,
 } from "../state/channel-conversation/atoms";
-import {
-  useChannelConversationStore,
-  useChannelConversationView,
-} from "../state/channel-conversation/useChannelConversationStore";
+import { useChannelConversationView } from "../state/channel-conversation/useChannelConversationView";
+import { useChannelConversationActions } from "../state/channel-conversation/actions";
+import { useChannelConversationLoader } from "../state/channel-conversation/loader";
+import { useChannelConversationSync } from "../state/channel-conversation/useChannelConversationSync";
+import { useChannelConversationTyping } from "../state/channel-conversation/useChannelConversationTyping";
 import {
   resetChannelConversationViewState,
   writeChannelAgentReplies,
@@ -207,7 +213,7 @@ export function CompanionChannels({
     five entry LRU beside them (`CompanionChannelCache`) that bounded its own
     messages and threads; the store is that cache, bounded once.
   */
-  const conversationStore = useChannelConversationStore(channel?.id ?? null);
+  const conversationLoader = useChannelConversationLoader();
   const {
     agents,
     members,
@@ -301,106 +307,91 @@ export function CompanionChannels({
     },
     [markSelectedChannelRead],
   );
-  /*
-    A delta reaches the threads this screen is not showing as well as the one it
-    is. The cache walked its own stored threads for this; the store does the
-    same walk, so a thread reopened from it is not missing what arrived while
-    another screen was up.
-  */
-  const applyCachedDeltaMessages = useCallback(
-    (
-      incoming: ChannelMessage[],
-      removedMessageIds: string[],
-      reset: boolean,
-    ) => {
-      conversationStore.applyDeltaToStoredThreads(
-        incoming,
-        removedMessageIds,
-        reset,
-      );
-    },
-    [conversationStore],
-  );
   const handleIncomingRootMessages = useCallback(() => {
     requestStickToBottomIfAtBottom();
   }, [requestStickToBottomIfAtBottom]);
   const channelDeltaIsBlocked = useCallback(() => loading, [loading]);
+  /*
+    The conversation's writes, its realtime transport and its typing strips are
+    `state/channel-conversation`'s. The delta no longer needs this screen to
+    walk the threads it is not showing either: `channel-messages-page` applies
+    to every thread the store holds for the channel, which is what the cache
+    did by hand.
+  */
   const {
     acceptExecutionProposal,
     acceptProposal,
     acceptSkillExecutionProposal,
-    acceptingProposalId,
     applyAcceptedExecutionProposal,
     applyAcceptedSkillExecutionProposal,
-    applyAgentReplies,
-    applyIncomingMessages,
-    busy,
-    captureChannelSurface,
-    channelSurfaceIsCurrent,
-    clearProposalHistory,
     closeThread: closeConversationThread,
     declineProposal,
-    decliningProposalId,
-    invalidateChannelSurface,
-    loadCreateExecutionProposalContext,
-    loadChannelConversation,
-    loadEarlierChannelMessages: loadEarlierConversationMessages,
-    loadExecutionProposalContext,
-    loadSkillExecutionProposalContext,
-    loadingEarlierMessages,
+    loadEarlierMessages: loadEarlierConversationMessages,
     openIssue,
     openThread: openConversationThread,
-    proposalProjects,
     removeMessage,
     send: sendConversationMessage,
-    setError,
-    setProposalProjects,
-    threadActivityByAgentName,
-    threadLoading,
-    threadSubscriptionPending,
-    threadTypingAgentNames,
+    setProposalProject,
     toggleReaction,
     toggleThreadSubscription,
-    typingActivityByAgentName,
-    typingAgentNames,
-  } = useChannelConversation({
-    token,
-    organizationId,
-    imageCache,
+  } = useChannelConversationActions(channel?.id ?? null, {
     currentUserId,
-    channel,
-    members,
-    agents,
-    replies,
-    threadParentId,
-    threadMessages: thread ?? [],
+    channelKind: channel?.kind,
+    defaultProjectId: channel?.defaultProjectId ?? null,
     pageSize: mobileChannelMessagePageSize,
-    updateRootMessages: conversationStore.updateRootMessages,
-    updateThreadMessages: conversationStore.updateThreadMessages,
-    setThreadParentId: conversationStore.setThreadParentId,
+    imageCache,
     onChannelLoaded: setChannel,
     onIssueOpen,
     onSkillSessionAccepted,
-    onRootMessagePending: () => {
-      requestStickToBottomIfAtBottom();
-    },
+    onRootMessagePending: requestStickToBottomIfAtBottom,
     onThreadClosed: () => {
       setLoading(false);
       requestStickToBottomIfAtBottom();
     },
-    realtime: {
-      enabled: Boolean(channel),
-      catalogCursor: cursor,
-      catalogReady: Boolean(channel),
-      syncSignal: channelInboxSyncSignal,
-      isBlocked: channelDeltaIsBlocked,
-      onCatalogDelta: applyChannelCatalogDelta,
-      onSelectedChannelRemoved: handleSelectedChannelRemoved,
-      onSelectedChannelSummary: handleSelectedChannelSummary,
-      onSelectedMessages: applyCachedDeltaMessages,
-      onIncomingRootMessages: handleIncomingRootMessages,
-      warningLabel: "Companion channel delta refresh failed",
-    },
+  });
+  const busy = useAtomValue(channelConversationBusyAtom(channel?.id ?? ""));
+  const acceptingProposalId = useAtomValue(
+    channelAcceptingProposalIdAtom(channel?.id ?? ""),
+  );
+  const decliningProposalId = useAtomValue(
+    channelDecliningProposalIdAtom(channel?.id ?? ""),
+  );
+  const threadSubscriptionPending = useAtomValue(
+    channelThreadSubscriptionPendingAtom(channel?.id ?? ""),
+  );
+  const loadingEarlierMessages = useAtomValue(
+    channelEarlierMessagesLoadingAtom(channel?.id ?? ""),
+  );
+  const threadLoading = useAtomValue(
+    channelThreadLoadingAtom(channel?.id ?? ""),
+  );
+  const proposalProjects = useAtomValue(
+    channelProposalProjectsAtom(channel?.id ?? ""),
+  );
+  const {
+    threadActivityByAgentName,
+    threadTypingAgentNames,
+    typingActivityByAgentName,
+    typingAgentNames,
+  } = useChannelConversationTyping(channel?.id ?? null);
+  const {
+    loadCreateExecutionProposalContext,
+    loadExecutionProposalContext,
+    loadSkillExecutionProposalContext,
+  } = conversationLoader;
+  const loadChannelConversation = conversationLoader.loadConversation;
+  useChannelConversationSync({
+    enabled: Boolean(channel),
+    channelId: channel?.id ?? null,
+    catalogCursor: cursor,
+    catalogReady: Boolean(channel),
+    syncSignal: channelInboxSyncSignal,
+    isBlocked: channelDeltaIsBlocked,
+    onCatalogDelta: applyChannelCatalogDelta,
+    onSelectedChannelRemoved: handleSelectedChannelRemoved,
+    onSelectedChannelSummary: handleSelectedChannelSummary,
+    onIncomingRootMessages: handleIncomingRootMessages,
+    warningLabel: "Companion channel delta refresh failed",
   });
 
   useEffect(() => {
@@ -448,12 +439,11 @@ export function CompanionChannels({
   useEffect(() => {
     let cancelled = false;
     channelSelectionVersion.current += 1;
-    invalidateChannelSurface(null, null);
+    conversationLoader.invalidateSurface(null, null);
     cursor.current = 0;
-    clearProposalHistory();
+    conversationLoader.clearProposalHistory(channelRef.current?.id ?? null);
     setChannels([]);
     setChannel(null);
-    setError(null);
     if (!token) {
       setLoading(false);
       return () => {
@@ -477,14 +467,7 @@ export function CompanionChannels({
     return () => {
       cancelled = true;
     };
-  }, [
-    clearProposalHistory,
-    invalidateChannelSurface,
-    organizationId,
-    setError,
-    toast,
-    token,
-  ]);
+  }, [conversationLoader, organizationId, toast, token]);
 
   const groups = useMemo(
     () =>
@@ -504,7 +487,7 @@ export function CompanionChannels({
   */
   const openChannel = useCallback(
     async (summary: ChannelSummary) => {
-      invalidateChannelSurface(summary.id, null);
+      conversationLoader.invalidateSurface(summary.id, null);
       requestStickToBottom();
       const selectionVersion = ++channelSelectionVersion.current;
       setChannel(markSelectedChannelRead(summary));
@@ -513,13 +496,12 @@ export function CompanionChannels({
       // while another screen is open, so restoring it would replay a stale
       // typing indicator until the authoritative channel load completes.
       writeChannelAgentReplies(registry, summary.id, []);
-      setError(null);
       setLoading(true);
       try {
-        const result = await loadChannelConversation({
-          channelId: summary.id,
+        const result = await loadChannelConversation(summary.id, {
           messageLimit: mobileChannelMessagePageSize,
           mergeWithCurrentMessages: false,
+          onChannelLoaded: setChannel,
         });
         if (
           !result ||
@@ -534,12 +516,11 @@ export function CompanionChannels({
       }
     },
     [
-      invalidateChannelSurface,
+      conversationLoader,
       loadChannelConversation,
       markSelectedChannelRead,
       registry,
       requestStickToBottom,
-      setError,
     ],
   );
 
@@ -601,22 +582,21 @@ export function CompanionChannels({
         candidate.id === requestedMessage.channelId,
     );
     if (!summary) return;
-    invalidateChannelSurface(summary.id, null);
+    conversationLoader.invalidateSurface(summary.id, null);
     const selectionVersion = ++channelSelectionVersion.current;
     let cancelled = false;
     setChannel(summary);
     resetChannelConversationViewState(registry, summary.id);
     writeChannelAgentReplies(registry, summary.id, []);
     setStickToBottom(false);
-    setError(null);
     setLoading(true);
     void (async () => {
       try {
-        const result = await loadChannelConversation({
-          channelId: summary.id,
+        const result = await loadChannelConversation(summary.id, {
           messageLimit: mobileChannelMessagePageSize,
           mergeWithCurrentMessages: false,
           requestedMessage,
+          onChannelLoaded: setChannel,
         });
         if (
           !result ||
@@ -657,7 +637,7 @@ export function CompanionChannels({
     };
   }, [
     channels,
-    invalidateChannelSurface,
+    conversationLoader,
     loadChannelConversation,
     markSelectedChannelRead,
     onRequestedMessageOpen,
@@ -698,13 +678,12 @@ export function CompanionChannels({
   const closeChannel = useCallback(() => {
     if (!channel) return false;
     channelSelectionVersion.current += 1;
-    invalidateChannelSurface(null, null);
+    conversationLoader.invalidateSurface(null, null);
     writeChannelAgentReplies(registry, channel.id, []);
     setChannel(null);
     setLoading(false);
-    setError(null);
     return true;
-  }, [channel, invalidateChannelSurface, registry, setError]);
+  }, [channel, conversationLoader, registry]);
 
   useMobileBackHandler(
     () => closeThread() || closeChannel(),
@@ -784,10 +763,7 @@ export function CompanionChannels({
               onProjectChange={(projectId) => {
                 const proposalId = item.proposal?.id;
                 if (!proposalId) return;
-                setProposalProjects((current) => ({
-                  ...current,
-                  [proposalId]: projectId,
-                }));
+                setProposalProject(proposalId, projectId);
               }}
               onToggleReaction={(emoji) => void toggleReaction(item, emoji)}
               onDelete={() => void removeMessage(item)}
@@ -893,10 +869,7 @@ export function CompanionChannels({
               onProjectChange={(projectId) => {
                 const proposalId = item.proposal?.id;
                 if (!proposalId) return;
-                setProposalProjects((current) => ({
-                  ...current,
-                  [proposalId]: projectId,
-                }));
+                setProposalProject(proposalId, projectId);
               }}
               onToggleReaction={(emoji) => void toggleReaction(item, emoji)}
               onDelete={() => void removeMessage(item)}
