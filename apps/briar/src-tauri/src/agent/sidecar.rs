@@ -132,12 +132,24 @@ impl AgentBackend for SidecarBackend {
     }
 }
 
+/// Resolve the provider CLI, preferring a real binary over a version manager
+/// shim. A `mise` shim shadowing `/opt/homebrew/bin/claude` would otherwise be
+/// picked and then refuse to run, because the analysis worktree Briar sets as
+/// the working directory carries the analyzed repository's own untrusted
+/// `mise.toml`. The shim stays a last resort so a provider installed only
+/// through a version manager still resolves.
 pub(super) fn provider_binary(
     config: SidecarProviderConfig,
     home: &Path,
     execution_path: &OsStr,
 ) -> Result<PathBuf, String> {
-    if let Ok(path) = which::which_in(config.executable.name, Some(execution_path), home) {
+    if let Some(path) =
+        crate::host::resolve_without_shim_shadowing(config.executable.name, execution_path, home)
+            .filter(|path| {
+                path.parent()
+                    .is_none_or(|parent| !crate::host::is_version_manager_shim_directory(parent))
+            })
+    {
         return Ok(path);
     }
     for candidate in config
@@ -157,7 +169,8 @@ pub(super) fn provider_binary(
             return Ok(candidate);
         }
     }
-    Err(config.executable.missing_error.to_string())
+    crate::host::resolve_without_shim_shadowing(config.executable.name, execution_path, home)
+        .ok_or_else(|| config.executable.missing_error.to_string())
 }
 
 struct PreparedSidecarChat<'a> {
@@ -738,6 +751,54 @@ mod tests {
     use std::fs;
 
     const TEST_CONFIG: SidecarProviderConfig = opencode::CONFIG;
+
+    /// A provider whose only install is what the fixture PATH provides, so the
+    /// assertion cannot be satisfied by a real CLI on the developer's machine.
+    const SHIM_TEST_CONFIG: SidecarProviderConfig = SidecarProviderConfig {
+        executable: SidecarExecutableConfig {
+            name: "briar-fixture-provider",
+            home_candidates: &[],
+            absolute_candidates: &[],
+            missing_error: "fixture provider is missing",
+        },
+        ..opencode::CONFIG
+    };
+
+    #[cfg(unix)]
+    #[test]
+    fn resolves_the_provider_cli_past_a_version_manager_shim() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let home = tempfile::tempdir().expect("fixture home should exist");
+        let shims = home.path().join(".local/share/mise/shims");
+        let homebrew = home.path().join("opt/homebrew/bin");
+        fs::create_dir_all(&shims).expect("shim directory should exist");
+        fs::create_dir_all(&homebrew).expect("homebrew directory should exist");
+        let name = SHIM_TEST_CONFIG.executable.name;
+        for directory in [&shims, &homebrew] {
+            let binary = directory.join(name);
+            fs::write(&binary, "#!/bin/sh\nexit 0\n").expect("fixture should be written");
+            fs::set_permissions(&binary, fs::Permissions::from_mode(0o700))
+                .expect("fixture should be executable");
+        }
+        // The shim directory is first on PATH, as it is in the real execution
+        // path, but the real binary must still win.
+        let execution_path =
+            std::env::join_paths([shims.clone(), homebrew.clone()]).expect("PATH should join");
+
+        assert_eq!(
+            provider_binary(SHIM_TEST_CONFIG, home.path(), &execution_path),
+            Ok(homebrew.join(name)),
+        );
+
+        // With no real binary anywhere the shim still beats reporting the
+        // provider as missing.
+        fs::remove_file(homebrew.join(name)).expect("homebrew copy should be removed");
+        assert_eq!(
+            provider_binary(SHIM_TEST_CONFIG, home.path(), &execution_path),
+            Ok(shims.join(name)),
+        );
+    }
 
     fn request() -> ProjectLlmRequest {
         ProjectLlmRequest {

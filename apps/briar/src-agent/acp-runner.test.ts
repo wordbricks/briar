@@ -1,3 +1,4 @@
+import { access } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import {
   acpPromptResultEnvelope,
@@ -25,6 +26,7 @@ import type {
   SidecarResultInput,
 } from "./sidecar-protocol";
 import type { RunnerRequest } from "./runner-request";
+import { readOnlyStateRootEnvironmentKey } from "./read-only-agent-environment";
 
 const request: RunnerRequest = {
   message: "Inspect the repository",
@@ -312,10 +314,16 @@ describe("ACP runner core", () => {
       connect: connection.connect,
       prepareComputerUse: emptyComputerUse,
       allocatePromptId: () => "prompt-1",
-      environment: {},
+      // The worker path already isolated this turn, so the marker keeps the
+      // runner from preparing a second read-only state root.
+      environment: { [readOnlyStateRootEnvironmentKey]: "/isolated" },
     });
 
     expect(connection.inputs[0]?.arguments).toEqual(["acp", "--read-only"]);
+    expect(connection.inputs[0]?.environment).toEqual({
+      [readOnlyStateRootEnvironmentKey]: "/isolated",
+      TEST_AGENT: "1",
+    });
     expect(connection.calls.map((call) => call.method)).toEqual([
       "initialize",
       "authenticate",
@@ -343,6 +351,54 @@ describe("ACP runner core", () => {
         { sessionId: "loaded-1" },
       ),
     );
+  });
+
+  it("isolates provider state for a read-only turn and removes it afterwards", async () => {
+    const connection = createFakeConnection(succeedingReply);
+    const { io } = createFakeIo({ ...request, sandboxMode: "readOnly" });
+
+    await runAcpTurn(testProfile, io, {
+      connect: connection.connect,
+      prepareComputerUse: emptyComputerUse,
+      allocatePromptId: () => "prompt-1",
+      environment: {
+        HOME: "/Users/worker",
+        XAI_API_KEY: "xai-secret",
+        BRIAR_WORKER_TOKEN: "worker-secret",
+      },
+    });
+
+    const spawned = connection.inputs[0]?.environment ?? {};
+    const stateRoot = spawned[readOnlyStateRootEnvironmentKey];
+    expect(stateRoot).toBeTruthy();
+    // The seatbelt state root, the Grok isolation guard, and OpenCode's
+    // recursive `$TMPDIR` creation all have to live under the isolated root.
+    expect(spawned.HOME).toBe(stateRoot);
+    expect(spawned.GROK_HOME).toBe(stateRoot);
+    expect(spawned.TMPDIR).toBe(stateRoot);
+    expect(spawned.TMP).toBe(stateRoot);
+    expect(spawned.TEMP).toBe(stateRoot);
+    expect(spawned.XAI_API_KEY).toBe("xai-secret");
+    expect(spawned.BRIAR_WORKER_TOKEN).toBeUndefined();
+    await expect(access(stateRoot!)).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("leaves a workspace-write turn on the inherited environment", async () => {
+    const connection = createFakeConnection(succeedingReply);
+    const { io } = createFakeIo(request);
+
+    await runAcpTurn(testProfile, io, {
+      connect: connection.connect,
+      prepareComputerUse: emptyComputerUse,
+      allocatePromptId: () => "prompt-1",
+      environment: { HOME: "/Users/worker", BRIAR_WORKER_TOKEN: "worker-secret" },
+    });
+
+    expect(connection.inputs[0]?.environment).toEqual({
+      HOME: "/Users/worker",
+      BRIAR_WORKER_TOKEN: "worker-secret",
+      TEST_AGENT: "1",
+    });
   });
 
   it("suppresses session updates replayed while session/load is pending", async () => {

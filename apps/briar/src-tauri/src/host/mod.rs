@@ -8,7 +8,10 @@ use std::{
     process::Child,
 };
 
-pub(crate) use environment::{bundled_bun_binary, cli_execution_path, LocalExecutionEnvironment};
+pub(crate) use environment::{
+    bundled_bun_binary, cli_execution_path, is_version_manager_shim_directory,
+    resolve_without_shim_shadowing, LocalExecutionEnvironment,
+};
 #[cfg(test)]
 pub(crate) use environment::{bundled_runtime_directories, cli_execution_path_with_runtime};
 pub(crate) use local::LocalRunner;
