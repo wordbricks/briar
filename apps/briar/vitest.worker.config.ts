@@ -14,6 +14,9 @@ export default defineConfig(async () => ({
       ...configDefaults.exclude,
       ...migrationTestGlobs,
       ...workerD1TestFiles,
+      // Node-only: these read files off disk, which workerd cannot do. They
+      // run in the app unit project instead (see vite.config.ts).
+      "worker/src/cascade-trigger-depth.test.ts",
       "worker/src/html-artifact-preview-shell.test.ts",
     ],
     hookTimeout: 60_000,

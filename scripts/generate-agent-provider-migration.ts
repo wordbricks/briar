@@ -59,11 +59,17 @@ for (
     tableSchemaSql,
   )
 ) {
-  if (providers.includes(nextProvider)) continue;
+  // Append every catalog provider the list is missing, not just the new one.
+  // A list that fell behind an earlier migration would otherwise stay behind
+  // forever, silently rejecting a provider the catalog already advertises.
+  const missing = agentProviders.filter(
+    (provider) => !providers.includes(provider),
+  );
+  if (missing.length === 0) continue;
   const lists = expandedLists.get(table) ?? new Map<string, string>();
   lists.set(
     listText,
-    [...providers, nextProvider].map((value) => `'${value}'`).join(", "),
+    [...providers, ...missing].map((value) => `'${value}'`).join(", "),
   );
   expandedLists.set(table, lists);
 }
@@ -122,9 +128,68 @@ const schema = db
     []
   >(
     `select rowid, type, name, tbl_name, sql from sqlite_schema
-     where sql is not null and type in ('index', 'trigger') order by rowid`,
+     where sql is not null and type in ('index', 'trigger', 'view')
+     order by rowid`,
   )
   .all();
+
+/**
+ * Views that read a provider out of stored ProtoJSON spell it as the generated
+ * enum value name (`AGENT_PROVIDER_CODEX`) rather than the platform name, and
+ * they assert the provider count. They are a second persisted copy of the
+ * catalog, so they are rewritten and recreated alongside the tables.
+ */
+const protoProviderName = (provider: string) =>
+  `AGENT_PROVIDER_${provider.toUpperCase()}`;
+
+function rewriteProviderView(sql: string) {
+  const previousCount = agentProviders.length - 1;
+  let rewritten = sql;
+  // `in (…)` membership lists: append every catalog provider they are missing.
+  // Anchored on `in (` so the single names in a `when … then …` arm below are
+  // not mistaken for one-element lists.
+  rewritten = rewritten.replaceAll(
+    /in\s*\(\s*('AGENT_PROVIDER_[A-Z_]+'(?:\s*,\s*'AGENT_PROVIDER_[A-Z_]+')*)\s*\)/gu,
+    (match, list: string) => {
+      const missing = agentProviders
+        .map(protoProviderName)
+        .filter((name) => !list.includes(`'${name}'`));
+      return missing.length === 0 ? match : match.replace(
+        list,
+        `${list}, ${missing.map((name) => `'${name}'`).join(", ")}`,
+      );
+    },
+  );
+  // `when '<enum>' then '<platform name>'` translation chains.
+  rewritten = rewritten.replaceAll(
+    /( *)when '(AGENT_PROVIDER_[A-Z_]+)' then '([a-z0-9_-]+)'\n(?! *when 'AGENT_PROVIDER_)/gu,
+    (match, indent: string) => {
+      const missing = agentProviders.filter(
+        (provider) => !rewritten.includes(`'${protoProviderName(provider)}' then`),
+      );
+      return missing.length === 0 ? match : `${match}${
+        missing
+          .map((provider) =>
+            `${indent}when '${protoProviderName(provider)}' then '${provider}'\n`
+          )
+          .join("")
+      }`;
+    },
+  );
+  // Provider cardinality assertions.
+  rewritten = rewritten.replaceAll(
+    new RegExp(`= ${previousCount}\\b`, "gu"),
+    `= ${agentProviders.length}`,
+  );
+  if (rewritten === sql) {
+    throw new Error(`Provider list not found in view ${sql.slice(0, 60)}.`);
+  }
+  return rewritten;
+}
+
+const providerViews = schema.filter(
+  (row) => row.type === "view" && row.sql.includes("AGENT_PROVIDER_"),
+);
 const backedPattern = new RegExp(
   [...backed]
     .map((name) => name.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"))
@@ -134,11 +199,40 @@ const backedPattern = new RegExp(
 const indexes = schema.filter(
   (row) => row.type === "index" && backed.has(row.tbl_name),
 );
-const triggers = schema.filter(
-  (row) =>
-    row.type === "trigger" &&
-    (backed.has(row.tbl_name) || backedPattern.test(row.sql)),
+/**
+ * Every trigger, not only the ones attached to a rebuilt table.
+ *
+ * SQLite fires triggers in creation order, and dropping a subset leaves the
+ * survivors ahead of everything this migration recreates. Recreating all of
+ * them in `sqlite_schema` order keeps the firing order the database already
+ * had, which several `*_sync` trigger pairs depend on.
+ */
+const triggers = schema.filter((row) => row.type === "trigger");
+// Triggers the rebuild would have dropped anyway, kept only for the assertion
+// below that the migration is still rewriting the tables it set out to.
+const backedTriggers = triggers.filter(
+  (row) => backed.has(row.tbl_name) || backedPattern.test(row.sql),
 );
+if (backedTriggers.length === 0) {
+  throw new Error("No triggers depend on the rebuilt tables.");
+}
+/**
+ * Wrangler splits a migration into statements before D1 runs them, and its
+ * splitter cannot find the `end` of a trigger body that holds more than one
+ * `case … end` expression: it swallows every following statement into one
+ * oversized statement, which D1 rejects with SQLITE_TOOBIG.
+ *
+ * Such a trigger is still valid SQL and still has to be recreated, so it is
+ * emitted at the end of the migration where there is nothing left to swallow.
+ */
+const splitterCanDelimit = (triggerSql: string) =>
+  unstable_splitSqlQuery(`${triggerSql};\n\nselect 1;\n`).length === 2;
+
+const safeTriggers = triggers.filter((row) => splitterCanDelimit(row.sql));
+const unsplittableTriggers = triggers.filter(
+  (row) => !splitterCanDelimit(row.sql),
+);
+
 const tableSql = new Map(tableRows.map((row) => [row.name, row.sql]));
 const backupName = (table: string) => `briar_provider_backup_${table.slice(6)}`;
 const quote = (identifier: string) => `"${identifier.replaceAll('"', '""')}"`;
@@ -149,6 +243,7 @@ const statements: string[] = [
   "-- and dependent rows remain byte-for-byte compatible with the prior schema.",
   "pragma defer_foreign_keys = on;",
   ...triggers.map((row) => `drop trigger if exists ${quote(row.name)};`),
+  ...providerViews.map((row) => `drop view if exists ${quote(row.name)};`),
   ...restoreOrder.map(
     (table) =>
       `create table ${quote(backupName(table))} as select * from ${quote(table)};`,
@@ -170,6 +265,11 @@ const statements: string[] = [
     }
     return `${expanded};`;
   }),
+  // Indexes come back before the rows do. A foreign key is resolved against the
+  // parent's primary key or a unique index, so restoring data while the
+  // parent's unique index is still missing raises "foreign key mismatch" — a
+  // schema error that `defer_foreign_keys` does not defer.
+  ...indexes.map((row) => `${row.sql};`),
   ...[...restoreOrder]
     .reverse()
     .map((table) => `delete from ${quote(table)};`),
@@ -177,11 +277,13 @@ const statements: string[] = [
     (table) =>
       `insert into ${quote(table)} select * from ${quote(backupName(table))};`,
   ),
-  ...indexes.map((row) => `${row.sql};`),
-  ...triggers.map((row) => `${row.sql};`),
   ...[...restoreOrder]
     .reverse()
     .map((table) => `drop table ${quote(backupName(table))};`),
+  ...providerViews.map((row) => `${rewriteProviderView(row.sql)};`),
+  // Triggers fire in creation order, so they are recreated in the order
+  // `sqlite_schema` already had them.
+  ...triggers.map((row) => `${row.sql};`),
   "pragma defer_foreign_keys = off;",
   "",
 ];
@@ -189,7 +291,53 @@ const renderedMigration = `${statements
   .join("\n\n")
   .replace(/[ \t]+$/gmu, "")
   .trimEnd()}\n`;
-await writeFile(outputPath, renderedMigration);
+
+/**
+ * Wrangler's splitter cannot delimit a trigger whose body holds more than one
+ * `case … end`, so everything after such a trigger is swallowed into one
+ * oversized statement that D1 rejects. Ending a migration file right after each
+ * of those triggers leaves nothing for it to swallow, and because migration
+ * files apply in order the resulting schema is identical to the single file —
+ * including the trigger creation order the `*_sync` pairs depend on.
+ */
+const migrationParts: string[][] = [[]];
+for (const statement of statements) {
+  migrationParts.at(-1)!.push(statement);
+  const endsAPart = unsplittableTriggers.some(
+    (row) => statement === `${row.sql};`,
+  );
+  if (endsAPart) migrationParts.push([]);
+}
+if (migrationParts.at(-1)!.length === 0) migrationParts.pop();
+
+const outputMatch = outputName.match(/^(\d+)_(.+)\.sql$/u);
+if (!outputMatch) {
+  throw new Error(`${outputName} must be named <number>_<name>.sql`);
+}
+const firstNumber = Number(outputMatch[1]);
+const baseName = outputMatch[2];
+const partNames = migrationParts.map((_, index) =>
+  index === 0
+    ? outputName
+    : `${String(firstNumber + index).padStart(4, "0")}_${baseName}_part${
+      index + 1
+    }.sql`
+);
+for (const [index, part] of migrationParts.entries()) {
+  // Every part opens and closes the deferred-foreign-key window itself, since
+  // each file is applied as its own migration.
+  const body = [
+    ...(index === 0 ? [] : ["pragma defer_foreign_keys = on;"]),
+    ...part.filter((statement) => statement !== ""),
+    ...(index === migrationParts.length - 1
+      ? []
+      : ["pragma defer_foreign_keys = off;"]),
+  ];
+  await writeFile(
+    resolve(migrationsDirectory, partNames[index]!),
+    `${body.join("\n\n").replace(/[ \t]+$/gmu, "").trimEnd()}\n`,
+  );
+}
 db.exec("begin");
 try {
   for (const [index, statement] of statements.entries()) {

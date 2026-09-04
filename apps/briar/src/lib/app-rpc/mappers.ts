@@ -111,6 +111,8 @@ export const agentProviderFromProto = (value: ProtoAgentProvider): AgentProvider
       return "opencode";
     case ProtoAgentProvider.OPENROUTER:
       return "openrouter";
+    case ProtoAgentProvider.VERTEX:
+      return "vertex";
     case ProtoAgentProvider.UNSPECIFIED:
       throw new Error("Agent provider is missing");
     default:
@@ -134,6 +136,8 @@ export const agentProviderToProto = (value: AgentProvider): ProtoAgentProvider =
       return ProtoAgentProvider.OPENCODE;
     case "openrouter":
       return ProtoAgentProvider.OPENROUTER;
+    case "vertex":
+      return ProtoAgentProvider.VERTEX;
   }
 };
 

@@ -19,8 +19,10 @@ import {
   agentProviderBinaryName,
   agentProviderExecutionEnvironment,
   agentProviders,
+  isOpenCodeUpstreamProvider,
   openCodeUpstreamOf,
   type AgentProvider,
+  type OpenCodeUpstreamCredentialValue,
 } from "../src/lib/agent-provider";
 import type {
   AgentEffortCapability,
@@ -107,7 +109,9 @@ const requestedTimeout = (fallback: number) => {
 };
 
 /** Saved credential of every OpenCode upstream, keyed by provider. */
-type UpstreamCredentials = Partial<Record<AgentProvider, string | null>>;
+type UpstreamCredentials = Partial<
+  Record<AgentProvider, OpenCodeUpstreamCredentialValue | null>
+>;
 
 /** The CLI owns the Briar config, so it reads its own upstream credentials. */
 const upstreamCredentials = async (): Promise<UpstreamCredentials> => {
@@ -127,12 +131,14 @@ const upstreamCredentials = async (): Promise<UpstreamCredentials> => {
 };
 
 /**
- * `--openrouter-configured` lets the desktop answer for the credential it owns
- * without handing the key to the CLI.
+ * `--<provider>-configured` lets the desktop answer for a credential it owns
+ * without handing it to the CLI. The flag name is derived from the provider, so
+ * every upstream has one; the CLI otherwise reads the same config the desktop
+ * writes.
  */
 const upstreamConfigured =
   (credentials: UpstreamCredentials) => (provider: AgentProvider) =>
-    (provider === "openrouter" && has("--openrouter-configured")) ||
+    (isOpenCodeUpstreamProvider(provider) && has(`--${provider}-configured`)) ||
     (credentials[provider] ?? null) !== null;
 
 const providerBinary = (provider: AgentProvider) =>

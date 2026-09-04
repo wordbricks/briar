@@ -149,7 +149,7 @@ pub(super) fn inspect_agent_browser_cli(
 
 pub(super) fn inspect_onboarding_prerequisites_sync(
     home: &Path,
-    openrouter_configured: bool,
+    configured_upstreams: &agent::ConfiguredUpstreams,
 ) -> OnboardingPrerequisites {
     let execution_path = cli_execution_path(home).unwrap_or_default();
     let mut codex = inspect_cli(agent::codex_binary(home, &execution_path), &execution_path);
@@ -173,11 +173,15 @@ pub(super) fn inspect_onboarding_prerequisites_sync(
     // healthy installed CLI is enough to launch; the server reports any
     // provider-specific authentication error during the request.
     opencode.authenticated = opencode.installed;
-    let openrouter = OnboardingPrerequisiteStatus {
+    // Every OpenCode upstream runs on the OpenCode CLI, so its prerequisite is
+    // that CLI plus the upstream credential the desktop stores.
+    let upstream = |provider| OnboardingPrerequisiteStatus {
         installed: opencode.installed,
         version: opencode.version.clone(),
-        authenticated: opencode.installed && openrouter_configured,
+        authenticated: opencode.installed && configured_upstreams.contains(provider),
     };
+    let openrouter = upstream(agent::AgentProviderKind::Openrouter);
+    let vertex = upstream(agent::AgentProviderKind::Vertex);
     OnboardingPrerequisites {
         git: inspect_cli(git_binary(home), &execution_path),
         codex,
@@ -187,6 +191,7 @@ pub(super) fn inspect_onboarding_prerequisites_sync(
         agy,
         opencode,
         openrouter,
+        vertex,
     }
 }
 
@@ -206,6 +211,7 @@ pub(super) fn load_agent_provider_models_sync(home: &Path) -> AgentProviderModel
             agy: provider_model_entry(catalog.agy.into_option(), false),
             opencode: provider_model_entry(catalog.opencode.into_option(), true),
             openrouter: provider_model_entry(catalog.openrouter.into_option(), true),
+            vertex: provider_model_entry(catalog.vertex.into_option(), true),
         },
         // A CLI that cannot run reports the same missing-provider surface the
         // app has always shown, with the selector policy left intact.
@@ -217,6 +223,7 @@ pub(super) fn load_agent_provider_models_sync(home: &Path) -> AgentProviderModel
             agy: unavailable_model_entry(&error, false),
             opencode: unavailable_model_entry(&error, true),
             openrouter: unavailable_model_entry(&error, true),
+            vertex: unavailable_model_entry(&error, true),
         },
     }
 }
@@ -508,6 +515,7 @@ pub(super) enum OnboardingPrerequisite {
     Agy,
     Opencode,
     Openrouter,
+    Vertex,
 }
 
 #[tauri::command]
@@ -518,8 +526,8 @@ pub(super) async fn inspect_onboarding_prerequisites(
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
     let config_path = cli_config_path(&app)?;
     tauri::async_runtime::spawn_blocking(move || {
-        let configured = openrouter_api_key_from(&config_path)?.is_some();
-        Ok(inspect_onboarding_prerequisites_sync(&home, configured))
+        let configured = configured_upstreams_from(&config_path)?;
+        Ok(inspect_onboarding_prerequisites_sync(&home, &configured))
     })
     .await
     .map_err(|error| error.to_string())?
@@ -877,12 +885,12 @@ pub(super) async fn install_onboarding_prerequisite(
             OnboardingPrerequisite::Cursor => install_cursor_cli(&home)?,
             OnboardingPrerequisite::Grok => install_grok_cli(&home)?,
             OnboardingPrerequisite::Agy => install_agy_cli(&home)?,
-            OnboardingPrerequisite::Opencode | OnboardingPrerequisite::Openrouter => {
-                install_cli_package(&home, "opencode-ai")?
-            }
+            OnboardingPrerequisite::Opencode
+            | OnboardingPrerequisite::Openrouter
+            | OnboardingPrerequisite::Vertex => install_cli_package(&home, "opencode-ai")?,
         }
-        let configured = openrouter_api_key_from(&config_path)?.is_some();
-        let prerequisites = inspect_onboarding_prerequisites_sync(&home, configured);
+        let configured = configured_upstreams_from(&config_path)?;
+        let prerequisites = inspect_onboarding_prerequisites_sync(&home, &configured);
         let installed = match prerequisite {
             OnboardingPrerequisite::Git => prerequisites.git.installed,
             OnboardingPrerequisite::Codex => prerequisites.codex.installed,
@@ -892,6 +900,7 @@ pub(super) async fn install_onboarding_prerequisite(
             OnboardingPrerequisite::Agy => prerequisites.agy.installed,
             OnboardingPrerequisite::Opencode => prerequisites.opencode.installed,
             OnboardingPrerequisite::Openrouter => prerequisites.openrouter.installed,
+            OnboardingPrerequisite::Vertex => prerequisites.vertex.installed,
         };
         if !installed {
             return Err(

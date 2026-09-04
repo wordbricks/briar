@@ -14,6 +14,7 @@ pub enum AgentProvider {
     AGENT_PROVIDER_AGY = 5i32,
     AGENT_PROVIDER_OPENCODE = 6i32,
     AGENT_PROVIDER_OPENROUTER = 7i32,
+    AGENT_PROVIDER_VERTEX = 8i32,
 }
 impl AgentProvider {
     ///Idiomatic alias for [`Self::AGENT_PROVIDER_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -40,6 +41,9 @@ impl AgentProvider {
     ///Idiomatic alias for [`Self::AGENT_PROVIDER_OPENROUTER`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const Openrouter: Self = Self::AGENT_PROVIDER_OPENROUTER;
+    ///Idiomatic alias for [`Self::AGENT_PROVIDER_VERTEX`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Vertex: Self = Self::AGENT_PROVIDER_VERTEX;
 }
 impl ::core::default::Default for AgentProvider {
     fn default() -> Self {
@@ -143,6 +147,7 @@ impl ::buffa::Enumeration for AgentProvider {
             5i32 => ::core::option::Option::Some(Self::AGENT_PROVIDER_AGY),
             6i32 => ::core::option::Option::Some(Self::AGENT_PROVIDER_OPENCODE),
             7i32 => ::core::option::Option::Some(Self::AGENT_PROVIDER_OPENROUTER),
+            8i32 => ::core::option::Option::Some(Self::AGENT_PROVIDER_VERTEX),
             _ => ::core::option::Option::None,
         }
     }
@@ -159,6 +164,7 @@ impl ::buffa::Enumeration for AgentProvider {
             Self::AGENT_PROVIDER_AGY => "AGENT_PROVIDER_AGY",
             Self::AGENT_PROVIDER_OPENCODE => "AGENT_PROVIDER_OPENCODE",
             Self::AGENT_PROVIDER_OPENROUTER => "AGENT_PROVIDER_OPENROUTER",
+            Self::AGENT_PROVIDER_VERTEX => "AGENT_PROVIDER_VERTEX",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -187,6 +193,9 @@ impl ::buffa::Enumeration for AgentProvider {
             "AGENT_PROVIDER_OPENROUTER" => {
                 ::core::option::Option::Some(Self::AGENT_PROVIDER_OPENROUTER)
             }
+            "AGENT_PROVIDER_VERTEX" => {
+                ::core::option::Option::Some(Self::AGENT_PROVIDER_VERTEX)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -200,6 +209,7 @@ impl ::buffa::Enumeration for AgentProvider {
             Self::AGENT_PROVIDER_AGY,
             Self::AGENT_PROVIDER_OPENCODE,
             Self::AGENT_PROVIDER_OPENROUTER,
+            Self::AGENT_PROVIDER_VERTEX,
         ]
     }
 }

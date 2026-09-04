@@ -112,6 +112,7 @@ export default defineConfig({
       "src-agent/**/*.{test,spec}.ts",
       "src-cli/**/*.{test,spec}.ts",
       // These tests require Node-only filesystem or VM APIs.
+      "worker/src/cascade-trigger-depth.test.ts",
       "worker/src/html-artifact-preview-shell.test.ts",
     ],
     exclude: [...configDefaults.exclude, "**/.claude/worktrees/**"],

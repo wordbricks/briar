@@ -346,6 +346,132 @@ describe("read-only Agent environment", () => {
     expect(upstream.environmentKeys).toContain("OPENCODE_CONFIG_CONTENT");
   });
 
+  it("derives the Vertex AI allowlist from its upstream descriptor", () => {
+    const { upstream } = agentProviderCatalog.vertex;
+    const allowed = readOnlyAgentEnvironment("vertex", {
+      HOME: "/Users/worker",
+      GOOGLE_VERTEX_PROJECT: "briar-dummy",
+      GOOGLE_VERTEX_LOCATION: "us-central1",
+      GOOGLE_APPLICATION_CREDENTIALS: "/Users/worker/.config/gcloud/adc.json",
+      CLOUDSDK_CONFIG: "/Users/worker/.config/gcloud",
+      OPENCODE_CONFIG_CONTENT: '{"provider":{"google-vertex":{}}}',
+      OPENROUTER_API_KEY: "unrelated-secret",
+      OPENAI_API_KEY: "unrelated-secret",
+      BRIAR_WORKER_TOKEN: "worker-secret",
+    });
+    expect(allowed.GOOGLE_VERTEX_PROJECT).toBe("briar-dummy");
+    expect(allowed.GOOGLE_VERTEX_LOCATION).toBe("us-central1");
+    expect(allowed.GOOGLE_APPLICATION_CREDENTIALS)
+      .toBe("/Users/worker/.config/gcloud/adc.json");
+    expect(allowed.CLOUDSDK_CONFIG).toBe("/Users/worker/.config/gcloud");
+    expect(allowed.OPENCODE_CONFIG_CONTENT)
+      .toBe('{"provider":{"google-vertex":{}}}');
+    expect(allowed.HOME).toBe("/Users/worker");
+    // Another upstream's credential is not this upstream's business.
+    expect(allowed.OPENROUTER_API_KEY).toBeUndefined();
+    expect(allowed.OPENAI_API_KEY).toBeUndefined();
+    expect(allowed.BRIAR_WORKER_TOKEN).toBeUndefined();
+    expect(upstream.environmentPrefixes).toContain("GOOGLE_VERTEX_");
+    expect(upstream.environmentKeys).toContain("GOOGLE_APPLICATION_CREDENTIALS");
+  });
+
+  it("keeps Vertex AI's Google environment out of Antigravity", () => {
+    // Both authenticate against Google, so the per-provider allowlist is what
+    // stops one provider's project from reaching the other's CLI.
+    const allowed = readOnlyAgentEnvironment("agy", {
+      HOME: "/Users/worker",
+      GOOGLE_VERTEX_PROJECT: "briar-dummy",
+      GOOGLE_VERTEX_LOCATION: "us-central1",
+      GOOGLE_APPLICATION_CREDENTIALS: "/Users/worker/.config/gcloud/adc.json",
+      CLOUDSDK_CONFIG: "/Users/worker/.config/gcloud",
+      OPENCODE_CONFIG_CONTENT: '{"provider":{"google-vertex":{}}}',
+    });
+    expect(allowed.GOOGLE_VERTEX_PROJECT).toBeUndefined();
+    expect(allowed.GOOGLE_VERTEX_LOCATION).toBeUndefined();
+    expect(allowed.GOOGLE_APPLICATION_CREDENTIALS).toBeUndefined();
+    expect(allowed.CLOUDSDK_CONFIG).toBeUndefined();
+    expect(allowed.OPENCODE_CONFIG_CONTENT).toBeUndefined();
+    expect(allowed.HOME).toBe("/Users/worker");
+  });
+
+  it("pins the gcloud ADC file so it survives the isolated HOME", async () => {
+    const sourceHome = await mkdtemp(join(tmpdir(), "briar-vertex-source-"));
+    const gcloudRoot = join(sourceHome, ".config", "gcloud");
+    await mkdir(gcloudRoot, { recursive: true });
+    const adcPath = join(gcloudRoot, "application_default_credentials.json");
+    await writeFile(adcPath, '{"type":"authorized_user"}', { mode: 0o600 });
+    const prepared = await prepareReadOnlyAgentEnvironment("vertex", {
+      workspaceRoot: "/repo",
+      environment: {
+        HOME: sourceHome,
+        GOOGLE_VERTEX_PROJECT: "briar-dummy",
+        GOOGLE_VERTEX_LOCATION: "us-central1",
+      },
+    });
+    try {
+      // The preparation replaced HOME, so a home-relative ADC lookup would now
+      // miss; the absolute path keeps google-auth-library pointed at the file.
+      expect(prepared.environment.HOME).not.toBe(sourceHome);
+      expect(prepared.environment.GOOGLE_APPLICATION_CREDENTIALS).toBe(adcPath);
+      expect(prepared.environment.GOOGLE_VERTEX_PROJECT).toBe("briar-dummy");
+    } finally {
+      await prepared.cleanup();
+      await rm(sourceHome, { recursive: true, force: true });
+    }
+  });
+
+  it("resolves the ADC file under CLOUDSDK_CONFIG when it is set", async () => {
+    const sourceHome = await mkdtemp(join(tmpdir(), "briar-vertex-sdk-"));
+    const gcloudRoot = join(sourceHome, "custom-gcloud");
+    await mkdir(gcloudRoot, { recursive: true });
+    const adcPath = join(gcloudRoot, "application_default_credentials.json");
+    await writeFile(adcPath, '{"type":"authorized_user"}', { mode: 0o600 });
+    const prepared = await prepareReadOnlyAgentEnvironment("vertex", {
+      workspaceRoot: "/repo",
+      environment: {
+        HOME: sourceHome,
+        CLOUDSDK_CONFIG: gcloudRoot,
+        GOOGLE_VERTEX_PROJECT: "briar-dummy",
+        GOOGLE_VERTEX_LOCATION: "us-central1",
+      },
+    });
+    try {
+      expect(prepared.environment.GOOGLE_APPLICATION_CREDENTIALS).toBe(adcPath);
+    } finally {
+      await prepared.cleanup();
+      await rm(sourceHome, { recursive: true, force: true });
+    }
+  });
+
+  it("pins nothing when the machine has no ADC file or already named one", async () => {
+    const sourceHome = await mkdtemp(join(tmpdir(), "briar-vertex-none-"));
+    const missing = await prepareReadOnlyAgentEnvironment("vertex", {
+      workspaceRoot: "/repo",
+      environment: { HOME: sourceHome, GOOGLE_VERTEX_PROJECT: "briar-dummy" },
+    });
+    try {
+      // A machine that never ran `gcloud auth application-default login` is
+      // simply not signed in; the provider reports that itself.
+      expect(missing.environment.GOOGLE_APPLICATION_CREDENTIALS).toBeUndefined();
+    } finally {
+      await missing.cleanup();
+    }
+    const explicit = await prepareReadOnlyAgentEnvironment("vertex", {
+      workspaceRoot: "/repo",
+      environment: {
+        HOME: sourceHome,
+        GOOGLE_APPLICATION_CREDENTIALS: "/etc/briar/service-account.json",
+      },
+    });
+    try {
+      expect(explicit.environment.GOOGLE_APPLICATION_CREDENTIALS)
+        .toBe("/etc/briar/service-account.json");
+    } finally {
+      await explicit.cleanup();
+      await rm(sourceHome, { recursive: true, force: true });
+    }
+  });
+
   it("isolates Antigravity state while preserving Google subscription OAuth", async () => {
     const sourceHome = await mkdtemp(join(tmpdir(), "briar-agy-source-"));
     await Promise.all([

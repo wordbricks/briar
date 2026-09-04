@@ -142,6 +142,29 @@ export function OpenRouterIcon({ size = 14, className, style }: AgentIconProps) 
   );
 }
 
+/**
+ * Brand-neutral mark for Vertex AI: a four-point spark drawn in `currentColor`,
+ * so it inherits the surrounding tone in both themes. Google's own artwork is
+ * not bundled, and Vertex AI is addressed by project rather than by a product
+ * logo, so a geometric mark keeps the provider list consistent.
+ */
+export function VertexAiIcon({ size = 14, className, style }: AgentIconProps) {
+  return (
+    <svg
+      aria-hidden
+      className={className}
+      fill="currentColor"
+      height={size}
+      style={style}
+      viewBox="0 0 24 24"
+      width={size}
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path d="M12 2c.9 5.2 4.8 9.1 10 10-5.2.9-9.1 4.8-10 10-.9-5.2-4.8-9.1-10-10 5.2-.9 9.1-4.8 10-10z" />
+    </svg>
+  );
+}
+
 export function AntigravityIcon({ size = 14, className, style }: AgentIconProps) {
   return (
     <img
@@ -163,7 +186,8 @@ export type AgentProviderIconId =
   | "grok"
   | "agy"
   | "opencode"
-  | "openrouter";
+  | "openrouter"
+  | "vertex";
 
 export function AgentProviderIcon({
   provider,
@@ -190,6 +214,9 @@ export function AgentProviderIcon({
   }
   if (provider === "openrouter") {
     return <OpenRouterIcon className={className} size={size} style={style} />;
+  }
+  if (provider === "vertex") {
+    return <VertexAiIcon className={className} size={size} style={style} />;
   }
   if (provider === "agy") {
     return <AntigravityIcon className={className} size={size} style={style} />;

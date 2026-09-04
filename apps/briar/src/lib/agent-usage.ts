@@ -129,6 +129,7 @@ function parseUsageSnapshot(value: unknown): AgentUsageSnapshot | null {
   const agy = usageProviderFrom(snapshot.agy, "agy");
   const opencode = usageProviderFrom(snapshot.opencode, "opencode");
   const openrouter = usageProviderFrom(snapshot.openrouter, "openrouter");
+  const vertex = usageProviderFrom(snapshot.vertex, "vertex");
   const cursor = usageProviderFrom(snapshot.cursor, "cursor");
   if (
     typeof snapshot.updatedAt !== "number" ||
@@ -138,6 +139,7 @@ function parseUsageSnapshot(value: unknown): AgentUsageSnapshot | null {
     !agy ||
     !opencode ||
     !openrouter ||
+    !vertex ||
     !cursor
   ) {
     return null;
@@ -149,6 +151,7 @@ function parseUsageSnapshot(value: unknown): AgentUsageSnapshot | null {
     agy,
     opencode,
     openrouter,
+    vertex,
     cursor,
     updatedAt: snapshot.updatedAt,
   };

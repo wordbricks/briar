@@ -23,6 +23,7 @@ const enabled = {
   agy: true,
   opencode: true,
   openrouter: true,
+  vertex: true,
 };
 
 describe("inspectWorkerProviderHealth", () => {
@@ -124,6 +125,12 @@ describe("inspectWorkerProviderHealth", () => {
         healthy: false,
         reason: "not_authenticated",
       },
+      vertex: {
+        installed: true,
+        authenticated: false,
+        healthy: false,
+        reason: "not_authenticated",
+      },
     });
     expect(healthyWorkerProviders(health)).toEqual(["codex"]);
   });
@@ -154,6 +161,7 @@ describe("inspectWorkerProviderHealth", () => {
       "agy",
       "opencode",
       "openrouter",
+      "vertex",
     ]);
     expect(usage).toHaveBeenCalled();
   });
@@ -183,6 +191,7 @@ describe("inspectWorkerProviderHealth", () => {
       "agy",
       "opencode",
       "openrouter",
+      "vertex",
     ]);
   });
 
@@ -202,6 +211,7 @@ describe("inspectWorkerProviderHealth", () => {
         agy: false,
         opencode: false,
         openrouter: false,
+        vertex: false,
       },
       {
         which: (provider) => `/usr/local/bin/${provider}`,
@@ -227,6 +237,7 @@ describe("inspectWorkerProviderHealth", () => {
     expect(health.agy.reason).toBe("disabled");
     expect(health.opencode.reason).toBe("disabled");
     expect(health.openrouter.reason).toBe("disabled");
+    expect(health.vertex.reason).toBe("disabled");
   });
 
   it("requires an API key before advertising OpenRouter as healthy", async () => {
@@ -238,6 +249,7 @@ describe("inspectWorkerProviderHealth", () => {
       agy: false,
       opencode: false,
       openrouter: true,
+      vertex: false,
     } satisfies Record<WorkerProvider, boolean>;
     const withoutKey = await inspectWorkerProviderHealth(onlyOpenRouter, {
       which: (provider) => provider === "openrouter" ? "/usr/local/bin/opencode" : null,
@@ -306,6 +318,12 @@ describe("inspectWorkerProviderHealth", () => {
         reason: "disabled",
       },
       openrouter: {
+        installed: false,
+        authenticated: false,
+        healthy: false,
+        reason: "disabled",
+      },
+      vertex: {
         installed: false,
         authenticated: false,
         healthy: false,

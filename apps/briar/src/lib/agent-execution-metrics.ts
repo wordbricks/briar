@@ -1239,7 +1239,9 @@ function agentExecutionObservationsFromPayload(
     })),
     Match.when("opencode", () =>
       openCodeExecutionObservationsFromPayload(payload)),
-    Match.when("openrouter", () => ({
+    // OpenCode upstreams publish no per-turn usage or cost of their own; the
+    // account they bill against is the upstream's, not Briar's.
+    Match.whenOr("openrouter", "vertex", () => ({
       usage: [] as AgentExecutionUsageObservation[],
       costs: [] as AgentExecutionCostObservation[],
     })),

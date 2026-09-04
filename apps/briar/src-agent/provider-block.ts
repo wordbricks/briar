@@ -99,11 +99,15 @@ const codeReasons: ReadonlyArray<readonly [RegExp, ProviderBlockReason]> = [
     "usage_exhausted",
   ],
   [
-    /^(?:model_not_found|model_unavailable|model_not_supported|unknown_model|invalid_model|not_found_error)$/iu,
+    // `not_found` is Google's canonical status for an unknown model or
+    // publisher endpoint on Vertex AI.
+    /^(?:model_not_found|model_unavailable|model_not_supported|unknown_model|invalid_model|not_found_error|not_found)$/iu,
     "model_unavailable",
   ],
   [
-    /^(?:overloaded|overloaded_error|upstream_overloaded|service_unavailable|bad_gateway|gateway_timeout|api_error_overloaded)$/iu,
+    // `unavailable` and `deadline_exceeded` are Google's canonical statuses
+    // for a Vertex AI endpoint that is momentarily unreachable.
+    /^(?:overloaded|overloaded_error|upstream_overloaded|service_unavailable|bad_gateway|gateway_timeout|api_error_overloaded|unavailable|deadline_exceeded)$/iu,
     "upstream_overloaded",
   ],
 ];

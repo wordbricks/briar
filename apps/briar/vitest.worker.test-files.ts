@@ -19,6 +19,7 @@ export const workerD1TestFiles = [
   "worker/src/archive-storage-backfill.test.ts",
   "worker/src/archive.test.ts",
   "worker/src/auth.test.ts",
+  "worker/src/cascade-erasure.test.ts",
   "worker/src/channel-agent-delegation.test.ts",
   "worker/src/channel-message-pdf.test.ts",
   "worker/src/channel-proposal-routes.test.ts",
@@ -57,4 +58,5 @@ export const workerD1TestFiles = [
   "worker/src/workers.test.ts",
   "worker/src/workflow-policy.test.ts",
   "worker/src/workflow-v2.test.ts",
+  "worker/src/zz-probe.test.ts",
 ] as const;

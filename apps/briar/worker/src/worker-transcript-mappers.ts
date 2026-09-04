@@ -111,6 +111,8 @@ export const transcriptAgentProvider = (
       return "opencode";
     case ProtoAgentProvider.OPENROUTER:
       return "openrouter";
+    case ProtoAgentProvider.VERTEX:
+      return "vertex";
     default:
       throw new HttpError(400, "agent_provider is required");
   }

@@ -12,6 +12,7 @@ import {
   type ApprovalPolicy,
   type JsonValue,
   type OpenRouterCredentialStatus,
+  type VertexAiCredentialStatus,
   type ProjectAgentRunRequest,
   type ProjectAgentRunResponse,
   type ProjectAgentRunSnapshot,
@@ -40,6 +41,7 @@ export const defaultAppProviderSettings = {
   agy: true,
   opencode: true,
   openrouter: true,
+  vertex: true,
 } satisfies AppProviderSettings;
 
 export type AgentModelOption = {
@@ -463,6 +465,34 @@ export async function updateOpenRouterApiKey(
 ): Promise<OpenRouterCredentialStatus> {
   if (!isTauri()) return { configured: Boolean(apiKey?.trim()) };
   return commands.updateOpenrouterApiKey(apiKey);
+}
+
+export async function loadVertexAiCredentialStatus(): Promise<
+  VertexAiCredentialStatus
+> {
+  if (!isTauri()) {
+    return { configured: false, projectId: null, location: null };
+  }
+  return commands.loadVertexAiCredentialStatus();
+}
+
+/**
+ * Vertex AI saves only the project and region. Authentication is the machine's
+ * Google Application Default Credentials, which Briar never reads or stores.
+ */
+export async function updateVertexAiSettings(
+  projectId: string | null,
+  location: string | null,
+): Promise<VertexAiCredentialStatus> {
+  if (!isTauri()) {
+    const configured = Boolean(projectId?.trim() && location?.trim());
+    return {
+      configured,
+      projectId: configured ? projectId : null,
+      location: configured ? location : null,
+    };
+  }
+  return commands.updateVertexAiSettings(projectId, location);
 }
 
 export async function updateTeamLlmSettings(

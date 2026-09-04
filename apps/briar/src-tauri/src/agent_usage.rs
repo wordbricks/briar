@@ -56,6 +56,7 @@ pub(crate) struct AgentUsageSnapshot {
     agy: ProviderUsage,
     opencode: ProviderUsage,
     openrouter: ProviderUsage,
+    vertex: ProviderUsage,
     cursor: ProviderUsage,
     updated_at: u64,
 }
@@ -82,6 +83,7 @@ pub(crate) struct ProviderQuotas {
     agy: ProviderQuota,
     opencode: ProviderQuota,
     openrouter: ProviderQuota,
+    vertex: ProviderQuota,
 }
 
 impl ProviderQuotas {
@@ -97,6 +99,7 @@ impl ProviderQuotas {
             agent::AgentProviderKind::Agy => self.agy = quota,
             agent::AgentProviderKind::Opencode => self.opencode = quota,
             agent::AgentProviderKind::Openrouter => self.openrouter = quota,
+            agent::AgentProviderKind::Vertex => self.vertex = quota,
         }
         self
     }
@@ -110,6 +113,7 @@ impl ProviderQuotas {
             agent::AgentProviderKind::Agy => self.agy,
             agent::AgentProviderKind::Opencode => self.opencode,
             agent::AgentProviderKind::Openrouter => self.openrouter,
+            agent::AgentProviderKind::Vertex => self.vertex,
         }
     }
 }
@@ -124,15 +128,19 @@ impl ProviderQuotas {
 */
 const QUOTA_CACHE_TTL: Duration = Duration::from_secs(60);
 
-static QUOTA_CACHE: Mutex<Option<(Instant, PathBuf, bool, ProviderQuotas)>> = Mutex::new(None);
+static QUOTA_CACHE: Mutex<Option<(Instant, PathBuf, agent::ConfiguredUpstreams, ProviderQuotas)>> =
+    Mutex::new(None);
 
 /// Read every provider's remaining quota. A provider whose usage cannot be read
 /// is reported as unknown rather than exhausted.
-pub(crate) fn local_quotas(home: &Path, openrouter_configured: bool) -> ProviderQuotas {
-    if let Some(cached) = cached_quotas(home, openrouter_configured) {
+pub(crate) fn local_quotas(
+    home: &Path,
+    configured_upstreams: &agent::ConfiguredUpstreams,
+) -> ProviderQuotas {
+    if let Some(cached) = cached_quotas(home, configured_upstreams) {
         return cached;
     }
-    let snapshot = load_sync(home, openrouter_configured);
+    let snapshot = load_sync(home, configured_upstreams);
     let quotas = ProviderQuotas {
         codex: provider_quota(&snapshot.codex),
         claude: provider_quota(&snapshot.claude),
@@ -141,24 +149,28 @@ pub(crate) fn local_quotas(home: &Path, openrouter_configured: bool) -> Provider
         agy: provider_quota(&snapshot.agy),
         opencode: provider_quota(&snapshot.opencode),
         openrouter: provider_quota(&snapshot.openrouter),
+        vertex: provider_quota(&snapshot.vertex),
     };
     if let Ok(mut cache) = QUOTA_CACHE.lock() {
         *cache = Some((
             Instant::now(),
             home.to_path_buf(),
-            openrouter_configured,
+            configured_upstreams.clone(),
             quotas,
         ));
     }
     quotas
 }
 
-fn cached_quotas(home: &Path, openrouter_configured: bool) -> Option<ProviderQuotas> {
+fn cached_quotas(
+    home: &Path,
+    configured_upstreams: &agent::ConfiguredUpstreams,
+) -> Option<ProviderQuotas> {
     let cache = QUOTA_CACHE.lock().ok()?;
-    let (read_at, cached_home, cached_openrouter, quotas) = cache.as_ref()?;
+    let (read_at, cached_home, cached_upstreams, quotas) = cache.as_ref()?;
     (read_at.elapsed() < QUOTA_CACHE_TTL
         && cached_home == home
-        && *cached_openrouter == openrouter_configured)
+        && cached_upstreams == configured_upstreams)
         .then_some(*quotas)
 }
 
@@ -201,16 +213,22 @@ pub(crate) struct ProviderAuthentication {
     pub(crate) agy: bool,
 }
 
-pub(crate) async fn load(home: PathBuf, openrouter_configured: bool) -> AgentUsageSnapshot {
-    tauri::async_runtime::spawn_blocking(move || load_sync(&home, openrouter_configured))
+pub(crate) async fn load(
+    home: PathBuf,
+    configured_upstreams: agent::ConfiguredUpstreams,
+) -> AgentUsageSnapshot {
+    tauri::async_runtime::spawn_blocking(move || load_sync(&home, &configured_upstreams))
         .await
         .unwrap_or_else(|error| {
             unavailable_snapshot(format!("Usage 조회 작업에 실패했습니다: {error}"))
         })
 }
 
-fn load_sync(home: &Path, openrouter_configured: bool) -> AgentUsageSnapshot {
-    match provider_cli::provider_usage_snapshot(home, openrouter_configured) {
+fn load_sync(
+    home: &Path,
+    configured_upstreams: &agent::ConfiguredUpstreams,
+) -> AgentUsageSnapshot {
+    match provider_cli::provider_usage_snapshot(home, configured_upstreams) {
         Ok(snapshot) => AgentUsageSnapshot {
             codex: provider_usage(
                 agent::AgentProviderKind::Codex,
@@ -229,6 +247,10 @@ fn load_sync(home: &Path, openrouter_configured: bool) -> AgentUsageSnapshot {
             openrouter: provider_usage(
                 agent::AgentProviderKind::Openrouter,
                 snapshot.openrouter.into_option(),
+            ),
+            vertex: provider_usage(
+                agent::AgentProviderKind::Vertex,
+                snapshot.vertex.into_option(),
             ),
             cursor: provider_usage(
                 agent::AgentProviderKind::Cursor,
@@ -336,6 +358,7 @@ fn unavailable_snapshot(error: String) -> AgentUsageSnapshot {
         agy: provider(agent::AgentProviderKind::Agy),
         opencode: provider(agent::AgentProviderKind::Opencode),
         openrouter: provider(agent::AgentProviderKind::Openrouter),
+        vertex: provider(agent::AgentProviderKind::Vertex),
         cursor: provider(agent::AgentProviderKind::Cursor),
         updated_at: now_millis(),
     }

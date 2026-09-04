@@ -6,7 +6,7 @@ pub(super) use local_proto::LocalWorktreeConfig;
 pub(super) use local_proto::{
     LocalAgentProviderSettings, LocalAppSettings, LocalAutoHuntConfig, LocalConfig,
     LocalExecutionWorkerConfig, LocalLinearConfig, LocalProjectConfig, LocalProjectLlmConfig,
-    LocalSandboxConfig,
+    LocalSandboxConfig, LocalVertexAiCredential,
 };
 
 const DEFAULT_API_URL: &str = "http://127.0.0.1:8787";
@@ -20,6 +20,7 @@ pub(super) fn default_agent_provider_settings() -> LocalAgentProviderSettings {
         agy: true,
         opencode: true,
         openrouter: true,
+        vertex: true,
         ..Default::default()
     }
 }
@@ -131,6 +132,7 @@ fn migrate_pre_protojson_local_config(contents: &str) -> Result<Option<LocalConf
                         ("agy", "AGENT_PROVIDER_AGY"),
                         ("opencode", "AGENT_PROVIDER_OPENCODE"),
                         ("openrouter", "AGENT_PROVIDER_OPENROUTER"),
+                        ("vertex", "AGENT_PROVIDER_VERTEX"),
                     ],
                 );
                 changed |= replace_legacy_enum(
@@ -831,6 +833,7 @@ pub(super) fn provider_is_enabled(
         agent::AgentProviderKind::Agy => settings.agy,
         agent::AgentProviderKind::Opencode => settings.opencode,
         agent::AgentProviderKind::Openrouter => settings.openrouter,
+        agent::AgentProviderKind::Vertex => settings.vertex,
     }
 }
 

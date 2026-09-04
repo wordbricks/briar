@@ -23,6 +23,7 @@ message LocalConfig {
   optional string worker_device_identity = 6;
   optional LocalManagedComputerConfig managed_computer = 7;
   repeated LocalProjectConfig projects = 8;
+  optional LocalVertexAiCredential vertex_ai = 9;
 }
 
 // Omitted boolean fields are disabled. New configs explicitly enable the
@@ -35,6 +36,14 @@ message LocalAgentProviderSettings {
   bool agy = 5;
   bool opencode = 6;
   bool openrouter = 7;
+  bool vertex = 8;
+}
+
+// Google Vertex AI is addressed by project and region; the credential itself
+// is the machine's Application Default Credentials, which Briar never stores.
+message LocalVertexAiCredential {
+  string project_id = 1;
+  string location = 2;
 }
 
 enum LocalBrowserAutomationProvider {

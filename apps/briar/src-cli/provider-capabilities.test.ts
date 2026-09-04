@@ -12,7 +12,9 @@ import {
   parseCursorAvailableModelsResponse,
   parseGrokModelList,
   parseOpenCodeVerbose,
+  selectOpenCodeUpstreamModels,
 } from "./provider-capabilities";
+import { agentProviderCatalog } from "../src/lib/agent-provider";
 
 describe("worker provider capabilities", () => {
   it("does not start Cursor ACP when the CLI is not authenticated", async () => {
@@ -150,6 +152,7 @@ fi
         agy: true,
         opencode: false,
         openrouter: false,
+        vertex: false,
       }, {
         refresh: true,
         home: directory,
@@ -212,6 +215,90 @@ fi
     }]);
   });
 
+  it("keeps only agent-capable Vertex AI models, Gemini first", () => {
+    // Shaped like `opencode models --verbose` for `google-vertex`: Gemini and
+    // Claude on the upstream's own SDK, speech/image/embedding models that
+    // report no tool calling, and a partner model resold over an
+    // OpenAI-compatible endpoint.
+    const output = `google-vertex/claude-opus-5@default
+{
+  "name": "Claude Opus 5",
+  "api": { "npm": "@ai-sdk/google-vertex/anthropic" },
+  "capabilities": { "toolcall": true }
+}
+google-vertex/gemini-2.5-flash-tts
+{
+  "name": "Gemini 2.5 Flash TTS",
+  "api": { "npm": "@ai-sdk/google-vertex" },
+  "capabilities": { "toolcall": false }
+}
+google-vertex/gemini-2.5-pro
+{
+  "name": "Gemini 2.5 Pro",
+  "api": { "npm": "@ai-sdk/google-vertex" },
+  "capabilities": { "toolcall": true }
+}
+google-vertex/gemini-embedding-001
+{
+  "name": "Gemini Embedding 001",
+  "api": { "npm": "@ai-sdk/google-vertex" },
+  "capabilities": { "toolcall": false }
+}
+google-vertex/openai/gpt-oss-120b-maas
+{
+  "name": "GPT OSS 120B",
+  "api": { "npm": "@ai-sdk/google-vertex" },
+  "capabilities": { "toolcall": true }
+}
+google-vertex/meta/llama-4-maverick-17b-128e-instruct-maas
+{
+  "name": "Llama 4 Maverick",
+  "api": { "npm": "@ai-sdk/openai-compatible" },
+  "capabilities": { "toolcall": true }
+}
+openrouter/anthropic/claude-sonnet-4
+{
+  "name": "Claude Sonnet 4",
+  "api": { "npm": "@openrouter/ai-sdk-provider" },
+  "capabilities": { "toolcall": true }
+}
+`;
+    const { upstream } = agentProviderCatalog.vertex;
+    expect(selectOpenCodeUpstreamModels(output, upstream).map((m) => m.id))
+      .toEqual([
+        "google-vertex/gemini-2.5-pro",
+        "google-vertex/claude-opus-5@default",
+      ]);
+  });
+
+  it("keeps every prefixed model for an upstream that selects all", () => {
+    const output = `openrouter/anthropic/claude-sonnet-4
+{
+  "name": "Claude Sonnet 4",
+  "api": { "npm": "@openrouter/ai-sdk-provider" },
+  "capabilities": { "toolcall": true }
+}
+openrouter/mystery-model
+{
+  "name": "Mystery"
+}
+google-vertex/gemini-2.5-pro
+{
+  "name": "Gemini 2.5 Pro",
+  "api": { "npm": "@ai-sdk/google-vertex" },
+  "capabilities": { "toolcall": true }
+}
+`;
+    // OpenRouter's catalog is already chat models, and its records carry no
+    // capability block Briar could filter on, so nothing is dropped.
+    const { upstream } = agentProviderCatalog.openrouter;
+    expect(selectOpenCodeUpstreamModels(output, upstream).map((m) => m.id))
+      .toEqual([
+        "openrouter/anthropic/claude-sonnet-4",
+        "openrouter/mystery-model",
+      ]);
+  });
+
   it("advertises only OpenRouter models for the OpenRouter provider", async () => {
     const directory = await mkdtemp(join(tmpdir(), "briar-openrouter-capabilities-"));
     const binary = join(directory, "opencode");
@@ -237,6 +324,7 @@ openai/gpt-5
         agy: false,
         opencode: false,
         openrouter: true,
+        vertex: true,
       }, {
         refresh: true,
         home: directory,
@@ -260,6 +348,7 @@ describe("desktop provider model catalog", () => {
     agy: false,
     opencode: true,
     openrouter: false,
+    vertex: false,
   };
 
   it("falls back to the active free OpenCode models from the local cache", async () => {
@@ -337,6 +426,7 @@ printf '%s\\n' 'openrouter/test-model' '{' '  "name": "Test model"' '}'
         ...onlyOpencode,
         opencode: false,
         openrouter: true,
+        vertex: true,
       }, {
         refresh: true,
         home: directory,

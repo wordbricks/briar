@@ -33,6 +33,7 @@ public nonisolated enum BriarTypes_AgentProvider: SwiftProtobuf.Enum, Swift.Case
   case agy // = 5
   case opencode // = 6
   case openrouter // = 7
+  case vertex // = 8
   case UNRECOGNIZED(Int)
 
   public init() {
@@ -49,6 +50,7 @@ public nonisolated enum BriarTypes_AgentProvider: SwiftProtobuf.Enum, Swift.Case
     case 5: self = .agy
     case 6: self = .opencode
     case 7: self = .openrouter
+    case 8: self = .vertex
     default: self = .UNRECOGNIZED(rawValue)
     }
   }
@@ -63,6 +65,7 @@ public nonisolated enum BriarTypes_AgentProvider: SwiftProtobuf.Enum, Swift.Case
     case .agy: return 5
     case .opencode: return 6
     case .openrouter: return 7
+    case .vertex: return 8
     case .UNRECOGNIZED(let i): return i
     }
   }
@@ -77,6 +80,7 @@ public nonisolated enum BriarTypes_AgentProvider: SwiftProtobuf.Enum, Swift.Case
     .agy,
     .opencode,
     .openrouter,
+    .vertex,
   ]
 
 }
@@ -84,5 +88,5 @@ public nonisolated enum BriarTypes_AgentProvider: SwiftProtobuf.Enum, Swift.Case
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
 nonisolated extension BriarTypes_AgentProvider: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0AGENT_PROVIDER_UNSPECIFIED\0\u{1}AGENT_PROVIDER_CODEX\0\u{1}AGENT_PROVIDER_CLAUDE\0\u{1}AGENT_PROVIDER_CURSOR\0\u{1}AGENT_PROVIDER_GROK\0\u{1}AGENT_PROVIDER_AGY\0\u{1}AGENT_PROVIDER_OPENCODE\0\u{1}AGENT_PROVIDER_OPENROUTER\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0AGENT_PROVIDER_UNSPECIFIED\0\u{1}AGENT_PROVIDER_CODEX\0\u{1}AGENT_PROVIDER_CLAUDE\0\u{1}AGENT_PROVIDER_CURSOR\0\u{1}AGENT_PROVIDER_GROK\0\u{1}AGENT_PROVIDER_AGY\0\u{1}AGENT_PROVIDER_OPENCODE\0\u{1}AGENT_PROVIDER_OPENROUTER\0\u{1}AGENT_PROVIDER_VERTEX\0")
 }

@@ -10,6 +10,7 @@ enum AgentProvider: String, Codable, CaseIterable, Hashable, Identifiable, Senda
     case agy
     case opencode
     case openrouter
+    case vertex
 
     var id: String { rawValue }
     var displayName: String {
@@ -17,6 +18,7 @@ enum AgentProvider: String, Codable, CaseIterable, Hashable, Identifiable, Senda
         case .agy: "Antigravity"
         case .opencode: "OpenCode"
         case .openrouter: "OpenRouter"
+        case .vertex: "Vertex AI"
         default: rawValue.capitalized
         }
     }
@@ -45,6 +47,7 @@ enum AgentProvider: String, Codable, CaseIterable, Hashable, Identifiable, Senda
         case .agy: .agy
         case .opencode: .opencode
         case .openrouter: .openrouter
+        case .vertex: .vertex
         }
     }
 

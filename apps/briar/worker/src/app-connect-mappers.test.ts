@@ -92,6 +92,6 @@ describe("app Connect message mapping", () => {
         remoteUpdates: { supported: true, protocol: 1 },
       },
     });
-    expect(worker.capabilities?.providerCapabilities).toHaveLength(7);
+    expect(worker.capabilities?.providerCapabilities).toHaveLength(8);
   });
 });

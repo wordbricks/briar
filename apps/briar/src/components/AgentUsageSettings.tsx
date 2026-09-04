@@ -52,6 +52,7 @@ const providerColors = {
   agy: "#4285f4",
   opencode: "#4f8a70",
   openrouter: "#6d5bd0",
+  vertex: "#1a73e8",
   unknown: "var(--muted-foreground)",
 } satisfies Record<UsageAttribution, string>;
 
