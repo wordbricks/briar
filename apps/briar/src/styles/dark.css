@@ -13,6 +13,18 @@
 .dark .sidebar {
   border-color: var(--sidebar-border);
   color: var(--sidebar-foreground);
+  background: var(--sidebar-fallback);
+  box-shadow: var(--sidebar-shadow);
+}
+
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .dark .sidebar {
+    background:
+      linear-gradient(145deg, var(--sidebar-glass-highlight), transparent 46%),
+      var(--sidebar);
+    backdrop-filter: blur(24px) saturate(155%);
+    -webkit-backdrop-filter: blur(24px) saturate(155%);
+  }
 }
 
 .dark .sidebar-channel-list button.unread {
