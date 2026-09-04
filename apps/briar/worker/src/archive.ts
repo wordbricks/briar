@@ -9,6 +9,7 @@ import { upsertTeamAgentSessionSummary } from "./db";
 import type { TranscriptSessionRow } from "./workers";
 import type {
   AgentTranscriptSegmentRow,
+  AgentTranscriptSessionSummary,
   AgentWorkLogEntryRow,
 } from "./agent-worklog";
 import {
@@ -1278,6 +1279,30 @@ export async function readArchivedWorkLog(
     workLog.session.run_id,
   );
   return current ? workLog : null;
+}
+
+/**
+ * Archived sessions keep only their archive metadata in D1, so a summary is
+ * restored from the object's period instead of the deleted session row.
+ */
+export async function listArchivedTranscriptSessionsForRun(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+): Promise<AgentTranscriptSessionSummary[]> {
+  if (!(await runCurrentlyBelongsToProject(db, projectId, runId))) return [];
+  const metadata = await listArchiveMetadata(db, projectId, {
+    runId,
+    kind: "agent_transcript",
+  });
+  return metadata.map((archive) => ({
+    session_id: archive.scope_id,
+    worker_id: null,
+    agent_provider: null,
+    started_at: archive.period_start,
+    last_event_at: archive.period_end,
+    archived: true,
+  }));
 }
 
 export async function readLatestArchivedWorkLogForRun(

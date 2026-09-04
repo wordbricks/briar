@@ -67,6 +67,8 @@ open class BriarAPI_AgentServiceClientMock: BriarAPI_AgentServiceClientInterface
     public var mockAsyncCancelProjectAgentTask = { (_: BriarAPI_CancelProjectAgentTaskRequest) -> ResponseMessage<BriarAPI_CancelProjectAgentTaskResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `getProjectAgentTranscript()`.
     public var mockAsyncGetProjectAgentTranscript = { (_: BriarAPI_GetProjectAgentTranscriptRequest) -> ResponseMessage<BriarAPI_GetProjectAgentTranscriptResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `listProjectAgentTranscriptSessions()`.
+    public var mockAsyncListProjectAgentTranscriptSessions = { (_: BriarAPI_ListProjectAgentTranscriptSessionsRequest) -> ResponseMessage<BriarAPI_ListProjectAgentTranscriptSessionsResponse> in .init(result: .success(.init())) }
 
     public init() {}
 
@@ -160,5 +162,9 @@ open class BriarAPI_AgentServiceClientMock: BriarAPI_AgentServiceClientInterface
 
     open func `getProjectAgentTranscript`(request: BriarAPI_GetProjectAgentTranscriptRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_GetProjectAgentTranscriptResponse> {
         return self.mockAsyncGetProjectAgentTranscript(request)
+    }
+
+    open func `listProjectAgentTranscriptSessions`(request: BriarAPI_ListProjectAgentTranscriptSessionsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ListProjectAgentTranscriptSessionsResponse> {
+        return self.mockAsyncListProjectAgentTranscriptSessions(request)
     }
 }
