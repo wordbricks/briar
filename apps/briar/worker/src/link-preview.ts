@@ -5,6 +5,8 @@ export type ChannelLinkPreview = {
   readonly imageUrl: string | null;
   readonly faviconUrl: string | null;
   readonly siteName: string | null;
+  readonly imageWidth: number | null;
+  readonly imageHeight: number | null;
 };
 
 const maxUrlLength = 2_048;
@@ -225,6 +227,11 @@ function parseHtmlPreview(html: string, pageUrl: URL): Omit<ChannelLinkPreview, 
       return null;
     }
   };
+  const parsePositiveInt = (value: string | undefined | null): number | null => {
+    if (!value) return null;
+    const n = Number.parseInt(value, 10);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
   const preview = {
     title: firstValue("og:title", "twitter:title") ?? title,
     description: firstValue(
@@ -235,6 +242,8 @@ function parseHtmlPreview(html: string, pageUrl: URL): Omit<ChannelLinkPreview, 
     imageUrl: resolveAsset(imageValue),
     faviconUrl: resolveAsset(faviconValue),
     siteName: firstValue("og:site_name", "application-name"),
+    imageWidth: parsePositiveInt(firstValue("og:image:width")),
+    imageHeight: parsePositiveInt(firstValue("og:image:height")),
   } satisfies Omit<ChannelLinkPreview, "url">;
   return preview.title || preview.description || preview.imageUrl || preview.siteName
     ? preview

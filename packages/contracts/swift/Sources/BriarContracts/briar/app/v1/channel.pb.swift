@@ -2151,6 +2151,24 @@ public nonisolated struct BriarAPI_ChannelLinkPreview: Sendable {
   /// Clears the value of `siteName`. Subsequent reads from it will return its default value.
   public mutating func clearSiteName() {self._siteName = nil}
 
+  public var imageWidth: Int32 {
+    get {_imageWidth ?? 0}
+    set {_imageWidth = newValue}
+  }
+  /// Returns true if `imageWidth` has been explicitly set.
+  public var hasImageWidth: Bool {self._imageWidth != nil}
+  /// Clears the value of `imageWidth`. Subsequent reads from it will return its default value.
+  public mutating func clearImageWidth() {self._imageWidth = nil}
+
+  public var imageHeight: Int32 {
+    get {_imageHeight ?? 0}
+    set {_imageHeight = newValue}
+  }
+  /// Returns true if `imageHeight` has been explicitly set.
+  public var hasImageHeight: Bool {self._imageHeight != nil}
+  /// Clears the value of `imageHeight`. Subsequent reads from it will return its default value.
+  public mutating func clearImageHeight() {self._imageHeight = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -2160,6 +2178,8 @@ public nonisolated struct BriarAPI_ChannelLinkPreview: Sendable {
   fileprivate var _imageURL: String? = nil
   fileprivate var _faviconURL: String? = nil
   fileprivate var _siteName: String? = nil
+  fileprivate var _imageWidth: Int32? = nil
+  fileprivate var _imageHeight: Int32? = nil
 }
 
 public nonisolated struct BriarAPI_GetChannelLinkPreviewResponse: Sendable {
@@ -6010,7 +6030,7 @@ nonisolated extension BriarAPI_GetChannelLinkPreviewRequest: SwiftProtobuf.Messa
 
 nonisolated extension BriarAPI_ChannelLinkPreview: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ChannelLinkPreview"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}url\0\u{1}title\0\u{1}description\0\u{3}image_url\0\u{3}favicon_url\0\u{3}site_name\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}url\0\u{1}title\0\u{1}description\0\u{3}image_url\0\u{3}favicon_url\0\u{3}site_name\0\u{3}image_width\0\u{3}image_height\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -6024,6 +6044,8 @@ nonisolated extension BriarAPI_ChannelLinkPreview: SwiftProtobuf.Message, SwiftP
       case 4: try { try decoder.decodeSingularStringField(value: &self._imageURL) }()
       case 5: try { try decoder.decodeSingularStringField(value: &self._faviconURL) }()
       case 6: try { try decoder.decodeSingularStringField(value: &self._siteName) }()
+      case 7: try { try decoder.decodeSingularInt32Field(value: &self._imageWidth) }()
+      case 8: try { try decoder.decodeSingularInt32Field(value: &self._imageHeight) }()
       default: break
       }
     }
@@ -6052,6 +6074,12 @@ nonisolated extension BriarAPI_ChannelLinkPreview: SwiftProtobuf.Message, SwiftP
     try { if let v = self._siteName {
       try visitor.visitSingularStringField(value: v, fieldNumber: 6)
     } }()
+    try { if let v = self._imageWidth {
+      try visitor.visitSingularInt32Field(value: v, fieldNumber: 7)
+    } }()
+    try { if let v = self._imageHeight {
+      try visitor.visitSingularInt32Field(value: v, fieldNumber: 8)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -6062,6 +6090,8 @@ nonisolated extension BriarAPI_ChannelLinkPreview: SwiftProtobuf.Message, SwiftP
     if lhs._imageURL != rhs._imageURL {return false}
     if lhs._faviconURL != rhs._faviconURL {return false}
     if lhs._siteName != rhs._siteName {return false}
+    if lhs._imageWidth != rhs._imageWidth {return false}
+    if lhs._imageHeight != rhs._imageHeight {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

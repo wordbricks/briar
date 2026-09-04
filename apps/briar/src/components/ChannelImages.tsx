@@ -480,9 +480,13 @@ function ChannelMessageMediaAttachment({
     );
   }
 
+  const dimensionStyle = attachment.imageWidth && attachment.imageHeight
+    ? { aspectRatio: `${attachment.imageWidth} / ${attachment.imageHeight}` }
+    : undefined;
+
   return (
     <figure className="channel-message-attachment-card">
-      <div className="channel-message-image-preview">{preview}</div>
+      <div className="channel-message-image-preview" style={dimensionStyle}>{preview}</div>
       <figcaption>
         <strong title={attachment.filename}>{attachment.filename}</strong>
         <small>{formatAttachmentBytes(attachment.byteSize)}</small>

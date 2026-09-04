@@ -33,6 +33,8 @@ export type UploadMetadata = {
   contentType: string;
   byteSize: number;
   sha256: Uint8Array;
+  imageWidth?: number | null;
+  imageHeight?: number | null;
 };
 
 export type UploadBatchRow = {
@@ -68,6 +70,8 @@ export type UploadRow = {
   consumed_at: string | null;
   consumer_kind: string | null;
   consumer_id: string | null;
+  image_width: number | null;
+  image_height: number | null;
 };
 
 export type ScopedUploadRow = UploadRow & {
@@ -96,6 +100,8 @@ export async function uploadMetadataHash(files: readonly UploadMetadata[]) {
         contentType: file.contentType,
         byteSize: file.byteSize,
         sha256: bytesToHex(file.sha256),
+        imageWidth: file.imageWidth ?? null,
+        imageHeight: file.imageHeight ?? null,
       })),
     ),
   );
@@ -179,9 +185,9 @@ export async function prepareUploadRows(
         .prepare(
           `insert into briar_uploads (
          upload_id, batch_request_id, client_id, position, filename,
-         content_type, byte_size, sha256, object_key
+         content_type, byte_size, sha256, object_key, image_width, image_height
        )
-       select ?, batch.request_id, ?, ?, ?, ?, ?, ?, ?
+       select ?, batch.request_id, ?, ?, ?, ?, ?, ?, ?, ?, ?
        from briar_upload_batches batch
        where batch.request_id = ? and batch.creation_nonce = ?
        on conflict do nothing
@@ -196,6 +202,8 @@ export async function prepareUploadRows(
           file.byteSize,
           file.sha256,
           file.objectKey,
+          file.imageWidth ?? null,
+          file.imageHeight ?? null,
           input.requestId,
           creationNonce,
         ),

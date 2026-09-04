@@ -183,6 +183,8 @@ describe("mergeChannelMessages", () => {
           contentType: "image/png",
           byteSize: 1234,
           url: "blob:http://localhost/local-blob-1",
+          imageWidth: null,
+          imageHeight: null,
         },
       ],
     };
@@ -195,6 +197,8 @@ describe("mergeChannelMessages", () => {
           contentType: "image/png",
           byteSize: 1234,
           url: "/organizations/org-1/channels/chan-1/messages/msg-1/attachments/server-upload-1",
+          imageWidth: null,
+          imageHeight: null,
         },
       ],
     };
@@ -206,6 +210,8 @@ describe("mergeChannelMessages", () => {
         contentType: "image/png",
         byteSize: 1234,
         url: "blob:http://localhost/local-blob-1",
+        imageWidth: null,
+        imageHeight: null,
       },
     ]);
   });

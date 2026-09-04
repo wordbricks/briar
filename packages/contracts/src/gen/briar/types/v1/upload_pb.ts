@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file briar/types/v1/upload.proto.
  */
 export const file_briar_types_v1_upload: GenFile = /*@__PURE__*/
-  fileDesc("Chticmlhci90eXBlcy92MS91cGxvYWQucHJvdG8SDmJyaWFyLnR5cGVzLnYxInIKElVwbG9hZEZpbGVNZXRhZGF0YRIRCgljbGllbnRfaWQYASABKAkSEAoIZmlsZW5hbWUYAiABKAkSFAoMY29udGVudF90eXBlGAMgASgJEhEKCWJ5dGVfc2l6ZRgEIAEoBBIOCgZzaGEyNTYYBSABKAwiJAoPVXBsb2FkUmVmZXJlbmNlEhEKCXVwbG9hZF9pZBgBIAEoCSK2AQoOUHJlcGFyZWRVcGxvYWQSEQoJY2xpZW50X2lkGAEgASgJEjIKCXJlZmVyZW5jZRgCIAEoCzIfLmJyaWFyLnR5cGVzLnYxLlVwbG9hZFJlZmVyZW5jZRISCgp1cGxvYWRfdXJsGAMgASgJEhkKEXVwbG9hZF9jYXBhYmlsaXR5GAQgASgJEi4KCmV4cGlyZXNfYXQYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQg66AgtCcmlhclR5cGVzX2IGcHJvdG8z", [file_google_protobuf_timestamp]);
+  fileDesc("Chticmlhci90eXBlcy92MS91cGxvYWQucHJvdG8SDmJyaWFyLnR5cGVzLnYxIsgBChJVcGxvYWRGaWxlTWV0YWRhdGESEQoJY2xpZW50X2lkGAEgASgJEhAKCGZpbGVuYW1lGAIgASgJEhQKDGNvbnRlbnRfdHlwZRgDIAEoCRIRCglieXRlX3NpemUYBCABKAQSDgoGc2hhMjU2GAUgASgMEhgKC2ltYWdlX3dpZHRoGAYgASgFSACIAQESGQoMaW1hZ2VfaGVpZ2h0GAcgASgFSAGIAQFCDgoMX2ltYWdlX3dpZHRoQg8KDV9pbWFnZV9oZWlnaHQiJAoPVXBsb2FkUmVmZXJlbmNlEhEKCXVwbG9hZF9pZBgBIAEoCSK2AQoOUHJlcGFyZWRVcGxvYWQSEQoJY2xpZW50X2lkGAEgASgJEjIKCXJlZmVyZW5jZRgCIAEoCzIfLmJyaWFyLnR5cGVzLnYxLlVwbG9hZFJlZmVyZW5jZRISCgp1cGxvYWRfdXJsGAMgASgJEhkKEXVwbG9hZF9jYXBhYmlsaXR5GAQgASgJEi4KCmV4cGlyZXNfYXQYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQg66AgtCcmlhclR5cGVzX2IGcHJvdG8z", [file_google_protobuf_timestamp]);
 
 /**
  * Metadata for one file whose bytes will be transferred through an
@@ -50,6 +50,18 @@ export type UploadFileMetadata = Message<"briar.types.v1.UploadFileMetadata"> & 
    * @generated from field: bytes sha256 = 5;
    */
   sha256: Uint8Array;
+
+  /**
+   * Optional image dimensions provided by the client for layout reservation.
+   *
+   * @generated from field: optional int32 image_width = 6;
+   */
+  imageWidth?: number | undefined;
+
+  /**
+   * @generated from field: optional int32 image_height = 7;
+   */
+  imageHeight?: number | undefined;
 };
 
 /**
