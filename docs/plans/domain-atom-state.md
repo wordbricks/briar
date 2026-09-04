@@ -732,7 +732,9 @@ Effect Atom을 고르는 이유는 이미 코드베이스에 있고 Effect 스�
   `registry.get(atom)`으로 읽으므로 dep 배열과 ref가 필요 없다. 서버 쓰기는
   `state/sync/optimistic.ts`의 공통 헬퍼로 낙관 적용, 커밋, 롤백을 통일한다.
   `Atom.fn` + `AsyncResult`는 기존 Promise 호출 계약을 유지하기 위해 1차 범위에서
-  제외한다.
+  제외했고, 후속 F9가 그 계약을 그대로 둔 채 들여왔다: 쓰기 흐름의 pending과
+  실패는 `state/actions.ts`의 액션 atom이 갖고, 뷰가 읽던 플래그는 그 위의
+  파생이다. 액션은 여전히 Promise를 돌려주고 **같은 `Error` 인스턴스**로 거부한다.
 
 ### 루트 3종은 읽기 전용 의존
 
@@ -1226,7 +1228,11 @@ Phase 2 이후 언제든 착수 가능하며 Phase 3–7과 병행할 수 있다
   액션, 답장 버전 부기 — 을 옮기고 훅을 지웠다. 마지막으로 남아 있던
   `useStatusTray`의 i18n 의존 effect 둘은 후속 F7이 구독형 atom으로 바꿨다:
   **훅이 소유한 로직은 이제 하나도 없다.**
-- `Atom.fn` + `AsyncResult`로 pending / 에러 상태 자동화.
+- **pending / 에러 상태는 `Atom.fn` + `AsyncResult`가 갖는다.** 후속 F9가
+  `state/actions.ts`(`defineAction` / `defineActionFamily` / `defineTaskAction` /
+  `defineTaskActionFamily` / `runAction` / `runTask` / `useAction`)를 두고 이슈
+  변이 13종, 팀 삭제, 채널 대화 쓰기 다섯을 옮겼다. 남은 것은 요청 상태가 **아닌**
+  것들이다(아래 기준 갱신에 목록과 이유).
 - 오프라인 우선과 멀티 디바이스 충돌 해결이 목표가 되면 서버 측 SyncAction 로그를
   가진 전용 sync engine(Replicache, Zero 등)을 검토한다. 그 전까지는 이 계획으로
   충분하다.
@@ -1268,6 +1274,9 @@ Phase 2 이후 언제든 착수 가능하며 Phase 3–7과 병행할 수 있다
 | F6-3 중복 읽음 처리, 대화 쓰기 정리, 죽은 코드 | #1659 | 머지됨 | F6의 나머지 정리 셋. **중복 `markRead`**: 다른 팀의 알림은 두 패스로 라우팅되고(첫 패스가 팀을 고르고 반환, 둘째가 라우팅) 읽음 영수증은 팀 검사 **앞**에 있어 `markRead`가 알림 하나에 두 번 불렸다. 다만 서버 쓰기는 이미 한 번이었다 — 읽음 버전 비교가 두 번째를 걸렀고 푸시 큐도 같은 버전을 버렸다 — 이므로 실제 중복은 호출뿐이었다. 이제 `markRead`가 "이 알림은 읽힌 상태인가"를 boolean으로 답하고 `useDeepLinks`가 영수증이 안착한 메시지 id를 기억해 둘째 패스는 묻지 않는다. 실패(인박스가 아직 그 메시지를 갖고 있지 않음)는 기억하지 않으므로 다음 패스가 다시 시도한다. `actions.test.ts`가 "두 번 불러도 쓰기는 한 번, 모르는 메시지는 `false`"를 고정한다. **`write.ts`**: updater 모양이었던 것은 `write.ts`가 아니라 `actions.ts`의 지역 헬퍼 `updateRoot` / `updateThread`였다(주석이 스스로 "훅이 뷰의 `useState` setter에 주던 모양"이라고 적고 있었다). 하는 일을 이름으로 옮겨 `patchChannelMessages` / `patchChannelRootMessage` / `mergeIntoChannelSurface` / `removeOptimisticChannelMessages` / `applyChannelMessageDeletionToChannel` 다섯 직접 writer를 `write.ts`에 두고 두 헬퍼를 지웠다. 이들이 인코딩하는 규칙은 "두 표면 동시에"다 — 메시지는 루트 행과 열린 스레드 행으로 동시에 그려질 수 있고, 한쪽만 닿은 낙관 패치는 한 화면에 같은 메시지의 두 판본을 보여 준다. `write.test.ts`에 4 케이스 추가. **죽은 코드**: F5-4가 델타 루프를 합친 뒤 아무도 읽지 않게 된 `channelInboxSyncSignal` 프롭 체인(셸 두 곳 → `InboxDetailContent` → `Channels` / `CompanionChannels` / `DirectMessages`)과, 두 채널 뷰에 남아 있던 죽은 import·지역 함수(`ChannelTypingState`, `ChannelDelta`, `mergeChannelMessages`, `relativeTime`, 쓰이지 않던 `toast`)를 지웠다. `state/agent-sessions` / `state/inbox` / `state/channel-conversation` / `hooks/useChannelComposer`의 export는 전수 조사했고 **죽은 것이 없다** — 자기 모듈 밖에서 쓰이지 않는 것들은 전부 모듈 계약을 적는 타입이다. |
 | F6-5 트레이 플래시 + F7 남은 hook형 effect | #1660 | 머지됨 | 훅이 소유한 마지막 로직을 옮기고, 그러면서 드러난 트레이 플래시를 고쳤다. **`state/i18n`**: `localeCatalogAtom`(로케일 + 실제로 로드된 카탈로그)과 파생 `localeAtom` / `localeTagAtom` / `translatorAtom`, 그리고 `publishLocaleCatalog`. 문자열은 로케일당 청크라 "로케일 X의 번역기"는 그 청크가 평가되기 전까지 X의 순수 함수가 아니다 — 그래서 카탈로그를 **소유한 쪽**(`I18nProvider`)이 effect로 발행하고 atom이 그 위에서 파생된다(F5-4의 타이핑 퍼블리셔와 같은 모양: 도는 곳과 읽는 곳을 가른다). 뷰는 그대로 `useI18n()`을 쓴다. **트레이**: `useStatusTray`의 effect 셋이 `statusTrayTeamRunsAtom` / `statusTraySnapshotAtom` / `statusTrayWorkerLabelsAtom`이 되어 훅은 `useAtomMount` 네 줄이다. 마운트 순서가 곧 쓰기 순서다 — 폴이 씨앗을 놓고, 병합이 열린 팀을 접고, 스냅샷이 결과를 읽는다. **플래시(F6-5)는 여전히 재현됐고 원인이 둘이었다**: 폴 atom 본문이 시작하며 목록을 비웠고(하이드레이션된 부팅이나 리마운트에서 병합보다 먼저 돌아 한 패스 동안 빈 트레이가 Rust로 갔다), 폴의 **첫 응답**이 병합이 방금 넣은 런을 통째로 덮었다(그 뒤 아무것도 다시 돌지 않는다). 앞의 것은 열린 팀에서 씨앗을 놓는 것으로, 뒤의 것은 조직 응답이 열린 팀의 몫만 남기고 나머지를 대체하도록 고쳤다. `statusTrayRunsAtom`에 아홉 필드 비교 동등성을 달아 같은 목록의 두 번째 쓰기가 알림을 내지 않는다. **테스트**: `useStatusTray.test.tsx`에 "대시보드가 이미 있는 부팅에서 빈 트레이를 한 번도 밀지 않는다"와 "로케일이 바뀌면 스냅샷이 다시 동기화된다", `state/status-tray/atoms.test.tsx`에 "마지막 관측자가 사라지면 스냅샷을 더 밀지 않는다"(idle TTL 경과), `state/i18n/atoms.test.ts` 4 케이스. |
 | F8 실브라우저·데스크톱·컴패니언 검증 | #1664 | 머지됨 | 지금까지 런타임 확인은 테스트와 빌드, 그리고 내장 브라우저 데모 스모크 하나뿐이었다. **웹(실 Chromium 148, 프로필 IndexedDB)**: 데모 모드는 `useHydration`과 `useSnapshotWriter`가 둘 다 `demoMode`에서 조기 반환하므로 영속화를 전혀 돌리지 않는다 — 그래서 영속화는 `VITE_BRIAR_DEMO=false` 데브 서버와 `web:build` 정적 배포에서 확인했다. `briar-client-snapshots` v1 / `snapshots` 스토어에 `${userId}:${organizationId}` 레코드 하나(11KB), `schemaVersion` 1, 토큰·로그인 코드·`restoringSession` 계열 필드 0개(정규식 전수 스캔), `teamState`는 활성 조직의 팀만. 리로드하면 네트워크가 하나도 없는 상태에서 마지막 대시보드가 **한 DOM 배치로** 올라오고 부팅 게이트는 한 프레임도 보이지 않는다 — 스냅샷을 지운 대조군은 같은 자리에서 "Checking your sign-in…"에 멈춘다. 정적 프로덕션 번들 기준 DOMContentLoaded 148ms, 셸+보드 960ms. 팀 전환·복귀는 LRU가 두 팀을 모두 보존해 복귀가 동기(0ms)이고, 조직 전환은 이전 조직 레코드를 지우고 새 레코드와 계정 포인터를 쓴다. 로그아웃은 스토어를 전부 비우고 `briar.snapshot-account.v1`을 지운다(`briar.inbox.v1:<userId>`와 `briar.auto-hunt-sessions.v1`은 설계대로 남는다 — 전자는 계정별 키, 후자는 이 기기의 실행 로그다). 알림 하나를 열면 `briar.inbox.v1` 쓰기가 정확히 한 번, `readVersions` 항목 하나(F6-3). 로케일 전환은 UI 전체를 즉시 relabel하고 `localeAtom` / `localeTagAtom`이 따라간다. `indexedDB` getter가 `SecurityError`를 던지는 프로필에서도 앱은 그대로 부팅한다(no-op 스토어). 콘솔 오류·경고는 전 구간 0. **찾은 결함**: 스냅샷 스토어가 `IDBDatabase` 연결을 페이지 수명 내내 붙들고 `versionchange`를 처리하지 않아, 다른 클라이언트의 업그레이드와 `deleteDatabase`가 무기한 `blocked`가 된다 — 실브라우저에서 `blocked` 후 8초 타임아웃으로 재현했다. `DATABASE_VERSION`이 1인 지금은 증상이 없지만, 그 상수를 올리는 순간 열려 있던 창(데스크톱은 며칠씩 떠 있고 프로젝트마다 창을 연다)이 새 빌드의 업그레이드를 막고 새 빌드는 `onblocked` 때문에 그 창이 닫힐 때까지 스냅샷 없이 부팅한다. `onversionchange`에서 연결을 닫고 캐시된 promise를 비우도록 고쳤다: 고친 뒤 같은 실험이 `upgradeneeded` → `success`로 즉시 끝나고, 옛 홀더는 다음 접근에서 `VersionError`를 받아 `readSnapshotSafely`가 `null`로 낮춘다 — 이 모듈이 원래 약속한 저하다. `store.test.ts`에 "업그레이드가 오면 연결을 놓고 다음 접근에서 다시 연다" 케이스 추가. **데스크톱**: `tauri dev`가 2분 27초에 빌드·기동했고 런타임 로그에 오류 0(경고는 dev 서버 대기 1건). 화면 제어 권한이 거부되어 창 자체는 보지 못했으므로 트레이 콜드 부팅·트레이 클릭 딥링크·트레이 로케일 relabel·앱 메뉴 설정은 **미검증**으로 남는다. **컴패니언**: `apps/briar/ios/BriarCompanion`은 SwiftUI 네이티브 클라이언트라 이 리팩터의 코드가 한 줄도 돌지 않는다 — 검증 대상은 `VITE_BRIAR_COMPANION=true`로 도는 React 컴패니언 셸이고, 375×812에서 Home / Tasks / Inbox와 런별로 구독하는 태스크 행이 렌더된다. 로그아웃 후 팀 0개 상태에서 `AppEffects`가 4초 동안 오류 0. DMs와 채널 페이지는 `token` 게이트라 데모에서는 열리지 않아 조직 전환 뒤 홈 채널 목록(F6-2)은 미검증이다. |
+| F9-1 `Atom.fn` 액션 헬퍼와 이슈 변이 | #1667 | 머지됨 | `state/actions.ts`가 이 저장소의 쓰기 흐름이 요청 상태를 선언하는 자리다. `defineAction(label, body, options?)`은 `Atom.fn` 위의 `AtomResultFn<Arg, A, Error>`이고, 본문은 `(arg, { registry }) => Promise<A>` — `registry`는 **읽기 전용 이음매**다(atom 그래프로 읽으면 액션이 자기가 읽은 것에 구독된다). `defineActionFamily`는 키별, `runAction` / `useAction`은 레지스트리 코드와 컴포넌트에서의 실행이다. 일이 `createXxxActions(registry, deps)` 안에서 주입된 api·데모 플래그를 닫고 있어 모듈 스코프에 적을 수 없는 흐름은 `defineTaskAction` / `runTask`가 받는다: atom이 상태 기계를, 팩터리가 호출을 갖고, 대상 id가 인자와 함께 실려 `pendingTarget`이 파생된다. **이슈**: `pendingIssueMutationAtom` / `beginIssueMutation` / `recoveryErrorAtom`이 사라지고 유니온의 네 갈래가 네 태스크 액션(`createIssueAction` / `updateIssueAction` / `deleteIssueAction` / `recoverRunAction`)이 됐다. 뷰가 읽던 네 플래그는 이름과 모양 그대로 파생이고 복구 실패는 `runRecoveryFailureAtom`이다. 13개 액션이 팩터리의 `mutate` / `recover`를 통과하며 복구 계열은 `try/catch`가 통째로 없어졌다. 런별 `runIsUpdatingAtom(runId)` / `runIsDeletingAtom` / `runIsRecoveringAtom`을 더하고 `RunPageWithRun`이 그것을 구독한다(`RunPageWithRun.test.tsx`가 "다른 런의 수정 → 이 페이지 0회"를 `profile`로 고정). |
+| F9-2 팀 삭제와 채널 대화 쓰기 플래그 | #1668 | 머지됨 | `deletingTeamIdAtom`은 `deleteTeamAction.pendingTarget`이 되고 `removeProject`가 workspace의 `mutate`를 통과한다. 채널 대화는 채널별 태스크 액션 다섯(`channelSendAction` / `channelDeleteMessageAction` / `channelAcceptProposalAction` / `channelDeclineProposalAction` / `channelThreadSubscriptionAction`)을 얻고 플래그 넷이 파생이 됐다: `busy`는 앞의 네 액션의 `isWaiting` OR, 승인·거절 id는 각 `pendingTarget`, 스레드 구독 대기는 그 액션의 `isWaiting`(본문의 "이미 도는 중이면 무시" 가드가 그 파생을 읽는다). 전송과 메시지 삭제만 `concurrent: true`다. 다섯 액션의 `finally`와, `resetChannelConversationViewState` / `clearPendingFlags`의 중복 클리어가 사라졌다. `defineTaskActionFamily`(강한 `Map`)를 헬퍼에 더했고, F5-4 이후 아무도 읽지 않던 `channelConversationLoadingAtom`을 지웠다. |
+| F9-3 계획 문서 | #1669 | 머지됨 | 이 문서의 F9 기준 갱신과 "후속" 항목 갱신. |
 
 ### 기준 갱신 (2026-09-04, 후속 F3 이후)
 
@@ -1477,3 +1486,60 @@ Phase 2 이후 언제든 착수 가능하며 Phase 3–7과 병행할 수 있다
   export를 전수 조사한 결과 남은 것은 모듈 계약을 적는 타입뿐이었다. 실제로 죽어
   있던 것은 export가 아니라 **아무도 읽지 않는 프롭 체인**(`channelInboxSyncSignal`)
   이었다. 죽은 코드를 찾을 때는 `tsc --noUnusedLocals`가 export 스캔보다 정확하다.
+
+### 기준 갱신 (2026-09-04, 후속 F9 이후)
+
+`Atom.fn` + `AsyncResult`로 요청 상태를 옮기며 확인한, 앞으로 쓸 사실이다.
+
+- **재실행은 이전 결과를 지우지 않는다 — `waiting`으로 덮는다.** 그래서 "다음
+  시도가 도는 동안 지난 결과를 그대로 보여 준다"는 공짜지만, "재시도가 시작되면
+  배너를 지운다"(모든 복구 액션이 `registry.set(recoveryErrorAtom, null)`로 하던
+  것)는 파생에서 `isFailure && !waiting`으로 직접 걸러야 한다. 인터럽트된 실행도
+  같은 자리에서 "실패 아님"으로 읽힌다.
+- **`Effect.tryPromise`의 `catch`는 태그 에러를 요구한다.** 그냥 `Error`를 주면
+  타입 경고(`effect(globalErrorInEffectCatch)`)가 `tsc`를 깨뜨린다. 그런데 이
+  리팩터의 계약은 "호출부가 보는 거부 값이 바뀌지 않는다"이므로 감쌀 수가 없다.
+  답은 `Effect.callback`으로 직접 `Effect.fail(원본 Error)`를 넣는 것이다 —
+  `Effect.runPromise`가 `Fail` cause를 다시 그 인스턴스로 squash하므로 `await`
+  하던 호출부와 토스트가 그대로 돈다.
+- **액션 atom은 도는 동안 노드가 살아 있어야 한다.** 구독자가 0이면 노드가
+  폐기되고, 폐기가 fiber를 인터럽트한다. `runAction`이 호출 동안
+  `registry.mount`하고 정착하면 놓는다.
+- **본문이 첫 `await` 전에 하는 동기 레지스트리 쓰기는 그대로 도착한다.** 데모
+  분기가 전부 그 모양(`applyRunPatch` 후 즉시 `return`)이라 이것이 성립하지
+  않으면 옮길 수 없었다.
+- **겹친 호출의 규칙은 `concurrent`가 정한다.** 기본(`false`)은 두 번째가 첫
+  번째를 대체하고 **두 호출자 모두 두 번째의 결과**로 끝난다 — 옛 플래그가 이미
+  그렇게 모델링했고(두 번째가 마커를 덮고, 첫 번째가 끝나도 지우지 않는다) 그
+  사이 UI가 버튼을 잠근다. 겹침이 정상인 흐름(채팅 전송)은 `concurrent: true`로
+  둔다. 기본값이면 첫 번째를 기다리던 작성기가 인터럽트로 거부되기 때문이다.
+  (`Atom.Interrupt`를 직접 쓸 때만 거부가 보인다: "All fibers interrupted
+  without error".)
+- **키별 액션 번들은 `Atom.family`에 담지 않는다.** family는 값을 **약하게** 들고
+  레지스트리 노드는 자기 atom만 참조하므로, 수집된 번들은 다음 호출자에게 뷰가
+  이미 구독한 것과 **다른** atom 묶음을 준다. `defineTaskActionFamily`는 강한
+  `Map`이다. 메모리의 실체인 레지스트리 노드는 여전히 keepAlive가 아니라서 안 보는
+  키에서 사라진다.
+- **"오래된 요청이 새 요청의 플래그를 지운다"는 문제가 통째로 사라진다.** 채널
+  대화의 다섯 액션이 `finally`를 `surfaceIsCurrent`로 감싸고, 그래도 안 지워지는
+  경우를 메우려고 `write.ts`와 `loader.ts`가 같은 플래그를 한 번 더 지우고
+  있었다 — 하나의 사실에 writer가 셋. 요청이 자기 `AsyncResult`를 가지면 오래된
+  요청은 **자기 것만** 정착시킬 수 있으므로 가드도 중복 writer도 필요 없다.
+  (늦은 응답이 저장소에 닿지 않게 하는 `surfaceIsCurrent`는 그대로 남는다. 그것은
+  플래그가 아니라 데이터 문제다.)
+- **모든 pending 플래그가 요청 상태인 것은 아니다.** 옮기지 않은 것과 이유:
+  `isCreatingTeamAtom`은 "팀 생성 플로가 열려 있다"는 모달 플래그로
+  `startTeamCreation`이 올리고 `finishTeamCreation`이 내리며 그 구간을 소유하는
+  요청이 없다. `session/loadingAtom`은 부트스트랩을 포함한 여덟 흐름이 함께 쓰는
+  셸 게이트라 한 요청의 상태가 아니다(옮기려면 전부를 한 번에 옮겨 OR로 합성해야
+  한다). `channelConversationFailureAtom`은 **번호 붙은 토스트 봉투**라서 같은
+  메시지가 두 번이면 두 번 보여야 하는데 `Failure` 하나로는 그 구분이 없다.
+  workspace `healthAtom`은 `idle`과 `ready(value: null)`을 구분하고
+  `keepValue` / `clearError` 규칙이 있으며 리셋 호출자가 네 모듈이다.
+  `restoringSessionAtom`은 하이드레이션이 소유한다.
+- **`state/agent-sessions`와 `state/inbox`에는 옮길 pending 플래그가 없었다.**
+  전수 조사 결과 두 모듈은 요청 중 상태를 아예 들고 있지 않다.
+- **서브트리 렌더 카운트는 첫 렌더의 잔여 작업을 센다.** `profile`은
+  `lazy()` 청크가 늦게 도착한 커밋도 세므로, 부하가 걸린 머신에서는 "0회" 단언이
+  깜빡인다. 세기 전에 **카운터가 한 턴 동안 0으로 남을 때까지** 기다리는 루프를
+  두면 그 뒤의 숫자는 "이 쓰기가 만든 것"이 된다.
