@@ -227,8 +227,8 @@ export function HuntBoard({
 export function BoardCreateIssueButton({ onCreate }: { onCreate: () => void }) {
   const { t } = useI18n();
   return (
-    <Button aria-keyshortcuts="Meta+N" aria-label={t("dashboard.createIssue")} className="create-issue-button" onClick={onCreate} type="button">
-      <Plus size={16} />
+    <Button aria-keyshortcuts="Meta+N" className="create-issue-button" onClick={onCreate} type="button">
+      <Plus aria-hidden="true" size={16} />
       {t("issue.newIssue")}
     </Button>
   );
