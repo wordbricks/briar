@@ -288,7 +288,7 @@ export function useAgentDispatch({
             },
             {
               agent,
-              dashboard,
+              board: dashboard,
               message: recovery.request.message,
               sessionId: recovery.request.sessionId,
               startedAt: recovery.startedAt,

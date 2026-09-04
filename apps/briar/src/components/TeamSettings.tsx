@@ -64,9 +64,10 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Typography } from "@/components/ui/typography";
 import type {
-  DashboardPayload,
+  ExecutionWorker,
   MergeQueueProfile,
   Project,
+  ProjectExecutionWorkerPolicy,
   ProjectSettings as ProjectSettingsData,
 } from "../types";
 import { useI18n } from "../i18n";
@@ -123,7 +124,7 @@ import type { ProjectSettingsSection as TeamSettingsSection } from "../lib/app-n
 export type { ProjectSettingsSection as TeamSettingsSection } from "../lib/app-navigation";
 
 export function TeamSettings({
-  dashboard,
+  executionPolicy,
   githubRepository,
   health,
   isDeleting,
@@ -148,9 +149,12 @@ export function TeamSettings({
   project,
   repositoryConnected,
   sessionToken = null,
+  settings,
   velen,
+  workers,
 }: {
-  dashboard: DashboardPayload | null;
+  /** The team's execution worker policy, when its payload carried one. */
+  executionPolicy?: ProjectExecutionWorkerPolicy;
   githubRepository: string | null;
   health?: AutoHuntHealth | null;
   isDeleting: boolean;
@@ -197,7 +201,11 @@ export function TeamSettings({
   project: Project;
   repositoryConnected: boolean;
   sessionToken?: string | null;
+  /** The team's settings, or `null` while none are on screen. */
+  settings: ProjectSettingsData | null;
   velen: VelenInspection | null;
+  /** The execution workers the team's payload described. */
+  workers: ExecutionWorker[];
 }) {
   const { localeTag, t } = useI18n();
   const canManageProject = hasOrganizationCapability(
@@ -282,13 +290,13 @@ export function TeamSettings({
     setIssueKeyPrefixSaved(false);
   }, [project.id, project.issueKeyPrefix]);
   const [velenOrg, setVelenOrg] = useState(
-    () => dashboard?.settings.velenOrg ?? "",
+    () => settings?.velenOrg ?? "",
   );
   const [velenLoading, setVelenLoading] = useState(false);
   const [velenSaving, setVelenSaving] = useState(false);
   const [velenError, setVelenError] = useState<string | null>(null);
   const cancelButtonRef = useRef<HTMLButtonElement | null>(null);
-  const workflow = dashboard?.settings.workflow ?? null;
+  const workflow = settings?.workflow ?? null;
   const workflowContract = workflow
     ? {
         version: workflow.version,
@@ -301,7 +309,7 @@ export function TeamSettings({
   const workflowJson = workflowContract
     ? JSON.stringify(workflowContract, null, 2)
     : "";
-  const checkpointPolicy = dashboard?.settings.checkpointPolicy;
+  const checkpointPolicy = settings?.checkpointPolicy;
   const projectMandatory = checkpointPolicy?.teamMandatory ??
     workflowContract?.execution.checkpoints ?? [];
   const userDefaults = checkpointPolicy?.userDefaults ?? [];
@@ -429,12 +437,12 @@ export function TeamSettings({
   };
 
   useEffect(() => {
-    setVelenOrg(dashboard?.settings.velenOrg ?? "");
+    setVelenOrg(settings?.velenOrg ?? "");
     setVelenError(null);
-  }, [dashboard?.settings.velenOrg, project.id]);
+  }, [settings?.velenOrg, project.id]);
 
   useEffect(() => {
-    const org = dashboard?.settings.velenOrg;
+    const org = settings?.velenOrg;
     if (!org) return;
     let cancelled = false;
     setVelenLoading(true);
@@ -456,7 +464,7 @@ export function TeamSettings({
     return () => {
       cancelled = true;
     };
-  }, [dashboard?.settings.velenOrg, onRefreshVelen, project.id, t]);
+  }, [settings?.velenOrg, onRefreshVelen, project.id, t]);
 
   useEffect(() => {
     if (!isConfirming) return;
@@ -565,7 +573,7 @@ export function TeamSettings({
     }
   };
 
-  const savedVelenOrg = dashboard?.settings.velenOrg ?? "";
+  const savedVelenOrg = settings?.velenOrg ?? "";
   const velenChanged = velenOrg !== savedVelenOrg;
   const refreshVelen = async () => {
     setVelenLoading(true);
@@ -1234,10 +1242,10 @@ export function TeamSettings({
           <div hidden={activeSection !== "execution"}>
             <TeamExecutionSettings
               canManage={canManageDevelopment}
-              initialPolicy={dashboard?.executionPolicy}
+              initialPolicy={executionPolicy}
               project={project}
               token={sessionToken}
-              workers={dashboard?.workers ?? []}
+              workers={workers}
             />
           </div>
 

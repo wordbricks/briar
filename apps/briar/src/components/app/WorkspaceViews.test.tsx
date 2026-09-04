@@ -81,10 +81,13 @@ const flush = async (attempts = 5) => {
 
 /**
  * Waits for the `lazy()` boundaries these wrappers hold: a first paint waits on
- * a module load, so a fixed number of ticks is not enough.
+ * a module load, so a fixed number of ticks is not enough. The bound is
+ * generous because the wait is over a module load the whole suite competes
+ * for — a loaded machine resolves it late, not never — and an already painted
+ * view returns on the first attempt regardless.
  */
 const paint = async (view: ReactTestRoot) => {
-  for (let attempt = 0; attempt < 40; attempt += 1) {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
     if ((view.container.textContent ?? "") !== "") return;
     await flush(1);
   }

@@ -21,10 +21,10 @@ import { runTeamAgent } from "../lib/team-llm";
 import { loadManagedComputers } from "../lib/api";
 import { supportsManagedComputerRemoteDesktop } from "../lib/platform";
 import type {
-  DashboardPayload,
   HuntRun,
   ManagedComputer,
   ProjectAgent,
+  TeamAgentBoard,
 } from "../types";
 import { ManagedComputerRemoteDesktop } from
   "./ManagedComputerRemoteDesktop";
@@ -43,8 +43,8 @@ export type {
 
 export function TeamAgentDetail({
   agent,
+  board,
   companionMode = false,
-  dashboard,
   isSidebarOpen,
   onBack,
   onIssueOpen,
@@ -60,8 +60,9 @@ export function TeamAgentDetail({
   token = null,
 }: {
   agent: ProjectAgent;
+  /** The team's board, or `null` while none is on screen. */
+  board: TeamAgentBoard | null;
   companionMode?: boolean;
-  dashboard: DashboardPayload | null;
   isSidebarOpen: boolean;
   onBack: () => void;
   onIssueOpen: (runId: string) => void;
@@ -158,7 +159,7 @@ export function TeamAgentDetail({
     setRemoteComputerTarget(null);
     if (
       !token ||
-      !dashboard?.team.organizationId ||
+      !board?.team.organizationId ||
       !agent.designatedWorkerId ||
       agent.computerUsePolicy !== "unattended" ||
       !supportsManagedComputerRemoteDesktop()
@@ -166,7 +167,7 @@ export function TeamAgentDetail({
       return;
     }
     let cancelled = false;
-    void loadManagedComputers(token, dashboard.team.organizationId)
+    void loadManagedComputers(token, board.team.organizationId)
       .then((response) => {
         if (cancelled) return;
         setRemoteComputerTarget(response.computers.find((computer) =>
@@ -183,7 +184,7 @@ export function TeamAgentDetail({
   }, [
     agent.computerUsePolicy,
     agent.designatedWorkerId,
-    dashboard?.team.organizationId,
+    board?.team.organizationId,
     token,
   ]);
 
@@ -205,7 +206,7 @@ export function TeamAgentDetail({
   const isTaskStarting = isExternalStartPending || isStarting;
 
   const submit = async (input: TeamAgentTaskDialogSubmit) => {
-    if (isTaskStarting || !dashboard) return;
+    if (isTaskStarting || !board) return;
     setIsStarting(true);
     try {
       if (input.workerId) {
@@ -235,7 +236,7 @@ export function TeamAgentDetail({
         },
         {
           agent: runtimeAgent,
-          dashboard,
+          board,
           message: input.request,
           sessionId,
           skillId: input.skill.id,
@@ -253,7 +254,7 @@ export function TeamAgentDetail({
   const sendFollowUp = async (message: string) => {
     if (
       companionMode ||
-      !dashboard ||
+      !board ||
       !selectedSession ||
       selectedSession.sessionType !== "task" ||
       selectedSession.status === "running" ||
@@ -281,7 +282,7 @@ export function TeamAgentDetail({
       },
       {
         agent: runtimeAgent,
-        dashboard,
+        board,
         message,
         skillId: selectedSession.skillId,
         sessionId: selectedSession.id,
@@ -296,14 +297,14 @@ export function TeamAgentDetail({
     return (
       <TeamAgentSessionDetail
         isSidebarOpen={isSidebarOpen}
-        issueKeyPrefix={dashboard?.team.issueKeyPrefix}
+        issueKeyPrefix={board?.team.issueKeyPrefix}
         onBack={() => setSelectedSessionId(null)}
         onIssueOpen={onIssueOpen}
         onFollowUp={companionMode ? undefined : sendFollowUp}
         onStop={() => onStopSession(selectedSession.id)}
         session={selectedSession}
         token={token}
-        workers={dashboard?.workers ?? []}
+        workers={board?.workers ?? []}
       />
     );
   }
@@ -328,7 +329,7 @@ export function TeamAgentDetail({
             ) : null}
             <Button
             className="h-[34px] px-3 text-xs active:scale-[.97]"
-            disabled={isTaskStarting || !dashboard || agent.skills.length === 0}
+            disabled={isTaskStarting || !board || agent.skills.length === 0}
             onClick={openTaskDialog}
             type="button"
           >
@@ -374,14 +375,14 @@ export function TeamAgentDetail({
           agent={agent}
           onSessionOpen={setSelectedSessionId}
           onStopSession={onStopSession}
-          projectId={dashboard?.team.id ?? agent.teamId}
+          projectId={board?.team.id ?? agent.teamId}
           sessions={sessions}
         />
       </div>
 
       <TeamAgentTaskDialog
         agent={agent}
-        dashboard={dashboard}
+        board={board}
         isOpen={isTaskDialogOpen}
         isSubmitting={isStarting}
         onOpenChange={setIsTaskDialogOpen}
@@ -389,12 +390,12 @@ export function TeamAgentDetail({
         workerSelectionRequired={Boolean(onStartRemoteTask)}
       />
 
-      {remoteComputer && token && dashboard?.team.organizationId ? (
+      {remoteComputer && token && board?.team.organizationId ? (
         <ManagedComputerRemoteDesktop
           agentId={agent.id}
           computer={remoteComputer}
           onClose={() => setRemoteComputer(null)}
-          organizationId={dashboard.team.organizationId}
+          organizationId={board.team.organizationId}
           token={token}
         />
       ) : null}

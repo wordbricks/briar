@@ -43,13 +43,13 @@ import {
   activeOrganizationIdAtom,
   organizationsAtom,
 } from "../../state/organization/atoms";
+import { teamWorkersAtom } from "../../state/entities/workers";
 import { demoMode, lockedTeamIdAtom } from "../../state/platform";
 import { useRunDetailActions } from "../../state/run-detail/actions";
 import { appErrorAtom } from "../../state/app-error";
 import { useSessionActions } from "../../state/session/actions";
 import { loadingAtom, tokenAtom, userAtom } from "../../state/session/atoms";
 import { useSyncActions } from "../../state/sync/actions";
-import { activeDashboardAtom } from "../../state/sync/view";
 import { useTeamActions } from "../../state/team/actions";
 import { activeTeamIdAtom, teamsAtom } from "../../state/team/atoms";
 import {
@@ -130,7 +130,9 @@ export function CompanionShell({
   const activeTeamId = useAtomValue(activeTeamIdAtom);
   const activeOrganizationId = useAtomValue(activeOrganizationIdAtom);
   const lockedTeamId = useAtomValue(lockedTeamIdAtom);
-  const dashboard = useAtomValue(activeDashboardAtom);
+  // The one projection this shell shows of the open team: the agent session
+  // detail lists the workers a session ran on. A run edit leaves it alone.
+  const workers = useAtomValue(teamWorkersAtom(activeTeamId ?? ""));
   const sessionError = useAtomValue(appErrorAtom);
   const channelInboxSyncSignal = useAtomValue(channelInboxSyncSignalAtom);
   const conversationInboxSyncSignal = useAtomValue(
@@ -254,7 +256,7 @@ export function CompanionShell({
           onStop={() => sessions.stopSession(requestedCompanionSession.id)}
           session={requestedCompanionSession}
           token={token}
-          workers={dashboard?.workers ?? []}
+          workers={workers ?? []}
         />
       ) : companionPage === "settings" ? (
         <CompanionSettings

@@ -42,12 +42,7 @@ import {
   type TeamUsageSummaryRun,
   type TeamUsageSummaryLoadOptions,
 } from "../lib/team-usage-summary";
-import type {
-  DashboardPayload,
-  HuntRun,
-  Project,
-  TeamUsageSummary,
-} from "../types";
+import type { HuntRun, Project, TeamUsageSummary } from "../types";
 import { cn } from "../lib/utils";
 
 const defaultPeriod: TeamUsagePeriod = "day";
@@ -129,7 +124,6 @@ function statusLabel(run: HuntRun, t: ReturnType<typeof useI18n>["t"]) {
 export function TeamLobby({
   companionMode = false,
   connectionState,
-  dashboard,
   isSidebarOpen,
   onLoadUsageSummary,
   onLoadMergeActivity,
@@ -142,10 +136,11 @@ export function TeamLobby({
   project,
   readiness,
   requiresLocalReadiness,
+  runs,
+  settingsRepository,
 }: {
   companionMode?: boolean;
   connectionState: LocalTeamConnectionState;
-  dashboard: DashboardPayload | null;
   isSidebarOpen: boolean;
   onLoadMergeActivity?: TeamMergeActivityLoader;
   onLoadUsageSummary: (
@@ -162,6 +157,10 @@ export function TeamLobby({
   project: Project;
   readiness: RepositoryReadiness | null;
   requiresLocalReadiness: boolean;
+  /** The team's runs, which every stat tile and the usage fallback are built from. */
+  runs: readonly HuntRun[];
+  /** `githubRepository` from the team's settings, when it has any. */
+  settingsRepository: string | null;
 }) {
   const { localeTag, t } = useI18n();
   const [usageSummary, setUsageSummary] = useState<TeamUsageSummary | null>(
@@ -208,8 +207,7 @@ export function TeamLobby({
     void refreshUsage();
   }, [period, project.id, refreshUsage]);
 
-  const dashboardRuns =
-    dashboard?.team.id === project.id ? dashboard.runs : [];
+  const dashboardRuns = runs;
   const dashboardUsage = useMemo(
     () => summarizeTeamUsage(dashboardRuns, period, now, dateRange),
     [dashboardRuns, dateRange, now, period],
@@ -245,10 +243,7 @@ export function TeamLobby({
     ? localTeamReadiness(connectionState, readiness)
     : readiness;
   const githubRepository =
-    inspectedReadiness?.githubRepository ??
-    (dashboard?.team.id === project.id
-      ? dashboard.settings.githubRepository
-      : null);
+    inspectedReadiness?.githubRepository ?? settingsRepository;
   const localSetupReady = Boolean(
     (!requiresLocalReadiness || connectionState === "connected") &&
     (requiresLocalReadiness

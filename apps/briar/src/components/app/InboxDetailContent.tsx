@@ -22,8 +22,9 @@ import { useIssueActions } from "../../state/issues/actions";
 import { activeOrganizationIdAtom } from "../../state/organization/atoms";
 import { useRunDetailActions } from "../../state/run-detail/actions";
 import { tokenAtom } from "../../state/session/atoms";
-import { activeDashboardAtom } from "../../state/sync/view";
-import { teamsAtom } from "../../state/team/atoms";
+import { runAtom } from "../../state/entities/runs";
+import { teamWorkersAtom } from "../../state/entities/workers";
+import { loadedTeamIdAtom, teamsAtom } from "../../state/team/atoms";
 import { useWorkerDispatch } from "../../hooks/useWorkerDispatch";
 import { Button } from "../ui/button";
 import { LoadingState } from "../ui/loading-state";
@@ -87,7 +88,23 @@ export function InboxDetailContent({
   target,
 }: InboxDetailContentProps) {
   const { t } = useI18n();
-  const dashboard = useAtomValue(activeDashboardAtom);
+  /*
+    The pane opens on one notification, so it reads the one run that
+    notification points at rather than the board it belongs to. Everything else
+    on the board — including the run beside this one — leaves the pane alone.
+  */
+  const loadedTeamId = useAtomValue(loadedTeamIdAtom);
+  // The run is looked up on the board this window has open; a target for a
+  // team that is not on screen keeps the loading state it had.
+  const isTargetTeamLoaded = loadedTeamId === target.projectId;
+  const run = useAtomValue(
+    runAtom(
+      isInboxRunDetailTarget(target) && isTargetTeamLoaded
+        ? target.targetId
+        : "",
+    ),
+  );
+  const workers = useAtomValue(teamWorkersAtom(loadedTeamId ?? ""));
   const teams = useAtomValue(teamsAtom);
   const token = useAtomValue(tokenAtom);
   const activeOrganizationId = useAtomValue(activeOrganizationIdAtom);
@@ -109,15 +126,11 @@ export function InboxDetailContent({
   const { processIssueNow } = useWorkerDispatch();
 
   const channelId = target.kind === "channel" ? target.targetId : null;
-  const run = isInboxRunDetailTarget(target)
-    ? dashboard?.runs.find((candidate) => candidate.id === target.targetId) ??
-      null
-    : null;
   const session = target.kind === "session"
     ? sessions.find((candidate) => candidate.id === target.targetId) ?? null
     : null;
   const isLoading = Boolean(
-    isInboxRunDetailTarget(target) && dashboard?.team.id !== target.projectId,
+    isInboxRunDetailTarget(target) && !isTargetTeamLoaded,
   );
 
   return (
@@ -198,7 +211,7 @@ export function InboxDetailContent({
           onStop={() => onStopSession(session.id)}
           session={session}
           token={token}
-          workers={dashboard?.workers ?? []}
+          workers={workers ?? []}
         />
       ) : channelId && activeOrganizationId && token ? (
         <ChannelsWithCatalog

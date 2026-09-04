@@ -15,6 +15,7 @@ import {
 import type { IssueDetailTab } from "../../lib/issue-detail-tab";
 import { parseWebAppIssuePath, type BriarLinkTarget } from "../../lib/issue-links";
 import { activeChannelIdAtom } from "../channels/atoms";
+import { runsByIdAtom, teamRunIdsAtom } from "../entities/runs";
 import { shallowArrayEqual } from "../entities/upsert";
 import { webMode } from "../platform";
 import { userAtom } from "../session/atoms";
@@ -139,6 +140,60 @@ export const navigationHistoryEntriesAtom = Atom.map(
   Atom.keepAlive,
   Atom.withEquality<readonly AppNavigationLocation[]>(shallowArrayEqual),
   Atom.withLabel("navigation/historyEntries"),
+);
+
+/** What the history popover prints for an issue it visited. */
+export interface NavigationHistoryRunLabel {
+  readonly runNumber: number;
+  readonly title: string;
+}
+
+const sameRunLabels = (
+  left: ReadonlyMap<string, NavigationHistoryRunLabel>,
+  right: ReadonlyMap<string, NavigationHistoryRunLabel>,
+) =>
+  left === right ||
+  (left.size === right.size &&
+    [...left].every(([runId, label]) => {
+      const other = right.get(runId);
+      return (
+        other !== undefined &&
+        other.runNumber === label.runNumber &&
+        other.title === label.title
+      );
+    }));
+
+/**
+ * The issue key and title of every run the visit stack points at, for the rows
+ * the window's history popover draws.
+ *
+ * The popover is the only thing above the page that reads a run at all, and it
+ * reads two fields of the handful of runs it has actually visited. Resolving
+ * them here — against the board on screen, which is where the labels came from
+ * before — means an edit to any other run, or to any other field, produces an
+ * equal map and wakes nobody.
+ */
+export const navigationHistoryRunLabelsAtom = Atom.make(
+  (get): ReadonlyMap<string, NavigationHistoryRunLabel> => {
+    const labels = new Map<string, NavigationHistoryRunLabel>();
+    const teamId = get(activeTeamIdAtom);
+    if (teamId === null) return labels;
+    const runIds = get(teamRunIdsAtom(teamId));
+    if (!runIds) return labels;
+    const runs = get(runsByIdAtom);
+    for (const location of get(navigationHistoryEntriesAtom)) {
+      if (projectIdFromNavigationLocation(location) !== teamId) continue;
+      const runId = runIdFromNavigationLocation(location);
+      if (!runId || labels.has(runId) || !runIds.includes(runId)) continue;
+      const run = runs.get(runId);
+      if (run) labels.set(runId, { runNumber: run.runNumber, title: run.title });
+    }
+    return labels;
+  },
+).pipe(
+  Atom.keepAlive,
+  Atom.withEquality(sameRunLabels),
+  Atom.withLabel("navigation/historyRunLabels"),
 );
 
 /** Where the location on screen sits in {@link navigationHistoryEntriesAtom}. */

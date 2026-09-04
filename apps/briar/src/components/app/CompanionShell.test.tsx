@@ -38,6 +38,13 @@ import {
   lives, not what it draws, so the cases check that the header and the issue
   board come up, that the companion page atom still switches surfaces, and that
   a run edit does not push a render through the shell.
+
+  The last case counts with `renders.profile`, which sees a render an atom
+  pushed into the shell — `track` only sees the ones a parent pushed, and after
+  follow-up F2 there is no parent left to push one. It counts the shell's whole
+  subtree, so it is measured on the inbox page: the board is *supposed* to
+  redraw a card for a run change, and on the issues page that would be
+  indistinguishable from the shell itself waking up.
 */
 
 const team = demoDashboard.team;
@@ -183,6 +190,41 @@ describe("CompanionShell", () => {
     expect(view.container.textContent).toContain("Companion issue edited");
     // The board read the change itself; nothing was pushed through the shell.
     renderCounter.expectRenderCounts({});
+    await view.cleanup();
+  });
+
+  it("subscribes to no run of its own", async () => {
+    const registry = harness();
+    registry.set(companionPageAtom, "inbox");
+    const renders = createRenderCounter();
+    const view = createReactTestRoot({ attachToDocument: true });
+    await view.render(
+      <RegistryContext.Provider value={registry}>
+        <I18nProvider>
+          <AppKeyboardCommandProvider>
+            <ToastProvider>
+              <TooltipProvider>
+                {renders.profile("companion-shell", <CompanionShell {...props} />)}
+              </TooltipProvider>
+            </ToastProvider>
+          </AppKeyboardCommandProvider>
+        </I18nProvider>
+      </RegistryContext.Provider>,
+    );
+    await flush();
+    renders.reset();
+
+    await act(async () => {
+      applySyncEvent(registry, {
+        kind: "run-changed",
+        teamId: team.id,
+        run: { ...run, title: "Companion issue edited again" },
+      });
+    });
+
+    // The shell reads the team's workers, not its runs, so a run edit reaches
+    // nothing inside it while the board is off screen.
+    renders.expectRenderCounts({});
     await view.cleanup();
   });
 });

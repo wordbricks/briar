@@ -29,6 +29,18 @@ const builtInWorkflowStageIds = new Set<string>(
   autoHuntWorkflowStageCatalog.map((stage) => stage.id),
 );
 
+/**
+ * What the inbox reads of a team's board.
+ *
+ * Named so the store can publish exactly these four projections rather than a
+ * whole `DashboardPayload` — a `loadDashboard` response still satisfies it.
+ * Follow-up F4 replaces the argument with the atoms themselves.
+ */
+export type InboxSource = Pick<
+  DashboardPayload,
+  "team" | "runs" | "conversationNotifications" | "channelNotifications"
+>;
+
 /** Run states that surface a message in the Inbox. Other transitions are too noisy. */
 export const inboxIssueNotifyingStatuses = new Set<HuntStatus>([
   "paused",
@@ -211,7 +223,7 @@ export const defaultInboxSyncDependencies = {
 const emptyStorage = (): InboxStorage => ({ messages: [], readVersions: {} });
 
 export function buildCurrentInboxMessages(
-  dashboard: DashboardPayload | null,
+  dashboard: InboxSource | null,
   sessions: AutoHuntSession[],
   projects: Project[],
   currentUserId?: string | null,
@@ -697,7 +709,7 @@ function writeInboxStorage(storageKey: string, storage: InboxStorage) {
 export function useInbox(
   userId: string | null,
   organizationId: string | null,
-  dashboard: DashboardPayload | null,
+  dashboard: InboxSource | null,
   sessions: AutoHuntSession[],
   projects: Project[],
   token: string | null = null,

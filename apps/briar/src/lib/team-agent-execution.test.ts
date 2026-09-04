@@ -40,7 +40,7 @@ describe("executeTeamAgentTask", () => {
           responsibility: "Maintain releases.",
           skill: "# Release agent",
         },
-        dashboard: {
+        board: {
           team: { id: "project-1" },
           runs: [],
         } as unknown as DashboardPayload,
@@ -103,7 +103,7 @@ describe("executeTeamAgentTask", () => {
             responsibility: "Publish releases.",
             skill: "# Release agent",
           },
-          dashboard: {
+          board: {
             team: { id: "project-1" },
             runs: [],
           } as unknown as DashboardPayload,
@@ -142,7 +142,7 @@ describe("executeTeamAgentTask", () => {
           responsibility: "Publish releases.",
           skill: "# Release agent",
         },
-        dashboard: {
+        board: {
           team: { id: "project-1" },
           runs: [],
         } as unknown as DashboardPayload,

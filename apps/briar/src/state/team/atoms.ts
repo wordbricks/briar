@@ -6,11 +6,15 @@ import type {
   IssueConversationNotification,
   Project,
   ProjectConnection,
+  TeamAgentBoard,
   TeamExecutionWorkerPolicy,
   TeamSettings,
 } from "../../types";
 import { demoSelectionApplies } from "../demo-fixtures";
+import { teamRunsAtom } from "../entities/runs";
+import { teamEntityAtom } from "../entities/teams";
 import { shallowArrayEqual } from "../entities/upsert";
+import { teamWorkersAtom } from "../entities/workers";
 import { activeOrganizationIdAtom } from "../organization/atoms";
 import { demoMode, lockedTeamIdAtom } from "../platform";
 
@@ -254,6 +258,45 @@ export const teamSyncedSinceBootAtom = Atom.family((teamId: string) =>
   Atom.make(false).pipe(
     Atom.keepAlive,
     Atom.withLabel(`team/${teamId}/syncedSinceBoot`),
+  ),
+);
+
+const sameAgentBoard = (
+  left: TeamAgentBoard | null,
+  right: TeamAgentBoard | null,
+) =>
+  left === right ||
+  (left !== null &&
+    right !== null &&
+    left.team === right.team &&
+    left.runs === right.runs &&
+    left.workers === right.workers &&
+    left.executionPolicy === right.executionPolicy);
+
+/**
+ * The four projections the Agents page runs on, or `null` before the team has
+ * a payload.
+ *
+ * It is one atom rather than four props because all four are handed to the
+ * same three components and every one of them needs the set: a dispatch picks
+ * runs, checks them against the workers and the policy, and reports in the
+ * team's own issue key. The equality below is over the four references the
+ * store holds, so a projection the page does not read cannot wake it.
+ */
+export const teamAgentBoardAtom = Atom.family((teamId: string) =>
+  Atom.make((get): TeamAgentBoard | null => {
+    const team = get(teamEntityAtom(teamId));
+    const runs = get(teamRunsAtom(teamId));
+    if (!team || !runs) return null;
+    return {
+      team,
+      runs,
+      workers: get(teamWorkersAtom(teamId)) ?? undefined,
+      executionPolicy: get(teamExecutionPolicyAtom(teamId)) ?? undefined,
+    };
+  }).pipe(
+    Atom.withEquality(sameAgentBoard),
+    Atom.withLabel(`team/${teamId}/agentBoard`),
   ),
 );
 

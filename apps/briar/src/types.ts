@@ -1110,6 +1110,20 @@ export type DashboardPayload = {
   generatedAt: string;
 };
 
+/**
+ * What the Agents page and everything under it read of a team's board: the
+ * team it acts in, the runs an Auto Hunt dispatch may pick from, and the
+ * workers and policy that decide which providers are runnable.
+ *
+ * `null` where one of these is expected means "no board on screen", which is
+ * the condition the page disables its actions on. The store publishes it as
+ * `teamAgentBoardAtom`; a `loadDashboard` response satisfies it as well.
+ */
+export type TeamAgentBoard = Pick<
+  DashboardPayload,
+  "team" | "runs" | "workers" | "executionPolicy"
+>;
+
 export type DashboardDeltaPayload = {
   cursor: number;
   hasMore: boolean;

@@ -54,7 +54,7 @@ describe("TeamAgents", () => {
         <I18nProvider>
           <TeamAgents
             agentListRequestKey={0}
-            dashboard={null}
+            board={null}
             error={null}
             isSidebarOpen={true}
             onIssueOpen={vi.fn()}
@@ -80,7 +80,7 @@ describe("TeamAgents", () => {
         <I18nProvider>
           <TeamAgents
             agentListRequestKey={1}
-            dashboard={null}
+            board={null}
             error={null}
             isSidebarOpen={true}
             onIssueOpen={vi.fn()}
@@ -115,7 +115,7 @@ describe("TeamAgents", () => {
         <I18nProvider>
           <TeamAgents
             agentListRequestKey={0}
-            dashboard={null}
+            board={null}
             error={null}
             isSidebarOpen={true}
             onIssueOpen={vi.fn()}
@@ -147,7 +147,7 @@ describe("TeamAgents", () => {
         <I18nProvider>
           <TeamAgents
             agentListRequestKey={0}
-            dashboard={null}
+            board={null}
             error={null}
             isSidebarOpen={true}
             onIssueOpen={vi.fn()}
@@ -171,7 +171,7 @@ describe("TeamAgents", () => {
         <I18nProvider>
           <TeamAgents
             agentListRequestKey={1}
-            dashboard={null}
+            board={null}
             error={null}
             isSidebarOpen={true}
             onIssueOpen={vi.fn()}

@@ -16,20 +16,30 @@ import {
   activeOrganizationIdAtom,
   organizationsAtom,
 } from "../../state/organization/atoms";
+import { runAtom } from "../../state/entities/runs";
 import { createTestRegistry, type AtomRegistry } from "../../state/registry";
 import { tokenAtom, userAtom } from "../../state/session/atoms";
 import { applySyncEvent } from "../../state/sync/apply";
-import { activeTeamIdAtom, teamsAtom } from "../../state/team/atoms";
+import {
+  activeTeamIdAtom,
+  teamSettingsAtom,
+  teamsAtom,
+} from "../../state/team/atoms";
 import { healthAtom } from "../../state/workspace/atoms";
 import { createReactTestRoot } from "../../test/react";
-import { createRenderCounter } from "../../test/render-count";
+import {
+  createRenderCounter,
+  type RenderCounter,
+} from "../../test/render-count";
 import { DesktopPages, type DesktopPagesProps } from "./DesktopPages";
+import { InboxBridge } from "./InboxBridge";
 import { SidebarWithSession } from "./SidebarWithSession";
+import { WindowNavigationControlsWithHistory } from "./WindowNavigationControlsWithHistory";
 import { ConnectionHealthWithWorkspace } from "./WorkspaceViews";
 import type { DashboardPayload, HuntRun } from "../../types";
 
 /*
-  Who a visit reaches.
+  Who a visit reaches, and who a sync event reaches.
 
   `DesktopPages` and `SidebarWithSession` subscribe to the navigation location;
   the shell around them — which owns their callbacks — subscribes to nothing
@@ -37,6 +47,15 @@ import type { DashboardPayload, HuntRun } from "../../types";
   stand-in, walks from one page to another, and asserts that both connected
   views followed while the stand-in and an unrelated wrapper never rendered
   again.
+
+  The second and third cases are about the store rather than the location. They
+  are counted with `renders.profile`, which sees a render an atom pushed into a
+  component — `track` cannot, because its wrapper only re-renders when a parent
+  hands it new props. It counts the whole subtree, so they are measured on the
+  inbox page: a board on screen is *supposed* to redraw a card for a run
+  change, and that would be indistinguishable from the page itself waking up.
+  What is asserted is that a run change and a settings change reach nothing in
+  the page, the window controls or the inbox bridge at all.
 */
 
 const team = demoDashboard.team;
@@ -144,6 +163,71 @@ const currentSidebarPages = (container: HTMLElement) =>
     (element) => element.textContent?.trim() ?? "",
   );
 
+/** One run's own subscriber, so a change that reaches nobody else is visible. */
+function RunProbe({ renders }: { renders: RenderCounter }) {
+  renders.useRenderCount("run-probe");
+  const value = useAtomValue(runAtom(run.id));
+  return <output>{value?.title ?? ""}</output>;
+}
+
+/** What a settings write is allowed to reach. */
+function SettingsProbe({ renders }: { renders: RenderCounter }) {
+  renders.useRenderCount("settings-probe");
+  const settings = useAtomValue(teamSettingsAtom(team.id));
+  return <output>{settings?.velenOrg ?? ""}</output>;
+}
+
+/**
+ * The three subscription boundaries above the page slot, on the inbox page and
+ * with nothing selected in it. Counting starts after the first paint.
+ */
+const mountInboxPage = async () => {
+  const registry: AtomRegistry = createTestRegistry([
+    [userAtom, demoUser],
+    [tokenAtom, "token-1"],
+    [teamsAtom, [team]],
+    [activeTeamIdAtom, team.id],
+    [organizationsAtom, [demoOrganization]],
+    [activeOrganizationIdAtom, demoOrganization.id],
+  ]);
+  applySyncEvent(registry, { kind: "team-snapshot", teamId: team.id, payload });
+  createNavigationActions(registry).resetNavigation("inbox");
+  const renders = createRenderCounter();
+
+  const view = createReactTestRoot({ attachToDocument: true });
+  await view.render(
+    <RegistryContext.Provider value={registry}>
+      <I18nProvider>
+        <AppKeyboardCommandProvider>
+          <ToastProvider>
+            <TooltipProvider>
+              {renders.profile("desktop-pages", <DesktopPages {...pageProps} />)}
+              {renders.profile(
+                "window-controls",
+                <WindowNavigationControlsWithHistory />,
+              )}
+              {renders.profile(
+                "inbox-bridge",
+                <InboxBridge
+                  reconcileWorkerDispatches={noop}
+                  sessions={[]}
+                />,
+              )}
+              <RunProbe renders={renders} />
+              <SettingsProbe renders={renders} />
+            </TooltipProvider>
+          </ToastProvider>
+        </AppKeyboardCommandProvider>
+      </I18nProvider>
+    </RegistryContext.Provider>,
+  );
+  await settle(
+    () => view.container.querySelector(".inbox-detail-pane") !== null,
+  );
+  renders.reset();
+  return { registry, renders, view };
+};
+
 beforeEach(async () => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   window.localStorage.setItem("briar.locale.v1", "en");
@@ -225,6 +309,52 @@ describe("desktop page slot", () => {
     // Neither the shell that owns their callbacks nor the health wrapper beside
     // them rendered again.
     renders.expectRenderCounts({});
+
+    await view.cleanup();
+  });
+
+  it("keeps a run change out of the page, the window controls and the bridge", async () => {
+    const { registry, renders, view } = await mountInboxPage();
+
+    await act(async () => {
+      applySyncEvent(registry, {
+        kind: "run-changed",
+        teamId: team.id,
+        run: { ...run, title: "Desktop issue edited" },
+      });
+    });
+
+    /*
+      The run's own subscriber saw it, and nothing else did: not the page (the
+      inbox detail pane reads only the run its notification points at, and none
+      is open), not the window's history popover (it labels only the runs the
+      visit stack points at), and not the inbox bridge (a running run produces
+      no message, and the dispatch reconciliation subscribes in an effect
+      instead of during render).
+    */
+    renders.expectRenderCounts({ "run-probe": 1 });
+    expect(registry.get(runAtom(run.id))?.title).toBe("Desktop issue edited");
+
+    await view.cleanup();
+  });
+
+  it("keeps a settings change to the settings readers", async () => {
+    const { registry, renders, view } = await mountInboxPage();
+
+    await act(async () => {
+      applySyncEvent(registry, {
+        kind: "team-settings-changed",
+        teamId: team.id,
+        settings: { ...payload.settings, velenOrg: "wordbricks" },
+      });
+    });
+
+    // Only what reads the settings. The page shows none of them here, and a
+    // settings write is not a run.
+    renders.expectRenderCounts({ "settings-probe": 1 });
+    expect(registry.get(teamSettingsAtom(team.id))?.velenOrg).toBe(
+      "wordbricks",
+    );
 
     await view.cleanup();
   });

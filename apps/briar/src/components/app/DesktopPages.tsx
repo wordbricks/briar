@@ -1,5 +1,5 @@
 import { useAtom, useAtomSet, useAtomValue } from "@effect/atom-react";
-import { lazy, Suspense, useMemo } from "react";
+import { lazy, Suspense, useMemo, type ReactNode } from "react";
 import { Inbox as InboxIcon, MessageCircle } from "lucide-react";
 
 import { useI18n } from "../../i18n";
@@ -39,6 +39,7 @@ import {
 import {
   inboxNotificationTarget,
   isInboxChannelTarget,
+  isInboxRunDetailTarget,
 } from "../../lib/inbox-notifications";
 import { activeOrganizationTeams } from "../../lib/team-window-scope";
 import { cn } from "../../lib/utils";
@@ -69,6 +70,7 @@ import {
   visibleInboxMessagesAtom,
   visibleInboxUnreadCountAtom,
 } from "../../state/inbox/atoms";
+import { runAtom } from "../../state/entities/runs";
 import { useIssueActions } from "../../state/issues/actions";
 import { useNavigationActions } from "../../state/navigation/actions";
 import {
@@ -98,11 +100,11 @@ import { appErrorAtom } from "../../state/app-error";
 import { useSessionActions } from "../../state/session/actions";
 import { tokenAtom, userAtom } from "../../state/session/atoms";
 import { useSyncActions } from "../../state/sync/actions";
-import { activeDashboardAtom } from "../../state/sync/view";
 import { useTeamActions } from "../../state/team/actions";
 import {
   activeTeamIdAtom,
   deletingTeamIdAtom,
+  loadedTeamIdAtom,
   teamsAtom,
 } from "../../state/team/atoms";
 import { useWorkspaceActions } from "../../state/workspace/actions";
@@ -162,6 +164,51 @@ const Teams = lazy(() =>
 /** Neutral placeholder that fills the slot a lazy view is about to occupy. */
 const lazyViewFallback = <div className="lazy-view-placeholder h-full w-full" />;
 
+/**
+ * The inbox's detail pane, named after whatever it opened on.
+ *
+ * The name is the one thing about the pane that depends on the store, and an
+ * issue notification wants the run's own title — the one that keeps up with an
+ * edit. Reading that run here rather than in the page is what keeps a board
+ * edit out of the page: the pane subscribes to the one run it names, and the
+ * page around it subscribes to no run at all.
+ */
+function InboxDetailPane({
+  children,
+  target,
+}: {
+  readonly children: ReactNode;
+  readonly target: InboxNotificationTarget | null;
+}) {
+  const { t } = useI18n();
+  const messages = useAtomValue(inboxMessagesAtom);
+  const loadedTeamId = useAtomValue(loadedTeamIdAtom);
+  const run = useAtomValue(
+    runAtom(
+      target && isInboxRunDetailTarget(target) &&
+        loadedTeamId === target.projectId
+        ? target.targetId
+        : "",
+    ),
+  );
+  return (
+    <InboxDetailPanel
+      label={
+        target
+          ? inboxDetailLabel({
+              fallback: t("inbox.messages"),
+              messages,
+              runTitle: run?.title ?? null,
+              target,
+            })
+          : t("inbox.noNotificationSelected")
+      }
+    >
+      {children}
+    </InboxDetailPanel>
+  );
+}
+
 export interface DesktopPagesProps {
   /** The selected team, as the app resolved it for its hooks. */
   readonly activeProject: Project | undefined;
@@ -207,7 +254,6 @@ export function DesktopPages({
   const conversationInboxSyncSignal = useAtomValue(
     conversationInboxSyncSignalAtom,
   );
-  const allInboxMessages = useAtomValue(inboxMessagesAtom);
   const visibleInboxMessages = useAtomValue(visibleInboxMessagesAtom);
   const inbox = useInboxActions();
   const activePage = useAtomValue(activePageAtom);
@@ -246,7 +292,6 @@ export function DesktopPages({
   const activeOrganizationId = useAtomValue(activeOrganizationIdAtom);
   const lockedTeamId = useAtomValue(lockedTeamIdAtom);
   const deletingProjectId = useAtomValue(deletingTeamIdAtom);
-  const dashboard = useAtomValue(activeDashboardAtom);
   const error = useAtomValue(appErrorAtom);
   const [isSidebarOpen, setIsSidebarOpen] = useAtom(isSidebarOpenAtom);
   const [settingsTarget, setSettingsTarget] = useAtom(settingsTargetAtom);
@@ -551,18 +596,7 @@ export function DesktopPages({
         />
         <InboxDetailTargetBoundary>
           {(target) => (
-            <InboxDetailPanel
-              label={
-                target
-                  ? inboxDetailLabel({
-                      fallback: t("inbox.messages"),
-                      messages: allInboxMessages,
-                      runs: dashboard?.runs,
-                      target,
-                    })
-                  : t("inbox.noNotificationSelected")
-              }
-            >
+            <InboxDetailPane target={target}>
               {target ? renderInboxDetailContent(target) : (
                 <div
                   className="inbox-detail-empty flex h-full w-full flex-col items-center justify-center gap-[18px] bg-card text-center text-muted-foreground [&>svg]:text-muted-foreground/60 [&>p]:m-0 [&>p]:text-sm"
@@ -572,7 +606,7 @@ export function DesktopPages({
                   <p>{t("inbox.noNotificationSelected")}</p>
                 </div>
               )}
-            </InboxDetailPanel>
+            </InboxDetailPane>
           )}
         </InboxDetailTargetBoundary>
       </main>
