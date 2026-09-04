@@ -9,7 +9,6 @@ import { Typography } from "@/components/ui/typography";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import { NativeSelect } from "@/components/NativeSelect";
 import { CompanionBottomNavigation, type CompanionStatusFilter } from "@/components/CompanionBottomNavigation";
-import type { AutoHuntSession } from "@/types";
 import { inboxIssueMessageVersion } from "@/hooks/useInbox";
 import { AppKeyboardCommandBoundary, useAppKeyboardCommandScope } from "@/hooks/appKeyboardCommands";
 import { useMobileBackHandler } from "@/hooks/useMobileNavigation";
@@ -144,7 +143,6 @@ function HuntDashboardContent({
   selectedRunId: controlledSelectedRunId,
   issueListRequestKey = 0,
   processingIssueIds = new Set<string>(),
-  sessions = [],
   token = null
 }: {
   agents?: ProjectAgent[];
@@ -231,7 +229,6 @@ function HuntDashboardContent({
   selectedRunId?: string | null;
   issueListRequestKey?: number;
   processingIssueIds?: ReadonlySet<string>;
-  sessions?: AutoHuntSession[];
   token?: string | null;
 }) {
   const {
@@ -259,7 +256,7 @@ function HuntDashboardContent({
   const scopedRunIds = useAtomValue(boardScopedRunIdsAtom(teamId));
   const companionStatus = useAtomValue(companionStatusAtom);
   const setCompanionStatus = useAtomSet(companionStatusAtom);
-  useBoardSources(agents, sessions);
+  useBoardSources(agents);
 
   const [internalSelectedRunId, setInternalSelectedRunId] = useState<string | null>(null);
   const selectedRunId = controlledSelectedRunId === undefined ? internalSelectedRunId : controlledSelectedRunId;

@@ -47,9 +47,8 @@ import { activeTeamIdAtom, teamsAtom } from "../../state/team/atoms";
 
   It was the `else` branch of `App.tsx`'s gate chain, which is why the shell had
   to hold every value any page might want. The pages read the store themselves
-  now, so what arrives here is what the app still owns: the auto hunt sessions,
-  the agent list and the repository setup flow — and every one of them is passed
-  straight through to the page slot.
+  now, so what arrives here is what the app still owns: the agent list and the
+  repository setup flow — and both are passed straight through to the page slot.
 
   Nothing this component reads moves when the user navigates. That is the point:
   a visit commits `DesktopPages` and `SidebarWithSession`, which subscribe to the
@@ -64,7 +63,7 @@ export function DesktopShell({
   openProjectInNewWindow,
   ...pages
 }: DesktopShellProps) {
-  const { agents, autoHunt, repositorySetup } = pages;
+  const { agents, repositorySetup } = pages;
   const runsOnDesktopTauri = isDesktopTauri();
   const unreadInboxCount = useAtomValue(visibleInboxUnreadCountAtom);
   const token = useAtomValue(tokenAtom);
@@ -206,7 +205,6 @@ export function DesktopShell({
           }}
           onSettings={openAppSettings}
           onLogout={() => void logout()}
-          sessions={autoHunt.sessions}
           unreadInboxCount={unreadInboxCount}
         />
         <DesktopPages {...pages} />

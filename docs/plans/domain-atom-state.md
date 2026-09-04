@@ -1189,7 +1189,7 @@ Phase 2 이후 언제든 착수 가능하며 Phase 3–7과 병행할 수 있다
 | 정규화로 관계 조회 비용 증가 | 인덱스 파생 atom + `withEquality`. 런은 팀당 200개 상한이라 Map 복사 비용은 미미. 메시지처럼 큰 컬렉션은 채널별 family로 분할 |
 | ref였던 런 상세 캐시가 반응형이 되면서 렌더 증가 | `RunPage` 계열만 구독, 렌더 카운트 테스트로 확인 |
 | 영속 스냅샷과 스키마 드리프트 | `schemaVersion` 키. 불일치 시 폐기하고 스냅샷 요청 |
-| 스케줄 러너 effect(818)가 옵션 콜백 아이덴티티 변화마다 재시작 | 콜백 ref 고정. `useAutoHuntSessions` 전환은 후속 |
+| 스케줄 러너 effect(818)가 옵션 콜백 아이덴티티 변화마다 재시작 | 콜백 ref 고정. 후속 F3이 레지스트리 바인딩 액션으로 대체했다 |
 | 렌더 단계 ref 대입(480)과 StrictMode | Phase 1에서 제거 |
 | 고변경 파일과의 충돌 | 각 PR을 하루 이내 머지 가능한 크기로 유지, 기계적 치환은 스크립트로 |
 | demo / companion / web 모드 분기 누락 | `platform.ts` 상수는 그대로 두고 액션 내부 분기를 옮길 때 테스트에 모드별 케이스 추가 |
@@ -1208,8 +1208,9 @@ Phase 2 이후 언제든 착수 가능하며 Phase 3–7과 병행할 수 있다
 
 ## 후속 (범위 밖)
 
-- `useInbox`, `useAutoHuntSessions`(localStorage 상태는 `Atom.kvs` 후보),
-  `useChannelConversation`(메시지를 채널별 엔티티 family로)의 동일 패턴 전환.
+- `useInbox`, `useChannelConversation`(메시지를 채널별 엔티티 family로)의 동일 패턴
+  전환. `useAutoHuntSessions`는 후속 F3이 끝냈다(localStorage 상태는 `Atom.kvs`가
+  아니라 atom의 lazy read가 됐다 — 이유는 아래 기준 갱신에 있다).
 - `Atom.fn` + `AsyncResult`로 pending / 에러 상태 자동화.
 - 오프라인 우선과 멀티 디바이스 충돌 해결이 목표가 되면 서버 측 SyncAction 로그를
   가진 전용 sync engine(Replicache, Zero 등)을 검토한다. 그 전까지는 이 계획으로
@@ -1243,3 +1244,42 @@ Phase 2 이후 언제든 착수 가능하며 Phase 3–7과 병행할 수 있다
 |---|---|---|---|
 | F1 워크플로 자동 생성 하이드레이션 가드 + `useDeepLinks` 이름 정리 | #1607 | 머지됨 | `state/team/atoms.ts`에 팀별 `teamSyncedSinceBootAtom`을 두고 `applySyncEvent`의 `team-snapshot` / `team-delta`가 세운다(`clearTeamState`가 되돌리고, 같은 값의 쓰기는 레지스트리가 버리므로 조용한 틱의 알림은 그대로 0회다). `useWorkflowAutoGeneration`은 하이드레이션된 부팅에서 이 플래그가 서기 전까지 조건을 보지 않으므로, 디스크에서 올라온 pending 플레이스홀더로 LLM 자동 생성이 한 번 더 도는 일이 없다. 스냅샷을 읽지 않은 부팅과 팀 전환은 그대로다. `useWorkflowAutoGeneration.test.tsx`에 하이드레이션 케이스 3종 추가. `useDeepLinks`의 지역 변수 `listeners`는 실제로 리졸버를 담고 있어 `resolvers`로 고쳤다(네이티브 리스너 4종을 가리키는 주석은 그대로 둔다). |
 | F2 `dashboardViewAtom` 제거 | #1608, #1615, #1618 | 머지됨 | 통짜 `DashboardPayload`를 읽던 19개 모듈을 옮기고 `state/sync/view.ts`를 지웠다. #1608: `loadedTeamIdAtom` / `renderedTeamSettingsAtom`(`state/team`)과 `activeTeamTrayRunsAtom`(`state/status-tray`), 액션 여섯 곳과 훅 다섯 개. `useCommandPaletteItems`는 팔레트가 열렸을 때만, `useDeepLinks`는 id 목록만 구독하고 `useAgentDispatch`는 구독을 아예 끊었다. `MyIssues`는 자기가 읽는 네 프로젝션(`MyIssuesTeamBoard`)만 받는다. #1615: 뷰 일곱 개와 `inboxSourceAtom` / `navigationHistoryRunLabelsAtom` / `teamAgentBoardAtom`, `InboxBridge`의 디스패치 조정을 effect 구독으로, `TeamLobby` / `TeamSettings` / `TeamAgents` 계열과 `useInbox` / `inboxDetailLabel` / `executeTeamAgentTask`의 프롭·인자 좁히기, `test/render-count.tsx`의 `profile`(React `Profiler`)과 `run-changed` / `team-settings-changed` 렌더 카운트. #1618: `state/sync/view.ts`와 그 테스트 삭제, 페이로드 단위 단언은 테스트 전용 `test/team-view.ts`로, `dashboard-view.test.tsx` → `team-sync.test.tsx`. 스냅샷은 이미 엔티티 맵에서 모으고 있어 `SNAPSHOT_SCHEMA_VERSION`은 1 그대로다. |
+| F3 `useAutoHuntSessions` 전환 | #1621, #1626 | 머지됨 | 에이전트 세션을 `state/agent-sessions`로 옮기고 훅을 지웠다. #1621: `model`(순수 헬퍼 6종과 `reconcileDispatchSession`), `atoms`(`agentSessionsByIdAtom` + 저장 순서 `agentSessionIdsAtom`, `agentSessionAtom(id)` / `teamAgentSessionIdsAtom(teamId)` / `agentSessionsAtom` / `agentSessionSyncContextAtom` / `synchronizedTeamIdsAtom`), `persistence`(레거시 `briar.auto-hunt-sessions.v1` 키와 중단 세션 마이그레이션), `useAgentSessionPersistence`(250ms 디바운스 + `pagehide` flush), `sync/events`·`apply`의 `agent-sessions-changed` / `-merged` / `-synced` / `-removed`, `actions`(`createAgentSessionActions` + `agentSessionApiAtom` 이음매), `useAgentSessionSync`(configureSync·실시간 새로고침·업로드·네이티브 복구·디스패치 리스너, 그리고 `InboxBridge`에서 가져온 `reconcileWorkerDispatches` 구독). #1626: 소비자 전환. `agentSessionRowIdsAtom` / `teamRunningAgentIdsAtom` / `agentDispatchSessionIdAtom` / `runningAgentSessionsAtom` / `processingIssueIdsAtom`을 더하고 Agents 뷰 3종·사이드바·커맨드 팔레트·인박스·보드가 직접 구독한다. `state/action-bridges.ts`와 `IssueActionBridge` / `WorkspaceScheduleBridge`, `boardSessionsAtom`, `hooks/useAutoHuntSessions.ts`가 사라졌고 `App.tsx`는 세션을 구독하지 않는다. |
+
+### 기준 갱신 (2026-09-04, 후속 F3 이후)
+
+에이전트 세션을 옮기며 확인한, 앞으로 훅이 소유한 도메인을 옮길 때 쓸 사실:
+
+- **`Atom.writable`의 read 본문이 lazy 하이드레이션이다.** `localStorage`를 읽는
+  파생 atom 하나를 두고 두 저장 atom이 그것을 초기값으로 삼으면, 레지스트리당 한 번
+  파싱되고 **첫 읽기 시점**에 값이 선다. effect로 하이드레이션하면 첫 페인트가 빈
+  목록이 되는데 이 방식은 그 창이 아예 없다. `Atom.make(value)`에는 lazy 초기값
+  오버로드가 없으므로 `Atom.writable(read, (ctx, v) => ctx.setSelf(v))`를 쓴다.
+- **`Atom.kvs`는 이 자리에 맞지 않았다.** Effect 런타임과 `KeyValueStore` 레이어,
+  값 `Schema`를 요구하는데 정작 읽기가 해야 하는 일(중단된 세션을 `interrupted`로
+  닫는 마이그레이션)은 표현하지 못한다. 평범한 코덱 + lazy read가 기계가 덜 든다.
+- **세션 로그는 `ClientSnapshot`에 넣지 않는다.** 스냅샷은 한 조직의 서버 데이터라
+  계정·스키마가 바뀌면 폐기되지만, 세션 로그는 이 기기가 무엇을 돌렸는지의 기록이라
+  수명이 다르다. `session-cleared`도 세션 로그를 건드리지 않는다(로그아웃이 기록을
+  지우지 않던 기존 동작 그대로다).
+- **목록 순서는 저장이다**(`teamRunIdsAtom`과 같은 이유). 새 세션은 앞에 붙고, 조정
+  패스는 자리를 안 건드리고, 서버 병합은 `startedAt`으로 전부 다시 정렬한다. `Map`
+  삽입 순서는 그 셋 중 어느 것도 아니다.
+- **훅이 파라미터로 받던 주입은 레지스트리 atom 이음매가 대신한다.**
+  `useAutoHuntSessions(stopper, remoteTaskCanceller)`의 두 파라미터는
+  `agentSessionApiAtom` 하나가 됐고, 액션과 동기화 훅이 같은 구현을 집는다.
+- **브리지는 도메인이 atom이 되면 사라진다.** `state/action-bridges.ts`가 존재한
+  이유는 세션이 훅 상태였기 때문이고, 이제 `state/issues/actions.ts`와 스케줄
+  러너가 `createAgentSessionActions(registry)`를 직접 부른다. 남은 레지스트리
+  브리지는 `state/inbox`의 콜백 홀더뿐이며 F4가 가져간다.
+- **파생 하나가 셸의 마지막 구독을 끊었다.** `processingIssueIds`는 세션과
+  `quickStartingRunId`의 합이라 atom으로 옮길 수 있었고, 그러고 나니 `App`이 세션을
+  구독할 이유가 없어졌다. 보드 **안쪽**에서는 여전히 프롭으로 흐른다 — 카드까지
+  내려가는 컨텍스트의 일부라 거기까지 바꾸는 것은 별개의 작업이다.
+- **한 목록의 "행 하나만" 보장은 프로브로 잰다.** `TeamAgentSessions`는 id 배열을,
+  각 행은 자기 세션을 구독한다. `profile`이 서브트리를 세므로 경계별 카운트는 같은
+  atom을 읽는 형제 프로브로 재고, 실제 목록은 옆에서 DOM으로 확인한다
+  (`TeamAgentSessions.test.tsx`).
+- **남은 통짜 세션 목록 소비자는 셋이다.** `useInbox`(F4), `Sidebar`의 프로젝트별
+  실행 중 목록, 커맨드 팔레트. 앞의 둘은 자기 경계에서 구독하고, 팔레트는 열렸을
+  때만 구독한다(빈 키 family 관용구).

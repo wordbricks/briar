@@ -105,7 +105,6 @@ const baseInput: CommandPaletteItemsInput = {
   commandPaletteAvailable: true,
   keybindings: loadKeybindings(),
   keyboardShortcutsShortcut: "⌘/",
-  sessions: [],
 };
 
 function Probe({

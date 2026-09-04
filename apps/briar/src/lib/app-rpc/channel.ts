@@ -44,7 +44,7 @@ import {
   type IssueExecutionDispatch as IssueExecutionDispatchMessage,
   type IssueExecutionProposal as IssueExecutionProposalMessage,
 } from "@briar/contracts/gen/briar/app/v1/issue_pb";
-import type { AutoHuntSession } from "../../hooks/useAutoHuntSessions";
+import type { AutoHuntSession } from "../../types";
 import type {
   AgentSkillExecutionApprovalInput,
   IssueExecutionApprovalInput,

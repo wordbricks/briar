@@ -49,7 +49,7 @@ import {
   type ChannelSkillCommandTarget,
 } from "../hooks/useChannelComposer";
 import { useHorizontalPaneResize } from "../hooks/useHorizontalPaneResize";
-import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
+import type { AutoHuntSession } from "../types";
 import {
   createChannelWebhook,
   listDirectMessageRecipients,

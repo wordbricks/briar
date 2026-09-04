@@ -4,12 +4,15 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useI18n } from "../i18n";
 import { loadProjectAgents } from "../lib/api";
 import { demoTeamAgents } from "../lib/demo-team-agents";
-import { quickStartingRunIdAtom } from "../state/dialogs/atoms";
 import { tokenAtom } from "../state/session/atoms";
-import type { AutoHuntSession, Project, ProjectAgent } from "../types";
+import type { Project, ProjectAgent } from "../types";
 
 /*
-  The agents the issue surfaces label runs with, and the runs that are busy.
+  The agents the issue surfaces label runs with.
+
+  The runs an agent is busy with used to be derived here too, which is what made
+  the app shell subscribe to the session list; it is `processingIssueIdsAtom`
+  now and the board wrapper reads it.
 
   The list is loaded per team but kept across team switches: a session started
   by an agent of another team is still on screen in the inbox and in the agent
@@ -37,8 +40,6 @@ export interface IssueAgentsInput {
    * list update is what re-reads the agents.
    */
   readonly activeTeam: Project | undefined;
-  /** Auto hunt sessions, whose running issues are the "processing" set. */
-  readonly sessions: readonly AutoHuntSession[];
   readonly deps?: IssueAgentsDeps;
 }
 
@@ -49,18 +50,14 @@ export interface IssueAgents {
   readonly activeTeamAgents: ProjectAgent[];
   /** Records an agent the shell learned about outside the load, e.g. a start. */
   readonly rememberAgent: (agent: ProjectAgent) => void;
-  /** Runs a dispatch or an auto hunt session is currently working on. */
-  readonly processingIssueIds: ReadonlySet<string>;
 }
 
 export function useIssueAgents({
   activeTeam,
   deps,
-  sessions,
 }: IssueAgentsInput): IssueAgents {
   const { locale } = useI18n();
   const token = useAtomValue(tokenAtom);
-  const quickStartingRunId = useAtomValue(quickStartingRunIdAtom);
   const loadTeamAgents = deps?.loadTeamAgents ?? loadProjectAgents;
   const loadDemoTeamAgents = deps?.loadDemoTeamAgents ?? demoTeamAgents;
   const [agents, setAgents] = useState<ProjectAgent[]>([]);
@@ -108,15 +105,5 @@ export function useIssueAgents({
     });
   }, []);
 
-  const processingIssueIds = useMemo(() => {
-    const runIds = new Set<string>();
-    if (quickStartingRunId) runIds.add(quickStartingRunId);
-    for (const session of sessions) {
-      if (session.status !== "running") continue;
-      for (const issue of session.issues) runIds.add(issue.runId);
-    }
-    return runIds;
-  }, [sessions, quickStartingRunId]);
-
-  return { activeTeamAgents, agents, processingIssueIds, rememberAgent };
+  return { activeTeamAgents, agents, rememberAgent };
 }

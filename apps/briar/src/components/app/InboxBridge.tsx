@@ -15,6 +15,7 @@ import {
   viewingChannelThreadRootMessageIdAtom,
   viewingIssueConversationRunIdAtom,
 } from "../../state/channels/atoms";
+import { agentSessionsAtom } from "../../state/agent-sessions/atoms";
 import { setInboxCallbacks } from "../../state/inbox/actions";
 import {
   inboxMessagesAtom,
@@ -27,7 +28,6 @@ import { lockedTeamIdAtom } from "../../state/platform";
 import { useRegistry } from "../../state/registry";
 import { tokenAtom, userAtom } from "../../state/session/atoms";
 import { teamsAtom } from "../../state/team/atoms";
-import type { AutoHuntSession } from "../../types";
 
 /*
   Everything below `App` that still reads a whole team's board.
@@ -50,15 +50,15 @@ import type { AutoHuntSession } from "../../types";
   The worker dispatch reconciliation subscribed here for the same reason. It
   moved to `state/agent-sessions/useAgentSessionSync` with the rest of that
   domain, so the open board has one reader here now instead of two.
+
+  The agent sessions a completion becomes a message from are read here too,
+  rather than handed down by `App`: that is the last reason the shell had to
+  subscribe to them.
 */
 
-export interface InboxBridgeProps {
-  /** Agent sessions, whose completions become inbox messages. */
-  readonly sessions: AutoHuntSession[];
-}
-
-export function InboxBridge({ sessions }: InboxBridgeProps) {
+export function InboxBridge() {
   const registry = useRegistry();
+  const sessions = useAtomValue(agentSessionsAtom);
   const user = useAtomValue(userAtom);
   const token = useAtomValue(tokenAtom);
   const teams = useAtomValue(teamsAtom);

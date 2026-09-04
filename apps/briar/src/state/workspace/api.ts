@@ -50,7 +50,6 @@ import {
   generateTeamWorkflow,
   reviseTeamWorkflow,
 } from "../../lib/team-workflow";
-import type { ClaimedProjectAgentScheduleRun, HuntRun } from "../../types";
 import { demoMode, remoteMode } from "../platform";
 import type { AtomRegistry } from "../registry";
 
@@ -277,54 +276,3 @@ export const isCurrentReconnectRequest = (
 export const reconnectRequestGeneration = (registry: AtomRegistry) =>
   workspaceCoordinators(registry).requests.reconnect;
 
-/**
- * The scheduled agent session callbacks only the app shell can supply:
- * `useAutoHuntSessions` owns the session list a scheduled run appears in, and
- * it renders far above the effect that polls for those runs.
- *
- * They are held per registry rather than passed as hook dependencies because
- * their identity changes on every render of the shell, while the schedule
- * poller must restart only when the token, the teams or the connection
- * inventory change — a restart re-claims, which is what could make one
- * scheduled run execute twice.
- */
-export interface WorkspaceScheduleBridge {
-  readonly startScheduledAgentSession?:
-    | ((run: ClaimedProjectAgentScheduleRun) => string | null)
-    | undefined;
-  readonly settleScheduledAgentSession?:
-    | ((
-        sessionId: string,
-        input: {
-          status: "completed" | "failed" | "skipped";
-          conversationId: string | null;
-          workspaceRoot: string | null;
-          summary: string | null;
-          error: string | null;
-        },
-      ) => void)
-    | undefined;
-  readonly startScheduledAgentWorkerDispatch?:
-    | ((
-        parentSessionId: string,
-        run: ClaimedProjectAgentScheduleRun,
-        runs: readonly HuntRun[],
-        dispatch: { dispatchId: string; runIds: string[] },
-      ) => void)
-    | undefined;
-}
-
-const scheduleBridges = new WeakMap<AtomRegistry, WorkspaceScheduleBridge>();
-
-/** Installs the scheduled agent session callbacks for this registry. */
-export function setWorkspaceScheduleBridge(
-  registry: AtomRegistry,
-  bridge: WorkspaceScheduleBridge,
-): void {
-  scheduleBridges.set(registry, bridge);
-}
-
-/** The scheduled agent session callbacks installed for this registry. */
-export const getWorkspaceScheduleBridge = (
-  registry: AtomRegistry,
-): WorkspaceScheduleBridge => scheduleBridges.get(registry) ?? {};

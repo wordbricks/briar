@@ -3,6 +3,10 @@ import { lazy, Suspense } from "react";
 
 import { useI18n } from "../../i18n";
 import { isInboxRunDetailTarget } from "../../lib/inbox-notifications";
+import {
+  agentSessionAtom,
+  processingIssueIdsAtom,
+} from "../../state/agent-sessions/atoms";
 import { inboxDetailTargetAtom } from "../../state/inbox-selection";
 import { isSidebarOpenAtom } from "../../state/dialogs/atoms";
 import {
@@ -60,9 +64,7 @@ export interface InboxDetailContentProps {
   readonly target: InboxNotificationTarget;
   /** Agents loaded so far, for the mention list and the "who ran this" label. */
   readonly agents: ProjectAgent[];
-  readonly sessions: readonly AutoHuntSession[];
   /** Runs a dispatch or an auto hunt session is currently working on. */
-  readonly processingIssueIds: ReadonlySet<string>;
   readonly channelInboxSyncSignal: string;
   readonly conversationInboxSyncSignal: string;
   /** Leaving the pane for the full issue page, still the shell's history. */
@@ -83,8 +85,6 @@ export function InboxDetailContent({
   onNavigateToPage,
   onSkillSessionAccepted,
   onStopSession,
-  processingIssueIds,
-  sessions,
   target,
 }: InboxDetailContentProps) {
   const { t } = useI18n();
@@ -126,9 +126,12 @@ export function InboxDetailContent({
   const { processIssueNow } = useWorkerDispatch();
 
   const channelId = target.kind === "channel" ? target.targetId : null;
-  const session = target.kind === "session"
-    ? sessions.find((candidate) => candidate.id === target.targetId) ?? null
-    : null;
+  // The empty id resolves to `null`, so a notification that is not a session
+  // subscribes to none.
+  const session = useAtomValue(
+    agentSessionAtom(target.kind === "session" ? target.targetId : ""),
+  );
+  const processingIssueIds = useAtomValue(processingIssueIdsAtom);
   const isLoading = Boolean(
     isInboxRunDetailTarget(target) && !isTargetTeamLoaded,
   );

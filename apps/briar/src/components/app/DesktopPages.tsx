@@ -47,6 +47,7 @@ import {
   projectNavigationLocation,
   settingsNavigationLocation,
 } from "../../lib/app-navigation";
+import { useAgentSessionActions } from "../../state/agent-sessions/actions";
 import { useChannelActions } from "../../state/channels/actions";
 import {
   requestedChannelMessageAtom,
@@ -110,7 +111,6 @@ import {
 import { useWorkspaceActions } from "../../state/workspace/actions";
 import type {
   DesktopShellAgents,
-  DesktopShellAutoHunt,
   DesktopShellRepositorySetup,
 } from "./desktop-shell-props";
 import type { createCachedTeamUsageSummaryLoader } from "../../lib/team-usage-summary";
@@ -213,7 +213,6 @@ export interface DesktopPagesProps {
   /** The selected team, as the app resolved it for its hooks. */
   readonly activeProject: Project | undefined;
   readonly agents: DesktopShellAgents;
-  readonly autoHunt: DesktopShellAutoHunt;
   readonly repositorySetup: DesktopShellRepositorySetup;
   readonly loadUsageReport: () => Promise<AgentUsageReport>;
   readonly loadProjectHomeUsage: ReturnType<
@@ -239,7 +238,6 @@ export interface DesktopPagesProps {
 export function DesktopPages({
   activeProject,
   agents,
-  autoHunt,
   loadOrganizationProjectDashboard,
   loadProjectHomeMerges,
   loadProjectHomeUsage,
@@ -276,9 +274,9 @@ export function DesktopPages({
   const {
     activeTeamAgents: activeProjectAgents,
     all: issueAgents,
-    processingIssueIds,
     rememberAgent: rememberIssueAgent,
   } = agents;
+  const agentSessions = useAgentSessionActions();
   const {
     closeRepositorySetup,
     openTeamRepository: openProjectRepository,
@@ -400,10 +398,8 @@ export function DesktopPages({
       onEnsureTeamSelected={ensureTeamSelected}
       onNavigateToIssue={navigateToIssue}
       onNavigateToPage={navigateToPage}
-      onSkillSessionAccepted={autoHunt.adoptRemoteSession}
-      onStopSession={autoHunt.stopSession}
-      processingIssueIds={processingIssueIds}
-      sessions={autoHunt.sessions}
+      onSkillSessionAccepted={agentSessions.adoptRemoteSession}
+      onStopSession={agentSessions.stopSession}
       target={inboxDetailTarget}
     />
   );
@@ -487,7 +483,7 @@ export function DesktopPages({
           setRequestedRunId(runId);
           navigateToIssue(runId, projectId);
         }}
-        onSkillSessionAccepted={autoHunt.adoptRemoteSession}
+        onSkillSessionAccepted={agentSessions.adoptRemoteSession}
       />
     ) : activePage === "dms" &&
       !lockedTeamId &&
@@ -625,7 +621,7 @@ export function DesktopPages({
             (project) => project.id !== activeProject.id,
           );
           await removeProject(activeProject.id);
-          autoHunt.removeProjectSessions(activeProject.id);
+          agentSessions.removeTeamSessions(activeProject.id);
           replaceNavigationLocation(
             fallbackProject
               ? projectNavigationLocation("issues", fallbackProject.id)
@@ -679,21 +675,19 @@ export function DesktopPages({
           navigateToIssue(runId);
         }}
         onRequestedSessionOpen={() => setRequestedSessionId(null)}
-        onSettleTaskSession={(sessionId, settlement) =>
-          autoHunt.settleTaskSession(sessionId, settlement)}
-        onStopSession={(sessionId) => autoHunt.stopSession(sessionId)}
+        onSettleTaskSession={agentSessions.settleTaskSession}
+        onStopSession={agentSessions.stopSession}
         onStart={startAgentAutoHunt}
         onStartRemoteTask={token ? startProjectAgentTask : undefined}
         onStartTaskSession={(agent, session) => {
           rememberIssueAgent(agent);
-          autoHunt.startTaskSession(activeProject.id, agent.id, {
+          agentSessions.startTaskSession(activeProject.id, agent.id, {
             ...session,
             agentName: agent.name,
           });
         }}
         project={activeProject}
         requestedSessionId={requestedSessionId}
-        sessions={autoHunt.sessions}
         token={token}
       />
     ) : activePage === "schedule" && activeProject ? (
@@ -719,7 +713,7 @@ export function DesktopPages({
             navigateToPage("channels");
           }
         }}
-        onSkillSessionAccepted={autoHunt.adoptRemoteSession}
+        onSkillSessionAccepted={agentSessions.adoptRemoteSession}
         onCreateAgent={() => {
           setSettingsTarget({
             scope: "organization",
@@ -787,9 +781,7 @@ export function DesktopPages({
           setRequestedRunInitialTab(null);
         }}
         onSendIssueMessage={addIssueMessage}
-        processingIssueIds={processingIssueIds}
         projects={activeOrganizationProjects}
-        sessions={autoHunt.sessions}
       />
       )}
     </Suspense>

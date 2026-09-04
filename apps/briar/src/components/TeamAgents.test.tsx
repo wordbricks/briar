@@ -1,9 +1,12 @@
 /** @vitest-environment jsdom */
 
+import { RegistryContext } from "@effect/atom-react";
 import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { describe, expect, it, vi } from "vitest";
-import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
+import type { AutoHuntSession } from "../types";
 import type { Project } from "../types";
+import { createTestRegistry, type AtomRegistry } from "../state/registry";
+import { applySyncEvent } from "../state/sync/apply";
 import { TeamAgents } from "./TeamAgents";
 import { I18nProvider } from "../i18n";
 
@@ -42,8 +45,16 @@ const session: AutoHuntSession = {
   workers: [],
 };
 
+/** A registry holding `sessions`, which the page reads instead of a prop. */
+const registryWith = (sessions: AutoHuntSession[]): AtomRegistry => {
+  const registry = createTestRegistry();
+  applySyncEvent(registry, { kind: "agent-sessions-changed", sessions });
+  return registry;
+};
+
 describe("TeamAgents", () => {
   it("resets agent session view back to agent list when agentListRequestKey changes", async () => {
+    const registry = registryWith([session]);
     const { cleanup, container, root } = createReactTestRoot({
       attachToDocument: true,
     });
@@ -51,6 +62,7 @@ describe("TeamAgents", () => {
     try {
       await renderReactTestRoot(
         root,
+        <RegistryContext.Provider value={registry}>
         <I18nProvider>
           <TeamAgents
             agentListRequestKey={0}
@@ -64,10 +76,10 @@ describe("TeamAgents", () => {
             onStartTaskSession={vi.fn()}
             project={project}
             requestedSessionId="session-1"
-            sessions={[session]}
             token={null}
           />
-        </I18nProvider>,
+        </I18nProvider>
+        </RegistryContext.Provider>,
       );
 
       // Initially with requestedSessionId="session-1", the session detail view should be rendered
@@ -77,6 +89,7 @@ describe("TeamAgents", () => {
       // When agentListRequestKey increments and requestedSessionId is cleared (as done when clicking agent tab)
       await renderReactTestRoot(
         root,
+        <RegistryContext.Provider value={registry}>
         <I18nProvider>
           <TeamAgents
             agentListRequestKey={1}
@@ -90,10 +103,10 @@ describe("TeamAgents", () => {
             onStartTaskSession={vi.fn()}
             project={project}
             requestedSessionId={null}
-            sessions={[session]}
             token={null}
           />
-        </I18nProvider>,
+        </I18nProvider>
+        </RegistryContext.Provider>,
       );
 
       // Now the agent list should be shown
@@ -105,6 +118,7 @@ describe("TeamAgents", () => {
   });
 
   it("resets agent detail view back to agent list when agentListRequestKey changes", async () => {
+    const registry = registryWith([]);
     const { cleanup, container, root } = createReactTestRoot({
       attachToDocument: true,
     });
@@ -112,6 +126,7 @@ describe("TeamAgents", () => {
     try {
       await renderReactTestRoot(
         root,
+        <RegistryContext.Provider value={registry}>
         <I18nProvider>
           <TeamAgents
             agentListRequestKey={0}
@@ -125,10 +140,10 @@ describe("TeamAgents", () => {
             onStartTaskSession={vi.fn()}
             project={project}
             requestedSessionId={null}
-            sessions={[]}
             token={null}
           />
-        </I18nProvider>,
+        </I18nProvider>
+        </RegistryContext.Provider>,
       );
 
       // Agent list is initially shown
@@ -144,6 +159,7 @@ describe("TeamAgents", () => {
       // After clicking agent card, detail view is shown
       await renderReactTestRoot(
         root,
+        <RegistryContext.Provider value={registry}>
         <I18nProvider>
           <TeamAgents
             agentListRequestKey={0}
@@ -157,10 +173,10 @@ describe("TeamAgents", () => {
             onStartTaskSession={vi.fn()}
             project={project}
             requestedSessionId={null}
-            sessions={[]}
             token={null}
           />
-        </I18nProvider>,
+        </I18nProvider>
+        </RegistryContext.Provider>,
       );
       expect(container.querySelector("#project-agent-detail")).not.toBeNull();
       expect(container.querySelector("#project-agents")).toBeNull();
@@ -168,6 +184,7 @@ describe("TeamAgents", () => {
       // When agentListRequestKey changes, should return to agent list
       await renderReactTestRoot(
         root,
+        <RegistryContext.Provider value={registry}>
         <I18nProvider>
           <TeamAgents
             agentListRequestKey={1}
@@ -181,10 +198,10 @@ describe("TeamAgents", () => {
             onStartTaskSession={vi.fn()}
             project={project}
             requestedSessionId={null}
-            sessions={[]}
             token={null}
           />
-        </I18nProvider>,
+        </I18nProvider>
+        </RegistryContext.Provider>,
       );
       expect(container.querySelector("#project-agents")).not.toBeNull();
       expect(container.querySelector("#project-agent-detail")).toBeNull();

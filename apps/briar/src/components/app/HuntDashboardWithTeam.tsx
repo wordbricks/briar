@@ -1,6 +1,7 @@
 import { useAtomValue } from "@effect/atom-react";
 import { useMemo, type ComponentProps } from "react";
 
+import { processingIssueIdsAtom } from "../../state/agent-sessions/atoms";
 import { useIssueActions } from "../../state/issues/actions";
 import {
   deletingIssueIdAtom,
@@ -24,8 +25,8 @@ import { HuntDashboard } from "../hunt/HuntDashboard";
 
   Since Phase 2C it no longer reads the dashboard either: the board resolves the
   team's runs itself, one id at a time, so nothing an issue edit touches passes
-  through this component. What is left is the pending-mutation flags and the
-  action bundles, none of which a delta tick moves.
+  through this component. What is left is the pending-mutation flags, the runs an
+  agent is working on and the action bundles, none of which a delta tick moves.
 */
 
 /** The props this wrapper supplies; `App` may not pass them. */
@@ -34,6 +35,7 @@ type ConnectedProps =
   | "deletingIssueId"
   | "isCreatingIssue"
   | "issueProjects"
+  | "processingIssueIds"
   | "recoveringRunId"
   | "recoveryError"
   | "token"
@@ -80,6 +82,7 @@ export function HuntDashboardWithTeam(props: HuntDashboardWithTeamProps) {
   const deletingIssueId = useAtomValue(deletingIssueIdAtom);
   const recoveringRunId = useAtomValue(recoveringRunIdAtom);
   const recoveryError = useAtomValue(recoveryErrorAtom);
+  const processingIssueIds = useAtomValue(processingIssueIdsAtom);
   const issueActions = useIssueActions();
   const runDetailActions = useRunDetailActions();
 
@@ -147,6 +150,7 @@ export function HuntDashboardWithTeam(props: HuntDashboardWithTeamProps) {
       deletingIssueId={deletingIssueId}
       isCreatingIssue={isCreatingIssue}
       issueProjects={issueProjects}
+      processingIssueIds={processingIssueIds}
       recoveringRunId={recoveringRunId}
       recoveryError={recoveryError}
       token={token}

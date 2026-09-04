@@ -135,8 +135,6 @@ const mount = async (
           onNavigateToPage={() => undefined}
           onSkillSessionAccepted={() => undefined}
           onStopSession={async () => true}
-          processingIssueIds={new Set<string>()}
-          sessions={[]}
           target={target}
         />
         </TooltipProvider>

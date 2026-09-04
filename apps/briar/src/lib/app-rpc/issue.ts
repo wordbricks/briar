@@ -33,7 +33,7 @@ import {
 import {
   IssueDifficulty as ProtoIssueDifficulty,
 } from "@briar/contracts/gen/briar/app/v1/common_pb";
-import type { AutoHuntSession } from "../../hooks/useAutoHuntSessions";
+import type { AutoHuntSession } from "../../types";
 import type {
   AgentSkillExecutionApprovalInput,
   AgentSkillExecutionProposal,

@@ -1,3 +1,4 @@
+import { useAtomValue } from "@effect/atom-react";
 import { ArrowLeft, MonitorUp, Play } from "lucide-react";
 import { Spinner } from "./ui/spinner";
 import { useEffect, useState } from "react";
@@ -5,8 +6,11 @@ import { useEffect, useState } from "react";
 import { MainContent, PageHeader } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
-import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import { useMobileBackHandler } from "../hooks/useMobileNavigation";
+import {
+  agentDispatchSessionIdAtom,
+  agentSessionAtom,
+} from "../state/agent-sessions/atoms";
 import { useI18n } from "../i18n";
 import {
   executeTeamAgentTask,
@@ -56,7 +60,6 @@ export function TeamAgentDetail({
   onStartTaskSession,
   requestedSessionId,
   isStarting: isExternalStartPending = false,
-  sessions,
   token = null,
 }: {
   agent: ProjectAgent;
@@ -90,7 +93,6 @@ export function TeamAgentDetail({
   onStartTaskSession: (session: TeamAgentTaskSessionStart) => void;
   requestedSessionId: string | null;
   isStarting?: boolean;
-  sessions: AutoHuntSession[];
   token?: string | null;
 }) {
   const { t } = useI18n();
@@ -105,13 +107,20 @@ export function TeamAgentDetail({
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
     requestedSessionId,
   );
-  const selectedSession =
-    sessions.find(
-      (session) =>
-        session.id === selectedSessionId &&
-        session.projectId === agent.teamId &&
-        session.agentId === agent.id,
-    ) ?? null;
+  /*
+    The open session and the requested one are read under the empty id when
+    there is none, which is how "not subscribed right now" is spelled without a
+    conditional hook: a session this page is not showing never wakes it.
+  */
+  const openSession = useAtomValue(agentSessionAtom(selectedSessionId ?? ""));
+  const requestedSession = useAtomValue(
+    agentSessionAtom(requestedSessionId ?? ""),
+  );
+  const belongsHere = (session: typeof openSession) =>
+    session?.projectId === agent.teamId && session.agentId === agent.id
+      ? session
+      : null;
+  const selectedSession = belongsHere(openSession);
   useMobileBackHandler(
     () => {
       if (!companionMode) return false;
@@ -129,27 +138,12 @@ export function TeamAgentDetail({
     { enabled: companionMode, priority: 200 },
   );
 
+  const hasRequestedSession = Boolean(belongsHere(requestedSession));
   useEffect(() => {
-    if (
-      !requestedSessionId ||
-      !sessions.some(
-        (session) =>
-          session.id === requestedSessionId &&
-          session.projectId === agent.teamId &&
-          session.agentId === agent.id,
-      )
-    ) {
-      return;
-    }
+    if (!requestedSessionId || !hasRequestedSession) return;
     setSelectedSessionId(requestedSessionId);
     onRequestedSessionOpen?.();
-  }, [
-    agent.id,
-    agent.teamId,
-    onRequestedSessionOpen,
-    requestedSessionId,
-    sessions,
-  ]);
+  }, [hasRequestedSession, onRequestedSessionOpen, requestedSessionId]);
 
   useEffect(() => {
     if (selectedSession) setIsTaskDialogOpen(false);
@@ -188,16 +182,17 @@ export function TeamAgentDetail({
     token,
   ]);
 
+  // A task that spawned a worker dispatch shows the dispatch: that is where the
+  // work is. The family answers `null` for the empty id, so a page with nothing
+  // open subscribes to nothing.
+  const dispatchSessionId = useAtomValue(
+    agentDispatchSessionIdAtom(
+      selectedSession?.sessionType === "task" ? selectedSession.id : "",
+    ),
+  );
   useEffect(() => {
-    if (selectedSession?.sessionType !== "task") return;
-    const dispatchSession = sessions.find(
-      (session) =>
-        session.parentSessionId === selectedSession.id &&
-        session.projectId === agent.teamId &&
-        session.agentId === agent.id,
-    );
-    if (dispatchSession) setSelectedSessionId(dispatchSession.id);
-  }, [agent.id, agent.teamId, selectedSession, sessions]);
+    if (dispatchSessionId) setSelectedSessionId(dispatchSessionId);
+  }, [dispatchSessionId]);
 
   const openTaskDialog = () => {
     setIsTaskDialogOpen(true);
@@ -376,7 +371,6 @@ export function TeamAgentDetail({
           onSessionOpen={setSelectedSessionId}
           onStopSession={onStopSession}
           projectId={board?.team.id ?? agent.teamId}
-          sessions={sessions}
         />
       </div>
 

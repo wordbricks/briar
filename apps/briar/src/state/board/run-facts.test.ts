@@ -12,10 +12,10 @@ import { membersByIdAtom, teamMemberIdsAtom } from "../entities/members";
 import { runsByIdAtom, teamRunIdsAtom } from "../entities/runs";
 import { teamWorkerIdsAtom, workersByIdAtom } from "../entities/workers";
 import { createTestRegistry } from "../registry";
+import { applySyncEvent } from "../sync/apply";
 import { boardRunKey } from "./atoms";
 import {
   boardAgentsAtom,
-  boardSessionsAtom,
   runAgentAssociationAtom,
   runAssignedWorkerAtom,
   runAssigneeAtom,
@@ -126,13 +126,15 @@ const harness = (
   runs: readonly HuntRun[],
   sessions: readonly AutoHuntSession[] = [],
   agents: readonly ProjectAgent[] = [runAgent, sessionAgent, olderSessionAgent],
-) =>
-  createTestRegistry([
+) => {
+  const registry = createTestRegistry([
     [runsByIdAtom, new Map(runs.map((run) => [run.id, run]))],
     [teamRunIdsAtom(teamId), runs.map((run) => run.id)],
     [boardAgentsAtom, agents],
-    [boardSessionsAtom, sessions],
   ]);
+  applySyncEvent(registry, { kind: "agent-sessions-changed", sessions });
+  return registry;
+};
 
 describe("board run facts", () => {
   it("labels a run with its own agent and calls it active while it runs", () => {
@@ -256,10 +258,11 @@ describe("board run facts", () => {
     );
     seen.length = 0;
 
-    // A new session array with the same content must not reach run-a.
-    registry.set(boardSessionsAtom, [
-      sessionOf({ id: "session-1", runId: "run-b" }),
-    ]);
+    // A session write with the same content must not reach run-a.
+    applySyncEvent(registry, {
+      kind: "agent-sessions-changed",
+      sessions: [sessionOf({ id: "session-1", runId: "run-b" })],
+    });
 
     expect(seen).toEqual([]);
   });

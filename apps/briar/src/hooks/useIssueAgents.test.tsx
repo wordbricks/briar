@@ -6,11 +6,10 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { I18nProvider } from "../i18n";
 import { demoDashboard } from "../lib/demo-data";
-import { quickStartingRunIdAtom } from "../state/dialogs/atoms";
 import { createTestRegistry, type AtomRegistry } from "../state/registry";
 import { tokenAtom } from "../state/session/atoms";
 import { createReactTestRoot } from "../test/react";
-import type { AutoHuntSession, Project, ProjectAgent } from "../types";
+import type { Project, ProjectAgent } from "../types";
 import { useIssueAgents, type IssueAgents } from "./useIssueAgents";
 
 /*
@@ -18,7 +17,8 @@ import { useIssueAgents, type IssueAgents } from "./useIssueAgents";
 
   A session started by another team's agent stays on screen in the inbox, so
   the entry that names it must not be dropped when the board moves on. The
-  first case is that rule; the rest are the two writes and the busy set.
+  first case is that rule; the rest are the two writes. The busy set is
+  `processingIssueIdsAtom` and is covered with the other agent session atoms.
 */
 
 const teamOf = (id: string): Project => ({
@@ -46,32 +46,6 @@ const agentOf = (id: string, teamId: string, name = id): ProjectAgent => ({
   updatedAt: "2026-09-01T00:00:00.000Z",
 });
 
-const runningSession = (id: string, runIds: string[]): AutoHuntSession => ({
-  id,
-  dispatchGroupId: id,
-  projectId: teamA.id,
-  agentId: "agent-a",
-  sessionType: "dispatch",
-  status: "running",
-  issues: runIds.map((runId, index) => ({
-    runId,
-    runNumber: index + 1,
-    sourceKey: runId,
-    title: runId,
-    outcome: "pending" as const,
-    summary: null,
-  })),
-  startedAt: "2026-09-01T00:00:00.000Z",
-  updatedAt: "2026-09-01T00:00:00.000Z",
-  completedAt: null,
-  conversationId: null,
-  workspaceRoot: null,
-  summary: null,
-  error: null,
-  events: [],
-  dispatchEvents: [],
-  workers: [],
-});
 
 class AgentSource {
   readonly requests: string[] = [];
@@ -89,17 +63,11 @@ let latest: IssueAgents;
 function Harness({
   activeTeam,
   load,
-  sessions,
 }: {
   readonly activeTeam: Project | undefined;
   readonly load: AgentSource["load"];
-  readonly sessions: readonly AutoHuntSession[];
 }) {
-  latest = useIssueAgents({
-    activeTeam,
-    deps: { loadTeamAgents: load },
-    sessions,
-  });
+  latest = useIssueAgents({ activeTeam, deps: { loadTeamAgents: load } });
   return null;
 }
 
@@ -144,14 +112,13 @@ describe("useIssueAgents", () => {
     const { render, view } = await mount(registry, {
       activeTeam: teamA,
       load: source.load,
-      sessions: [],
     });
     expect(latest.agents.map((agent) => agent.id)).toEqual(["agent-a"]);
     expect(latest.activeTeamAgents.map((agent) => agent.id)).toEqual([
       "agent-a",
     ]);
 
-    await render({ activeTeam: teamB, load: source.load, sessions: [] });
+    await render({ activeTeam: teamB, load: source.load });
     await flush();
     expect(latest.agents.map((agent) => agent.id).sort()).toEqual([
       "agent-a",
@@ -173,11 +140,10 @@ describe("useIssueAgents", () => {
     const { render, view } = await mount(registry, {
       activeTeam: teamA,
       load: source.load,
-      sessions: [],
     });
     expect(latest.agents).toHaveLength(1);
 
-    await render({ activeTeam: undefined, load: source.load, sessions: [] });
+    await render({ activeTeam: undefined, load: source.load });
     await flush();
     expect(latest.agents).toEqual([]);
     await view.cleanup();
@@ -191,7 +157,6 @@ describe("useIssueAgents", () => {
     const { view } = await mount(registry, {
       activeTeam: teamA,
       load: source.load,
-      sessions: [],
     });
 
     await act(async () => {
@@ -210,30 +175,4 @@ describe("useIssueAgents", () => {
     await view.cleanup();
   });
 
-  it("marks the dispatching run and every running session issue as busy", async () => {
-    const registry = createTestRegistry([
-      [tokenAtom, "token-1"],
-      [quickStartingRunIdAtom, "run-dispatching"],
-    ]);
-    const source = new AgentSource();
-
-    const { view } = await mount(registry, {
-      activeTeam: teamA,
-      load: source.load,
-      sessions: [
-        runningSession("session-1", ["run-1", "run-2"]),
-        {
-          ...runningSession("session-2", ["run-3"]),
-          status: "completed" as const,
-        },
-      ],
-    });
-
-    expect([...latest.processingIssueIds].sort()).toEqual([
-      "run-1",
-      "run-2",
-      "run-dispatching",
-    ]);
-    await view.cleanup();
-  });
 });

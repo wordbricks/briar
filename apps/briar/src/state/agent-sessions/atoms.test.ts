@@ -3,6 +3,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { testAgentSession } from "../../test/agent-sessions";
+import { quickStartingRunIdAtom } from "../dialogs/atoms";
 import { createTestRegistry } from "../registry";
 import { applySyncEvent } from "../sync/apply";
 import {
@@ -14,6 +15,7 @@ import {
   agentSessionIdsAtom,
   agentSessionsAtom,
   agentSessionsByIdAtom,
+  processingIssueIdsAtom,
   teamAgentSessionIdsAtom,
   teamAgentSessionsAtom,
 } from "./atoms";
@@ -175,6 +177,41 @@ describe("agent session atoms", () => {
 
     expect(registry.get(agentSessionIdsAtom)).toEqual(["b-1"]);
     expect(registry.get(agentSessionsByIdAtom).has("a-1")).toBe(false);
+  });
+
+  it("marks the dispatching run and every running session issue as busy", () => {
+    const registry = createTestRegistry([
+      [quickStartingRunIdAtom, "run-dispatching"],
+    ]);
+    const issues = (runIds: string[]) =>
+      runIds.map((runId, index) => ({
+        runId,
+        runNumber: index + 1,
+        sourceKey: runId,
+        title: runId,
+        outcome: "pending" as const,
+        summary: null,
+      }));
+    applySyncEvent(registry, {
+      kind: "agent-sessions-changed",
+      sessions: [
+        testAgentSession("session-1", {
+          sessionType: "dispatch",
+          issues: issues(["run-1", "run-2"]),
+        }),
+        testAgentSession("session-2", {
+          sessionType: "dispatch",
+          status: "completed",
+          issues: issues(["run-3"]),
+        }),
+      ],
+    });
+
+    expect([...registry.get(processingIssueIdsAtom)].sort()).toEqual([
+      "run-1",
+      "run-2",
+      "run-dispatching",
+    ]);
   });
 
   it("re-sorts by start time when server copies are merged in", () => {
