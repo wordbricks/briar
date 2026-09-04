@@ -36,7 +36,6 @@ pub(super) struct SidecarExecutableConfig {
 #[derive(Clone, Copy)]
 pub(super) struct SidecarProviderConfig {
     pub(super) provider: AgentProviderKind,
-    pub(super) conversation_namespace: &'static str,
     pub(super) runner_name: &'static str,
     pub(super) request_name: &'static str,
     pub(super) executable: SidecarExecutableConfig,
@@ -568,7 +567,7 @@ fn run_chat(
                     }
                     if let Some(event_sink) = execution.event_sink {
                         let conversation_id =
-                            encode_conversation_id(config, project_id, &session.session_id);
+                            encode_conversation_id(config, project_id, &session.session_id)?;
                         event_sink(AgentProviderEvent {
                             provider: config.provider,
                             direction: AgentEventDirection::Server,
@@ -648,7 +647,7 @@ fn run_chat(
                             config,
                             project_id,
                             &result.session_id,
-                        ),
+                        )?,
                         message: result.message,
                         workspace_root: prepared.workspace,
                     });
@@ -699,15 +698,25 @@ fn run_chat(
     }
 }
 
+/// sidecar provider의 대화 ID 네임스페이스. 네임스페이스는
+/// [`AgentProviderKind::conversation_namespace`]가 유일한 출처이므로, sidecar로
+/// 옮겨 온 provider는 반드시 거기에 등록되어 있어야 한다.
+fn conversation_namespace(config: SidecarProviderConfig) -> Result<&'static str, String> {
+    config.provider.conversation_namespace().ok_or_else(|| {
+        format!(
+            "{}가 대화 ID 네임스페이스를 등록하지 않았습니다.",
+            config.runner_name
+        )
+    })
+}
+
 fn encode_conversation_id(
     config: SidecarProviderConfig,
     project_id: &str,
     session_id: &str,
-) -> String {
-    format!(
-        "briar:{}:{project_id}:{session_id}",
-        config.conversation_namespace
-    )
+) -> Result<String, String> {
+    let namespace = conversation_namespace(config)?;
+    Ok(format!("briar:{namespace}:{project_id}:{session_id}"))
 }
 
 fn decode_conversation_id<'a>(
@@ -715,7 +724,8 @@ fn decode_conversation_id<'a>(
     project_id: &str,
     conversation_id: &'a str,
 ) -> Result<&'a str, String> {
-    let prefix = format!("briar:{}:{project_id}:", config.conversation_namespace);
+    let namespace = conversation_namespace(config)?;
+    let prefix = format!("briar:{namespace}:{project_id}:");
     conversation_id
         .strip_prefix(&prefix)
         .filter(|session_id| !session_id.is_empty())
@@ -1050,9 +1060,20 @@ for await (const message of sizeDelimitedDecodeStream(
     #[test]
     fn scopes_conversation_ids_to_the_provider_and_project() {
         for config in provider_configs() {
-            let conversation_id = format!(
-                "briar:{}:project-1:session-1",
-                config.conversation_namespace
+            let conversation_id = encode_conversation_id(config, "project-1", "session-1")
+                .expect("sidecar provider should declare a conversation namespace");
+            let namespace = config
+                .provider
+                .conversation_namespace()
+                .expect("sidecar provider should declare a conversation namespace");
+            assert_eq!(
+                conversation_id,
+                format!("briar:{namespace}:project-1:session-1")
+            );
+            // 인코딩과 provider 조회가 같은 표를 쓰는지 확인한다.
+            assert_eq!(
+                AgentProviderKind::for_conversation_id("project-1", &conversation_id),
+                Some(config.provider)
             );
             assert_eq!(
                 decode_conversation_id(config, "project-1", &conversation_id),

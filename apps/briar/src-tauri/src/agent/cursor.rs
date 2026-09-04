@@ -5,7 +5,6 @@ use super::{
 
 pub(super) const CONFIG: SidecarProviderConfig = SidecarProviderConfig {
     provider: AgentProviderKind::Cursor,
-    conversation_namespace: "cursor",
     runner_name: "Cursor Agent runner",
     request_name: "Cursor Agent",
     executable: SidecarExecutableConfig {

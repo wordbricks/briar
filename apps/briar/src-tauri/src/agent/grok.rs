@@ -5,7 +5,6 @@ use super::{
 
 pub(super) const CONFIG: SidecarProviderConfig = SidecarProviderConfig {
     provider: AgentProviderKind::Grok,
-    conversation_namespace: "grok",
     runner_name: "Grok Agent runner",
     request_name: "Grok Agent",
     executable: SidecarExecutableConfig {
