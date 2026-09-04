@@ -1463,7 +1463,7 @@ export function Channels({
                   )}
                   {loadingEarlierMessages ? (
                     <div className="channel-message-page-loader" role="status">
-                      <Spinner aria-hidden="true" size={15} />
+                      <Spinner aria-hidden="true" className="size-[15px]" />
                     </div>
                   ) : null}
                   <VirtualizedChannelMessageList
@@ -2578,7 +2578,7 @@ function ChannelWebhooksDialog({
 
         <div className="channel-webhook-list">
           {loading ? (
-            <p className="channel-invite-status"><Spinner size={16} />{t("channel.webhookLoading")}</p>
+            <p className="channel-invite-status"><Spinner className="size-[16px]" />{t("channel.webhookLoading")}</p>
           ) : webhooks.length === 0 ? (
             <p className="channel-invite-status">{t("channel.webhookEmpty")}</p>
           ) : webhooks.map((webhook) => (
@@ -2840,7 +2840,7 @@ function ChannelInviteDialog({
             <div className="channel-invite-results">
               {loading ? (
                 <p className="channel-invite-status">
-                  <Spinner size={16} />
+                  <Spinner className="size-[16px]" />
                   {t("channel.inviteLoading")}
                 </p>
               ) : filtered.length > 0 ? (
@@ -3264,7 +3264,7 @@ export const MessageRow = memo(function MessageRow({
                 >
                   {acceptingProposal ? (
                     <>
-                      <Spinner aria-hidden="true" size={15} />
+                      <Spinner aria-hidden="true" className="size-[15px]" />
                       {t("channel.creatingIssue")}
                     </>
                   ) : (

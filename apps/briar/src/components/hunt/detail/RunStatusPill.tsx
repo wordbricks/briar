@@ -20,7 +20,7 @@ export function RunStatusPill({
   } = useI18n();
   const Tag = as;
   return <Tag aria-label={reviewed ? `${label} · ${t("run.resultReviewed")}` : undefined} className={`status-pill ${tone}${reviewed ? " reviewed" : ""}`} title={reviewed ? t("run.resultReviewed") : undefined}>
-      {status === "running" && <Spinner size={11} />}
+      {status === "running" && <Spinner className="size-[11px]" />}
       {reviewed && <BadgeCheck aria-hidden="true" className="status-pill-review-icon" size={11} />}
       {label}
     </Tag>;

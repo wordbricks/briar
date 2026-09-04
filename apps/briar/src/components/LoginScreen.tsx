@@ -79,7 +79,7 @@ export function LoginActions({
           value={code}
         />
         <Button disabled={loading || code.length !== 6} type="submit">
-          {loading ? <Spinner size={18} /> : null}
+          {loading ? <Spinner className="size-[18px]" /> : null}
           {t("login.verifyCode")}
         </Button>
         <div className="grid grid-cols-2 gap-2">
@@ -135,7 +135,7 @@ export function LoginActions({
             disabled={loading}
             type="submit"
           >
-            {loading ? <Spinner size={18} /> : <Mail size={18} />}
+            {loading ? <Spinner className="size-[18px]" /> : <Mail size={18} />}
             <span className="col-start-2 text-center">
               {emailButtonLabel ?? t("login.continueEmail")}
             </span>
@@ -149,7 +149,7 @@ export function LoginActions({
           onClick={() => onLogin("email")}
           type="button"
         >
-          {loading ? <Spinner size={18} /> : <Mail size={18} />}
+          {loading ? <Spinner className="size-[18px]" /> : <Mail size={18} />}
           <span className="col-start-2 text-center">
             {emailButtonLabel ?? t("login.continueEmail")}
           </span>

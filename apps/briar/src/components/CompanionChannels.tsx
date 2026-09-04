@@ -1501,7 +1501,7 @@ function MessageRow({
                 >
                   {acceptingProposal ? (
                     <>
-                      <Spinner aria-hidden="true" size={15} />
+                      <Spinner aria-hidden="true" className="size-[15px]" />
                       {t("channel.creatingIssue")}
                     </>
                   ) : (
@@ -1923,7 +1923,7 @@ function relativeTime(value: string, locale: string) {
 function CompanionChannelLoadingSpinner() {
   return (
     <p className="companion-channel-loading">
-      <Spinner size={16} />
+      <Spinner className="size-[16px]" />
     </p>
   );
 }

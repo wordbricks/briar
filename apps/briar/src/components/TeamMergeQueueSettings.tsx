@@ -249,7 +249,7 @@ export function TeamMergeQueueSettings({
 
       {loading ? (
         <div className="grid min-h-32 place-items-center">
-          <Spinner size={20} />
+          <Spinner className="size-[20px]" />
         </div>
       ) : (
         <>
@@ -332,7 +332,7 @@ export function TeamMergeQueueSettings({
                 variant="ghost"
               >
                 {statusLoading ? (
-                  <Spinner size={14} />
+                  <Spinner className="size-[14px]" />
                 ) : (
                   <RefreshCw size={14} />
                 )}
@@ -435,7 +435,7 @@ export function TeamMergeQueueSettings({
               type="button"
             >
               {saving ? (
-                <Spinner size={14} />
+                <Spinner className="size-[14px]" />
               ) : !dirty ? (
                 <Check size={14} />
               ) : (

@@ -946,7 +946,7 @@ export function TeamSettings({
                   type="button"
                   variant="outline"
                 >
-                  <Spinner icon={RefreshCw} size={14} spinning={velenLoading} />
+                  <RefreshCw className={velenLoading ? "animate-spin" : undefined} size={14} />
                 </Button>
               </div>
             </header>
@@ -1000,7 +1000,7 @@ export function TeamSettings({
                 type="button"
               >
                 {velenSaving ? (
-                  <Spinner size={14} />
+                  <Spinner className="size-[14px]" />
                 ) : !velenChanged ? (
                   <Check size={14} />
                 ) : null}
@@ -1169,7 +1169,7 @@ export function TeamSettings({
                   type="button"
                 >
                   {runtimeSaving ? (
-                    <Spinner size={14} />
+                    <Spinner className="size-[14px]" />
                   ) : !runtimeChanged ? (
                     <Check size={14} />
                   ) : (
@@ -1279,7 +1279,7 @@ export function TeamSettings({
                   variant="outline"
                 >
                   {isAnalyzingWorkflowRequirements ? (
-                    <Spinner size={14} />
+                    <Spinner className="size-[14px]" />
                   ) : (
                     <Cpu size={14} />
                   )}
@@ -1300,7 +1300,7 @@ export function TeamSettings({
                   variant="outline"
                 >
                   {isRegeneratingWorkflow ? (
-                    <Spinner size={14} />
+                    <Spinner className="size-[14px]" />
                   ) : (
                     <RefreshCw size={14} />
                   )}
@@ -1373,7 +1373,7 @@ export function TeamSettings({
                   type="submit"
                 >
                   {isRevisingWorkflow ? (
-                    <Spinner size={14} />
+                    <Spinner className="size-[14px]" />
                   ) : (
                     <Sparkles size={14} />
                   )}
@@ -1832,7 +1832,7 @@ export function TeamSettings({
               variant="destructive"
             >
               {isDeleting ? (
-                <Spinner size={15} />
+                <Spinner className="size-[15px]" />
               ) : (
                 <Trash2 size={15} />
               )}

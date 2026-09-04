@@ -164,6 +164,7 @@ export const ko = {
   "keyboardShortcuts.moveRight": "오른쪽 항목으로 이동",
   "keyboardShortcuts.openFocused": "포커스한 항목 열기",
   "loading.churning": "처리 중",
+  "loading.spinner": "로딩 중",
   "image.enlarge": "{name} 크게 보기",
   "image.download": "{name} 다운로드",
   "session.restoring": "로그인 정보를 확인하는 중입니다",

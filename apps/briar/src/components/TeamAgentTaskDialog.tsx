@@ -212,7 +212,7 @@ export function TeamAgentTaskDialog({
             type="submit"
           >
             {isSubmitting ? (
-              <Spinner size={16} />
+              <Spinner className="size-[16px]" />
             ) : (
               <Play size={16} />
             )}

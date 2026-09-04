@@ -92,7 +92,7 @@ export function AppVersionStatus({
               type="button"
             >
               {isChecking ? (
-                <Spinner aria-hidden="true" size={14} />
+                <Spinner aria-hidden="true" className="size-[14px]" />
               ) : (
                 <RefreshCw aria-hidden="true" size={14} />
               )}

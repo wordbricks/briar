@@ -235,7 +235,7 @@ export function OrganizationAgentsSettings({
           aria-live="polite"
           className="flex min-h-48 items-center justify-center gap-2 rounded-xl border border-border bg-card text-muted-foreground"
         >
-          <Spinner size={20} />
+          <Spinner className="size-[20px]" />
           <Typography variant="bodySm">{t("organization.agentsLoading")}</Typography>
         </div>
       ) : agents.length === 0 ? (
@@ -409,7 +409,7 @@ export function OrganizationAgentsSettings({
               type="button"
             >
               {isSavingSkills ? (
-                <Spinner size={16} />
+                <Spinner className="size-[16px]" />
               ) : null}
               {t(isSavingSkills ? "common.saving" : "common.save")}
             </Button>
@@ -449,7 +449,7 @@ export function OrganizationAgentsSettings({
               type="button"
               variant="destructive"
             >
-              {isDeleting ? <Spinner size={16} /> : null}
+              {isDeleting ? <Spinner className="size-[16px]" /> : null}
               {t(
                 isDeleting
                   ? "organization.agentsDeleting"
@@ -675,7 +675,7 @@ function OrganizationAgentCreateDialog({
             type="submit"
           >
             {isSubmitting ? (
-              <Spinner size={16} />
+              <Spinner className="size-[16px]" />
             ) : (
               <Plus aria-hidden="true" size={16} />
             )}

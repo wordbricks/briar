@@ -520,7 +520,7 @@ export function TeamAgents({
                 className="flex min-h-[330px] flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card p-10 text-center text-muted-foreground [&>strong]:mt-2"
                 aria-live="polite"
               >
-                <Spinner size={21} />
+                <Spinner className="size-[21px]" />
                 <Typography as="strong" variant="body">
                   {t("agents.loading")}
                 </Typography>
@@ -667,7 +667,7 @@ export function TeamAgents({
                           type="button"
                         >
                           {isStarting ? (
-                            <Spinner aria-hidden="true" size={14} />
+                            <Spinner aria-hidden="true" className="size-[14px]" />
                           ) : (
                             <Play
                               aria-hidden="true"
@@ -1279,7 +1279,7 @@ export function TeamAgentDialog({
               type="submit"
             >
               {isSubmitting ? (
-                <Spinner size={14} />
+                <Spinner className="size-[14px]" />
               ) : isEditing ? (
                 <Pencil size={14} />
               ) : (

@@ -29,7 +29,7 @@ export function IssueActionsMenu({
   return <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
         <button aria-label={t("issue.actions")} className="run-page-tool-button run-page-actions-trigger" disabled={disabled} type="button">
-          {disabled ? <Spinner size={15} /> : <MoreHorizontal size={16} />}
+          {disabled ? <Spinner className="size-[15px]" /> : <MoreHorizontal size={16} />}
         </button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>

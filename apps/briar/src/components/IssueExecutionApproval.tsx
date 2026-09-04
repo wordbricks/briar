@@ -386,7 +386,7 @@ export function IssueExecutionApproval<T extends ExecutionProposalView>({
               type="button"
             >
               {opening ? (
-                <Spinner aria-hidden="true" size={15} />
+                <Spinner aria-hidden="true" className="size-[15px]" />
               ) : (
                 <Play aria-hidden="true" size={15} />
               )}

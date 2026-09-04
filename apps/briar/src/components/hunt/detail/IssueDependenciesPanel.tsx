@@ -128,7 +128,7 @@ export function IssueDependenciesPanel({
               onClick={() => void mutate(() => remove(relation.id))}
               type="button"
             >
-              {isUpdating ? <Spinner size={13} /> : <X size={13} />}
+              {isUpdating ? <Spinner className="size-[13px]" /> : <X size={13} />}
             </button>
           ) : null}
         </li>
@@ -277,7 +277,7 @@ export function IssueDependenciesPanel({
                   </span>
                   <strong>{candidate.title}</strong>
                 </span>
-                {isUpdating ? <Spinner size={15} /> : <Plus size={15} />}
+                {isUpdating ? <Spinner className="size-[15px]" /> : <Plus size={15} />}
               </button>
             )) : (
               <p className="issue-dependency-picker-empty">

@@ -308,7 +308,7 @@ export function TeamAgentSessionDetail({
                 variant="destructive"
               >
                 {isStopping ? (
-                  <Spinner />
+                  <Spinner className="size-[24px]" />
                 ) : (
                   <OctagonX />
                 )}
@@ -422,7 +422,7 @@ export function TeamAgentSessionDetail({
                     </div>
                   ) : executionEvents.isLoading ? (
                     <div className="auto-hunt-event-state">
-                      <Spinner size={14} />
+                      <Spinner className="size-[14px]" />
                       {t("autoHunt.eventsLoading")}
                     </div>
                   ) : (
@@ -461,7 +461,7 @@ export function TeamAgentSessionDetail({
                         type="submit"
                       >
                         {isSendingFollowUp
-                          ? <Spinner />
+                          ? <Spinner className="size-[24px]" />
                           : <Send />}
                       </Button>
                       {followUpError ? (

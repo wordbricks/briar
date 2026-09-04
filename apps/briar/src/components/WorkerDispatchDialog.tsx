@@ -505,7 +505,7 @@ export function WorkerDispatchDialog({
             {didDispatchSuccessfully ? (
               <Check aria-hidden="true" size={15} />
             ) : isDispatching ? (
-              <Spinner size={15} />
+              <Spinner className="size-[15px]" />
             ) : null}
             {didDispatchSuccessfully
               ? t(isApproval

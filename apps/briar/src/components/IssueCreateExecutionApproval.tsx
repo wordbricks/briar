@@ -151,7 +151,7 @@ export function IssueCreateExecutionApproval({
               onClick={() => void onCreate()}
               type="button"
             >
-              {creating ? <Spinner aria-hidden="true" size={15} /> : null}
+              {creating ? <Spinner aria-hidden="true" className="size-[15px]" /> : null}
               {creating ? t("channel.creatingIssue") : t("channel.createIssue")}
             </button>
           ) : null}
@@ -163,7 +163,7 @@ export function IssueCreateExecutionApproval({
             type="button"
           >
             {opening || accepting ? (
-              <Spinner aria-hidden="true" size={15} />
+              <Spinner aria-hidden="true" className="size-[15px]" />
             ) : (
               <Play aria-hidden="true" size={15} />
             )}
@@ -183,7 +183,7 @@ export function IssueCreateExecutionApproval({
               onClick={() => void onDecline()}
               type="button"
             >
-              {declining ? <Spinner aria-hidden="true" size={15} /> : null}
+              {declining ? <Spinner aria-hidden="true" className="size-[15px]" /> : null}
               {declining
                 ? t("channel.decliningIssueProposal")
                 : t("channel.declineIssueProposal")}

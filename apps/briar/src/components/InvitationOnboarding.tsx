@@ -245,7 +245,7 @@ export function InvitationOnboarding({
                   type="button"
                 >
                   {accepting ? (
-                    <Spinner size={17} />
+                    <Spinner className="size-[17px]" />
                   ) : (
                     <Check size={17} />
                   )}

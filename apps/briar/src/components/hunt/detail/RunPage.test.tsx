@@ -181,7 +181,7 @@ function expectPendingAgentReplyLoader(scope: ParentNode | null | undefined) {
   expect(loader?.dataset.size).toBe("compact");
   expect(pending?.textContent).toContain("에이전트가 답변을 작성하고 있습니다");
   expect(pending?.textContent).toContain("0.0s");
-  expect(pending?.querySelector(".spin")).toBeNull();
+  expect(pending?.querySelector(".animate-spin")).toBeNull();
   return pending;
 }
 describe("RunPage", () => {
@@ -1059,14 +1059,14 @@ describe("RunPage", () => {
     await renderReactTestRoot(root, renderRun(pausedRun));
     const resumeButton = container.querySelector<HTMLButtonElement>(".paused-result-resume");
     expect(resumeButton?.disabled).toBe(false);
-    expect(resumeButton?.querySelector(".spin")).toBeNull();
+    expect(resumeButton?.querySelector(".animate-spin")).toBeNull();
     await act(async () => {
       resumeButton?.click();
       await Promise.resolve();
     });
     expect(onResume).toHaveBeenCalledOnce();
     expect(resumeButton?.disabled).toBe(true);
-    expect(resumeButton?.querySelector(".spin")).not.toBeNull();
+    expect(resumeButton?.querySelector(".animate-spin")).not.toBeNull();
     await renderReactTestRoot(
       root,
       renderRun({
@@ -1085,7 +1085,7 @@ describe("RunPage", () => {
     );
     const nextCheckpointButton = container.querySelector<HTMLButtonElement>(".paused-result-resume");
     expect(nextCheckpointButton?.disabled).toBe(false);
-    expect(nextCheckpointButton?.querySelector(".spin")).toBeNull();
+    expect(nextCheckpointButton?.querySelector(".animate-spin")).toBeNull();
     await cleanup();
   });
   it("submits paused review feedback as an explicit rework request", async () => {

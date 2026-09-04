@@ -169,7 +169,7 @@ export function IssueMessageItem({
                     {t("channel.viewIssue")}
                   </button> : null}
               </> : onAcceptIssueAction ? <button className="issue-rework-proposal-accept" disabled={actionProposalState?.accepting} onClick={onAcceptIssueAction} type="button">
-                {actionProposalState?.accepting ? <Spinner aria-hidden="true" size={15} /> : proposal.type === "request_issue_create" ? <Plus aria-hidden="true" size={15} /> : <Play aria-hidden="true" size={15} />}
+                {actionProposalState?.accepting ? <Spinner aria-hidden="true" className="size-[15px]" /> : proposal.type === "request_issue_create" ? <Plus aria-hidden="true" size={15} /> : <Play aria-hidden="true" size={15} />}
                 {actionProposalState?.accepting ? t("run.reworkProposalAccepting") : proposalAcceptLabel}
               </button> : null}
             {actionProposalState?.error ? <p className="issue-rework-proposal-error">

@@ -336,7 +336,7 @@ export function CreateIssueDialog({
               {t("common.cancel")}
             </button>
             <button className="issue-submit-button" disabled={isSubmitting || !title.trim() || !projectId || titleTooLong} type="submit">
-              {isSubmitting && <Spinner size={13} />}
+              {isSubmitting && <Spinner className="size-[13px]" />}
               {isSubmitting ? t("issue.submitting") : t("issue.submit")}
             </button>
           </div>

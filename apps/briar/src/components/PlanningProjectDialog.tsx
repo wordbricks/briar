@@ -168,7 +168,7 @@ export function PlanningProjectDialog({
                 type="button"
                 variant="destructive"
               >
-                {deleting ? <Spinner size={15} /> : <Trash2 aria-hidden="true" />}
+                {deleting ? <Spinner className="size-[15px]" /> : <Trash2 aria-hidden="true" />}
                 {deleting
                   ? t("planningProject.deleting")
                   : t("planningProject.delete")}

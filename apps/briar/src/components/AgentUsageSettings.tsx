@@ -1,5 +1,4 @@
 import { CircleDashed, RefreshCw, Trash2 } from "lucide-react";
-import { Spinner } from "./ui/spinner";
 import {
   useCallback,
   useEffect,
@@ -682,7 +681,7 @@ export function AgentUsageSettings({
             onClick={() => void refresh()}
             title={t("usage.refresh")}
           >
-            <Spinner icon={RefreshCw} size={16} spinning={refreshing} />
+            <RefreshCw className={refreshing ? "animate-spin" : undefined} size={16} />
           </SettingsIconButton>
         </div>
       </header>
