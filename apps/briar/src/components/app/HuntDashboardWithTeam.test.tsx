@@ -177,7 +177,7 @@ const mount = async (registry: AtomRegistry, renders: RenderCounter) => {
     renders.useRenderCount("shell");
     return (
       <>
-        <Board {...boardProps} projects={[team]} sessions={[]} />
+        <Board {...boardProps} projects={[team]} />
         <RunRow name="row-a" renders={renders} runId={runA.id} />
         <RunRow name="row-b" renders={renders} runId={runB.id} />
         <ColumnProbe columnId="status:backlog" renders={renders} />

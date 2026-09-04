@@ -59,6 +59,7 @@ import {
   activeOrganizationIdAtom,
   organizationsAtom,
 } from "../state/organization/atoms";
+import { runningAgentSessionsAtom } from "../state/agent-sessions/atoms";
 import { teamRunsAtom } from "../state/entities/runs";
 import { lockedTeamIdAtom } from "../state/platform";
 import { tokenAtom, userAtom } from "../state/session/atoms";
@@ -69,8 +70,6 @@ import {
   activeTeamAtom,
   activeTeamIdAtom,
 } from "../state/team/atoms";
-import { collapseLinkedAutoHuntSessions } from "./useAutoHuntSessions";
-import type { AutoHuntSession } from "../types";
 
 /*
   The command palette's item list.
@@ -84,21 +83,19 @@ import type { AutoHuntSession } from "../types";
 
   It reads what it shows from atoms now, including where the user is and what
   the history can do. What is still a parameter is what the app decides: whether
-  a gate owns the screen, and the auto hunt sessions.
+  a gate owns the screen.
 */
 
 /** What the shell knows and the palette cannot read from the store. */
 export interface CommandPaletteItemsInput {
   /** False while a gate — login, onboarding, the intro — owns the screen. */
   readonly commandPaletteAvailable: boolean;
-  readonly sessions: readonly AutoHuntSession[];
   readonly keybindings: Keybindings;
   readonly keyboardShortcutsShortcut: string;
 }
 
 export function useCommandPaletteItems({
   commandPaletteAvailable,
-  sessions,
   keybindings,
   keyboardShortcutsShortcut,
 }: CommandPaletteItemsInput): CommandPaletteItem[] {
@@ -141,6 +138,10 @@ export function useCommandPaletteItems({
   */
   const paletteRuns = useAtomValue(
     teamRunsAtom(isCommandPaletteOpen && activeTeamId ? activeTeamId : ""),
+  );
+  /** The running agent sessions, under the same "only while open" rule. */
+  const runningSessions = useAtomValue(
+    runningAgentSessionsAtom(isCommandPaletteOpen ? "open" : ""),
   );
   const setIsKeyboardShortcutsOpen = useAtomSet(isKeyboardShortcutsOpenAtom);
   const setIsIssueDialogOpen = useAtomSet(isIssueDialogOpenAtom);
@@ -250,15 +251,9 @@ export function useCommandPaletteItems({
   const paletteProjectIds = new Set(
     activeOrganizationTeams.map((project) => project.id),
   );
-  const runningPaletteSessions = isCommandPaletteOpen
-    ? collapseLinkedAutoHuntSessions(sessions)
-        .filter(
-          (session) =>
-            session.status === "running" &&
-            paletteProjectIds.has(session.projectId),
-        )
-        .sort((left, right) => right.startedAt.localeCompare(left.startedAt))
-    : [];
+  const runningPaletteSessions = runningSessions.filter((session) =>
+    paletteProjectIds.has(session.projectId)
+  );
   for (const session of runningPaletteSessions) {
     const project = activeOrganizationTeams.find(
       (candidate) => candidate.id === session.projectId,

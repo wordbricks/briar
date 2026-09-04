@@ -25,11 +25,11 @@ import type {
   Project,
   ProjectAgent,
 } from "../types";
+import { agentSessionsAtom } from "../state/agent-sessions/atoms";
 import {
   useAgentDispatch,
   type AgentDispatch,
   type AgentDispatchDeps,
-  type AgentDispatchSessions,
 } from "./useAgentDispatch";
 
 /*
@@ -86,20 +86,6 @@ class DispatchBridge {
   readonly dispatched: { teamId: string; runId: string }[] = [];
   readonly dashboardLoads: string[] = [];
   readonly workerTasks: { teamId: string; agentId: string }[] = [];
-  readonly startedDispatches: string[] = [];
-  readonly adopted: string[] = [];
-
-  sessions: AgentDispatchSessions = {
-    adoptRemoteSession: (session) => {
-      this.adopted.push(session.id);
-    },
-    settleTaskSession: () => undefined,
-    startTaskSession: () => "session-task",
-    startWorkerDispatchSession: (teamId) => {
-      this.startedDispatches.push(teamId);
-    },
-  };
-
   deps: AgentDispatchDeps = {
     desktopTauri: false,
     dispatchRun: ((
@@ -163,7 +149,6 @@ function Harness({
     activeTeam,
     deps: bridge.deps,
     rememberAgent: () => undefined,
-    sessions: bridge.sessions,
     teamWindowTeamId: null,
   });
   return null;
@@ -230,7 +215,10 @@ describe("useAgentDispatch", () => {
     // The team on screen: no round trip, and the write is followed by a refresh.
     expect(bridge.dashboardLoads).toEqual([]);
     expect(bridge.dispatched).toEqual([{ teamId: teamA.id, runId: "run-1" }]);
-    expect(bridge.startedDispatches).toEqual([teamA.id]);
+    // The dispatch session is written to the store, not handed to a callback.
+    expect(
+      registry.get(agentSessionsAtom).map((session) => session.projectId),
+    ).toEqual([teamA.id]);
     expect(sync.refreshes).toBe(1);
 
     await act(async () => {
@@ -277,7 +265,8 @@ describe("useAgentDispatch", () => {
     expect(bridge.workerTasks).toEqual([
       { teamId: teamA.id, agentId: agent.id },
     ]);
-    expect(bridge.adopted).toEqual(["session-remote"]);
+    expect(registry.get(agentSessionsAtom).map((session) => session.id))
+      .toEqual(["session-remote"]);
     expect(sync.refreshes).toBe(1);
     await view.cleanup();
   });

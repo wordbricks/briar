@@ -30,7 +30,7 @@ import {
   directMessageParticipants,
   sortDirectMessages,
 } from "../lib/direct-messages";
-import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
+import type { AutoHuntSession } from "../types";
 import { cn } from "../lib/utils";
 import type { OrganizationMember, Project } from "../types";
 import { Channels } from "./Channels";

@@ -1,8 +1,10 @@
 import * as Atom from "effect/unstable/reactivity/Atom";
 
 import type { AutoHuntSession } from "../../types";
+import { quickStartingRunIdAtom } from "../dialogs/atoms";
 import { shallowArrayEqual } from "../entities/upsert";
 import type { TeamRealtimeTarget } from "../../lib/team-realtime-refresh";
+import { collapseLinkedAutoHuntSessions } from "./model";
 import { readStoredAgentSessions } from "./persistence";
 
 /*
@@ -117,6 +119,127 @@ export const teamAgentSessionsAtom = Atom.family((teamId: string) =>
     Atom.withEquality<AutoHuntSession[]>(shallowArrayEqual),
     Atom.withLabel(`agentSessions/team/${teamId}`),
   ),
+);
+
+/*
+  The key of an atom that answers for one agent on one team. `Atom.family` takes
+  one key, so the two ids are joined with a NUL — the same separator and the
+  same reason as `state/board/atoms.ts`.
+*/
+const keySeparator = "\u0000";
+
+/** The key {@link agentSessionRowIdsAtom} takes. */
+export const agentSessionsKey = (teamId: string, agentId: string) =>
+  `${teamId}${keySeparator}${agentId}`;
+
+const splitAgentSessionsKey = (key: string): [string, string] => {
+  const separator = key.indexOf(keySeparator);
+  return [key.slice(0, separator), key.slice(separator + 1)];
+};
+
+/**
+ * The session ids one agent's list renders: that agent's sessions on that team,
+ * newest first, with a task collapsed into the worker dispatch it spawned.
+ *
+ * A row reads its own session, so this array is what a status change must *not*
+ * move — and it does not, which is the whole point of keeping the list on ids.
+ */
+export const agentSessionRowIdsAtom = Atom.family((key: string) => {
+  const [teamId, agentId] = splitAgentSessionsKey(key);
+  return Atom.make((get): string[] => {
+    const sessions = get(agentSessionsByIdAtom);
+    const own: AutoHuntSession[] = [];
+    for (const id of get(teamAgentSessionIdsAtom(teamId))) {
+      const session = sessions.get(id);
+      if (session?.agentId === agentId) own.push(session);
+    }
+    return collapseLinkedAutoHuntSessions(own).map((session) => session.id);
+  }).pipe(
+    Atom.withEquality<string[]>(shallowArrayEqual),
+    Atom.withLabel(`agentSessions/team/${teamId}/agent/${agentId}/ids`),
+  );
+});
+
+const sameIds = (left: ReadonlySet<string>, right: ReadonlySet<string>) =>
+  left === right ||
+  (left.size === right.size && [...left].every((id) => right.has(id)));
+
+/** The agents of one team with a session running right now. */
+export const teamRunningAgentIdsAtom = Atom.family((teamId: string) =>
+  Atom.make((get): ReadonlySet<string> => {
+    const running = new Set<string>();
+    for (const session of get(teamAgentSessionsAtom(teamId))) {
+      if (session.status === "running" && session.agentId) {
+        running.add(session.agentId);
+      }
+    }
+    return running;
+  }).pipe(
+    Atom.withEquality<ReadonlySet<string>>(sameIds),
+    Atom.withLabel(`agentSessions/team/${teamId}/runningAgents`),
+  ),
+);
+
+/**
+ * The worker dispatch a task session spawned, if it has one. The agent detail
+ * page follows it so opening a task lands on the dispatch that is doing the
+ * work. The empty key is how "nothing is open" is spelled.
+ */
+export const agentDispatchSessionIdAtom = Atom.family(
+  (parentSessionId: string) =>
+    Atom.make((get): string | null => {
+      if (parentSessionId === "") return null;
+      for (const session of get(agentSessionsByIdAtom).values()) {
+        if (session.parentSessionId === parentSessionId) return session.id;
+      }
+      return null;
+    }).pipe(Atom.withLabel(`agentSessions/${parentSessionId}/dispatch`)),
+);
+
+/**
+ * Every running session, newest first, with linked ones collapsed — or nothing
+ * under the empty key. The command palette lists them only while it is open, and
+ * reading the family under the empty key is how it subscribes to no session at
+ * all without a conditional hook.
+ */
+export const runningAgentSessionsAtom = Atom.family((key: string) =>
+  Atom.make((get): AutoHuntSession[] =>
+    key === ""
+      ? []
+      : collapseLinkedAutoHuntSessions(get(agentSessionsAtom))
+          .filter((session) => session.status === "running")
+          .sort((left, right) =>
+            right.startedAt.localeCompare(left.startedAt)
+          )
+  ).pipe(
+    Atom.withEquality<AutoHuntSession[]>(shallowArrayEqual),
+    Atom.withLabel(`agentSessions/running/${key}`),
+  ),
+);
+
+/**
+ * The runs an agent is working on right now: every issue of a running session,
+ * plus the one a quick dispatch has just been asked to start.
+ *
+ * It was a `useMemo` in `useIssueAgents`, which is what made the app shell
+ * subscribe to the session list. The board still takes it as a prop — it is part
+ * of the context that reaches each card — but nothing above the board does.
+ */
+export const processingIssueIdsAtom = Atom.make(
+  (get): ReadonlySet<string> => {
+    const runIds = new Set<string>();
+    const quickStartingRunId = get(quickStartingRunIdAtom);
+    if (quickStartingRunId) runIds.add(quickStartingRunId);
+    for (const session of get(agentSessionsAtom)) {
+      if (session.status !== "running") continue;
+      for (const issue of session.issues) runIds.add(issue.runId);
+    }
+    return runIds;
+  },
+).pipe(
+  Atom.keepAlive,
+  Atom.withEquality<ReadonlySet<string>>(sameIds),
+  Atom.withLabel("agentSessions/processingIssueIds"),
 );
 
 /** The token and the teams the session sync is currently subscribed for. */

@@ -21,8 +21,8 @@ import type {
   AutoHuntSession,
   AutoHuntSessionIssueOutcome,
   AutoHuntSessionStatus,
-} from "../hooks/useAutoHuntSessions";
-import { canStopAutoHuntSession } from "../hooks/useAutoHuntSessions";
+} from "../types";
+import { canStopAutoHuntSession } from "../state/agent-sessions/model";
 import { useAutoHuntAppServerEvents } from "../hooks/useAutoHuntAppServerEvents";
 import { useProjectAgentWorkerEvents } from "../hooks/useProjectAgentWorkerEvents";
 import { useI18n } from "../i18n";

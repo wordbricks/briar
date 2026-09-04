@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  collapseLinkedAutoHuntSessions,
-  type AutoHuntSession,
-} from "./useAutoHuntSessions";
-import type { DashboardPayload, HuntRun, HuntStatus, Project } from "../types";
+import { collapseLinkedAutoHuntSessions } from "../state/agent-sessions/model";
+import type {
+  AutoHuntSession,
+  DashboardPayload,
+  HuntRun,
+  HuntStatus,
+  Project,
+} from "../types";
 import {
   autoHuntWorkflowStageCatalog,
   type AutoHuntWorkflowStageId,

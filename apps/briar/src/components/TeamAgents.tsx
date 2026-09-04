@@ -12,8 +12,9 @@ import {
   Wrench,
   X,
 } from "lucide-react";
+import { useAtomValue } from "@effect/atom-react";
 import { Spinner } from "./ui/spinner";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { EmptyState, MainContent, PageHeader } from "@/components/layout";
 import { Button } from "@/components/ui/button";
@@ -56,8 +57,11 @@ import {
   type TeamAgentTaskSessionStart,
 } from "../lib/team-agent-execution";
 import { runTeamAgent } from "../lib/team-llm";
-import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import { useMobileBackHandler } from "../hooks/useMobileNavigation";
+import {
+  agentSessionAtom,
+  teamRunningAgentIdsAtom,
+} from "../state/agent-sessions/atoms";
 import { useAgentProviderModels } from "../hooks/useAgentProviderModels";
 import type {
   CreateProjectAgentInput,
@@ -99,7 +103,6 @@ export function TeamAgents({
   onStartTaskSession,
   project,
   requestedSessionId = null,
-  sessions,
   token,
 }: {
   agentListRequestKey?: number;
@@ -136,7 +139,6 @@ export function TeamAgents({
   ) => void;
   project: Project;
   requestedSessionId?: string | null;
-  sessions: AutoHuntSession[];
   token: string | null;
 }) {
   const { locale, localeTag, t } = useI18n();
@@ -160,20 +162,7 @@ export function TeamAgents({
     if (!appError) return;
     toast(appError, { tone: "error" });
   }, [appError, toast]);
-  const runningAgentIds = useMemo(
-    () =>
-      new Set(
-        sessions
-          .filter(
-            (session) =>
-              session.projectId === project.id &&
-              session.status === "running" &&
-              session.agentId,
-          )
-          .map((session) => session.agentId as string),
-      ),
-    [project.id, sessions],
-  );
+  const runningAgentIds = useAtomValue(teamRunningAgentIdsAtom(project.id));
   useMobileBackHandler(
     () => {
       if (!companionMode) return false;
@@ -229,19 +218,21 @@ export function TeamAgents({
     setIsDialogOpen(false);
   }, [agentListRequestKey, project.id]);
 
+  const requestedSession = useAtomValue(
+    agentSessionAtom(requestedSessionId ?? ""),
+  );
+  const requestedSessionAgentId =
+    requestedSession?.projectId === project.id
+      ? requestedSession.agentId ?? null
+      : null;
   useEffect(() => {
-    if (!requestedSessionId || agents.length === 0) return;
-    const requestedSession = sessions.find(
-      (session) =>
-        session.projectId === project.id && session.id === requestedSessionId,
-    );
-    if (!requestedSession) return;
+    if (!requestedSessionAgentId || agents.length === 0) return;
     const agent = agents.find(
-      (candidate) => candidate.id === requestedSession.agentId,
+      (candidate) => candidate.id === requestedSessionAgentId,
     );
     if (!agent) return;
     setSelectedAgent(agent);
-  }, [agents, project.id, requestedSessionId, sessions]);
+  }, [agents, requestedSessionAgentId]);
 
   const addAgent = async (input: CreateProjectAgentInput) => {
     setIsSubmitting(true);
@@ -431,7 +422,6 @@ export function TeamAgents({
         }
         requestedSessionId={requestedSessionId}
         isStarting={startingAgentIds.has(selectedAgent.id)}
-        sessions={sessions}
         token={token}
       />
     );

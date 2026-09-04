@@ -2,13 +2,13 @@ import { useAtomValue } from "@effect/atom-react";
 import { useEffect, useMemo, useRef } from "react";
 
 import { isTeamConnectedLocally } from "../../lib/local-team-connection";
+import { createAgentSessionActions } from "../agent-sessions/actions";
 import { lockedTeamIdAtom } from "../platform";
 import { useRegistry } from "../registry";
 import { tokenAtom } from "../session/atoms";
 import { activeTeamIdAtom, teamSettingsAtom, teamsAtom } from "../team/atoms";
 import {
   getSharedWorkflowKeys,
-  getWorkspaceScheduleBridge,
   resolveWorkspaceApi,
   workspaceModes,
 } from "./api";
@@ -57,14 +57,15 @@ export function useWorkspaceSync(): void {
 
     The poller is restarted only by the three things that change what it may
     claim. The session callbacks it hands to each run used to be dependencies
-    too, and they change identity on every shell render, so the poller was torn
+    too, and they changed identity on every shell render, so the poller was torn
     down and restarted constantly — and a restart claims immediately. They are
-    read from the registry bridge at execution time instead.
+    registry-bound agent session actions now, whose identity never moves.
   */
   useEffect(() => {
     if (lockedTeamId || demoMode || remoteMode || !token) return;
     if (connectedIds.length === 0) return;
     const api = resolveWorkspaceApi(registry);
+    const agentSessions = createAgentSessionActions(registry);
     return api.startTeamAgentSchedulePolling(
       {
         claim: (claimTeamIds) =>
@@ -73,9 +74,8 @@ export function useWorkspaceSync(): void {
           api.completeProjectAgentScheduleRun(token, teamId, runId, input),
         renew: (teamId, runId, claimToken) =>
           api.renewProjectAgentScheduleRun(token, teamId, runId, claimToken),
-        execute: (run) => {
-          const bridge = getWorkspaceScheduleBridge(registry);
-          return api.executeScheduledTeamAgent(
+        execute: (run) =>
+          api.executeScheduledTeamAgent(
             {
               loadDashboard: api.loadDashboard,
               dispatchRun: (currentToken, teamId, candidate, input) =>
@@ -83,15 +83,40 @@ export function useWorkspaceSync(): void {
               retryRun: (currentToken, teamId, runId, reason) =>
                 api.retryHuntRun(currentToken, teamId, runId, reason),
               runAgent: api.runTeamAgent,
-              startSession: bridge.startScheduledAgentSession,
-              startWorkerDispatchSession:
-                bridge.startScheduledAgentWorkerDispatch,
-              settleSession: bridge.settleScheduledAgentSession,
+              startSession: (scheduled) =>
+                agentSessions.startTaskSession(
+                  scheduled.teamId,
+                  scheduled.agent.id,
+                  {
+                    agentName: scheduled.agent.name,
+                    request: scheduled.scheduleName,
+                    startedAt: scheduled.startedAt,
+                    trigger: "scheduled",
+                    scheduleId: scheduled.scheduleId,
+                    scheduleRunId: scheduled.id,
+                  },
+                ),
+              startWorkerDispatchSession: (
+                parentSessionId,
+                scheduled,
+                runs,
+                dispatch,
+              ) =>
+                agentSessions.startWorkerDispatchSession(
+                  scheduled.teamId,
+                  scheduled.agent,
+                  runs,
+                  {
+                    ...dispatch,
+                    parentSessionId,
+                    startedAt: scheduled.startedAt,
+                  },
+                ),
+              settleSession: agentSessions.settleTaskSession,
             },
             token,
             run,
-          );
-        },
+          ),
         log: (message, caught) => console.error(message, caught),
       },
       connectedIds,

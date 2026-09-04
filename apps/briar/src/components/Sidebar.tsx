@@ -19,10 +19,8 @@ import {
   MessageCircle,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  collapseLinkedAutoHuntSessions,
-  type AutoHuntSession,
-} from "../hooks/useAutoHuntSessions";
+import { collapseLinkedAutoHuntSessions } from "../state/agent-sessions/model";
+import type { AutoHuntSession } from "../types";
 import { useI18n, type Locale } from "../i18n";
 import {
   isLocalTeamRepositoryReady,

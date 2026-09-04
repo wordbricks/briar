@@ -27,6 +27,7 @@ import {
   quickProcessErrorAtom,
   quickStartingRunIdAtom,
 } from "../state/dialogs/atoms";
+import { useAgentSessionActions } from "../state/agent-sessions/actions";
 import { useRegistry } from "../state/registry";
 import { tokenAtom } from "../state/session/atoms";
 import { teamWorkersAtom } from "../state/entities/workers";
@@ -36,15 +37,16 @@ import {
   teamExecutionPolicyAtom,
 } from "../state/team/atoms";
 import { useSyncActions } from "../state/sync/actions";
-import type { AutoHuntSession, HuntRun, Project, ProjectAgent } from "../types";
+import type { HuntRun, Project, ProjectAgent } from "../types";
 
 /*
   Handing work to an agent: the auto hunt dispatch, the remote worker task, and
   the recovery pass that resumes whatever a planned app update interrupted.
 
   All three need the same three things — the session token, the team's worker
-  capabilities and the auto hunt session bookkeeping — which is why they moved
-  out of the shell together rather than one per surface.
+  capabilities and the agent session bookkeeping — which is why they moved out
+  of the shell together rather than one per surface. The session bookkeeping is
+  `state/agent-sessions`, which is why nothing about it is a parameter.
 */
 
 export type AgentAutoHuntOptions = {
@@ -54,42 +56,6 @@ export type AgentAutoHuntOptions = {
   targetRunIds?: string[];
   retryReason?: string | null;
 };
-
-/** The auto hunt session bookkeeping this hook drives. */
-export interface AgentDispatchSessions {
-  readonly adoptRemoteSession: (session: AutoHuntSession) => void;
-  readonly settleTaskSession: (
-    sessionId: string,
-    input: {
-      status: "completed" | "failed" | "skipped";
-      conversationId: string | null;
-      workspaceRoot: string | null;
-      summary: string | null;
-      error: string | null;
-    },
-  ) => void;
-  readonly startTaskSession: (
-    teamId: string,
-    agentId: string,
-    session: {
-      sessionId?: string;
-      request: string;
-      agentName?: string | null;
-      startedAt: string;
-    },
-  ) => string;
-  readonly startWorkerDispatchSession: (
-    teamId: string,
-    agent: TeamAgentRunInput["agent"],
-    runs: readonly HuntRun[],
-    dispatch: {
-      dispatchId: string;
-      runIds: readonly string[];
-      parentSessionId?: string;
-      coordinatorConversationId?: string | null;
-    },
-  ) => void;
-}
 
 /** The writes this hook performs, so tests can supply in-memory ones. */
 export interface AgentDispatchDeps {
@@ -109,7 +75,6 @@ export interface AgentDispatchInput {
   readonly teamWindowTeamId: string | null;
   /** Records an agent the dispatch just started, for the run labels. */
   readonly rememberAgent: (agent: ProjectAgent) => void;
-  readonly sessions: AgentDispatchSessions;
   readonly deps?: AgentDispatchDeps;
 }
 
@@ -138,10 +103,10 @@ export function useAgentDispatch({
   activeTeam,
   deps,
   rememberAgent,
-  sessions,
   teamWindowTeamId,
 }: AgentDispatchInput): AgentDispatch {
   const registry = useRegistry();
+  const sessions = useAgentSessionActions();
   const { refreshActiveTeam: refresh } = useSyncActions();
   const token = useAtomValue(tokenAtom);
   const activeTeamId = useAtomValue(activeTeamIdAtom);
@@ -207,12 +172,7 @@ export function useAgentDispatch({
     });
     if (activeTeam?.id === teamId) await refresh();
     return result.dispatchId;
-  }, [
-    activeTeam?.id,
-    registry,
-    sessions.startWorkerDispatchSession,
-    token,
-  ]);
+  }, [activeTeam?.id, registry, sessions, token]);
 
   const startAgentAutoHunt = useCallback(async (
     agent: ProjectAgent,
@@ -242,12 +202,7 @@ export function useAgentDispatch({
       await refresh();
     }
     return session.id;
-  }, [
-    activeTeam,
-    sessions.adoptRemoteSession,
-    activeTeamId,
-      token,
-  ]);
+  }, [activeTeam, activeTeamId, sessions, token]);
 
   useEffect(() => {
     if (
@@ -310,12 +265,11 @@ export function useAgentDispatch({
       );
     });
   }, [
-    sessions.settleTaskSession,
-    sessions.startTaskSession,
-    token,
     dispatchAgentAutoHunt,
-    teamWindowTeamId,
     runsOnDesktopTauri,
+    sessions,
+    teamWindowTeamId,
+    token,
   ]);
 
   // Switching teams abandons whatever dispatch was on screen for the old one.

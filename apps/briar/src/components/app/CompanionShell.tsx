@@ -62,9 +62,11 @@ import {
   DirectMessagesWithCatalog,
 } from "./ChannelViews";
 import { HuntDashboardWithTeam } from "./HuntDashboardWithTeam";
+import { useAgentSessionActions } from "../../state/agent-sessions/actions";
+import { agentSessionAtom } from "../../state/agent-sessions/atoms";
 import { TeamLobbyWithDashboard } from "./TeamViewsWithDashboard";
 import type { createCachedTeamUsageSummaryLoader } from "../../lib/team-usage-summary";
-import type { AutoHuntSession, Project, ProjectAgent } from "../../types";
+import type { Project, ProjectAgent } from "../../types";
 
 /*
   The phone shell: a header, one page at a time, and a bottom bar.
@@ -74,10 +76,10 @@ import type { AutoHuntSession, Project, ProjectAgent } from "../../types";
   above the shell choice now, and what is left here is the page chain itself.
 
   Everything the pages render from — the session, the selected organization and
-  team, the companion page and status, the requested run, the inbox — is read
-  from the store, and every call goes through a `state/` action. What the shell
-  still takes as props is the auto hunt sessions, which are not atom state yet,
-  and the team's usage loader, whose cache belongs to the app.
+  team, the companion page and status, the requested run, the agent sessions,
+  the inbox — is read from the store, and every call goes through a `state/`
+  action. What the shell still takes as props is the agent list and the team's
+  usage loader, whose cache belongs to the app.
 */
 
 const CompanionSettings = lazy(() =>
@@ -93,21 +95,11 @@ const TeamAgentSessionDetail = lazy(() =>
 
 const lazyViewFallback = <div className="lazy-view-placeholder h-full w-full" />;
 
-/** Auto hunt sessions, still `useAutoHuntSessions`'s. */
-export interface CompanionSessions {
-  readonly list: AutoHuntSession[];
-  readonly adoptRemoteSession: (session: AutoHuntSession) => string;
-  readonly stopSession: (sessionId: string) => Promise<boolean>;
-}
-
 export interface CompanionShellProps {
   /** The selected team, as the shell resolved it for its hooks. */
   readonly activeTeam: Project | undefined;
   /** The selected team's agents, for the board's labels. */
   readonly agents: ProjectAgent[];
-  /** Runs a dispatch or an auto hunt session is currently working on. */
-  readonly processingIssueIds: ReadonlySet<string>;
-  readonly sessions: CompanionSessions;
   readonly loadTeamHomeUsage: ReturnType<
     typeof createCachedTeamUsageSummaryLoader
   >;
@@ -117,8 +109,6 @@ export function CompanionShell({
   activeTeam,
   agents,
   loadTeamHomeUsage,
-  processingIssueIds,
-  sessions,
 }: CompanionShellProps) {
   const { t } = useI18n();
   const mobilePlatform = getMobilePlatform() ?? "android";
@@ -184,9 +174,12 @@ export function CompanionShell({
       ),
     [activeOrganizationId, activeTeamId, lockedTeamId, teams],
   );
-  const requestedCompanionSession =
-    sessions.list.find((candidate) => candidate.id === requestedSessionId) ??
-    null;
+  const agentSessions = useAgentSessionActions();
+  // Read under the empty id when nothing is open, so a session the phone is not
+  // showing never re-renders the shell.
+  const requestedCompanionSession = useAtomValue(
+    agentSessionAtom(requestedSessionId ?? ""),
+  );
 
   /*
     The phone's back gesture. It unwinds the shell's own stack — an open agent
@@ -253,7 +246,7 @@ export function CompanionShell({
             setCompanionStatus("all");
             setCompanionPage("issues");
           }}
-          onStop={() => sessions.stopSession(requestedCompanionSession.id)}
+          onStop={() => agentSessions.stopSession(requestedCompanionSession.id)}
           session={requestedCompanionSession}
           token={token}
           workers={workers ?? []}
@@ -271,7 +264,7 @@ export function CompanionShell({
         <>
           <CompanionChannelsWithCatalog
             channelInboxSyncSignal={channelInboxSyncSignal}
-            onSkillSessionAccepted={sessions.adoptRemoteSession}
+            onSkillSessionAccepted={agentSessions.adoptRemoteSession}
             onIssueOpen={async (projectId, runId) => {
               await ensureTeamSelected(projectId);
               setRequestedRunId(runId);
@@ -371,7 +364,7 @@ export function CompanionShell({
               setCompanionStatus("all");
               setCompanionPage("issues");
             }}
-            onSkillSessionAccepted={sessions.adoptRemoteSession}
+            onSkillSessionAccepted={agentSessions.adoptRemoteSession}
           />
           <CompanionBottomNavigation
             activeDestination="dms"
@@ -424,9 +417,7 @@ export function CompanionShell({
             setRequestedRunInitialTab(null);
           }}
           onSendIssueMessage={addIssueMessage}
-          processingIssueIds={processingIssueIds}
           projects={organizationTeams}
-          sessions={sessions.list}
         />
       )}
       </Suspense>

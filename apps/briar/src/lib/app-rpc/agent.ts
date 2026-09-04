@@ -27,7 +27,7 @@ import type {
   AutoHuntSession,
   AutoHuntSessionEventType,
   AutoHuntSessionIssueOutcome,
-} from "../../hooks/useAutoHuntSessions";
+} from "../../types";
 import type { ChannelAgentSummary, ChannelAgentSkillInput } from "../channels-contract";
 import type { AgentProvider } from "../agent-provider";
 import type { ModelEffort } from "../agent-provider-contract";

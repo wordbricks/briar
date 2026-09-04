@@ -7,12 +7,11 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { demoDashboard, demoRepositoryReadiness } from "../../lib/demo-data";
 import { createReactTestRoot } from "../../test/react";
 import type { DashboardPayload, HuntRun, Project } from "../../types";
-import { createTestRegistry, useRegistry, type AtomRegistry } from "../registry";
+import { createTestRegistry, type AtomRegistry } from "../registry";
 import { tokenAtom } from "../session/atoms";
 import { applySyncEvent } from "../sync/apply";
 import { activeTeamIdAtom, teamsAtom } from "../team/atoms";
 import {
-  setWorkspaceScheduleBridge,
   workspaceApiAtom,
   workspaceModesAtom,
   type WorkspaceApi,
@@ -83,23 +82,13 @@ const makeRegistry = () => {
 };
 
 /**
- * Stands in for `useActionBridges`: it installs the scheduled agent callbacks after
- * every render, and every render hands over fresh closures. `renderKey` forces
- * a re-render so a test can prove the poller ignores them.
+ * `renderKey` only forces a re-render, so a test can prove the poller ignores
+ * one. The scheduled agent callbacks it used to install after every render are
+ * registry-bound actions now, whose identity never moves.
  */
-function ScheduleBridge({ renderKey }: { renderKey: number }) {
-  const registry = useRegistry();
-  setWorkspaceScheduleBridge(registry, {
-    startScheduledAgentSession: () => `session-${renderKey}`,
-    settleScheduledAgentSession: () => undefined,
-    startScheduledAgentWorkerDispatch: () => undefined,
-  });
-  return null;
-}
-
 function Effects({ renderKey }: { renderKey: number }) {
   useWorkspaceSync();
-  return <ScheduleBridge renderKey={renderKey} />;
+  return <span data-render-key={renderKey} hidden />;
 }
 
 const tree = (registry: AtomRegistry, renderKey: number) => (
@@ -152,8 +141,8 @@ describe("useWorkspaceSync", () => {
 
     expect(server.pollerStarts).toEqual([[teamA.id]]);
 
-    // The bridge callbacks change identity on every render, which is what used
-    // to tear the poller down — and a restart claims scheduled work again.
+    // The session callbacks used to change identity on every render, which is
+    // what tore the poller down — and a restart claims scheduled work again.
     await view.render(tree(registry, 1));
     await flush();
     await view.render(tree(registry, 2));

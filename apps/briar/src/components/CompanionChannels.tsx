@@ -69,7 +69,7 @@ import {
   scrollConversationToBottom,
 } from "../lib/conversation-scroll";
 import { useChannelScrollStability } from "../hooks/use-channel-scroll-stability";
-import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
+import type { AutoHuntSession } from "../types";
 import type { ChannelAgentActivityDescriptor } from "../lib/channel-agent-activity";
 import {
   ChannelDraftImages,

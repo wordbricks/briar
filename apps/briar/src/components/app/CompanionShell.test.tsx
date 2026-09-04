@@ -66,12 +66,6 @@ const props: CompanionShellProps = {
   activeTeam: team,
   agents: [],
   loadTeamHomeUsage: createCachedTeamUsageSummaryLoader(async () => null),
-  processingIssueIds: new Set<string>(),
-  sessions: {
-    adoptRemoteSession: () => "session-1",
-    list: [],
-    stopSession: async () => true,
-  },
 };
 
 const renderCounter = createRenderCounter();

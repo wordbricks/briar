@@ -56,16 +56,7 @@ const props: DesktopShellProps = {
   agents: {
     activeTeamAgents: [],
     all: [],
-    processingIssueIds: new Set<string>(),
     rememberAgent: () => undefined,
-  },
-  autoHunt: {
-    adoptRemoteSession: () => "session-1",
-    removeProjectSessions: () => undefined,
-    sessions: [],
-    settleTaskSession: () => undefined,
-    startTaskSession: () => "session-1",
-    stopSession: async () => true,
   },
   loadOrganizationProjectDashboard: async () => null,
   loadProjectHomeMerges: async () => ({

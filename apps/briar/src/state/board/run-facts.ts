@@ -1,11 +1,11 @@
 import * as Atom from "effect/unstable/reactivity/Atom";
 
 import type {
-  AutoHuntSession,
   ExecutionWorker,
   OrganizationMember,
   ProjectAgent,
 } from "../../types";
+import { teamAgentSessionsAtom } from "../agent-sessions/atoms";
 import { teamMembersAtom } from "../entities/members";
 import { runAtom } from "../entities/runs";
 import { shallowArrayEqual } from "../entities/upsert";
@@ -21,9 +21,10 @@ import { splitBoardKey } from "./atoms";
   card renders: the same agent, worker or member reference means no
   notification, whatever else moved in the store.
 
-  The agents and the auto hunt sessions still come from React hooks — the plan
-  leaves `useAutoHuntSessions` for a follow-up — so the board publishes them
-  into the two atoms below and everything downstream is derived.
+  The sessions come from `state/agent-sessions`. The agents still come from a
+  React hook — `useIssueAgents` loads them per team and remembers the ones a
+  dispatch just started — so the board publishes those into the atom below and
+  everything downstream is derived.
 */
 
 /** Every agent the shell has loaded, across teams. Published by the board. */
@@ -31,13 +32,6 @@ export const boardAgentsAtom = Atom.make<readonly ProjectAgent[]>([]).pipe(
   Atom.keepAlive,
   Atom.withEquality<readonly ProjectAgent[]>(shallowArrayEqual),
   Atom.withLabel("board/agents"),
-);
-
-/** The auto hunt sessions the shell knows about. Published by the board. */
-export const boardSessionsAtom = Atom.make<readonly AutoHuntSession[]>([]).pipe(
-  Atom.keepAlive,
-  Atom.withEquality<readonly AutoHuntSession[]>(shallowArrayEqual),
-  Atom.withLabel("board/sessions"),
 );
 
 /** The agent a run is labelled with, and the one working on it right now. */
@@ -86,11 +80,11 @@ export const teamSessionAgentIndexAtom = Atom.family((teamId: string) =>
     );
     const active = new Map<string, ProjectAgent>();
     const performed = new Map<string, ProjectAgent>();
-    const recent = [...get(boardSessionsAtom)].sort(
+    const recent = [...get(teamAgentSessionsAtom(teamId))].sort(
       (left, right) => Date.parse(right.startedAt) - Date.parse(left.startedAt),
     );
     for (const session of recent) {
-      if (session.projectId !== teamId || !session.agentId) continue;
+      if (!session.agentId) continue;
       const agent = agentById.get(session.agentId);
       if (!agent) continue;
       for (const issue of session.issues) {

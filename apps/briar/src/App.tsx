@@ -9,7 +9,6 @@ import { DesktopShell } from "./components/app/DesktopShell";
 import { InboxBridge } from "./components/app/InboxBridge";
 import { loadProjectMergeActivity } from "./lib/app-rpc/github";
 import { useOrganizationViewData } from "./hooks/useOrganizationViewData";
-import { useAutoHuntSessions } from "./hooks/useAutoHuntSessions";
 import { useAgentDispatch } from "./hooks/useAgentDispatch";
 import { useAppShortcuts } from "./hooks/useAppShortcuts";
 import { useCommandPaletteItems } from "./hooks/useCommandPaletteItems";
@@ -34,7 +33,6 @@ import {
   requestedRunIdAtom,
   requestedSessionIdAtom,
 } from "./state/navigation/atoms";
-import { useActionBridges } from "./state/action-bridges";
 import { companionMode, lockedTeamId, remoteMode } from "./state/platform";
 import { organizationsAtom } from "./state/organization/atoms";
 import { useTeamActions } from "./state/team/actions";
@@ -62,10 +60,10 @@ import type { AppZoomCommands } from "./lib/app-zoom";
   nothing else: which gates stand between a cold start and the shell, which
   shell that is, and what the dialogs above both of them are showing.
 
-  It deliberately subscribes to no run and no channel. The inbox, which does
-  need the open board, lives in `InboxBridge` below — so a polling tick that
-  changes one run commits that run's subscribers and this component is not one
-  of them.
+  It deliberately subscribes to no run, no channel and no agent session. The
+  inbox, which does need the open board, lives in `InboxBridge` below — so a
+  polling tick that changes one run commits that run's subscribers and this
+  component is not one of them.
 */
 
 export function App({
@@ -82,41 +80,6 @@ export function App({
   const activeTeam = useAtomValue(activeTeamAtom) ?? undefined;
   const isCreatingTeam = useAtomValue(isCreatingTeamAtom);
   const teamConnection = useAtomValue(teamConnectionAtom);
-
-  const autoHunt = useAutoHuntSessions();
-  /*
-    The callbacks the registry-bound actions reach back into
-    `useAutoHuntSessions` for: adopting a session an agent proposed, and the
-    three a claimed scheduled run goes through.
-  */
-  useActionBridges({
-    adoptRemoteAgentSession: autoHunt.adoptRemoteSession,
-    startScheduledAgentSession: (run) =>
-      autoHunt.startTaskSession(run.teamId, run.agent.id, {
-        agentName: run.agent.name,
-        request: run.scheduleName,
-        startedAt: run.startedAt,
-        trigger: "scheduled",
-        scheduleId: run.scheduleId,
-        scheduleRunId: run.id,
-      }),
-    settleScheduledAgentSession: autoHunt.settleTaskSession,
-    startScheduledAgentWorkerDispatch: (
-      parentSessionId,
-      run,
-      runs,
-      dispatch,
-    ) => autoHunt.startWorkerDispatchSession(
-      run.teamId,
-      run.agent,
-      runs,
-      {
-        ...dispatch,
-        parentSessionId,
-        startedAt: run.startedAt,
-      },
-    ),
-  });
 
   const { cancelTeamCreation, finishTeamCreation, startTeamCreation } =
     useTeamActions();
@@ -177,9 +140,8 @@ export function App({
   const {
     activeTeamAgents,
     agents: issueAgents,
-    processingIssueIds,
     rememberAgent: rememberIssueAgent,
-  } = useIssueAgents({ activeTeam, sessions: autoHunt.sessions });
+  } = useIssueAgents({ activeTeam });
   const shouldShowInitialOnboarding =
     !remoteMode &&
     !hasCompletedOnboarding &&
@@ -205,7 +167,6 @@ export function App({
   const { startAgentAutoHunt, startTeamAgentTask } = useAgentDispatch({
     activeTeam,
     rememberAgent: rememberIssueAgent,
-    sessions: autoHunt,
     teamWindowTeamId: lockedTeamId,
   });
 
@@ -266,7 +227,6 @@ export function App({
     commandPaletteAvailable,
     keybindings: configuredKeybindings,
     keyboardShortcutsShortcut: keyboardShortcutsModifierLabel(),
-    sessions: autoHunt.sessions,
   });
 
   const shell = companionMode ? (
@@ -274,12 +234,6 @@ export function App({
       activeTeam={activeTeam}
       agents={activeTeamAgents}
       loadTeamHomeUsage={loadTeamHomeUsage}
-      processingIssueIds={processingIssueIds}
-      sessions={{
-        adoptRemoteSession: autoHunt.adoptRemoteSession,
-        list: autoHunt.sessions,
-        stopSession: autoHunt.stopSession,
-      }}
     />
   ) : (
     <DesktopShell
@@ -287,16 +241,7 @@ export function App({
       agents={{
         activeTeamAgents,
         all: issueAgents,
-        processingIssueIds,
         rememberAgent: rememberIssueAgent,
-      }}
-      autoHunt={{
-        adoptRemoteSession: autoHunt.adoptRemoteSession,
-        removeProjectSessions: autoHunt.removeProjectSessions,
-        sessions: autoHunt.sessions,
-        settleTaskSession: autoHunt.settleTaskSession,
-        startTaskSession: autoHunt.startTaskSession,
-        stopSession: autoHunt.stopSession,
       }}
       loadOrganizationProjectDashboard={loadOrganizationTeamDashboard}
       loadProjectHomeMerges={loadTeamHomeMerges}
@@ -318,7 +263,7 @@ export function App({
   return (
     <>
       <AppEffects />
-      <InboxBridge sessions={autoHunt.sessions} />
+      <InboxBridge />
       <AuthGate
         acceptingInvitation={invitation.acceptingInvitation}
         invitationToken={invitation.invitationToken}

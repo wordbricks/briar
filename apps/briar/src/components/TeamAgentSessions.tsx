@@ -1,49 +1,49 @@
+import { useAtomValue } from "@effect/atom-react";
 import { Bot, ChevronRight, OctagonX } from "lucide-react";
 import { Spinner } from "./ui/spinner";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import { EmptyState } from "@/components/layout";
 import { Typography } from "@/components/ui/typography";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
-import type {
-  AutoHuntSession,
-  AutoHuntSessionStatus,
-} from "../hooks/useAutoHuntSessions";
 import {
-  canStopAutoHuntSession,
-  collapseLinkedAutoHuntSessions,
-} from "../hooks/useAutoHuntSessions";
+  agentSessionAtom,
+  agentSessionRowIdsAtom,
+  agentSessionsKey,
+} from "../state/agent-sessions/atoms";
+import { canStopAutoHuntSession } from "../state/agent-sessions/model";
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
-import type { ProjectAgent } from "../types";
+import type { AutoHuntSessionStatus, ProjectAgent } from "../types";
+
+/*
+  One agent's session list.
+
+  The panel subscribes to the ids and each row to its own session, so a session
+  that changes status commits that row alone — the list boundary above it does
+  not move, because a status change does not reorder anything.
+*/
 
 export function TeamAgentSessions({
   agent,
   onSessionOpen,
   onStopSession,
   projectId,
-  sessions,
 }: {
   agent: ProjectAgent;
   onSessionOpen: (sessionId: string) => void;
   onStopSession?: (sessionId: string) => Promise<boolean>;
   projectId: string;
-  sessions: AutoHuntSession[];
 }) {
-  const { localeTag, t } = useI18n();
-  const { toast } = useToast();
+  const { t } = useI18n();
+  const sessionIds = useAtomValue(
+    agentSessionRowIdsAtom(agentSessionsKey(projectId, agent.id)),
+  );
   const [stoppingSessionIds, setStoppingSessionIds] = useState<Set<string>>(
     () => new Set(),
   );
-
-  const agentSessions = useMemo(() => {
-    const matchingSessions = sessions.filter(
-      (session) =>
-        session.projectId === projectId && session.agentId === agent.id,
-    );
-    return collapseLinkedAutoHuntSessions(matchingSessions);
-  }, [agent.id, projectId, sessions]);
+  const { toast } = useToast();
 
   const handleStop = async (sessionId: string) => {
     if (!onStopSession || stoppingSessionIds.has(sessionId)) return;
@@ -78,10 +78,10 @@ export function TeamAgentSessions({
             {t("agents.sessionsDescription")}
           </Typography>
         </div>
-        <span>{agentSessions.length}</span>
+        <span>{sessionIds.length}</span>
       </header>
 
-      {agentSessions.length === 0 ? (
+      {sessionIds.length === 0 ? (
         <EmptyState
           className="auto-hunt-empty"
           description={t("agents.emptySessionsDescription")}
@@ -90,85 +90,104 @@ export function TeamAgentSessions({
         />
       ) : (
         <div className="auto-hunt-session-list">
-          {agentSessions.map((session) => {
-            const isRunning = session.status === "running";
-            const canStop =
-              isRunning &&
-              canStopAutoHuntSession(session) &&
-              Boolean(onStopSession);
-            const isStopping = stoppingSessionIds.has(session.id);
-            return (
-              <div
-                className="auto-hunt-session-row"
-                key={session.id}
-                onClick={() => onSessionOpen(session.id)}
-                onKeyDown={(event) => {
-                  if (
-                    event.target === event.currentTarget &&
-                    (event.key === "Enter" || event.key === " ")
-                  ) {
-                    event.preventDefault();
-                    onSessionOpen(session.id);
-                  }
-                }}
-                role="button"
-                tabIndex={0}
-              >
-                <SessionStatusIcon status={session.status} />
-                <span className="auto-hunt-session-copy">
-                  <strong>
-                    {t("autoHunt.session")} ·{" "}
-                    {formatDate(session.startedAt, localeTag)}
-                  </strong>
-                  <small>
-                    {session.request ??
-                      session.issues.map((issue) => issue.title).join(" · ")}
-                  </small>
-                </span>
-                <span className={`auto-hunt-status ${session.status}`}>
-                  {statusLabel(t, session.status)}
-                </span>
-                <span className="auto-hunt-session-count">
-                  {session.sessionType === "task"
-                    ? t(
-                        session.trigger === "scheduled"
-                          ? "agents.scheduledRun"
-                          : "agents.runTask",
-                      )
-                    : t("autoHunt.issueCount", {
-                        count: session.issues.length,
-                      })}
-                </span>
-                <span className="auto-hunt-session-row-actions">
-                  {canStop ? (
-                    <Button
-                      aria-label={t("agents.stopSession")}
-                      className="auto-hunt-session-row-stop size-7 shrink-0 p-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                      disabled={isStopping}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        void handleStop(session.id);
-                      }}
-                      size="icon"
-                      title={t("agents.stopSession")}
-                      type="button"
-                      variant="ghost"
-                    >
-                      {isStopping ? (
-                        <Spinner size={14} />
-                      ) : (
-                        <OctagonX size={15} />
-                      )}
-                    </Button>
-                  ) : null}
-                  <ChevronRight size={16} />
-                </span>
-              </div>
-            );
-          })}
+          {sessionIds.map((sessionId) => (
+            <TeamAgentSessionRow
+              canStop={Boolean(onStopSession)}
+              isStopping={stoppingSessionIds.has(sessionId)}
+              key={sessionId}
+              onOpen={onSessionOpen}
+              onStop={handleStop}
+              sessionId={sessionId}
+            />
+          ))}
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * One row, subscribed to its own session. Everything it needs to decide what to
+ * draw is on that session, so a change to any other one never reaches it.
+ */
+function TeamAgentSessionRow({
+  canStop: stopAvailable,
+  isStopping,
+  onOpen,
+  onStop,
+  sessionId,
+}: {
+  canStop: boolean;
+  isStopping: boolean;
+  onOpen: (sessionId: string) => void;
+  onStop: (sessionId: string) => void;
+  sessionId: string;
+}) {
+  const { localeTag, t } = useI18n();
+  const session = useAtomValue(agentSessionAtom(sessionId));
+  if (!session) return null;
+  const isRunning = session.status === "running";
+  const canStop = isRunning && canStopAutoHuntSession(session) && stopAvailable;
+  return (
+    <div
+      className="auto-hunt-session-row"
+      onClick={() => onOpen(session.id)}
+      onKeyDown={(event) => {
+        if (
+          event.target === event.currentTarget &&
+          (event.key === "Enter" || event.key === " ")
+        ) {
+          event.preventDefault();
+          onOpen(session.id);
+        }
+      }}
+      role="button"
+      tabIndex={0}
+    >
+      <SessionStatusIcon status={session.status} />
+      <span className="auto-hunt-session-copy">
+        <strong>
+          {t("autoHunt.session")} ·{" "}
+          {formatDate(session.startedAt, localeTag)}
+        </strong>
+        <small>
+          {session.request ??
+            session.issues.map((issue) => issue.title).join(" · ")}
+        </small>
+      </span>
+      <span className={`auto-hunt-status ${session.status}`}>
+        {statusLabel(t, session.status)}
+      </span>
+      <span className="auto-hunt-session-count">
+        {session.sessionType === "task"
+          ? t(
+              session.trigger === "scheduled"
+                ? "agents.scheduledRun"
+                : "agents.runTask",
+            )
+          : t("autoHunt.issueCount", { count: session.issues.length })}
+      </span>
+      <span className="auto-hunt-session-row-actions">
+        {canStop ? (
+          <Button
+            aria-label={t("agents.stopSession")}
+            className="auto-hunt-session-row-stop size-7 shrink-0 p-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+            disabled={isStopping}
+            onClick={(event) => {
+              event.stopPropagation();
+              onStop(session.id);
+            }}
+            size="icon"
+            title={t("agents.stopSession")}
+            type="button"
+            variant="ghost"
+          >
+            {isStopping ? <Spinner size={14} /> : <OctagonX size={15} />}
+          </Button>
+        ) : null}
+        <ChevronRight size={16} />
+      </span>
+    </div>
   );
 }
 

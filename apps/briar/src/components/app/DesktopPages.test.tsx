@@ -80,16 +80,7 @@ const pageProps: DesktopPagesProps = {
   agents: {
     activeTeamAgents: [],
     all: [],
-    processingIssueIds: new Set<string>(),
     rememberAgent: noop,
-  },
-  autoHunt: {
-    adoptRemoteSession: () => "session-1",
-    removeProjectSessions: noop,
-    sessions: [],
-    settleTaskSession: noop,
-    startTaskSession: () => "session-1",
-    stopSession: async () => true,
   },
   loadOrganizationProjectDashboard: async () => null,
   loadProjectHomeMerges: async () => ({
@@ -206,7 +197,7 @@ const mountInboxPage = async () => {
                 "window-controls",
                 <WindowNavigationControlsWithHistory />,
               )}
-              {renders.profile("inbox-bridge", <InboxBridge sessions={[]} />)}
+              {renders.profile("inbox-bridge", <InboxBridge />)}
               <RunProbe renders={renders} />
               <SettingsProbe renders={renders} />
             </TooltipProvider>

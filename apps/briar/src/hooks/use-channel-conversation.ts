@@ -65,7 +65,7 @@ import type {
 } from "../lib/channel-agent-activity";
 import { useI18n } from "../i18n";
 import { useToast } from "../components/ui/toast";
-import type { AutoHuntSession } from "./useAutoHuntSessions";
+import type { AutoHuntSession } from "../types";
 import {
   CHANNEL_REALTIME_FALLBACK_MS,
   createChannelRealtimeTransport,

@@ -36,7 +36,6 @@ import {
   type AutoHuntWorkflowCheckpoint,
 } from "../../lib/auto-hunt-contract";
 import { canonicalizeIssueAttachmentReferences } from "../../lib/issue-markdown";
-import type { AutoHuntSession } from "../../hooks/useAutoHuntSessions";
 import type {
   AgentSkillExecutionApprovalInput,
   AgentSkillExecutionProposal,
@@ -53,6 +52,7 @@ import type {
   IssueDependencyReference,
   UpdateIssueInput,
 } from "../../types";
+import { createAgentSessionActions } from "../agent-sessions/actions";
 import { demoOrganization, demoUser, emptyDashboard } from "../demo-fixtures";
 import { runAtom, teamRunIdsAtom, teamRunsAtom } from "../entities/runs";
 import { activeOrganizationIdAtom } from "../organization/atoms";
@@ -151,31 +151,6 @@ export const liveIssueActionApi: IssueActionApi = {
   updateIssueSubscription: updateRemoteIssueSubscription,
 };
 
-/**
- * The one thing an issue action needs that only the app shell can supply: the
- * agent session adopter owned by `useAutoHuntSessions`.
- *
- * It is held per registry rather than passed as a hook dependency because the
- * views that call these actions render far below the hook that owns it, and
- * because keeping it out of the dependency list is what lets
- * {@link useIssueActions} hand back one stable object forever.
- */
-export interface IssueActionBridge {
-  readonly adoptRemoteAgentSession?:
-    | ((session: AutoHuntSession) => void)
-    | undefined;
-}
-
-const bridges = new WeakMap<AtomRegistry, IssueActionBridge>();
-
-/** Installs the shell callbacks the issue actions call back into. */
-export function setIssueActionBridge(
-  registry: AtomRegistry,
-  bridge: IssueActionBridge,
-): void {
-  bridges.set(registry, bridge);
-}
-
 export interface IssueActionDeps {
   readonly api?: Partial<IssueActionApi> | undefined;
   /**
@@ -254,7 +229,7 @@ export function createIssueActions(
   const resumeRequestIds = new Map<string, string>();
   const reworkRequestIds = new Map<string, string>();
 
-  const bridge = () => bridges.get(registry) ?? {};
+  const agentSessions = createAgentSessionActions(registry);
   const setError = (error: string | null) =>
     registry.set(sessionErrorAtom, error);
   const messageOf = (caught: unknown) =>
@@ -1112,7 +1087,9 @@ export function createIssueActions(
         proposal,
         input,
       );
-      if (result.session) bridge().adoptRemoteAgentSession?.(result.session);
+      // The session the server started for the approved skill, taken in so the
+      // agent views list it without waiting for the next sync page.
+      if (result.session) agentSessions.adoptRemoteSession(result.session);
       registry.update(issueMessagesAtom(runId), (messages) =>
         messages.map((message) =>
           message.skillExecutionProposal?.id === proposal.id

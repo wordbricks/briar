@@ -4,7 +4,7 @@ import { act } from "react";
 import { createReactTestRoot, renderReactTestRoot } from "../../../test/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import type { AutoHuntSession } from "@/hooks/useAutoHuntSessions";
+import type { AutoHuntSession } from "@/types";
 import { demoDashboard, demoRunEvents } from "@/lib/demo-data";
 import * as api from "@/lib/api";
 import * as channelRealtime from "@/lib/channel-realtime";

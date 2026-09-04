@@ -5,7 +5,7 @@ import { BoardHarness } from "../../../test/board-harness";
 import { createReactTestRoot, renderReactTestRoot } from "../../../test/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import type { AutoHuntSession } from "@/hooks/useAutoHuntSessions";
+import type { AutoHuntSession } from "@/types";
 import { demoDashboard, demoRunEvents } from "@/lib/demo-data";
 import { defaultAgentProviderModelCatalog } from "@/lib/team-llm";
 import * as api from "@/lib/api";

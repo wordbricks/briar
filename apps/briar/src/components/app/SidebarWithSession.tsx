@@ -1,6 +1,7 @@
 import { useAtomValue } from "@effect/atom-react";
 import type { ComponentProps, ReactNode } from "react";
 
+import { agentSessionsAtom } from "../../state/agent-sessions/atoms";
 import {
   activePlanningProjectIdAtom,
   isSidebarOpenAtom,
@@ -73,8 +74,8 @@ export function SidebarSessionBoundary({
 /**
  * `Sidebar` wired to the store. Everything it lists — the teams this window may
  * show, the channels of the active organization, where the user is, what this
- * device knows about each repository — comes from atoms; the shell keeps only
- * the callbacks that navigate and the agent sessions it owns.
+ * device knows about each repository, the agent sessions running on each team —
+ * comes from atoms; the shell keeps only the callbacks that navigate.
  *
  * The settings pages bring their own navigation column, so the sidebar takes
  * itself off screen there rather than making the shell branch on the page.
@@ -94,6 +95,7 @@ export function SidebarWithSession(
     | "projectReadinessError"
     | "projectWindowProjectId"
     | "projects"
+    | "sessions"
     | "unreadDmCount"
   >,
 ) {
@@ -109,6 +111,7 @@ export function SidebarWithSession(
   const projectReadiness = useAtomValue(teamReadinessRecordAtom);
   const projectReadinessError = useAtomValue(teamReadinessErrorRecordAtom);
   const projects = useAtomValue(visibleTeamsAtom);
+  const sessions = useAtomValue(agentSessionsAtom);
   if (activePage === "settings") return null;
   return (
     <SidebarSessionBoundary>
@@ -128,6 +131,7 @@ export function SidebarWithSession(
             isOpen={isOpen}
             projectReadiness={projectReadiness}
             projectReadinessError={projectReadinessError}
+            sessions={sessions}
             projectWindowProjectId={lockedTeamId}
             projects={projects}
             unreadDmCount={

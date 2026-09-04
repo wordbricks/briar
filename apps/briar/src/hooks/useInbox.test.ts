@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { demoDashboard } from "../lib/demo-data";
-import type { AutoHuntSession } from "./useAutoHuntSessions";
+import type { AutoHuntSession } from "../types";
 import {
   buildCurrentInboxMessages,
   classifyInboxMessage,
