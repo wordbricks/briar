@@ -1,30 +1,41 @@
 /** @vitest-environment jsdom */
 
-import { act, memo, useState } from "react";
+import { RegistryContext, useAtomValue } from "@effect/atom-react";
+import { act } from "react";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { I18nProvider } from "../i18n";
 import { createReactTestRoot } from "../test/react";
 import { createRenderCounter } from "../test/render-count";
+import { testChannelMessage } from "../test/channel-conversation";
 import type { ChannelMessage, ChannelSummary } from "../lib/channels-contract";
+import { createTestRegistry, type AtomRegistry } from "../state/registry";
+import { channelRootMessageSummariesAtom } from "../state/channel-conversation/atoms";
+import { applySyncEvent } from "../state/sync/apply";
+import { writeChannelTimeline } from "../state/channel-conversation/write";
 import {
+  ChannelMessageRow,
   MessageRow,
+  type ChannelMessageRowContext,
   type MessageRowHandlers,
 } from "./Channels";
 
 /*
-  The memo boundary of a channel message.
+  The subscription boundary of a channel message.
 
   Every handler a row needs used to arrive as an inline arrow function closing
   over that row's own message, so each of a dozen props was a new value on every
-  render of the list and `memo` compared nothing but identities that always
-  differed. The row binds its own message now and the list hands it one stable
-  bundle, which is what makes the comparison mean something: a new message
-  renders one row, not all of them.
+  render and `memo` compared nothing but identities that always differed. Then
+  the row bound its own message and the list handed it one stable bundle. Now
+  the row does not receive the message at all: it reads it from the store by id,
+  and the list reads summaries, so a change to one message reaches one row and
+  the list itself is not woken.
 */
 
+const channelId = "channel-1";
+
 const channel: ChannelSummary = {
-  id: "channel-1",
+  id: channelId,
   organizationId: "org-1",
   slug: "general",
   name: "General",
@@ -45,33 +56,12 @@ const channel: ChannelSummary = {
   dmParticipants: [],
 };
 
-const messageOf = (index: number): ChannelMessage => ({
-  id: `message-${index}`,
-  channelId: channel.id,
-  parentMessageId: null,
-  author: {
-    type: "user",
-    id: "user-1",
-    name: "Sam",
-    email: "sam@example.com",
-    image: null,
-  },
-  body: `Message ${index}`,
-  blocks: [],
-  mentionedUserIds: [],
-  mentionedAgentIds: [],
-  attachments: [],
-  reactions: [],
-  replyCount: 0,
-  lastReplyAt: null,
-  replyAuthors: [],
-  subscribers: [],
-  document: null,
-  proposal: null,
-  executionProposal: null,
-  skillExecutionProposal: null,
-  createdAt: `2026-08-01T00:0${index}:00.000Z`,
-});
+const messageOf = (index: number): ChannelMessage =>
+  testChannelMessage(`message-${index}`, {
+    channelId,
+    body: `Message ${index}`,
+    createdAt: `2026-08-01T00:0${index}:00.000Z`,
+  });
 
 const unusedHandler = (() => {
   throw new Error("not called");
@@ -95,103 +85,145 @@ const handlers: MessageRowHandlers = {
 
 const noTyping: string[] = [];
 const noActivity = {};
-const noAgents: never[] = [];
-const noMembers: never[] = [];
-const noProjects: never[] = [];
+
+const rowContext: ChannelMessageRowContext = {
+  acceptingProposalId: null,
+  agents: [],
+  busy: false,
+  canOpenThread: false,
+  channel,
+  currentUserId: "user-1",
+  decliningProposalId: null,
+  handlers,
+  highlightedMessageId: null,
+  loadCreateExecutionProposalContext: unusedHandler,
+  localeTag: "en-US",
+  members: [],
+  projects: [],
+  proposalProjects: {},
+  threadParentId: null,
+  token: "token",
+  typingActivityByAgentName: () => noActivity,
+  typingAgentNames: () => noTyping,
+};
 
 const renderCounter = createRenderCounter();
-/*
-  A counter inside a memoised component cannot be read from outside it, so the
-  boundary is measured by repeating it: this wrapper memoises the same props
-  with the same shallow comparison `MessageRow` uses, and counts the renders
-  that get through. A count of one is a row whose props actually changed.
-*/
-const TrackedRow = memo(renderCounter.track("row", MessageRow));
 
-let append: ((message: ChannelMessage) => void) | null = null;
-
-function MessageList({ initial }: { readonly initial: ChannelMessage[] }) {
-  const [messages, setMessages] = useState(initial);
-  append = (message) => setMessages((current) => [...current, message]);
+/**
+ * The list as `Channels` renders it: a subscription to the summaries and one
+ * row per id. Each row sits under its own `Profiler`, so a count of zero means
+ * nothing in that row re-rendered; the list counts its own body.
+ */
+function MessageList() {
+  const summaries = useAtomValue(channelRootMessageSummariesAtom(channelId));
+  renderCounter.record("list", null);
   return (
     <>
-      {messages.map((message) => (
-        <TrackedRow
-          acceptingProposal={false}
-          agents={noAgents}
-          busy={false}
-          channel={channel}
-          currentUserId="user-1"
-          decliningProposal={false}
-          handlers={handlers}
-          key={message.id}
-          loadCreateExecutionProposalContext={unusedHandler}
-          localeTag="en-US"
-          members={noMembers}
-          message={message}
-          projects={noProjects}
-          selectedProjectId={null}
-          token="token"
-          typingActivityByAgentName={noActivity}
-          typingAgentNames={noTyping}
-        />
-      ))}
+      {summaries.map((summary) =>
+        renderCounter.profile(
+          `row:${summary.id}`,
+          <ChannelMessageRow
+            channelId={channelId}
+            context={rowContext}
+            key={summary.id}
+            messageId={summary.id}
+          />,
+        ),
+      )}
     </>
   );
+}
+
+async function renderList(registry: AtomRegistry) {
+  const view = createReactTestRoot();
+  await view.render(
+    <RegistryContext.Provider value={registry}>
+      <I18nProvider>
+        <MessageList />
+      </I18nProvider>
+    </RegistryContext.Provider>,
+  );
+  return view;
 }
 
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   window.localStorage.setItem("briar.locale.v1", "en");
   renderCounter.reset();
-  append = null;
 });
 
-describe("MessageRow", () => {
+describe("ChannelMessageRow", () => {
   it("is memoised", () => {
-    // The render counts below measure a wrapper that repeats this comparison,
-    // so they only mean anything while the row itself is memoised.
+    // The counts below only mean something while the row is memoised: without
+    // it every row would re-render whenever the list did.
+    expect((ChannelMessageRow as { $$typeof?: symbol }).$$typeof).toBe(
+      Symbol.for("react.memo"),
+    );
     expect((MessageRow as { $$typeof?: symbol }).$$typeof).toBe(
       Symbol.for("react.memo"),
     );
   });
 
-  it("renders only the new row when a message arrives", async () => {
-    const view = createReactTestRoot();
-    await view.render(
-      <I18nProvider>
-        <MessageList initial={[messageOf(1), messageOf(2), messageOf(3)]} />
-      </I18nProvider>,
-    );
-    expect(renderCounter.count("row")).toBe(3);
-    renderCounter.reset();
+  it("renders the message the store holds for its id", async () => {
+    const registry = createTestRegistry();
+    writeChannelTimeline(registry, channelId, [messageOf(1), messageOf(2)]);
 
-    await act(async () => {
-      append?.(messageOf(4));
-    });
+    const view = await renderList(registry);
 
-    expect(view.container.textContent).toContain("Message 4");
-    // The three rows that did not change kept their memoised output.
-    expect(renderCounter.count("row")).toBe(1);
+    expect(view.container.textContent).toContain("Message 1");
+    expect(view.container.textContent).toContain("Message 2");
     await view.cleanup();
   });
 
-  it("re-renders the one row whose message was edited", async () => {
-    const view = createReactTestRoot();
-    const messages = [messageOf(1), messageOf(2)];
-    await view.render(
-      <I18nProvider>
-        <MessageList initial={messages} />
-      </I18nProvider>,
-    );
+  it("re-renders one row when one message changes, and not the list", async () => {
+    const registry = createTestRegistry();
+    writeChannelTimeline(registry, channelId, [
+      messageOf(1),
+      messageOf(2),
+      messageOf(3),
+    ]);
+    const view = await renderList(registry);
     renderCounter.reset();
 
     await act(async () => {
-      append?.({ ...messageOf(2), id: "message-3", body: "Edited" });
+      applySyncEvent(registry, {
+        kind: "channel-message-changed",
+        channelId,
+        message: { ...messageOf(2), body: "Edited" },
+        includeRepliesInRoot: false,
+      });
     });
 
     expect(view.container.textContent).toContain("Edited");
-    expect(renderCounter.count("row")).toBe(1);
+    /*
+      The claim is which boundaries woke, not how many commits each took: a row
+      whose message changed commits once for the new value and once more for
+      the effects inside it. Nothing else is in the map — not the list, not the
+      other two rows.
+    */
+    expect(Object.keys(renderCounter.counts())).toEqual(["row:message-2"]);
+    expect(renderCounter.count("row:message-2")).toBeGreaterThan(0);
+    await view.cleanup();
+  });
+
+  it("wakes nothing when a page re-sends the same messages", async () => {
+    const registry = createTestRegistry();
+    writeChannelTimeline(registry, channelId, [messageOf(1), messageOf(2)]);
+    const view = await renderList(registry);
+    renderCounter.reset();
+
+    await act(async () => {
+      applySyncEvent(registry, {
+        kind: "channel-messages-page",
+        channelId,
+        messages: [messageOf(1), messageOf(2)],
+        removedMessageIds: [],
+        reset: false,
+        includeRepliesInRoot: false,
+      });
+    });
+
+    renderCounter.expectRenderCounts({});
     await view.cleanup();
   });
 });

@@ -442,7 +442,7 @@ export function AgentSkillExecutionApproval<
                 onClick={() => void openApproval()}
                 type="button"
               >
-                {opening ? <Spinner size={15} /> : <Play size={15} />}
+                {opening ? <Spinner className="size-[15px]" /> : <Play size={15} />}
                 {opening ? t("skillExecution.loading") : t("skillExecution.review")}
               </button>
             </footer>
@@ -515,7 +515,7 @@ export function AgentSkillExecutionApproval<
               {t("common.cancel")}
             </Button>
             <Button disabled={!canAccept || accepting} onClick={() => void accept()}>
-              {accepting ? <Spinner size={15} /> : <Play size={15} />}
+              {accepting ? <Spinner className="size-[15px]" /> : <Play size={15} />}
               {accepting ? t("skillExecution.approving") : t("skillExecution.approve")}
             </Button>
           </DialogFooter>

@@ -34,7 +34,7 @@ export function IssueInlineAttachmentPreview({
           <CircleAlert aria-hidden="true" size={14} />
           {alt}
         </span>}
-      {!previewUrl && !failed && file && <Spinner aria-hidden="true" size={14} />}
+      {!previewUrl && !failed && file && <Spinner aria-hidden="true" className="size-[14px]" />}
       <button aria-label={removeLabel} onClick={onRemove} type="button">
         <Trash2 size={14} />
       </button>

@@ -51,12 +51,22 @@ export function channelMessageUploadMetadata(
     ) {
       throw new HttpError(400, "Channel attachment metadata is invalid");
     }
+    const contentType = normalizedContentType(attachment.contentType, filename);
+    const isImage = contentType.startsWith("image/");
+    const imageWidth = isImage && attachment.imageWidth && attachment.imageWidth > 0
+      ? attachment.imageWidth
+      : null;
+    const imageHeight = isImage && attachment.imageHeight && attachment.imageHeight > 0
+      ? attachment.imageHeight
+      : null;
     return {
       clientId,
       filename,
-      contentType: normalizedContentType(attachment.contentType, filename),
+      contentType,
       byteSize: Number(attachment.byteSize),
       sha256: attachment.sha256,
+      imageWidth,
+      imageHeight,
     };
   });
   if (new Set(files.map((file) => file.clientId)).size !== files.length) {

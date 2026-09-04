@@ -793,6 +793,8 @@ export async function completeChannelReplyApplication(
           filename: attachment.filename,
           content_type: attachment.content_type,
           byte_size: attachment.byte_size,
+          image_width: attachment.image_width ?? null,
+          image_height: attachment.image_height ?? null,
         })),
         commit,
       });

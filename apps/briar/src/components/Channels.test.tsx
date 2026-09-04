@@ -4,6 +4,8 @@ import { act } from "react";
 import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../i18n";
+import { RegistryContext } from "@effect/atom-react";
+import { createTestRegistry } from "../state/registry";
 import type { ChannelMessage, ChannelSummary } from "../lib/channels-contract";
 import { Channels } from "./Channels";
 
@@ -197,6 +199,7 @@ describe("Channels", () => {
     const { cleanup, container, root } = createReactTestRoot();
     await renderReactTestRoot(
       root,
+      <RegistryContext.Provider value={createTestRegistry()}>
       <I18nProvider>
         <Channels
           activeChannelId={selectedChannel.id}
@@ -208,7 +211,8 @@ describe("Channels", () => {
           organizationId="org-1"
           token="token"
         />
-      </I18nProvider>,
+      </I18nProvider>
+      </RegistryContext.Provider>,
     );
     await act(async () => Promise.resolve());
 
@@ -268,6 +272,7 @@ describe("Channels", () => {
 
     await renderReactTestRoot(
       root,
+      <RegistryContext.Provider value={createTestRegistry()}>
       <I18nProvider>
         <Channels
           activeChannelId={selectedChannel.id}
@@ -279,7 +284,8 @@ describe("Channels", () => {
           organizationId="org-1"
           token="token"
         />
-      </I18nProvider>,
+      </I18nProvider>
+      </RegistryContext.Provider>,
     );
     await act(async () => Promise.resolve());
 
@@ -364,6 +370,7 @@ describe("Channels", () => {
 
     await renderReactTestRoot(
       root,
+      <RegistryContext.Provider value={createTestRegistry()}>
       <I18nProvider>
         <Channels
           activeChannelId={selectedChannel.id}
@@ -380,7 +387,8 @@ describe("Channels", () => {
           }}
           token="token"
         />
-      </I18nProvider>,
+      </I18nProvider>
+      </RegistryContext.Provider>,
     );
     await act(async () => Promise.resolve());
 
@@ -468,6 +476,7 @@ describe("Channels", () => {
 
     await renderReactTestRoot(
       root,
+      <RegistryContext.Provider value={createTestRegistry()}>
       <I18nProvider>
         <Channels
           activeChannelId={selectedChannel.id}
@@ -488,7 +497,8 @@ describe("Channels", () => {
           }}
           token="token"
         />
-      </I18nProvider>,
+      </I18nProvider>
+      </RegistryContext.Provider>,
     );
     await act(async () => Promise.resolve());
 
@@ -508,6 +518,71 @@ describe("Channels", () => {
 
     requestAnimationFrame.mockRestore();
     await cleanup();
+  });
+
+  it("renders a revisited channel from the store before its refresh lands", async () => {
+    const stored = [
+      virtualMessage(selectedChannel.id, 0),
+      virtualMessage(selectedChannel.id, 1),
+    ];
+    const held: Array<() => void> = [];
+    let loads = 0;
+    Object.assign(globalThis, {
+      fetch: createChannelFetch(async (method, body) => {
+        if (method !== "GetChannel") return {};
+        const forFirst = body.includes(selectedChannel.id);
+        if (forFirst) loads += 1;
+        if (forFirst && loads > 1) {
+          // The revisit's request never answers during this test, so anything
+          // on screen came from the store rather than from the network.
+          await new Promise<void>((resolve) => held.push(resolve));
+        }
+        return {
+          channel: channelSummaryWire(
+            forFirst ? selectedChannel : secondChannel,
+          ),
+          members: [],
+          agents: [],
+          messages: forFirst ? stored.map(channelMessageWire) : [],
+          agentReplies: [],
+        };
+      }),
+    });
+    const view = createReactTestRoot();
+    const registry = createTestRegistry();
+    const render = (activeChannelId: string) => (
+      <RegistryContext.Provider value={registry}>
+      <I18nProvider>
+        <Channels
+          activeChannelId={activeChannelId}
+          channelCatalogCursor={0}
+          channels={[selectedChannel, secondChannel]}
+          currentUserId="user-1"
+          onChannelSelect={() => undefined}
+          onChannelsChange={() => undefined}
+          organizationId="org-1"
+          token="token"
+        />
+      </I18nProvider>
+      </RegistryContext.Provider>
+    );
+
+    await view.render(render(selectedChannel.id));
+    await act(async () => Promise.resolve());
+    expect(view.container.textContent).toContain("메시지 0");
+
+    await view.render(render(secondChannel.id));
+    await act(async () => Promise.resolve());
+    expect(view.container.textContent).not.toContain("메시지 0");
+
+    await view.render(render(selectedChannel.id));
+    expect(view.container.textContent).toContain("메시지 0");
+    expect(view.container.textContent).toContain("메시지 1");
+    expect(loads).toBe(2);
+    for (const release of held) release();
+    await act(async () => Promise.resolve());
+
+    await view.cleanup();
   });
 
   it("resets virtualized row measurements when switching channels", async () => {
@@ -547,7 +622,11 @@ describe("Channels", () => {
       };
     }));
     const view = createReactTestRoot({ attachToDocument: true });
+    // One registry across both renders: switching channels must keep the store
+    // that makes the return instant, which is what the measurements reset for.
+    const registry = createTestRegistry();
     const render = (activeChannelId: string) => (
+      <RegistryContext.Provider value={registry}>
       <I18nProvider>
         <Channels
           activeChannelId={activeChannelId}
@@ -560,6 +639,7 @@ describe("Channels", () => {
           token="token"
         />
       </I18nProvider>
+      </RegistryContext.Provider>
     );
 
     await view.render(render(selectedChannel.id));

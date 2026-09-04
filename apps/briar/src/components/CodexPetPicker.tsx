@@ -124,7 +124,7 @@ export function CodexPetPicker({
             <div className="codex-pet-picker-content">
               {loading ? (
                 <p className="codex-pet-picker-state">
-                  <Spinner size={20} />
+                  <Spinner className="size-[20px]" />
                   {t("agents.codexPetLoading")}
                 </p>
               ) : error ? (
@@ -176,7 +176,7 @@ export function CodexPetPicker({
                           type="button"
                         >
                           {selecting ? (
-                            <Spinner size={14} />
+                            <Spinner className="size-[14px]" />
                           ) : (
                             t("agents.selectCodexPetAction")
                           )}

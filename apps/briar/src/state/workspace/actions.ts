@@ -2,6 +2,7 @@ import * as Atom from "effect/unstable/reactivity/Atom";
 import { useMemo } from "react";
 
 import type {
+  AgentProviderKind,
   PreparedProjectRepository,
   RepositoryReadiness,
 } from "../../generated/tauri";
@@ -410,6 +411,7 @@ export function createWorkspaceActions(
       autoHunt: LocalAutoHuntConfig,
       repositoryPath: string,
       onWorkflowProgress?: (progress: TeamLlmProgress) => void,
+      provider?: AgentProviderKind | null,
     ) {
       const connection = registry.get(teamConnectionAtom);
       if (!connection) throw new Error("연결할 프로젝트가 없습니다.");
@@ -438,6 +440,7 @@ export function createWorkspaceActions(
           agentToken,
           repositoryPath,
           autoHunt,
+          provider: provider ?? null,
         });
         // The local config write is the connection commit boundary. Reflect it
         // immediately; later workflow analysis and optional worker setup may be

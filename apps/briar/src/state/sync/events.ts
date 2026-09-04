@@ -1,4 +1,10 @@
-import type { ChannelSummary } from "../../lib/channels-contract";
+import type {
+  ChannelAgentReply,
+  ChannelAgentSummary,
+  ChannelMember,
+  ChannelMessage,
+  ChannelSummary,
+} from "../../lib/channels-contract";
 import type {
   AutoHuntSession,
   DashboardDeltaPayload,
@@ -72,6 +78,93 @@ export type SyncEvent =
     }
   /** The organization's catalog is dropped: nothing is known about it again. */
   | { readonly kind: "channel-catalog-cleared"; readonly organizationId: string }
+  /*
+    One channel's conversation. The messages are per channel rather than per
+    organization because a timeline is large and only a handful of channels are
+    worth keeping; `state/channel-conversation/atoms.ts` bounds how many.
+  */
+  /**
+   * A channel detail response: its participants and one page of its root
+   * timeline. `merge` keeps what the store already had for the channel, which
+   * is how a cached channel refreshes without blanking first; without it the
+   * page replaces the timeline outright.
+   */
+  | {
+      readonly kind: "channel-conversation-snapshot";
+      readonly channelId: string;
+      readonly members: readonly ChannelMember[];
+      readonly agents: readonly ChannelAgentSummary[];
+      readonly messages: readonly ChannelMessage[];
+      readonly nextCursor: string | null;
+      readonly merge: boolean;
+    }
+  /**
+   * A page of messages for one channel: an older cursor page, a realtime delta
+   * or a reset. Root messages merge into the timeline, and every thread the
+   * store holds for the channel takes the replies that belong to it — the
+   * companion cache did the second half by hand so a thread reopened from cache
+   * was not stale.
+   *
+   * `includeRepliesInRoot` is the direct-message rendering, where replies are
+   * part of the single timeline rather than folded behind a thread.
+   */
+  | {
+      readonly kind: "channel-messages-page";
+      readonly channelId: string;
+      readonly messages: readonly ChannelMessage[];
+      readonly removedMessageIds: readonly string[];
+      readonly reset: boolean;
+      readonly includeRepliesInRoot: boolean;
+    }
+  /**
+   * One message was created or changed: an optimistic send, its server
+   * reconciliation, a confirmed reaction or an accepted proposal. It lands in
+   * the timeline and in whichever stored thread it belongs to.
+   */
+  | {
+      readonly kind: "channel-message-changed";
+      readonly channelId: string;
+      readonly message: ChannelMessage;
+      readonly includeRepliesInRoot: boolean;
+    }
+  /** One message is gone from a channel: a rolled back send or a deletion. */
+  | {
+      readonly kind: "channel-message-removed";
+      readonly channelId: string;
+      readonly messageId: string;
+    }
+  /** One thread's complete server snapshot, root first. */
+  | {
+      readonly kind: "channel-thread-snapshot";
+      readonly channelId: string;
+      readonly rootMessageId: string;
+      readonly messages: readonly ChannelMessage[];
+    }
+  /**
+   * The agent replies of one channel — what the typing strip renders, since an
+   * agent that is "typing" is a queued or running reply. `reset` replaces them,
+   * which is what a delta reset and an authoritative detail both mean.
+   */
+  | {
+      readonly kind: "channel-agent-replies-changed";
+      readonly channelId: string;
+      readonly replies: readonly ChannelAgentReply[];
+      readonly reset: boolean;
+    }
+  /**
+   * A channel detail's reply list, which is the whole truth for that channel as
+   * of when the request was made. Replies it does not list are settled and may
+   * not come back, except the ones in `retainedReplyIds`: those were observed
+   * while the request was in flight, so the answer predates them.
+   */
+  | {
+      readonly kind: "channel-agent-replies-authoritative";
+      readonly channelId: string;
+      readonly replies: readonly ChannelAgentReply[];
+      readonly retainedReplyIds: readonly string[];
+    }
+  /** One channel's conversation is dropped from the store. */
+  | { readonly kind: "channel-conversation-cleared"; readonly channelId: string }
   /**
    * A confirmed settings write for one team. Applied only to the team whose
    * payload is the one on screen: a write for any other team would otherwise

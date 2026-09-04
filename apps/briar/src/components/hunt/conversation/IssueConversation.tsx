@@ -747,7 +747,7 @@ export function IssueConversation({
                 </span> : null}
             </div> : null}
           {currentUserId && onUpdateSubscription ? <button aria-pressed={isSubscribed} className={`issue-subscribe-button${isSubscribed ? " active" : ""}`} disabled={subscriptionPending || isSubscribed && assigneeSubscriptionRequired} onClick={() => void toggleSubscription()} title={assigneeSubscriptionRequired ? t("run.assigneeSubscriptionRequired") : isSubscribed ? t("run.unsubscribe") : t("run.subscribe")} type="button">
-              {subscriptionPending ? <Spinner aria-hidden="true" size={13} /> : <Bell aria-hidden="true" size={13} />}
+              {subscriptionPending ? <Spinner aria-hidden="true" className="size-[13px]" /> : <Bell aria-hidden="true" size={13} />}
               {isSubscribed ? t("run.subscribed") : t("run.subscribe")}
             </button> : <small>{t("run.agentRepliesHere")}</small>}
         </div>
@@ -755,7 +755,7 @@ export function IssueConversation({
       <div className="conversation-scroll-region">
         <div className="issue-message-list" onScroll={event => setIsAwayFromBottom(conversationIsAwayFromBottom(event.currentTarget))} ref={messageListRef}>
         {loading ? <div className="issue-message-state">
-            <Spinner size={16} />
+            <Spinner className="size-[16px]" />
             {t("run.messagesLoading")}
           </div> : loadError ? <button className="issue-message-state error" onClick={() => void loadMessages()} type="button">
             <CircleAlert size={15} />

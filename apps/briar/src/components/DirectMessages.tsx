@@ -456,7 +456,7 @@ export function DirectMessages({
                 type="button"
                 variant="default"
               >
-                {submitting ? <Spinner aria-hidden="true" size={14} /> : <MessageCircle aria-hidden="true" size={15} />}
+                {submitting ? <Spinner aria-hidden="true" className="size-[14px]" /> : <MessageCircle aria-hidden="true" size={15} />}
                 {isSelfMessage
                   ? t("dm.self")
                   : selected.length > 1
@@ -467,7 +467,7 @@ export function DirectMessages({
             <div className="dm-candidate-popover scrollbar-subtle absolute left-5 top-[57px] z-20 max-h-[360px] w-[min(600px,calc(100%_-_40px))] overflow-auto rounded-xl border border-border bg-popover p-[7px] shadow-[0_16px_42px_rgba(20,20,18,.14),0_2px_7px_rgba(20,20,18,.08)]">
               {loadingCandidates ? (
                 <div className="dm-candidate-status m-0 flex items-center justify-center gap-2 p-[18px] text-sm text-muted-foreground">
-                  <Spinner aria-hidden="true" size={16} />
+                  <Spinner aria-hidden="true" className="size-[16px]" />
                   {t("dm.loadingPeople")}
                 </div>
               ) : filteredCandidates.length ? (

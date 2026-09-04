@@ -71,6 +71,11 @@ import {
   createChannelRealtimeTransport,
   MAX_CHANNEL_DELTA_PAGES_PER_SYNC,
 } from "../lib/channel-realtime";
+import { useRegistry } from "../state/registry";
+import {
+  channelMessageCursorAtom,
+  channelRootMessagesAtom,
+} from "../state/channel-conversation/atoms";
 
 export type ChannelSurfaceContext = {
   generation: number;
@@ -87,11 +92,9 @@ type UseChannelConversationOptions = {
   channel: ChannelSummary | null;
   members: ChannelMember[];
   agents: ChannelAgentSummary[];
-  messages: ChannelMessage[];
   replies: ChannelAgentReply[];
   threadParentId: string | null;
   threadMessages: ChannelMessage[];
-  messageNextCursor: string | null;
   pageSize: number;
   updateRootMessages: MessageUpdater;
   updateThreadMessages: MessageUpdater;
@@ -300,11 +303,9 @@ export function useChannelConversation({
   channel,
   members,
   agents,
-  messages,
   replies,
   threadParentId,
   threadMessages,
-  messageNextCursor,
   pageSize,
   updateRootMessages,
   updateThreadMessages,
@@ -326,6 +327,21 @@ export function useChannelConversation({
 }: UseChannelConversationOptions) {
   const { t } = useI18n();
   const { toast } = useToast();
+  const registry = useRegistry();
+  /*
+    The timeline and its cursor live in `state/channel-conversation`, so they
+    are read at call time rather than mirrored into a ref every render. What is
+    left as props is what the hook needs *during* a render — the replies the
+    typing strips derive from, and the thread on screen.
+  */
+  const storedMessages = useCallback(
+    () => registry.get(channelRootMessagesAtom(channelIdRef.current ?? "")),
+    [registry],
+  );
+  const storedCursor = useCallback(
+    () => registry.get(channelMessageCursorAtom(channelIdRef.current ?? "")),
+    [registry],
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const reportConversationError = useCallback((cause: unknown) => {
@@ -359,12 +375,10 @@ export function useChannelConversation({
   const optimisticThreadMessageIds = useRef(new Set<string>());
   const earlierMessagesPending = useRef(false);
   const requestVersion = useRef(0);
-  const messagesRef = useRef(messages);
   const repliesRef = useRef(replies);
   const replyTombstones = useRef(new Set<string>());
   const replyVersions = useRef(new Map<string, number>());
   const replyVersion = useRef(0);
-  const messageNextCursorRef = useRef(messageNextCursor);
   const realtimeRef = useRef(realtime);
   const dependenciesRef = useRef(dependencies);
 
@@ -377,14 +391,12 @@ export function useChannelConversation({
   }
   channelIdRef.current = channelId;
   threadParentIdRef.current = threadParentId;
-  messagesRef.current = messages;
   repliesRef.current = replies;
   for (const reply of replies) {
     if (!replyVersions.current.has(reply.id)) {
       replyVersions.current.set(reply.id, replyVersion.current);
     }
   }
-  messageNextCursorRef.current = messageNextCursor;
   realtimeRef.current = realtime;
   dependenciesRef.current = dependencies;
 
@@ -806,7 +818,7 @@ export function useChannelConversation({
           observedReplyVersion,
         );
         recordProposalMessages(result.messages);
-        const currentMessages = messagesRef.current;
+        const currentMessages = storedMessages();
         let appliedMessages = mergeWithCurrentMessages
           ? mergeChannelMessages(currentMessages, result.messages, [])
           : result.messages;
@@ -814,9 +826,8 @@ export function useChannelConversation({
         const nextCursor =
           mergeWithCurrentMessages &&
             currentMessages.length > result.messages.length
-            ? messageNextCursorRef.current
+            ? storedCursor()
             : result.nextCursor ?? null;
-        messageNextCursorRef.current = nextCursor;
         setMessageNextCursor(nextCursor);
 
         const target = requestedMessage?.channelId === requestedChannelId
@@ -915,7 +926,7 @@ export function useChannelConversation({
   const loadEarlierChannelMessages = useCallback(
     async (signal?: AbortSignal): Promise<LoadEarlierMessagesResult> => {
       const activeId = channelIdRef.current;
-      const cursor = messageNextCursorRef.current;
+      const cursor = storedCursor();
       if (
         !activeId ||
         !cursor ||
@@ -942,7 +953,6 @@ export function useChannelConversation({
           mergeChannelMessages(current, result.messages, [])
         );
         const nextCursor = result.nextCursor ?? null;
-        messageNextCursorRef.current = nextCursor;
         setMessageNextCursor(nextCursor);
         return { applied: true, nextCursor };
       } catch (cause) {
@@ -1077,7 +1087,7 @@ export function useChannelConversation({
         attachmentUrls,
       });
       const parentBeforeSend = parentMessageId
-        ? messages.find((item) => item.id === parentMessageId) ?? null
+        ? storedMessages().find((item) => item.id === parentMessageId) ?? null
         : null;
       setBusy(true);
       setError(null);
@@ -1210,8 +1220,8 @@ export function useChannelConversation({
       currentUserId,
       imageCache,
       members,
-      messages,
       onRootMessagePending,
+      storedMessages,
       organizationId,
       reportConversationError,
       t,

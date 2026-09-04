@@ -272,7 +272,7 @@ export function InitialOnboarding({
                 {permissionStatus === "authorized" ? (
                   <Check strokeWidth={2.4} size={42} />
                 ) : checkingPermission ? (
-                  <Spinner size={38} />
+                  <Spinner className="size-[38px]" />
                 ) : (
                   <BellRing size={40} />
                 )}
@@ -331,7 +331,7 @@ export function InitialOnboarding({
                     type="button"
                   >
                     {requestingPermission ? (
-                      <Spinner size={17} />
+                      <Spinner className="size-[17px]" />
                     ) : (
                       <BellRing size={17} />
                     )}

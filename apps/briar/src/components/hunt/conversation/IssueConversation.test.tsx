@@ -138,7 +138,7 @@ function expectPendingAgentReplyLoader(scope: ParentNode | null | undefined) {
   expect(loader?.dataset.size).toBe("compact");
   expect(pending?.textContent).toContain("에이전트가 답변을 작성하고 있습니다");
   expect(pending?.textContent).toContain("0.0s");
-  expect(pending?.querySelector(".spin")).toBeNull();
+  expect(pending?.querySelector(".animate-spin")).toBeNull();
   return pending;
 }
 describe("IssueConversation", () => {
@@ -1087,7 +1087,7 @@ describe("IssueConversation", () => {
     const errorState = userMessageGroup?.querySelector(":scope > .issue-agent-reply-state.error");
     expect(errorState?.textContent).toContain("Agent 답변을 생성하지 못했습니다: worker unavailable");
     expect(errorState?.querySelector("[data-testid='loading-state']")).toBeNull();
-    expect(errorState?.querySelector(".spin")).toBeNull();
+    expect(errorState?.querySelector(".animate-spin")).toBeNull();
     expect(errorState?.querySelector("svg")).not.toBeNull();
     await cleanup();
   });

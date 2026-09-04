@@ -83,6 +83,7 @@ const preparedOf = (path: string): PreparedProjectRepository => ({
 class WorkspaceServer {
   connectedTeamIds: string[] = [];
   readonly connected: string[] = [];
+  readonly connectedProviders: (string | null)[] = [];
   readonly disconnected: string[] = [];
   readonly workersConfigured: string[] = [];
   readonly settingsWrites: { teamId: string; settings: TeamSettings }[] = [];
@@ -118,6 +119,7 @@ class WorkspaceServer {
     connectLocalTeam: async (input) => {
       if (this.connectError) throw this.connectError;
       this.connected.push(input.projectId);
+      this.connectedProviders.push(input.provider ?? null);
       this.connectedTeamIds = [...this.connectedTeamIds, input.projectId];
       return {
         repositoryPath: input.repositoryPath,
@@ -301,9 +303,14 @@ describe("createWorkspaceActions", () => {
         workflow: demoDashboard.settings.workflow,
       },
       "/repos/team-a",
+      undefined,
+      "claude",
     );
 
     expect(connected.repositoryPath).toBe("/repos/team-a");
+    // The agent backend chosen on the connection screen reaches the native
+    // command instead of being resolved again from install order.
+    expect(server.connectedProviders).toEqual(["claude"]);
     // Local config first, then the server settings that share the workflow.
     expect(server.connected).toEqual([teamA.id]);
     expect(server.localWorkflowWrites).toEqual([teamA.id]);

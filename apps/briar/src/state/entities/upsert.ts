@@ -87,16 +87,25 @@ export function removeMany<T>(
  * Replaces a whole projection while keeping the reference of every element the
  * server re-sent unchanged, and the array reference itself when nothing moved.
  */
+export function replaceEntitiesBy<T>(
+  current: readonly T[],
+  incoming: readonly T[],
+  identify: (item: T) => string,
+): T[] {
+  const currentById = new Map(current.map((item) => [identify(item), item]));
+  const next = incoming.map((item) => {
+    const previous = currentById.get(identify(item));
+    return previous && sameValue(previous, item) ? previous : item;
+  });
+  return sameReferences(current, next) ? (current as T[]) : next;
+}
+
+/** {@link replaceEntitiesBy} for the entities keyed by their own `id`. */
 export function replaceEntities<T extends { id: string }>(
   current: readonly T[],
   incoming: readonly T[],
 ): T[] {
-  const currentById = new Map(current.map((item) => [item.id, item]));
-  const next = incoming.map((item) => {
-    const previous = currentById.get(item.id);
-    return previous && sameValue(previous, item) ? previous : item;
-  });
-  return sameReferences(current, next) ? (current as T[]) : next;
+  return replaceEntitiesBy(current, incoming, (item) => item.id);
 }
 
 /** How many runs a team keeps after a delta merge. */

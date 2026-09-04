@@ -107,7 +107,7 @@ export class WebSocketRealtimeTransport implements RealtimeTransport {
       });
       socket.addEventListener("close", finish);
       socket.addEventListener("error", () => {
-        socket.close(1011, "Realtime socket failed");
+        socket.close(4011, "Realtime socket failed");
         finish();
       });
     } catch (error) {

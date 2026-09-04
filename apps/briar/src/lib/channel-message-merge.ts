@@ -6,9 +6,9 @@ import type { ChannelMessage } from "./channels-contract";
  * applied so transfer/unassign invalidation cannot leave a stale approval card.
  */
 export function mergeChannelMessages(
-  current: ChannelMessage[],
-  incoming: ChannelMessage[],
-  removedIds: string[],
+  current: readonly ChannelMessage[],
+  incoming: readonly ChannelMessage[],
+  removedIds: readonly string[],
 ) {
   const byId = new Map(current.map((message) => [message.id, message]));
   for (const message of incoming) {
@@ -69,8 +69,8 @@ export function mergeChannelMessages(
 
 /** Merge a complete server snapshot while preserving only monotonic accepts. */
 export function mergeChannelMessageSnapshot(
-  current: ChannelMessage[],
-  incoming: ChannelMessage[],
+  current: readonly ChannelMessage[],
+  incoming: readonly ChannelMessage[],
 ) {
   const incomingIds = new Set(incoming.map((message) => message.id));
   return mergeChannelMessages(

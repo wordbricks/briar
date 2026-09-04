@@ -115,6 +115,21 @@ import {
   channelConversationError,
   useChannelConversation,
 } from "../hooks/use-channel-conversation";
+import { useRegistry } from "../state/registry";
+import { applySyncEvent } from "../state/sync/apply";
+import {
+  channelThreadKey,
+  channelThreadMessagesAtom,
+} from "../state/channel-conversation/atoms";
+import {
+  useChannelConversationStore,
+  useChannelConversationView,
+} from "../state/channel-conversation/useChannelConversationStore";
+import {
+  resetChannelConversationViewState,
+  writeChannelAgentReplies,
+  writeChannelOpenThreadId,
+} from "../state/channel-conversation/write";
 
 const mergeChannels = (
   current: ChannelSummary[],
@@ -155,100 +170,9 @@ type CompanionChannelsProps = {
     rootMessageId: string;
   } | null;
   onRequestedMessageOpen?: () => void;
-  channelCache?: CompanionChannelCache;
 };
-
-export type CachedCompanionChannel = {
-  channel: ChannelSummary;
-  members: ChannelMember[];
-  agents: ChannelAgentSummary[];
-  messages: ChannelMessage[];
-  nextCursor: string | null;
-  threads: Map<string, ChannelMessage[]>;
-};
-
-export type CompanionChannelCache = Map<string, CachedCompanionChannel>;
 
 const mobileChannelMessagePageSize = 20;
-export const mobileChannelCacheLimit = 5;
-export const mobileThreadCacheLimit = 5;
-export const mobileCachedMessageLimit = 40;
-
-function boundedThreadMessages(
-  parentMessageId: string,
-  messages: ChannelMessage[],
-) {
-  if (messages.length <= mobileCachedMessageLimit) return messages;
-  const root = messages.find((item) => item.id === parentMessageId);
-  const replies = messages.filter((item) => item.id !== parentMessageId);
-  const replyLimit = root
-    ? mobileCachedMessageLimit - 1
-    : mobileCachedMessageLimit;
-  return [...(root ? [root] : []), ...replies.slice(-replyLimit)];
-}
-
-export function cacheCompanionThreadSnapshot(
-  threads: Map<string, ChannelMessage[]>,
-  parentMessageId: string,
-  messages: ChannelMessage[],
-) {
-  threads.delete(parentMessageId);
-  threads.set(
-    parentMessageId,
-    boundedThreadMessages(parentMessageId, messages),
-  );
-  while (threads.size > mobileThreadCacheLimit) {
-    const oldest = threads.keys().next().value;
-    if (oldest === undefined) break;
-    threads.delete(oldest);
-  }
-}
-
-function readCachedThread(
-  threads: Map<string, ChannelMessage[]> | undefined,
-  parentMessageId: string,
-) {
-  const cached = threads?.get(parentMessageId) ?? null;
-  if (!cached || !threads) return cached;
-  threads.delete(parentMessageId);
-  threads.set(parentMessageId, cached);
-  return cached;
-}
-
-export function cacheCompanionChannelSnapshot(
-  cache: CompanionChannelCache,
-  snapshot: CachedCompanionChannel,
-) {
-  const threads = new Map<string, ChannelMessage[]>();
-  for (const [parentMessageId, messages] of snapshot.threads) {
-    cacheCompanionThreadSnapshot(threads, parentMessageId, messages);
-  }
-  const messages = snapshot.messages.slice(-mobileCachedMessageLimit);
-  const bounded = {
-    ...snapshot,
-    messages,
-    nextCursor: snapshot.messages.length > messages.length
-      ? messages[0]?.id ?? snapshot.nextCursor
-      : snapshot.nextCursor,
-    threads,
-  };
-  cache.delete(snapshot.channel.id);
-  cache.set(snapshot.channel.id, bounded);
-  while (cache.size > mobileChannelCacheLimit) {
-    const oldest = cache.keys().next().value;
-    if (oldest === undefined) break;
-    cache.delete(oldest);
-  }
-  return bounded;
-}
-
-function readCachedChannel(cache: CompanionChannelCache, channelId: string) {
-  const cached = cache.get(channelId) ?? null;
-  if (!cached) return null;
-  cache.delete(channelId);
-  cache.set(channelId, cached);
-  return cached;
-}
 
 /**
  * Home on mobile is a channel list, then a channel's root messages, then one
@@ -270,26 +194,33 @@ export function CompanionChannels({
   onRequestedChannelOpen,
   requestedMessage,
   onRequestedMessageOpen,
-  channelCache,
 }: CompanionChannelsProps) {
   const { t } = useI18n();
   const { toast } = useToast();
+  const registry = useRegistry();
   const imageCache = useChannelMessageImageCache(`${organizationId}\0${token}`);
   const [channels, setChannels] = useState<ChannelSummary[]>([]);
   const [channel, setChannel] = useState<ChannelSummary | null>(null);
-  const [messages, setMessages] = useState<ChannelMessage[]>([]);
-  const [members, setMembers] = useState<ChannelMember[]>([]);
-  const [agents, setAgents] = useState<ChannelAgentSummary[]>([]);
-  const [replies, setReplies] = useState<ChannelAgentReply[]>([]);
-  const [thread, setThread] = useState<ChannelMessage[] | null>(null);
-  const [threadParentId, setThreadParentId] = useState<string | null>(null);
+  /*
+    The conversation is `state/channel-conversation`'s store, shared with the
+    desktop view. This screen used to hold it in six `useState` values with a
+    five entry LRU beside them (`CompanionChannelCache`) that bounded its own
+    messages and threads; the store is that cache, bounded once.
+  */
+  const conversationStore = useChannelConversationStore(channel?.id ?? null);
+  const {
+    agents,
+    members,
+    messages,
+    replies,
+    threadMessages,
+    threadParentId,
+  } = useChannelConversationView(channel?.id ?? null);
+  const thread = threadParentId ? threadMessages : null;
   const [highlightedMessage, setHighlightedMessage] = useState<{
     channelId: string;
     messageId: string;
   } | null>(null);
-  const [messageNextCursor, setMessageNextCursor] = useState<string | null>(
-    null,
-  );
   const [loading, setLoading] = useState(true);
   const [threadIsAwayFromBottom, setThreadIsAwayFromBottom] = useState(false);
   const cursor = useRef(0);
@@ -297,11 +228,11 @@ export function CompanionChannels({
   const channelMessagesScrollRef = useRef<HTMLDivElement | null>(null);
   const threadMessagesScrollRef = useRef<HTMLDivElement | null>(null);
   const threadMessagesEndRef = useRef<HTMLDivElement | null>(null);
-  const localChannelCache = useRef<CompanionChannelCache>(new Map());
-  const resolvedChannelCache = channelCache ?? localChannelCache.current;
-  const renderedChannel = useRef<CachedCompanionChannel | null>(null);
   const highlightedMessageRef = useRef(highlightedMessage);
   highlightedMessageRef.current = highlightedMessage;
+  // The realtime callback below outlives the render that installed it.
+  const channelRef = useRef<ChannelSummary | null>(channel);
+  channelRef.current = channel;
   const {
     isAwayFromBottom: channelIsAwayFromBottom,
     onScroll: handleChannelScroll,
@@ -319,19 +250,6 @@ export function CompanionChannels({
     scrollerRef: channelMessagesScrollRef,
     observeRows: true,
   });
-  const cachedThreads = channel
-    ? resolvedChannelCache.get(channel.id)?.threads ?? new Map()
-    : new Map<string, ChannelMessage[]>();
-  renderedChannel.current = channel
-    ? {
-        channel,
-        members,
-        agents,
-        messages,
-        nextCursor: messageNextCursor,
-        threads: cachedThreads,
-      }
-    : null;
 
   const markSelectedChannelRead = useCallback(
     (summary: ChannelSummary) => {
@@ -353,28 +271,6 @@ export function CompanionChannels({
     [organizationId, token],
   );
 
-  const updateRootMessages = useCallback(
-    (update: (current: ChannelMessage[]) => ChannelMessage[]) => {
-      setMessages(update);
-    },
-    [],
-  );
-  const updateThreadMessages = useCallback(
-    (update: (current: ChannelMessage[]) => ChannelMessage[]) => {
-      setThread((current) => update(current ?? []));
-    },
-    [],
-  );
-  const applyConversationSnapshot = useCallback(
-    (snapshot: Omit<CachedCompanionChannel, "threads">) => {
-      cacheCompanionChannelSnapshot(resolvedChannelCache, {
-        ...snapshot,
-        threads: resolvedChannelCache.get(snapshot.channel.id)?.threads ??
-          new Map(),
-      });
-    },
-    [resolvedChannelCache],
-  );
   const applyChannelCatalogDelta = useCallback(
     (delta: ChannelDelta) => {
       setChannels((current) =>
@@ -389,46 +285,41 @@ export function CompanionChannels({
   );
   const handleSelectedChannelRemoved = useCallback(() => {
     channelSelectionVersion.current += 1;
+    const removed = channelRef.current;
+    if (removed) {
+      applySyncEvent(registry, {
+        kind: "channel-conversation-cleared",
+        channelId: removed.id,
+      });
+    }
     setChannel(null);
-    setMessages([]);
-    setMessageNextCursor(null);
-    setMembers([]);
-    setAgents([]);
-    setReplies([]);
-    setThread(null);
-    setThreadParentId(null);
     setLoading(false);
-  }, []);
+  }, [registry]);
   const handleSelectedChannelSummary = useCallback(
     (summary: ChannelSummary) => {
       setChannel(markSelectedChannelRead(summary));
     },
     [markSelectedChannelRead],
   );
+  /*
+    A delta reaches the threads this screen is not showing as well as the one it
+    is. The cache walked its own stored threads for this; the store does the
+    same walk, so a thread reopened from it is not missing what arrived while
+    another screen was up.
+  */
   const applyCachedDeltaMessages = useCallback(
     (
       incoming: ChannelMessage[],
       removedMessageIds: string[],
       reset: boolean,
     ) => {
-      const activeId = channel?.id;
-      if (!activeId) return;
-      const storedThreads = resolvedChannelCache.get(activeId)?.threads;
-      if (!storedThreads) return;
-      for (const [parentId, storedThread] of storedThreads) {
-        if (removedMessageIds.includes(parentId)) {
-          storedThreads.delete(parentId);
-          continue;
-        }
-        const relevant = incoming.filter(
-          (item) => item.id === parentId || item.parentMessageId === parentId,
-        );
-        storedThreads.set(parentId, reset
-          ? relevant
-          : mergeChannelMessages(storedThread, relevant, removedMessageIds));
-      }
+      conversationStore.applyDeltaToStoredThreads(
+        incoming,
+        removedMessageIds,
+        reset,
+      );
     },
-    [channel?.id, resolvedChannelCache],
+    [conversationStore],
   );
   const handleIncomingRootMessages = useCallback(() => {
     requestStickToBottomIfAtBottom();
@@ -480,21 +371,18 @@ export function CompanionChannels({
     channel,
     members,
     agents,
-    messages,
     replies,
     threadParentId,
     threadMessages: thread ?? [],
-    messageNextCursor,
     pageSize: mobileChannelMessagePageSize,
-    updateRootMessages,
-    updateThreadMessages,
-    setMembers,
-    setAgents,
-    setReplies,
-    setThreadParentId,
-    setMessageNextCursor,
+    updateRootMessages: conversationStore.updateRootMessages,
+    updateThreadMessages: conversationStore.updateThreadMessages,
+    setMembers: conversationStore.setMembers,
+    setAgents: conversationStore.setAgents,
+    setReplies: conversationStore.setReplies,
+    setThreadParentId: conversationStore.setThreadParentId,
+    setMessageNextCursor: conversationStore.setMessageNextCursor,
     onChannelLoaded: setChannel,
-    onConversationLoaded: applyConversationSnapshot,
     onIssueOpen,
     onSkillSessionAccepted,
     onRootMessagePending: () => {
@@ -518,14 +406,6 @@ export function CompanionChannels({
       warningLabel: "Companion channel delta refresh failed",
     },
   });
-
-  useLayoutEffect(() => {
-    if (!channel || !threadParentId || thread === null) return;
-    const cached = resolvedChannelCache.get(channel.id);
-    if (!cached) return;
-    cacheCompanionThreadSnapshot(cached.threads, threadParentId, thread);
-    cacheCompanionChannelSnapshot(resolvedChannelCache, cached);
-  }, [channel, resolvedChannelCache, thread, threadParentId]);
 
   useEffect(() => {
     onViewingChannelChange?.(channel?.id ?? null, threadParentId);
@@ -569,23 +449,6 @@ export function CompanionChannels({
   const activeHighlightedMessageId =
     requestedMessage?.messageId ?? highlightedMessage?.messageId ?? null;
 
-  const persistRenderedChannel = useCallback(() => {
-    const snapshot = renderedChannel.current;
-    if (!snapshot) return;
-    const cached = resolvedChannelCache.get(snapshot.channel.id);
-    cacheCompanionChannelSnapshot(resolvedChannelCache, {
-      ...snapshot,
-      threads: cached?.threads ?? snapshot.threads,
-    });
-  }, [resolvedChannelCache]);
-
-  useEffect(
-    () => () => {
-      persistRenderedChannel();
-    },
-    [persistRenderedChannel],
-  );
-
   useEffect(() => {
     let cancelled = false;
     channelSelectionVersion.current += 1;
@@ -594,13 +457,6 @@ export function CompanionChannels({
     clearProposalHistory();
     setChannels([]);
     setChannel(null);
-    setMessages([]);
-    setMessageNextCursor(null);
-    setMembers([]);
-    setAgents([]);
-    setReplies([]);
-    setThread(null);
-    setThreadParentId(null);
     setError(null);
     if (!token) {
       setLoading(false);
@@ -645,24 +501,22 @@ export function CompanionChannels({
     [activeProjectId, channels, projects, t],
   );
 
+  /*
+    Opening a channel writes the channel it is opening, not the one on screen:
+    `conversationStore` is bound to the current selection and this runs before
+    the selection changes.
+  */
   const openChannel = useCallback(
     async (summary: ChannelSummary) => {
-      persistRenderedChannel();
       invalidateChannelSurface(summary.id, null);
       requestStickToBottom();
       const selectionVersion = ++channelSelectionVersion.current;
-      const cached = readCachedChannel(resolvedChannelCache, summary.id);
-      setChannel(markSelectedChannelRead(cached?.channel ?? summary));
-      setThread(null);
-      setThreadParentId(null);
-      setMessages(cached?.messages ?? []);
-      setMessageNextCursor(cached?.nextCursor ?? null);
-      setMembers(cached?.members ?? []);
-      setAgents(cached?.agents ?? []);
-      // Reply jobs are live execution state. A cached running job can finish
+      setChannel(markSelectedChannelRead(summary));
+      resetChannelConversationViewState(registry, summary.id);
+      // Reply jobs are live execution state. A stored running job can finish
       // while another screen is open, so restoring it would replay a stale
       // typing indicator until the authoritative channel load completes.
-      setReplies([]);
+      writeChannelAgentReplies(registry, summary.id, []);
       setError(null);
       setLoading(true);
       try {
@@ -675,15 +529,7 @@ export function CompanionChannels({
           !result ||
           selectionVersion !== channelSelectionVersion.current
         ) return;
-        const nextChannel = markSelectedChannelRead(result.channel);
-        setChannel(nextChannel);
-        const refreshed = resolvedChannelCache.get(summary.id);
-        if (refreshed) {
-          cacheCompanionChannelSnapshot(resolvedChannelCache, {
-            ...refreshed,
-            channel: nextChannel,
-          });
-        }
+        setChannel(markSelectedChannelRead(result.channel));
         requestStickToBottom();
       } finally {
         if (selectionVersion === channelSelectionVersion.current) {
@@ -695,9 +541,9 @@ export function CompanionChannels({
       invalidateChannelSurface,
       loadChannelConversation,
       markSelectedChannelRead,
-      persistRenderedChannel,
+      registry,
       requestStickToBottom,
-      resolvedChannelCache,
+      setError,
     ],
   );
 
@@ -741,17 +587,14 @@ export function CompanionChannels({
     async (parent: ChannelMessage) => {
       if (!channel) return;
       channelSelectionVersion.current += 1;
-      const cachedThread = readCachedThread(
-        readCachedChannel(resolvedChannelCache, channel.id)?.threads,
-        parent.id,
-      ) ?? [];
-      await openConversationThread(parent.id, cachedThread);
+      // What the store already holds for the thread renders while the
+      // authoritative page loads, which is what the thread cache bought.
+      const stored = registry.get(
+        channelThreadMessagesAtom(channelThreadKey(channel.id, parent.id)),
+      );
+      await openConversationThread(parent.id, [...stored]);
     },
-    [
-      channel,
-      openConversationThread,
-      resolvedChannelCache,
-    ],
+    [channel, openConversationThread, registry],
   );
 
   useEffect(() => {
@@ -766,10 +609,8 @@ export function CompanionChannels({
     const selectionVersion = ++channelSelectionVersion.current;
     let cancelled = false;
     setChannel(summary);
-    setReplies([]);
-    setThread(null);
-    setThreadParentId(null);
-    setMessageNextCursor(null);
+    resetChannelConversationViewState(registry, summary.id);
+    writeChannelAgentReplies(registry, summary.id, []);
     setStickToBottom(false);
     setError(null);
     setLoading(true);
@@ -788,7 +629,7 @@ export function CompanionChannels({
         ) return;
         setChannel(markSelectedChannelRead(result.channel));
         if (requestedMessage.rootMessageId === requestedMessage.messageId) {
-          setThread(null);
+          writeChannelOpenThreadId(registry, summary.id, null);
         }
         window.requestAnimationFrame(() => {
           const requestedMessageElement = document.querySelector(
@@ -825,6 +666,7 @@ export function CompanionChannels({
     markSelectedChannelRead,
     onRequestedMessageOpen,
     organizationId,
+    registry,
     requestedMessage,
     setStickToBottom,
   ]);
@@ -849,24 +691,24 @@ export function CompanionChannels({
   const closeThread = useCallback(() => {
     if (!channel || !threadParentId) return false;
     channelSelectionVersion.current += 1;
-    const closed = closeConversationThread();
-    setThread(null);
-    return closed;
+    return closeConversationThread();
   }, [channel, closeConversationThread, threadParentId]);
 
+  /*
+    Leaving a channel keeps its messages: they are the store's, and coming back
+    renders them before the refresh lands. Only the live reply jobs go, for the
+    same reason opening a channel drops them.
+  */
   const closeChannel = useCallback(() => {
     if (!channel) return false;
-    persistRenderedChannel();
     channelSelectionVersion.current += 1;
     invalidateChannelSurface(null, null);
+    writeChannelAgentReplies(registry, channel.id, []);
     setChannel(null);
-    setMessages([]);
-    setMessageNextCursor(null);
-    setReplies([]);
     setLoading(false);
     setError(null);
     return true;
-  }, [channel, invalidateChannelSurface, persistRenderedChannel, setError]);
+  }, [channel, invalidateChannelSurface, registry, setError]);
 
   useMobileBackHandler(
     () => closeThread() || closeChannel(),
@@ -1501,7 +1343,7 @@ function MessageRow({
                 >
                   {acceptingProposal ? (
                     <>
-                      <Spinner aria-hidden="true" size={15} />
+                      <Spinner aria-hidden="true" className="size-[15px]" />
                       {t("channel.creatingIssue")}
                     </>
                   ) : (
@@ -1923,7 +1765,7 @@ function relativeTime(value: string, locale: string) {
 function CompanionChannelLoadingSpinner() {
   return (
     <p className="companion-channel-loading">
-      <Spinner size={16} />
+      <Spinner className="size-[16px]" />
     </p>
   );
 }

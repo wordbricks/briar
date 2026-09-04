@@ -235,17 +235,31 @@ struct PreparedLocalProjectConnection {
     auto_hunt: AutoHuntConfig,
 }
 
-fn configured_local_project_provider(
+/// Which providers this machine could run the repository analysis on, with the
+/// quota probe folded in. The probe is one Briar CLI call and never fails the
+/// connection: a provider whose usage cannot be read stays selectable.
+fn local_project_provider_availability(
     config_path: &Path,
     home: &Path,
-) -> Result<agent::AgentProviderKind, String> {
-    connected_agent_provider(
-        &inspect_onboarding_prerequisites_sync(
-            home,
-            openrouter_api_key_from(config_path)?.is_some(),
-        ),
+) -> Result<Vec<AgentProviderAvailability>, String> {
+    let openrouter_configured = openrouter_api_key_from(config_path)?.is_some();
+    Ok(agent_provider_availability(
+        &inspect_onboarding_prerequisites_sync(home, openrouter_configured),
         app_provider_settings_from(config_path)?,
-    )
+        &agent_usage::local_quotas(home, openrouter_configured),
+    ))
+}
+
+/// The provider a connection commits to: the requested one when the screen sent
+/// a choice, and otherwise the first connected provider with quota left.
+fn resolved_local_project_provider(
+    availability: &[AgentProviderAvailability],
+    requested: Option<agent::AgentProviderKind>,
+) -> Result<agent::AgentProviderKind, String> {
+    match requested {
+        Some(requested) => requested_agent_provider(availability, requested),
+        None => select_connected_agent_provider(availability),
+    }
 }
 
 fn prepare_local_project_connection_on(
@@ -314,7 +328,8 @@ pub(super) async fn preflight_local_project_connection(
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
     tauri::async_runtime::spawn_blocking(move || {
         let runner = LocalExecutionEnvironment::discover(&home)?.runner();
-        let provider = configured_local_project_provider(&config_path, &home);
+        let availability = local_project_provider_availability(&config_path, &home)?;
+        let provider = resolved_local_project_provider(&availability, None);
         let prepared = prepare_local_project_connection_on(
             &runner,
             Path::new(&repository_path),
@@ -325,6 +340,7 @@ pub(super) async fn preflight_local_project_connection(
             repository_path: prepared.repository_path,
             repository_remote: prepared.repository_remote,
             provider: prepared.provider,
+            providers: availability,
         })
     })
     .await
@@ -340,6 +356,7 @@ pub(super) async fn connect_local_project(
     agent_token: String,
     repository_path: String,
     auto_hunt: AutoHuntConfig,
+    provider: Option<agent::AgentProviderKind>,
 ) -> Result<ConnectedLocalProject, String> {
     let config_path = cli_config_path(&app)?;
     let resource_directory = app
@@ -349,12 +366,13 @@ pub(super) async fn connect_local_project(
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
     tauri::async_runtime::spawn_blocking(move || {
         let runner = LocalExecutionEnvironment::discover(&home)?.runner();
-        let provider = configured_local_project_provider(&config_path, &home);
+        let availability = local_project_provider_availability(&config_path, &home)?;
+        let resolved = resolved_local_project_provider(&availability, provider);
         let prepared = prepare_local_project_connection_on(
             &runner,
             Path::new(&repository_path),
             auto_hunt,
-            provider,
+            resolved,
         )?;
         install_auto_hunt_assets(&resource_directory, &home)?;
         write_cli_connection(
@@ -449,6 +467,48 @@ mod tests {
             .err()
             .expect("missing provider should block preparation"),
             "provider unavailable"
+        );
+    }
+
+    fn availability(
+        provider: agent::AgentProviderKind,
+        selectable: bool,
+        usage_exhausted: bool,
+    ) -> AgentProviderAvailability {
+        AgentProviderAvailability {
+            provider,
+            enabled: true,
+            installed: selectable,
+            authenticated: selectable,
+            selectable,
+            usage_exhausted,
+            max_used_percent: None,
+            usage_resets_at: None,
+            reason: None,
+        }
+    }
+
+    #[test]
+    fn connects_on_the_requested_provider_and_otherwise_on_the_one_with_quota_left() {
+        let entries = vec![
+            availability(agent::AgentProviderKind::Codex, true, true),
+            availability(agent::AgentProviderKind::Claude, true, false),
+            availability(agent::AgentProviderKind::Grok, false, false),
+        ];
+
+        assert_eq!(
+            resolved_local_project_provider(&entries, None)
+                .expect("a provider with quota left should be chosen"),
+            agent::AgentProviderKind::Claude
+        );
+        assert_eq!(
+            resolved_local_project_provider(&entries, Some(agent::AgentProviderKind::Codex))
+                .expect("the requested provider should be committed"),
+            agent::AgentProviderKind::Codex
+        );
+        assert!(
+            resolved_local_project_provider(&entries, Some(agent::AgentProviderKind::Grok))
+                .is_err()
         );
     }
 }

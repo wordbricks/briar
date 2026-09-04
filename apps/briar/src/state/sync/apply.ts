@@ -17,13 +17,30 @@ import {
   applyProjectAgentSessionSync,
   mergeSynchronizedSessions,
 } from "../agent-sessions/model";
+import { retainedConversationChannelIdsAtom } from "../channel-conversation/atoms";
+import {
+  applyAuthoritativeChannelAgentReplies,
+  applyChannelAgentReplies,
+  applyChannelConversationSnapshot,
+  applyChannelMessageChanged,
+  applyChannelMessageRemoved,
+  applyChannelMessagesPage,
+  clearChannelConversation,
+  writeChannelThreadSnapshot,
+} from "../channel-conversation/write";
 import {
   channelCatalogOrganizationIdsAtom,
   channelsByIdAtom,
   organizationChannelIdsAtom,
   organizationChannelsAtom,
 } from "../entities/channels";
-import type { ChannelSummary } from "../../lib/channels-contract";
+import type {
+  ChannelAgentReply,
+  ChannelAgentSummary,
+  ChannelMember,
+  ChannelMessage,
+  ChannelSummary,
+} from "../../lib/channels-contract";
 import {
   membersByIdAtom,
   teamMemberIdsAtom,
@@ -37,6 +54,7 @@ import {
   mergeTeamRuns,
   removeMany,
   replaceEntities,
+  replaceEntitiesBy,
   sameValue,
   upsertMany,
   upsertManyBy,
@@ -492,12 +510,13 @@ function applyChannelRemoved(
   registry.update(channelsByIdAtom, (stored) => removeMany(stored, [channelId]));
 }
 
-/** Forgets an organization's catalog entirely, summaries included. */
+/** Forgets an organization's catalog entirely, summaries and messages included. */
 function clearChannelCatalog(registry: AtomRegistry, organizationId: string) {
   const ids = registry.get(organizationChannelIdsAtom(organizationId));
   registry.set(organizationChannelIdsAtom(organizationId), null);
   if (ids && ids.length > 0) {
     registry.update(channelsByIdAtom, (stored) => removeMany(stored, ids));
+    for (const channelId of ids) clearChannelConversation(registry, channelId);
   }
   registry.update(channelCatalogOrganizationIdsAtom, (organizationIds) =>
     organizationIds.includes(organizationId)
@@ -521,6 +540,11 @@ function applySessionCleared(registry: AtomRegistry) {
   }
   registry.set(channelCatalogOrganizationIdsAtom, []);
   registry.set(channelsByIdAtom, new Map());
+  for (const channelId of [
+    ...registry.get(retainedConversationChannelIdsAtom),
+  ]) {
+    clearChannelConversation(registry, channelId);
+  }
   registry.set(retainedTeamIdsAtom, []);
   registry.set(staleTeamIdAtom, null);
 }
@@ -603,6 +627,65 @@ export function applySyncEvent(registry: AtomRegistry, event: SyncEvent): void {
         return;
       case "channel-catalog-cleared":
         clearChannelCatalog(registry, event.organizationId);
+        return;
+      case "channel-conversation-snapshot":
+        applyChannelConversationSnapshot(
+          registry,
+          event.channelId,
+          event.members,
+          event.agents,
+          event.messages,
+          event.nextCursor,
+          event.merge,
+        );
+        return;
+      case "channel-messages-page":
+        applyChannelMessagesPage(
+          registry,
+          event.channelId,
+          event.messages,
+          event.removedMessageIds,
+          event.reset,
+          event.includeRepliesInRoot,
+        );
+        return;
+      case "channel-message-changed":
+        applyChannelMessageChanged(
+          registry,
+          event.channelId,
+          event.message,
+          event.includeRepliesInRoot,
+        );
+        return;
+      case "channel-message-removed":
+        applyChannelMessageRemoved(registry, event.channelId, event.messageId);
+        return;
+      case "channel-thread-snapshot":
+        writeChannelThreadSnapshot(
+          registry,
+          event.channelId,
+          event.rootMessageId,
+          event.messages,
+        );
+        return;
+      case "channel-agent-replies-changed":
+        applyChannelAgentReplies(
+          registry,
+          event.channelId,
+          event.replies,
+          event.reset,
+        );
+        return;
+      case "channel-agent-replies-authoritative":
+        applyAuthoritativeChannelAgentReplies(
+          registry,
+          event.channelId,
+          event.replies,
+          event.retainedReplyIds,
+        );
+        return;
+      case "channel-conversation-cleared":
+        clearChannelConversation(registry, event.channelId);
         return;
       case "team-settings-changed": {
         // The guard the payload level commit had: settings replace a payload

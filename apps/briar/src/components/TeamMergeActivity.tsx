@@ -68,7 +68,7 @@ export function TeamMergeActivity({ projectId, repository, onLoad, refreshKey = 
           {onLoad ? <button className="merge-activity-retry" onClick={() => setAttempt((value) => value + 1)} type="button"><RefreshCw aria-hidden size={14} />{t("lobby.merges.retry")}</button> : null}
         </div>
       ) : !activity ? (
-        <p className="merge-activity-state" role="status"><Spinner size={18} />{t("lobby.merges.loading")}</p>
+        <p className="merge-activity-state" role="status"><Spinner className="size-[18px]" />{t("lobby.merges.loading")}</p>
       ) : <MergeActivityCharts activity={activity} />}
     </section>
   );

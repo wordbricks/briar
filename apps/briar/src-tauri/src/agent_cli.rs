@@ -274,15 +274,58 @@ fn provider_effort(value: local_proto::LocalProviderEffort) -> AgentProviderEffo
     }
 }
 
-pub(super) fn connected_agent_provider(
+/// Every provider with the reason it can or cannot analyse a repository.
+/// Install, sign-in and the app settings switch decide whether a provider is
+/// selectable at all; a spent usage window only marks it as the worse choice.
+pub(super) fn agent_provider_availability(
     prerequisites: &OnboardingPrerequisites,
     enabled: LocalAgentProviderSettings,
-) -> Result<agent::AgentProviderKind, String> {
+    quotas: &agent_usage::ProviderQuotas,
+) -> Vec<AgentProviderAvailability> {
     agent::AgentProviderKind::all()
-        .find(|provider| {
-            let status = prerequisites.provider(*provider);
-            provider_is_enabled(&enabled, *provider) && status.installed && status.authenticated
+        .map(|provider| {
+            let status = prerequisites.provider(provider);
+            let is_enabled = provider_is_enabled(&enabled, provider);
+            let selectable = is_enabled && status.installed && status.authenticated;
+            let quota = quotas.provider(provider);
+            let usage_exhausted = selectable && quota.exhausted;
+            AgentProviderAvailability {
+                provider,
+                enabled: is_enabled,
+                installed: status.installed,
+                authenticated: status.authenticated,
+                selectable,
+                usage_exhausted,
+                max_used_percent: quota.known.then_some(quota.max_used_percent).flatten(),
+                usage_resets_at: usage_exhausted.then_some(quota.resets_at).flatten(),
+                reason: if !is_enabled {
+                    Some(AgentProviderUnavailableReason::Disabled)
+                } else if !status.installed {
+                    Some(AgentProviderUnavailableReason::NotInstalled)
+                } else if !status.authenticated {
+                    Some(AgentProviderUnavailableReason::NotAuthenticated)
+                } else if usage_exhausted {
+                    Some(AgentProviderUnavailableReason::UsageExhausted)
+                } else {
+                    None
+                },
+            }
         })
+        .collect()
+}
+
+/// The provider a connection runs on when the user did not choose one. A
+/// provider whose quota is spent is skipped in favour of one that can answer
+/// now, and only picked when it is the sole connected provider — an exhausted
+/// account still beats refusing to connect, and the screen says so.
+pub(super) fn select_connected_agent_provider(
+    availability: &[AgentProviderAvailability],
+) -> Result<agent::AgentProviderKind, String> {
+    availability
+        .iter()
+        .find(|entry| entry.selectable && !entry.usage_exhausted)
+        .or_else(|| availability.iter().find(|entry| entry.selectable))
+        .map(|entry| entry.provider)
         .ok_or_else(|| {
             let names = agent::AgentProviderKind::all()
                 .map(agent::AgentProviderKind::display_name)
@@ -297,6 +340,25 @@ pub(super) fn connected_agent_provider(
                 "연결된 LLM 프로바이더가 없습니다. 앱 설정에서 {choices}를 연결한 뒤 다시 시도하세요."
             )
         })
+}
+
+/// The provider a connection must run on when the user picked one. Availability
+/// is re-read here rather than trusted from the screen, so a provider that was
+/// signed out or switched off since the preflight cannot be committed.
+pub(super) fn requested_agent_provider(
+    availability: &[AgentProviderAvailability],
+    requested: agent::AgentProviderKind,
+) -> Result<agent::AgentProviderKind, String> {
+    let entry = availability
+        .iter()
+        .find(|entry| entry.provider == requested)
+        .filter(|entry| entry.selectable);
+    entry.map(|entry| entry.provider).ok_or_else(|| {
+        format!(
+            "{}를 지금 사용할 수 없습니다. 앱 설정에서 연결한 뒤 다시 시도하세요.",
+            requested.display_name()
+        )
+    })
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, specta::Type)]

@@ -43,6 +43,8 @@ describe("channel message attachments", () => {
           contentType: "text/html",
           byteSize: 24,
           url: "/attachments/artifact-1",
+          imageWidth: null,
+          imageHeight: null,
         }]}
         token="token"
       />,
@@ -83,6 +85,8 @@ describe("channel message attachments", () => {
             contentType: "application/pdf",
             byteSize: 2048,
             url: "/attachments/pdf-1",
+            imageWidth: null,
+            imageHeight: null,
           }]}
           token="token"
         />
@@ -132,6 +136,8 @@ describe("channel message attachments", () => {
             contentType: "image/png",
             byteSize: 4096,
             url: "blob:http://localhost/local-screenshot",
+            imageWidth: null,
+            imageHeight: null,
           }]}
           token="token"
         />
@@ -169,6 +175,8 @@ describe("channel message attachments", () => {
               contentType: "image/png",
               byteSize: 8192,
               url: "/attachments/server-img-1",
+              imageWidth: null,
+              imageHeight: null,
             }]}
             token="token"
           />

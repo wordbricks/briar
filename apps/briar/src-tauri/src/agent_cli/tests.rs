@@ -8,6 +8,29 @@ fn provider_prerequisite(installed: bool, authenticated: bool) -> OnboardingPrer
     }
 }
 
+/// The provider a connection picks with no explicit choice, the way the
+/// connection commands compose availability and selection.
+fn connected_agent_provider(
+    prerequisites: &OnboardingPrerequisites,
+    enabled: LocalAgentProviderSettings,
+    quotas: &agent_usage::ProviderQuotas,
+) -> Result<agent::AgentProviderKind, String> {
+    select_connected_agent_provider(&agent_provider_availability(prerequisites, enabled, quotas))
+}
+
+fn open_quotas() -> agent_usage::ProviderQuotas {
+    agent_usage::ProviderQuotas::default()
+}
+
+fn exhausted_quota(resets_at: Option<u64>) -> agent_usage::ProviderQuota {
+    agent_usage::ProviderQuota {
+        known: true,
+        exhausted: true,
+        max_used_percent: Some(100.0),
+        resets_at,
+    }
+}
+
 fn provider_prerequisites(
     codex: (bool, bool),
     claude: (bool, bool),
@@ -32,8 +55,12 @@ fn selects_an_authenticated_llm_provider_for_repository_analysis() {
         provider_prerequisites((true, false), (true, true), (false, false), (false, false));
 
     assert_eq!(
-        connected_agent_provider(&prerequisites, default_agent_provider_settings())
-            .expect("Claude should be selected"),
+        connected_agent_provider(
+            &prerequisites,
+            default_agent_provider_settings(),
+            &open_quotas(),
+        )
+        .expect("Claude should be selected"),
         agent::AgentProviderKind::Claude
     );
 }
@@ -56,6 +83,7 @@ fn skips_authenticated_llm_providers_disabled_in_app_settings() {
                 openrouter: true,
                 ..Default::default()
             },
+            &open_quotas(),
         )
         .expect("Grok should be selected"),
         agent::AgentProviderKind::Grok
@@ -68,8 +96,12 @@ fn selects_connected_opencode_for_repository_analysis() {
         provider_prerequisites((false, false), (false, false), (false, false), (true, true));
 
     assert_eq!(
-        connected_agent_provider(&prerequisites, default_agent_provider_settings())
-            .expect("OpenCode should be selected"),
+        connected_agent_provider(
+            &prerequisites,
+            default_agent_provider_settings(),
+            &open_quotas(),
+        )
+        .expect("OpenCode should be selected"),
         agent::AgentProviderKind::Opencode
     );
 }
@@ -79,10 +111,116 @@ fn rejects_repository_analysis_without_a_connected_llm_provider() {
     let prerequisites =
         provider_prerequisites((true, false), (false, false), (true, false), (false, false));
 
+    assert!(connected_agent_provider(
+        &prerequisites,
+        default_agent_provider_settings(),
+        &open_quotas(),
+    )
+    .expect_err("a connected provider should be required")
+    .contains("연결된 LLM 프로바이더가 없습니다"));
+}
+
+#[test]
+fn skips_a_connected_provider_whose_usage_window_is_spent() {
+    let prerequisites =
+        provider_prerequisites((true, true), (true, true), (false, false), (false, false));
+
+    assert_eq!(
+        connected_agent_provider(
+            &prerequisites,
+            default_agent_provider_settings(),
+            &open_quotas().with(agent::AgentProviderKind::Codex, exhausted_quota(None)),
+        )
+        .expect("Claude should be selected"),
+        agent::AgentProviderKind::Claude
+    );
+}
+
+#[test]
+fn falls_back_to_an_exhausted_provider_when_it_is_the_only_connected_one() {
+    let prerequisites =
+        provider_prerequisites((true, true), (false, false), (false, false), (false, false));
+
+    assert_eq!(
+        connected_agent_provider(
+            &prerequisites,
+            default_agent_provider_settings(),
+            &open_quotas().with(agent::AgentProviderKind::Codex, exhausted_quota(None)),
+        )
+        .expect("the only connected provider should still be offered"),
+        agent::AgentProviderKind::Codex
+    );
+}
+
+#[test]
+fn reports_why_each_provider_can_or_cannot_analyse_a_repository() {
+    let prerequisites =
+        provider_prerequisites((true, true), (true, false), (false, false), (true, true));
+    let availability = agent_provider_availability(
+        &prerequisites,
+        LocalAgentProviderSettings {
+            codex: true,
+            claude: true,
+            cursor: true,
+            grok: true,
+            agy: true,
+            opencode: false,
+            openrouter: true,
+            ..Default::default()
+        },
+        &open_quotas().with(
+            agent::AgentProviderKind::Codex,
+            exhausted_quota(Some(1_800_052_800_000)),
+        ),
+    );
+    let entry = |provider: agent::AgentProviderKind| {
+        availability
+            .iter()
+            .find(|entry| entry.provider == provider)
+            .expect("every provider should be reported")
+    };
+
+    let codex = entry(agent::AgentProviderKind::Codex);
+    assert!(codex.selectable && codex.usage_exhausted);
+    assert_eq!(
+        codex.reason,
+        Some(AgentProviderUnavailableReason::UsageExhausted)
+    );
+    assert_eq!(codex.usage_resets_at, Some(1_800_052_800_000));
+    assert_eq!(
+        entry(agent::AgentProviderKind::Claude).reason,
+        Some(AgentProviderUnavailableReason::NotAuthenticated)
+    );
+    assert_eq!(
+        entry(agent::AgentProviderKind::Grok).reason,
+        Some(AgentProviderUnavailableReason::NotInstalled)
+    );
+    assert_eq!(
+        entry(agent::AgentProviderKind::Opencode).reason,
+        Some(AgentProviderUnavailableReason::Disabled)
+    );
+    assert!(!entry(agent::AgentProviderKind::Opencode).selectable);
+}
+
+#[test]
+fn commits_a_requested_provider_only_while_it_stays_usable() {
+    let prerequisites =
+        provider_prerequisites((true, true), (true, true), (false, false), (false, false));
+    let availability = agent_provider_availability(
+        &prerequisites,
+        default_agent_provider_settings(),
+        &open_quotas().with(agent::AgentProviderKind::Claude, exhausted_quota(None)),
+    );
+
+    assert_eq!(
+        requested_agent_provider(&availability, agent::AgentProviderKind::Claude)
+            .expect("an exhausted provider stays the user's choice"),
+        agent::AgentProviderKind::Claude
+    );
     assert!(
-        connected_agent_provider(&prerequisites, default_agent_provider_settings())
-            .expect_err("a connected provider should be required")
-            .contains("연결된 LLM 프로바이더가 없습니다")
+        requested_agent_provider(&availability, agent::AgentProviderKind::Grok)
+            .expect_err("a provider that is not connected cannot be committed")
+            .contains("Grok")
     );
 }
 

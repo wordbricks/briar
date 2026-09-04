@@ -160,6 +160,8 @@ describe("channel message contract", () => {
         contentType: "image/png",
         byteSize: 42,
         url: "/private/display-only-url",
+        imageWidth: null,
+        imageHeight: null,
       }],
       reactions: [{ emoji: "👍", count: 1, userIds: [projectId] }],
       replyCount: 2,

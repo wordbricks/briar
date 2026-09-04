@@ -225,7 +225,7 @@ export function EditIssueDialog({
               {t("common.cancel")}
             </button>
             <button className="issue-submit-button" disabled={isSubmitting || !title.trim() || titleTooLong} type="submit">
-              {isSubmitting && <Spinner size={13} />}
+              {isSubmitting && <Spinner className="size-[13px]" />}
               {isSubmitting ? t("common.saving") : t("common.save")}
             </button>
           </div>

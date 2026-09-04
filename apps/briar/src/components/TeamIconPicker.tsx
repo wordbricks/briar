@@ -138,7 +138,7 @@ export function TeamIconPicker({
                 type="button"
               >
                 {saving ? (
-                  <Spinner size={16} />
+                  <Spinner className="size-[16px]" />
                 ) : (
                   <Icon
                     aria-hidden="true"

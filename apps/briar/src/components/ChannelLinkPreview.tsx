@@ -89,6 +89,12 @@ function normalizePreview(
   if (!value) return null;
   const url = safeHttpUrl(value.url) ?? safeHttpUrl(requestedUrl);
   if (!url) return null;
+  const imageWidth = typeof value.imageWidth === "number" && value.imageWidth > 0
+    ? value.imageWidth
+    : null;
+  const imageHeight = typeof value.imageHeight === "number" && value.imageHeight > 0
+    ? value.imageHeight
+    : null;
   return {
     url,
     title: previewText(value.title, 240),
@@ -96,6 +102,8 @@ function normalizePreview(
     imageUrl: safeHttpUrl(value.imageUrl),
     faviconUrl: safeHttpUrl(value.faviconUrl),
     siteName: previewText(value.siteName, 120),
+    imageWidth,
+    imageHeight,
   };
 }
 
@@ -227,6 +235,11 @@ export function ChannelLinkPreview({
           loading="lazy"
           onError={() => setImageFailed(true)}
           src={imageUrl}
+          style={
+            preview.imageWidth && preview.imageHeight
+              ? { aspectRatio: `${preview.imageWidth} / ${preview.imageHeight}` }
+              : undefined
+          }
         />
       ) : null}
     </a>

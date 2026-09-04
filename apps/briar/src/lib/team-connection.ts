@@ -4,7 +4,11 @@ import {
   isRepositoryWorkflowPending,
   type AutoHuntWorkflow,
 } from "./auto-hunt-contract";
-import { commands, type PreparedProjectRepository } from "../generated/tauri";
+import {
+  commands,
+  type AgentProviderKind,
+  type PreparedProjectRepository,
+} from "../generated/tauri";
 import type { OrganizationRole, ProjectSettings } from "../types";
 import type { ProjectGithubCredential } from "./api";
 import { hasOrganizationCapability } from "./organization-role";
@@ -186,6 +190,8 @@ export async function connectLocalTeam(input: {
   agentToken: string;
   repositoryPath: string;
   autoHunt: LocalAutoHuntConfig;
+  /** Agent backend the user picked; the native layer resolves one when absent. */
+  provider?: AgentProviderKind | null;
 }) {
   if (!isTauri()) {
     throw new Error("프로젝트 연결은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
@@ -196,6 +202,7 @@ export async function connectLocalTeam(input: {
     input.agentToken,
     input.repositoryPath,
     input.autoHunt,
+    input.provider ?? null,
   );
   return {
     ...connected,

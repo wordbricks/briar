@@ -70,7 +70,7 @@ const StoredChannelMessageBlocksJson = Schema.fromJsonString(
     Schema.isLengthBetween(1, 50),
   ),
 );
-const decodeStoredChannelMessageBlocks = Schema.decodeUnknownSync(
+export const decodeStoredChannelMessageBlocks = Schema.decodeUnknownSync(
   StoredChannelMessageBlocksJson,
   strictStoredChannelMessageBlockOptions,
 );
@@ -232,6 +232,8 @@ export type ChannelMessageAttachmentRow = {
   content_type: string;
   byte_size: number;
   created_at: string;
+  image_width: number | null;
+  image_height: number | null;
 };
 
 export type ChannelMessageDocumentRow = {
@@ -245,7 +247,10 @@ export type ChannelMessageDocumentRow = {
 export type ChannelMessageAttachmentInput = Pick<
   ChannelMessageAttachmentRow,
   "id" | "organization_id" | "object_key" | "filename" | "content_type" | "byte_size"
->;
+> & {
+  image_width?: number | null;
+  image_height?: number | null;
+};
 
 export type ChannelMessageMutationCommit = ChannelMessageUploadScope & {
   uploadIds: readonly string[];
@@ -1600,6 +1605,8 @@ const channelMessageAttachmentJson = (
   contentType: row.content_type,
   byteSize: row.byte_size,
   url: `/organizations/${row.organization_id}/channels/${row.channel_id}/messages/${row.message_id}/attachments/${row.id}`,
+  imageWidth: row.image_width ?? null,
+  imageHeight: row.image_height ?? null,
 });
 
 async function attachMessageRelations(
@@ -1633,7 +1640,8 @@ async function attachMessageRelations(
     db
       .prepare(
         `select id, organization_id, channel_id, message_id, object_key,
-                filename, content_type, byte_size, created_at
+                filename, content_type, byte_size, created_at,
+                image_width, image_height
          from briar_channel_message_attachments
          where message_id in (${placeholders})
          order by created_at, id`,
@@ -2446,8 +2454,8 @@ export async function createChannelMessage(
         .prepare(
           `insert into briar_channel_message_attachments (
              id, organization_id, channel_id, message_id, object_key,
-             filename, content_type, byte_size, created_at
-           ) select ?, ?, ?, ?, ?, ?, ?, ?, ?
+             filename, content_type, byte_size, created_at, image_width, image_height
+           ) select ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
              where exists (
                select 1 from briar_channel_messages
                where id = ? and channel_id = ?
@@ -2463,6 +2471,8 @@ export async function createChannelMessage(
           attachment.content_type,
           attachment.byte_size,
           input.createdAt,
+          attachment.image_width ?? null,
+          attachment.image_height ?? null,
           input.id,
           input.channelId,
         ),
@@ -4507,9 +4517,9 @@ export async function completeChannelReply(
         .prepare(
           `insert into briar_channel_message_attachments (
              id, organization_id, channel_id, message_id, object_key,
-             filename, content_type, byte_size, created_at
+             filename, content_type, byte_size, created_at, image_width, image_height
            )
-           select ?, ?, ?, ?, ?, ?, ?, ?, ?
+           select ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
            from briar_channel_agent_reply_jobs claim
            where claim.id = ? and claim.claimed_device_id = ?
              and claim.claimed_worker_id = ? and claim.claim_token_hash = ?
@@ -4538,6 +4548,8 @@ export async function completeChannelReply(
           attachment.content_type,
           attachment.byte_size,
           input.completedAt,
+          attachment.image_width ?? null,
+          attachment.image_height ?? null,
           input.jobId,
           input.deviceId,
           input.workerId,

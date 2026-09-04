@@ -176,7 +176,7 @@ export function DeveloperToolsSetup({
                   className="initial-prerequisite-check checking"
                   role="status"
                 >
-                  <Spinner size={16} />
+                  <Spinner className="size-[16px]" />
                   {t("initialOnboarding.checking")}
                 </span>
               ) : needsTerminalPath ? (
@@ -187,7 +187,7 @@ export function DeveloperToolsSetup({
                   type="button"
                 >
                   {terminalPathSaving ? (
-                    <Spinner size={14} />
+                    <Spinner className="size-[14px]" />
                   ) : (
                     <SquareTerminal size={14} />
                   )}
@@ -213,7 +213,7 @@ export function DeveloperToolsSetup({
                   type="button"
                 >
                   {isInstalling ? (
-                    <Spinner size={14} />
+                    <Spinner className="size-[14px]" />
                   ) : (
                     <Download size={14} />
                   )}

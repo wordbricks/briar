@@ -1941,6 +1941,22 @@ pub struct IssueAttachment {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub url: ::buffa::alloc::string::String,
+    /// Field 6: `image_width`
+    #[serde(
+        rename = "imageWidth",
+        alias = "image_width",
+        with = "::buffa::json_helpers::opt_int32",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub image_width: ::core::option::Option<i32>,
+    /// Field 7: `image_height`
+    #[serde(
+        rename = "imageHeight",
+        alias = "image_height",
+        with = "::buffa::json_helpers::opt_int32",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub image_height: ::core::option::Option<i32>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -1953,6 +1969,8 @@ impl ::core::fmt::Debug for IssueAttachment {
             .field("content_type", &self.content_type)
             .field("byte_size", &self.byte_size)
             .field("url", &self.url)
+            .field("image_width", &self.image_width)
+            .field("image_height", &self.image_height)
             .finish()
     }
 }
@@ -1962,6 +1980,22 @@ impl IssueAttachment {
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
     pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.IssueAttachment";
+}
+impl IssueAttachment {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::image_width`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_image_width(mut self, value: i32) -> Self {
+        self.image_width = Some(value);
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::image_height`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_image_height(mut self, value: i32) -> Self {
+        self.image_height = Some(value);
+        self
+    }
 }
 ::buffa::impl_default_instance!(IssueAttachment);
 impl ::buffa::MessageName for IssueAttachment {
@@ -1998,6 +2032,12 @@ impl ::buffa::Message for IssueAttachment {
         if !self.url.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.url) as u64;
         }
+        if let Some(v) = self.image_width {
+            size += 1u64 + ::buffa::types::int32_encoded_len(v) as u64;
+        }
+        if let Some(v) = self.image_height {
+            size += 1u64 + ::buffa::types::int32_encoded_len(v) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -2022,6 +2062,12 @@ impl ::buffa::Message for IssueAttachment {
         }
         if !self.url.is_empty() {
             ::buffa::types::put_string_field(5u32, &self.url, buf);
+        }
+        if let Some(v) = self.image_width {
+            ::buffa::types::put_int32_field(6u32, v, buf);
+        }
+        if let Some(v) = self.image_height {
+            ::buffa::types::put_int32_field(7u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -2071,6 +2117,24 @@ impl ::buffa::Message for IssueAttachment {
                 )?;
                 ::buffa::types::merge_string(&mut self.url, buf)?;
             }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.image_width = ::core::option::Option::Some(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.image_height = ::core::option::Option::Some(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -2084,6 +2148,8 @@ impl ::buffa::Message for IssueAttachment {
         self.content_type.clear();
         self.byte_size = 0u64;
         self.url.clear();
+        self.image_width = ::core::option::Option::None;
+        self.image_height = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -80369,6 +80435,22 @@ pub struct ChannelLinkPreview {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub site_name: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 7: `image_width`
+    #[serde(
+        rename = "imageWidth",
+        alias = "image_width",
+        with = "::buffa::json_helpers::opt_int32",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub image_width: ::core::option::Option<i32>,
+    /// Field 8: `image_height`
+    #[serde(
+        rename = "imageHeight",
+        alias = "image_height",
+        with = "::buffa::json_helpers::opt_int32",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub image_height: ::core::option::Option<i32>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -80382,6 +80464,8 @@ impl ::core::fmt::Debug for ChannelLinkPreview {
             .field("image_url", &self.image_url)
             .field("favicon_url", &self.favicon_url)
             .field("site_name", &self.site_name)
+            .field("image_width", &self.image_width)
+            .field("image_height", &self.image_height)
             .finish()
     }
 }
@@ -80443,6 +80527,20 @@ impl ChannelLinkPreview {
         self.site_name = Some(value.into());
         self
     }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::image_width`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_image_width(mut self, value: i32) -> Self {
+        self.image_width = Some(value);
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::image_height`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_image_height(mut self, value: i32) -> Self {
+        self.image_height = Some(value);
+        self
+    }
 }
 ::buffa::impl_default_instance!(ChannelLinkPreview);
 impl ::buffa::MessageName for ChannelLinkPreview {
@@ -80482,6 +80580,12 @@ impl ::buffa::Message for ChannelLinkPreview {
         if let Some(ref v) = self.site_name {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
+        if let Some(v) = self.image_width {
+            size += 1u64 + ::buffa::types::int32_encoded_len(v) as u64;
+        }
+        if let Some(v) = self.image_height {
+            size += 1u64 + ::buffa::types::int32_encoded_len(v) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -80509,6 +80613,12 @@ impl ::buffa::Message for ChannelLinkPreview {
         }
         if let Some(ref v) = self.site_name {
             ::buffa::types::put_string_field(6u32, v, buf);
+        }
+        if let Some(v) = self.image_width {
+            ::buffa::types::put_int32_field(7u32, v, buf);
+        }
+        if let Some(v) = self.image_height {
+            ::buffa::types::put_int32_field(8u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -80588,6 +80698,24 @@ impl ::buffa::Message for ChannelLinkPreview {
                     buf,
                 )?;
             }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.image_width = ::core::option::Option::Some(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.image_height = ::core::option::Option::Some(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -80602,6 +80730,8 @@ impl ::buffa::Message for ChannelLinkPreview {
         self.image_url = ::core::option::Option::None;
         self.favicon_url = ::core::option::Option::None;
         self.site_name = ::core::option::Option::None;
+        self.image_width = ::core::option::Option::None;
+        self.image_height = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -144583,6 +144713,10 @@ pub mod __buffa {
             pub byte_size: u64,
             /// Field 5: `url`
             pub url: &'a str,
+            /// Field 6: `image_width`
+            pub image_width: ::core::option::Option<i32>,
+            /// Field 7: `image_height`
+            pub image_height: ::core::option::Option<i32>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for IssueAttachmentView<'a> {
@@ -144652,6 +144786,22 @@ pub mod __buffa {
                         )?;
                         view.url = ::buffa::types::borrow_str(&mut cur)?;
                     }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.image_width = Some(::buffa::types::decode_int32(&mut cur)?);
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.image_height = Some(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -144686,6 +144836,8 @@ pub mod __buffa {
                     content_type: self.content_type.to_string(),
                     byte_size: self.byte_size,
                     url: self.url.to_string(),
+                    image_width: self.image_width,
+                    image_height: self.image_height,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -144722,6 +144874,12 @@ pub mod __buffa {
                 if !self.url.is_empty() {
                     size += 1u64 + ::buffa::types::string_encoded_len(&self.url) as u64;
                 }
+                if let Some(v) = self.image_width {
+                    size += 1u64 + ::buffa::types::int32_encoded_len(v) as u64;
+                }
+                if let Some(v) = self.image_height {
+                    size += 1u64 + ::buffa::types::int32_encoded_len(v) as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -144747,6 +144905,12 @@ pub mod __buffa {
                 }
                 if !self.url.is_empty() {
                     ::buffa::types::put_string_field(5u32, &self.url, buf);
+                }
+                if let Some(v) = self.image_width {
+                    ::buffa::types::put_int32_field(6u32, v, buf);
+                }
+                if let Some(v) = self.image_height {
+                    ::buffa::types::put_int32_field(7u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -144787,6 +144951,20 @@ pub mod __buffa {
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.url) {
                     __map.serialize_entry("url", self.url)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.image_width {
+                    __map
+                        .serialize_entry(
+                            "imageWidth",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                if let ::core::option::Option::Some(__v) = self.image_height {
+                    __map
+                        .serialize_entry(
+                            "imageHeight",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
                 }
                 __map.end()
             }
@@ -144907,6 +145085,16 @@ pub mod __buffa {
             #[must_use]
             pub fn url(&self) -> &'_ str {
                 self.0.reborrow().url
+            }
+            /// Field 6: `image_width`
+            #[must_use]
+            pub fn image_width(&self) -> ::core::option::Option<i32> {
+                self.0.reborrow().image_width
+            }
+            /// Field 7: `image_height`
+            #[must_use]
+            pub fn image_height(&self) -> ::core::option::Option<i32> {
+                self.0.reborrow().image_height
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<IssueAttachmentView<'static>>>
@@ -260304,6 +260492,10 @@ pub mod __buffa {
             pub favicon_url: ::core::option::Option<&'a str>,
             /// Field 6: `site_name`
             pub site_name: ::core::option::Option<&'a str>,
+            /// Field 7: `image_width`
+            pub image_width: ::core::option::Option<i32>,
+            /// Field 8: `image_height`
+            pub image_height: ::core::option::Option<i32>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ChannelLinkPreviewView<'a> {
@@ -260380,6 +260572,22 @@ pub mod __buffa {
                         )?;
                         view.site_name = Some(::buffa::types::borrow_str(&mut cur)?);
                     }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.image_width = Some(::buffa::types::decode_int32(&mut cur)?);
+                    }
+                    8u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.image_height = Some(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -260415,6 +260623,8 @@ pub mod __buffa {
                     image_url: self.image_url.map(|s| s.to_string()),
                     favicon_url: self.favicon_url.map(|s| s.to_string()),
                     site_name: self.site_name.map(|s| s.to_string()),
+                    image_width: self.image_width,
+                    image_height: self.image_height,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -260447,6 +260657,12 @@ pub mod __buffa {
                 if let Some(ref v) = self.site_name {
                     size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
                 }
+                if let Some(v) = self.image_width {
+                    size += 1u64 + ::buffa::types::int32_encoded_len(v) as u64;
+                }
+                if let Some(v) = self.image_height {
+                    size += 1u64 + ::buffa::types::int32_encoded_len(v) as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -260475,6 +260691,12 @@ pub mod __buffa {
                 }
                 if let Some(ref v) = self.site_name {
                     ::buffa::types::put_string_field(6u32, v, buf);
+                }
+                if let Some(v) = self.image_width {
+                    ::buffa::types::put_int32_field(7u32, v, buf);
+                }
+                if let Some(v) = self.image_height {
+                    ::buffa::types::put_int32_field(8u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -260514,6 +260736,20 @@ pub mod __buffa {
                 }
                 if let ::core::option::Option::Some(__v) = self.site_name {
                     __map.serialize_entry("siteName", __v)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.image_width {
+                    __map
+                        .serialize_entry(
+                            "imageWidth",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                if let ::core::option::Option::Some(__v) = self.image_height {
+                    __map
+                        .serialize_entry(
+                            "imageHeight",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
                 }
                 __map.end()
             }
@@ -260639,6 +260875,16 @@ pub mod __buffa {
             #[must_use]
             pub fn site_name(&self) -> ::core::option::Option<&'_ str> {
                 self.0.reborrow().site_name
+            }
+            /// Field 7: `image_width`
+            #[must_use]
+            pub fn image_width(&self) -> ::core::option::Option<i32> {
+                self.0.reborrow().image_width
+            }
+            /// Field 8: `image_height`
+            #[must_use]
+            pub fn image_height(&self) -> ::core::option::Option<i32> {
+                self.0.reborrow().image_height
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<ChannelLinkPreviewView<'static>>>
