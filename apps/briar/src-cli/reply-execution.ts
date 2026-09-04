@@ -1,4 +1,8 @@
 import {
+  providerBlockHeadline,
+  type ProviderBlock,
+} from "../src/lib/provider-block";
+import {
   mkdtemp,
   mkdir,
   rm,
@@ -29,7 +33,9 @@ import {
 } from "./agent-runner";
 import { agentImageAttachments } from "../src-agent/runner-attachments";
 import {
+  DetachedProviderBlockedError,
   assertDetachedProviderTurnSucceeded,
+  detachedProviderBlockOf,
   logDetachedProviderTurnDiagnostic,
   runDetachedProviderTurn,
 } from "./detached-provider-turn";
@@ -590,6 +596,7 @@ async function failClaimedIssueReply(
 ) {
   const workerId = project.executionWorker?.workerId;
   if (!workerId) throw error;
+  const block = detachedProviderBlockOf(error);
   await createReplyCompletionClient(config.apiUrl, workerToken)
     .completeIssueReply({
       projectId: project.id,
@@ -598,6 +605,7 @@ async function failClaimedIssueReply(
       outcome: {
         case: "failure",
         error: error instanceof Error ? error.message : String(error),
+        ...(block ? { block } : {}),
       },
     });
 }
@@ -1050,7 +1058,8 @@ async function runClaimedChannelReply(
     });
     retainedUntil = completion.retainedUntil;
   } catch (error) {
-    throw reply.memory ? dmMemoryExecutionError(error) : error;
+    if (!reply.memory || error instanceof DetachedProviderBlockedError) throw error;
+    throw dmMemoryExecutionError(error);
   } finally {
     activityPublisher.stop();
     if (activeReplyActivityPublishers.get(reply.workId) === activityPublisher) {
@@ -1097,6 +1106,7 @@ async function failClaimedChannelReply(
 ) {
   const workerId = project.executionWorker?.workerId;
   if (!workerId) throw error;
+  const block = detachedProviderBlockOf(error);
   await createReplyCompletionClient(config.apiUrl, workerToken)
     .completeChannelReply({
       projectId: project.id,
@@ -1104,11 +1114,24 @@ async function failClaimedChannelReply(
       work: reply,
       outcome: {
         case: "failure",
-        error: reply.memory
-          ? dmMemoryExecutionError(error).message
-          : error instanceof Error ? error.message : String(error),
+        error: block
+          ? error instanceof Error ? error.message : String(error)
+          : reply.memory
+            ? dmMemoryExecutionError(error).message
+            : error instanceof Error ? error.message : String(error),
+        // A block names the provider and its reason, never the DM content,
+        // so the memory privacy fence keeps it.
+        ...(block ? { block: reply.memory ? dmSafeProviderBlock(block) : block } : {}),
       },
     });
+}
+
+/** Keep the reason and provider; drop provider text that could echo a prompt. */
+function dmSafeProviderBlock(block: ProviderBlock): ProviderBlock {
+  return {
+    ...block,
+    message: providerBlockHeadline(block),
+  };
 }
 
 export {

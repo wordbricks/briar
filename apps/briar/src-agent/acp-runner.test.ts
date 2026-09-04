@@ -39,6 +39,7 @@ const request: RunnerRequest = {
 };
 
 const testProfile: AcpProviderProfile = {
+  providerId: "grok",
   providerName: "Test Agent",
   displayName: "Test",
   missingSessionIdMessage: "Test agent did not return a session id.",

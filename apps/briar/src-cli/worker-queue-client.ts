@@ -1,3 +1,7 @@
+import {
+  providerBlockToProto,
+  type ProviderBlock,
+} from "../src/lib/provider-block";
 import { timestampDate } from "@bufbuild/protobuf/wkt";
 import type { Client } from "@connectrpc/connect";
 import {
@@ -265,7 +269,7 @@ export function createWorkerQueueOperations(client: WorkerQueueClient) {
           summary: string;
           conversationId: string | null;
         }
-        | { case: "failure"; error: string };
+        | { case: "failure"; error: string; block?: ProviderBlock };
       signal?: AbortSignal;
     }) =>
       client.completeProjectAgentTask(
@@ -283,7 +287,12 @@ export function createWorkerQueueOperations(client: WorkerQueueClient) {
             }
             : {
               case: "failure",
-              value: { error: input.result.error },
+              value: {
+                error: input.result.error,
+                ...(input.result.block
+                  ? { block: providerBlockToProto(input.result.block) }
+                  : {}),
+              },
             },
         },
         { signal: input.signal },

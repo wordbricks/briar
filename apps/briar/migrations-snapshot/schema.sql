@@ -5,8 +5,8 @@
 -- Whenever a migration changes the schema or seeds rows, run
 -- `bun run d1:snapshot` and commit the result; `bun run d1:snapshot:check`
 -- fails in CI otherwise.
--- migrations-digest: 371d7d168d7b17f6da3a23c009316bb12fdbf563e9bfe5d2e6d246561574a5e5
--- snapshot-digest: 9f8ac6f870c7a371b0e267047074aec9c00c6ebd1334181082f98d14c7537ca2
+-- migrations-digest: aef772c50f35a8d663e4ebf40d64da74566c4c403406e5b041f58eed15f325a9
+-- snapshot-digest: 3a025ef1a2c70d3279fce35eb91a7c7718c8cfc646fc5e9b3a10613076e714e1
 -- @statement
 CREATE TABLE IF NOT EXISTS "d1_migrations"(
 		id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -10049,80 +10049,6 @@ when old.revocation_epoch <> new.revocation_epoch begin
     select id from briar_dm_memory_documents where space_id = new.id and status = 'deleted');
 end;
 -- @statement
-CREATE TRIGGER briar_reply_completion_receipt_insert_guard
-before insert on briar_reply_completion_receipts
-when not (
-  (
-    new.reply_kind = 'issue'
-    and exists (
-      select 1
-      from briar_issue_agent_reply_jobs job
-      join briar_projects project on project.id = job.project_id
-      join briar_execution_workers worker
-        on worker.id = job.claimed_worker_id
-       and worker.project_id = job.project_id
-      where job.id = new.work_id and job.project_id = new.project_id
-        and job.run_id = new.run_id
-        and project.organization_id = new.organization_id
-        and worker.id = new.worker_id and worker.device_id = new.device_id
-        and job.claim_token_hash = new.claim_token_hash
-        and (
-          (new.outcome_kind = 'success'
-            and new.disposition = 'completed'
-            and job.status = 'completed'
-            and job.completed_at = new.created_at)
-          or
-          (new.outcome_kind = 'failure'
-            and job.updated_at = new.created_at
-            and (
-              (job.attempts < 3 and new.disposition = 'requeued'
-                and job.status = 'queued')
-              or
-              (job.attempts >= 3 and new.disposition = 'failed'
-                and job.status = 'failed')
-            ))
-        )
-    )
-  )
-  or
-  (
-    new.reply_kind = 'channel'
-    and exists (
-      select 1
-      from briar_channel_agent_reply_jobs job
-      join briar_execution_workers worker
-        on worker.id = job.claimed_worker_id
-       and worker.device_id = job.claimed_device_id
-      join briar_projects project on project.id = worker.project_id
-      where job.id = new.work_id and job.channel_id = new.run_id
-        and job.organization_id = new.organization_id
-        and project.id = new.project_id
-        and project.organization_id = new.organization_id
-        and worker.id = new.worker_id and worker.device_id = new.device_id
-        and job.claim_token_hash = new.claim_token_hash
-        and (
-          (new.outcome_kind = 'success'
-            and new.disposition = 'completed'
-            and job.status = 'completed'
-            and job.completed_at = new.created_at)
-          or
-          (new.outcome_kind = 'failure'
-            and job.updated_at = new.created_at
-            and (
-              (job.attempts < 3 and new.disposition = 'requeued'
-                and job.status = 'queued')
-              or
-              (job.attempts >= 3 and new.disposition = 'failed'
-                and job.status = 'failed')
-            ))
-        )
-    )
-  )
-)
-begin
-  select raise(abort, 'invalid reply completion receipt');
-end;
--- @statement
 CREATE TRIGGER briar_reply_completion_receipt_immutable_update
 before update on briar_reply_completion_receipts
 begin
@@ -12487,4 +12413,75 @@ before update of context_json on briar_hunt_runs
 when json_type(new.context_json, '$.fullAuto') is not null
 begin
   select raise(abort, 'run context cannot contain execution policy');
+end;
+-- @statement
+CREATE TRIGGER briar_reply_completion_receipt_insert_guard
+before insert on briar_reply_completion_receipts
+when not (
+  (
+    new.reply_kind = 'issue'
+    and exists (
+      select 1
+      from briar_issue_agent_reply_jobs job
+      join briar_projects project on project.id = job.project_id
+      join briar_execution_workers worker
+        on worker.id = job.claimed_worker_id
+       and worker.project_id = job.project_id
+      where job.id = new.work_id and job.project_id = new.project_id
+        and job.run_id = new.run_id
+        and project.organization_id = new.organization_id
+        and worker.id = new.worker_id and worker.device_id = new.device_id
+        and job.claim_token_hash = new.claim_token_hash
+        and (
+          (new.outcome_kind = 'success'
+            and new.disposition = 'completed'
+            and job.status = 'completed'
+            and job.completed_at = new.created_at)
+          or
+          (new.outcome_kind = 'failure'
+            and job.updated_at = new.created_at
+            and (
+              (job.attempts < 3 and new.disposition = 'requeued'
+                and job.status = 'queued')
+              or
+              (new.disposition = 'failed' and job.status = 'failed')
+            ))
+        )
+    )
+  )
+  or
+  (
+    new.reply_kind = 'channel'
+    and exists (
+      select 1
+      from briar_channel_agent_reply_jobs job
+      join briar_execution_workers worker
+        on worker.id = job.claimed_worker_id
+       and worker.device_id = job.claimed_device_id
+      join briar_projects project on project.id = worker.project_id
+      where job.id = new.work_id and job.channel_id = new.run_id
+        and job.organization_id = new.organization_id
+        and project.id = new.project_id
+        and project.organization_id = new.organization_id
+        and worker.id = new.worker_id and worker.device_id = new.device_id
+        and job.claim_token_hash = new.claim_token_hash
+        and (
+          (new.outcome_kind = 'success'
+            and new.disposition = 'completed'
+            and job.status = 'completed'
+            and job.completed_at = new.created_at)
+          or
+          (new.outcome_kind = 'failure'
+            and job.updated_at = new.created_at
+            and (
+              (new.disposition = 'requeued' and job.status = 'queued')
+              or
+              (new.disposition = 'failed' and job.status = 'failed')
+            ))
+        )
+    )
+  )
+)
+begin
+  select raise(abort, 'invalid reply completion receipt');
 end;

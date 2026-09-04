@@ -1,3 +1,7 @@
+import {
+  providerBlockFromProto,
+  providerBlockReplyMessage,
+} from "../../src/lib/provider-block";
 import { create, fromJson, toJson } from "@bufbuild/protobuf";
 import * as Schema from "effect/Schema";
 import { timestampFromDate, ValueSchema } from "@bufbuild/protobuf/wkt";
@@ -873,8 +877,11 @@ async function completeTeamAgentTask(
     });
   }
   if (result.case === "failure") {
+    const block = providerBlockFromProto(result.value.block);
     const failure = decodeTeamAgentTaskFailure({
-      error: result.value.error,
+      // A blocked task is reported in the words a person can act on, not
+      // in provider error text.
+      error: block ? providerBlockReplyMessage(block) : result.value.error,
     });
     return services.completeTeamAgentTaskWork({
       db: input.db,

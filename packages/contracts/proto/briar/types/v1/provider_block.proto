@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package briar.types.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option swift_prefix = "BriarTypes_";
+
+// Provider-neutral reasons a coding-agent turn stopped before producing a
+// result. A block is an account, quota, or environment condition that time or
+// a person can clear; a turn that simply failed is not a block. Every runner
+// maps its provider's native failure onto this list, and every consumer —
+// the desktop sidecar, the execution Worker, and the server — acts on the
+// reason instead of on provider error text.
+enum ProviderBlockReason {
+  PROVIDER_BLOCK_REASON_UNSPECIFIED = 0;
+  // An MCP server the turn needs is not authenticated on this machine.
+  PROVIDER_BLOCK_REASON_MCP_AUTH_REQUIRED = 1;
+  // A plan's quota or rate limit is used up; next_retry_at names the reset
+  // when the provider reported one.
+  PROVIDER_BLOCK_REASON_USAGE_EXHAUSTED = 2;
+  // The model provider is temporarily overloaded (HTTP 502/503/504/529).
+  PROVIDER_BLOCK_REASON_UPSTREAM_OVERLOADED = 3;
+  // A free tier's allowance is used up and the provider offered a retry time.
+  PROVIDER_BLOCK_REASON_FREE_TIER_LIMIT = 4;
+  // The provider CLI itself is signed out or its credentials were rejected.
+  PROVIDER_BLOCK_REASON_AUTH_REQUIRED = 5;
+  // The request no longer fits the model's context window.
+  PROVIDER_BLOCK_REASON_CONTEXT_WINDOW_EXCEEDED = 6;
+  // The account needs billing attention: no credits, payment required, or
+  // the selected usage is not part of the plan.
+  PROVIDER_BLOCK_REASON_BILLING_REQUIRED = 7;
+  // The selected model does not exist or the account may not use it.
+  PROVIDER_BLOCK_REASON_MODEL_UNAVAILABLE = 8;
+}
+
+message ProviderBlock {
+  ProviderBlockReason reason = 1;
+  // Human-readable provider text, already safe to show to an end user.
+  string message = 2;
+  // The runner provider, or the upstream model provider a block names when
+  // that differs (an OpenRouter model behind OpenCode, for example).
+  optional string provider = 3;
+  repeated string server_names = 4;
+  optional google.protobuf.Timestamp next_retry_at = 5;
+  optional uint32 status_code = 6;
+  // The provider's own error identifier when it had one, such as
+  // `usage_limit_reached` or `rate_limit`, for diagnostics and tests.
+  optional string provider_code = 7;
+}

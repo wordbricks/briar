@@ -7,6 +7,19 @@ import {
 
 export type AcpJsonRpcMessage = JsonRpcMessage;
 
+/** A JSON-RPC error response, kept structured so runners can classify it. */
+export class AcpRpcError extends Error {
+  constructor(
+    readonly method: string,
+    message: string,
+    readonly code?: number,
+    readonly data?: unknown,
+  ) {
+    super(message);
+    this.name = "AcpRpcError";
+  }
+}
+
 /**
  * Minimal newline-delimited JSON-RPC transport shared by ACP-backed provider
  * runners. Provider-specific lifecycle and event normalization stay in the
@@ -89,7 +102,12 @@ export class AcpJsonRpcConnection {
       });
     });
     if (response.error) {
-      throw new Error(response.error.message || `ACP ${method} failed.`);
+      throw new AcpRpcError(
+        method,
+        response.error.message || `ACP ${method} failed.`,
+        response.error.code,
+        response.error.data,
+      );
     }
     return response.result;
   }

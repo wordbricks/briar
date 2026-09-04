@@ -3925,6 +3925,10 @@ export async function failChannelReply(
     error: string;
     updatedAt: string;
     commit?: ReplyCompletionCommit;
+    /** Fail now even with attempts left, because retrying cannot help. */
+    terminal?: boolean;
+    /** Channel text posted in place of the reply when the job fails. */
+    failureMessage?: string;
   },
 ) {
   const claimed = await getClaimedChannelReply(db, {
@@ -3933,17 +3937,18 @@ export async function failChannelReply(
   });
   if (!claimed) return null;
   const retainedUntil = channelReplySessionRetentionUntil(input.updatedAt);
+  const terminal = input.terminal ? 1 : 0;
   const statements: D1PreparedStatement[] = [
     db.prepare(
       `update briar_channel_agent_reply_jobs
-       set status = case when attempts >= (? + memory_restart_count) then 'failed' else 'queued' end,
+       set status = case when ? = 1 or attempts >= (? + memory_restart_count) then 'failed' else 'queued' end,
            error = ?,
            ${input.commit
              ? ""
              : `claimed_device_id = null, claimed_worker_id = null,
                 preferred_device_id = null,
                 claim_token_hash = null, lease_expires_at = null,`}
-           completed_at = case when attempts >= (? + memory_restart_count) then ? else completed_at end,
+           completed_at = case when ? = 1 or attempts >= (? + memory_restart_count) then ? else completed_at end,
            updated_at = ?
        where id = ? and claimed_device_id = ? and claimed_worker_id = ?
          and claim_token_hash = ? and status = 'running'
@@ -3955,8 +3960,10 @@ export async function failChannelReply(
          )
        returning *`,
     ).bind(
+      terminal,
       MAX_REPLY_ATTEMPTS,
       input.error.slice(0, 4000),
+      terminal,
       MAX_REPLY_ATTEMPTS,
       input.updatedAt,
       input.updatedAt,
@@ -3994,7 +4001,7 @@ export async function failChannelReply(
          and job.completed_at = ? and job.updated_at = ?
        on conflict (id) do nothing`,
     ).bind(
-      CHANNEL_REPLY_FAILURE_MESSAGE,
+      (input.failureMessage?.trim() || CHANNEL_REPLY_FAILURE_MESSAGE).slice(0, 4000),
       input.updatedAt,
       input.updatedAt,
       input.jobId,

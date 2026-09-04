@@ -801,6 +801,8 @@ export async function channelReplyWorkerAvailability(
     projectId: string | null;
     preferredDeviceId?: string | null;
     preferredWorkerId?: string | null;
+    /** A Worker whose provider account just refused this work. */
+    excludeWorkerId?: string | null;
     provider: AgentProvider;
     model: string | null;
     effort: ModelEffort | null;
@@ -827,6 +829,7 @@ export async function channelReplyWorkerAvailability(
          and (? is null or worker.project_id = ?)
          and (? is null or device.id = ?)
          and (? is null or worker.id = ?)
+         and (? is null or worker.id <> ?)
          and credential.revoked_at is null
          and (credential.expires_at is null or credential.expires_at > ?)
          and (
@@ -850,6 +853,8 @@ export async function channelReplyWorkerAvailability(
       input.preferredDeviceId ?? null,
       input.preferredWorkerId ?? null,
       input.preferredWorkerId ?? null,
+      input.excludeWorkerId ?? null,
+      input.excludeWorkerId ?? null,
       input.observedAt,
       input.projectId,
       input.projectId,

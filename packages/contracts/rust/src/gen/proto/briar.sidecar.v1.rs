@@ -331,176 +331,6 @@ impl ::buffa::Enumeration for SandboxMode {
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
-pub enum BlockReason {
-    BLOCK_REASON_UNSPECIFIED = 0i32,
-    BLOCK_REASON_MCP_AUTH_REQUIRED = 1i32,
-    BLOCK_REASON_USAGE_EXHAUSTED = 2i32,
-    BLOCK_REASON_UPSTREAM_OVERLOADED = 3i32,
-    BLOCK_REASON_FREE_TIER_LIMIT = 4i32,
-}
-impl BlockReason {
-    ///Idiomatic alias for [`Self::BLOCK_REASON_UNSPECIFIED`]; `Debug` prints the variant name.
-    #[allow(non_upper_case_globals)]
-    pub const Unspecified: Self = Self::BLOCK_REASON_UNSPECIFIED;
-    ///Idiomatic alias for [`Self::BLOCK_REASON_MCP_AUTH_REQUIRED`]; `Debug` prints the variant name.
-    #[allow(non_upper_case_globals)]
-    pub const McpAuthRequired: Self = Self::BLOCK_REASON_MCP_AUTH_REQUIRED;
-    ///Idiomatic alias for [`Self::BLOCK_REASON_USAGE_EXHAUSTED`]; `Debug` prints the variant name.
-    #[allow(non_upper_case_globals)]
-    pub const UsageExhausted: Self = Self::BLOCK_REASON_USAGE_EXHAUSTED;
-    ///Idiomatic alias for [`Self::BLOCK_REASON_UPSTREAM_OVERLOADED`]; `Debug` prints the variant name.
-    #[allow(non_upper_case_globals)]
-    pub const UpstreamOverloaded: Self = Self::BLOCK_REASON_UPSTREAM_OVERLOADED;
-    ///Idiomatic alias for [`Self::BLOCK_REASON_FREE_TIER_LIMIT`]; `Debug` prints the variant name.
-    #[allow(non_upper_case_globals)]
-    pub const FreeTierLimit: Self = Self::BLOCK_REASON_FREE_TIER_LIMIT;
-}
-impl ::core::default::Default for BlockReason {
-    fn default() -> Self {
-        Self::BLOCK_REASON_UNSPECIFIED
-    }
-}
-impl ::serde::Serialize for BlockReason {
-    fn serialize<S: ::serde::Serializer>(
-        &self,
-        s: S,
-    ) -> ::core::result::Result<S::Ok, S::Error> {
-        s.serialize_str(::buffa::Enumeration::proto_name(self))
-    }
-}
-impl<'de> ::serde::Deserialize<'de> for BlockReason {
-    fn deserialize<D: ::serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        struct _V;
-        impl ::serde::de::Visitor<'_> for _V {
-            type Value = BlockReason;
-            fn expecting(
-                &self,
-                f: &mut ::core::fmt::Formatter<'_>,
-            ) -> ::core::fmt::Result {
-                f.write_str(
-                    concat!("a string, integer, or null for ", stringify!(BlockReason)),
-                )
-            }
-            fn visit_str<E: ::serde::de::Error>(
-                self,
-                v: &str,
-            ) -> ::core::result::Result<BlockReason, E> {
-                <BlockReason as ::buffa::Enumeration>::from_proto_name(v)
-                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
-            }
-            fn visit_i64<E: ::serde::de::Error>(
-                self,
-                v: i64,
-            ) -> ::core::result::Result<BlockReason, E> {
-                let v32 = i32::try_from(v)
-                    .map_err(|_| {
-                        ::serde::de::Error::custom(
-                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
-                        )
-                    })?;
-                <BlockReason as ::buffa::Enumeration>::from_i32(v32)
-                    .ok_or_else(|| {
-                        ::serde::de::Error::custom(
-                            ::buffa::alloc::format!("unknown enum value {v32}"),
-                        )
-                    })
-            }
-            fn visit_u64<E: ::serde::de::Error>(
-                self,
-                v: u64,
-            ) -> ::core::result::Result<BlockReason, E> {
-                let v32 = i32::try_from(v)
-                    .map_err(|_| {
-                        ::serde::de::Error::custom(
-                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
-                        )
-                    })?;
-                <BlockReason as ::buffa::Enumeration>::from_i32(v32)
-                    .ok_or_else(|| {
-                        ::serde::de::Error::custom(
-                            ::buffa::alloc::format!("unknown enum value {v32}"),
-                        )
-                    })
-            }
-            fn visit_unit<E: ::serde::de::Error>(
-                self,
-            ) -> ::core::result::Result<BlockReason, E> {
-                ::core::result::Result::Ok(::core::default::Default::default())
-            }
-        }
-        d.deserialize_any(_V)
-    }
-}
-impl ::buffa::json_helpers::ProtoElemJson for BlockReason {
-    fn serialize_proto_json<S: ::serde::Serializer>(
-        v: &Self,
-        s: S,
-    ) -> ::core::result::Result<S::Ok, S::Error> {
-        ::serde::Serialize::serialize(v, s)
-    }
-    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        <Self as ::serde::Deserialize>::deserialize(d)
-    }
-}
-impl ::buffa::Enumeration for BlockReason {
-    fn from_i32(value: i32) -> ::core::option::Option<Self> {
-        match value {
-            0i32 => ::core::option::Option::Some(Self::BLOCK_REASON_UNSPECIFIED),
-            1i32 => ::core::option::Option::Some(Self::BLOCK_REASON_MCP_AUTH_REQUIRED),
-            2i32 => ::core::option::Option::Some(Self::BLOCK_REASON_USAGE_EXHAUSTED),
-            3i32 => ::core::option::Option::Some(Self::BLOCK_REASON_UPSTREAM_OVERLOADED),
-            4i32 => ::core::option::Option::Some(Self::BLOCK_REASON_FREE_TIER_LIMIT),
-            _ => ::core::option::Option::None,
-        }
-    }
-    fn to_i32(&self) -> i32 {
-        *self as i32
-    }
-    fn proto_name(&self) -> &'static str {
-        match self {
-            Self::BLOCK_REASON_UNSPECIFIED => "BLOCK_REASON_UNSPECIFIED",
-            Self::BLOCK_REASON_MCP_AUTH_REQUIRED => "BLOCK_REASON_MCP_AUTH_REQUIRED",
-            Self::BLOCK_REASON_USAGE_EXHAUSTED => "BLOCK_REASON_USAGE_EXHAUSTED",
-            Self::BLOCK_REASON_UPSTREAM_OVERLOADED => "BLOCK_REASON_UPSTREAM_OVERLOADED",
-            Self::BLOCK_REASON_FREE_TIER_LIMIT => "BLOCK_REASON_FREE_TIER_LIMIT",
-        }
-    }
-    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
-        match name {
-            "BLOCK_REASON_UNSPECIFIED" => {
-                ::core::option::Option::Some(Self::BLOCK_REASON_UNSPECIFIED)
-            }
-            "BLOCK_REASON_MCP_AUTH_REQUIRED" => {
-                ::core::option::Option::Some(Self::BLOCK_REASON_MCP_AUTH_REQUIRED)
-            }
-            "BLOCK_REASON_USAGE_EXHAUSTED" => {
-                ::core::option::Option::Some(Self::BLOCK_REASON_USAGE_EXHAUSTED)
-            }
-            "BLOCK_REASON_UPSTREAM_OVERLOADED" => {
-                ::core::option::Option::Some(Self::BLOCK_REASON_UPSTREAM_OVERLOADED)
-            }
-            "BLOCK_REASON_FREE_TIER_LIMIT" => {
-                ::core::option::Option::Some(Self::BLOCK_REASON_FREE_TIER_LIMIT)
-            }
-            _ => ::core::option::Option::None,
-        }
-    }
-    fn values() -> &'static [Self] {
-        &[
-            Self::BLOCK_REASON_UNSPECIFIED,
-            Self::BLOCK_REASON_MCP_AUTH_REQUIRED,
-            Self::BLOCK_REASON_USAGE_EXHAUSTED,
-            Self::BLOCK_REASON_UPSTREAM_OVERLOADED,
-            Self::BLOCK_REASON_FREE_TIER_LIMIT,
-        ]
-    }
-}
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-#[repr(i32)]
 pub enum RunErrorCode {
     RUN_ERROR_CODE_UNSPECIFIED = 0i32,
     RUN_ERROR_CODE_INVALID_REQUEST = 1i32,
@@ -3874,69 +3704,22 @@ pub const __RUN_RESULT_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa:
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct RunBlocked {
-    /// Field 1: `reason`
+    /// Field 1: `block`
     #[serde(
-        rename = "reason",
-        with = "::buffa::json_helpers::proto_enum",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
-    )]
-    pub reason: ::buffa::EnumValue<BlockReason>,
-    /// Field 2: `message`
-    #[serde(
-        rename = "message",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub message: ::buffa::alloc::string::String,
-    /// Provider-specific block diagnostics may name an upstream model provider,
-    /// not one of Briar's configured runner providers.
-    ///
-    /// Field 3: `provider`
-    #[serde(
-        rename = "provider",
-        skip_serializing_if = "::core::option::Option::is_none"
-    )]
-    pub provider: ::core::option::Option<::buffa::alloc::string::String>,
-    /// Field 4: `server_names`
-    #[serde(
-        rename = "serverNames",
-        alias = "server_names",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
-        deserialize_with = "::buffa::json_helpers::null_as_default"
-    )]
-    pub server_names: ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
-    /// Field 5: `next_retry_at`
-    #[serde(
-        rename = "nextRetryAt",
-        alias = "next_retry_at",
+        rename = "block",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
-    pub next_retry_at: ::buffa::MessageField<
-        ::buffa_types::google::protobuf::Timestamp,
-        ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+    pub block: ::buffa::MessageField<
+        super::super::types::v1::ProviderBlock,
+        ::buffa::Inline<super::super::types::v1::ProviderBlock>,
     >,
-    /// Field 6: `status_code`
-    #[serde(
-        rename = "statusCode",
-        alias = "status_code",
-        with = "::buffa::json_helpers::opt_uint32",
-        skip_serializing_if = "::core::option::Option::is_none"
-    )]
-    pub status_code: ::core::option::Option<u32>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
 impl ::core::fmt::Debug for RunBlocked {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("RunBlocked")
-            .field("reason", &self.reason)
-            .field("message", &self.message)
-            .field("provider", &self.provider)
-            .field("server_names", &self.server_names)
-            .field("next_retry_at", &self.next_retry_at)
-            .field("status_code", &self.status_code)
-            .finish()
+        f.debug_struct("RunBlocked").field("block", &self.block).finish()
     }
 }
 impl RunBlocked {
@@ -3945,25 +3728,6 @@ impl RunBlocked {
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
     pub const TYPE_URL: &'static str = "type.googleapis.com/briar.sidecar.v1.RunBlocked";
-}
-impl RunBlocked {
-    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
-    #[inline]
-    ///Sets [`Self::provider`] to `Some(value)`, consuming and returning `self`.
-    pub fn with_provider(
-        mut self,
-        value: impl Into<::buffa::alloc::string::String>,
-    ) -> Self {
-        self.provider = Some(value.into());
-        self
-    }
-    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
-    #[inline]
-    ///Sets [`Self::status_code`] to `Some(value)`, consuming and returning `self`.
-    pub fn with_status_code(mut self, value: u32) -> Self {
-        self.status_code = Some(value);
-        self
-    }
 }
 ::buffa::impl_default_instance!(RunBlocked);
 impl ::buffa::MessageName for RunBlocked {
@@ -3985,31 +3749,13 @@ impl ::buffa::Message for RunBlocked {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        {
-            let val = self.reason.to_i32();
-            if val != 0 {
-                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
-            }
-        }
-        if !self.message.is_empty() {
-            size += 1u64 + ::buffa::types::string_encoded_len(&self.message) as u64;
-        }
-        if let Some(ref v) = self.provider {
-            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
-        }
-        for v in &self.server_names {
-            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
-        }
-        if self.next_retry_at.is_set() {
+        if self.block.is_set() {
             let __slot = __cache.reserve();
-            let inner_size = self.next_retry_at.compute_size(__cache);
+            let inner_size = self.block.compute_size(__cache);
             __cache.set(__slot, inner_size);
             size
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
-        }
-        if let Some(v) = self.status_code {
-            size += 1u64 + ::buffa::types::uint32_encoded_len(v) as u64;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
@@ -4021,31 +3767,13 @@ impl ::buffa::Message for RunBlocked {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        {
-            let val = self.reason.to_i32();
-            if val != 0 {
-                ::buffa::types::put_int32_field(1u32, val, buf);
-            }
-        }
-        if !self.message.is_empty() {
-            ::buffa::types::put_string_field(2u32, &self.message, buf);
-        }
-        if let Some(ref v) = self.provider {
-            ::buffa::types::put_string_field(3u32, v, buf);
-        }
-        for v in &self.server_names {
-            ::buffa::types::put_string_field(4u32, v, buf);
-        }
-        if self.next_retry_at.is_set() {
+        if self.block.is_set() {
             ::buffa::types::put_len_delimited_header(
-                5u32,
+                1u32,
                 u64::from(__cache.consume_next()),
                 buf,
             );
-            self.next_retry_at.write_to(__cache, buf);
-        }
-        if let Some(v) = self.status_code {
-            ::buffa::types::put_uint32_field(6u32, v, buf);
+            self.block.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -4063,61 +3791,13 @@ impl ::buffa::Message for RunBlocked {
             1u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.reason = ::buffa::EnumValue::from(
-                    ::buffa::types::decode_int32(buf)?,
-                );
-            }
-            2u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.message, buf)?;
-            }
-            3u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(
-                    self
-                        .provider
-                        .get_or_insert_with(::buffa::alloc::string::String::new),
-                    buf,
-                )?;
-            }
-            4u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                let __elem = ::buffa::types::decode_string(buf)?;
-                ctx.register_element_memory(
-                    ::buffa::__private::element_footprint(&__elem),
-                )?;
-                self.server_names.push(__elem);
-            }
-            5u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 ::buffa::Message::merge_length_delimited(
-                    self.next_retry_at.get_or_insert_default(),
+                    self.block.get_or_insert_default(),
                     buf,
                     ctx,
                 )?;
-            }
-            6u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.status_code = ::core::option::Option::Some(
-                    ::buffa::types::decode_uint32(buf)?,
-                );
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -4127,12 +3807,7 @@ impl ::buffa::Message for RunBlocked {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.reason = ::buffa::EnumValue::from(0);
-        self.message.clear();
-        self.provider = ::core::option::Option::None;
-        self.server_names.clear();
-        self.next_retry_at = ::buffa::MessageField::none();
-        self.status_code = ::core::option::Option::None;
+        self.block = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -9066,23 +8741,12 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct RunBlockedView<'a> {
-            /// Field 1: `reason`
-            pub reason: ::buffa::EnumValue<super::super::BlockReason>,
-            /// Field 2: `message`
-            pub message: &'a str,
-            /// Provider-specific block diagnostics may name an upstream model provider,
-            /// not one of Briar's configured runner providers.
-            ///
-            /// Field 3: `provider`
-            pub provider: ::core::option::Option<&'a str>,
-            /// Field 4: `server_names`
-            pub server_names: ::buffa::RepeatedView<'a, &'a str>,
-            /// Field 5: `next_retry_at`
-            pub next_retry_at: ::buffa::MessageFieldView<
-                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            /// Field 1: `block`
+            pub block: ::buffa::MessageFieldView<
+                super::super::super::super::types::v1::__buffa::view::ProviderBlockView<
+                    'a,
+                >,
             >,
-            /// Field 6: `status_code`
-            pub status_code: ::core::option::Option<u32>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for RunBlockedView<'a> {
@@ -9120,34 +8784,11 @@ pub mod __buffa {
                     1u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.reason = ::buffa::EnumValue::from(
-                            ::buffa::types::decode_int32(&mut cur)?,
-                        );
-                    }
-                    2u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.message = ::buffa::types::borrow_str(&mut cur)?;
-                    }
-                    3u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.provider = Some(::buffa::types::borrow_str(&mut cur)?);
-                    }
-                    5u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
                         let __sub_ctx = ctx.descend()?;
                         let sub = ::buffa::types::borrow_bytes(&mut cur)?;
-                        match view.next_retry_at.as_mut() {
+                        match view.block.as_mut() {
                             Some(existing) => {
                                 ::buffa::MessageView::merge_into_view(
                                     existing,
@@ -9156,34 +8797,14 @@ pub mod __buffa {
                                 )?
                             }
                             None => {
-                                view.next_retry_at = ::buffa::MessageFieldView::set(
-                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                view.block = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::types::v1::__buffa::view::ProviderBlockView as ::buffa::MessageView>::decode_view_ctx(
                                         sub,
                                         __sub_ctx,
                                     )?,
                                 );
                             }
                         }
-                    }
-                    6u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.status_code = Some(
-                            ::buffa::types::decode_uint32(&mut cur)?,
-                        );
-                    }
-                    4u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        let __elem = ::buffa::types::borrow_str(&mut cur)?;
-                        ctx.register_element_memory(
-                            ::buffa::__private::element_footprint(&__elem),
-                        )?;
-                        view.server_names.push(__elem);
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -9208,24 +8829,17 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::RunBlocked {
-                    reason: self.reason,
-                    message: self.message.to_string(),
-                    provider: self.provider.map(|s| s.to_string()),
-                    server_names: self
-                        .server_names
-                        .iter()
-                        .map(|s| s.to_string())
-                        .collect(),
-                    next_retry_at: match self.next_retry_at.as_option() {
+                    block: match self.block.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
-                                ::buffa_types::google::protobuf::Timestamp,
-                                ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+                                super::super::super::super::types::v1::ProviderBlock,
+                                ::buffa::Inline<
+                                    super::super::super::super::types::v1::ProviderBlock,
+                                >,
                             >::some(v.to_owned_from_source(__buffa_src)?)
                         }
                         None => ::buffa::MessageField::none(),
                     },
-                    status_code: self.status_code,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -9240,33 +8854,13 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                {
-                    let val = self.reason.to_i32();
-                    if val != 0 {
-                        size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
-                    }
-                }
-                if !self.message.is_empty() {
-                    size
-                        += 1u64
-                            + ::buffa::types::string_encoded_len(&self.message) as u64;
-                }
-                if let Some(ref v) = self.provider {
-                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
-                }
-                for v in &self.server_names {
-                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
-                }
-                if self.next_retry_at.is_set() {
+                if self.block.is_set() {
                     let __slot = __cache.reserve();
-                    let inner_size = self.next_retry_at.compute_size(__cache);
+                    let inner_size = self.block.compute_size(__cache);
                     __cache.set(__slot, inner_size);
                     size
                         += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                             + inner_size as u64;
-                }
-                if let Some(v) = self.status_code {
-                    size += 1u64 + ::buffa::types::uint32_encoded_len(v) as u64;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
@@ -9279,31 +8873,13 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                {
-                    let val = self.reason.to_i32();
-                    if val != 0 {
-                        ::buffa::types::put_int32_field(1u32, val, buf);
-                    }
-                }
-                if !self.message.is_empty() {
-                    ::buffa::types::put_string_field(2u32, &self.message, buf);
-                }
-                if let Some(ref v) = self.provider {
-                    ::buffa::types::put_string_field(3u32, v, buf);
-                }
-                for v in &self.server_names {
-                    ::buffa::types::put_string_field(4u32, v, buf);
-                }
-                if self.next_retry_at.is_set() {
+                if self.block.is_set() {
                     ::buffa::types::put_len_delimited_header(
-                        5u32,
+                        1u32,
                         u64::from(__cache.consume_next()),
                         buf,
                     );
-                    self.next_retry_at.write_to(__cache, buf);
-                }
-                if let Some(v) = self.status_code {
-                    ::buffa::types::put_uint32_field(6u32, v, buf);
+                    self.block.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -9326,32 +8902,10 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.reason) {
-                    __map.serialize_entry("reason", &self.reason)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.message) {
-                    __map.serialize_entry("message", self.message)?;
-                }
-                if let ::core::option::Option::Some(__v) = self.provider {
-                    __map.serialize_entry("provider", __v)?;
-                }
-                if !self.server_names.is_empty() {
-                    __map.serialize_entry("serverNames", &*self.server_names)?;
-                }
                 {
-                    if let ::core::option::Option::Some(__v) = self
-                        .next_retry_at
-                        .as_option()
-                    {
-                        __map.serialize_entry("nextRetryAt", __v)?;
+                    if let ::core::option::Option::Some(__v) = self.block.as_option() {
+                        __map.serialize_entry("block", __v)?;
                     }
-                }
-                if let ::core::option::Option::Some(__v) = self.status_code {
-                    __map
-                        .serialize_entry(
-                            "statusCode",
-                            &::buffa::json_helpers::ProtoJson(&__v),
-                        )?;
                 }
                 __map.end()
             }
@@ -9446,42 +9000,16 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `reason`
+            /// Field 1: `block`
             #[must_use]
-            pub fn reason(&self) -> ::buffa::EnumValue<super::super::BlockReason> {
-                self.0.reborrow().reason
-            }
-            /// Field 2: `message`
-            #[must_use]
-            pub fn message(&self) -> &'_ str {
-                self.0.reborrow().message
-            }
-            /// Provider-specific block diagnostics may name an upstream model provider,
-            /// not one of Briar's configured runner providers.
-            ///
-            /// Field 3: `provider`
-            #[must_use]
-            pub fn provider(&self) -> ::core::option::Option<&'_ str> {
-                self.0.reborrow().provider
-            }
-            /// Field 4: `server_names`
-            #[must_use]
-            pub fn server_names(&self) -> &::buffa::RepeatedView<'_, &'_ str> {
-                &self.0.reborrow().server_names
-            }
-            /// Field 5: `next_retry_at`
-            #[must_use]
-            pub fn next_retry_at(
+            pub fn block(
                 &self,
             ) -> &::buffa::MessageFieldView<
-                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+                super::super::super::super::types::v1::__buffa::view::ProviderBlockView<
+                    '_,
+                >,
             > {
-                &self.0.reborrow().next_retry_at
-            }
-            /// Field 6: `status_code`
-            #[must_use]
-            pub fn status_code(&self) -> ::core::option::Option<u32> {
-                self.0.reborrow().status_code
+                &self.0.reborrow().block
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<RunBlockedView<'static>>>

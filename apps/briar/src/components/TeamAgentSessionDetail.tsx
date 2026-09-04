@@ -1,3 +1,4 @@
+import { describeDesktopError } from "../lib/provider-block-error";
 import {
   ArrowLeft,
   Check,
@@ -145,7 +146,9 @@ export function TeamAgentSessionDetail({
             isComplete: true,
             phase: "final_answer",
             startedAtMs: Date.parse(session.completedAt ?? session.startedAt),
-            text: session.error ?? session.summary ?? "",
+            text: session.error
+              ? describeDesktopError(session.error, t)
+              : session.summary ?? "",
             updatedAtMs: Date.parse(session.completedAt ?? session.startedAt),
           }]
         : []),
@@ -580,7 +583,9 @@ export function TeamAgentSessionDetail({
                   ) : null}
                   {session.summary || session.error ? (
                     <p className={session.error ? "error" : undefined}>
-                      {session.error ?? session.summary}
+                      {session.error
+                        ? describeDesktopError(session.error, t)
+                        : session.summary}
                     </p>
                   ) : session.issues.length === 0 ? (
                     <p>{t("agents.outputsEmpty")}</p>

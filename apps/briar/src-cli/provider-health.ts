@@ -19,6 +19,10 @@ import {
   type ProviderUsageProbe,
   type ProviderUsageProbeDependencies,
 } from "./provider-usage";
+import {
+  activeProviderBlock,
+  type ActiveProviderBlock,
+} from "./provider-block-registry";
 
 export {
   agyAuthenticated,
@@ -39,6 +43,7 @@ export type WorkerProviderHealthReason =
   | "not_installed"
   | "not_authenticated"
   | "usage_exhausted"
+  | "billing_required"
   | null;
 
 export type WorkerProviderHealth = {
@@ -61,6 +66,11 @@ type ProviderHealthDependencies = {
   openrouterApiKey: string | null;
   now: () => number;
   which: (provider: WorkerProvider) => string | null;
+  /** A block a runner reported for this provider that is still in force. */
+  runtimeBlock: (
+    provider: WorkerProvider,
+    now: number,
+  ) => ActiveProviderBlock | null;
   authenticated: (
     provider: WorkerProvider,
     binary: string,
@@ -86,6 +96,7 @@ const defaultDependencies: ProviderHealthDependencies = {
   openrouterApiKey: process.env.OPENROUTER_API_KEY?.trim() || null,
   now: Date.now,
   which: (provider) => Bun.which(agentProviderBinaryName(provider)),
+  runtimeBlock: (provider, now) => activeProviderBlock(provider, () => now),
   authenticated: async (provider, binary, home, now, openrouterApiKey) => {
     if (provider === "codex") {
       return codexAuthenticated(home);
@@ -184,6 +195,13 @@ export async function inspectWorkerProviderHealth(
         ] as const;
       }
 
+      // A runner saw the provider refuse work moments ago; that beats a
+      // cached or unavailable quota probe until the hold ends.
+      const runtimeBlock = resolved.runtimeBlock(provider, resolved.now());
+      if (runtimeBlock) {
+        return [provider, runtimeBlockHealth(runtimeBlock)] as const;
+      }
+
       const usage = await resolved.usage(
         provider,
         binary,
@@ -219,6 +237,35 @@ export async function inspectWorkerProviderHealth(
   return Object.fromEntries(entries) as WorkerProviderHealthMap;
 }
 
+function runtimeBlockHealth(entry: ActiveProviderBlock): WorkerProviderHealth {
+  switch (entry.block.reason) {
+    case "auth_required":
+      return {
+        installed: true,
+        authenticated: false,
+        healthy: false,
+        reason: "not_authenticated",
+      };
+    case "billing_required":
+      return {
+        installed: true,
+        authenticated: true,
+        healthy: false,
+        reason: "billing_required",
+        usageExhausted: false,
+      };
+    default:
+      return {
+        installed: true,
+        authenticated: true,
+        healthy: false,
+        reason: "usage_exhausted",
+        usageExhausted: true,
+        maxUsedPercent: 100,
+      };
+  }
+}
+
 export function healthyWorkerProviders(
   health: WorkerProviderHealthMap,
 ): WorkerProvider[] {
@@ -230,18 +277,23 @@ export function providerHealthReadinessDetail(
   health: WorkerProviderHealthMap,
 ): string {
   const values = workerProviderIds.map((provider) => health[provider]);
+  const blockedReasons = new Set(["usage_exhausted", "billing_required"]);
   if (
-    values.some((entry) => entry.reason === "usage_exhausted") &&
+    values.some((entry) => entry.reason !== null && blockedReasons.has(entry.reason)) &&
     values.every(
       (entry) =>
         !entry.healthy &&
         (entry.reason === "usage_exhausted" ||
+          entry.reason === "billing_required" ||
           entry.reason === "disabled" ||
           entry.reason === "not_installed" ||
           entry.reason === "not_authenticated"),
     ) &&
     values.some((entry) => entry.authenticated)
   ) {
+    if (values.every((entry) => entry.reason !== "usage_exhausted")) {
+      return "결제 또는 크레딧 문제로 실행할 수 있는 coding agent가 없습니다.";
+    }
     return "사용량 한도에 도달해 실행할 수 있는 coding agent가 없습니다.";
   }
   return "로그인되어 사용할 수 있는 coding agent가 없습니다.";

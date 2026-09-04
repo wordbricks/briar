@@ -1,3 +1,4 @@
+import { agentUsageRefreshEvent } from "../lib/provider-block-error";
 import {
   ArrowLeft,
   ChevronRight,
@@ -396,7 +397,13 @@ export function AgentUsageStatusBar({
       () => void refresh(),
       refreshIntervalMs,
     );
-    return () => window.clearInterval(interval);
+    // A session that just hit a provider limit invalidates the snapshot.
+    const refreshNow = () => void refresh();
+    window.addEventListener(agentUsageRefreshEvent, refreshNow);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener(agentUsageRefreshEvent, refreshNow);
+    };
   }, [refresh]);
 
   useEffect(() => {

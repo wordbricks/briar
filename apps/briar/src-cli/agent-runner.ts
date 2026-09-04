@@ -1,10 +1,8 @@
 import { create, type JsonObject } from "@bufbuild/protobuf";
-import { timestampDate } from "@bufbuild/protobuf/wkt";
 import { CONTRACTS_DESCRIPTOR_FINGERPRINT } from "@briar/contracts/descriptor-fingerprint";
 import {
   AgentRunKind,
   ApprovalPolicy,
-  BlockReason,
   JsonSchemaSchema,
   RunRequestSchema,
   SandboxMode,
@@ -12,7 +10,16 @@ import {
   type RunnerToParent,
 } from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
 import type { AgentAttachment } from "../src-agent/runner-attachments";
-import { sidecarProviderRaw } from "../src-agent/sidecar-protocol";
+import {
+  sidecarProviderBlock,
+  sidecarProviderRaw,
+} from "../src-agent/sidecar-protocol";
+import {
+  providerBlockDetail,
+  providerBlockNextAction,
+  providerBlockRunSummary,
+  type ProviderBlock,
+} from "../src/lib/provider-block";
 import type { ModelEffort } from "../src/lib/agent-provider-contract";
 import type { AgentProvider } from "../src/lib/agent-provider";
 import type { JsonSchema } from "../src/lib/team-llm";
@@ -274,79 +281,17 @@ export function detachedAgentContext(
   ].filter((section): section is string => section !== null).join("\n\n");
 }
 
-export type DetachedProviderBlock =
-  | {
-      reason: "free_tier_limit";
-      provider: string;
-      message: string;
-      nextRetryAt: string | null;
-    }
-  | {
-      reason: "upstream_overloaded";
-      provider: string;
-      message: string;
-      nextRetryAt: null;
-      statusCode: 502 | 503 | 504;
-    }
-  | {
-      reason: "mcp_auth_required";
-      provider: "codex";
-      message: string;
-      nextRetryAt: null;
-      serverNames: string[];
-    };
+export type DetachedProviderBlock = ProviderBlock;
 
+/**
+ * The block a runner frame carries, for every `briar.types.v1.ProviderBlock`
+ * reason. A frame with a reason this Worker does not know yields null so the
+ * caller falls back to its generic failure path.
+ */
 export function detachedProviderBlockFromPayload(
   payload: RunnerToParent,
 ): DetachedProviderBlock | null {
-  if (payload.payload.case !== "blocked") return null;
-  const blocked = payload.payload.value;
-  const provider = blocked.provider?.trim();
-  const message = blocked.message.trim();
-  if (!provider || !message) return null;
-  const nextRetryAt = blocked.nextRetryAt
-    ? timestampDate(blocked.nextRetryAt).toISOString()
-    : null;
-  if (blocked.reason === BlockReason.MCP_AUTH_REQUIRED) {
-    const serverNames = blocked.serverNames
-      .map((value) =>
-        value
-          .replace(/[\r\n\t]+/g, " ")
-          .replace(/[^\p{L}\p{N} ._@/-]+/gu, " ")
-          .replace(/\s+/g, " ")
-          .trim()
-          .slice(0, 200)
-      )
-      .filter(Boolean);
-    if (provider !== "codex" || serverNames.length === 0) return null;
-    return {
-      reason: "mcp_auth_required",
-      provider: "codex",
-      message,
-      nextRetryAt: null,
-      serverNames: [...new Set(serverNames)].sort(),
-    };
-  }
-  if (blocked.reason === BlockReason.UPSTREAM_OVERLOADED) {
-    const statusCode = blocked.statusCode;
-    if (statusCode !== 502 && statusCode !== 503 && statusCode !== 504) {
-      return null;
-    }
-    return {
-      reason: "upstream_overloaded",
-      provider,
-      message,
-      nextRetryAt: null,
-      statusCode,
-    };
-  }
-  if (blocked.reason !== BlockReason.FREE_TIER_LIMIT) return null;
-  return {
-    reason: "free_tier_limit",
-    provider,
-    message,
-    nextRetryAt,
-  };
+  return sidecarProviderBlock(payload);
 }
 
 export function detachedProviderBlockedRunEvent(input: {
@@ -358,31 +303,8 @@ export function detachedProviderBlockedRunEvent(input: {
   model: string | null;
   occurredAt: string;
 }) {
-  const providerName = input.block.provider === "agy"
-    ? "Antigravity"
-    : input.block.provider === "opencode"
-      ? "OpenCode"
-      : input.block.provider;
-  const availableAt = input.block.nextRetryAt
-      ? ` ${providerName}가 안내한 다음 사용 가능 시각은 ${input.block.nextRetryAt}입니다.`
-      : "";
-  const serverNames = input.block.reason === "mcp_auth_required"
-    ? input.block.serverNames.join(", ")
-    : null;
-  const summary = input.block.reason === "mcp_auth_required"
-    ? `작업에 실제로 필요한 MCP 연결(${serverNames})의 인증이 없어 실행을 안전하게 멈췄습니다. 전체 실패로 처리하지 않았으며 현재까지의 코드와 작업 기록은 worktree에 보존됩니다.`
-    : input.block.reason === "upstream_overloaded"
-      ? `${providerName} 서비스가 혼잡해 요청을 처리하지 못했습니다. 작업이 완료되지 않았으며 현재까지의 변경 사항은 worktree에 보존됩니다. 잠시 후 다시 시도하거나 사용 가능한 다른 모델로 변경해 주세요.`
-      : `${providerName} 무료 사용 한도가 소진되어 에이전트가 작업을 계속할 수 없습니다. ` +
-        `작업이 완료되지 않았으며 현재까지의 변경 사항은 worktree에 보존됩니다. 사용 가능한 모델이나 요금제를 준비한 뒤 다시 실행해야 합니다.${availableAt}`;
-  const nextAction = input.block.reason === "mcp_auth_required"
-    ? `Worker 컴퓨터를 관리하는 담당자가 Codex의 MCP 또는 플러그인 설정에서 ${serverNames} 연결을 다시 인증하고 인증됨으로 표시되는지 확인한 다음, Briar 이슈 화면에서 재시도를 눌러 실행이 다시 시작되는지 확인해 주세요.`
-    : input.block.reason === "upstream_overloaded"
-      ? "잠시 기다린 뒤 Briar 이슈 화면에서 재시도를 누르거나, 프로젝트 또는 이슈의 실행 모델을 다른 사용 가능한 모델로 변경한 뒤 새 실행이 시작되는지 확인해 주세요."
-      : input.block.nextRetryAt
-        ? `프로젝트 또는 이슈의 실행 모델을 사용 가능한 모델로 변경하거나 ${input.block.nextRetryAt} 이후까지 기다린 다음, Briar 이슈 화면에서 재시도를 눌러 새 실행이 시작되는지 확인해 주세요.`
-        : `프로젝트 또는 이슈의 실행 모델을 사용 가능한 모델로 변경하거나 ${providerName} 요금제를 활성화한 다음, Briar 이슈 화면에서 재시도를 눌러 새 실행이 시작되는지 확인해 주세요.`;
-  const selectedModel = input.model?.trim() || "provider default";
+  const copy = { model: input.model };
+  const summary = providerBlockRunSummary(input.block, copy);
   return {
     runId: input.runId,
     status: "blocked" as const,
@@ -391,17 +313,7 @@ export function detachedProviderBlockedRunEvent(input: {
     occurredAt: input.occurredAt,
     actor: input.actor,
     repository: input.repository,
-    detail:
-      (input.block.reason === "mcp_auth_required"
-        ? `Codex required MCP authentication; servers=${serverNames}; `
-        : input.block.reason === "upstream_overloaded"
-          ? `${providerName} upstream returned transient HTTP ${input.block.statusCode}; `
-          : `${providerName} session entered retry/${input.block.reason}; `) +
-      `provider=${input.block.provider}, model=${selectedModel}, ` +
-      `providerMessage=${input.block.message}` +
-      (input.block.nextRetryAt
-        ? `, nextRetryAt=${input.block.nextRetryAt}`
-        : ""),
+    detail: providerBlockDetail(input.block, copy),
     resultSummary: summary,
     structuredResult: {
       summary,
@@ -410,7 +322,7 @@ export function detachedProviderBlockedRunEvent(input: {
       urgency: "normal" as const,
       impact: "issue" as const,
       humanActionRequired: true,
-      nextAction,
+      nextAction: providerBlockNextAction(input.block, copy),
       dueAt: input.block.nextRetryAt,
     },
     pullRequestUrls: [] as string[],

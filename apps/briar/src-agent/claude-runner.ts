@@ -7,9 +7,13 @@ import {
   approvalResult,
   claudeOptions,
   claudePrompt,
+  claudeResultBlock,
   createClaudeEventState,
+  createClaudeFailureState,
   normalizeClaudeMessage,
+  observeClaudeFailure,
 } from "./claude-runner-lib";
+import { ProviderBlockedError } from "./provider-block";
 import { createRunnerIo } from "./runner-io";
 import { prepareComputerUseMcp } from "./computer-use-mcp-config";
 import { claudeComputerUseServers } from "./computer-use-provider-adapters";
@@ -35,6 +39,7 @@ async function main() {
     return approvalResult(approved, input);
   };
   const state = createClaudeEventState();
+  const failures = createClaudeFailureState();
   let result:
     | Extract<SDKMessage, { type: "result"; subtype: "success" }>
     | undefined;
@@ -57,6 +62,7 @@ async function main() {
         emit.session(sessionId);
       }
     }
+    observeClaudeFailure(message, failures);
     const normalizedEvents = normalizeClaudeMessage(message, state);
     if (normalizedEvents.length === 0) {
       emit.event({ raw: message });
@@ -67,6 +73,8 @@ async function main() {
     }
     if (message.type === "result") {
       if (message.subtype !== "success") {
+        const block = claudeResultBlock(message, failures);
+        if (block) throw new ProviderBlockedError(block);
         throw new Error(
           message.errors.join("\n") || `Claude failed: ${message.subtype}`,
         );
@@ -92,6 +100,10 @@ async function main() {
 
 void main()
   .catch((caught) => {
+    if (caught instanceof ProviderBlockedError) {
+      emit.blocked(caught.block);
+      return;
+    }
     emit.error(caught instanceof Error ? caught.message : String(caught));
     process.exitCode = 1;
   })

@@ -21,21 +21,12 @@ import {
   normalizedTurnCompleted,
 } from "./normalized-agent-event";
 import type { RunnerRequest } from "./runner-request";
+import {
+  classifyProviderFailure,
+  type ProviderBlock,
+} from "./provider-block";
 
-export type OpenCodeBlockedRetry =
-  | {
-      reason: "free_tier_limit";
-      provider: string;
-      message: string;
-      nextRetryAt: string | null;
-    }
-  | {
-      reason: "upstream_overloaded";
-      provider: string;
-      message: string;
-      nextRetryAt: null;
-      statusCode: 502 | 503 | 504;
-    };
+export type OpenCodeBlockedRetry = ProviderBlock;
 
 export type OpenCodeEventState = {
   messageRoles: Map<string, "user" | "assistant">;
@@ -320,22 +311,49 @@ export function openCodeSessionErrorMessage(error: unknown): string {
   );
 }
 
-/** Convert transient OpenCode upstream HTTP failures into a resumable block. */
-export function openCodeTransientOverload(
-  error: unknown,
-): OpenCodeBlockedRetry | null {
-  const statusCode = transientUpstreamStatusCode(error);
-  if (!statusCode) return null;
-  return {
-    reason: "upstream_overloaded",
-    provider: "opencode",
-    message:
-      openCodeErrorMessage(error) ??
-      `OpenCode upstream returned HTTP ${statusCode}.`,
-    nextRetryAt: null,
-    statusCode,
-  };
+function openCodeStatusCode(value: unknown, depth = 0): number | null {
+  if (depth > 4 || !value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  for (const key of ["statusCode", "status", "httpStatus"]) {
+    const parsed = Number(record[key]);
+    if (Number.isInteger(parsed) && parsed >= 400 && parsed < 600) return parsed;
+  }
+  for (const nested of Object.values(record)) {
+    const statusCode = openCodeStatusCode(nested, depth + 1);
+    if (statusCode) return statusCode;
+  }
+  return null;
 }
+
+const openCodeErrorNameCodes = new Map<string, string>([
+  ["ProviderAuthError", "authentication_failed"],
+  ["ContextOverflowError", "context_window_exceeded"],
+  ["ContextWindowExceededError", "context_window_exceeded"],
+]);
+
+/**
+ * Classify an OpenCode `session.error` or assistant-response error. OpenCode
+ * wraps the upstream model provider's failure as `{ name, data: { message,
+ * statusCode } }`; the status and message carry the provider's rate limit,
+ * credit, auth, or overload signal.
+ */
+export function openCodeProviderBlock(
+  error: unknown,
+  provider = "opencode",
+): OpenCodeBlockedRetry | null {
+  const name = openCodeErrorName(error);
+  const message = openCodeErrorMessage(error) ?? name ?? "";
+  if (!message) return null;
+  return classifyProviderFailure({
+    provider,
+    message,
+    code: name ? openCodeErrorNameCodes.get(name) : undefined,
+    statusCode: openCodeStatusCode(error) ?? transientUpstreamStatusCode(error),
+  });
+}
+
+/** Kept as the name the runner and tests use for response-level errors. */
+export const openCodeTransientOverload = openCodeProviderBlock;
 
 /**
  * Detect OpenCode provider states that should release the worker for a later
@@ -344,6 +362,7 @@ export function openCodeTransientOverload(
 export function openCodeBlockedRetry(
   raw: unknown,
   sessionId: string,
+  provider = "opencode",
 ): OpenCodeBlockedRetry | null {
   if (!raw || typeof raw !== "object") return null;
   const event = raw as Record<string, unknown>;
@@ -352,7 +371,7 @@ export function openCodeBlockedRetry(
   }
   const properties = event.properties as Record<string, unknown>;
   if (event.type === "session.error") {
-    return openCodeTransientOverload(properties.error);
+    return openCodeProviderBlock(properties.error, provider);
   }
   if (event.type !== "session.status") return null;
   const status = properties.status;
@@ -378,7 +397,7 @@ export function openCodeBlockedRetry(
     provider:
       typeof blocker?.provider === "string" && blocker.provider.trim()
         ? blocker.provider.trim()
-        : "opencode",
+        : provider,
     message:
       typeof blocker?.message === "string" && blocker.message.trim()
         ? blocker.message.trim()
@@ -407,8 +426,9 @@ export type OpenCodeTerminalOutcome =
 export function openCodeTerminalOutcome(
   raw: unknown,
   sessionId: string,
+  provider = "opencode",
 ): OpenCodeTerminalOutcome | null {
-  const blocker = openCodeBlockedRetry(raw, sessionId);
+  const blocker = openCodeBlockedRetry(raw, sessionId, provider);
   if (blocker) return { type: "blocked", blocker };
   if (!raw || typeof raw !== "object") return null;
   const event = raw as Record<string, unknown>;

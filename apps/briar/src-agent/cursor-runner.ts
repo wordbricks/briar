@@ -148,6 +148,7 @@ export function buildCursorPromptParts(
 }
 
 export const cursorProfile: AcpProviderProfile = {
+  providerId: "cursor",
   providerName: "Cursor Agent",
   displayName: "Cursor",
   missingSessionIdMessage: "Cursor Agent did not return a session id.",

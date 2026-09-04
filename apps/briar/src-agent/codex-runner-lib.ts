@@ -16,6 +16,11 @@ import {
   normalizedTurnCompleted,
 } from "./normalized-agent-event";
 import type { RunnerRequest } from "./runner-request";
+import {
+  ProviderBlockedError,
+  classifyProviderFailure,
+  type ProviderBlock,
+} from "./provider-block";
 
 export type CodexRpcMessage = JsonRpcMessage;
 
@@ -608,10 +613,11 @@ export function consumeCodexAppServerMessage(
 
   if (message.id !== undefined && message.id !== null) {
     if (message.error) {
-      throw new Error(
-        message.error.message?.trim() ||
-          "Codex App Server returned an RPC error.",
-      );
+      const errorMessage = message.error.message?.trim() ||
+        "Codex App Server returned an RPC error.";
+      const block = codexProviderBlock(message.error, errorMessage);
+      if (block) throw new ProviderBlockedError(block);
+      throw new Error(errorMessage);
     }
     const result = asRecord(message.result);
     if (!result) {
@@ -744,6 +750,8 @@ export function consumeCodexAppServerMessage(
       if (mcpFailure) {
         return { outgoing: [], completed: false, mcpFailure };
       }
+      const block = codexProviderBlock(error, message);
+      if (block) throw new ProviderBlockedError(block);
       throw new Error(
         `Codex turn did not complete: ${message}`,
       );
@@ -1111,4 +1119,52 @@ function asArray(value: unknown): unknown[] {
 
 function firstText(...values: unknown[]): string | undefined {
   return values.find((value): value is string => typeof value === "string");
+}
+
+/**
+ * Codex App Server error identifiers live under `codexErrorInfo`, which is
+ * either a string tag such as `usageLimitReached` or a one-key object such as
+ * `{ contextWindowExceeded: {} }`; RPC errors also carry a numeric `code`.
+ */
+export function codexErrorCode(
+  error: Record<string, unknown> | null | undefined,
+): string | undefined {
+  if (!error) return undefined;
+  const info = error.codexErrorInfo ?? error.codex_error_info;
+  if (typeof info === "string" && info.trim()) return snakeCase(info.trim());
+  if (info && typeof info === "object") {
+    const key = Object.keys(info as Record<string, unknown>)[0];
+    if (key) return snakeCase(key);
+  }
+  for (const key of ["code", "type"]) {
+    const value = error[key];
+    if (typeof value === "string" && value.trim()) return snakeCase(value.trim());
+  }
+  return undefined;
+}
+
+function snakeCase(value: string): string {
+  return value
+    .replace(/([a-z0-9])([A-Z])/gu, "$1_$2")
+    .replace(/[-\s]+/gu, "_")
+    .toLowerCase();
+}
+
+/** Classify a Codex turn or RPC failure; null means an ordinary failure. */
+export function codexProviderBlock(
+  error: unknown,
+  message: string,
+): ProviderBlock | null {
+  const record = asRecord(error);
+  const status = record
+    ? ["status", "statusCode", "httpStatus"]
+      .map((key) => Number(record[key]))
+      .find((value) => Number.isInteger(value) && value > 0) ?? null
+    : null;
+  return classifyProviderFailure({
+    provider: "codex",
+    message,
+    code: codexErrorCode(record),
+    statusCode: status,
+  });
 }

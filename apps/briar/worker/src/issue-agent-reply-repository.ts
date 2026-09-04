@@ -469,11 +469,13 @@ export async function failIssueAgentReply(
     error: string;
     updatedAt: string;
     commit?: ReplyCompletionCommit;
+    /** Fail now even with attempts left, because retrying cannot help. */
+    terminal?: boolean;
   },
 ) {
   const transition = db.prepare(
       `update briar_issue_agent_reply_jobs
-       set status = case when attempts >= 3 then 'failed' else 'queued' end,
+       set status = case when ? = 1 or attempts >= 3 then 'failed' else 'queued' end,
            preferred_worker_id = case
              when requires_preferred_worker = 1 then preferred_worker_id
              else null
@@ -493,6 +495,7 @@ export async function failIssueAgentReply(
        returning *`,
     )
     .bind(
+      input.terminal ? 1 : 0,
       input.error,
       input.updatedAt,
       jobId,

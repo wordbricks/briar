@@ -22,7 +22,7 @@ use crate::host::{CommandRunner, CommandSpec};
 use super::{
     AgentBackend, AgentEvent, AgentEventDirection, AgentEventSink, AgentProviderEvent,
     AgentProviderKind, ApprovalPolicy, BundledRunnerFile, ChatExecution, ProjectLlmRequest,
-    ProjectLlmResponse, SandboxMode,
+    ProjectLlmResponse, ProviderBlock, SandboxMode,
 };
 
 #[derive(Clone, Copy)]
@@ -480,18 +480,6 @@ fn event_direction(
     }
 }
 
-fn block_reason(
-    reason: buffa::EnumValue<sidecar_proto::BlockReason>,
-) -> Result<&'static str, String> {
-    match reason.as_known() {
-        Some(sidecar_proto::BlockReason::McpAuthRequired) => Ok("mcp_auth_required"),
-        Some(sidecar_proto::BlockReason::UsageExhausted) => Ok("usage_exhausted"),
-        Some(sidecar_proto::BlockReason::UpstreamOverloaded) => Ok("upstream_overloaded"),
-        Some(sidecar_proto::BlockReason::FreeTierLimit) => Ok("free_tier_limit"),
-        _ => Err("Runner가 알 수 없는 block reason을 보냈습니다.".to_string()),
-    }
-}
-
 struct SidecarChatExecution<'a> {
     environment: &'a [(String, String)],
     event_sink: Option<&'a AgentEventSink>,
@@ -656,33 +644,32 @@ fn run_chat(
                     });
                 }
                 sidecar_proto::runner_to_parent::Payload::Blocked(blocked) => {
-                    let mut details = vec![format!("reason={}", block_reason(blocked.reason)?)];
-                    if let Some(provider) = blocked.provider {
-                        details.push(format!("provider={provider}"));
-                    }
-                    if !blocked.server_names.is_empty() {
-                        details.push(format!("serverNames={}", blocked.server_names.join(",")));
-                    }
-                    if let Some(next_retry_at) = blocked.next_retry_at.into_option() {
-                        let timestamp = serde_json::to_value(next_retry_at).map_err(|error| {
+                    let block = blocked
+                        .block
+                        .into_option()
+                        .and_then(|block| ProviderBlock::from_wire(config.provider, block))
+                        .ok_or_else(|| {
                             format!(
-                                "{} retry timestamp를 읽지 못했습니다: {error}",
-                                config.runner_name
+                                "{}: Runner가 알 수 없는 block reason을 보냈습니다.",
+                                config.blocked_prefix
                             )
                         })?;
-                        if let Some(timestamp) = timestamp.as_str() {
-                            details.push(format!("nextRetryAt={timestamp}"));
-                        }
+                    // The block is part of the session's record: without this
+                    // the transcript ends without saying why.
+                    if let Some(event_sink) = execution.event_sink {
+                        event_sink(AgentProviderEvent {
+                            provider: config.provider,
+                            direction: AgentEventDirection::Server,
+                            raw: json!({
+                                "type": "providerBlocked",
+                                "block": block,
+                            }),
+                            event: Some(AgentEvent::TurnCompleted {
+                                status: format!("blocked:{}", block.reason.as_str()),
+                            }),
+                        })?;
                     }
-                    if let Some(status_code) = blocked.status_code {
-                        details.push(format!("statusCode={status_code}"));
-                    }
-                    return Err(format!(
-                        "{}: {} ({})",
-                        config.blocked_prefix,
-                        blocked.message,
-                        details.join(", ")
-                    ));
+                    return Err(block.to_error(config.blocked_prefix));
                 }
                 sidecar_proto::runner_to_parent::Payload::Error(error) => {
                     let code = error

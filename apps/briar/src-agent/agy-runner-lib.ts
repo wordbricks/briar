@@ -15,21 +15,12 @@ import {
   normalizedTurnCompleted,
 } from "./normalized-agent-event";
 import type { RunnerRequest } from "./runner-request";
+import {
+  classifyProviderFailure,
+  type ProviderBlock,
+} from "./provider-block";
 
-export type AgyBlockedRetry =
-  | {
-      reason: "usage_exhausted";
-      provider: "agy";
-      message: string;
-      nextRetryAt: null;
-    }
-  | {
-      reason: "upstream_overloaded";
-      provider: "agy";
-      message: string;
-      nextRetryAt: null;
-      statusCode: 502 | 503 | 504;
-    };
+export type AgyBlockedRetry = ProviderBlock;
 
 export type AgyEventState = {
   messageId: string;
@@ -425,18 +416,30 @@ export function agyBlockedRetry(value: unknown): AgyBlockedRetry | null {
   if (payload === null) return null;
   const serialized = typeof payload === "string" ? payload : JSON.stringify(payload);
   const message = textFrom(payload) ?? serialized;
-  if (/resource_exhausted|quota|usage (?:limit|exhausted)|rate limit/i.test(serialized)) {
-    return { reason: "usage_exhausted", provider: "agy", message, nextRetryAt: null };
-  }
-  const statusCode = transientUpstreamStatusCode(payload);
-  if (statusCode) {
-    return {
-      reason: "upstream_overloaded",
-      provider: "agy",
-      message,
-      nextRetryAt: null,
-      statusCode,
-    };
-  }
-  return null;
+  const record = recordValue(payload);
+  const code = record
+    ? ["code", "status", "reason", "type"]
+      .map((key) => record[key])
+      .find((entry): entry is string =>
+        typeof entry === "string" && entry.trim() !== "" &&
+        !/^\d+$/u.test(entry.trim())
+      )
+    : undefined;
+  const statusCode = transientUpstreamStatusCode(payload) ??
+    (record
+      ? ["status", "statusCode", "code"]
+        .map((key) => Number(record[key]))
+        .find((entry) => Number.isInteger(entry) && entry >= 400 && entry < 600)
+      : undefined);
+  return classifyProviderFailure({
+    provider: "agy",
+    message,
+    code,
+    statusCode: statusCode ?? null,
+  }) ?? (message === serialized ? null : classifyProviderFailure({
+    provider: "agy",
+    message: serialized,
+    code,
+    statusCode: statusCode ?? null,
+  }));
 }

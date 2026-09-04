@@ -1,3 +1,7 @@
+import {
+  providerBlockFromProto,
+  type ProviderBlock,
+} from "../../src/lib/provider-block";
 import type {
   CompleteChannelReplyRequest,
   CompleteIssueReplyRequest,
@@ -269,7 +273,7 @@ export type IssueReplyCompletionInput = {
   claim: ReplyWireClaim & { replyKind: "issue" };
   attachmentIds: string[];
   outcome:
-    | { case: "failure"; error: string }
+    | { case: "failure"; error: string; block: ProviderBlock | null }
     | {
         case: "success";
         completion: ReturnType<typeof decodeIssueAgentReplyResult>;
@@ -295,6 +299,7 @@ export function completeIssueReplyInputFromProto(
       outcome: {
         case: "failure",
         error: requiredText(failure.error, "Issue reply error", 4_000),
+        block: providerBlockFromProto(failure.block),
       },
     };
   }
@@ -374,7 +379,7 @@ export type ChannelReplyCompletionInput = {
   attachmentIds: string[];
   conversationId: string | null;
   outcome:
-    | { case: "failure"; error: string }
+    | { case: "failure"; error: string; block: ProviderBlock | null }
     | { case: "success"; completion: ChannelReplyCompletion };
 };
 
@@ -398,6 +403,7 @@ export function completeChannelReplyInputFromProto(
       outcome: {
         case: "failure",
         error: requiredText(failure.error, "Channel reply error", 4_000),
+        block: providerBlockFromProto(failure.block),
       },
     };
   }
