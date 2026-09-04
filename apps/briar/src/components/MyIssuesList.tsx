@@ -20,7 +20,7 @@ import { PullRequestIconLink } from "./hunt/board/PullRequestIconLink";
 import { relativeTime, localizeStatus } from "./hunt/model/formatters";
 import { useI18n } from "../i18n";
 import { formatIssueKey } from "../lib/issue-key";
-import type { DashboardView } from "./hunt/model/filters";
+import type { DashboardView } from "../state/board/filters";
 import type { HuntRun, OrganizationMember, Project } from "../types";
 
 export type MyIssue = {

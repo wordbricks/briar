@@ -21,7 +21,7 @@ import type { DashboardPayload, HuntRun, OrganizationMember, Project } from "../
 import {
   emptyIssuePropertyFilters,
   runMatchesIssuePropertyFilters,
-} from "./hunt/model/filters";
+} from "../state/board/filters";
 
 export type MyIssuesProps = {
   currentUserId: string | null;

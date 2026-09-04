@@ -59,7 +59,7 @@ import {
   type SourceFilter,
   type StatusFilter,
   runMatchesIssuePropertyFilters,
-} from "../model/filters";
+} from "@/state/board/filters";
 import { localizeWorkflowStage } from "../model/formatters";
 import { placementMatchesRun } from "../model/kanban";
 
