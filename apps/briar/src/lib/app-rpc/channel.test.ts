@@ -62,6 +62,8 @@ describe("Channel Connect DTO mapping", () => {
       title: "Release",
       description: null,
       imageUrl: null,
+      imageWidth: null,
+      imageHeight: null,
       faviconUrl: null,
       siteName: null,
     });
