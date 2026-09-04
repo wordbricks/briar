@@ -201,6 +201,43 @@ describe("channel message contract", () => {
       createdAt: "2026-08-16T00:00:00.000Z",
     });
   });
+
+  it("carries block text an incoming webhook body does not repeat", () => {
+    const message: ChannelMessage = {
+      id: clientMessageId,
+      channelId: projectId,
+      parentMessageId: null,
+      author: { type: "webhook", id: agentId, name: "LLM error" },
+      body: "LLM call failed: generateObject",
+      blocks: [{
+        type: "header",
+        text: { type: "plain_text", text: "LLM Call Error" },
+      }, {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: "*Provider*\ngoogle.vertex.chat\n\n*Model*\ngemini-3.7-flash",
+        },
+      }],
+      mentionedUserIds: [],
+      mentionedAgentIds: [],
+      attachments: [],
+      reactions: [],
+      replyCount: 0,
+      lastReplyAt: null,
+      replyAuthors: [],
+      subscribers: [],
+      document: null,
+      proposal: null,
+      executionProposal: null,
+      skillExecutionProposal: null,
+      createdAt: "2026-09-04T07:09:36.842Z",
+    };
+
+    expect(channelReplyContextMessageJson(message).blockText).toBe(
+      "LLM Call Error\n*Provider*\ngoogle.vertex.chat\n\n*Model*\ngemini-3.7-flash",
+    );
+  });
 });
 
 describe("channel webhook contract", () => {

@@ -566,6 +566,34 @@ describe("detached Agent runner", () => {
     expect(prompt.length).toBeLessThan(20_000);
   });
 
+  it("keeps webhook block text that the message body does not repeat", () => {
+    const prompt = detachedChannelReplyPrompt({
+      agent,
+      workspaceAvailable: true,
+      snapshot: {
+        messages: [{
+          id: "33333333-3333-4333-8333-333333333333",
+          parentMessageId: null,
+          author: {
+            type: "webhook",
+            id: "44444444-4444-4444-8444-444444444444",
+            name: "LLM error",
+          },
+          body: "LLM call failed: generateObject",
+          blockText:
+            "LLM Call Error\n*Provider*\ngoogle.vertex.chat\n\n*Model*\ngemini-3.7-flash",
+          mentionedUserIds: [],
+          mentionedAgentIds: [],
+          attachments: [],
+          createdAt: "2026-09-04T07:09:36.842Z",
+        }],
+      },
+    });
+
+    expect(prompt).toContain("blockText");
+    expect(prompt).toContain("google.vertex.chat");
+  });
+
   it("allows related external repository research without expanding project mutations", () => {
     const projectId = "22222222-2222-4222-8222-222222222222";
     const projectAgent = {

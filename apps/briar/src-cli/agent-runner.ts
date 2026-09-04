@@ -618,6 +618,7 @@ export function channelReplyPromptSnapshot(
         "id",
         "parentMessageId",
         "body",
+        "blockText",
         "mentionedUserIds",
         "mentionedAgentIds",
         "document",

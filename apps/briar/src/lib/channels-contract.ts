@@ -836,6 +836,13 @@ export type ChannelReplyContextMessage = {
   parentMessageId: string | null;
   author: ChannelReplyContextAuthor;
   body: string;
+  /**
+   * Plain-text projection of block content that the body does not already
+   * carry. Slack-compatible webhooks routinely post a short `text` summary
+   * alongside blocks that hold the actual report, so without this an Agent
+   * answers from the summary line alone.
+   */
+  blockText?: string;
   mentionedUserIds: string[];
   mentionedAgentIds: string[];
   attachments: Array<
@@ -851,8 +858,10 @@ export type ChannelReplyContextMessage = {
 /**
  * Project a display-oriented channel message onto the semantic fields an Agent
  * can use when answering. In particular, never copy profile images, email
- * addresses, reactions, presentation blocks, or reply-summary decorations into
- * a model context snapshot.
+ * addresses, reactions, block presentation structure, or reply-summary
+ * decorations into a model context snapshot. Block *text* is semantic content
+ * rather than decoration, so it travels as a flattened `blockText` whenever the
+ * body does not already contain it.
  */
 export function channelReplyContextMessageJson(
   message: ChannelMessage,
@@ -873,11 +882,13 @@ export function channelReplyContextMessageJson(
       };
       break;
   }
+  const blockText = channelMessageBlocksFallback(message.blocks ?? []);
   return {
     id: message.id,
     parentMessageId: message.parentMessageId,
     author,
     body: message.body,
+    ...(blockText && blockText !== message.body ? { blockText } : {}),
     mentionedUserIds: message.mentionedUserIds,
     mentionedAgentIds: message.mentionedAgentIds,
     attachments: message.attachments.map((attachment) => ({
