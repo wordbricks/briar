@@ -4,7 +4,9 @@ import {
   createGithubOAuthState,
   getGithubConnectionForOrganization,
   listGithubConnectionRepositories,
+  syncGithubConnectionRepositories,
 } from "./db";
+import { listGithubInstallationRepositories } from "./github-app-api";
 import {
   githubOAuthStateTtlMs,
   githubSha256Hex,
@@ -53,7 +55,62 @@ type OrganizationGithubApplicationInput = {
   readonly env: Env;
   readonly organizationId: string;
   readonly userId: string;
+  readonly fetchImpl?: typeof fetch;
 };
+
+/**
+ * Brings the stored repository snapshot back in line with what the App can
+ * reach. Installations granted "All repositories" never announce a newly
+ * created repository over the installation_repositories webhook, so without
+ * this every caller that checks the snapshot rejects repositories the App does
+ * have access to. A GitHub failure leaves the snapshot as it was rather than
+ * emptying an organization's repository list.
+ */
+async function refreshedInstallationRepositories(
+  input: {
+    readonly db: D1Database;
+    readonly env: Env;
+    readonly installationId: number;
+    readonly fetchImpl?: typeof fetch;
+  },
+) {
+  const stored = await listGithubConnectionRepositories(
+    input.db,
+    input.installationId,
+  );
+  if (
+    !input.env.GITHUB_APP_ID?.trim() || !input.env.GITHUB_APP_PRIVATE_KEY?.trim()
+  ) {
+    return stored;
+  }
+  try {
+    const live = await listGithubInstallationRepositories(
+      input.env,
+      input.installationId,
+      input.fetchImpl,
+    );
+    const liveIds = new Set(live.map((repository) => repository.id));
+    await syncGithubConnectionRepositories(input.db, {
+      installationId: input.installationId,
+      added: live,
+      removedIds: stored
+        .filter((repository) => !liveIds.has(repository.repository_id))
+        .map((repository) => repository.repository_id),
+      observedAt: new Date().toISOString(),
+    });
+    return await listGithubConnectionRepositories(
+      input.db,
+      input.installationId,
+    );
+  } catch (error) {
+    console.error(JSON.stringify({
+      message: "GitHub installation repository refresh failed",
+      installationId: input.installationId,
+      error: error instanceof Error ? error.message : String(error),
+    }));
+    return stored;
+  }
+}
 
 export async function getGithubIntegrationApplication(
   input: OrganizationGithubApplicationInput,
@@ -75,10 +132,12 @@ export async function getGithubIntegrationApplication(
     canManage: hasOrganizationCapability(role, "development:manage"),
   };
   if (!connection) return { ...common, connected: false as const };
-  const repositories = await listGithubConnectionRepositories(
-    input.db,
-    connection.installation_id,
-  );
+  const repositories = await refreshedInstallationRepositories({
+    db: input.db,
+    env: input.env,
+    installationId: connection.installation_id,
+    fetchImpl: input.fetchImpl,
+  });
   return {
     ...common,
     connected: true as const,
