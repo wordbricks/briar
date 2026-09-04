@@ -216,6 +216,10 @@ test "$(systemctl show briar-managed-worker.service --property=Group --value)" =
   "briar"
 test "$(systemctl show briar-managed-runtime-updater.service --property=User --value)" = \
   "root"
+test "$(systemctl show briar-managed-runtime-bootstrap.service --property=User --value)" = \
+  "root"
+test "$(systemctl show briar-managed-runtime-bootstrap.service --property=Type --value)" = \
+  "oneshot"
 test "$(systemctl show briar-box-exec.service --property=User --value)" = \
   "briar"
 test "$(systemctl show briar-box-exec.service --property=Group --value)" = \
@@ -252,6 +256,7 @@ systemd-analyze verify \
   /etc/systemd/system/briar-managed-computer-health.service \
   /etc/systemd/system/briar-managed-computer-health.timer \
   /etc/systemd/system/briar-managed-enroll.service \
+  /etc/systemd/system/briar-managed-runtime-bootstrap.service \
   /etc/systemd/system/briar-managed-runtime-updater.service \
   /etc/systemd/system/briar-managed-worker.service \
   /etc/systemd/system/briar-box-exec.service \

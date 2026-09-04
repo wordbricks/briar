@@ -1,7 +1,7 @@
 [Unit]
 Description=Briar managed computer outbound remote and guided setup agent
-After=network-online.target briar-managed-enroll.service briar-remote-desktop.service
-Wants=network-online.target briar-remote-desktop.service
+After=network-online.target briar-managed-enroll.service briar-managed-runtime-bootstrap.service briar-remote-desktop.service
+Wants=network-online.target briar-managed-runtime-bootstrap.service briar-remote-desktop.service
 Requires=briar-managed-enroll.service briar-remote-desktop.service
 
 [Service]

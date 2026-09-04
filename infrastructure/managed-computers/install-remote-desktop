@@ -60,6 +60,7 @@ install -o root -g root -m 0644 \
   "$source_dir/briar-managed-computer-health.timer" \
   "$source_dir/briar-box-exec.service" \
   "$source_dir/briar-managed-enroll.service" \
+  "$source_dir/briar-managed-runtime-bootstrap.service" \
   "$source_dir/briar-managed-runtime-updater.service" \
   "$source_dir/briar-managed-worker.service" \
   "$source_dir/briar-computer-use-window@.service" \
@@ -81,6 +82,7 @@ install -o root -g root -m 0755 "$source_dir/briar-computer-executor.py" \
 systemctl daemon-reload
 systemctl disable \
   briar-managed-enroll.service \
+  briar-managed-runtime-bootstrap.service \
   briar-managed-runtime-updater.service \
   briar-managed-worker.service \
   briar-box-exec.service \

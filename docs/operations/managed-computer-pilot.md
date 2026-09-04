@@ -72,6 +72,20 @@ device session이 비워진 뒤 updater가 버전 고정 URL에서 번들과 서
 새 Worker가 목표 버전 heartbeat를 보내면 완료된다. 제한 시간 안에 확인되지
 않으면 이전 release 링크로 롤백하고 update request를 `failed`로 기록한다.
 
+새로 만든 managed computer는 AMI에 구운 런타임 대신 최신 릴리스로 시작한다.
+enrollment 직후 Worker·원격 세션 agent·box executor보다 먼저 실행되는
+`briar-managed-runtime-bootstrap.service`(`Type=oneshot`)가
+`briar-managed-runtime-updater --bootstrap`으로 공개 매니페스트
+`GET <api-origin>/releases/latest.json`을 읽고, 기록된 버전이 `current`보다 높을
+때만 같은 서명 검증 경로로 번들을 설치한 뒤 `current` 링크를 원자적으로 바꾼다.
+아직 아무 서비스도 시작하지 않았으므로 handoff·health 확인·서비스 재시작은
+건너뛴다. 매니페스트를 읽지 못하거나 서명 검증이 실패하면 `current`를 그대로 둔
+채 stderr에 남기고 종료 코드 0으로 끝나므로 부팅을 막지 않고, 버전이 같거나 더
+낮으면 아무것도 하지 않는다. 결과는 `/var/lib/briar-runtime-updater/last-result.json`에
+`bootstrap_completed`·`bootstrap_skipped`·`bootstrap_failed`로 남는다. bootstrap
+unit이 없는 AMI로 만든 기존 managed computer는 이 기능을 스스로 얻을 수 없으므로
+AMI 교체가 필요하다.
+
 이 경로는 Briar CLI, runner, 원격 세션 agent와 `briar-workflow`/`browser` Skill을
 업데이트한다. Debian, Chrome, Bun, Rust와 provider CLI 같은 base toolchain은 계속
 AMI 교체로 배포한다. updater가 포함되기 전에 생성된 기존 managed computer는 이
@@ -80,8 +94,9 @@ AMI 교체로 배포한다. updater가 포함되기 전에 생성된 기존 mana
 ### 1.2 부팅 순서와 자동 복구
 
 부팅 진입점은 `briar-managed-computer.target` 하나다. target은
-`briar-managed-enroll.service`가 먼저 성공한 뒤 signed runtime updater, Worker,
-loopback 데스크톱, outbound remote-session agent를 시작하고 모든 서비스가 준비될
+`briar-managed-enroll.service`가 먼저 성공한 뒤 boot-time runtime bootstrap,
+signed runtime updater, Worker, loopback 데스크톱, outbound remote-session agent를
+시작하고 모든 서비스가 준비될
 때까지 `multi-user.target` 완료를 기다린다. 개별 서비스의 `WantedBy` 링크를
 만들면 부팅 순서가 다시 깨질 수 있으므로 이미지 설치기는 기존 개별 링크를
 제거하고 target만 enable한다.

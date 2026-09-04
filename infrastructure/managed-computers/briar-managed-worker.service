@@ -1,7 +1,7 @@
 [Unit]
 Description=Run Briar managed-computer project workers
-After=network-online.target briar-managed-enroll.service briar-managed-runtime-updater.service
-Wants=network-online.target
+After=network-online.target briar-managed-enroll.service briar-managed-runtime-bootstrap.service briar-managed-runtime-updater.service
+Wants=network-online.target briar-managed-runtime-bootstrap.service
 Requires=briar-managed-enroll.service briar-managed-runtime-updater.service
 
 [Service]

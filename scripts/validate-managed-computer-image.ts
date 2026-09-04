@@ -318,6 +318,8 @@ const managedComputerTarget = await text(
 );
 for (const required of [
   "Requires=briar-managed-enroll.service",
+  "Wants=briar-managed-runtime-bootstrap.service",
+  "After=briar-managed-runtime-bootstrap.service",
   "Requires=briar-managed-runtime-updater.service",
   "Requires=briar-managed-worker.service",
   "Requires=briar-remote-desktop.service",
@@ -482,6 +484,7 @@ for (const required of [
 }
 for (const unitName of [
   "briar-managed-enroll.service",
+  "briar-managed-runtime-bootstrap.service",
   "briar-managed-runtime-updater.service",
   "briar-managed-worker.service",
   "briar-remote-desktop.service",
@@ -510,8 +513,23 @@ for (const required of [
   "Refusing to downgrade the managed runtime",
   "managed-computer worker-update-fail",
   "managed-computer worker-update-status",
+  "--bootstrap",
+  "run_bootstrap",
+  "link_release",
+  "releases/latest.json",
+  "bootstrap_completed",
+  "bootstrap_skipped",
+  "bootstrap_failed",
 ]) {
   if (!updater.includes(required)) fail(`runtime updater omits ${required}`);
+}
+for (const required of [
+  "abort_startup",
+  "# Boot continues on the baked runtime whatever happened above.\n  exit 0",
+]) {
+  if (!updater.includes(required)) {
+    fail(`runtime updater bootstrap must never block boot: ${required}`);
+  }
 }
 if (updater.includes("curl | sh") || updater.includes("eval ")) {
   fail("runtime updater must not execute an unverified download");
@@ -529,6 +547,60 @@ for (const required of [
 ]) {
   if (!updaterService.includes(required)) {
     fail(`runtime updater unit omits ${required}`);
+  }
+}
+if (
+  !updaterService.includes(
+    "After=network-online.target briar-managed-enroll.service " +
+      "briar-managed-runtime-bootstrap.service",
+  )
+) {
+  fail("runtime updater unit must start after the boot-time bootstrap");
+}
+
+const bootstrapService = await text(
+  join(image, "briar-managed-runtime-bootstrap.service"),
+);
+for (const required of [
+  "Type=oneshot",
+  "RemainAfterExit=yes",
+  "User=root",
+  "Group=briar",
+  "Requires=briar-managed-enroll.service",
+  "Before=briar-managed-runtime-updater.service",
+  "Before=briar-managed-worker.service",
+  "Before=briar-remote-session-agent.service",
+  "Before=briar-box-exec.service",
+  "StateDirectory=briar-runtime-updater",
+  "ProtectSystem=strict",
+  "ReadOnlyPaths=/var/lib/briar",
+  "TimeoutStartSec=",
+  "ExecStart=/opt/briar/bin/briar-managed-runtime-updater --bootstrap",
+]) {
+  if (!bootstrapService.includes(required)) {
+    fail(`runtime bootstrap unit omits ${required}`);
+  }
+}
+if (bootstrapService.includes("RuntimeDirectory=")) {
+  fail(
+    "runtime bootstrap unit must not own the updater runtime directory",
+  );
+}
+for (const unitName of [
+  "briar-managed-worker.service",
+  "briar-remote-session-agent.service",
+  "briar-box-exec.service",
+]) {
+  const unit = await text(join(image, unitName));
+  if (
+    !unit.includes("After=network-online.target") ||
+    !/After=[^\n]*briar-managed-runtime-bootstrap\.service/u.test(unit) ||
+    !/Wants=[^\n]*briar-managed-runtime-bootstrap\.service/u.test(unit)
+  ) {
+    fail(`${unitName} must wait for the boot-time runtime bootstrap`);
+  }
+  if (/Requires=[^\n]*briar-managed-runtime-bootstrap\.service/u.test(unit)) {
+    fail(`${unitName} must not fail when the runtime bootstrap fails`);
   }
 }
 

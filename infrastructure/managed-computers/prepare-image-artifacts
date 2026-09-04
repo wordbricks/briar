@@ -44,6 +44,7 @@ for file in \
   briar-managed-enroll \
   briar-managed-enroll.service \
   briar-open-browser \
+  briar-managed-runtime-bootstrap.service \
   briar-managed-runtime-update-request \
   briar-managed-runtime-updater \
   briar-managed-runtime-updater.service \
