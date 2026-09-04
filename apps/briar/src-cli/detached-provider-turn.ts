@@ -548,6 +548,15 @@ async function executeDetachedProviderTurn(
         ? input.signal.reason
         : new Error("Worker execution was cancelled");
     }
+    if (completed && exitCode !== 0) {
+      // The turn already succeeded; the runner just failed to shut down
+      // cleanly. Keep it visible without turning it into a failed turn.
+      diagnose("turn.exit_after_result", {
+        runnerPid: child.pid ?? null,
+        exitCode,
+        stderr: redactDiagnosticText(stderr.trim()),
+      });
+    }
     diagnose("turn.returned", {
       runnerPid: child.pid ?? null,
       exitCode,
@@ -586,17 +595,29 @@ export function assertDetachedProviderTurnSucceeded(
  * lifecycle. Issue workers use this to inspect the durable claim first: an
  * agent CLI exiting after a failed tool or CI command is a recoverable turn
  * while the run remains active, not permission to fail the whole run.
+ *
+ * A completed turn — one whose runner delivered its terminal `result` frame —
+ * is never a failure here. The exit code that follows describes how the runner
+ * process shut down, not whether the turn produced an answer, and treating a
+ * late crash as a failed turn makes the server requeue work that already ran.
+ * `turn.exit_after_result` records that exit for diagnosis instead, and callers
+ * can still read `exitCode`/`stderr` off the result.
  */
 export function detachedProviderTurnFailure(
   result: DetachedProviderTurnResult,
   options: { requireResult?: boolean } = {},
 ): string | null {
   if (result.block) return providerBlockReplyMessage(result.block);
-  if (result.exitCode !== 0 || result.runnerError) {
-    return result.runnerError ??
-      (result.stderr.trim() || `Agent exited with ${result.exitCode}`);
+  if (result.runnerError) return result.runnerError;
+  // The terminal `result` frame is the runner's own verdict on the turn. A
+  // process that delivered it and then died while shutting down already did the
+  // work, so a nonzero exit code afterwards is a diagnostic, not a failure —
+  // reporting it as one makes the server requeue side-effectful tasks.
+  if (result.completed) return null;
+  if (result.exitCode !== 0) {
+    return result.stderr.trim() || `Agent exited with ${result.exitCode}`;
   }
-  if (options.requireResult !== false && !result.completed) {
+  if (options.requireResult !== false) {
     return "Agent runner exited without a result";
   }
   return null;

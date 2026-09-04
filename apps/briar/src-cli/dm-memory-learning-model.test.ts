@@ -79,6 +79,20 @@ describe("isolated memory model transport", () => {
     expect(conversations).toEqual([null, null]);
   });
 
+  it("accepts an Agent proposal whose runner process died after delivering the result", async () => {
+    const proposal = { explicitRequest: false, changes: [] };
+    const prepareAgentEnvironment = vi.fn<typeof prepareReadOnlyAgentEnvironment>(async () => ({
+      environment: {}, cleanup: async () => undefined,
+    }));
+    const runAgentTurn = vi.fn<typeof runDetachedProviderTurn>(async () => ({
+      exitCode: 1, stderr: "AbortError: The operation was aborted\n", runnerError: null, completed: true,
+      resultText: JSON.stringify(proposal), conversationId: crypto.randomUUID(),
+    }));
+    expect(await invokeDmLearningModel({ invocation: agentFixture(), apiKey: null,
+      signal: new AbortController().signal, prepareAgentEnvironment, runAgentTurn }))
+      .toEqual({ proposal, usage: expect.objectContaining({ costMicroUsd: null }) });
+  });
+
   it("pins routing, disables fallback and submits only system instructions, authorized data and the output schema", async () => {
     const invocation = fixture(), proposal = { explicitRequest: false, changes: [] };
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(response(invocation, proposal));
