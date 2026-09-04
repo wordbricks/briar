@@ -1,7 +1,7 @@
 import { CircleAlert, Image as ImageIcon, Paperclip, X } from "lucide-react";
 import { Kbd } from "@/components/ui/kbd";
 import { Spinner } from "@/components/ui/spinner";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { NativeSelect } from "@/components/NativeSelect";
 import { ProviderModelSelector } from "@/components/ProviderModelSelector";
 import { SelectMenu } from "@/components/SelectMenu";
@@ -16,6 +16,7 @@ import type { CreateIssueInput, OrganizationMember } from "@/types";
 import { agentEffortOptions, agentProviders, type AgentProvider, type ModelEffort } from "@/lib/team-llm";
 import { useAgentProviderModels } from "@/hooks/useAgentProviderModels";
 import { useAgentProviderModelPreferences } from "@/hooks/useAgentProviderModelPreferences";
+import { useInertDialogBackground } from "@/hooks/useInertDialogBackground";
 import { useI18n } from "@/i18n";
 import { DraftIssueDescriptionEditor } from "./DraftIssueDescriptionEditor";
 import { IssueCheckpointDropdown } from "./IssueCheckpointDropdown";
@@ -86,6 +87,8 @@ export function CreateIssueDialog({
     : projectId === workflowProjectId;
   const [checkpoints, setCheckpoints] = useState<AutoHuntWorkflowCheckpoint[]>(initialDraft && (projects.find(project => project.id === initialDraft.projectId)?.teamId === workflowTeamId || initialDraft.projectId === workflowProjectId) ? initialDraft.checkpoints ?? [] : []);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const backdropRef = useRef<HTMLDivElement | null>(null);
+  useInertDialogBackground(backdropRef);
   const {
     addAttachments,
     attachmentError,
@@ -141,7 +144,7 @@ export function CreateIssueDialog({
   useEffect(() => {
     persistDraft();
   }, [persistDraft]);
-  return <div className="dialog-backdrop issue-dialog-backdrop" onMouseDown={event => event.target === event.currentTarget && !isSubmitting && closeWithDraft()}>
+  return <div className="dialog-backdrop issue-dialog-backdrop" ref={backdropRef} onMouseDown={event => event.target === event.currentTarget && !isSubmitting && closeWithDraft()}>
       <form className={`issue-dialog${isDraggingAttachments ? " is-dragging-attachments" : ""}`} {...formEventHandlers} onSubmit={event => {
       event.preventDefault();
       if (!title.trim() || isSubmitting) return;
