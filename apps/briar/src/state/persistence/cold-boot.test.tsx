@@ -11,7 +11,7 @@ import { ApiError } from "../../lib/api/errors";
 import { demoDashboard } from "../../lib/demo-data";
 import { initialOnboardingStorageKey } from "../../lib/initial-onboarding";
 import { launchIntroStorageKey } from "../../lib/launch-intro";
-import { createReactTestRoot, type ReactTestRoot } from "../../test/react";
+import { createReactTestRoot, flush, type ReactTestRoot } from "../../test/react";
 import type {
   DashboardDeltaPayload,
   DashboardPayload,
@@ -192,14 +192,6 @@ let view: ReactTestRoot;
 let registry: AtomRegistry;
 let store: MemorySnapshotStore;
 let server: BootServer;
-
-const flush = async (attempts = 8) => {
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
-  }
-};
 
 const bootGate = () =>
   view.container.querySelector("[data-testid=session-loading-screen]");

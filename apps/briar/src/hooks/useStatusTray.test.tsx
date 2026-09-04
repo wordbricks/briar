@@ -13,7 +13,7 @@ import { createTestRegistry, type AtomRegistry } from "../state/registry";
 import { tokenAtom } from "../state/session/atoms";
 import { applySyncEvent } from "../state/sync/apply";
 import { activeTeamIdAtom } from "../state/team/atoms";
-import { createReactTestRoot } from "../test/react";
+import { createReactTestRoot, flush } from "../test/react";
 import type { DashboardPayload, HuntRun, Project, StatusTrayRun } from "../types";
 import {
   statusTrayApiAtom,
@@ -99,14 +99,6 @@ const mount = async (registry: AtomRegistry) => {
     </RegistryContext.Provider>,
   );
   return view;
-};
-
-const flush = async () => {
-  for (let attempt = 0; attempt < 5; attempt += 1) {
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
-  }
 };
 
 const harness = (

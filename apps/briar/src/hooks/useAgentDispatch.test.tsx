@@ -17,7 +17,7 @@ import { tokenAtom } from "../state/session/atoms";
 import { applySyncEvent } from "../state/sync/apply";
 import { teamSyncApiAtom } from "../state/sync/loader";
 import { activeTeamIdAtom, teamsAtom } from "../state/team/atoms";
-import { createReactTestRoot } from "../test/react";
+import { createReactTestRoot, flush } from "../test/react";
 import type {
   AutoHuntSession,
   DashboardPayload,
@@ -153,14 +153,6 @@ function Harness({
   });
   return null;
 }
-
-const flush = async () => {
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
-  }
-};
 
 const mount = async (
   registry: AtomRegistry,
