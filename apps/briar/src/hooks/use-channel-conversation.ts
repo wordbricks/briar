@@ -52,6 +52,10 @@ import { channelReplyErrorText } from "../lib/channel-reply-error";
 import {
   channelIssueProposalRequestsExecution,
 } from "../components/ChannelIssueProposalDetails";
+import {
+  type ChannelMessageImageCache,
+  registerChannelMessageImageSource,
+} from "../components/ChannelImages";
 import type { ChannelSkillCommandTarget } from "./useChannelComposer";
 import { currentExecutionWorkerDeviceId } from "../lib/execution-worker-device";
 import { useChannelAgentActivity } from "./use-channel-agent-activity";
@@ -105,6 +109,7 @@ type UseChannelConversationOptions = {
   realtime?: ChannelConversationRealtimeOptions;
   dependencies?: ChannelConversationDependencies;
   activityEnabled?: boolean;
+  imageCache?: ChannelMessageImageCache | null;
 };
 
 export type ChannelConversationRealtimeOptions = {
@@ -317,6 +322,7 @@ export function useChannelConversation({
   realtime,
   dependencies = defaultChannelConversationDependencies,
   activityEnabled = true,
+  imageCache,
 }: UseChannelConversationOptions) {
   const { t } = useI18n();
   const { toast } = useToast();
@@ -1046,6 +1052,17 @@ export function useChannelConversation({
       const attachmentUrls = attachments.map((attachment) =>
         URL.createObjectURL(attachment)
       );
+      if (imageCache) {
+        for (let i = 0; i < attachmentUrls.length; i++) {
+          const url = attachmentUrls[i]!;
+          const ref = attachmentReferences[i];
+          registerChannelMessageImageSource(imageCache, url, url);
+          if (ref) {
+            registerChannelMessageImageSource(imageCache, ref, url);
+            registerChannelMessageImageSource(imageCache, `${ref}:${url}`, url);
+          }
+        }
+      }
       const optimisticMessage = createOptimisticChannelMessage({
         id: clientMessageId,
         channelId: activeId,
@@ -1117,6 +1134,20 @@ export function useChannelConversation({
           },
         );
         if (!channelSurfaceIsCurrent(sendContext)) return;
+        if (imageCache && result?.message?.attachments) {
+          result.message.attachments.forEach((attachment, index) => {
+            const url = attachmentUrls[index];
+            if (url) {
+              registerChannelMessageImageSource(imageCache, attachment.id, url);
+              registerChannelMessageImageSource(imageCache, attachment.url, url);
+              registerChannelMessageImageSource(
+                imageCache,
+                `${attachment.id}:${attachment.url}`,
+                url,
+              );
+            }
+          });
+        }
         applyAgentReplies(result.agentReplies);
         if (parentMessageId) {
           optimisticThreadMessageIds.current.delete(clientMessageId);
@@ -1161,9 +1192,12 @@ export function useChannelConversation({
           });
           reportConversationError(cause);
         }
+        for (const url of attachmentUrls) {
+          URL.revokeObjectURL(url);
+          imageCache?.entries.delete(url);
+        }
       } finally {
         optimisticThreadMessageIds.current.delete(clientMessageId);
-        for (const url of attachmentUrls) URL.revokeObjectURL(url);
         if (channelSurfaceIsCurrent(sendContext)) setBusy(false);
       }
     },
@@ -1174,6 +1208,7 @@ export function useChannelConversation({
       channel?.kind,
       channelSurfaceIsCurrent,
       currentUserId,
+      imageCache,
       members,
       messages,
       onRootMessagePending,

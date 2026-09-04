@@ -171,4 +171,42 @@ describe("mergeChannelMessages", () => {
     expect(merged.find((item) => item.id === "message-skill")
       ?.skillExecutionProposal).toBeNull();
   });
+
+  it("preserves local blob URLs on attachments when replacing an optimistic message", () => {
+    const optimistic = {
+      ...message(null),
+      optimistic: true,
+      attachments: [
+        {
+          id: "local-ref-1",
+          filename: "photo.png",
+          contentType: "image/png",
+          byteSize: 1234,
+          url: "blob:http://localhost/local-blob-1",
+        },
+      ],
+    };
+    const authoritative = {
+      ...message(null),
+      attachments: [
+        {
+          id: "server-upload-1",
+          filename: "photo.png",
+          contentType: "image/png",
+          byteSize: 1234,
+          url: "/organizations/org-1/channels/chan-1/messages/msg-1/attachments/server-upload-1",
+        },
+      ],
+    };
+    const merged = mergeChannelMessages([optimistic], [authoritative], []);
+    expect(merged[0]?.attachments).toEqual([
+      {
+        id: "server-upload-1",
+        filename: "photo.png",
+        contentType: "image/png",
+        byteSize: 1234,
+        url: "blob:http://localhost/local-blob-1",
+      },
+    ]);
+  });
 });

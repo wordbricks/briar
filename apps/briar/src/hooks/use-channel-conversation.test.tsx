@@ -22,6 +22,7 @@ import {
   defaultChannelConversationDependencies,
   useChannelConversation,
 } from "./use-channel-conversation";
+import type { ChannelMessageImageCache } from "../components/ChannelImages";
 
 const api = {
   acceptChannelProposal: vi.fn(),
@@ -165,6 +166,7 @@ function Harness({
   initialNextCursor = null,
   initialThreadParentId = null,
   realtimeEnabled = false,
+  imageCache,
 }: {
   activeChannel: ChannelSummary;
   initialMessages?: ChannelMessage[];
@@ -172,6 +174,7 @@ function Harness({
   initialNextCursor?: string | null;
   initialThreadParentId?: string | null;
   realtimeEnabled?: boolean;
+  imageCache?: ChannelMessageImageCache | null;
 }) {
   const [members, setMembers] = React.useState<ChannelMember[]>([member]);
   const [agents, setAgents] = React.useState<ChannelAgentSummary[]>([]);
@@ -202,6 +205,7 @@ function Harness({
   const conversation = useChannelConversation({
     token: "token",
     organizationId: "org-1",
+    imageCache,
     currentUserId: "user-1",
     channel: activeChannel,
     members,
@@ -882,5 +886,66 @@ describe("useChannelConversation", () => {
     expect(
       document.body.querySelector('[data-testid="app-toast"]')?.textContent,
     ).toContain("offline");
+  });
+
+  it("preserves local blob URLs on sent image attachments and seeds the image cache", async () => {
+    const revokeSpy = vi.spyOn(URL, "revokeObjectURL");
+    const fakeFile = new File(["test-image-data"], "photo.png", {
+      type: "image/png",
+    });
+    const fakeBlobUrl = "blob:http://localhost/sent-photo";
+    const createObjectURLOriginal = URL.createObjectURL;
+    URL.createObjectURL = vi.fn(() => fakeBlobUrl);
+
+    const imageCache: ChannelMessageImageCache = {
+      disposed: false,
+      entries: new Map(),
+    };
+
+    const pending = deferred<Awaited<ReturnType<typeof import("../lib/api").sendChannelMessage>>>();
+    api.sendChannelMessage.mockReturnValueOnce(pending.promise);
+
+    ({ cleanup, root } = await renderHarness({
+      activeChannel: channel("channel-a"),
+      imageCache,
+    }));
+
+    let request!: ReturnType<Conversation["send"]>;
+    await act(async () => {
+      request = current().send("photo upload", [], null, [fakeFile], ["ref-1"]);
+      await Promise.resolve();
+    });
+
+    expect(current().messages).toHaveLength(1);
+    expect(current().messages[0]?.attachments[0]?.url).toBe(fakeBlobUrl);
+    const optimisticId = current().messages[0]!.id;
+
+    await act(async () => pending.resolve({
+      message: {
+        ...message(optimisticId, { body: "photo upload" }),
+        attachments: [
+          {
+            id: "server-upload-1",
+            filename: "photo.png",
+            contentType: "image/png",
+            byteSize: 15,
+            url: `/organizations/org-1/channels/channel-a/messages/${optimisticId}/attachments/server-upload-1`,
+          },
+        ],
+      },
+      agentReplies: [],
+    }));
+    await act(async () => request);
+
+    expect(current().messages[0]?.attachments[0]?.url).toBe(fakeBlobUrl);
+    expect(
+      imageCache.entries.get(
+        `server-upload-1:/organizations/org-1/channels/channel-a/messages/${optimisticId}/attachments/server-upload-1`,
+      )?.source,
+    ).toBe(fakeBlobUrl);
+    expect(imageCache.entries.get("server-upload-1")?.source).toBe(fakeBlobUrl);
+    expect(revokeSpy).not.toHaveBeenCalledWith(fakeBlobUrl);
+
+    URL.createObjectURL = createObjectURLOriginal;
   });
 });
