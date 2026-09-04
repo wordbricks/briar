@@ -691,6 +691,12 @@ function InboxMessageRowContent({
         </span>
         <span className="inbox-message-copy col-start-2 row-span-2 grid min-w-0 grid-rows-[1fr_1fr] items-center gap-0">
           <span className="flex min-w-0 items-center gap-1.5">
+            {showUnreadAction ? (
+              <i
+                aria-label={t("inbox.unread")}
+                className="inbox-unread-dot size-1.5 shrink-0 rounded-full bg-primary shadow-[0_0_0_3px_color-mix(in_srgb,var(--primary)_10%,transparent)]"
+              />
+            ) : null}
             <Typography
               as="strong"
               className="min-w-0 truncate text-xs font-semibold leading-[1.25]"
