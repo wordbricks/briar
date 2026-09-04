@@ -30,7 +30,6 @@ import {
 } from "../lib/channel-grouping";
 import {
   channelQuickReactionEmojis,
-  type ChannelAgentReply,
   type ChannelAgentSummary,
   type ChannelExecutionProposal,
   type ChannelMember,
@@ -46,9 +45,6 @@ import type {
   ProjectExecutionWorkerPolicy,
 } from "../types";
 import type { MentionTarget } from "../lib/channel-mentions";
-import {
-  mergeChannelMessages,
-} from "../lib/channel-message-merge";
 import { useToast } from "./ui/toast";
 import { maxIssueAttachmentCount } from "../lib/issue-attachments";
 import { useI18n } from "../i18n";
@@ -60,7 +56,6 @@ import {
 } from "../lib/conversation-scroll";
 import { useChannelScrollStability } from "../hooks/use-channel-scroll-stability";
 import type { AutoHuntSession } from "../types";
-import type { ChannelAgentActivityDescriptor } from "../lib/channel-agent-activity";
 import {
   ChannelDraftImages,
   ChannelMessageImageCacheProvider,
@@ -71,7 +66,6 @@ import {
 import { channelAttachmentAccept } from "../lib/channel-attachments";
 import { ChannelMentionMenu } from "./ChannelMentionMenu";
 import { ChannelThreadSubscribeControls } from "./ChannelThreadSubscribeControls";
-import { ChannelTypingState } from "./ChannelTypingState";
 import { MentionComposerField } from "./MentionComposerField";
 import { ChannelMessageText } from "./ChannelMessageText";
 import { ChannelLinkPreview } from "./ChannelLinkPreview";
@@ -145,7 +139,6 @@ type CompanionChannelsProps = {
   onLobbyOpen?: () => void;
   onIssueOpen?: (projectId: string, runId: string) => void | Promise<void>;
   onSkillSessionAccepted?: (session: AutoHuntSession) => void;
-  channelInboxSyncSignal?: string;
   onViewingChannelChange?: (
     channelId: string | null,
     threadRootMessageId: string | null,
@@ -176,7 +169,6 @@ export function CompanionChannels({
   onLobbyOpen,
   onIssueOpen,
   onSkillSessionAccepted,
-  channelInboxSyncSignal,
   onViewingChannelChange,
   requestedChannelId,
   onRequestedChannelOpen,
@@ -1651,20 +1643,6 @@ export function CompanionChannelComposer({
       />
     </>
   );
-}
-
-function relativeTime(value: string, locale: string) {
-  const elapsedSeconds = Math.round(
-    (new Date(value).getTime() - Date.now()) / 1_000,
-  );
-  const formatter = new Intl.RelativeTimeFormat(locale, { numeric: "always" });
-  if (Math.abs(elapsedSeconds) < 3_600) {
-    return formatter.format(Math.round(elapsedSeconds / 60), "minute");
-  }
-  if (Math.abs(elapsedSeconds) < 86_400) {
-    return formatter.format(Math.round(elapsedSeconds / 3_600), "hour");
-  }
-  return formatter.format(Math.round(elapsedSeconds / 86_400), "day");
 }
 
 function CompanionChannelLoadingSpinner() {

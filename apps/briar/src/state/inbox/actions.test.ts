@@ -125,6 +125,24 @@ describe("inbox actions", () => {
     stop();
   });
 
+  it("answers whether the message is read, and writes only the first time", async () => {
+    const { registry, stop } = await harness([issue("issue:run-1", "v1")]);
+    const actions = createInboxActions(registry);
+
+    /*
+      A notification for another team routes in two passes, so the transition
+      asks twice for the same message. The second ask writes nothing and pushes
+      nothing, and a message this window's inbox does not hold answers `false`
+      so the caller retries on the pass that has it.
+    */
+    expect(actions.markRead("issue:run-1")).toBe(true);
+    expect(actions.markRead("issue:run-1")).toBe(true);
+    expect(api.saveReadStates).toHaveBeenCalledTimes(1);
+    expect(actions.markRead("issue:run-missing")).toBe(false);
+    expect(api.saveReadStates).toHaveBeenCalledTimes(1);
+    stop();
+  });
+
   it("reads every reply a thread row stands for", async () => {
     const { registry, stop } = await harness([
       reply("thread-reply-1", "run-1", "2026-09-01T00:01:00.000Z"),

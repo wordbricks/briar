@@ -33,7 +33,15 @@ import { currentInboxReadSync, queueInboxReadStatePush } from "./read-sync";
 
 export interface InboxActions {
   readonly markAllRead: () => void;
-  readonly markRead: (messageId: string) => void;
+  /**
+   * Records a read receipt for one notification. Reports whether the account's
+   * record now says it is read, so a caller that may be asked twice for the
+   * same message — a notification transition that routes in two passes — can
+   * stop after the pass that landed. `false` means the message is not this
+   * window's to read: it is not in the account's inbox, or the record on screen
+   * belongs to somebody else.
+   */
+  readonly markRead: (messageId: string) => boolean;
   readonly markUnread: (messageId: string) => void;
   readonly markIssueRead: (runId: string) => void;
 }
@@ -100,23 +108,29 @@ export function createInboxActions(
 ): InboxActions {
   const api = () => resolveInboxApi(registry, deps.api);
 
-  const markRead = (messageId: string) => {
+  const markRead = (messageId: string): boolean => {
     const message = displayedMessage(
       registry.get(inboxMessagesAtom),
       messageId,
     );
-    if (!message) return;
+    if (!message) return false;
     const versions = inboxMessageReadVersions(message);
     const current = writableInboxState(registry);
-    if (!current) return;
+    if (!current) return false;
+    /*
+      Already at these versions, so there is nothing to write — which is what
+      makes a second call for the same message free. The caller is told `true`
+      all the same: the question it asks is "is this read", not "did I write".
+    */
     if (
       Object.entries(versions).every(
         ([id, version]) => current.readVersions[id] === version,
       )
     ) {
-      return;
+      return true;
     }
     commitReadVersions(registry, api(), current, versions);
+    return true;
   };
 
   const markIssueRead = (runId: string) => {

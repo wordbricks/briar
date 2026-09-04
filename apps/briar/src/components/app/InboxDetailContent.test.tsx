@@ -113,7 +113,6 @@ const mount = async (
         <TooltipProvider>
         <Tracked
           agents={[]}
-          channelInboxSyncSignal=""
           conversationInboxSyncSignal=""
           onEnsureTeamSelected={async () => undefined}
           onNavigateToIssue={() => undefined}

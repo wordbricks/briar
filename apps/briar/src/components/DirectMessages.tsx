@@ -65,7 +65,6 @@ type DirectMessagesProps = {
   projects?: readonly Pick<Project, "id" | "name" | "organizationId">[];
   activeChannelId: string | null;
   channelCatalogCursor: number | null;
-  channelInboxSyncSignal?: string;
   onChannelSelect: (channelId: string | null) => void;
   onChannelFallback?: (channelId: string | null) => void;
   onChannelsChange: Dispatch<SetStateAction<ChannelSummary[]>>;
@@ -157,7 +156,6 @@ export function DirectMessages({
   projects = [],
   activeChannelId,
   channelCatalogCursor,
-  channelInboxSyncSignal,
   onChannelSelect,
   onChannelFallback,
   onChannelsChange,
@@ -545,7 +543,6 @@ export function DirectMessages({
           <Channels
             activeChannelId={activeChannelId}
             channelCatalogCursor={channelCatalogCursor}
-            channelInboxSyncSignal={channelInboxSyncSignal}
             channels={directMessages}
             currentUserId={currentUserId}
             onChannelFallback={onChannelFallback}

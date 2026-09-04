@@ -32,7 +32,6 @@ import {
 } from "../../state/channels/atoms";
 import { useInboxActions } from "../../state/inbox/actions";
 import {
-  channelInboxSyncSignalAtom,
   conversationInboxSyncSignalAtom,
   visibleInboxUnreadCountAtom,
 } from "../../state/inbox/atoms";
@@ -123,7 +122,6 @@ export function CompanionShell({
   // detail lists the workers a session ran on. A run edit leaves it alone.
   const workers = useAtomValue(teamWorkersAtom(activeTeamId ?? ""));
   const sessionError = useAtomValue(appErrorAtom);
-  const channelInboxSyncSignal = useAtomValue(channelInboxSyncSignalAtom);
   const conversationInboxSyncSignal = useAtomValue(
     conversationInboxSyncSignalAtom,
   );
@@ -261,7 +259,6 @@ export function CompanionShell({
         (token || demoMode) ? (
         <>
           <CompanionChannelsWithCatalog
-            channelInboxSyncSignal={channelInboxSyncSignal}
             onSkillSessionAccepted={agentSessions.adoptRemoteSession}
             onIssueOpen={async (projectId, runId) => {
               await ensureTeamSelected(projectId);
@@ -348,7 +345,6 @@ export function CompanionShell({
         <>
           <DirectMessagesWithCatalog
             activeChannelId={activeChannelId}
-            channelInboxSyncSignal={channelInboxSyncSignal}
             isSidebarOpen
             onChannelSelect={selectChannel}
             onIssueCreated={async (projectId, runId) => {
