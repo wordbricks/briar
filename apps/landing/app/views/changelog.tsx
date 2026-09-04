@@ -30,6 +30,19 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.192",
+        date: "2026년 9월 4일",
+        title: "새 관리형 컴퓨터가 최신 런타임으로 부팅하고 이슈 보드 반응 속도를 높입니다",
+        summary:
+          "새로 만든 관리형 컴퓨터가 부팅 때 최신 Briar 런타임으로 스스로 갱신하고, 내 이슈와 컴패니언 보드의 불필요한 리렌더를 줄였습니다.",
+        items: [
+          "새 관리형 컴퓨터가 부팅할 때 공개 최신 릴리스 매니페스트를 확인해, 구운 이미지보다 새 런타임이 있으면 서명을 검증한 뒤 스스로 설치하고 활성화합니다. 내려받거나 검증에 실패해도 부팅은 계속됩니다.",
+          "내 이슈 화면을 엔티티 저장소 위로 옮겨 실시간 갱신이 즉시 반영되고, 런 하나가 바뀌면 그 행만 다시 그립니다. 이 화면이 열려 있는 동안 조직 팀이 메모리 한도에서 밀려나지 않습니다.",
+          "컴패니언 채널 목록을 데스크톱과 같은 공용 저장소에서 읽어 목록이 두 벌로 갈라지지 않게 하고, DM이 공용 채널 그룹에 섞이던 문제를 고쳤습니다.",
+          "에이전트 세션이 시작될 때 이슈 보드의 모든 카드가 다시 그려지던 문제를 고쳤습니다. 이제 그 런의 카드만 다시 그립니다.",
+        ],
+      },
+      {
         version: "1.2.191",
         date: "2026년 9월 4일",
         title: "사이드바 크기 조절과 사용량 한도 표시를 더하고 채널 이미지·업로드 문제를 고칩니다",
@@ -1594,6 +1607,19 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.192",
+        date: "September 4, 2026",
+        title: "Boot new managed computers on the latest runtime and speed up issue boards",
+        summary:
+          "Newly created managed computers now self-update to the latest Briar runtime at boot, and the My issues and companion boards shed unnecessary re-renders.",
+        items: [
+          "At boot, a new managed computer reads the public latest-release manifest and, when the baked image is older, installs and activates the newest runtime after verifying its minisign signature; any download or verification failure keeps booting on the baked runtime.",
+          "Move My issues onto the entity store so live run updates land immediately, and a changed run re-renders only its own row. Teams of the active organization stay pinned in memory while the page is open.",
+          "Read the companion channel catalog from the same store as the desktop app so the list no longer forks into two copies, and fix DMs leaking into the shared-channels group.",
+          "Fix agent sessions re-rendering every issue-board card when one starts; only the card whose run changed re-renders now.",
+        ],
+      },
       {
         version: "1.2.191",
         date: "September 4, 2026",
