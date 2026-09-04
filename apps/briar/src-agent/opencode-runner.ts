@@ -45,6 +45,11 @@ import {
 } from "./computer-use-mcp-config";
 import { openCodeComputerUseEnvironment } from
   "./computer-use-provider-adapters";
+import {
+  ensureReadOnlyAgentEnvironment,
+  type PreparedReadOnlyAgentEnvironment,
+} from "./read-only-agent-environment";
+import type { AgentProvider } from "../src/lib/agent-provider";
 
 type RunnerDiagnostic = (
   phase: string,
@@ -86,17 +91,47 @@ async function availablePort(): Promise<number> {
   });
 }
 
-function stopOpenCodeProcess(child: ChildProcessWithoutNullStreams) {
-  if (child.exitCode !== null) return;
+const openCodeStopEscalationMs = 2_000;
+
+function signalOpenCodeProcess(
+  child: ChildProcessWithoutNullStreams,
+  signal: NodeJS.Signals,
+) {
   if (process.platform !== "win32" && child.pid) {
     try {
-      process.kill(-child.pid, "SIGTERM");
+      process.kill(-child.pid, signal);
       return;
     } catch {
-      // Fall back to terminating the direct process.
+      // Fall back to signalling the direct process.
     }
   }
-  child.kill();
+  child.kill(signal);
+}
+
+/**
+ * Stop the OpenCode server process group.
+ *
+ * OpenCode does not always exit on SIGTERM while a request is still winding
+ * down. Its open stdio pipes would then keep this runner's event loop alive
+ * after the result was already delivered, so the pipes are dropped at once
+ * and a SIGKILL follows when the process is still around shortly afterwards.
+ */
+export function stopOpenCodeProcess(
+  child: ChildProcessWithoutNullStreams,
+  escalateAfterMs = openCodeStopEscalationMs,
+) {
+  if (child.exitCode !== null || child.signalCode !== null) return;
+  signalOpenCodeProcess(child, "SIGTERM");
+  for (const stream of [child.stdin, child.stdout, child.stderr]) {
+    stream.destroy();
+  }
+  child.unref();
+  const escalation = setTimeout(() => {
+    if (child.exitCode === null && child.signalCode === null) {
+      signalOpenCodeProcess(child, "SIGKILL");
+    }
+  }, escalateAfterMs);
+  child.once("exit", () => clearTimeout(escalation));
 }
 
 export function openCodeServerArgs(port: number, pure: boolean) {
@@ -225,6 +260,26 @@ class OpenCodeServer {
     });
     stopOpenCodeProcess(this.child);
   }
+
+  /**
+   * Resolve once the server process is gone, or once the SIGKILL escalation
+   * in `stopOpenCodeProcess` has had its turn. The isolated state root is
+   * removed only after this: OpenCode still writes caches into HOME while it
+   * shuts down, and a removal racing those writes leaves the root behind.
+   */
+  exited(timeoutMs = openCodeStopEscalationMs + 500): Promise<void> {
+    const child = this.child;
+    if (child.exitCode !== null || child.signalCode !== null) {
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+      const timer = setTimeout(resolve, timeoutMs);
+      child.once("exit", () => {
+        clearTimeout(timer);
+        resolve();
+      });
+    });
+  }
 }
 
 async function resolveSession(
@@ -304,18 +359,34 @@ type OpenCodeRunnerIo = ReturnType<typeof createRunnerIo>;
 type OpenCodeRunnerResources = {
   server?: OpenCodeServer;
   computerUseMcp?: PreparedComputerUseMcp;
+  isolation?: PreparedReadOnlyAgentEnvironment;
 };
+
+/**
+ * OpenRouter runs behind the same OpenCode server, and the sidecar request
+ * carries no provider id. Briar only ever sets `OPENCODE_CONFIG_CONTENT` for
+ * the OpenRouter provider, so its presence selects the isolation allowlist
+ * that keeps that generated config and the OpenRouter key.
+ */
+export function openCodeIsolationProvider(
+  environment: NodeJS.ProcessEnv,
+): AgentProvider {
+  return environment.OPENCODE_CONFIG_CONTENT?.trim() ? "openrouter" : "opencode";
+}
 
 const activeResources: OpenCodeRunnerResources = {};
 
 function closeOpenCodeRunnerResources() {
-  const { server, computerUseMcp } = activeResources;
+  const { server, computerUseMcp, isolation } = activeResources;
   activeResources.server = undefined;
   activeResources.computerUseMcp = undefined;
+  activeResources.isolation = undefined;
   // Killing the opencode process group is synchronous; the Computer Use
-  // temporary directory removal is best effort so it never delays the exit.
+  // temporary directory and the isolated read-only state removals are best
+  // effort so they never delay the exit.
   server?.close();
   void computerUseMcp?.cleanup().catch(() => undefined);
+  void isolation?.cleanup().catch(() => undefined);
 }
 
 async function main(
@@ -338,12 +409,27 @@ async function main(
   });
   const computerUseMcp = await prepareComputerUseMcp(request);
   activeResources.computerUseMcp = computerUseMcp;
+  // `openCodeServerSpawnSpec` uses HOME as the seatbelt state root, and
+  // OpenCode recursively creates `$TMPDIR/opencode` on start. Both must point
+  // inside the isolated root or the seatbelt denies them.
+  const isolation = await ensureReadOnlyAgentEnvironment(
+    openCodeIsolationProvider(process.env),
+    {
+      readOnly: request.sandboxMode === "readOnly",
+      workspaceRoot: request.workspaceRoot,
+      environment: process.env,
+    },
+  );
+  activeResources.isolation = isolation;
   let server: OpenCodeServer | undefined;
   try {
     server = await OpenCodeServer.start(
       request.providerBinaryPath,
       request.workspaceRoot,
-      openCodeComputerUseEnvironment(process.env, computerUseMcp.servers),
+      openCodeComputerUseEnvironment(
+        isolation.environment,
+        computerUseMcp.servers,
+      ),
       request.sandboxMode === "readOnly",
       emitRunnerDiagnostic,
     );
@@ -461,10 +547,13 @@ async function main(
         : {}),
       parts,
     });
-    const response = await Promise.race([
-      prompt,
-      eventPump.then(() => new Promise<never>(() => undefined)),
-    ]);
+    // The pump only wins the race by failing; if it fails after the prompt
+    // already won, that rejection must not surface as unhandled.
+    const pumpFailure = eventPump.then(
+      () => new Promise<never>(() => undefined),
+    );
+    pumpFailure.catch(() => undefined);
+    const response = await Promise.race([prompt, pumpFailure]);
     controller.abort(eventStreamAbortReason);
     await eventPump.catch((caught) => {
       if (!controller.signal.aborted) throw caught;
@@ -496,8 +585,11 @@ async function main(
   } finally {
     activeResources.server = undefined;
     activeResources.computerUseMcp = undefined;
+    activeResources.isolation = undefined;
     server?.close();
+    await server?.exited();
     await computerUseMcp.cleanup();
+    await isolation.cleanup();
   }
 }
 

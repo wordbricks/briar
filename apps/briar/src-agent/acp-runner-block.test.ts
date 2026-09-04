@@ -4,7 +4,7 @@ import { AcpRpcError } from "./acp-json-rpc";
 import { acpFailureBlock } from "./acp-runner";
 import { ProviderBlockedError } from "./provider-block";
 
-const profile = { providerId: "grok" };
+const profile = { providerId: "grok" } as const;
 
 describe("ACP failure classification", () => {
   it("classifies JSON-RPC errors by their data, then their text", () => {
@@ -35,9 +35,9 @@ describe("ACP failure classification", () => {
       message: "insufficient credits",
       nextRetryAt: null,
     };
-    expect(acpFailureBlock({ providerId: "cursor" }, new ProviderBlockedError(block)))
+    expect(acpFailureBlock({ providerId: "cursor" } as const, new ProviderBlockedError(block)))
       .toBe(block);
-    expect(acpFailureBlock({ providerId: "cursor" }, new Error("Not logged in. Run cursor-agent login.")))
+    expect(acpFailureBlock({ providerId: "cursor" } as const, new Error("Not logged in. Run cursor-agent login.")))
       .toMatchObject({ reason: "auth_required", provider: "cursor" });
     expect(acpFailureBlock(profile, new Error("Grok Agent ACP process exited with code 1.")))
       .toBeNull();

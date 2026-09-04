@@ -119,6 +119,37 @@ fn execution_path_candidates(
         .collect()
 }
 
+/// A version manager shim directory (`mise`, `asdf`, `nodenv`, `pyenv`, …).
+///
+/// Their contents are dispatch stubs, not the tool: `~/.local/share/mise/shims/claude`
+/// re-executes `mise`, which refuses to run when the directory it is invoked
+/// from holds an untrusted `mise.toml` — exactly the case for the temporary
+/// worktree a workflow analysis runs in. The shim directories stay on PATH so
+/// a tool installed only through a version manager still resolves.
+pub(crate) fn is_version_manager_shim_directory(directory: &Path) -> bool {
+    directory.file_name() == Some(OsStr::new("shims"))
+}
+
+/// Resolve `tool` on `execution_path`, preferring a real binary over a version
+/// manager shim. A shim only wins when nothing else on PATH provides the tool.
+pub(crate) fn resolve_without_shim_shadowing(
+    tool: &str,
+    execution_path: &OsStr,
+    cwd: &Path,
+) -> Option<PathBuf> {
+    let matches = which::which_in_all(tool, Some(execution_path), cwd)
+        .map(|paths| paths.collect::<Vec<_>>())
+        .unwrap_or_default();
+    matches
+        .iter()
+        .find(|path| {
+            path.parent()
+                .is_none_or(|parent| !is_version_manager_shim_directory(parent))
+        })
+        .or_else(|| matches.first())
+        .cloned()
+}
+
 pub(crate) fn bundled_runtime_directories(executable: &Path) -> Vec<PathBuf> {
     let Some(directory) = executable.parent() else {
         return Vec::new();
@@ -198,6 +229,76 @@ mod tests {
                 .filter(|path| path.as_path() == Path::new("/usr/bin"))
                 .count(),
             1
+        );
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn prefers_a_real_binary_over_a_version_manager_shim_earlier_on_path() {
+        use std::{fs, os::unix::fs::PermissionsExt};
+
+        let home = tempfile::tempdir().expect("fixture home should exist");
+        let shims = home.path().join(".local/share/mise/shims");
+        let homebrew = home.path().join("opt/homebrew/bin");
+        fs::create_dir_all(&shims).expect("shim directory should exist");
+        fs::create_dir_all(&homebrew).expect("homebrew directory should exist");
+        for directory in [&shims, &homebrew] {
+            let binary = directory.join("fixture-claude");
+            fs::write(&binary, "#!/bin/sh\nexit 0\n").expect("fixture should be written");
+            fs::set_permissions(&binary, fs::Permissions::from_mode(0o700))
+                .expect("fixture should be executable");
+        }
+        // The shim directory comes first, exactly as it does in the real
+        // execution PATH.
+        let execution_path =
+            env::join_paths([shims.clone(), homebrew.clone()]).expect("fixture PATH should join");
+
+        assert_eq!(
+            resolve_without_shim_shadowing("fixture-claude", &execution_path, home.path()),
+            Some(homebrew.join("fixture-claude")),
+        );
+
+        // A tool that only a version manager provides still resolves.
+        fs::remove_file(homebrew.join("fixture-claude")).expect("homebrew copy should be removed");
+        assert_eq!(
+            resolve_without_shim_shadowing("fixture-claude", &execution_path, home.path()),
+            Some(shims.join("fixture-claude")),
+        );
+        assert_eq!(
+            resolve_without_shim_shadowing("briar-does-not-exist", &execution_path, home.path()),
+            None,
+        );
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn local_runner_prefers_a_real_binary_over_a_shim() {
+        use std::{fs, os::unix::fs::PermissionsExt};
+
+        let home = tempfile::tempdir().expect("fixture home should exist");
+        let shims = home.path().join(".local/share/mise/shims");
+        let real = home.path().join(".local/bin");
+        fs::create_dir_all(&shims).expect("shim directory should exist");
+        fs::create_dir_all(&real).expect("binary directory should exist");
+        for directory in [&shims, &real] {
+            let binary = directory.join("fixture-tool");
+            fs::write(&binary, "#!/bin/sh\nexit 0\n").expect("fixture should be written");
+            fs::set_permissions(&binary, fs::Permissions::from_mode(0o700))
+                .expect("fixture should be executable");
+        }
+        let environment = LocalExecutionEnvironment::with_runtime_and_inherited_path(
+            home.path(),
+            Vec::new(),
+            Some(OsString::from("/usr/bin:/bin")),
+        )
+        .expect("environment should resolve");
+
+        assert_eq!(
+            environment
+                .runner()
+                .resolve_binary("fixture-tool")
+                .expect("tool should resolve"),
+            real.join("fixture-tool").to_string_lossy(),
         );
     }
 

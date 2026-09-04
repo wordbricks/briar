@@ -10,8 +10,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
+  ensureReadOnlyAgentEnvironment,
   prepareReadOnlyAgentEnvironment,
   readOnlyAgentEnvironment,
+  readOnlyStateRootEnvironmentKey,
 } from "./read-only-agent-environment";
 
 describe("read-only Agent environment", () => {
@@ -361,5 +363,36 @@ describe("read-only Agent environment", () => {
       await prepared.cleanup();
       await rm(sourceHome, { recursive: true, force: true });
     }
+  });
+  it("marks the isolated state root so the runner does not isolate twice", async () => {
+    const prepared = await prepareReadOnlyAgentEnvironment("grok", {
+      workspaceRoot: "/repo",
+      environment: { HOME: "/Users/worker" },
+    });
+    try {
+      expect(prepared.environment[readOnlyStateRootEnvironmentKey])
+        .toBe(prepared.environment.GROK_HOME);
+
+      const reused = await ensureReadOnlyAgentEnvironment("grok", {
+        readOnly: true,
+        workspaceRoot: "/repo",
+        environment: prepared.environment,
+      });
+      await reused.cleanup();
+      expect(reused.environment).toBe(prepared.environment);
+    } finally {
+      await prepared.cleanup();
+    }
+  });
+
+  it("leaves a turn that is not read-only on the inherited environment", async () => {
+    const environment = { HOME: "/Users/worker", BRIAR_WORKER_TOKEN: "keep" };
+    const scope = await ensureReadOnlyAgentEnvironment("grok", {
+      readOnly: false,
+      workspaceRoot: "/repo",
+      environment,
+    });
+    await scope.cleanup();
+    expect(scope.environment).toBe(environment);
   });
 });

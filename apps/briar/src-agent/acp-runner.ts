@@ -29,6 +29,8 @@ import {
   providerBlockFromError,
   type ProviderBlock,
 } from "./provider-block";
+import { ensureReadOnlyAgentEnvironment } from "./read-only-agent-environment";
+import type { AgentProvider } from "../src/lib/agent-provider";
 
 /**
  * Shared Agent Client Protocol runner core.
@@ -129,8 +131,11 @@ export type AcpSessionConfiguration = {
 };
 
 export type AcpProviderProfile = {
-  /** Briar provider id carried on blocks ("grok", "cursor"). */
-  readonly providerId: string;
+  /**
+   * Briar provider id carried on blocks ("grok", "cursor"). It also selects
+   * the read-only isolation profile for the turn.
+   */
+  readonly providerId: AgentProvider;
   /** Transport label, used in process lifecycle errors ("Grok Agent"). */
   readonly providerName: string;
   /** Short label for the runner close and turn failure errors ("Grok"). */
@@ -200,6 +205,7 @@ export type AcpRunnerOverrides = {
   ) => Promise<PreparedComputerUseMcp>;
   readonly allocatePromptId?: () => string;
   readonly environment?: NodeJS.ProcessEnv;
+  readonly prepareEnvironment?: typeof ensureReadOnlyAgentEnvironment;
 };
 
 type AcpSessionSetup = { sessionId?: string };
@@ -311,8 +317,18 @@ export async function runAcpTurn(
     throw new Error("LLM에 보낼 메시지를 입력하세요.");
   }
 
-  const environment = overrides.environment ?? process.env;
   const readOnly = request.sandboxMode === "readOnly";
+  // The desktop sidecar hands the runner the plain process environment, so a
+  // read-only turn builds its isolated provider home here: the seatbelt state
+  // root and the profile's own isolation guard both read it back off `environment`.
+  const isolation = await (
+    overrides.prepareEnvironment ?? ensureReadOnlyAgentEnvironment
+  )(profile.providerId, {
+    readOnly,
+    workspaceRoot: request.workspaceRoot,
+    environment: overrides.environment ?? process.env,
+  });
+  const environment = isolation.environment;
   const computerUseMcp = await (
     overrides.prepareComputerUse ?? prepareComputerUseMcp
   )(request);
@@ -480,6 +496,7 @@ export async function runAcpTurn(
   } finally {
     connection.close();
     await computerUseMcp.cleanup();
+    await isolation.cleanup();
   }
 }
 

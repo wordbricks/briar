@@ -47,9 +47,9 @@ impl CommandRunner for LocalRunner {
                 "앱에 포함된 Bun 런타임을 찾지 못했습니다. Briar를 다시 설치하세요.".to_string(),
             );
         }
-        which::which_in(tool, Some(&self.execution_path), &self.home)
+        super::environment::resolve_without_shim_shadowing(tool, &self.execution_path, &self.home)
             .map(|path| path.to_string_lossy().to_string())
-            .map_err(|_| format!("{tool}을(를) 찾지 못했습니다. 설치되어 있는지 확인해 주세요."))
+            .ok_or_else(|| format!("{tool}을(를) 찾지 못했습니다. 설치되어 있는지 확인해 주세요."))
     }
 
     fn run(&self, spec: &CommandSpec) -> Result<CommandOutput, String> {

@@ -16,13 +16,20 @@ import {
   providerInstructionSeatbeltPattern,
   readOnlySeatbeltSpawnSpec,
 } from "./read-only-seatbelt";
+import {
+  ensureReadOnlyAgentEnvironment,
+  type PreparedReadOnlyAgentEnvironment,
+} from "./read-only-agent-environment";
 
-function agySpawnSpec(request: RunnerRequest) {
+function agySpawnSpec(
+  request: RunnerRequest,
+  environment: NodeJS.ProcessEnv,
+) {
   const args = agyArgs(request);
   if (request.sandboxMode !== "readOnly") {
     return { command: request.providerBinaryPath, arguments: args };
   }
-  const stateRoot = process.env.HOME;
+  const stateRoot = environment.HOME;
   if (!stateRoot) throw new Error("Antigravity read-only state is not isolated.");
   return readOnlySeatbeltSpawnSpec({
     providerName: "Antigravity",
@@ -56,10 +63,19 @@ function parseAgyLine(line: string) {
 
 async function main(io: AgyRunnerIo) {
   const request = await io.request;
-  const spec = agySpawnSpec(request);
+  // The desktop sidecar spawns this runner with the plain process
+  // environment, so a read-only turn builds its own isolated HOME here; the
+  // seatbelt state root and the isolation guard above both read it back.
+  const isolation = await ensureReadOnlyAgentEnvironment("agy", {
+    readOnly: request.sandboxMode === "readOnly",
+    workspaceRoot: request.workspaceRoot,
+    environment: process.env,
+  });
+  activeIsolation = isolation;
+  const spec = agySpawnSpec(request, isolation.environment);
   const child = spawn(spec.command, spec.arguments, {
     cwd: request.workspaceRoot,
-    env: agyEnvironment(),
+    env: agyEnvironment(isolation.environment),
     stdio: ["pipe", "pipe", "pipe"],
   });
   activeChild = child;
@@ -127,6 +143,7 @@ async function main(io: AgyRunnerIo) {
 }
 
 let activeChild: ChildProcessWithoutNullStreams | null = null;
+let activeIsolation: PreparedReadOnlyAgentEnvironment | null = null;
 const io = createRunnerIo({
   closeError: "Antigravity runner 입력이 요청 전에 닫혔습니다.",
   onClose: () => stop(activeChild),
@@ -136,4 +153,9 @@ main(io)
   .catch((caught) => {
     io.emit.error(caught instanceof Error ? caught.message : String(caught));
   })
-  .finally(() => io.close());
+  .finally(async () => {
+    const isolation = activeIsolation;
+    activeIsolation = null;
+    await isolation?.cleanup().catch(() => undefined);
+    io.close();
+  });
