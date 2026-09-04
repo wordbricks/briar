@@ -199,4 +199,18 @@ describe("DesktopShell", () => {
     renderCounter.expectRenderCounts({});
     await view.cleanup();
   });
+
+  it("renders the sidebar resizer separator in the shell", async () => {
+    const registry = harness();
+    const { view } = await mount(registry);
+    await settle(
+      () => view.container.querySelector(".sidebar-resizer") !== null,
+    );
+    const resizer = view.container.querySelector(".sidebar-resizer");
+    expect(resizer).not.toBeNull();
+    expect(resizer?.getAttribute("role")).toBe("separator");
+    expect(resizer?.getAttribute("aria-orientation")).toBe("vertical");
+    expect(resizer?.getAttribute("aria-label")).toBe("Resize sidebar");
+    await view.cleanup();
+  });
 });
