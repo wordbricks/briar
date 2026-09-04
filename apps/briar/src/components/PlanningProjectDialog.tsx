@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { AlertTriangle, Trash2 } from "lucide-react";
+import { AlertTriangle, FolderKanban, Palette, Trash2 } from "lucide-react";
 import { useI18n } from "../i18n";
 import { hasOrganizationCapability } from "../lib/organization-role";
 import type { PlanningProject, PlanningProjectStatus } from "../types";
@@ -16,6 +16,8 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 import { Spinner } from "./ui/spinner";
+import { teamIconComponent } from "./TeamIcon";
+import { TeamIconPicker } from "./TeamIconPicker";
 
 export function PlanningProjectDialog({
   onCreate,
@@ -36,6 +38,8 @@ export function PlanningProjectDialog({
     name: string;
     description: string;
     status: PlanningProjectStatus;
+    icon: string | null;
+    color: string | null;
   }) => Promise<unknown>;
   onOpenChange: (open: boolean) => void;
   open: boolean;
@@ -46,6 +50,9 @@ export function PlanningProjectDialog({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<PlanningProjectStatus>("planned");
+  const [icon, setIcon] = useState<string | null>(null);
+  const [color, setColor] = useState<string | null>(null);
+  const [isIconPickerOpen, setIsIconPickerOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -56,6 +63,9 @@ export function PlanningProjectDialog({
     setName(project?.name ?? "");
     setDescription(project?.description ?? "");
     setStatus(project?.status ?? "planned");
+    setIcon(project?.icon ?? null);
+    setColor(project?.color ?? null);
+    setIsIconPickerOpen(false);
     setConfirmingDelete(false);
     setError(null);
   }, [open, project]);
@@ -79,6 +89,8 @@ export function PlanningProjectDialog({
           name: normalizedName,
           description: description.trim(),
           status,
+          icon,
+          color,
         });
       } else {
         await onCreate({
@@ -110,6 +122,7 @@ export function PlanningProjectDialog({
   };
 
   return (
+    <>
     <Dialog
       onOpenChange={(nextOpen) => {
         if (!submitting && !deleting) onOpenChange(nextOpen);
@@ -234,6 +247,58 @@ export function PlanningProjectDialog({
                 ) : null}
             </select>
           </div>
+          {project ? (
+            <div className="grid gap-2">
+              <Label>{t("planningProject.icon")}</Label>
+              <div className="flex items-center gap-3">
+                <div className="grid size-10 shrink-0 place-items-center rounded-lg border border-border bg-muted/40">
+                  {icon ? (() => {
+                    const Icon = teamIconComponent(icon);
+                    return (
+                      <Icon
+                        aria-hidden="true"
+                        size={20}
+                        strokeWidth={1.7}
+                        style={color ? { color } : undefined}
+                      />
+                    );
+                  })() : (
+                    <FolderKanban
+                      aria-hidden="true"
+                      className="text-muted-foreground"
+                      size={20}
+                      strokeWidth={1.7}
+                      style={color ? { color } : undefined}
+                    />
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    disabled={submitting}
+                    onClick={() => setIsIconPickerOpen(true)}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    <Palette aria-hidden="true" size={15} strokeWidth={1.8} />
+                    {t("planningProject.chooseIcon")}
+                  </Button>
+                  {icon ? (
+                    <Button
+                      disabled={submitting}
+                      onClick={() => { setIcon(null); setColor(null); }}
+                      size="sm"
+                      type="button"
+                      variant="ghost"
+                    >
+                      <Trash2 aria-hidden="true" size={14} strokeWidth={1.8} />
+                      {t("planningProject.removeIcon")}
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          ) : null}
           {error ? (
             <p className="text-sm text-destructive" role="alert">{error}</p>
           ) : null}
@@ -293,5 +358,17 @@ export function PlanningProjectDialog({
         )}
       </DialogContent>
     </Dialog>
+    <TeamIconPicker
+      disabled={submitting}
+      onOpenChange={setIsIconPickerOpen}
+      onSelect={async ({ name: selectedName, color: selectedColor }) => {
+        setIcon(selectedName);
+        setColor(selectedColor);
+      }}
+      open={isIconPickerOpen}
+      selectedColor={color}
+      selectedName={icon}
+    />
+    </>
   );
 }
