@@ -19,10 +19,12 @@ import {
   readGeminiOauthEmail,
   readGrokAuthSession,
   readOpencodeAccountIdentity,
+  readOpencodeGoKey,
   type GrokAuthSession,
 } from "./provider-credentials";
 
 const CLAUDE_USAGE_URL = "https://api.anthropic.com/api/oauth/usage";
+const OPENCODE_USAGE_URL = "https://opencode.ai/zen/go/v1/usage";
 const AGY_LOAD_ASSIST_URL =
   "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist";
 const AGY_QUOTA_URL =
@@ -30,6 +32,9 @@ const AGY_QUOTA_URL =
 const GROK_DEFAULT_PROXY_BASE = "https://cli-chat-proxy.grok.com/v1";
 const GROK_WEEKLY_MINUTES = 10_080;
 const GROK_MONTHLY_MINUTES = 43_200;
+const OPENCODE_ROLLING_MINUTES = 300;
+const OPENCODE_WEEKLY_MINUTES = 10_080;
+const OPENCODE_MONTHLY_MINUTES = 43_200;
 const DEFAULT_CACHE_TTL_MS = 5 * 60_000;
 const DEFAULT_PROBE_TIMEOUT_MS = 10_000;
 
@@ -959,14 +964,123 @@ async function loadAgyUsage(
   return providerWithoutUsage("unavailable", "Antigravity 로그인이 필요합니다.");
 }
 
+const parseOpencodeUsageWindow = (
+  value: unknown,
+  minutes: number,
+): AgentUsageWindow | null => {
+  const entry = objectOrNull(value);
+  if (!entry) return null;
+  const percent = typeof entry.percent === "number" ? entry.percent : null;
+  if (percent === null || !Number.isFinite(percent)) return null;
+  return {
+    usedPercent: clampPercent(percent),
+    windowMinutes: minutes,
+    resetsAt: typeof entry.resetsAt === "string"
+      ? parseIsoMillis(entry.resetsAt)
+      : parseResetTimestamp(entry.resetsAt),
+  };
+};
+
+export function parseOpencodeUsageResponse(body: unknown): ProviderUsageResult {
+  const windows = objectOrNull(objectOrNull(body)?.usage);
+  if (!windows) {
+    return { usage: null, error: "OpenCode usage 응답을 읽지 못했습니다." };
+  }
+  const session = parseOpencodeUsageWindow(
+    windows.rolling,
+    OPENCODE_ROLLING_MINUTES,
+  );
+  const weekly = parseOpencodeUsageWindow(
+    windows.weekly,
+    OPENCODE_WEEKLY_MINUTES,
+  );
+  const monthly = parseOpencodeUsageWindow(
+    windows.monthly,
+    OPENCODE_MONTHLY_MINUTES,
+  );
+  if (!session && !weekly && !monthly) {
+    return { usage: null, error: "OpenCode 계정에 usage 정보가 없습니다." };
+  }
+  return { usage: okUsage({ session, weekly, monthly }), error: null };
+}
+
+export type OpencodeUsageError = {
+  message: string;
+  reauthenticationRequired: boolean;
+};
+
+export function opencodeUsageErrorForStatus(
+  status: number,
+): OpencodeUsageError {
+  // The Go key comes straight from `auth.json`, so the API rejecting it means
+  // the stored login itself is no longer valid.
+  if (status === 401 || status === 403) {
+    return {
+      message:
+        "OpenCode 인증이 거부되었습니다. `opencode auth login`을 실행해 다시 로그인하세요.",
+      reauthenticationRequired: true,
+    };
+  }
+  return {
+    message: `OpenCode usage를 불러오지 못했습니다. HTTP ${status}`,
+    reauthenticationRequired: false,
+  };
+}
+
+export async function probeOpencodeUsage(
+  apiKey: string,
+  timeoutMs = DEFAULT_PROBE_TIMEOUT_MS,
+  fetchImpl: typeof fetch = fetch,
+): Promise<ProviderUsageReport | OpencodeUsageError> {
+  try {
+    const response = await fetchImpl(OPENCODE_USAGE_URL, {
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        Accept: "application/json",
+      },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!response.ok) return opencodeUsageErrorForStatus(response.status);
+    const parsed = parseOpencodeUsageResponse(await response.json());
+    return parsed.usage ??
+      { message: parsed.error, reauthenticationRequired: false };
+  } catch (error) {
+    return {
+      message: `OpenCode usage를 불러오지 못했습니다: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      reauthenticationRequired: false,
+    };
+  }
+}
+
 async function loadOpencodeUsage(
   home: string,
   binary: string | null,
+  timeoutMs: number,
+  fetchImpl: typeof fetch,
 ): Promise<ProviderUsageReport> {
   const identity = await readOpencodeAccountIdentity(home, binary !== null);
-  return identity.authenticated
-    ? connectedWithoutWindows(identity.accountLabel)
-    : providerWithoutUsage("unavailable", "OpenCode CLI가 필요합니다.");
+  if (!identity.authenticated) {
+    return providerWithoutUsage("unavailable", "OpenCode CLI가 필요합니다.");
+  }
+  const apiKey = await readOpencodeGoKey(home);
+  // Without a Go key there is no usage API to call; the account stays
+  // connected exactly as before instead of failing the probe.
+  if (!apiKey) return connectedWithoutWindows(identity.accountLabel);
+  const result = await probeOpencodeUsage(apiKey, timeoutMs, fetchImpl);
+  if ("status" in result) {
+    return { ...result, accountLabel: identity.accountLabel, authenticated: true };
+  }
+  return {
+    ...providerWithoutUsage(
+      "error",
+      result.message,
+      identity.accountLabel,
+      !result.reauthenticationRequired,
+    ),
+    reauthenticationRequired: result.reauthenticationRequired,
+  };
 }
 
 function loadCursorUsage(binary: string | null): ProviderUsageReport {
@@ -1019,7 +1133,9 @@ export async function loadProviderUsage(
   if (provider === "agy") {
     return loadAgyUsage(home, binary, now, timeoutMs, fetchImpl);
   }
-  if (provider === "opencode") return loadOpencodeUsage(home, binary);
+  if (provider === "opencode") {
+    return loadOpencodeUsage(home, binary, timeoutMs, fetchImpl);
+  }
   if (provider === "cursor") return loadCursorUsage(binary);
   return loadOpenrouterUsage(options.openrouterConfigured === true);
 }
