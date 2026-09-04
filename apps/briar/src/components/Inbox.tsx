@@ -1,3 +1,4 @@
+import { useAtomValue } from "@effect/atom-react";
 import {
   useCallback,
   useEffect,
@@ -32,11 +33,17 @@ import { autoHuntWorkflowStageCatalog } from "../lib/auto-hunt-contract";
 import type { Project } from "../types";
 import { TeamIcon } from "./TeamIcon";
 import {
+  inboxMessageAtom,
+  inboxMessagesByIdAtom,
+  type InboxMessageSummary,
+} from "../state/inbox/atoms";
+import {
   classifyInboxMessage,
   type InboxCategory,
   type InboxIssueMessage,
   type InboxMessageWithReadState,
 } from "../state/inbox/model";
+import { useRegistry } from "../state/registry";
 
 /** Number of filtered inbox rows revealed per page while scrolling. */
 export const INBOX_PAGE_SIZE = 50;
@@ -77,6 +84,15 @@ export function nextInboxVisibleCount(
   return Math.min(currentVisibleCount + pageSize, totalCount);
 }
 
+/*
+  The list takes summaries, not messages.
+
+  Filtering, counting, paging and keyboard order need four facts about each
+  message — which project, which class, read or not, and its id — and every row
+  reads its own contents from `inboxMessageAtom(id)`. That split is what makes a
+  notification whose text changed re-render one row rather than the whole list:
+  the summary array keeps its reference, so this component is not woken at all.
+*/
 export function Inbox({
   companionMode = false,
   desktopEmbedded = false,
@@ -93,7 +109,7 @@ export function Inbox({
   companionMode?: boolean;
   desktopEmbedded?: boolean;
   isSidebarOpen: boolean;
-  messages: InboxMessageWithReadState[];
+  messages: readonly InboxMessageSummary[];
   onMarkAllRead: () => void;
   onMarkRead: (messageId: string) => void;
   onMarkUnread?: (messageId: string) => void;
@@ -103,6 +119,7 @@ export function Inbox({
   unreadCount: number;
 }) {
   const { localeTag, t } = useI18n();
+  const registry = useRegistry();
   // Mobile companion shows one chronological feed; desktop keeps category filters.
   const [activeFilters, setActiveFilters] = useState<Set<InboxCategory>>(
     () =>
@@ -151,9 +168,7 @@ export function Inbox({
     () =>
       projectMessages.reduce<Record<InboxCategory, number>>(
         (counts, message) => {
-          if (message.isUnread) {
-            counts[classifyInboxMessage(message)] += 1;
-          }
+          if (message.isUnread) counts[message.category] += 1;
           return counts;
         },
         { urgent: 0, action_required: 0, important: 0, activity: 0 },
@@ -164,7 +179,7 @@ export function Inbox({
     () =>
       projectMessages.filter(
         (message) =>
-          activeFilters.has(classifyInboxMessage(message)) &&
+          activeFilters.has(message.category) &&
           (!showUnreadOnly || message.isUnread),
       ),
     [activeFilters, projectMessages, showUnreadOnly],
@@ -186,10 +201,6 @@ export function Inbox({
     () => visibleMessages.map((message) => message.id),
     [visibleMessages],
   );
-  const visibleMessagesById = useMemo(
-    () => new Map(visibleMessages.map((message) => [message.id, message])),
-    [visibleMessages],
-  );
   const hasMore = visibleMessages.length < filteredMessages.length;
 
   useEffect(() => {
@@ -204,7 +215,9 @@ export function Inbox({
     itemIds: visibleMessageIds,
     onCursorIdChange: setCursorMessageId,
     onSelectedIdChange: (messageId) => {
-      const message = visibleMessagesById.get(messageId);
+      // Read rather than subscribe: the list holds ids, the store holds
+      // contents, and this needs the contents only at the moment of a keypress.
+      const message = registry.get(inboxMessagesByIdAtom).get(messageId);
       if (message) onOpen(message);
     },
     orientation: "vertical",
@@ -453,12 +466,11 @@ export function Inbox({
             >
               {visibleMessages.map((message) => (
                 <InboxMessageRow
-                  category={classifyInboxMessage(message)}
                   compact={companionMode}
                   current={message.id === cursorMessageId}
                   key={message.id}
                   localeTag={localeTag}
-                  message={message}
+                  messageId={message.id}
                   onCursorChange={setCursorMessageId}
                   onMarkRead={onMarkRead}
                   onMarkUnread={onMarkUnread}
@@ -522,8 +534,37 @@ function FilterIcon({ category }: { category: InboxCategory }) {
   return <Clock3 aria-hidden="true" size={14} />;
 }
 
+interface InboxMessageRowProps {
+  compact: boolean;
+  current: boolean;
+  localeTag: string;
+  onCursorChange: (messageId: string) => void;
+  onMarkRead: (messageId: string) => void;
+  onMarkUnread: (messageId: string) => void;
+  onOpen: (message: InboxMessageWithReadState) => void;
+  openButtonRef: (element: HTMLButtonElement | null) => void;
+  project: Project | undefined;
+  selected: boolean;
+  t: (key: MessageKey, values?: Record<string, string | number>) => string;
+}
+
+/**
+ * One row, subscribed to its own message. The list hands it an id and nothing
+ * else about the contents, so an edit to this notification renders this row and
+ * nothing above it.
+ */
 function InboxMessageRow({
-  category,
+  messageId,
+  ...props
+}: InboxMessageRowProps & { messageId: string }) {
+  const message = useAtomValue(inboxMessageAtom(messageId));
+  // A message the store dropped between the list's read and this one: the list
+  // is about to re-render without it.
+  if (!message) return null;
+  return <InboxMessageRowContent {...props} message={message} />;
+}
+
+function InboxMessageRowContent({
   compact,
   current,
   localeTag,
@@ -536,21 +577,8 @@ function InboxMessageRow({
   project,
   selected,
   t,
-}: {
-  category: InboxCategory;
-  compact: boolean;
-  current: boolean;
-  localeTag: string;
-  message: InboxMessageWithReadState;
-  onCursorChange: (messageId: string) => void;
-  onMarkRead: (messageId: string) => void;
-  onMarkUnread: (messageId: string) => void;
-  onOpen: (message: InboxMessageWithReadState) => void;
-  openButtonRef: (element: HTMLButtonElement | null) => void;
-  project: Project | undefined;
-  selected: boolean;
-  t: (key: MessageKey, values?: Record<string, string | number>) => string;
-}) {
+}: InboxMessageRowProps & { message: InboxMessageWithReadState }) {
+  const category = classifyInboxMessage(message);
   const showUnreadAction = message.isUnread && category !== "activity";
   const showMarkUnreadAction = !compact && !message.isUnread;
   const showReadStateAction = showUnreadAction || showMarkUnreadAction;

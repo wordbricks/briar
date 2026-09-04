@@ -68,8 +68,6 @@ import {
   channelInboxSyncSignalAtom,
   conversationInboxSyncSignalAtom,
   inboxMessagesAtom,
-  visibleInboxMessagesAtom,
-  visibleInboxUnreadCountAtom,
 } from "../../state/inbox/atoms";
 import { runAtom } from "../../state/entities/runs";
 import { useIssueActions } from "../../state/issues/actions";
@@ -252,7 +250,6 @@ export function DesktopPages({
   const conversationInboxSyncSignal = useAtomValue(
     conversationInboxSyncSignalAtom,
   );
-  const visibleInboxMessages = useAtomValue(visibleInboxMessagesAtom);
   const inbox = useInboxActions();
   const activePage = useAtomValue(activePageAtom);
   const activeProjectForTabs = useAtomValue(activeTeamForTabsAtom);
@@ -336,7 +333,6 @@ export function DesktopPages({
     changeTeamScheduleTab,
     startTeamCreation,
   } = useTeamActions();
-  const visibleInboxUnreadCount = useAtomValue(visibleInboxUnreadCountAtom);
   const { removeProject } = useWorkspaceActions();
   const { deleteAccount, logout, updateAccountProfile } = useSessionActions();
   const { ensureTeamSelected, selectTeam } = useTeamActions();
@@ -539,18 +535,6 @@ export function DesktopPages({
         <InboxWithSelection
           desktopEmbedded
           isSidebarOpen={isSidebarOpen}
-          messages={visibleInboxMessages}
-          onMarkAllRead={
-            lockedTeamId
-              ? () => {
-                  for (const message of visibleInboxMessages) {
-                    if (message.isUnread) inbox.markRead(message.id);
-                  }
-                }
-              : inbox.markAllRead
-          }
-          onMarkRead={inbox.markRead}
-          onMarkUnread={inbox.markUnread}
           onOpen={(message) => {
             const target = inboxNotificationTarget(message);
             inbox.markRead(message.id);
@@ -573,7 +557,6 @@ export function DesktopPages({
             setInboxDetailTarget(target);
           }}
           projects={activeOrganizationProjects}
-          unreadCount={visibleInboxUnreadCount}
         />
         <div
           aria-label={t("inbox.resizeDetailPane")}

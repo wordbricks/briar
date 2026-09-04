@@ -20,6 +20,7 @@ import {
   inboxMessageSnapshotsEqual,
   isInboxMessageUnread,
   reuseInboxMessageIdentities,
+  type InboxCategory,
   type InboxMessage,
   type InboxMessageWithReadState,
   type InboxSource,
@@ -319,6 +320,62 @@ export const visibleInboxMessagesAtom = Atom.make(
 export const visibleInboxUnreadCountAtom = Atom.make((get): number =>
   countActionableUnread(get(visibleInboxMessagesAtom)),
 ).pipe(Atom.keepAlive, Atom.withLabel("inbox/visibleUnreadCount"));
+
+/**
+ * What the list needs of a message to filter, count, order and key it — and
+ * nothing else. The rows read their own contents, so an edit to a message that
+ * left its class and its read state alone does not reach the list at all.
+ */
+export interface InboxMessageSummary {
+  readonly id: string;
+  readonly projectId: string;
+  readonly category: InboxCategory;
+  readonly isUnread: boolean;
+}
+
+const sameInboxMessageSummary = (
+  left: InboxMessageSummary,
+  right: InboxMessageSummary,
+) =>
+  left.id === right.id &&
+  left.projectId === right.projectId &&
+  left.category === right.category &&
+  left.isUnread === right.isUnread;
+
+const summarizeInboxMessages = (
+  previous: readonly InboxMessageSummary[],
+  messages: readonly InboxMessageWithReadState[],
+): InboxMessageSummary[] => {
+  const previousById = new Map(
+    previous.map((summary) => [summary.id, summary]),
+  );
+  return messages.map((message) => {
+    const next: InboxMessageSummary = {
+      id: message.id,
+      projectId: message.projectId,
+      category: classifyInboxMessage(message),
+      isUnread: message.isUnread,
+    };
+    const stored = previousById.get(next.id);
+    return stored && sameInboxMessageSummary(stored, next) ? stored : next;
+  });
+};
+
+/** {@link visibleInboxMessagesAtom} as the list reads it. */
+export const visibleInboxMessageSummariesAtom = Atom.make(
+  (get): InboxMessageSummary[] =>
+    summarizeInboxMessages(
+      Option.getOrElse(
+        get.self<InboxMessageSummary[]>(),
+        (): InboxMessageSummary[] => [],
+      ),
+      get(visibleInboxMessagesAtom),
+    ),
+).pipe(
+  Atom.keepAlive,
+  Atom.withEquality<InboxMessageSummary[]>(shallowArrayEqual),
+  Atom.withLabel("inbox/visibleMessageSummaries"),
+);
 
 function countActionableUnread(
   messages: readonly InboxMessageWithReadState[],
