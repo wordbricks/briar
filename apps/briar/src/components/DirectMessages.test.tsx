@@ -39,6 +39,7 @@ describe("DirectMessages", () => {
       <I18nProvider>
         <DirectMessages
           activeChannelId={null}
+        channelCatalogCursor={0}
           channels={[]}
           currentUserId="user-1"
           isSidebarOpen
@@ -78,6 +79,7 @@ describe("DirectMessages", () => {
       <I18nProvider>
         <DirectMessages
           activeChannelId={null}
+        channelCatalogCursor={0}
           channels={[]}
           currentUserId="user-1"
           isSidebarOpen={false}

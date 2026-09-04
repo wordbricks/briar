@@ -18,6 +18,7 @@ import {
   channelCatalogCursorAtom,
   channelsLoadingAtom,
 } from "./atoms";
+import { subscribeToChannelDelta } from "./delta";
 import {
   CHANNEL_CATALOG_RETRY_MS,
   useChannelCatalogSync,
@@ -233,6 +234,39 @@ describe("useChannelCatalogSync", () => {
       registry.get(activeOrganizationChannelsAtom).map((item) => item.id),
     ).toEqual(["announcements"]);
 
+    await view.cleanup();
+  });
+
+  it("hands each page to the subscribers that ride the one loop", async () => {
+    const server = new CatalogServer();
+    server.catalogs.set("org-a", { channels: [channel("general")], cursor: 4 });
+    const registry = harness(server, "org-a");
+    const view = await mount(registry);
+    await settle();
+    const seen: ChannelDelta[] = [];
+    const unsubscribe = subscribeToChannelDelta(registry, (delta) =>
+      seen.push(delta),
+    );
+
+    const page = {
+      ...emptyDelta(5),
+      channels: [channel("announcements")],
+    };
+    server.deltas.push(page);
+    await act(async () => server.notify?.({ topic: "channels", cursor: 5 }));
+    await settle();
+
+    /*
+      The conversation had a loop of its own against this endpoint. It has a
+      subscription instead, so a page is fetched once and everything that needs
+      it sees the same one — after the catalog has taken it.
+    */
+    expect(seen.map((delta) => delta.cursor)).toEqual([5]);
+    expect(
+      registry.get(activeOrganizationChannelsAtom).map((item) => item.id),
+    ).toEqual(["announcements", "general"]);
+
+    unsubscribe();
     await view.cleanup();
   });
 

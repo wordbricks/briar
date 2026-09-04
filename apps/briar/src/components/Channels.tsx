@@ -54,7 +54,6 @@ import {
   createChannelWebhook,
   listDirectMessageRecipients,
   listChannelWebhooks,
-  listChannels,
   loadChannel,
   markChannelRead,
   revokeChannelWebhook,
@@ -183,7 +182,11 @@ import {
   type ChannelConversationLoader,
 } from "../state/channel-conversation/loader";
 import { useChannelConversationSync } from "../state/channel-conversation/useChannelConversationSync";
-import { useChannelConversationTyping } from "../state/channel-conversation/useChannelConversationTyping";
+import { ChannelActivityPublisher } from "../state/channel-conversation/activity";
+import {
+  ChannelMessageTypingStrip,
+  ChannelThreadTypingStrip,
+} from "./ChannelTypingStrip";
 import {
   resetChannelConversationViewState,
   writeChannelAgentReplies,
@@ -199,7 +202,8 @@ type ChannelsProps = {
   channels: ChannelSummary[];
   projects?: readonly Pick<Project, "id" | "name" | "organizationId">[];
   activeChannelId: string | null;
-  channelCatalogCursor?: number | null;
+  /** The catalog cursor, or `null` while the catalog has not landed yet. */
+  channelCatalogCursor: number | null;
   onChannelSelect: (channelId: string | null) => void;
   onChannelFallback?: (channelId: string | null) => void;
   onChannelsChange: Dispatch<SetStateAction<ChannelSummary[]>>;
@@ -390,7 +394,6 @@ export function Channels({
   const {
     agents,
     members,
-    replies,
     threadMessages,
     threadParentId,
   } = useChannelConversationView(activeChannelId);
@@ -407,7 +410,6 @@ export function Channels({
     onViewingChannelChange?.(activeChannelId, threadParentId);
     return () => onViewingChannelChange?.(null, null);
   }, [activeChannelId, onViewingChannelChange, threadParentId]);
-  const [channelListReady, setChannelListReady] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteIsInitial, setInviteIsInitial] = useState(false);
   const [inviteMembers, setInviteMembers] = useState<OrganizationMember[]>([]);
@@ -438,7 +440,6 @@ export function Channels({
     min: channelThreadWidthMin,
     save: saveChannelThreadWidth,
   });
-  const cursor = useRef(0);
   const channelDataVersion = useRef(0);
   const authoritativeLoadVersion = useRef<number | null>(null);
   const messagesScrollRef = useRef<HTMLDivElement | null>(null);
@@ -464,6 +465,11 @@ export function Channels({
     scrollerRef: messagesScrollRef,
   });
 
+  /*
+    The catalog is `state/channels`' and one loop keeps it current, so "is the
+    list ready" is a read of its cursor rather than a fetch this view starts.
+  */
+  const channelListReady = channelCatalogCursor !== null;
   const activeChannel = useMemo(
     () => channels.find((channel) => channel.id === activeChannelId) ?? null,
     [channels, activeChannelId],
@@ -480,21 +486,6 @@ export function Channels({
     },
     [onChannelsChange],
   );
-  const applyChannelCatalogDelta = useCallback(
-    (delta: ChannelDelta) => {
-      onChannelsChange((current) => {
-        const byId = new Map(
-          (delta.reset ? [] : current).map((item) => [item.id, item]),
-        );
-        for (const item of delta.channels) byId.set(item.id, item);
-        for (const id of delta.removedChannelIds) byId.delete(id);
-        return [...byId.values()].sort((left, right) =>
-          left.name.localeCompare(right.name)
-        );
-      });
-    },
-    [onChannelsChange],
-  );
   const handleSelectedChannelRemoved = useCallback(() => {
     const remaining = channels.filter((item) => item.id !== activeChannelId);
     onChannelFallback(remaining[0]?.id ?? null);
@@ -502,10 +493,6 @@ export function Channels({
   const handleIncomingRootMessages = useCallback(() => {
     requestStickToBottomIfAtBottom();
   }, [requestStickToBottomIfAtBottom]);
-  const channelDeltaIsBlocked = useCallback(
-    () => authoritativeLoadVersion.current != null,
-    [],
-  );
   /*
     The conversation's writes, its realtime transport and its typing strips are
     `state/channel-conversation`'s. What this view still decides is what the
@@ -557,12 +544,6 @@ export function Channels({
     channelProposalProjectsAtom(activeChannelId ?? ""),
   );
   const {
-    threadActivityByAgentName,
-    threadTypingAgentNames,
-    typingActivityByAgentName,
-    typingAgentNames,
-  } = useChannelConversationTyping(activeChannelId);
-  const {
     loadCreateExecutionProposalContext,
     loadExecutionProposalContext,
     loadSkillExecutionProposalContext,
@@ -571,15 +552,9 @@ export function Channels({
   useChannelConversationSync({
     enabled: true,
     channelId: activeChannelId,
-    catalogCursor: cursor,
-    catalogReady: channelListReady,
-    syncSignal: channelInboxSyncSignal,
     includeRepliesInRoot: surface === "dm",
-    isBlocked: channelDeltaIsBlocked,
-    onCatalogDelta: applyChannelCatalogDelta,
     onSelectedChannelRemoved: handleSelectedChannelRemoved,
     onIncomingRootMessages: handleIncomingRootMessages,
-    warningLabel: "Channel delta refresh failed",
   });
 
   const activeChannelName = activeChannel && surface === "dm"
@@ -888,47 +863,6 @@ export function Channels({
     [activeChannelId, onChannelsChange, organizationId, token],
   );
 
-  useEffect(() => {
-    if (channelCatalogCursor !== undefined) {
-      cursor.current = channelCatalogCursor ?? 0;
-      setChannelListReady(channelCatalogCursor !== null);
-      return;
-    }
-    let cancelled = false;
-    cursor.current = 0;
-    setChannelListReady(false);
-    conversationLoader.clearProposalHistory(activeChannelIdRef.current);
-    void (async () => {
-      try {
-        const result = await listChannels(token, organizationId);
-        if (cancelled) return;
-        cursor.current = result.cursor;
-        onChannelsChange(result.channels);
-        setChannelListReady(true);
-        if (!activeChannelIdRef.current) {
-          onChannelFallback(result.channels[0]?.id ?? null);
-        }
-      } catch (cause) {
-        if (!cancelled) {
-          toast(errorMessage(cause), { tone: "error" });
-          // A channel detail can still load from the parent's last catalog;
-          // polling from cursor zero will reconcile once connectivity returns.
-          setChannelListReady(true);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    channelCatalogCursor,
-    conversationLoader,
-    onChannelFallback,
-    onChannelsChange,
-    organizationId,
-    toast,
-    token,
-  ]);
 
   useEffect(() => {
     preparedChannelId.current = null;
@@ -1266,44 +1200,6 @@ export function Channels({
     other half of what defeated the row memo; returning the previous one when
     the content matches lets an unrelated tick pass a row by.
   */
-  const typingNamesCache = useRef(new Map<string, string[]>());
-  const typingActivityCache = useRef(
-    new Map<string, Readonly<Record<string, ChannelAgentActivityDescriptor>>>(),
-  );
-  const rowTypingAgentNames = useCallback(
-    (messageId: string) => {
-      const next = typingAgentNames(messageId);
-      const previous = typingNamesCache.current.get(messageId);
-      if (
-        previous &&
-        previous.length === next.length &&
-        previous.every((name, index) => name === next[index])
-      ) {
-        return previous;
-      }
-      typingNamesCache.current.set(messageId, next);
-      return next;
-    },
-    [typingAgentNames],
-  );
-  const rowTypingActivity = useCallback(
-    (messageId: string) => {
-      const next = typingActivityByAgentName(messageId);
-      const previous = typingActivityCache.current.get(messageId);
-      const nextKeys = Object.keys(next);
-      if (
-        previous &&
-        Object.keys(previous).length === nextKeys.length &&
-        nextKeys.every((key) => previous[key] === next[key])
-      ) {
-        return previous;
-      }
-      typingActivityCache.current.set(messageId, next);
-      return next;
-    },
-    [typingActivityByAgentName],
-  );
-
   /*
     Everything a row needs that is not its own message, as one object.
 
@@ -1331,8 +1227,6 @@ export function Channels({
       proposalProjects,
       threadParentId,
       token,
-      typingActivityByAgentName: rowTypingActivity,
-      typingAgentNames: rowTypingAgentNames,
     }),
     [
       acceptingProposalId,
@@ -1349,8 +1243,6 @@ export function Channels({
       projects,
       proposalProjects,
       requestedMessage?.messageId,
-      rowTypingActivity,
-      rowTypingAgentNames,
       surface,
       threadParentId,
       token,
@@ -1365,6 +1257,7 @@ export function Channels({
 
   return (
     <ChannelMessageImageCacheProvider cache={imageCache}>
+      <ChannelActivityPublisher channelId={activeChannelId} />
       <div
       className={`channels${isResizingThread ? " is-resizing-thread" : ""}${
         showRequestedThreadOnly ? " channels-inbox-thread-only" : ""
@@ -1652,15 +1545,12 @@ export function Channels({
                     : null
                 }
                 token={token}
-                typingAgentNames={rowTypingAgentNames(message.id)}
-                typingActivityByAgentName={rowTypingActivity(message.id)}
                 showTypingState={false}
               />
             ))}
           </div>
-          <ChannelTypingState
-            agentNames={threadTypingAgentNames}
-            activityByAgentName={threadActivityByAgentName}
+          <ChannelThreadTypingStrip
+            channelId={activeChannelId ?? ""}
             className="channel-thread-typing"
           />
           <Composer
@@ -2999,10 +2889,6 @@ export interface ChannelMessageRowContext {
   readonly proposalProjects: Readonly<Record<string, string>>;
   readonly threadParentId: string | null;
   readonly token: string;
-  readonly typingActivityByAgentName: (
-    messageId: string,
-  ) => Readonly<Record<string, ChannelAgentActivityDescriptor>>;
-  readonly typingAgentNames: (messageId: string) => string[];
 }
 
 /**
@@ -3055,8 +2941,6 @@ export const ChannelMessageRow = memo(function ChannelMessageRow({
       }
       showTypingState={message.id !== context.threadParentId}
       token={context.token}
-      typingActivityByAgentName={context.typingActivityByAgentName(message.id)}
-      typingAgentNames={context.typingAgentNames(message.id)}
     />
   );
 });
@@ -3079,8 +2963,6 @@ export const MessageRow = memo(function MessageRow({
   projects,
   selectedProjectId,
   token,
-  typingAgentNames,
-  typingActivityByAgentName,
   showTypingState = true,
 }: {
   acceptingProposal: boolean;
@@ -3105,8 +2987,6 @@ export const MessageRow = memo(function MessageRow({
   projects: readonly Pick<Project, "id" | "name" | "organizationId">[];
   selectedProjectId: string | null;
   token: string;
-  typingAgentNames: string[];
-  typingActivityByAgentName: Readonly<Record<string, ChannelAgentActivityDescriptor>>;
   showTypingState?: boolean;
 }) {
   const { t } = useI18n();
@@ -3470,9 +3350,9 @@ export const MessageRow = memo(function MessageRow({
           />
         ) : null}
         {showTypingState ? (
-          <ChannelTypingState
-            agentNames={typingAgentNames}
-            activityByAgentName={typingActivityByAgentName}
+          <ChannelMessageTypingStrip
+            channelId={channel.id}
+            messageId={message.id}
           />
         ) : null}
       </div>
@@ -3491,13 +3371,7 @@ export const MessageRow = memo(function MessageRow({
   previous.projects === next.projects &&
   previous.selectedProjectId === next.selectedProjectId &&
   previous.showTypingState === next.showTypingState &&
-  previous.token === next.token &&
-  JSON.stringify(previous.typingActivityByAgentName) ===
-    JSON.stringify(next.typingActivityByAgentName) &&
-  previous.typingAgentNames.length === next.typingAgentNames.length &&
-  previous.typingAgentNames.every(
-    (name, index) => name === next.typingAgentNames[index],
-  ));
+  previous.token === next.token);
 
 function Composer({
   agents,

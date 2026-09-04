@@ -130,7 +130,11 @@ import { useChannelConversationView } from "../state/channel-conversation/useCha
 import { useChannelConversationActions } from "../state/channel-conversation/actions";
 import { useChannelConversationLoader } from "../state/channel-conversation/loader";
 import { useChannelConversationSync } from "../state/channel-conversation/useChannelConversationSync";
-import { useChannelConversationTyping } from "../state/channel-conversation/useChannelConversationTyping";
+import { ChannelActivityPublisher } from "../state/channel-conversation/activity";
+import {
+  ChannelMessageTypingStrip,
+  ChannelThreadTypingStrip,
+} from "./ChannelTypingStrip";
 import {
   resetChannelConversationViewState,
   writeChannelAgentReplies,
@@ -229,7 +233,6 @@ export function CompanionChannels({
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [threadIsAwayFromBottom, setThreadIsAwayFromBottom] = useState(false);
-  const cursor = useRef(0);
   const channelSelectionVersion = useRef(0);
   const channelMessagesScrollRef = useRef<HTMLDivElement | null>(null);
   const threadMessagesScrollRef = useRef<HTMLDivElement | null>(null);
@@ -310,7 +313,6 @@ export function CompanionChannels({
   const handleIncomingRootMessages = useCallback(() => {
     requestStickToBottomIfAtBottom();
   }, [requestStickToBottomIfAtBottom]);
-  const channelDeltaIsBlocked = useCallback(() => loading, [loading]);
   /*
     The conversation's writes, its realtime transport and its typing strips are
     `state/channel-conversation`'s. The delta no longer needs this screen to
@@ -369,29 +371,20 @@ export function CompanionChannels({
     channelProposalProjectsAtom(channel?.id ?? ""),
   );
   const {
-    threadActivityByAgentName,
-    threadTypingAgentNames,
-    typingActivityByAgentName,
-    typingAgentNames,
-  } = useChannelConversationTyping(channel?.id ?? null);
-  const {
     loadCreateExecutionProposalContext,
     loadExecutionProposalContext,
     loadSkillExecutionProposalContext,
   } = conversationLoader;
   const loadChannelConversation = conversationLoader.loadConversation;
   useChannelConversationSync({
-    enabled: Boolean(channel),
+    // The catalog delta reaches this screen even with no channel open: its own
+    // list is what it draws, and it is the only view that still keeps one.
+    enabled: true,
     channelId: channel?.id ?? null,
-    catalogCursor: cursor,
-    catalogReady: Boolean(channel),
-    syncSignal: channelInboxSyncSignal,
-    isBlocked: channelDeltaIsBlocked,
     onCatalogDelta: applyChannelCatalogDelta,
     onSelectedChannelRemoved: handleSelectedChannelRemoved,
     onSelectedChannelSummary: handleSelectedChannelSummary,
     onIncomingRootMessages: handleIncomingRootMessages,
-    warningLabel: "Companion channel delta refresh failed",
   });
 
   useEffect(() => {
@@ -440,7 +433,6 @@ export function CompanionChannels({
     let cancelled = false;
     channelSelectionVersion.current += 1;
     conversationLoader.invalidateSurface(null, null);
-    cursor.current = 0;
     conversationLoader.clearProposalHistory(channelRef.current?.id ?? null);
     setChannels([]);
     setChannel(null);
@@ -454,10 +446,7 @@ export function CompanionChannels({
     void (async () => {
       try {
         const result = await listChannels(token, organizationId);
-        if (!cancelled) {
-          cursor.current = result.cursor;
-          setChannels(result.channels);
-        }
+        if (!cancelled) setChannels(result.channels);
       } catch (cause) {
         if (!cancelled) toast(channelConversationError(cause), { tone: "error" });
       } finally {
@@ -693,6 +682,8 @@ export function CompanionChannels({
   if (channel && threadParentId) {
     return (
       <ChannelMessageImageCacheProvider cache={imageCache}>
+      <ChannelActivityPublisher channelId={channel?.id ?? null} />
+        <ChannelActivityPublisher channelId={channel?.id ?? null} />
         <section
           aria-busy={threadLoading}
           className="companion-channels companion-channel-detail"
@@ -772,8 +763,6 @@ export function CompanionChannels({
                 item.proposal ? proposalProjects[item.proposal.id] ?? null : null
               }
               token={token}
-              typingAgentNames={typingAgentNames(item.id)}
-              typingActivityByAgentName={typingActivityByAgentName(item.id)}
               showTypingState={false}
             />
             ))}
@@ -791,9 +780,8 @@ export function CompanionChannels({
             />
           ) : null}
         </div>
-        <ChannelTypingState
-          agentNames={threadTypingAgentNames}
-          activityByAgentName={threadActivityByAgentName}
+        <ChannelThreadTypingStrip
+          channelId={channel.id}
           className="companion-channel-thread-typing"
         />
         <CompanionChannelComposer
@@ -811,6 +799,8 @@ export function CompanionChannels({
   if (channel) {
     return (
       <ChannelMessageImageCacheProvider cache={imageCache}>
+      <ChannelActivityPublisher channelId={channel?.id ?? null} />
+        <ChannelActivityPublisher channelId={channel?.id ?? null} />
         <section
           aria-busy={loading}
           className="companion-channels companion-channel-detail"
@@ -879,8 +869,6 @@ export function CompanionChannels({
               }
               showThreadSummary
               token={token}
-              typingAgentNames={typingAgentNames(item.id)}
-              typingActivityByAgentName={typingActivityByAgentName(item.id)}
             />
             ))}
             {!loading && messages.length === 0 ? (
@@ -1096,8 +1084,6 @@ function MessageRow({
   selectedProjectId,
   showThreadSummary = false,
   token,
-  typingAgentNames,
-  typingActivityByAgentName,
   showTypingState = true,
 }: {
   acceptingProposal: boolean;
@@ -1146,8 +1132,6 @@ function MessageRow({
   selectedProjectId: string | null;
   showThreadSummary?: boolean;
   token: string;
-  typingAgentNames: string[];
-  typingActivityByAgentName: Readonly<Record<string, ChannelAgentActivityDescriptor>>;
   showTypingState?: boolean;
 }) {
   const { localeTag, t } = useI18n();
@@ -1406,10 +1390,10 @@ function MessageRow({
           )
           : null}
         {showTypingState ? (
-          <ChannelTypingState
-            agentNames={typingAgentNames}
-            activityByAgentName={typingActivityByAgentName}
+          <ChannelMessageTypingStrip
+            channelId={message.channelId}
             className="companion-channel-typing"
+            messageId={message.id}
           />
         ) : null}
       </div>

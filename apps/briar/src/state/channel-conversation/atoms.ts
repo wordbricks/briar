@@ -278,6 +278,24 @@ export const channelPendingAgentRepliesAtom = Atom.family((channelId: string) =>
   ),
 );
 
+/**
+ * The replies still working under one root message, keyed by
+ * {@link channelMessageKey}. A typing strip reads its own message's, so a reply
+ * that moves under one message leaves every other strip's array equal and does
+ * not wake it.
+ */
+export const channelMessagePendingRepliesAtom = Atom.family((key: string) => {
+  const { channelId, messageId } = splitChannelKey(key);
+  return Atom.make((get): ChannelAgentReply[] =>
+    get(channelPendingAgentRepliesAtom(channelId)).filter(
+      (reply) => reply.parentMessageId === messageId,
+    ),
+  ).pipe(
+    Atom.withEquality<ChannelAgentReply[]>(shallowArrayEqual),
+    Atom.withLabel(`channelConversation/${key}/pendingReplies`),
+  );
+});
+
 /*
   Retention.
 */
@@ -318,17 +336,6 @@ export function touchRetained(current: string[], id: string, limit: number) {
   const overflow = Math.max(0, next.length - limit);
   return { retained: next.slice(overflow), evicted: next.slice(0, overflow) };
 }
-/**
- * The channel this window is showing, or `null` when none is open. The views
- * set it as they mount a channel, and the loader reads it to decide whether a
- * failure is worth a toast: a request that outlived the channel it belongs to
- * still writes its data, but must not interrupt whatever is on screen now.
- */
-export const openConversationChannelIdAtom = Atom.make<string | null>(null).pipe(
-  Atom.keepAlive,
-  Atom.withLabel("channelConversation/openChannelId"),
-);
-
 /**
  * The thread open inside one channel. Per channel rather than global because
  * the store keeps several channels, but the views reset it when they open a
