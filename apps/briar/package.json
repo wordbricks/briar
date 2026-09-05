@@ -37,6 +37,8 @@
     "runtime:prepare": "bun run ../../scripts/prepare-bun-sidecar.ts",
     "skills:generate": "bun run ../../scripts/generate-skill-guides.ts",
     "skills:check": "bun run ../../scripts/generate-skill-guides.ts --check",
+    "sandbox:generate": "bun run ../../scripts/generate-sandbox-runtime-assets.ts",
+    "sandbox:check": "bun run ../../scripts/generate-sandbox-runtime-assets.ts --check",
     "d1:migrate:local": "wrangler d1 migrations apply briar-db --local",
     "d1:migrate:remote": "bun run ../../scripts/apply-remote-d1-migrations.ts",
     "test:d1:migrations": "vitest run --config vitest.worker-migrations.config.ts",

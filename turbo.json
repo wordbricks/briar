@@ -100,6 +100,9 @@
     "skills:check": {
       "outputs": []
     },
+    "sandbox:check": {
+      "outputs": []
+    },
     "web:build": { "cache": false },
     "build:release": { "cache": false },
     "ios:native:project": { "cache": false },

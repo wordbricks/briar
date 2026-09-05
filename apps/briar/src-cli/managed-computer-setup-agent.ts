@@ -1,24 +1,10 @@
 import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from "node:child_process";
-import {
-  chmod,
-  lstat,
-  mkdir,
-  mkdtemp,
-  rename,
-  rm,
-  writeFile,
-} from "node:fs/promises";
 import { homedir } from "node:os";
-import { tmpdir } from "node:os";
-import { isAbsolute, join, resolve } from "node:path";
+import { join } from "node:path";
 import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
-import { timestampDate } from "@bufbuild/protobuf/wkt";
 import {
   ManagedComputerSetupSessionStatus,
 } from "@briar/contracts/gen/briar/app/v1/fleet_pb";
-import type {
-  ProjectGitHubCredential,
-} from "@briar/contracts/gen/briar/app/v1/github_pb";
 import {
   ManagedComputerSetupChallengeKind,
   ManagedComputerSetupChallengeSchema,
@@ -55,6 +41,11 @@ import { requiredMessage } from "../src/lib/app-rpc/mappers";
 import { teamSettingsFromProto } from "../src/lib/app-rpc/team-configuration-mappers";
 import { cliVersion, gitValueAt, loadConfig, saveConfig } from "./command-support";
 import { createAuthenticatedConnectClient } from "./connect-client";
+import {
+  abortError,
+  ensureRepository,
+  waitForAbort,
+} from "./project-repository-bootstrap";
 import type { ManagedComputerRemoteAgentConfig } from "./managed-computer-remote-session-agent";
 import { discoverWorkerProviderCapabilities } from "./provider-capabilities";
 import {
@@ -327,7 +318,7 @@ function commandStatus(binary: string, args: string[]) {
   return { status: result.status, stdout: result.stdout };
 }
 
-async function providerAuthenticated(provider: ManagedComputerSetupProvider) {
+export async function providerAuthenticated(provider: ManagedComputerSetupProvider) {
   if (provider === "codex") {
     return commandStatus("codex", ["login", "status"]).status === 0;
   }
@@ -343,177 +334,6 @@ class ProviderSkippedError extends Error {
     super("Provider authentication was skipped");
     this.name = "ProviderSkippedError";
   }
-}
-
-function abortError() {
-  const error = new Error("Managed computer setup was cancelled");
-  error.name = "AbortError";
-  return error;
-}
-
-function waitForAbort(signal: AbortSignal): Promise<never> {
-  return new Promise((_, reject) => {
-    if (signal.aborted) return reject(abortError());
-    signal.addEventListener("abort", () => reject(abortError()), { once: true });
-  });
-}
-
-async function runSimpleCommand(
-  binary: string,
-  args: string[],
-  signal: AbortSignal,
-  options: { cwd?: string; env?: NodeJS.ProcessEnv } = {},
-) {
-  const child = spawn(binary, args, {
-    cwd: options.cwd,
-    env: options.env ?? process.env,
-    stdio: ["ignore", "ignore", "ignore"],
-  });
-  const exited = new Promise<number>((resolveExit, rejectExit) => {
-    child.once("error", rejectExit);
-    child.once("exit", (code) => resolveExit(code ?? 1));
-  });
-  try {
-    const code = await Promise.race([exited, waitForAbort(signal)]);
-    if (code !== 0) throw new Error(`${binary} command failed`);
-  } finally {
-    if (child.exitCode === null) child.kill("SIGTERM");
-  }
-}
-
-async function pathExists(path: string) {
-  try {
-    await lstat(path);
-    return true;
-  } catch (error) {
-    if (
-      error && typeof error === "object" && "code" in error &&
-      error.code === "ENOENT"
-    ) return false;
-    throw error;
-  }
-}
-
-function githubRepositoryFromRemote(remote: string) {
-  const normalized = remote.trim().replace(/\.git$/u, "");
-  const https = normalized.match(/^https:\/\/github\.com\/([^/]+\/[^/]+)$/iu);
-  if (https) return https[1]!.toLowerCase();
-  const ssh = normalized.match(/^git@github\.com:([^/]+\/[^/]+)$/iu);
-  return ssh?.[1]?.toLowerCase() ?? null;
-}
-
-async function ensureRepository(
-  credential: ProjectGitHubCredential,
-  signal: AbortSignal,
-) {
-  const repository = credential.repository;
-  if (
-    credential.projectId.length === 0 ||
-    credential.organizationId.length === 0 ||
-    credential.repositoryId <= 0n ||
-    credential.cloneUrl !== `https://github.com/${repository}.git`
-  ) {
-    throw new Error("Managed repository credential identity is invalid");
-  }
-  const expiresAt = credential.expiresAt
-    ? timestampDate(credential.expiresAt)
-    : null;
-  if (!expiresAt || expiresAt.getTime() <= Date.now() + 30_000) {
-    throw new Error("Managed repository credential expired; restart setup to retry");
-  }
-  const configuredRoot = process.env.BRIAR_MANAGED_WORKSPACE_ROOT?.trim();
-  const workspaceRoot = configuredRoot || join(homedir(), "Briar", "projects");
-  if (!isAbsolute(workspaceRoot)) {
-    throw new Error("Managed workspace root must be absolute");
-  }
-  const repositoryName = repository.split("/")[1]!;
-  const projectRoot = join(
-    workspaceRoot,
-    credential.organizationId,
-    credential.projectId,
-  );
-  const repositoryPath = join(projectRoot, repositoryName);
-  await mkdir(projectRoot, { recursive: true, mode: 0o700 });
-  if (await pathExists(repositoryPath)) {
-    const root = gitValueAt(repositoryPath, ["rev-parse", "--show-toplevel"]);
-    const remote = gitValueAt(repositoryPath, ["remote", "get-url", "origin"]);
-    if (
-      !root || resolve(root) !== resolve(repositoryPath) || !remote ||
-      githubRepositoryFromRemote(remote) !== repository.toLowerCase()
-    ) {
-      throw new Error("Managed project directory contains a different repository");
-    }
-    const marker = gitValueAt(repositoryPath, [
-      "config",
-      "--local",
-      "--get",
-      "briar.githubRepositoryId",
-    ]);
-    if (marker && marker !== String(credential.repositoryId)) {
-      throw new Error("Managed clone has a different GitHub repository ID");
-    }
-  }
-  const credentialDirectory = await mkdtemp(join(tmpdir(), "briar-git-"));
-  const askpass = join(credentialDirectory, "askpass.sh");
-  let cloneStagingDirectory: string | null = null;
-  try {
-    await writeFile(
-      askpass,
-      "#!/bin/sh\ncase \"$1\" in\n  *Username*) printf '%s\\n' \"$BRIAR_GIT_USERNAME\" ;;\n  *) printf '%s\\n' \"$BRIAR_GIT_PASSWORD\" ;;\nesac\n",
-      { mode: 0o700 },
-    );
-    await chmod(askpass, 0o700);
-    const env = {
-      ...process.env,
-      GIT_ASKPASS: askpass,
-      GIT_TERMINAL_PROMPT: "0",
-      GCM_INTERACTIVE: "Never",
-      BRIAR_GIT_USERNAME: credential.username,
-      BRIAR_GIT_PASSWORD: credential.password,
-    };
-    if (await pathExists(repositoryPath)) {
-      await runSimpleCommand(
-        "git",
-        ["-c", "credential.helper=", "ls-remote", "--exit-code", credential.cloneUrl, "HEAD"],
-        signal,
-        { cwd: repositoryPath, env },
-      );
-    } else {
-      cloneStagingDirectory = await mkdtemp(join(projectRoot, ".briar-clone-"));
-      const checkout = join(cloneStagingDirectory, "repository");
-      await runSimpleCommand(
-        "git",
-        ["-c", "credential.helper=", "clone", "--origin", "origin", "--", credential.cloneUrl, checkout],
-        signal,
-        { env },
-      );
-      await rename(checkout, repositoryPath);
-    }
-  } finally {
-    await rm(credentialDirectory, { recursive: true, force: true });
-    if (cloneStagingDirectory) {
-      await rm(cloneStagingDirectory, { recursive: true, force: true });
-    }
-  }
-  await runSimpleCommand(
-    "git",
-    ["config", "--local", "briar.githubRepositoryId", String(credential.repositoryId)],
-    signal,
-    { cwd: repositoryPath },
-  );
-  await runSimpleCommand(
-    "git",
-    ["config", "--local", "credential.useHttpPath", "true"],
-    signal,
-    { cwd: repositoryPath },
-  );
-  await runSimpleCommand(
-    "git",
-    ["config", "--local", "credential.https://github.com.helper", "!\"${BRIAR_CLI:-briar}\" github credential"],
-    signal,
-    { cwd: repositoryPath },
-  );
-  return repositoryPath;
 }
 
 type GuidedSetupDependencies = {
