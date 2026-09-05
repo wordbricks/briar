@@ -58,8 +58,10 @@ import type {
   ServiceImpl,
 } from "@connectrpc/connect";
 import { claimNextChannelReplyWork } from "./channel-reply-claim-routes";
+import { scheduleChannelRealtimePublish } from "./realtime-scheduling";
 import {
   checkpointChannelReplySession,
+  failChannelReply,
   getClaimedChannelReply,
   getChannelReplySession,
   renewChannelReplyLease,
@@ -171,6 +173,7 @@ export type WorkerQueueServices = {
   readonly renewTeamAgentTaskLease: typeof renewTeamAgentTaskLease;
   readonly renewIssueAgentReplyLease: typeof renewIssueAgentReplyLease;
   readonly renewChannelReplyLease: typeof renewChannelReplyLease;
+  readonly failChannelReply: typeof failChannelReply;
   readonly getClaimedChannelReply: typeof getClaimedChannelReply;
   readonly checkpointChannelReplySession: typeof checkpointChannelReplySession;
   readonly renewMergeBatchLease: typeof renewMergeBatchLease;
@@ -217,6 +220,7 @@ const workerQueueServices: WorkerQueueServices = {
   renewTeamAgentTaskLease,
   renewIssueAgentReplyLease,
   renewChannelReplyLease,
+  failChannelReply,
   getClaimedChannelReply,
   checkpointChannelReplySession,
   renewMergeBatchLease,
@@ -325,6 +329,51 @@ const dmLearningPolicyFor = (input: WorkerConnectQueueInput, organizationId: str
   return policy;
 };
 
+/**
+ * The claim mutation commits before the protobuf mapping runs, so a mapping
+ * failure leaves the job `running` behind a fifteen-minute lease that no Worker
+ * is executing. Release the claim so the job requeues immediately instead of
+ * silently stalling the reply until the lease expires.
+ */
+async function channelReplyClaimMessage(
+  claim: NonNullable<Awaited<ReturnType<typeof claimNextChannelReplyWork>>>,
+  release: {
+    db: D1Database;
+    env: Env;
+    context?: ExecutionContext;
+    organizationId: string;
+    deviceId: string;
+    workerId: string;
+    services: WorkerQueueServices;
+  },
+) {
+  try {
+    return workerClaimMessage(claim);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("Channel reply claim mapping failed", {
+      workId: claim.workId,
+      channelId: claim.channelId,
+      error: message,
+    });
+    await release.services.failChannelReply(release.db, {
+      jobId: claim.workId,
+      deviceId: release.deviceId,
+      workerId: release.workerId,
+      claimTokenHash: await release.services.sha256(claim.claimToken),
+      error: message,
+      updatedAt: new Date().toISOString(),
+    });
+    scheduleChannelRealtimePublish(
+      release.env,
+      release.db,
+      release.organizationId,
+      release.context,
+    );
+    throw error;
+  }
+}
+
 async function claimWork(
   input: WorkerConnectQueueInput,
   request: {
@@ -387,7 +436,19 @@ async function claimWork(
     context: input.context,
     authenticatedWorker: worker,
   });
-  if (channelReply) return { work: workerClaimMessage(channelReply) };
+  if (channelReply) {
+    return {
+      work: await channelReplyClaimMessage(channelReply, {
+        db: input.db,
+        env: input.env,
+        context: input.context,
+        organizationId: worker.principal.organizationId,
+        deviceId: worker.principal.deviceId,
+        workerId: claimInput.workerId,
+        services,
+      }),
+    };
+  }
 
   if (!request.repliesOnly) {
     const issue = await services.claimNextQueueWork({

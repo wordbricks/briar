@@ -1508,6 +1508,7 @@ pub enum ChannelReplySessionClaimReason {
     CHANNEL_REPLY_SESSION_CLAIM_REASON_WORKER_FAILOVER_LEASE_EXPIRED = 4i32,
     CHANNEL_REPLY_SESSION_CLAIM_REASON_WORKER_FAILOVER_UNAVAILABLE_OR_INCOMPATIBLE = 5i32,
     CHANNEL_REPLY_SESSION_CLAIM_REASON_TTL_EXPIRED_REACTIVATED = 6i32,
+    CHANNEL_REPLY_SESSION_CLAIM_REASON_DESIGNATED_WORKER_CLAIMED = 7i32,
 }
 impl ChannelReplySessionClaimReason {
     ///Idiomatic alias for [`Self::CHANNEL_REPLY_SESSION_CLAIM_REASON_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -1531,6 +1532,9 @@ impl ChannelReplySessionClaimReason {
     ///Idiomatic alias for [`Self::CHANNEL_REPLY_SESSION_CLAIM_REASON_TTL_EXPIRED_REACTIVATED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const TtlExpiredReactivated: Self = Self::CHANNEL_REPLY_SESSION_CLAIM_REASON_TTL_EXPIRED_REACTIVATED;
+    ///Idiomatic alias for [`Self::CHANNEL_REPLY_SESSION_CLAIM_REASON_DESIGNATED_WORKER_CLAIMED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const DesignatedWorkerClaimed: Self = Self::CHANNEL_REPLY_SESSION_CLAIM_REASON_DESIGNATED_WORKER_CLAIMED;
 }
 impl ::core::default::Default for ChannelReplySessionClaimReason {
     fn default() -> Self {
@@ -1666,6 +1670,11 @@ impl ::buffa::Enumeration for ChannelReplySessionClaimReason {
                     Self::CHANNEL_REPLY_SESSION_CLAIM_REASON_TTL_EXPIRED_REACTIVATED,
                 )
             }
+            7i32 => {
+                ::core::option::Option::Some(
+                    Self::CHANNEL_REPLY_SESSION_CLAIM_REASON_DESIGNATED_WORKER_CLAIMED,
+                )
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -1694,6 +1703,9 @@ impl ::buffa::Enumeration for ChannelReplySessionClaimReason {
             }
             Self::CHANNEL_REPLY_SESSION_CLAIM_REASON_TTL_EXPIRED_REACTIVATED => {
                 "CHANNEL_REPLY_SESSION_CLAIM_REASON_TTL_EXPIRED_REACTIVATED"
+            }
+            Self::CHANNEL_REPLY_SESSION_CLAIM_REASON_DESIGNATED_WORKER_CLAIMED => {
+                "CHANNEL_REPLY_SESSION_CLAIM_REASON_DESIGNATED_WORKER_CLAIMED"
             }
         }
     }
@@ -1734,6 +1746,11 @@ impl ::buffa::Enumeration for ChannelReplySessionClaimReason {
                     Self::CHANNEL_REPLY_SESSION_CLAIM_REASON_TTL_EXPIRED_REACTIVATED,
                 )
             }
+            "CHANNEL_REPLY_SESSION_CLAIM_REASON_DESIGNATED_WORKER_CLAIMED" => {
+                ::core::option::Option::Some(
+                    Self::CHANNEL_REPLY_SESSION_CLAIM_REASON_DESIGNATED_WORKER_CLAIMED,
+                )
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -1746,6 +1763,7 @@ impl ::buffa::Enumeration for ChannelReplySessionClaimReason {
             Self::CHANNEL_REPLY_SESSION_CLAIM_REASON_WORKER_FAILOVER_LEASE_EXPIRED,
             Self::CHANNEL_REPLY_SESSION_CLAIM_REASON_WORKER_FAILOVER_UNAVAILABLE_OR_INCOMPATIBLE,
             Self::CHANNEL_REPLY_SESSION_CLAIM_REASON_TTL_EXPIRED_REACTIVATED,
+            Self::CHANNEL_REPLY_SESSION_CLAIM_REASON_DESIGNATED_WORKER_CLAIMED,
         ]
     }
 }

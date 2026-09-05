@@ -515,6 +515,8 @@ const sessionReason = (value: string): ChannelReplySessionClaimReason => {
       return ChannelReplySessionClaimReason.WORKER_FAILOVER_UNAVAILABLE_OR_INCOMPATIBLE;
     case "ttl_expired_reactivated":
       return ChannelReplySessionClaimReason.TTL_EXPIRED_REACTIVATED;
+    case "designated_worker_claimed":
+      return ChannelReplySessionClaimReason.DESIGNATED_WORKER_CLAIMED;
     default: throw new Error(`Worker claim has unknown session reason: ${value}`);
   }
 };

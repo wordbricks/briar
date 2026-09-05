@@ -129,6 +129,32 @@ describe("Worker claim protobuf mapper", () => {
     });
   });
 
+  // Every reason `claimNextChannelAgentReply` can write must survive the wire.
+  // `designated_worker_claimed` reached production unmapped, so the claim
+  // committed in D1 and then failed to serialize: the Worker saw a 500 and the
+  // job sat `running` behind its lease until it expired.
+  it("round-trips every session claim reason the claim query produces", () => {
+    const reasons = [
+      "session_created",
+      "worker_reused",
+      "worker_reused_runtime_changed",
+      "worker_failover_lease_expired",
+      "worker_failover_unavailable_or_incompatible",
+      "ttl_expired_reactivated",
+      "designated_worker_claimed",
+    ] as const;
+
+    for (const claimReason of reasons) {
+      const message = workerClaimMessage({
+        ...channelReply,
+        session: { ...channelReply.session, claimReason },
+      } as WorkerQueueClaim);
+      expect(claimedWorkFromProto(message)).toMatchObject({
+        session: { claimReason },
+      });
+    }
+  });
+
   it("carries the planned-update resume count on an Agent task claim", () => {
     const message = workerClaimMessage({
       ...common,
