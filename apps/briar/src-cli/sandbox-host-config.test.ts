@@ -43,7 +43,16 @@ describe("sandbox host registry", () => {
     expect(raw).not.toContain("briar_agent_");
     expect(raw).not.toContain("token");
     await removeSandboxHostEntry("gx10", root);
-    expect(await loadSandboxHostConfig(root)).toEqual({ version: 1, sandboxes: {} });
+    const afterRemove = await loadSandboxHostConfig(root);
+    expect(afterRemove.sandboxes.gx10).toMatchObject({
+      dockerContext: "briar-sandbox-gx10",
+      host: "ssh://jay@gx10",
+      teamIds: [],
+      gpus: true,
+      runtimeSha256: "",
+    });
+    await removeSandboxHostEntry("missing", root);
+    expect(Object.keys((await loadSandboxHostConfig(root)).sandboxes)).toEqual(["gx10"]);
   });
 
   it("reads a registry written before the project-to-team rename", async () => {
