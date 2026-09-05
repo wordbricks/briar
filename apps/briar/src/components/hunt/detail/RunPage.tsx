@@ -226,7 +226,7 @@ export function RunPage({
   const label = localizeStatus(t, run.status, run.workflowStage, meta.label);
   const needsAttention = ["paused", "blocked", "failed"].includes(run.status);
   const canCancelRemoteExecution = Boolean(run.workerId) && !["completed", "cancelled", "paused", "blocked", "failed"].includes(run.status);
-  const canUnassign = Boolean(onUnassignRun && (run.workerId || run.requestedWorkerId)) && !["completed", "cancelled"].includes(run.status);
+  const canUnassign = Boolean(onUnassignRun && (run.workerId || run.requestedWorkerId || run.dispatchedAt)) && !["completed", "cancelled"].includes(run.status);
   const isClaimed = run.status === "queued" && Boolean(run.leaseExpiresAt) && Date.parse(run.leaseExpiresAt!) > Date.now();
   const canReassign = Boolean(run.workerId || run.requestedWorkerId) && !["completed", "cancelled", "paused"].includes(run.status);
   const processNowDisabled = !onProcessNow || run.executionReadiness === "waiting" || run.status !== "queued" && !canReassign || isClaimed && !canReassign || isProcessing;
@@ -1293,6 +1293,10 @@ export function RunPage({
                               {t("run.viewResultEvidence")}
                             </button>
                           </div>
+                          {run.resumeRequestedAt ? <p className="paused-result-resume-hint" role="status">
+                              <Spinner aria-hidden="true" className="size-[12px]" />
+                              {t("run.resumeWaitingForWorker")}
+                            </p> : null}
                           {isReworkFormOpen ? <form className="paused-rework-form" onSubmit={event => void submitRework(event)}>
                               <div className="paused-rework-heading">
                                 <strong>{t("run.reworkTitle")}</strong>

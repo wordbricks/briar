@@ -1612,6 +1612,7 @@ button.paused-review-state { width:100%; border:0; border-radius:8px; cursor:poi
 .paused-result-actions button:hover:not(:disabled) { background:color-mix(in srgb,#4baa86 12%,var(--card)); }
 .paused-result-actions button:focus-visible { outline:2px solid var(--ring); outline-offset:2px; }
 .paused-result-actions button:disabled { cursor:default; opacity:.65; }
+.paused-result-resume-hint { margin:10px 0 0; display:flex; align-items:center; gap:6px; color:var(--muted-foreground); font-size:var(--text-2xs); line-height:1.5; }
 .paused-result-actions .paused-result-resume { border-color:var(--primary); color:var(--primary-foreground); background:var(--primary); }
 .paused-result-actions .paused-result-resume:hover:not(:disabled) { background:color-mix(in srgb,var(--primary) 88%,#000); }
 .paused-result-actions .paused-result-rework { border-color:color-mix(in srgb,var(--warning) 62%,var(--border)); color:color-mix(in srgb,var(--warning) 72%,var(--foreground)); background:color-mix(in srgb,var(--warning) 10%,var(--card)); }
