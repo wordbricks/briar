@@ -91,6 +91,7 @@ const sidebarChannel = (
   pinnedAt: null,
   sidebarSectionId: null,
   hiddenAt: null,
+  readOnly: false,
 });
 
 describe("Sidebar", () => {
@@ -292,6 +293,7 @@ describe("Sidebar", () => {
             pinnedAt: null,
             sidebarSectionId: null,
             hiddenAt: null,
+            readOnly: false,
           },
         ]}
         onChannelCreate={onChannelCreate}

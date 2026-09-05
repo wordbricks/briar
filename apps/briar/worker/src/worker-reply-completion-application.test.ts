@@ -6,6 +6,7 @@ import {
 } from "@briar/contracts/gen/briar/types/v1/provider_block_pb";
 import {
   ChannelReplyClaimIdentitySchema,
+  ChannelReplyAgentMessageActionSchema,
   ChannelReplyArtifactsActionSchema,
   ChannelReplyDocumentActionSchema,
   ChannelReplyIssueActionSchema,
@@ -738,6 +739,46 @@ describe("reply completion application", () => {
     ).bind(claim.workId).first()).resolves.toEqual({
       document_count: 1,
       proposal_count: 1,
+    });
+  });
+
+  // Phase 0 only ships the contract: the Agent-to-Agent DM, the relay rows and
+  // the hop guards do not exist yet, so the action is refused rather than
+  // half-applied. Phase 2 replaces this with the round trip.
+  it("refuses an Agent message until the round trip exists", async () => {
+    const claim = await seedChannelClaim();
+    const completion = completeChannelReplyInputFromProto(create(
+      CompleteChannelReplyRequestSchema,
+      {
+        requestId: crypto.randomUUID(),
+        projectId,
+        workerId,
+        work: channelIdentity(claim),
+        outcome: {
+          case: "success",
+          value: {
+            body: "Sure, I'll ask them.",
+            action: {
+              case: "agentMessage",
+              value: create(ChannelReplyAgentMessageActionSchema, {
+                agentId: crypto.randomUUID(),
+                body: "Please check the ticker now.",
+              }),
+            },
+          },
+        },
+      },
+    ));
+
+    await expect(completeChannelReplyApplication({
+      db,
+      env: env(),
+      worker,
+      request: completion,
+      observedAt: at(240 + sequence),
+    })).rejects.toMatchObject({
+      reason: "invalid_request",
+      message: "Agent messages are not available for this reply",
     });
   });
 

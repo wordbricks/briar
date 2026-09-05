@@ -63,6 +63,7 @@ const general: ChannelSummary = {
   pinnedAt: null,
   sidebarSectionId: null,
   hiddenAt: null,
+  readOnly: false,
 };
 
 const channelSummaryWire = (channel: ChannelSummary) => ({

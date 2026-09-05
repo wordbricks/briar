@@ -417,6 +417,7 @@ export function completeChannelReplyInputFromProto(
   let executionProposal: ChannelReplyCompletion["executionProposal"] = null;
   let skillExecutionProposal: ChannelReplyCompletion["skillExecutionProposal"] = null;
   let delegation: ChannelReplyCompletion["delegation"] = null;
+  let agentMessage: ChannelReplyCompletion["agentMessage"] = null;
   switch (success.action.case) {
     case undefined:
       break;
@@ -479,6 +480,12 @@ export function completeChannelReplyInputFromProto(
         request: success.action.value.request,
       };
       break;
+    case "agentMessage":
+      agentMessage = {
+        agentId: success.action.value.agentId,
+        body: success.action.value.body,
+      };
+      break;
     default:
       throw new ReplyCompletionMappingError("Channel reply action is unknown");
   }
@@ -494,6 +501,7 @@ export function completeChannelReplyInputFromProto(
     executionProposal,
     skillExecutionProposal,
     delegation,
+    agentMessage,
   }), "Channel reply result is invalid");
   return {
     requestId: requestId(request.requestId),

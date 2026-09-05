@@ -38,6 +38,9 @@
     "DM_MEMORY_INDEX_ENABLED": "true",
     "DM_MEMORY_RETRIEVAL_ENABLED": "true",
     "DM_MEMORY_MINIMUM_SCORE": "0.5",
+    // Agent-to-Agent turns (the recipient's run plus the sender's relay run)
+    // one organization may spend per hour.
+    "AGENT_MESSAGE_HOURLY_LIMIT": "30",
     "APNS_TEAM_ID": "QFJZ2V3829",
     "MANAGED_COMPUTER_AWS_REGION": "us-east-1",
     "MANAGED_COMPUTER_AWS_LAUNCH_TEMPLATE_ID": "lt-0bf7a358da7b03e93",

@@ -29,6 +29,8 @@ open class BriarAPI_ChannelServiceClientMock: BriarAPI_ChannelServiceClientInter
     public var mockAsyncListDirectMessageRecipients = { (_: BriarAPI_ListDirectMessageRecipientsRequest) -> ResponseMessage<BriarAPI_ListDirectMessageRecipientsResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `createDirectMessage()`.
     public var mockAsyncCreateDirectMessage = { (_: BriarAPI_CreateDirectMessageRequest) -> ResponseMessage<BriarAPI_CreateDirectMessageResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `listAgentDirectMessages()`.
+    public var mockAsyncListAgentDirectMessages = { (_: BriarAPI_ListAgentDirectMessagesRequest) -> ResponseMessage<BriarAPI_ListAgentDirectMessagesResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `createChannel()`.
     public var mockAsyncCreateChannel = { (_: BriarAPI_CreateChannelRequest) -> ResponseMessage<BriarAPI_CreateChannelResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `updateChannel()`.
@@ -106,6 +108,10 @@ open class BriarAPI_ChannelServiceClientMock: BriarAPI_ChannelServiceClientInter
 
     open func `createDirectMessage`(request: BriarAPI_CreateDirectMessageRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CreateDirectMessageResponse> {
         return self.mockAsyncCreateDirectMessage(request)
+    }
+
+    open func `listAgentDirectMessages`(request: BriarAPI_ListAgentDirectMessagesRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ListAgentDirectMessagesResponse> {
+        return self.mockAsyncListAgentDirectMessages(request)
     }
 
     open func `createChannel`(request: BriarAPI_CreateChannelRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CreateChannelResponse> {

@@ -178,6 +178,7 @@ describe("channel message contract", () => {
       proposal: null,
       executionProposal: null,
       skillExecutionProposal: null,
+      relay: null,
       createdAt: "2026-08-16T00:00:00.000Z",
     };
 
@@ -231,6 +232,7 @@ describe("channel message contract", () => {
       proposal: null,
       executionProposal: null,
       skillExecutionProposal: null,
+      relay: null,
       createdAt: "2026-09-04T07:09:36.842Z",
     };
 
@@ -305,6 +307,7 @@ describe("channel reply completion contract", () => {
     executionProposal: null,
     skillExecutionProposal: null,
     delegation: null,
+    agentMessage: null,
     ...overrides,
   });
 
@@ -374,6 +377,59 @@ describe("channel reply completion contract", () => {
       },
     ));
     expect(expanded).toBe(false);
+  });
+
+  it("accepts one bounded Agent-to-Agent message", () => {
+    expect(decode(channelReplyCompletionSchema, completion(
+      "Sure, I'll ask them.",
+      {
+        agentMessage: {
+          agentId,
+          body: "  Please check the ticker now.  ",
+        },
+      },
+    ))).toMatchObject({
+      agentMessage: { agentId, body: "Please check the ticker now." },
+    });
+  });
+
+  it("does not combine an Agent message with a delegation or an artifact", () => {
+    /*
+      The two outgoing paths are exclusive: delegation posts the answer in this
+      thread, an Agent message brings it back through the sender. Nothing in an
+      Agent-to-Agent conversation is approvable, so no artifact rides along.
+    */
+    expect(accepts(channelReplyCompletionSchema, completion(
+      "Delegating and messaging.",
+      {
+        delegation: { projectId, agentId, request: "Inspect it." },
+        agentMessage: { agentId, body: "Check the ticker." },
+      },
+    ))).toBe(false);
+
+    for (const artifact of [
+      { document: { title: "Plan", markdown: "# Plan", projectId } },
+      {
+        issueProposal: {
+          projectId,
+          executeAfterCreate: false,
+          issue: { title: "Follow up", description: null, priority: 2 },
+        },
+      },
+      { executionProposal: { projectId, runId: projectId } },
+      { skillExecutionProposal: { type: "request_agent_skill_execute" } },
+    ]) {
+      expect(accepts(channelReplyCompletionSchema, completion(
+        "Messaging and proposing.",
+        { ...artifact, agentMessage: { agentId, body: "Check the ticker." } },
+      ))).toBe(false);
+    }
+
+    // A project is what delegation scopes; an Agent message addresses an Agent.
+    expect(accepts(channelReplyCompletionSchema, completion(
+      "Messaging.",
+      { agentMessage: { agentId, body: "Check it.", projectId } },
+    ))).toBe(false);
   });
 
   it("accepts bounded acyclic issue batches and rejects invalid graphs", () => {

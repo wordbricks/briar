@@ -41,6 +41,7 @@ export function testChannelMessage(
     proposal: null,
     executionProposal: null,
     skillExecutionProposal: null,
+    relay: null,
     createdAt: "2026-08-01T01:00:00.000Z",
     ...overrides,
   };
@@ -132,6 +133,7 @@ export function testChannelSummary(
     pinnedAt: null,
     sidebarSectionId: null,
     hiddenAt: null,
+    readOnly: false,
     ...overrides,
   };
 }

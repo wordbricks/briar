@@ -27,8 +27,10 @@ import {
   ClaimedProjectAgentTaskSchema,
   ClaimedWorkSchema,
   ChannelActivityCredentialSchema,
+  ChannelAgentMessageTargetSchema,
   ChannelDelegationTargetSchema,
   ChannelDelegationTarget_SkillSchema,
+  ClaimedInboundAgentMessageSchema,
   ChannelReplyScopeSchema,
   ChannelReplyScope_OrganizationSchema,
   ChannelReplyScope_ProjectSchema,
@@ -613,6 +615,27 @@ const channelReply = (
           })
         : undefined,
       memoryLearningEnabled: value.memoryLearningEnabled,
+      agentMessageTargets: value.agentMessageTargets.map((target) =>
+        create(ChannelAgentMessageTargetSchema, {
+          agentId: target.agentId,
+          agentName: target.agentName,
+          // Organization Agents have no repository, so both project fields
+          // stay absent rather than being filled with a placeholder.
+          projectId: target.projectId ?? undefined,
+          projectName: target.projectName ?? undefined,
+          responsibility: target.responsibility,
+          skills: target.skills.map((item) =>
+            create(ChannelDelegationTarget_SkillSchema, {
+              id: item.id,
+              name: item.name,
+            })
+          ),
+        })
+      ),
+      inboundAgentMessage: value.inboundAgentMessage
+        ? create(ClaimedInboundAgentMessageSchema, value.inboundAgentMessage)
+        : undefined,
+      agentMessageHop: value.agentMessageHop,
     }),
   },
 });

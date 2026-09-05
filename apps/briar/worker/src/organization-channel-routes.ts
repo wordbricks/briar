@@ -22,6 +22,7 @@ import {
   getChannelSyncCursor,
   getDirectMessageByKey,
   listActiveChannelAgentReplies,
+  listAgentDirectMessages,
   listChannelAgents,
   listChannelMembers,
   listChannelMessagePage,
@@ -199,6 +200,32 @@ export async function createOrganizationDirectMessage(
   }
   if (!channel) throw new HttpError(500, "Direct message was not created");
   return { channel: channelJson(channel) };
+}
+
+/**
+ * Every Agent-to-Agent conversation one Agent takes part in, newest first, for
+ * the conversations tab on an Agent detail page. Organization read is the bar;
+ * the narrower project-access rule of the plan's §3.5 lands with the rest of
+ * the viewing permissions.
+ */
+export async function listOrganizationAgentDirectMessages(
+  input: OrganizationChannelApplicationInput & { agentId: string },
+) {
+  const role = await getOrganizationRole(
+    input.db,
+    input.organizationId,
+    input.userId,
+  );
+  if (!hasOrganizationCapability(role, "organization:read")) {
+    throw new HttpError(404, "Organization not found");
+  }
+  const channels = await listAgentDirectMessages(
+    input.db,
+    input.organizationId,
+    input.agentId,
+    input.userId,
+  );
+  return { channels: channels.map(channelJson) };
 }
 
 export async function getOrganizationChannelDetail(

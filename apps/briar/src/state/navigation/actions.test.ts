@@ -72,6 +72,7 @@ const channelOf = (
   pinnedAt: null,
   sidebarSectionId: null,
   hiddenAt: null,
+  readOnly: false,
   ...overrides,
 });
 

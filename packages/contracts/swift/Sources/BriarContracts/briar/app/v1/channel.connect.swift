@@ -24,6 +24,9 @@ public protocol BriarAPI_ChannelServiceClientInterface: Sendable {
     func `createDirectMessage`(request: BriarAPI_CreateDirectMessageRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_CreateDirectMessageResponse>
 
     @available(iOS 13, *)
+    func `listAgentDirectMessages`(request: BriarAPI_ListAgentDirectMessagesRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_ListAgentDirectMessagesResponse>
+
+    @available(iOS 13, *)
     func `createChannel`(request: BriarAPI_CreateChannelRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_CreateChannelResponse>
 
     @available(iOS 13, *)
@@ -140,6 +143,11 @@ public final class BriarAPI_ChannelServiceClient: BriarAPI_ChannelServiceClientI
     @available(iOS 13, *)
     public func `createDirectMessage`(request: BriarAPI_CreateDirectMessageRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CreateDirectMessageResponse> {
         return await self.client.unary(path: "/briar.app.v1.ChannelService/CreateDirectMessage", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `listAgentDirectMessages`(request: BriarAPI_ListAgentDirectMessagesRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ListAgentDirectMessagesResponse> {
+        return await self.client.unary(path: "/briar.app.v1.ChannelService/ListAgentDirectMessages", idempotencyLevel: .unknown, request: request, headers: headers)
     }
 
     @available(iOS 13, *)
@@ -298,6 +306,7 @@ public final class BriarAPI_ChannelServiceClient: BriarAPI_ChannelServiceClientI
             public static let syncChannels = Connect.MethodSpec(name: "SyncChannels", service: "briar.app.v1.ChannelService", type: .unary)
             public static let listDirectMessageRecipients = Connect.MethodSpec(name: "ListDirectMessageRecipients", service: "briar.app.v1.ChannelService", type: .unary)
             public static let createDirectMessage = Connect.MethodSpec(name: "CreateDirectMessage", service: "briar.app.v1.ChannelService", type: .unary)
+            public static let listAgentDirectMessages = Connect.MethodSpec(name: "ListAgentDirectMessages", service: "briar.app.v1.ChannelService", type: .unary)
             public static let createChannel = Connect.MethodSpec(name: "CreateChannel", service: "briar.app.v1.ChannelService", type: .unary)
             public static let updateChannel = Connect.MethodSpec(name: "UpdateChannel", service: "briar.app.v1.ChannelService", type: .unary)
             public static let deleteChannel = Connect.MethodSpec(name: "DeleteChannel", service: "briar.app.v1.ChannelService", type: .unary)

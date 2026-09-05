@@ -44,6 +44,7 @@ const channel = (
   pinnedAt: null,
   sidebarSectionId: null,
   hiddenAt: null,
+  readOnly: false,
   ...overrides,
 });
 

@@ -404,6 +404,27 @@ export async function claimNextChannelReplyWork(
           : null,
         delegation,
         delegationTargets,
+        /*
+          Phase 1 computes the reachable Agents and Phase 2 the inbound message
+          and the hop. Until then every claim is an ordinary hop-0 turn, and
+          the shapes are present so the proto mapper stays total.
+        */
+        agentMessageTargets:
+          [] as ReadonlyArray<{
+            agentId: string;
+            agentName: string;
+            projectId: string | null;
+            projectName: string | null;
+            responsibility: string;
+            skills: ReadonlyArray<{ id: string; name: string }>;
+          }>,
+        inboundAgentMessage: null as {
+          senderAgentId: string;
+          senderAgentName: string;
+          body: string;
+          originReplyJobId: string;
+        } | null,
+        agentMessageHop: 0,
         triggerAttachments: (triggerMessage?.attachments ?? []).map(
           (attachment) => ({
             id: attachment.id,

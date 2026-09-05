@@ -746,6 +746,17 @@ export async function completeChannelReplyApplication(
           scope.workId,
         );
       }
+      /*
+        Phase 0 ships the wire contract only. Until the Agent-to-Agent DM,
+        relay rows and hop guards land, a runner that returns this action gets
+        a plain rejection rather than a half-applied round trip.
+      */
+      if (result.agentMessage) {
+        throw new ReplyCompletionApplicationError(
+          "invalid_request",
+          "Agent messages are not available for this reply",
+        );
+      }
       if (
         result.delegation &&
         (agent.project_id !== null || claimed.delegated_by_reply_job_id !== null)

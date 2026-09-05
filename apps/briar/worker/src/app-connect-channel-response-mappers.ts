@@ -62,6 +62,9 @@ import {
   ChannelMessageAuthorSchema,
   ChannelMessageReactionPersonSchema,
   ChannelMessageReactionSchema,
+  ChannelMessageRelay_Direction,
+  ChannelMessageRelay_Status,
+  ChannelMessageRelaySchema,
   ChannelMessageSchema,
   ChannelMessageUserAuthorSchema,
   ChannelMessageWebhookAuthorSchema,
@@ -91,6 +94,7 @@ import type {
   ChannelMessageAuthor,
   ChannelMessageBlock,
   ChannelMessageProposal,
+  ChannelMessageRelay,
   ChannelSkillExecutionProposal,
   ChannelSummary,
   ChannelThreadSubscriber,
@@ -297,6 +301,7 @@ export const appChannelSummaryJson = (channel: ChannelSummary) => {
     pinnedAt: optionalTimestamp(channel.pinnedAt, "channel pin"),
     sidebarSectionId: channel.sidebarSectionId ?? undefined,
     hiddenAt: optionalTimestamp(channel.hiddenAt, "channel hide"),
+    readOnly: channel.readOnly,
   });
 };
 
@@ -710,6 +715,42 @@ export const appChannelSubscriber = (subscriber: ChannelThreadSubscriber) =>
     ),
   });
 
+const channelMessageRelayDirection = {
+  outbound: ChannelMessageRelay_Direction.OUTBOUND,
+  inbound: ChannelMessageRelay_Direction.INBOUND,
+} as const satisfies Record<
+  ChannelMessageRelay["direction"],
+  ChannelMessageRelay_Direction
+>;
+
+const channelMessageRelayStatus = {
+  pending: ChannelMessageRelay_Status.PENDING,
+  completed: ChannelMessageRelay_Status.COMPLETED,
+  failed: ChannelMessageRelay_Status.FAILED,
+} as const satisfies Record<
+  ChannelMessageRelay["status"],
+  ChannelMessageRelay_Status
+>;
+
+const appChannelMessageRelay = (relay: ChannelMessageRelay) =>
+  create(ChannelMessageRelaySchema, {
+    direction: enumValue(
+      channelMessageRelayDirection,
+      relay.direction,
+      "channel message relay direction",
+    ),
+    peerChannelId: relay.peerChannelId,
+    peerMessageId: relay.peerMessageId,
+    peerAgentId: relay.peerAgentId,
+    peerAgentName: relay.peerAgentName,
+    peerAgentImage: relay.peerAgentImage ?? undefined,
+    status: enumValue(
+      channelMessageRelayStatus,
+      relay.status,
+      "channel message relay status",
+    ),
+  });
+
 export const appChannelMessage = (message: ChannelMessage) =>
   create(ChannelMessageSchema, {
     id: message.id,
@@ -769,6 +810,7 @@ export const appChannelMessage = (message: ChannelMessage) =>
       documentId: reference.documentId,
       version: reference.version,
     })),
+    relay: message.relay ? appChannelMessageRelay(message.relay) : undefined,
   });
 
 export const appChannelAgentReply = (reply: ChannelAgentReply) =>

@@ -317,6 +317,13 @@ export type ChannelReplyJobRow = {
   skill_execution_request_snapshot?: string | null;
   delegated_by_reply_job_id: string | null;
   delegation_request: string | null;
+  /*
+    0 human-started, 1 the Agent answering another Agent, 2 the sender relaying
+    that answer back. `origin_reply_job_id` ties every hop of one round trip to
+    the job the person triggered.
+  */
+  agent_message_hop: number;
+  origin_reply_job_id: string | null;
   execution_target_ids_json?: string;
   session_id: string | null;
   approved_skill_execution_proposal_id?: string | null;
@@ -686,6 +693,16 @@ const channelHasUnreadFromRow = (row: ChannelRow) => Boolean(
     (!row.last_read_at || row.last_unread_message_at > row.last_read_at),
 );
 
+/*
+  An Agent-to-Agent direct message is keyed `agents:["<a>","<b>"]`. It has no
+  human members, so the prefix is what tells every reader that the conversation
+  can be opened but never written to.
+*/
+export const AGENT_DIRECT_MESSAGE_KEY_PREFIX = "agents:";
+
+export const isAgentDirectMessageKey = (dmKey: string | null) =>
+  dmKey !== null && dmKey.startsWith(AGENT_DIRECT_MESSAGE_KEY_PREFIX);
+
 export const channelJson = (row: ChannelRow): ChannelSummary => ({
   id: row.id,
   organizationId: row.organization_id,
@@ -711,6 +728,7 @@ export const channelJson = (row: ChannelRow): ChannelSummary => ({
   pinnedAt: row.sidebar_pinned_at,
   sidebarSectionId: row.sidebar_section_id,
   hiddenAt: row.sidebar_hidden_at,
+  readOnly: isAgentDirectMessageKey(row.dm_key),
 });
 
 export const channelReplyJson = (
@@ -877,6 +895,8 @@ export const channelMessageJson = (
   skillExecutionProposal: row.deleted_at
     ? null
     : channelSkillExecutionProposalJson(row),
+  // Phase 1 fills this from briar_channel_message_relays.
+  relay: null,
   createdAt: row.created_at,
   deletedAt: row.deleted_at,
 });
@@ -963,6 +983,36 @@ export async function listChannels(
        order by channel.archived_at is not null, channel.name, channel.id`,
     )
     .bind(userId, userId, userId, organizationId, userId)
+    .all<ChannelRow>();
+  return rows.results;
+}
+
+/**
+ * The Agent-to-Agent conversations one Agent takes part in.
+ *
+ * These channels carry no `briar_channel_members` rows, so `visibleToUser`
+ * would hide every one of them. Access is decided one level up instead: the
+ * caller must already be an organization member, and §3.5 of the plan narrows
+ * that further once project-scoped Agents can be reached.
+ */
+export async function listAgentDirectMessages(
+  db: D1Database,
+  organizationId: string,
+  agentId: string,
+  userId: string,
+) {
+  const rows = await db
+    .prepare(
+      `${channelSelectForUser}
+       where channel.organization_id = ? and channel.kind = 'dm'
+         and channel.dm_key like 'agents:%'
+         and exists (
+           select 1 from briar_channel_agents roster
+           where roster.channel_id = channel.id and roster.agent_id = ?
+         )
+       order by channel.updated_at desc, channel.id`,
+    )
+    .bind(userId, userId, userId, organizationId, agentId)
     .all<ChannelRow>();
   return rows.results;
 }

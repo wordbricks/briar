@@ -109,6 +109,7 @@ const channel: ChannelSummary = {
   pinnedAt: null,
   sidebarSectionId: null,
   hiddenAt: null,
+  readOnly: false,
 };
 
 const STORED_CURSOR = 41;

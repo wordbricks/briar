@@ -16,10 +16,11 @@ import {
 import { Code, ConnectError } from "@connectrpc/connect";
 import * as Schema from "effect/Schema";
 import type { ChannelSidebarSection } from "./channel-sidebar-repository";
-import type {
-  ChannelMessageDocumentRow,
-  ChannelRow,
-  ChannelWebhookRow,
+import {
+  isAgentDirectMessageKey,
+  type ChannelMessageDocumentRow,
+  type ChannelRow,
+  type ChannelWebhookRow,
 } from "./channels";
 import type { ChannelLinkPreview } from "./link-preview";
 
@@ -121,6 +122,7 @@ export const appChannelSummary = (row: ChannelRow) =>
     pinnedAt: optionalTimestamp(row.sidebar_pinned_at, "Channel pin"),
     sidebarSectionId: row.sidebar_section_id ?? undefined,
     hiddenAt: optionalTimestamp(row.sidebar_hidden_at, "Channel hide"),
+    readOnly: isAgentDirectMessageKey(row.dm_key),
   });
 
 /** One of the requesting member's own sidebar sections. */

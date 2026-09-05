@@ -45,6 +45,7 @@ const selectedChannel: ChannelSummary = {
   pinnedAt: null,
   sidebarSectionId: null,
   hiddenAt: null,
+  readOnly: false,
 };
 
 const secondChannel: ChannelSummary = {
@@ -79,6 +80,7 @@ const virtualMessage = (channelId: string, index: number): ChannelMessage => ({
   proposal: null,
   executionProposal: null,
   skillExecutionProposal: null,
+  relay: null,
   createdAt: `2026-08-01T00:${String(index).padStart(2, "0")}:00.000Z`,
 });
 
@@ -362,6 +364,7 @@ describe("Channels", () => {
       proposal: null,
       executionProposal: null,
       skillExecutionProposal: null,
+      relay: null,
       createdAt: "2026-08-15T00:00:00.000Z",
     };
     vi.stubGlobal("fetch", createChannelFetch((method) =>
@@ -450,6 +453,7 @@ describe("Channels", () => {
       proposal: null,
       executionProposal: null,
       skillExecutionProposal: null,
+      relay: null,
       createdAt: "2026-08-15T00:00:00.000Z",
     };
     const replyMessage: ChannelMessage = {

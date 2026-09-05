@@ -568,6 +568,11 @@ export type ChannelSummary = {
   pinnedAt: string | null;
   sidebarSectionId: string | null;
   hiddenAt: string | null;
+  /*
+    True for an Agent-to-Agent direct message. People may read it but never
+    post, add participants, archive or delete it.
+  */
+  readOnly: boolean;
 };
 
 /** One of the user's own sidebar groups, within one organization. */
@@ -794,6 +799,23 @@ export type ChannelThreadSubscriber = {
   subscribedAt: string;
 };
 
+/**
+ * Links a message in the person's thread to its counterpart inside the
+ * Agent-to-Agent direct message. `outbound` marks the short "sent to B" notice
+ * the sending Agent leaves behind; `inbound` is B's answer copied back, so the
+ * timeline can render "from B" and link through to the original.
+ */
+export type ChannelMessageRelay = {
+  direction: "outbound" | "inbound";
+  peerChannelId: string;
+  peerMessageId: string;
+  peerAgentId: string;
+  peerAgentName: string;
+  peerAgentImage: string | null;
+  /** Outbound rows track the round trip; inbound rows are always completed. */
+  status: "pending" | "completed" | "failed";
+};
+
 export type ChannelMessage = {
   id: string;
   channelId: string;
@@ -815,6 +837,8 @@ export type ChannelMessage = {
   proposal: ChannelMessageProposal | null;
   executionProposal: ChannelExecutionProposal | null;
   skillExecutionProposal: ChannelSkillExecutionProposal | null;
+  /** Set only on the two thread-side messages of an Agent-to-Agent round trip. */
+  relay: ChannelMessageRelay | null;
   /** Owner-authorized immutable memory revisions used by this answer. */
   memoryCitations?: DmMemoryReference[];
   /** Client-only state while a newly sent message awaits its server response. */
@@ -1123,6 +1147,16 @@ const channelReplyDelegationSchema = strict(Schema.Struct({
   request: channelMessageBodySchema,
 }));
 
+/*
+  Sending to another Agent addresses that Agent alone: the answer comes back
+  here rather than being posted by the target, so unlike delegation there is no
+  project to scope the request to.
+*/
+const channelReplyAgentMessageSchema = strict(Schema.Struct({
+  agentId: Uuid,
+  body: channelMessageBodySchema,
+}));
+
 export const channelMemoryCitationSchema = strict(Schema.Struct({
   documentId: Uuid,
   version: Schema.Int.check(Schema.isGreaterThan(0)),
@@ -1137,6 +1171,7 @@ export const channelReplyCompletionFields = {
     channelReplySkillExecutionProposalSchema,
   ),
   delegation: Schema.NullOr(channelReplyDelegationSchema),
+  agentMessage: Schema.NullOr(channelReplyAgentMessageSchema),
 } as const;
 
 export const channelMemorySaveRequestSchema = strict(Schema.Struct({
@@ -1167,6 +1202,23 @@ export const channelReplyCompletionSchema = strict(Schema.Struct({
       issues.push({
         path: ["delegation"],
         issue: "A delegated reply cannot also attach an artifact proposal",
+      });
+    }
+    /*
+      A reply either hands work to a Project Agent inside this thread or opens
+      an Agent-to-Agent conversation, never both, and the Agent message itself
+      is nothing a person can approve, so it carries no artifact either.
+    */
+    if (
+      reply.agentMessage &&
+      (reply.delegation || reply.document || reply.issueProposal ||
+        reply.issueBatchProposal || reply.executionProposal ||
+        reply.skillExecutionProposal)
+    ) {
+      issues.push({
+        path: ["agentMessage"],
+        issue:
+          "An Agent message cannot be combined with a delegation or an artifact proposal",
       });
     }
     if (reply.issueProposal && reply.executionProposal) {

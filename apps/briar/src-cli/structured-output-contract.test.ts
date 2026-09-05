@@ -111,6 +111,7 @@ describe("provider structured output contracts", () => {
         agentId: "22222222-2222-4222-8222-222222222222",
         request: "  Inspect authentication.  ",
       },
+      agentMessage: null,
       contextRequests: null,
       memoryRequests: null,
       memoryCitations: null,
@@ -125,6 +126,7 @@ describe("provider structured output contracts", () => {
       executionProposal: null,
       skillExecutionProposal: null,
       delegation: null,
+      agentMessage: null,
       memoryRequests: null,
       memoryCitations: null,
       memorySaveRequest: null,
@@ -163,11 +165,47 @@ describe("provider structured output contracts", () => {
             agentId: "22222222-2222-4222-8222-222222222222",
             request: "Inspect authentication.",
           },
+          agentMessage: null,
           memoryCitations: null,
           memorySaveRequest: null,
         },
         attachmentPaths: ["auth.html"],
       });
+      /*
+        The Agent message rides the same reply turn as delegation and is
+        exclusive from it, so the codec has to carry one without the other.
+      */
+      expect(contract.decode({
+        ...replyOutput,
+        delegation: null,
+        agentMessage: {
+          agentId: "22222222-2222-4222-8222-222222222222",
+          body: "  Please check the ticker now.  ",
+        },
+      })).toMatchObject({
+        case: "reply",
+        result: {
+          delegation: null,
+          agentMessage: {
+            agentId: "22222222-2222-4222-8222-222222222222",
+            body: "Please check the ticker now.",
+          },
+        },
+      });
+      expect(() => contract.decode({
+        ...replyOutput,
+        agentMessage: {
+          agentId: "22222222-2222-4222-8222-222222222222",
+          body: "Check the ticker.",
+        },
+      })).toThrow();
+      expect(() => contract.decode({
+        ...contextOutput,
+        agentMessage: {
+          agentId: "22222222-2222-4222-8222-222222222222",
+          body: "Check the ticker.",
+        },
+      })).toThrow();
       expect(contract.decode(contextOutput)).toEqual({
         case: "context",
         requests: { contextRequests: contextOutput.contextRequests },
@@ -204,6 +242,7 @@ describe("Claude Code provider schemas", () => {
       agentId: "22222222-2222-4222-8222-222222222222",
       request: "Inspect authentication.",
     },
+    agentMessage: null,
     contextRequests: null,
     memoryRequests: null,
     memoryCitations: null,

@@ -57,6 +57,7 @@ const channel: ChannelSummary = {
   pinnedAt: null,
   sidebarSectionId: null,
   hiddenAt: null,
+  readOnly: false,
 };
 
 const messageOf = (index: number): ChannelMessage =>

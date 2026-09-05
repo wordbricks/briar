@@ -593,6 +593,23 @@ const channelReplyFromProto = (
     triggerAttachments: value.triggerAttachments,
     memory: value.memory ? dmMemoryDescriptorFromProto(value.memory) : null,
     memoryLearningEnabled: value.memoryLearningEnabled,
+    agentMessageTargets: value.agentMessageTargets.map((target) => ({
+      agentId: target.agentId,
+      agentName: target.agentName,
+      projectId: target.projectId ?? null,
+      projectName: target.projectName ?? null,
+      responsibility: target.responsibility,
+      skills: target.skills.map((skill) => ({ id: skill.id, name: skill.name })),
+    })),
+    inboundAgentMessage: value.inboundAgentMessage
+      ? {
+          senderAgentId: value.inboundAgentMessage.senderAgentId,
+          senderAgentName: value.inboundAgentMessage.senderAgentName,
+          body: value.inboundAgentMessage.body,
+          originReplyJobId: value.inboundAgentMessage.originReplyJobId,
+        }
+      : null,
+    agentMessageHop: value.agentMessageHop,
   };
   if (scope.kind === "organization") {
     if (!mapped.organizationContext || mapped.delegation || mapped.skillExecutionTarget) {

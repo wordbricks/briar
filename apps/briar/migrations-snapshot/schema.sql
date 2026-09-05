@@ -5,8 +5,8 @@
 -- Whenever a migration changes the schema or seeds rows, run
 -- `bun run d1:snapshot` and commit the result; `bun run d1:snapshot:check`
 -- fails in CI otherwise.
--- migrations-digest: 72629cf59da1a98798ac423ba2bceb5f0675af384a85760888054bb60660f98d
--- snapshot-digest: e022baee079bf31f654cd36881b0c9795fde4ed0a31a6abcd7fa6c3db0bfa6ef
+-- migrations-digest: bdbf867a7f9c966e831b6f861f38b1e8e285d1de4b26874f634fef11e9606c61
+-- snapshot-digest: 20983d1856671363062acb6042a123d559526550338f4926c7f6b2513cc3cb92
 -- @statement
 CREATE TABLE IF NOT EXISTS "d1_migrations"(
 		id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2440,7 +2440,9 @@ CREATE TABLE briar_channel_agent_reply_jobs (
     ), selected_agent_name_snapshot text, selected_agent_responsibility_snapshot text, selected_skill_name_snapshot text, selected_skill_instructions_snapshot text, selected_skill_provider_snapshot text, selected_skill_kind_snapshot text, selected_skill_model_snapshot text, selected_skill_effort_snapshot text, skill_execution_request_snapshot text, preferred_device_id text
   references briar_execution_worker_devices (id) on delete set null, planned_update_resume integer not null
   default 0 check (planned_update_resume in (0, 1)), session_id text
-  references briar_channel_reply_sessions (id) on delete cascade, approved_skill_execution_proposal_id text, memory_restart_count integer not null default 0,
+  references briar_channel_reply_sessions (id) on delete cascade, approved_skill_execution_proposal_id text, memory_restart_count integer not null default 0, agent_message_hop integer not null default 0
+    check (agent_message_hop between 0 and 2), origin_reply_job_id text
+    references briar_channel_agent_reply_jobs (id) on delete cascade,
   unique (channel_id, trigger_message_id, agent_id)
 );
 -- @statement
@@ -3595,6 +3597,18 @@ CREATE TABLE briar_channel_sidebar_preferences (
   hidden_at text,
   updated_at text not null,
   primary key (user_id, channel_id)
+);
+-- @statement
+CREATE TABLE briar_channel_message_relays (
+  message_id text primary key not null
+    references briar_channel_messages (id) on delete cascade,
+  direction text not null check (direction in ('outbound', 'inbound')),
+  peer_channel_id text not null references briar_channels (id) on delete cascade,
+  peer_message_id text not null
+    references briar_channel_messages (id) on delete cascade,
+  origin_reply_job_id text not null
+    references briar_channel_agent_reply_jobs (id) on delete cascade,
+  created_at text not null
 );
 -- @statement
 INSERT INTO "briar_managed_computer_campaigns" ("id","code_key","name","active","created_at","updated_at") VALUES('getbriar-pilot','getbriar-pilot','GETBRIAR managed computer pilot',1,'2026-08-21T00:00:00.000Z','2026-08-21T00:00:00.000Z');
@@ -4837,6 +4851,21 @@ CREATE INDEX briar_channel_sidebar_preferences_channel_idx
 -- @statement
 CREATE INDEX briar_channel_sidebar_preferences_section_idx
   on briar_channel_sidebar_preferences (section_id);
+-- @statement
+CREATE INDEX briar_channel_agent_reply_jobs_agent_message_origin_idx
+  on briar_channel_agent_reply_jobs (
+    origin_reply_job_id, agent_message_hop, status
+  );
+-- @statement
+CREATE INDEX briar_channel_agent_reply_jobs_agent_message_rate_idx
+  on briar_channel_agent_reply_jobs (organization_id, created_at)
+  where agent_message_hop > 0;
+-- @statement
+CREATE INDEX briar_channel_message_relays_peer_message_idx
+  on briar_channel_message_relays (peer_message_id);
+-- @statement
+CREATE INDEX briar_channel_message_relays_origin_idx
+  on briar_channel_message_relays (origin_reply_job_id);
 -- @statement
 CREATE TRIGGER briar_dashboard_settings_update_sync
 after update on briar_project_settings BEGIN
@@ -13297,3 +13326,33 @@ when not (
 begin
   select raise(abort, 'Channel reply session events are immutable');
 end;
+-- @statement
+CREATE TRIGGER briar_channel_reply_agent_message_hop_insert_guard
+before insert on briar_channel_agent_reply_jobs
+when new.agent_message_hop > 0
+BEGIN
+  select case
+    when new.delegated_by_reply_job_id is not null
+      then raise(abort, 'delegated reply cannot carry an Agent message hop')
+  end;
+  select case
+    when new.origin_reply_job_id is null
+      then raise(abort, 'Agent message hop requires an origin reply job')
+  end;
+END;
+-- @statement
+CREATE TRIGGER briar_channel_reply_agent_message_hop_update_guard
+before update of
+  agent_message_hop, origin_reply_job_id, delegated_by_reply_job_id
+on briar_channel_agent_reply_jobs
+when new.agent_message_hop > 0
+BEGIN
+  select case
+    when new.delegated_by_reply_job_id is not null
+      then raise(abort, 'delegated reply cannot carry an Agent message hop')
+  end;
+  select case
+    when new.origin_reply_job_id is null
+      then raise(abort, 'Agent message hop requires an origin reply job')
+  end;
+END;
