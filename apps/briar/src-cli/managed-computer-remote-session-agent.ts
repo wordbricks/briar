@@ -90,9 +90,10 @@ export function managedComputerRemoteDisplayResolver(
       const assignment = (await assignments.load()).find(
         (candidate) => candidate.agentId === agentId,
       );
-      if (assignment === undefined) {
-        throw new Error("Computer Use desktop assignment was not found");
-      }
+      // An agent that is not using the computer right now has no display of
+      // its own; show the computer's primary desktop instead of failing so
+      // the owner can always look at the machine.
+      if (assignment === undefined) return primary;
       return {
         host: primary.host,
         port: computerUseRfbPort(assignment.displayIndex),
