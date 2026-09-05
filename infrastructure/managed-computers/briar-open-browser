@@ -18,6 +18,9 @@ esac
 profile_directory="${BRIAR_BROWSER_PROFILE_DIRECTORY:-}"
 if [ -n "$profile_directory" ]; then
   case "$profile_directory" in
+    # display-1 is the owner's own desktop, the login source for the shared
+    # store; display-2 and above are the Agent windows.
+    /var/lib/briar-computer-use/profiles/display-1|\
     /var/lib/briar-computer-use/profiles/display-[2-9]|\
     /var/lib/briar-computer-use/profiles/display-[1-9][0-9]|\
     /var/lib/briar-computer-use/profiles/display-100) ;;

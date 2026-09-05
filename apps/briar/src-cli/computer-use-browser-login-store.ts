@@ -44,7 +44,7 @@ export const computerUseSharedLoginCookieEntries = [
 
 const sqliteSidecarSuffixes = ["-journal", "-wal", "-shm"] as const;
 
-const temporarySuffixPattern = /\.(?:tmp|old)-\d+$/u;
+const temporarySuffixPattern = /\.(?:tmp|old|snap)-\d+$/u;
 
 export const computerUseBrowserProfileDirectory = (
   displayIndex: number,
@@ -55,6 +55,18 @@ export const computerUseBrowserProfileDirectory = (
   }
   return join(profilesDirectory, `display-${displayIndex}`);
 };
+
+/** The computer owner's own desktop, which Agents observe but never drive. */
+export const COMPUTER_USE_PRIMARY_DISPLAY_INDEX = 1;
+
+/**
+ * Display `:1` runs Chrome against this profile so the owner's own sign-ins
+ * land on a path the box service can watch, whatever browser or HOME the
+ * image ships. It is a login source only; the shared store never seeds it.
+ */
+export const computerUsePrimaryBrowserProfileDirectory = (
+  profilesDirectory = defaultComputerUseBrowserProfilesDirectory,
+): string => join(profilesDirectory, `display-${COMPUTER_USE_PRIMARY_DISPLAY_INDEX}`);
 
 export interface ComputerUseBrowserLoginStoreReport {
   readonly merged: string[];
@@ -70,10 +82,29 @@ export interface ComputerUseBrowserLoginStore {
   capture(displayIndex: number): Promise<ComputerUseBrowserLoginStoreReport>;
 }
 
+export interface ComputerUseLiveLoginCaptureOptions {
+  /** Skip the directory entries, which cannot be copied safely under Chrome. */
+  readonly sqliteOnly: boolean;
+}
+
+/**
+ * Capture a profile whose Chrome is still running, such as the owner's
+ * display `:1`. Kept apart from {@link ComputerUseBrowserLoginStore} because
+ * the display lifecycle never needs it.
+ */
+export interface ComputerUseLiveBrowserLoginCapture {
+  captureLive(
+    sourceDirectory: string,
+    options: ComputerUseLiveLoginCaptureOptions,
+  ): Promise<ComputerUseBrowserLoginStoreReport>;
+}
+
 export interface FileComputerUseBrowserLoginStoreOptions {
   readonly sharedDirectory?: string;
   readonly profilesDirectory?: string;
   readonly log?: (message: string) => void;
+  /** Injected by tests to exercise the raw-copy fallback. */
+  readonly vacuumInto?: (source: string, target: string) => void;
 }
 
 const emptyReport = (): ComputerUseBrowserLoginStoreReport => ({
@@ -192,10 +223,49 @@ const mergeCookieDatabase = (sharedPath: string, displayPath: string): void => {
   }
 };
 
-export class FileComputerUseBrowserLoginStore implements ComputerUseBrowserLoginStore {
+/**
+ * Snapshot a database Chrome may be writing to. A read-only connection with a
+ * short busy timeout keeps the owner's browser unblocked, and `VACUUM INTO`
+ * writes a consistent copy without touching the source.
+ */
+const defaultVacuumInto = (source: string, target: string): void => {
+  const database = new DatabaseSync(source, { readOnly: true });
+  try {
+    database.exec("PRAGMA busy_timeout = 100");
+    database.exec(`VACUUM INTO '${target.replaceAll("'", "''")}'`);
+  } finally {
+    database.close();
+  }
+};
+
+/** Undefined when the snapshot is usable, otherwise why it is not. */
+const sqliteSnapshotProblem = (path: string): string | undefined => {
+  let database: DatabaseSync;
+  try {
+    database = new DatabaseSync(path, { readOnly: true });
+  } catch (error) {
+    return `snapshot could not be opened: ${describe(error)}`;
+  }
+  try {
+    const row = database.prepare("PRAGMA quick_check").get() as
+      | Record<string, unknown>
+      | undefined;
+    const result = row === undefined ? undefined : Object.values(row)[0];
+    if (String(result ?? "").toLowerCase() === "ok") return undefined;
+    return `snapshot failed quick_check: ${String(result ?? "no result")}`;
+  } catch (error) {
+    return `snapshot failed quick_check: ${describe(error)}`;
+  } finally {
+    database.close();
+  }
+};
+
+export class FileComputerUseBrowserLoginStore
+implements ComputerUseBrowserLoginStore, ComputerUseLiveBrowserLoginCapture {
   private readonly sharedDirectory: string;
   private readonly profilesDirectory: string;
   private readonly log: (message: string) => void;
+  private readonly vacuumInto: (source: string, target: string) => void;
   private queue: Promise<unknown> = Promise.resolve();
 
   constructor(options: FileComputerUseBrowserLoginStoreOptions = {}) {
@@ -205,6 +275,7 @@ export class FileComputerUseBrowserLoginStore implements ComputerUseBrowserLogin
       ?? defaultComputerUseBrowserProfilesDirectory;
     this.log = options.log
       ?? ((message) => console.warn(`[computer-use-login-store] ${message}`));
+    this.vacuumInto = options.vacuumInto ?? defaultVacuumInto;
   }
 
   private runExclusive<T>(operation: () => Promise<T>): Promise<T> {
@@ -336,68 +407,172 @@ export class FileComputerUseBrowserLoginStore implements ComputerUseBrowserLogin
     });
   }
 
+  /** Make the shared store ready to receive entries. */
+  private async prepareShared(
+    label: string,
+    report: ComputerUseBrowserLoginStoreReport,
+  ): Promise<boolean> {
+    try {
+      await mkdir(this.sharedDirectory, { recursive: true, mode: 0o700 });
+      await chmod(this.sharedDirectory, 0o700);
+      await this.purgeTemporaryEntries();
+      return true;
+    } catch (error) {
+      report.skipped.push({ entry: label, reason: describe(error) });
+      this.log(`capture ${label} failed: ${describe(error)}`);
+      return false;
+    }
+  }
+
+  private async applySqliteEntry(
+    entry: string,
+    source: string,
+    label: string,
+    report: ComputerUseBrowserLoginStoreReport,
+  ): Promise<void> {
+    const target = join(this.sharedDirectory, entry);
+    const targetExists = await pathExists(target);
+    const isCookieDatabase = (
+      computerUseSharedLoginCookieEntries as readonly string[]
+    ).includes(entry);
+    if (isCookieDatabase && targetExists) {
+      try {
+        mergeCookieDatabase(target, source);
+        report.merged.push(entry);
+        return;
+      } catch (error) {
+        this.log(
+          `capture ${label} ${entry} merge fell back to replacement: ${describe(error)}`,
+        );
+      }
+    }
+    await this.copySqliteFile(source, target);
+    (targetExists ? report.replaced : report.copied).push(entry);
+  }
+
+  private async applyDirectoryEntry(
+    entry: string,
+    source: string,
+    report: ComputerUseBrowserLoginStoreReport,
+  ): Promise<void> {
+    const target = join(this.sharedDirectory, entry);
+    const targetExists = await pathExists(target);
+    await this.replaceDirectory(source, target);
+    (targetExists ? report.replaced : report.copied).push(entry);
+  }
+
+  private async removeSnapshot(snapshot: string): Promise<void> {
+    await rm(snapshot, { force: true });
+    for (const suffix of sqliteSidecarSuffixes) {
+      await rm(`${snapshot}${suffix}`, { force: true });
+    }
+  }
+
+  /**
+   * Copy a database that may be open in a running Chrome. `VACUUM INTO` gives
+   * a consistent snapshot when the lock is free; otherwise the file and its
+   * sidecars are copied raw and SQLite recovers from the journal on open.
+   */
+  private async snapshotSqliteFile(source: string, snapshot: string): Promise<void> {
+    await this.removeSnapshot(snapshot);
+    try {
+      this.vacuumInto(source, snapshot);
+      return;
+    } catch (error) {
+      this.log(`snapshot of ${source} fell back to a raw copy: ${describe(error)}`);
+    }
+    await this.removeSnapshot(snapshot);
+    await copyFile(source, snapshot);
+    for (const suffix of sqliteSidecarSuffixes) {
+      const sidecar = `${source}${suffix}`;
+      if (await pathExists(sidecar)) await copyFile(sidecar, `${snapshot}${suffix}`);
+    }
+  }
+
   capture(displayIndex: number): Promise<ComputerUseBrowserLoginStoreReport> {
     return this.runExclusive(async () => {
       const report = emptyReport();
+      const label = `display-${displayIndex}`;
       const displayDirectory = this.displayDirectory(displayIndex);
       if (!(await pathExists(displayDirectory))) return report;
-      try {
-        await mkdir(this.sharedDirectory, { recursive: true, mode: 0o700 });
-        await chmod(this.sharedDirectory, 0o700);
-        await this.purgeTemporaryEntries();
-      } catch (error) {
-        report.skipped.push({
-          entry: `display-${displayIndex}`,
-          reason: describe(error),
-        });
-        this.log(`capture display-${displayIndex} failed: ${describe(error)}`);
-        return report;
-      }
+      if (!(await this.prepareShared(label, report))) return report;
       for (const entry of computerUseSharedLoginSqliteEntries) {
         const source = join(displayDirectory, entry);
-        const target = join(this.sharedDirectory, entry);
         try {
           if (!(await pathExists(source))) continue;
-          const targetExists = await pathExists(target);
-          const isCookieDatabase = (
-            computerUseSharedLoginCookieEntries as readonly string[]
-          ).includes(entry);
-          if (isCookieDatabase && targetExists) {
-            try {
-              mergeCookieDatabase(target, source);
-              report.merged.push(entry);
-              continue;
-            } catch (error) {
-              this.log(
-                `capture display-${displayIndex} ${entry} merge fell back to replacement: `
-                  + describe(error),
-              );
-            }
-          }
-          await this.copySqliteFile(source, target);
-          (targetExists ? report.replaced : report.copied).push(entry);
+          await this.applySqliteEntry(entry, source, label, report);
         } catch (error) {
           report.skipped.push({ entry, reason: describe(error) });
         }
       }
       for (const entry of computerUseSharedLoginDirectoryEntries) {
         const source = join(displayDirectory, entry);
-        const target = join(this.sharedDirectory, entry);
         try {
           if (!(await pathExists(source))) continue;
-          const targetExists = await pathExists(target);
-          await this.replaceDirectory(source, target);
-          (targetExists ? report.replaced : report.copied).push(entry);
+          await this.applyDirectoryEntry(entry, source, report);
         } catch (error) {
           report.skipped.push({ entry, reason: describe(error) });
         }
       }
-      this.log(
-        `capture display-${displayIndex} merged ${report.merged.length},`
-          + ` replaced ${report.replaced.length}, copied ${report.copied.length},`
-          + ` skipped ${report.skipped.length}`,
-      );
+      this.logReport(`capture ${label}`, report);
       return report;
     });
+  }
+
+  /**
+   * Fold a profile whose Chrome is still running into the shared store. Used
+   * for the owner's display `:1`, which has no stop hook: every SQLite entry
+   * is snapshotted and validated first, and the directory entries are only
+   * taken on the slower full cycle because a live leveldb copy can be torn.
+   */
+  captureLive(
+    sourceDirectory: string,
+    options: ComputerUseLiveLoginCaptureOptions,
+  ): Promise<ComputerUseBrowserLoginStoreReport> {
+    return this.runExclusive(async () => {
+      const report = emptyReport();
+      if (!(await pathExists(sourceDirectory))) return report;
+      if (!(await this.prepareShared(sourceDirectory, report))) return report;
+      for (const entry of computerUseSharedLoginSqliteEntries) {
+        const source = join(sourceDirectory, entry);
+        const target = join(this.sharedDirectory, entry);
+        const snapshot = `${target}.snap-${process.pid}`;
+        try {
+          if (!(await pathExists(source))) continue;
+          await mkdir(dirname(target), { recursive: true, mode: 0o700 });
+          await this.snapshotSqliteFile(source, snapshot);
+          const problem = sqliteSnapshotProblem(snapshot);
+          if (problem !== undefined) {
+            report.skipped.push({ entry, reason: problem });
+            continue;
+          }
+          await this.applySqliteEntry(entry, snapshot, sourceDirectory, report);
+        } catch (error) {
+          report.skipped.push({ entry, reason: describe(error) });
+        } finally {
+          await this.removeSnapshot(snapshot).catch(() => undefined);
+        }
+      }
+      if (!options.sqliteOnly) {
+        for (const entry of computerUseSharedLoginDirectoryEntries) {
+          const source = join(sourceDirectory, entry);
+          try {
+            if (!(await pathExists(source))) continue;
+            await this.applyDirectoryEntry(entry, source, report);
+          } catch (error) {
+            report.skipped.push({ entry, reason: describe(error) });
+          }
+        }
+      }
+      this.logReport(`capture ${sourceDirectory}`, report);
+      return report;
+    });
+  }
+
+  private logReport(label: string, report: ComputerUseBrowserLoginStoreReport): void {
+    this.log(
+      `${label} merged ${report.merged.length}, replaced ${report.replaced.length},`
+        + ` copied ${report.copied.length}, skipped ${report.skipped.length}`,
+    );
   }
 }

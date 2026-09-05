@@ -10,6 +10,7 @@
 - 로컬 TigerVNC는 `briar` 사용자로 `127.0.0.1:5901`에만 바인딩한다. 브라우저는 EC2 주소를 받지 않으며, 화면·키 입력·비밀번호·세션 토큰을 D1 또는 로그에 저장하지 않는다.
 - 컴퓨터 소유자의 데스크톱과 모든 프로젝트 Worker는 같은 `briar` 계정으로 실행하며, `sudo -n`으로 비밀번호 없이 이 컴퓨터의 관리자 권한을 사용할 수 있다. Worker가 실행하는 저장소 코드도 시스템 파일·패키지·서비스와 이 컴퓨터에 저장된 자격 증명을 수정하거나 삭제할 수 있다. 서로 신뢰하지 않는 프로젝트를 한 컴퓨터에 연결하지 않는다.
 - `/var/lib/briar-computer-use/profiles/shared`에는 그 컴퓨터의 모든 Agent Chrome이 공유하는 쿠키와 저장된 비밀번호가 들어간다. 디렉터리는 `briar` 소유의 0700이지만 Chrome의 고정된 기본 키(`--password-store=basic`)로 암호화하므로 이 계정에 접근할 수 있으면 평문과 다르지 않다. 런처 플래그는 AMI 재빌드 후에 적용되고, seed/capture 로직은 runtime 번들로 먼저 배포된다.
+- 소유자 디스플레이 `:1`의 Chrome은 `/var/lib/briar-computer-use/profiles/display-1` 프로필을 쓰고, 소유자가 이 화면에서 한 로그인은 box 서비스가 공유 저장소로 capture해 모든 Agent 디스플레이에 전파된다. 소유자 화면에서의 개인 로그인도 이 컴퓨터의 Agent가 쓸 수 있다는 뜻이다. 이미지 갱신 전 기본 프로필(`~/.config/google-chrome`)의 기존 로그인은 이전하지 않으므로, 갱신 후 `:1`에서 한 번 다시 로그인한다.
 - 관리자 권한은 해당 EC2의 운영체제 안에서만 부여한다. 인바운드·SSH·IMDSv2·EBS 설정이나 instance role의 AWS 권한은 확대하지 않으며, Parameter Store 조회 거부를 유지한다.
 - 파일럿 신청을 꺼도 생성 중·사용 중인 컴퓨터의 Workflow, 만료, drain, 중지 및 종료 처리는 계속된다.
 - 사용자가 컴퓨터 은퇴를 요청하면 새 작업을 즉시 차단하고 응답 후 중지를 시도한다. 활성 실행 lease가 없으면 EC2를 바로 중지하며, lease가 남아 있거나 AWS 호출이 실패하면 `draining` 상태를 유지한 채 기존 1분 Cron Trigger에서 다시 시도한다. 6시간 reconciliation은 만료·종료·고아 탐지 등 전체 수명주기 점검에 계속 사용한다.

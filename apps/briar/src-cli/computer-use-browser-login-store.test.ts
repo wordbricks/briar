@@ -1,3 +1,4 @@
+import { writeFileSync } from "node:fs";
 import {
   chmod,
   mkdir,
@@ -12,7 +13,10 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, expect, it } from "vitest";
-import { FileComputerUseBrowserLoginStore } from "./computer-use-browser-login-store";
+import {
+  type FileComputerUseBrowserLoginStoreOptions,
+  FileComputerUseBrowserLoginStore,
+} from "./computer-use-browser-login-store";
 
 const temporaryRoots: string[] = [];
 
@@ -22,7 +26,9 @@ afterEach(async () => {
   }
 });
 
-const makeRoots = async () => {
+const makeRoots = async (
+  options: Omit<FileComputerUseBrowserLoginStoreOptions, "sharedDirectory" | "profilesDirectory"> = {},
+) => {
   const root = await mkdtemp(join(tmpdir(), "briar-login-store-"));
   temporaryRoots.push(root);
   const shared = join(root, "shared");
@@ -32,6 +38,7 @@ const makeRoots = async () => {
     sharedDirectory: shared,
     profilesDirectory: profiles,
     log: () => {},
+    ...options,
   });
   return {
     root,
@@ -295,6 +302,106 @@ it("does nothing when the display profile is missing", async () => {
   const { shared, store } = await makeRoots();
 
   const report = await store.capture(2);
+
+  expect(report).toEqual({ merged: [], replaced: [], copied: [], skipped: [] });
+  await expect(stat(shared)).rejects.toThrow();
+});
+
+const liveRows = [
+  { host: "kept.com", name: "sid", value: "live-older", lastUpdate: 20 },
+  { host: "replaced.com", name: "sid", value: "live-newer", lastUpdate: 30 },
+  { host: "new.com", name: "sid", value: "live-new", lastUpdate: 40 },
+];
+
+const sharedRows = [
+  { host: "kept.com", name: "sid", value: "shared-newer", lastUpdate: 90 },
+  { host: "replaced.com", name: "sid", value: "shared-older", lastUpdate: 10 },
+];
+
+const mergedRows = [
+  { host: "kept.com", value: "shared-newer", update: "90" },
+  { host: "new.com", value: "live-new", update: "40" },
+  { host: "replaced.com", value: "live-newer", update: "30" },
+];
+
+it("merges a live profile through a snapshot of its cookie database", async () => {
+  const { shared, store, display } = await makeRoots();
+  await writeCookieDatabase(sharedCookiePath(shared), sharedRows);
+  await writeCookieDatabase(displayCookiePath(display(1)), liveRows);
+
+  const report = await store.captureLive(display(1), { sqliteOnly: false });
+
+  expect(report.merged).toEqual(["Default/Network/Cookies"]);
+  expect(report.skipped).toEqual([]);
+  expect(readCookies(sharedCookiePath(shared))).toEqual(mergedRows);
+  expect(await readdir(join(shared, "Default/Network"))).toEqual(["Cookies"]);
+});
+
+it("falls back to a raw copy when the snapshot cannot be vacuumed", async () => {
+  const attempts: string[] = [];
+  const { shared, store, display } = await makeRoots({
+    vacuumInto: (source) => {
+      attempts.push(source);
+      throw new Error("database is locked");
+    },
+  });
+  await writeCookieDatabase(sharedCookiePath(shared), sharedRows);
+  await writeCookieDatabase(displayCookiePath(display(1)), liveRows);
+
+  const report = await store.captureLive(display(1), { sqliteOnly: true });
+
+  expect(attempts).toContain(displayCookiePath(display(1)));
+  expect(report.merged).toEqual(["Default/Network/Cookies"]);
+  expect(readCookies(sharedCookiePath(shared))).toEqual(mergedRows);
+  expect(await readdir(join(shared, "Default/Network"))).toEqual(["Cookies"]);
+});
+
+it("skips an entry whose snapshot does not pass quick_check", async () => {
+  const { shared, store, display } = await makeRoots({
+    vacuumInto: (_source, target) => writeFileSync(target, "not a database"),
+  });
+  await writeCookieDatabase(sharedCookiePath(shared), sharedRows);
+  await writeCookieDatabase(displayCookiePath(display(1)), liveRows);
+
+  const report = await store.captureLive(display(1), { sqliteOnly: true });
+
+  expect(report.merged).toEqual([]);
+  expect(report.replaced).toEqual([]);
+  expect(report.skipped.map(({ entry }) => entry)).toEqual(["Default/Network/Cookies"]);
+  expect(report.skipped[0]?.reason).toContain("snapshot");
+  // The corrupt snapshot never becomes the shared cookie database.
+  expect(readCookies(sharedCookiePath(shared))).toEqual([
+    { host: "kept.com", value: "shared-newer", update: "90" },
+    { host: "replaced.com", value: "shared-older", update: "10" },
+  ]);
+  expect(await readdir(join(shared, "Default/Network"))).toEqual(["Cookies"]);
+});
+
+it("leaves the directory entries alone when capturing sqlite only", async () => {
+  const { shared, store, display } = await makeRoots();
+  await mkdir(join(shared, "Default/Local Storage/leveldb"), { recursive: true });
+  await writeFile(join(shared, "Default/Local Storage/leveldb/old.log"), "old");
+  await writeCookieDatabase(displayCookiePath(display(1)), liveRows);
+  await mkdir(join(display(1), "Default/Local Storage/leveldb"), { recursive: true });
+  await writeFile(join(display(1), "Default/Local Storage/leveldb/new.log"), "new");
+
+  const sqliteOnly = await store.captureLive(display(1), { sqliteOnly: true });
+
+  expect(sqliteOnly.copied).toEqual(["Default/Network/Cookies"]);
+  expect(await readdir(join(shared, "Default/Local Storage/leveldb"))).toEqual(["old.log"]);
+
+  const full = await store.captureLive(display(1), { sqliteOnly: false });
+
+  expect(full.replaced).toContain("Default/Local Storage");
+  expect(await readdir(join(shared, "Default/Local Storage/leveldb"))).toEqual(["new.log"]);
+  const remaining = await readdir(join(shared, "Default"));
+  expect(remaining.some((name) => /\.(?:tmp|old|snap)-/u.test(name))).toBe(false);
+});
+
+it("does nothing when the live profile is missing", async () => {
+  const { shared, store, display } = await makeRoots();
+
+  const report = await store.captureLive(display(1), { sqliteOnly: false });
 
   expect(report).toEqual({ merged: [], replaced: [], copied: [], skipped: [] });
   await expect(stat(shared)).rejects.toThrow();

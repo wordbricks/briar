@@ -16,6 +16,7 @@ import {
   decodeSandboxBootstrapPayload,
   novncCommand,
   novncTokenFileContents,
+  primaryDisplayEnvironment,
   readSandboxState,
   runSandboxBootstrap,
   runSandboxUnregister,
@@ -573,6 +574,14 @@ describe("primary display", () => {
   it("keeps the owner desktop :1 through the managed remote-desktop script", async () => {
     expect(primaryDisplayCommand()).toEqual(["/opt/briar/bin/briar-remote-desktop"]);
     expect(await primaryDisplayListening(1)).toBe(false);
+  });
+
+  it("pins the owner desktop browser to the display-1 login profile", () => {
+    const environment = primaryDisplayEnvironment({ PATH: "/opt/briar/bin" });
+    expect(environment).toEqual({
+      PATH: "/opt/briar/bin",
+      BRIAR_BROWSER_PROFILE_DIRECTORY: "/var/lib/briar-computer-use/profiles/display-1",
+    });
   });
 });
 

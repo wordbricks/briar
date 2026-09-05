@@ -43,6 +43,11 @@ sandbox는 Grok Bot의 로컬 VM처럼 에이전트가 볼 수 있는 데스크�
   seed한다. 프로필 사이에서 복호화되도록 `--password-store=basic`으로 Chrome 기본 키를 쓴다.
 - **소유자 디스플레이 `:1`**: supervisor가 `briar-remote-desktop`으로 `:1`(loopback 5901)을
   항상 띄운다. 에이전트가 없어도 볼 수 있는 데스크톱이며, 에이전트는 `:2` 이상을 쓴다.
+  supervisor가 이 프로세스에 `BRIAR_BROWSER_PROFILE_DIRECTORY=/var/lib/briar-computer-use/profiles/display-1`을
+  넘기므로 `:1`의 Chromium도 고정된 프로필을 쓰고, 여기서 한 로그인은 box 서비스가 공유
+  저장소로 capture해 모든 에이전트 디스플레이에 전파된다. 이미지 갱신 전 기본
+  프로필(`~/.config/chromium`)의 기존 로그인은 이전하지 않으므로 갱신 후 `:1`에서 한 번 다시
+  로그인한다.
 - **사용자가 보는 화면**: 컨테이너 안 websockify + noVNC가 6080에서 모든 디스플레이를
   `?token=displayN`으로 라우팅하고, Docker 호스트의 loopback(`--view-port`, 기본 6080)에만
   publish된다. `briar sandbox view --name <name> [--display N]`이 원격 호스트면 SSH 포트
