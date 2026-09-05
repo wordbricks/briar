@@ -17,16 +17,21 @@ import { sandboxRuntimeAssets } from "./sandbox-runtime-assets";
  * consulting the registry, exactly like Grok Bot's local Docker VM.
  */
 
-export const SANDBOX_SCHEMA_VERSION = "1";
+export const SANDBOX_SCHEMA_VERSION = "2";
 export const SANDBOX_IMAGE_REPOSITORY = "briar-sandbox";
 export const SANDBOX_RUNTIME_ROOT = "/opt/briar";
 export const SANDBOX_CLI_PATH = `${SANDBOX_RUNTIME_ROOT}/bin/briar`;
 export const SANDBOX_HOME = "/home/briar";
 export const SANDBOX_CONFIG_HOME = `${SANDBOX_HOME}/.config/briar`;
 export const DEFAULT_DEBIAN_MIRROR = "deb.debian.org";
+/**
+ * Display profiles, the shared browser login store, and the box service's auth
+ * token live here. It is a volume so a container replacement keeps the logins.
+ */
+export const SANDBOX_COMPUTER_USE_ROOT = "/var/lib/briar-computer-use";
 /** noVNC listens here inside the container; the host publishes it on loopback. */
 export const SANDBOX_NOVNC_PORT = 6080;
-export const SANDBOX_NOVNC_TOKEN_FILE = "/var/lib/briar-computer-use/novnc-tokens";
+export const SANDBOX_NOVNC_TOKEN_FILE = `${SANDBOX_COMPUTER_USE_ROOT}/novnc-tokens`;
 
 const debianMirrorPattern = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/u;
 

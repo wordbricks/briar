@@ -354,9 +354,14 @@ setup agent는 고정된 provider 명령만 pseudo-terminal에서 실행한다. 
 ## 기존 컴퓨터 업그레이드와 릴리스 기록
 
 - 새 신청은 검증된 새 AMI ID를 넣어 CloudFormation을 갱신하고, 스택 출력의 **새 숫자 Launch Template 버전**을 Worker 설정에 기록한다. `$Latest`/`$Default`는 사용하지 않는다.
-- 기존 컴퓨터는 실행 중인 작업을 drain하고 중지한 뒤 암호화 root EBS snapshot을 만든다. 같은 인스턴스를 다시 시작하여 검증된 같은 source commit의 이미지 artifact로 런타임·서비스를 갱신하면 `/home/briar`와 기존 로그인 상태를 유지할 수 있다. AMI 빌드 전용 `install-image-runtime`을 운영 인스턴스에 직접 실행하지 않는다.
+- 기존 컴퓨터는 실행 중인 작업을 drain하고 중지한 뒤 암호화 root EBS snapshot을 만든다. 같은 인스턴스를 다시 시작하여 검증된 같은 source commit의 이미지 artifact로 런타임·서비스를 갱신하면 `/home/briar`와 `/var/lib/briar-computer-use`(공유 브라우저 로그인 저장소와 `:1` 프로필)가 root 볼륨에 그대로 남는다. AMI 빌드 전용 `install-image-runtime`을 운영 인스턴스에 직접 실행하지 않는다.
 - 업그레이드 후 enrollment credential을 재발급하지 않는다. 기존 credential 파일을 확인한 뒤 `systemctl start briar-managed-computer.target`을 실행하고 `verify-remote-desktop`, health timer, Worker heartbeat, 실제 Briar 원격 연결을 확인한다. 실패하면 인스턴스를 중지하고 사전 snapshot으로 root volume을 복원한다.
-- 기존 컴퓨터를 새 AMI로 교체해야 한다면 사용자에게 로그아웃/재인증을 명시적으로 안내하고 새 D1 컴퓨터 레코드와 새 credential을 발급한다. 다른 컴퓨터의 홈이나 credential을 복사하지 않는다.
+- 기존 컴퓨터를 새 AMI로 교체해야 한다면 사용자에게 로그아웃/재인증을 명시적으로 안내하고 새 D1 컴퓨터 레코드와 새 credential을 발급한다. 다른 컴퓨터의 홈이나 credential은 복사하지 않으며, 소유자가 동의한 브라우저 로그인 저장소 이전만 예외로 둔다.
+- 브라우저 로그인 저장소 이전 절차. 저장소만 옮기고 Worker credential, 저장소 clone, provider 인증은 옮기지 않는다.
+  1. 중지 전 기존 컴퓨터에서 `sudo -u briar /opt/briar/bin/briar computer-use login-store export --out /tmp/login-store.tar.gz`를 실행한다. 아카이브는 0600이고 쿠키·저장된 비밀번호·Local Storage만 담는다.
+  2. SSM Session Manager로 아카이브를 내려받아 새 컴퓨터로 올린다. 이 파일은 그 컴퓨터의 로그인 그 자체이므로 티켓·채팅·객체 스토리지에 남기지 않는다.
+  3. 새 컴퓨터의 enrollment과 setup이 끝난 뒤 `sudo -u briar /opt/briar/bin/briar computer-use login-store import /tmp/login-store.tar.gz`를 실행한다. import는 공유 저장소에만 쓰고 살아 있는 `:1` 프로필은 건드리지 않는다.
+  4. 양쪽 인스턴스와 운영자 워크스테이션에서 아카이브를 즉시 삭제한다.
 
 릴리스 기록에는 `sourceCommit`, `amiId`, `baseAmiId`, `packageLockSha256`, `launchTemplateId`, `launchTemplateVersion`, `securityGroupId`, 검증 인스턴스 ID, 검증 시각, 10분 세션 측정값, 승인자를 모두 적는다. **실제 값과 관찰 결과가 없는 항목을 완료로 표시하지 않는다.**
 

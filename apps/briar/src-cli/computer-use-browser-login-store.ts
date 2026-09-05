@@ -260,6 +260,129 @@ const sqliteSnapshotProblem = (path: string): string | undefined => {
   }
 };
 
+const removeSnapshotFiles = async (snapshot: string): Promise<void> => {
+  await rm(snapshot, { force: true });
+  for (const suffix of sqliteSidecarSuffixes) {
+    await rm(`${snapshot}${suffix}`, { force: true });
+  }
+};
+
+/**
+ * Copy a database that may be open in a running Chrome. `VACUUM INTO` gives a
+ * consistent snapshot when the lock is free; otherwise the file and its
+ * sidecars are copied raw and SQLite recovers from the journal on open.
+ */
+const writeSqliteSnapshot = async (
+  source: string,
+  snapshot: string,
+  vacuumInto: (source: string, target: string) => void,
+  log: (message: string) => void,
+): Promise<void> => {
+  await removeSnapshotFiles(snapshot);
+  try {
+    vacuumInto(source, snapshot);
+    return;
+  } catch (error) {
+    log(`snapshot of ${source} fell back to a raw copy: ${describe(error)}`);
+  }
+  await removeSnapshotFiles(snapshot);
+  await copyFile(source, snapshot);
+  for (const suffix of sqliteSidecarSuffixes) {
+    const sidecar = `${source}${suffix}`;
+    if (await pathExists(sidecar)) await copyFile(sidecar, `${snapshot}${suffix}`);
+  }
+};
+
+/**
+ * Copy the whitelist out of a profile nothing is writing to, such as the
+ * shared store itself. Errors are the caller's to handle: a half-copied
+ * profile is never useful.
+ */
+export const copyComputerUseLoginEntries = async (
+  sourceDirectory: string,
+  targetDirectory: string,
+): Promise<ComputerUseBrowserLoginStoreReport> => {
+  const report = emptyReport();
+  for (const entry of computerUseSharedLoginSqliteEntries) {
+    const source = join(sourceDirectory, entry);
+    if (!(await pathExists(source))) continue;
+    const target = join(targetDirectory, entry);
+    await mkdir(dirname(target), { recursive: true, mode: 0o700 });
+    await copyFile(source, target);
+    for (const suffix of sqliteSidecarSuffixes) {
+      if (await pathExists(`${source}${suffix}`)) {
+        await copyFile(`${source}${suffix}`, `${target}${suffix}`);
+      }
+    }
+    report.copied.push(entry);
+  }
+  for (const entry of computerUseSharedLoginDirectoryEntries) {
+    const source = join(sourceDirectory, entry);
+    if (!(await pathExists(source))) continue;
+    const target = join(targetDirectory, entry);
+    await mkdir(dirname(target), { recursive: true, mode: 0o700 });
+    await cp(source, target, { recursive: true });
+    report.copied.push(entry);
+  }
+  return report;
+};
+
+export interface ComputerUseLoginSnapshotOptions {
+  readonly vacuumInto?: (source: string, target: string) => void;
+  readonly log?: (message: string) => void;
+  /** Left out when the profile's Chrome is running, as leveldb can be torn. */
+  readonly includeDirectories?: boolean;
+}
+
+/**
+ * Copy the whitelist out of a profile whose Chrome may still be running, such
+ * as the owner's display `:1`. Each SQLite entry is snapshotted and validated;
+ * an entry that cannot be read is reported rather than thrown.
+ */
+export const snapshotComputerUseLoginEntries = async (
+  sourceDirectory: string,
+  targetDirectory: string,
+  options: ComputerUseLoginSnapshotOptions = {},
+): Promise<ComputerUseBrowserLoginStoreReport> => {
+  const vacuumInto = options.vacuumInto ?? defaultVacuumInto;
+  const log = options.log ?? (() => undefined);
+  const report = emptyReport();
+  for (const entry of computerUseSharedLoginSqliteEntries) {
+    const source = join(sourceDirectory, entry);
+    const target = join(targetDirectory, entry);
+    try {
+      if (!(await pathExists(source))) continue;
+      await mkdir(dirname(target), { recursive: true, mode: 0o700 });
+      await writeSqliteSnapshot(source, target, vacuumInto, log);
+      const problem = sqliteSnapshotProblem(target);
+      if (problem !== undefined) {
+        await removeSnapshotFiles(target);
+        report.skipped.push({ entry, reason: problem });
+        continue;
+      }
+      report.copied.push(entry);
+    } catch (error) {
+      await removeSnapshotFiles(target).catch(() => undefined);
+      report.skipped.push({ entry, reason: describe(error) });
+    }
+  }
+  if (options.includeDirectories !== false) {
+    for (const entry of computerUseSharedLoginDirectoryEntries) {
+      const source = join(sourceDirectory, entry);
+      const target = join(targetDirectory, entry);
+      try {
+        if (!(await pathExists(source))) continue;
+        await mkdir(dirname(target), { recursive: true, mode: 0o700 });
+        await cp(source, target, { recursive: true });
+        report.copied.push(entry);
+      } catch (error) {
+        report.skipped.push({ entry, reason: describe(error) });
+      }
+    }
+  }
+  return report;
+};
+
 export class FileComputerUseBrowserLoginStore
 implements ComputerUseBrowserLoginStore, ComputerUseLiveBrowserLoginCapture {
   private readonly sharedDirectory: string;
@@ -369,27 +492,9 @@ implements ComputerUseBrowserLoginStore, ComputerUseLiveBrowserLoginCapture {
         await this.purgeTemporaryEntries();
         await rm(staging, { recursive: true, force: true });
         await mkdir(staging, { recursive: true, mode: 0o700 });
-        for (const entry of computerUseSharedLoginSqliteEntries) {
-          const source = join(this.sharedDirectory, entry);
-          if (!(await pathExists(source))) continue;
-          const target = join(staging, entry);
-          await mkdir(dirname(target), { recursive: true, mode: 0o700 });
-          await copyFile(source, target);
-          for (const suffix of sqliteSidecarSuffixes) {
-            if (await pathExists(`${source}${suffix}`)) {
-              await copyFile(`${source}${suffix}`, `${target}${suffix}`);
-            }
-          }
-          report.copied.push(entry);
-        }
-        for (const entry of computerUseSharedLoginDirectoryEntries) {
-          const source = join(this.sharedDirectory, entry);
-          if (!(await pathExists(source))) continue;
-          const target = join(staging, entry);
-          await mkdir(dirname(target), { recursive: true, mode: 0o700 });
-          await cp(source, target, { recursive: true });
-          report.copied.push(entry);
-        }
+        report.copied.push(
+          ...(await copyComputerUseLoginEntries(this.sharedDirectory, staging)).copied,
+        );
         await chmod(staging, 0o700);
         await rename(staging, displayDirectory);
       } catch (error) {
@@ -461,34 +566,6 @@ implements ComputerUseBrowserLoginStore, ComputerUseLiveBrowserLoginCapture {
     (targetExists ? report.replaced : report.copied).push(entry);
   }
 
-  private async removeSnapshot(snapshot: string): Promise<void> {
-    await rm(snapshot, { force: true });
-    for (const suffix of sqliteSidecarSuffixes) {
-      await rm(`${snapshot}${suffix}`, { force: true });
-    }
-  }
-
-  /**
-   * Copy a database that may be open in a running Chrome. `VACUUM INTO` gives
-   * a consistent snapshot when the lock is free; otherwise the file and its
-   * sidecars are copied raw and SQLite recovers from the journal on open.
-   */
-  private async snapshotSqliteFile(source: string, snapshot: string): Promise<void> {
-    await this.removeSnapshot(snapshot);
-    try {
-      this.vacuumInto(source, snapshot);
-      return;
-    } catch (error) {
-      this.log(`snapshot of ${source} fell back to a raw copy: ${describe(error)}`);
-    }
-    await this.removeSnapshot(snapshot);
-    await copyFile(source, snapshot);
-    for (const suffix of sqliteSidecarSuffixes) {
-      const sidecar = `${source}${suffix}`;
-      if (await pathExists(sidecar)) await copyFile(sidecar, `${snapshot}${suffix}`);
-    }
-  }
-
   capture(displayIndex: number): Promise<ComputerUseBrowserLoginStoreReport> {
     return this.runExclusive(async () => {
       const report = emptyReport();
@@ -540,7 +617,7 @@ implements ComputerUseBrowserLoginStore, ComputerUseLiveBrowserLoginCapture {
         try {
           if (!(await pathExists(source))) continue;
           await mkdir(dirname(target), { recursive: true, mode: 0o700 });
-          await this.snapshotSqliteFile(source, snapshot);
+          await writeSqliteSnapshot(source, snapshot, this.vacuumInto, this.log);
           const problem = sqliteSnapshotProblem(snapshot);
           if (problem !== undefined) {
             report.skipped.push({ entry, reason: problem });
@@ -550,7 +627,7 @@ implements ComputerUseBrowserLoginStore, ComputerUseLiveBrowserLoginCapture {
         } catch (error) {
           report.skipped.push({ entry, reason: describe(error) });
         } finally {
-          await this.removeSnapshot(snapshot).catch(() => undefined);
+          await removeSnapshotFiles(snapshot).catch(() => undefined);
         }
       }
       if (!options.sqliteOnly) {
