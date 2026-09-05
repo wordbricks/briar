@@ -17,6 +17,7 @@ import {
   summarizeChannelMessages,
   threadMessageIdSet,
   typingAgentNamesForReplies,
+  typingAgentsForReplies,
 } from "./model";
 
 const agentAuthor = {
@@ -235,6 +236,58 @@ describe("typing state", () => {
         testChannelAgentReply("c", { status: "completed" }),
       ].filter(channelReplyIsPending),
     ).toHaveLength(2);
+  });
+
+  it("returns agent descriptors with avatar, provider, and createdAt", () => {
+    const replies = [
+      testChannelAgentReply("reply-1", {
+        parentMessageId: "root",
+        createdAt: "2026-08-01T01:00:00.000Z",
+      }),
+      testChannelAgentReply("reply-2", {
+        parentMessageId: "root",
+        agentId: "agent-missing",
+        createdAt: "2026-08-01T01:05:00.000Z",
+      }),
+      testChannelAgentReply("reply-3", {
+        parentMessageId: "elsewhere",
+        createdAt: "2026-08-01T01:10:00.000Z",
+      }),
+    ];
+
+    const result = typingAgentsForReplies(
+      replies,
+      agents,
+      new Set(["root"]),
+      "Agent",
+    );
+    expect(result).toHaveLength(2);
+    expect(result[0]).toMatchObject({
+      name: "Builder",
+      provider: "claude",
+      createdAt: "2026-08-01T01:00:00.000Z",
+    });
+    expect(result[1]).toMatchObject({
+      name: "Agent",
+      provider: "claude",
+      createdAt: "2026-08-01T01:05:00.000Z",
+    });
+  });
+
+  it("deduplicates agents by agentId in typingAgentsForReplies", () => {
+    const replies = [
+      testChannelAgentReply("reply-1", { parentMessageId: "root" }),
+      testChannelAgentReply("reply-2", { parentMessageId: "root" }),
+    ];
+
+    const result = typingAgentsForReplies(
+      replies,
+      agents,
+      new Set(["root"]),
+      "Agent",
+    );
+    expect(result).toHaveLength(1);
+    expect(result[0]?.name).toBe("Builder");
   });
 
   it("watches the thread root together with its replies", () => {

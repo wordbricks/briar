@@ -184,6 +184,41 @@ export const activityForReplies = (
   return result;
 };
 
+/**
+ * The distinct agents replying under any of `messageIds`, with avatar, provider,
+ * and the reply's `createdAt` for placeholder-row timestamps.
+ */
+export interface TypingAgentDescriptor {
+  readonly name: string;
+  readonly avatar: string | null;
+  readonly provider: ChannelAgentSummary["provider"];
+  readonly createdAt: string;
+}
+
+export const typingAgentsForReplies = (
+  replies: readonly ChannelAgentReply[],
+  agents: readonly ChannelAgentSummary[],
+  messageIds: ReadonlySet<string>,
+  fallbackName: string,
+): TypingAgentDescriptor[] => {
+  const seen = new Set<string>();
+  const result: TypingAgentDescriptor[] = [];
+  for (const reply of replies) {
+    if (!messageIds.has(reply.parentMessageId)) continue;
+    const key = reply.agentId;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const agent = agents.find((a) => a.agentId === reply.agentId);
+    result.push({
+      name: agent?.name ?? fallbackName,
+      avatar: agent?.avatar ?? null,
+      provider: agent?.provider ?? "claude",
+      createdAt: reply.createdAt,
+    });
+  }
+  return result;
+};
+
 /** A reply that is still going to produce something. */
 export const channelReplyIsPending = (reply: ChannelAgentReply): boolean =>
   reply.status === "queued" || reply.status === "running";

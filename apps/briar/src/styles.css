@@ -5997,6 +5997,10 @@ button.issue-message-state { width:100%; cursor:pointer; }
   flex: 0 0 auto;
   padding: 0 16px 8px;
 }
+
+/* DM typing placeholder row — a full message-like row for each agent writing */
+.channel-typing-placeholder .loading-state { font-size: 13px; }
+
 .channel-empty { display: grid; place-items: center; height: 100%; }
 
 .channel-composer {
