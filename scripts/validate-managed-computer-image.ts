@@ -1,5 +1,9 @@
 import { statSync } from "node:fs";
 import { join } from "node:path";
+import {
+  agentProviders,
+  isOpenCodeUpstreamProvider,
+} from "../apps/briar/src/lib/agent-provider";
 
 const root = join(import.meta.dir, "..");
 const image = join(root, "infrastructure", "managed-computers");
@@ -602,6 +606,88 @@ for (const unitName of [
   if (/Requires=[^\n]*briar-managed-runtime-bootstrap\.service/u.test(unit)) {
     fail(`${unitName} must not fail when the runtime bootstrap fails`);
   }
+}
+
+/**
+ * Every provider that owns a runner bundle. OpenCode upstream providers run on
+ * the OpenCode runner and ship none of their own, so the catalog is the single
+ * source of truth for which `dist-agent/*-runner.js` files must exist.
+ *
+ * `detached-provider-turn.ts` resolves a runner beside the CLI bundle it runs
+ * from, and reports `<provider> runner bundle is missing` when it cannot. Every
+ * step that builds, ships, installs or verifies a managed runtime therefore has
+ * to name the same runners, or a provider added later silently reaches managed
+ * computers without its bundle and only fails once a task starts.
+ */
+const providerRunnerNames = [...agentProviders]
+  .filter((provider) => !isOpenCodeUpstreamProvider(provider))
+  .sort();
+const providerRunnerList = providerRunnerNames.join(" ");
+const sortedNames = (names: readonly string[]) => [...names].sort().join(" ");
+
+const appPackage = await Bun.file(
+  join(root, "apps", "briar", "package.json"),
+).json() as { scripts?: Record<string, string> };
+const builtRunners = [
+  ...(appPackage.scripts?.["agent:build"] ?? "")
+    .matchAll(/dist-agent\/([a-z0-9-]+)-runner\.js/gu),
+].map((match) => match[1]!);
+if (sortedNames(builtRunners) !== providerRunnerList) {
+  fail(
+    `agent:build must build exactly one runner per non-upstream provider: ${providerRunnerList}`,
+  );
+}
+
+const desktopBundle = await Bun.file(
+  join(root, "apps", "briar", "src-tauri", "tauri.conf.json"),
+).json() as { bundle?: { resources?: Record<string, string> } };
+const bundledRunners = Object.keys(desktopBundle.bundle?.resources ?? {})
+  .map((source) => source.match(/^\.\.\/dist-agent\/([a-z0-9-]+)-runner\.js$/u)?.[1])
+  .filter((name) => name !== undefined);
+if (sortedNames(bundledRunners) !== providerRunnerList) {
+  fail(
+    `desktop bundle resources must carry every provider runner: ${providerRunnerList}`,
+  );
+}
+
+const requireShellRunnerList = (source: string, label: string) => {
+  const declared = source.match(/for runner_name in ([a-z0-9 -]+); do/u)?.[1];
+  if (!declared) fail(`${label} must require each provider runner by name`);
+  if (sortedNames(declared!.trim().split(/\s+/u)) !== providerRunnerList) {
+    fail(`${label} runner list differs from the provider catalog: ${providerRunnerList}`);
+  }
+};
+const releasePackager = await text(
+  join(root, "scripts", "package-managed-runtime-release.sh"),
+);
+const packagedRunners = releasePackager.match(
+  /provider_runner_names=\(([a-z0-9 -]+)\)/u,
+)?.[1];
+if (!packagedRunners) {
+  fail("managed runtime packaging must require each provider runner by name");
+}
+if (sortedNames(packagedRunners!.trim().split(/\s+/u)) !== providerRunnerList) {
+  fail(
+    `managed runtime packaging runner list differs from the provider catalog: ${providerRunnerList}`,
+  );
+}
+requireShellRunnerList(artifactPreparer, "image artifact preparation");
+requireShellRunnerList(installer, "image installer");
+requireShellRunnerList(verifier, "image verifier");
+const updaterRunners = [
+  ...updater.matchAll(/lib\/agent\/([a-z0-9-]+)-runner\.js/gu),
+].map((match) => match[1]!);
+if (sortedNames(updaterRunners) !== providerRunnerList) {
+  fail(
+    `runtime updater must reject a release missing any provider runner: ${providerRunnerList}`,
+  );
+}
+const updaterQa = await text(
+  join(root, "scripts", "qa-managed-runtime-updater.sh"),
+);
+requireShellRunnerList(updaterQa, "runtime updater QA");
+if (!updaterQa.includes("missing lib/agent/claude-runner.js")) {
+  fail("runtime updater QA must cover a release missing a provider runner");
 }
 
 const releaseConfig = Object.fromEntries(

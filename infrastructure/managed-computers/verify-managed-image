@@ -110,9 +110,11 @@ sudo -u briar -H bash -lc 'rustup run 1.96.0 rustc --version' \
 
 # Require every provider runner by name instead of a total count, so adding a
 # provider cannot silently break image verification and a missing runner still
-# fails loudly.
+# fails loudly. `/opt/briar/bin/briar` runs the active release's lib/briar.js,
+# which resolves runners beside itself, so the release copy is verified too.
 for runner_name in agy claude codex cursor grok opencode pi; do
   test -s "/opt/briar/lib/agent/$runner_name-runner.js"
+  test -s "/opt/briar/current/lib/agent/$runner_name-runner.js"
 done
 test -s /opt/briar/lib/agent/computer-use-mcp-server.js
 test "$(readlink -f /opt/briar/current)" = \

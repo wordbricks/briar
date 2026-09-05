@@ -116,8 +116,12 @@ chmod 0755 \
   "$fake_bin/briar-control" "$fake_bin/curl" "$fake_bin/minisign" \
   "$fake_bin/systemctl"
 
+# make_release <version> [omitted-runner-name]
+# The optional second argument drops one provider runner from the staged
+# release so the missing-runner rejection can be exercised.
 make_release() {
   local version="$1"
+  local omit_runner="${2:-}"
   local stage="$fixture/stage-$version"
   rm -rf -- "$stage"
   mkdir -p \
@@ -130,7 +134,11 @@ make_release() {
   printf '#!/usr/bin/env python3\n' > "$stage/libexec/briar-computer-executor.py"
   chmod 0755 "$stage/libexec/briar-computer-executor.py"
   printf 'cli\n' > "$stage/lib/briar.js"
-  printf 'runner\n' > "$stage/lib/agent/codex-runner.js"
+  for runner_name in agy claude codex cursor grok opencode pi; do
+    if [[ "$runner_name" != "$omit_runner" ]]; then
+      printf 'runner\n' > "$stage/lib/agent/$runner_name-runner.js"
+    fi
+  done
   printf 'computer use mcp\n' > \
     "$stage/lib/agent/computer-use-mcp-server.js"
   printf 'workflow\n' > "$stage/skills/briar-workflow/SKILL.md"
@@ -225,6 +233,17 @@ test "$(readlink -f "$runtime_root/current")" = "$runtime_root/releases/2.0.0"
 jq -e \
   '.outcome == "failed" and .targetVersion == "1.9.0" and
    (.detail | contains("Refusing to downgrade"))' \
+  "$state_directory/last-result.json" >/dev/null
+
+# A release missing a provider runner must be rejected before activation, so
+# Computer Use never reports a missing runner bundle on a running instance.
+make_release 2.0.2 claude
+run_update aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa 2.0.2 0
+test "$(readlink -f "$runtime_root/current")" = "$runtime_root/releases/2.0.0"
+test ! -e "$runtime_root/releases/2.0.2"
+jq -e \
+  '.outcome == "failed" and .targetVersion == "2.0.2" and
+   (.detail | contains("missing lib/agent/claude-runner.js"))' \
   "$state_directory/last-result.json" >/dev/null
 
 for skill_root in \

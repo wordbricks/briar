@@ -19,7 +19,7 @@
 
 버전이 고정된 AMI에 다음 항목을 설치한다.
 
-1. `/opt/briar/bin/briar` CLI와 여섯 provider runner bundle. `/opt/briar/bin`에는 버전이 고정된 Bun·Node.js·Rust(`rustfmt`, `clippy`)·`cargo-audit`·`gitleaks`, Codex·Claude·Cursor Agent·Grok·Antigravity·OpenCode CLI와 `agent-browser`를 설치한다. OpenRouter는 같은 OpenCode 실행파일을 사용한다. 로그인 terminal과 managed Worker 모두 이 경로와 같은 `CARGO_HOME`·`RUSTUP_HOME`을 사용한다.
+1. `/opt/briar/bin/briar` CLI와 일곱 provider runner bundle(`agy`·`claude`·`codex`·`cursor`·`grok`·`opencode`·`pi`). `/opt/briar/bin`에는 버전이 고정된 Bun·Node.js·Rust(`rustfmt`, `clippy`)·`cargo-audit`·`gitleaks`, Codex·Claude·Cursor Agent·Grok·Antigravity·OpenCode CLI와 `agent-browser`를 설치한다. OpenRouter는 같은 OpenCode 실행파일을 사용한다. 로그인 terminal과 managed Worker 모두 이 경로와 같은 `CARGO_HOME`·`RUSTUP_HOME`을 사용한다.
 2. 승인 시점의 AWS Systems Manager Agent(`amazon-ssm-agent`). 버전과 설치 파일 SHA-256은 `image-lock.env`에 함께 고정한다.
 3. sudo 관리자 권한이 있는 `briar` 사용자와 XFCE, 실제 Google Chrome, TigerVNC, D-Bus, C/C++ build toolchain과 Noto CJK 글꼴. GitHub CLI는 기본 이미지 요구사항이 아니다. XFCE Terminal은 Korean glyph를 포함하는 `Noto Sans Mono CJK KR`을 기본으로 사용한다. `remote-desktop-packages.txt`의 각 Debian 패키지는 승인된 Debian 13 snapshot에서 `resolve-remote-desktop-packages`로 정확한 `package=version` lock을 만든 후 설치한다.
 4. `briar-managed-computer.target`과 health timer를 설치하고 부팅 대상으로 활성화한다. target이 enrollment, signed runtime updater, Worker supervisor, loopback 원격 데스크톱과 outbound 원격 세션 서비스를 순서대로 묶는다. 개별 서비스는 target이 관리하므로 각각을 별도 multi-user 부팅 링크로 활성화하지 않는다. Worker supervisor는 `/var/lib/briar/worker-credential.json`의 machine credential을 값으로 복사하지 않고 파일에서 읽으며, 설정된 각 프로젝트에 Worker 프로세스를 하나씩 유지한다.
@@ -87,9 +87,13 @@ unit이 없는 AMI로 만든 기존 managed computer는 이 기능을 스스로 
 AMI 교체가 필요하다.
 
 이 경로는 Briar CLI, runner, 원격 세션 agent와 `briar-workflow`/`browser` Skill을
-업데이트한다. Debian, Chrome, Bun, Rust와 provider CLI 같은 base toolchain은 계속
-AMI 교체로 배포한다. updater가 포함되기 전에 생성된 기존 managed computer는 이
-기능을 스스로 설치할 수 없으므로 updater-capable AMI로 한 번 교체해야 한다.
+업데이트한다. updater는 릴리스를 활성화하기 전에 일곱 provider runner bundle이
+모두 들어 있는지 확인하고, 하나라도 없으면 설치를 거부한 뒤 기존 릴리스를 그대로
+둔다. 러너가 빠진 릴리스가 활성화되면 Computer Use 태스크마다
+`<provider> runner bundle is missing`으로 실패하기 때문이다. Debian, Chrome,
+Bun, Rust와 provider CLI 같은 base toolchain은 계속 AMI 교체로 배포한다.
+updater가 포함되기 전에 생성된 기존 managed computer는 이 기능을 스스로 설치할
+수 없으므로 updater-capable AMI로 한 번 교체해야 한다.
 
 ### 1.2 부팅 순서와 자동 복구
 

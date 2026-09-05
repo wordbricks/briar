@@ -191,6 +191,12 @@ systemctl enable amazon-ssm-agent.service
 install -d -o root -g root -m 0755 /opt/briar/lib/agent
 install -o root -g root -m 0644 "$source_dir/briar.js" \
   /opt/briar/lib/briar.js
+# Name every provider runner the baked runtime and its initial release must
+# carry. Without this an artifact set missing one runner still installs, and
+# only the first Computer Use task on the instance reports the missing bundle.
+for runner_name in agy claude codex cursor grok opencode pi; do
+  test -s "$source_dir/agent/$runner_name-runner.js"
+done
 for runner in "$source_dir"/agent/*-runner.js; do
   test -s "$runner"
   install -o root -g root -m 0644 "$runner" \
