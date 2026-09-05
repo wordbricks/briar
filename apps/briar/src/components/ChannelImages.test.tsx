@@ -9,6 +9,7 @@ import {
   ChannelDraftImages,
   ChannelMessageImageCacheProvider,
   ChannelMessageImages,
+  channelBodyWithoutImages,
   draftChannelImage,
   registerChannelMessageImageSource,
 } from "./ChannelImages";
@@ -189,5 +190,10 @@ describe("channel message attachments", () => {
     expect(img?.src).toBe("blob:http://localhost/cached-source");
     expect(container.querySelector('[aria-label="churning"]')).toBeNull();
     expect(load).not.toHaveBeenCalled();
+  });
+
+  it("normalizes escaped line breaks in message bodies", () => {
+    expect(channelBodyWithoutImages("first\\nsecond\\r\\nthird"))
+      .toBe("first\nsecond\nthird");
   });
 });
