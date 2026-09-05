@@ -15,6 +15,7 @@ import {
   novncTokenFileContents,
   readSandboxState,
   runSandboxBootstrap,
+  runSandboxUnregister,
   type SandboxBootstrapPayload,
   sandboxReport,
   type SandboxState,
@@ -322,6 +323,80 @@ describe("sandboxWorkerTeamIds", () => {
     };
     expect(sandboxWorkerTeamIds(config, state)).toEqual([projectId]);
     expect(sandboxWorkerTeamIds(config, null)).toEqual([]);
+  });
+});
+
+describe("runSandboxUnregister", () => {
+  const state: SandboxState = {
+    schemaVersion: SANDBOX_SCHEMA_VERSION,
+    label: "sandbox-gx10",
+    teamIds: [projectId, otherProjectId],
+    bootstrappedAt: "2026-09-05T00:00:00.000Z",
+  };
+  const configWithWorker = (): Config => {
+    const config = baseConfig();
+    config.userToken = userToken;
+    config.teams = [
+      {
+        id: projectId,
+        repositoryPath: "/a",
+        apiUrl: "https://briar.example",
+        agentToken,
+        executionWorker: {
+          deviceId: "device",
+          workerId: "worker-1",
+          organizationId,
+          label: "sandbox-gx10",
+          maxConcurrentSessions: 1,
+        },
+      },
+      { id: otherProjectId, repositoryPath: "/b", apiUrl: "https://briar.example", agentToken },
+    ];
+    return config;
+  };
+
+  it("unbinds every registered team and reports the rest", async () => {
+    const calls: string[] = [];
+    const result = await runSandboxUnregister({
+      loadConfig: async () => configWithWorker(),
+      readState: async () => state,
+      unregister: async (input) => {
+        calls.push(`${input.team.id}:${input.reason}`);
+        return {
+          deviceId: "device",
+          projectId: input.team.id,
+          workerId: input.team.executionWorker!.workerId,
+          state: "unbound",
+        };
+      },
+    });
+    expect(calls).toEqual([`${projectId}:explicit_user_unlink`]);
+    expect(result.teams).toEqual([
+      { id: projectId, workerId: "worker-1", state: "unbound" },
+      { id: otherProjectId, workerId: null, state: "not_registered" },
+    ]);
+  });
+
+  it("records failures per team instead of aborting", async () => {
+    const result = await runSandboxUnregister({
+      loadConfig: async () => configWithWorker(),
+      readState: async () => state,
+      unregister: async () => {
+        throw new Error("server unreachable");
+      },
+    });
+    expect(result.teams[0]).toMatchObject({ state: "failed", detail: "server unreachable" });
+  });
+
+  it("does nothing without state", async () => {
+    const result = await runSandboxUnregister({
+      loadConfig: async () => configWithWorker(),
+      readState: async () => null,
+      unregister: async () => {
+        throw new Error("must not be called");
+      },
+    });
+    expect(result.teams).toEqual([]);
   });
 });
 

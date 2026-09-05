@@ -116,14 +116,21 @@ briar sandbox logs --name gx10 --follow
 briar sandbox shell --name gx10       # 컨테이너 안 bash
 briar sandbox recreate --name gx10    # 컨테이너 재시작
 briar sandbox stop --name gx10
-briar sandbox rm --name gx10          # 컨테이너 제거, 볼륨은 유지
-briar sandbox rm --name gx10 --purge  # 볼륨까지 제거
+briar sandbox rm --name gx10          # 워커 등록 해제 + 컨테이너 제거, 볼륨은 유지
+briar sandbox rm --name gx10 --purge  # 볼륨, 이미지, Briar가 만든 Docker context까지 제거
 briar sandbox verify --name gx10      # 디스플레이 할당 + 스크린샷 canary
 briar sandbox view --name gx10        # 에이전트 화면을 브라우저 noVNC로 보기
 ```
 
-`rm`은 Briar 서버의 워커 등록을 지우지 않는다. 컨테이너가 사라지면 워커는
-heartbeat가 끊겨 offline으로 보이고, 필요하면 앱의 fleet 화면에서 정리한다.
+`rm`은 먼저 컨테이너 안에서 `briar sandbox unregister`를 실행해 이 sandbox가
+등록한 워커를 서버에서 모두 unbind한 뒤 컨테이너를 지운다. 멈춰 있는
+컨테이너는 unbind를 위해 잠시 시작한다. 서버에 닿지 못하면 팀별 실패를
+경고로 출력하고 삭제는 계속 진행하므로, 그 경우 앱 fleet 화면에서 offline
+워커를 정리한다. 워커 등록을 남겨 두려면 `--keep-workers`를 준다.
+
+`--purge`가 지우는 Docker context는 `--host`로 Briar가 만든
+`briar-sandbox-<name>`뿐이다. `--context`로 직접 지정한 context는 건드리지
+않는다.
 
 ## 보안 경계
 

@@ -17,6 +17,7 @@ import {
   readStdin,
   runSandboxBootstrap,
   runSandboxSupervisor,
+  runSandboxUnregister,
   sandboxReport,
   type SandboxBootstrapPayload,
 } from "./sandbox-bootstrap";
@@ -39,6 +40,7 @@ import {
   SANDBOX_SCHEMA_VERSION,
   debianMirror,
   resolveSandboxRuntimeSources,
+  sandboxImageTag,
   stageSandboxBuildContext,
 } from "./sandbox-image";
 import { probeComputerUseDisplay } from "./worker-commands";
@@ -63,10 +65,14 @@ const requestedName = () => sandboxName(value("--name"));
 
 async function resolveDocker(name: string, entry?: SandboxHostEntry) {
   const explicitContext = value("--context");
-  const host = value("--host");
-  if (explicitContext && host) {
+  const explicitHost = value("--host");
+  if (explicitContext && explicitHost) {
     throw new Error("Use only one of --context or --host");
   }
+  // A removed sandbox keeps its host in the registry while `rm --purge`
+  // deletes the Docker context Briar created, so re-ensure the context from
+  // the host whenever no explicit routing flag is given.
+  const host = explicitHost ?? (explicitContext ? undefined : entry?.host);
   if (host) {
     const contextName = await ensureDockerContext(createDockerRunner(undefined), {
       name,
@@ -235,11 +241,37 @@ export async function sandboxRecreateCommand() {
 export async function sandboxRemoveCommand() {
   const name = requestedName();
   const entry = await registryEntry(name);
-  const { docker } = await resolveDocker(name, entry);
+  const { docker, dockerContext, host } = await resolveDocker(name, entry);
   const purge = has("--purge");
-  const removed = await removeSandbox(docker, name, { purge });
+  const result = await removeSandbox(docker, name, {
+    purge,
+    unregisterWorkers: !has("--keep-workers"),
+    ...(entry?.runtimeSha256 ? { imageTag: sandboxImageTag(entry.runtimeSha256) } : {}),
+    // Only a context Briar created from --host is ours to delete.
+    ...(host && dockerContext
+      ? { dockerContext, contextRunner: createDockerRunner(undefined) }
+      : {}),
+  });
   await removeSandboxHostEntry(name);
-  console.log(JSON.stringify({ name, removed, purged: purge }));
+  if (result.unregisterDetail) console.error(result.unregisterDetail);
+  for (const team of result.unregistered?.teams ?? []) {
+    if (team.state === "failed") {
+      console.error(`Team ${team.id}: worker ${team.workerId ?? "?"} was not unregistered (${team.detail ?? "unknown error"})`);
+    }
+  }
+  console.log(JSON.stringify({
+    name,
+    removed: result.existed,
+    purged: purge,
+    workers: result.unregistered?.teams ?? [],
+    volumeRemoved: result.volumeRemoved,
+    imageRemoved: result.imageRemoved,
+    contextRemoved: result.contextRemoved,
+  }, null, 2));
+}
+
+export async function sandboxUnregisterCommand() {
+  console.log(JSON.stringify(await runSandboxUnregister()));
 }
 
 export async function sandboxLogsCommand() {
