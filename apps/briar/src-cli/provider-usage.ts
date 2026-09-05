@@ -22,6 +22,7 @@ import {
   readGrokAuthSession,
   readOpencodeAccountIdentity,
   readOpencodeGoKey,
+  refreshClaudeAccessToken,
   type GrokAuthSession,
 } from "./provider-credentials";
 
@@ -461,7 +462,7 @@ async function loadClaudeUsage(
   timeoutMs: number,
   fetchImpl: typeof fetch,
 ): Promise<ProviderUsageReport> {
-  const credentials = await readClaudeCredentials(home);
+  let credentials = await readClaudeCredentials(home);
   if (!credentials) {
     return providerWithoutUsage("unavailable", "Claude 로그인이 필요합니다.");
   }
@@ -470,12 +471,22 @@ async function loadClaudeUsage(
   // good. Only report an expired login once the refresh token is gone too.
   const state = claudeTokenState(credentials, now);
   if (state === "stale") {
-    return providerWithoutUsage(
-      "unavailable",
-      "Claude 액세스 토큰이 만료되어 usage를 불러오지 못했습니다. Claude Code를 실행하면 자동으로 갱신됩니다.",
-      credentials.accountLabel,
-      true,
-    );
+    // Briar holds the same refresh token Claude Code does, so the token is
+    // renewed here rather than waiting for the user's next Claude Code run.
+    const refreshed = await refreshClaudeAccessToken(credentials, {
+      now,
+      timeoutMs,
+      fetchImpl,
+    });
+    if (!refreshed || claudeTokenState(refreshed, now) !== "usable") {
+      return providerWithoutUsage(
+        "unavailable",
+        "Claude 액세스 토큰이 만료되어 usage를 불러오지 못했습니다. Claude Code를 실행하면 자동으로 갱신됩니다.",
+        credentials.accountLabel,
+        true,
+      );
+    }
+    credentials = refreshed;
   }
   if (state === "expired") {
     return {

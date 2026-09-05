@@ -23,3 +23,14 @@ paths = [
 ]
 regexTarget = "secret"
 regexes = ['''^getbriar-jay-10$''']
+
+[[allowlists]]
+description = "Claude Code's OAuth client identifier is public by design"
+condition = "AND"
+targetRules = ["generic-api-key"]
+paths = [
+  '''^apps/briar/src-cli/provider-credentials\.ts$''',
+  '''^docs/operations/security-exceptions\.md$''',
+]
+regexTarget = "secret"
+regexes = ['''^9d1c250a-e61b-44d9-88ed-5944d1962f5e$''']
