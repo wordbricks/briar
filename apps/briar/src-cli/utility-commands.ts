@@ -79,12 +79,12 @@ async function showSkillGuide() {
 }
 
 async function mergeQueueCommandProject(config: Config) {
-  const projectId = value("--project");
+  const projectId = value("--team");
   const project = projectId
-    ? config.projects.find((candidate) => candidate.id === projectId)
+    ? config.teams.find((candidate) => candidate.id === projectId)
     : await currentProject(config);
   if (!project) {
-    throw new Error("이 컴퓨터에 연결된 프로젝트를 찾지 못했습니다.");
+    throw new Error("이 컴퓨터에 연결된 팀을 찾지 못했습니다.");
   }
   if (!config.userToken) {
     throw new Error("`briar login`으로 먼저 로그인하세요.");

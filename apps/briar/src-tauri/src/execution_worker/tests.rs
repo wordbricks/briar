@@ -214,7 +214,7 @@ fn reports_health_drift_and_repairs_bundled_assets() {
     assert!(repaired.cli_current);
 
     let mut config = read_cli_config(&config_path).expect("config should be readable");
-    config.projects[0]
+    config.teams[0]
         .auto_hunt
         .as_option_mut()
         .expect("Auto Hunt settings should exist")
@@ -236,7 +236,7 @@ fn reports_health_drift_and_repairs_bundled_assets() {
     assert!(without_velen.velen_org.is_none());
 
     let mut config = read_cli_config(&config_path).expect("config should be readable");
-    config.projects[0]
+    config.teams[0]
         .auto_hunt
         .as_option_mut()
         .and_then(|auto_hunt| auto_hunt.workflow.as_option_mut())
@@ -277,8 +277,8 @@ fn inspects_local_workers_without_mutating_their_configuration() {
     let project_one = "11111111-1111-4111-8111-111111111111";
     let project_two = "22222222-2222-4222-8222-222222222222";
     let config = LocalConfig {
-        projects: vec![
-            LocalProjectConfig {
+        teams: vec![
+            LocalTeamConfig {
                 id: project_one.to_string(),
                 repository_path: "/repo/one".to_string(),
                 api_url: "https://briar.example.com".to_string(),
@@ -295,7 +295,7 @@ fn inspects_local_workers_without_mutating_their_configuration() {
                 .into(),
                 ..Default::default()
             },
-            LocalProjectConfig {
+            LocalTeamConfig {
                 id: project_two.to_string(),
                 repository_path: "/repo/two".to_string(),
                 api_url: "https://briar.example.com".to_string(),
@@ -351,7 +351,7 @@ fn resolves_the_registered_worker_device_for_the_requested_organization() {
     let local_device = "44444444-4444-4444-8444-444444444444";
     let local_organization = "55555555-5555-4555-8555-555555555555";
     let config = LocalConfig {
-        projects: [
+        teams: [
             (
                 "11111111-1111-4111-8111-111111111111",
                 "/repo/one",
@@ -379,24 +379,22 @@ fn resolves_the_registered_worker_device_for_the_requested_organization() {
         ]
         .into_iter()
         .map(
-            |(id, repository_path, worker_id, device_id, organization_id, token)| {
-                LocalProjectConfig {
-                    id: id.to_string(),
-                    repository_path: repository_path.to_string(),
-                    api_url: "https://briar.example.com".to_string(),
-                    agent_token: Some(format!("briar_agent_{worker_id}")),
-                    execution_worker: LocalExecutionWorkerConfig {
-                        worker_id: worker_id.to_string(),
-                        device_id: device_id.to_string(),
-                        organization_id: organization_id.to_string(),
-                        label: "Dev Mac".to_string(),
-                        max_concurrent_sessions: 3,
-                        token: Some(token.to_string()),
-                        ..Default::default()
-                    }
-                    .into(),
+            |(id, repository_path, worker_id, device_id, organization_id, token)| LocalTeamConfig {
+                id: id.to_string(),
+                repository_path: repository_path.to_string(),
+                api_url: "https://briar.example.com".to_string(),
+                agent_token: Some(format!("briar_agent_{worker_id}")),
+                execution_worker: LocalExecutionWorkerConfig {
+                    worker_id: worker_id.to_string(),
+                    device_id: device_id.to_string(),
+                    organization_id: organization_id.to_string(),
+                    label: "Dev Mac".to_string(),
+                    max_concurrent_sessions: 3,
+                    token: Some(token.to_string()),
                     ..Default::default()
                 }
+                .into(),
+                ..Default::default()
             },
         )
         .collect(),

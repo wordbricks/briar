@@ -31,14 +31,14 @@ describe("sandbox host registry", () => {
     await upsertSandboxHostEntry("gx10", {
       dockerContext: "briar-sandbox-gx10",
       host: "ssh://jay@gx10",
-      projectIds: [projectId],
+      teamIds: [projectId],
       gpus: true,
       runtimeSha256: "a".repeat(64),
       updatedAt: "2026-09-05T00:00:00.000Z",
     }, root);
     const loaded = await loadSandboxHostConfig(root);
     expect(loaded.sandboxes.gx10?.host).toBe("ssh://jay@gx10");
-    expect(loaded.sandboxes.gx10?.projectIds).toEqual([projectId]);
+    expect(loaded.sandboxes.gx10?.teamIds).toEqual([projectId]);
     const raw = await readFile(sandboxHostConfigPath(root), "utf8");
     expect(raw).not.toContain("briar_agent_");
     expect(raw).not.toContain("token");

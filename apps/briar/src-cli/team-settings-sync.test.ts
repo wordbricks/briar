@@ -53,7 +53,7 @@ describe("team settings sync", () => {
         browserAutomationProvider:
           "LOCAL_BROWSER_AUTOMATION_PROVIDER_EGO_BROWSER",
       },
-      projects: [{
+      teams: [{
         id: projectId,
         repositoryPath: "/home/briar/briar",
         apiUrl: "https://briar.example",
@@ -82,7 +82,7 @@ describe("team settings sync", () => {
       projectId,
       settings,
     );
-    const project = updated.projects[0]!;
+    const project = updated.teams[0]!;
 
     expect(project).toMatchObject({
       repositoryPath: "/home/briar/briar",

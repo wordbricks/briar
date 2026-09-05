@@ -24,7 +24,7 @@ pub(super) fn config_with_cli_owned_settings(
     sandbox: Option<LocalSandboxConfig>,
 ) {
     let config = LocalConfig {
-        projects: vec![LocalProjectConfig {
+        teams: vec![LocalTeamConfig {
             id: TEST_PROJECT_ID.to_string(),
             repository_path: "/repo".to_string(),
             api_url: "http://127.0.0.1:8787".to_string(),

@@ -181,51 +181,6 @@ const skillsCommand = Command.make("skills").pipe(
   ]),
 );
 
-const projectCommand = Command.make("project").pipe(
-  Command.withDescription("Compatibility alias for repository-backed Teams"),
-  Command.withSubcommands([
-    leaf(
-      "list",
-      switches("json"),
-      listTeamsCommand,
-      "List projects available to the signed-in user",
-    ),
-    leaf(
-      "create",
-      optionalStrings("name"),
-      createTeam,
-      "Create and connect a project",
-    ),
-    leaf("doctor", {}, teamDoctor, "Inspect project readiness"),
-    leaf(
-      "configure",
-      {
-        ...optionalStrings(
-          "velen-org",
-          "data-source",
-          "linear-source",
-          "linear-team",
-          "worktree-root",
-          "branch-prefix",
-          "github-repository",
-        ),
-        ...switches(
-          "disable-velen",
-          "enable-linear",
-          "disable-linear",
-          "enable-worktrees",
-          "disable-worktrees",
-          "enable-full-access",
-          "disable-full-access",
-          "i-understand-the-risk",
-        ),
-      },
-      configureTeam,
-      "Configure project integrations and execution policy",
-    ),
-  ]),
-);
-
 const teamCommand = Command.make("team").pipe(
   Command.withDescription("Create and configure repository-backed Briar Teams"),
   Command.withSubcommands([
@@ -273,9 +228,9 @@ const teamCommand = Command.make("team").pipe(
 
 const connectCommand = leaf(
   "connect",
-  requiredStrings("project-id", "agent-token"),
+  requiredStrings("team-id", "agent-token"),
   connectTeam,
-  "Connect the current repository to an existing project",
+  "Connect the current repository to an existing team",
 );
 
 const issueUpdateCommand = Command.make(
@@ -318,7 +273,7 @@ const issueUpdateCommand = Command.make(
       Flag.withDefault(false),
     ),
     assigneeUserId: Flag.string("assignee-user-id").pipe(
-      Flag.withDescription("Assign the issue to a project member"),
+      Flag.withDescription("Assign the issue to a team member"),
       Flag.optional,
     ),
     clearAssignee: Flag.boolean("clear-assignee").pipe(
@@ -392,7 +347,7 @@ const issueCommand = Command.make("issue").pipe(
 );
 
 const channelCommand = Command.make("channel").pipe(
-  Command.withDescription("Inspect project channel activity"),
+  Command.withDescription("Inspect team channel activity"),
   Command.withSubcommands([
     leaf(
       "messages",
@@ -599,7 +554,7 @@ const runCommand = Command.make("run").pipe(
 );
 
 const workerSharedFlags = {
-  ...optionalStrings("project"),
+  ...optionalStrings("team"),
   ...optionalIntegers("max-issues"),
   ...switches("once"),
 };
@@ -614,7 +569,7 @@ const workerCommandTree = Command.make(
     leaf(
       "register",
       {
-        ...optionalStrings("project", "label"),
+        ...optionalStrings("team", "label"),
         ...optionalIntegers("max-sessions"),
       },
       workerRegisterCommand,
@@ -622,19 +577,19 @@ const workerCommandTree = Command.make(
     ),
     leaf(
       "unregister",
-      optionalStrings("project"),
+      optionalStrings("team"),
       workerUnregisterCommand,
       "Unregister this machine's worker",
     ),
     leaf(
       "sync-label",
-      optionalStrings("project", "label"),
+      optionalStrings("team", "label"),
       workerSyncLabelCommand,
       "Synchronize the worker label",
     ).pipe(Command.unlisted),
     leaf(
       "status",
-      optionalStrings("project"),
+      optionalStrings("team"),
       workerStatus,
       "Show worker status",
     ),
@@ -647,7 +602,7 @@ const workerCommandTree = Command.make(
     leaf(
       "install-service",
       optionalStrings(
-        "project",
+        "team",
         "briar-binary",
         "runtime-binary",
         "cli-script",
@@ -657,7 +612,7 @@ const workerCommandTree = Command.make(
     ),
     leaf(
       "uninstall-service",
-      optionalStrings("project"),
+      optionalStrings("team"),
       () => workerService("uninstall"),
       "Uninstall the worker system service",
     ),
@@ -676,7 +631,7 @@ const managedComputerCommand = Command.make("managed-computer").pipe(
     leaf(
       "setup",
       {
-        ...requiredStrings("project", "repository"),
+        ...requiredStrings("team", "repository"),
         ...optionalStrings(
           "provider",
           "computer",
@@ -685,11 +640,11 @@ const managedComputerCommand = Command.make("managed-computer").pipe(
         ),
       },
       managedComputerSetupCommand,
-      "Bind this enrolled computer to a Briar project",
+      "Bind this enrolled computer to a Briar team",
     ),
     leaf(
       "sync",
-      optionalStrings("project", "credential-file"),
+      optionalStrings("team", "credential-file"),
       managedComputerSyncCommand,
       "Synchronize repository workflow settings from Briar",
     ),
@@ -703,7 +658,7 @@ const managedComputerCommand = Command.make("managed-computer").pipe(
       "worker-supervisor",
       {},
       managedComputerWorkerSupervisor,
-      "Run managed project workers",
+      "Run managed team workers",
     ).pipe(Command.unlisted),
     leaf(
       "worker-update-status",
@@ -732,7 +687,7 @@ const mergeQueueCommand = Command.make("merge-queue").pipe(
     leaf(
       "configure",
       {
-        ...optionalStrings("project", "readiness-stage"),
+        ...optionalStrings("team", "readiness-stage"),
         ...optionalIntegers("quiet-window-ms", "max-batch-size"),
         ...switches("enable", "disable"),
       },
@@ -742,7 +697,7 @@ const mergeQueueCommand = Command.make("merge-queue").pipe(
     leaf(
       "doctor",
       {
-        ...optionalStrings("project"),
+        ...optionalStrings("team"),
         ...switches("json"),
       },
       mergeQueueDoctorCommand,
@@ -752,7 +707,7 @@ const mergeQueueCommand = Command.make("merge-queue").pipe(
 );
 
 const githubCommand = Command.make("github").pipe(
-  Command.withDescription("Use the project's GitHub App connection"),
+  Command.withDescription("Use the team's GitHub App connection"),
   Command.withSubcommands([
     Command.make("pr").pipe(
       Command.withSubcommands([
@@ -805,7 +760,7 @@ const githubCommand = Command.make("github").pipe(
       "repository",
       {},
       githubRepositoryCommand,
-      "Inspect the project's authoritative GitHub repository",
+      "Inspect the team's authoritative GitHub repository",
     ),
     Command.make(
       "credential",
@@ -875,11 +830,11 @@ const sandboxCommand = Command.make("sandbox").pipe(
       {
         ...sandboxTargetFlags,
         ...optionalStrings("label"),
-        ...repeatedStrings("project"),
+        ...repeatedStrings("team"),
         ...switches("gpus", "no-gpus", "no-provider-auth"),
       },
       sandboxUpCommand,
-      "Build, start, and bootstrap the sandbox for the connected projects",
+      "Build, start, and bootstrap the sandbox for the connected teams",
     ),
     leaf(
       "status",
@@ -928,13 +883,12 @@ const sandboxCommand = Command.make("sandbox").pipe(
 );
 
 export const briarCommand = Command.make("briar").pipe(
-  Command.withDescription("Briar project and worker command-line interface"),
+  Command.withDescription("Briar team and worker command-line interface"),
   Command.withSubcommands([
     loginCommand,
     whoamiCommand,
     versionCommand,
     skillsCommand,
-    projectCommand,
     teamCommand,
     connectCommand,
     issueCommand,

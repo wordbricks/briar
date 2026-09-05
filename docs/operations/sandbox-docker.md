@@ -24,7 +24,7 @@
 
 ## 요구 사항
 
-- 이 Mac: `briar login`이 끝나 있고, 연결된 프로젝트에 agent token이 있어야
+- 이 Mac: `briar login`이 끝나 있고, 연결된 팀에 agent token이 있어야
   한다. CLI 번들 옆에 `agent/` 러너가 있어야 하며(설치본 기본 배치),
   체크아웃에서 쓰려면 `bun run cli:build && bun run agent:build`를 먼저 돌린다.
 - Docker 호스트: Docker 24+ 데몬. 원격이면 SSH로 접근 가능해야 하고
@@ -37,7 +37,7 @@
 ## GX10에 sandbox 만들기
 
 ```sh
-briar sandbox up --name gx10 --host ssh://jay@gx10 --project <project-id> --gpus
+briar sandbox up --name gx10 --host ssh://jay@gx10 --team <team-id> --gpus
 ```
 
 첫 실행이 하는 일은 다음과 같다.
@@ -48,16 +48,16 @@ briar sandbox up --name gx10 --host ssh://jay@gx10 --project <project-id> --gpus
    전송된다). 첫 빌드는 Bun, Node, provider CLI 다운로드 때문에 몇 분 걸린다.
 4. 컨테이너를 만들고 `briar sandbox supervise`를 PID 1(`--init` 뒤)로 띄운다.
 5. `docker exec -i ... briar sandbox bootstrap`에 JSON payload를 넘긴다.
-   payload에는 Briar API origin, 사용자 세션 토큰, 프로젝트별 agent token,
+   payload에는 Briar API origin, 사용자 세션 토큰, 팀별 agent token,
    이 Mac의 global git `user.name`/`user.email`, 그리고 `~/.codex/auth.json`이
    있으면 그 내용이 들어간다. git identity는 컨테이너에 아직 없을 때만 쓴다.
-6. 컨테이너 안에서 프로젝트마다 GitHub 자격 증명을 받아 저장소를 클론하고
-   (`~/Briar/projects/<org>/<project>/<repo>`), 프로젝트를 연결하고, execution
+6. 컨테이너 안에서 팀마다 GitHub 자격 증명을 받아 저장소를 클론하고
+   (`~/Briar/projects/<org>/<project>/<repo>`), 팀을 연결하고, execution
    worker로 등록한다. 워커 label은 기본 `sandbox-<name>`이다.
 7. `briar sandbox report`가 `ready: true`를 돌려줄 때까지 최대 3분 기다린다.
 
-`--project`를 생략하면 이 Mac에 연결된 모든 프로젝트를 넘긴다. 다시 실행하면
-같은 단계를 멱등하게 반복하므로 프로젝트를 추가하거나 토큰을 갱신할 때도
+`--team`을 생략하면 이 Mac에 연결된 모든 팀을 넘긴다. 다시 실행하면
+같은 단계를 멱등하게 반복하므로 팀을 추가하거나 토큰을 갱신할 때도
 `up`을 쓴다. 이미 있는 sandbox는 `--host`나 `--context` 없이 이름만으로
 찾는다(`~/.config/briar/sandboxes.json`에 context 이름만 기록된다).
 

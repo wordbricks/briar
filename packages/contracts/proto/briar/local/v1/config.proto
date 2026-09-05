@@ -22,7 +22,7 @@ message LocalConfig {
   LocalAppSettings app_settings = 5;
   optional string worker_device_identity = 6;
   optional LocalManagedComputerConfig managed_computer = 7;
-  repeated LocalProjectConfig projects = 8;
+  repeated LocalTeamConfig teams = 8;
   optional LocalVertexAiCredential vertex_ai = 9;
   LocalAddedProviders added_providers = 10;
 }
@@ -78,13 +78,13 @@ message LocalManagedComputerConfig {
   string credential_file = 4;
 }
 
-message LocalProjectConfig {
+message LocalTeamConfig {
   string id = 1;
   string repository_path = 2;
   optional string agent_token = 3;
   string api_url = 4;
   optional string repository_remote = 5;
-  optional LocalProjectLlmConfig llm = 6;
+  optional LocalTeamLlmConfig llm = 6;
   optional LocalAutoHuntConfig auto_hunt = 7;
   optional LocalExecutionWorkerConfig execution_worker = 8;
   optional LocalActiveClaimConfig active_claim = 9;
@@ -97,7 +97,7 @@ enum LocalApprovalPolicy {
   LOCAL_APPROVAL_POLICY_NEVER = 3;
 }
 
-message LocalProjectLlmConfig {
+message LocalTeamLlmConfig {
   optional briar.types.v1.AgentProvider provider = 1;
   optional string model = 2;
   optional string effort = 3;

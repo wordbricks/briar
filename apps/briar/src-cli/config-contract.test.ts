@@ -36,10 +36,10 @@ const config = {
     organizationId,
     credentialFile: "/var/lib/briar/worker-credential.json",
   },
-  projects: [
+  teams: [
     {
       id: "11111111-1111-4111-8111-111111111111",
-      repositoryPath: "/projects/interactive",
+      repositoryPath: "/teams/interactive",
       agentToken: "briar_agent_test",
       apiUrl: "https://briar.example.com",
       llm: {
@@ -60,7 +60,7 @@ const config = {
     },
     {
       id: "33333333-3333-4333-8333-333333333333",
-      repositoryPath: "/projects/managed",
+      repositoryPath: "/teams/managed",
       apiUrl: "https://briar.example.com",
       executionWorker: {
         deviceId: managedDeviceId,
@@ -81,7 +81,7 @@ describe("CLI config contract", () => {
     expect(persisted.appSettings.browserAutomationProvider).toBe(
       "LOCAL_BROWSER_AUTOMATION_PROVIDER_EGO_BROWSER",
     );
-    expect(persisted.projects[0].llm).toMatchObject({
+    expect(persisted.teams[0].llm).toMatchObject({
       provider: "AGENT_PROVIDER_CODEX",
       approvalPolicy: "LOCAL_APPROVAL_POLICY_NEVER",
     });
@@ -96,15 +96,15 @@ describe("CLI config contract", () => {
     );
 
     const withoutCredential = structuredClone(persisted);
-    delete withoutCredential.projects[0].agentToken;
+    delete withoutCredential.teams[0].agentToken;
     expect(() => decodeConfig(withoutCredential)).toThrow(/credential/i);
 
     for (const concurrency of [undefined, 0]) {
       const invalid = structuredClone(persisted);
       if (concurrency === undefined) {
-        delete invalid.projects[1].executionWorker.maxConcurrentSessions;
+        delete invalid.teams[1].executionWorker.maxConcurrentSessions;
       } else {
-        invalid.projects[1].executionWorker.maxConcurrentSessions = concurrency;
+        invalid.teams[1].executionWorker.maxConcurrentSessions = concurrency;
       }
       expect(() => decodeConfig(invalid)).toThrow();
     }

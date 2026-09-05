@@ -15,7 +15,7 @@ import {
   loadConfig,
   saveConfig,
 } from "./command-support";
-import type { Config, ProjectConfig } from "./config-contract";
+import type { Config, TeamConfig } from "./config-contract";
 import { createAuthenticatedConnectClient } from "./connect-client";
 import { providerAuthenticated } from "./managed-computer-setup-agent";
 import { runWorkerSupervisor } from "./managed-computer-supervisor";
@@ -49,7 +49,7 @@ const HttpsUrl = Schema.String.check(
   ),
 );
 
-const BootstrapProject = Schema.Struct({
+const BootstrapTeam = Schema.Struct({
   id: Schema.String.check(Schema.isUUID()),
   agentToken: Schema.String.check(Schema.isStartsWith("briar_agent_")),
 });
@@ -59,7 +59,7 @@ export const SandboxBootstrapPayload = Schema.Struct({
   apiUrl: HttpsUrl,
   userToken: Schema.String.check(Schema.isMinLength(16)),
   label: Schema.String.check(Schema.isLengthBetween(1, 100)),
-  projects: Schema.Array(BootstrapProject).check(Schema.isMinLength(1)),
+  teams: Schema.Array(BootstrapTeam).check(Schema.isMinLength(1)),
   codexAuth: Schema.optional(Schema.String.check(Schema.isMinLength(2))),
   gitIdentity: Schema.optional(Schema.Struct({
     name: Schema.String.check(Schema.isLengthBetween(1, 200)),
@@ -76,7 +76,7 @@ export const decodeSandboxBootstrapPayload = Schema.decodeUnknownSync(
 const SandboxState = Schema.Struct({
   schemaVersion: Schema.Literal(SANDBOX_SCHEMA_VERSION),
   label: Schema.String,
-  projectIds: Schema.Array(Schema.String.check(Schema.isUUID())),
+  teamIds: Schema.Array(Schema.String.check(Schema.isUUID())),
   bootstrappedAt: Schema.String,
 }).annotate({ parseOptions: strictParseOptions });
 export type SandboxState = typeof SandboxState.Type;
@@ -182,8 +182,8 @@ const defaultDependencies: SandboxBootstrapDependencies = {
 
 /**
  * Converge the container onto the payload: session, provider credentials,
- * one verified clone per project, and one execution-worker registration per
- * project. Every step is idempotent so `briar sandbox up` can rerun it.
+ * one verified clone per team, and one execution-worker registration per
+ * team. Every step is idempotent so `briar sandbox up` can rerun it.
  */
 export async function runSandboxBootstrap(
   payload: SandboxBootstrapPayload,
@@ -200,15 +200,15 @@ export async function runSandboxBootstrap(
     await dependencies.writeGitIdentity(payload.gitIdentity);
   }
   const signal = new AbortController().signal;
-  for (const project of payload.projects) {
-    dependencies.log(`Preparing project ${project.id}`);
+  for (const project of payload.teams) {
+    dependencies.log(`Preparing team ${project.id}`);
     const credential = await dependencies.fetchRepositoryCredential(
       payload.apiUrl,
       project,
     );
     const repositoryPath = await dependencies.ensureRepository(credential, signal);
-    const existing = config.projects.find((candidate) => candidate.id === project.id);
-    const next: ProjectConfig = {
+    const existing = config.teams.find((candidate) => candidate.id === project.id);
+    const next: TeamConfig = {
       ...existing,
       id: project.id,
       repositoryPath,
@@ -216,8 +216,8 @@ export async function runSandboxBootstrap(
       agentToken: project.agentToken,
       apiUrl: payload.apiUrl,
     };
-    config.projects = [
-      ...config.projects.filter((candidate) => candidate.id !== project.id),
+    config.teams = [
+      ...config.teams.filter((candidate) => candidate.id !== project.id),
       next,
     ];
     await dependencies.saveConfig(config);
@@ -228,13 +228,13 @@ export async function runSandboxBootstrap(
       label: payload.label,
     });
     dependencies.log(
-      `Registered worker ${registration.workerId} for project ${project.id}`,
+      `Registered worker ${registration.workerId} for team ${project.id}`,
     );
   }
   await dependencies.writeState({
     schemaVersion: SANDBOX_SCHEMA_VERSION,
     label: payload.label,
-    projectIds: payload.projects.map((project) => project.id),
+    teamIds: payload.teams.map((project) => project.id),
     bootstrappedAt: dependencies.now().toISOString(),
   });
 }
@@ -258,7 +258,7 @@ function processAlive(pid: number) {
 
 /**
  * Report how far this container got, in the shape `briar sandbox status`
- * expects. `ready` means every desired project is registered, cloned, and
+ * expects. `ready` means every desired team is registered, cloned, and
  * supervised.
  */
 export async function sandboxReport(input: {
@@ -280,9 +280,9 @@ export async function sandboxReport(input: {
       providerAuthenticated(
         provider as (typeof managedComputerSetupProviders)[number],
       ).catch(() => false));
-  const desired = state?.projectIds ?? [];
-  const projects = desired.map((id) => {
-    const project = config.projects.find((candidate) => candidate.id === id);
+  const desired = state?.teamIds ?? [];
+  const teams = desired.map((id) => {
+    const project = config.teams.find((candidate) => candidate.id === id);
     const repositoryPath = project?.repositoryPath ?? null;
     return {
       id,
@@ -300,7 +300,7 @@ export async function sandboxReport(input: {
     ),
   );
   const supervisorRunning = supervisorPid !== null && processAlive(supervisorPid);
-  const missing = projects.filter((project) =>
+  const missing = teams.filter((project) =>
     !project.registered || !project.repositoryPresent
   );
   const detail = state === null
@@ -315,7 +315,7 @@ export async function sandboxReport(input: {
     ready: state !== null && missing.length === 0 && supervisorRunning,
     supervisorRunning,
     detail,
-    projects,
+    teams,
     providers,
   };
 }
@@ -329,15 +329,15 @@ async function readSupervisorPid(directory = configDirectory) {
   }
 }
 
-export function sandboxWorkerProjectIds(config: Config, state: SandboxState | null) {
-  const desired = new Set(state?.projectIds ?? []);
-  return config.projects
+export function sandboxWorkerTeamIds(config: Config, state: SandboxState | null) {
+  const desired = new Set(state?.teamIds ?? []);
+  return config.teams
     .filter((project) => desired.has(project.id) && project.executionWorker)
     .map((project) => project.id)
     .sort();
 }
 
-/** Keep one `briar worker` per bootstrapped project alive inside the container. */
+/** Keep one `briar worker` per bootstrapped team alive inside the container. */
 export async function runSandboxSupervisor(directory = configDirectory) {
   await mkdir(directory, { recursive: true, mode: 0o700 });
   await writeFile(sandboxSupervisorPidPath(directory), `${process.pid}\n`, {
@@ -348,7 +348,7 @@ export async function runSandboxSupervisor(directory = configDirectory) {
       // The state file is re-read on every reconcile so a later bootstrap
       // can add or drop projects without restarting the container.
       desiredProjectIds: async (config) =>
-        sandboxWorkerProjectIds(config, await readSandboxState(directory)),
+        sandboxWorkerTeamIds(config, await readSandboxState(directory)),
       childEnvironment: () => ({}),
       eventPrefix: "sandbox_worker",
     });

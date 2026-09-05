@@ -47,10 +47,7 @@ pub(super) fn write_cli_connection(
     config.api_url = api_url.clone();
     // Preserve CLI-owned worktree settings and the project sandbox choice when
     // the app refreshes the rest of the connection record.
-    let stored_project = config
-        .projects
-        .iter()
-        .find(|project| project.id == project_id);
+    let stored_project = config.teams.iter().find(|project| project.id == project_id);
     let stored_auto_hunt = stored_project.and_then(|project| project.auto_hunt.as_option());
     let stored_worktrees = stored_auto_hunt
         .map(|auto_hunt| auto_hunt.worktrees.clone())
@@ -75,8 +72,8 @@ pub(super) fn write_cli_connection(
         }
         .into()
     };
-    config.projects.retain(|project| project.id != project_id);
-    config.projects.push(LocalProjectConfig {
+    config.teams.retain(|project| project.id != project_id);
+    config.teams.push(LocalTeamConfig {
         id: project_id,
         repository_path,
         api_url,
@@ -97,9 +94,9 @@ pub(super) fn remove_cli_connection(config_path: &Path, project_id: &str) -> Res
         return Ok(());
     }
     let mut config = read_cli_config(config_path)?;
-    let previous_count = config.projects.len();
-    config.projects.retain(|project| project.id != project_id);
-    if config.projects.len() == previous_count {
+    let previous_count = config.teams.len();
+    config.teams.retain(|project| project.id != project_id);
+    if config.teams.len() == previous_count {
         return Ok(());
     }
 
@@ -121,7 +118,7 @@ pub(super) fn project_repository_path(
     project_id: &str,
 ) -> Result<PathBuf, String> {
     config
-        .projects
+        .teams
         .iter()
         .find(|project| project.id == project_id)
         .map(|project| PathBuf::from(&project.repository_path))
@@ -603,7 +600,7 @@ pub(super) fn project_llm_settings_from(
 ) -> Result<agent::ProjectLlmSettings, String> {
     let config = read_cli_config(config_path)?;
     let project = config
-        .projects
+        .teams
         .iter()
         .find(|project| project.id == project_id)
         .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?;
@@ -994,7 +991,7 @@ pub(super) fn update_project_llm_settings_at(
         return Err("앱 설정에서 먼저 이 에이전트 프로바이더를 활성화하세요.".to_string());
     }
     let project = config
-        .projects
+        .teams
         .iter_mut()
         .find(|project| project.id == project_id)
         .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?;
@@ -1012,7 +1009,7 @@ pub(super) fn update_project_workflow_at(
     validate_generated_workflow(&workflow)?;
     let mut config = read_cli_config(config_path)?;
     let project = config
-        .projects
+        .teams
         .iter_mut()
         .find(|project| project.id == project_id)
         .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?;
@@ -1033,7 +1030,7 @@ pub(super) fn update_project_velen_org_at(
 ) -> Result<Option<String>, String> {
     let mut config = read_cli_config(config_path)?;
     let project = config
-        .projects
+        .teams
         .iter_mut()
         .find(|project| project.id == project_id)
         .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?;

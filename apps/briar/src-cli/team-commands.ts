@@ -25,7 +25,7 @@ import {
 } from "./worktree";
 import {
   type Config,
-  type ProjectConfig,
+  type TeamConfig,
 } from "./config-contract";
 import { decodeVelenEnvelope } from "./command-contract";
 import {
@@ -141,8 +141,8 @@ async function createTeam() {
     config.userToken,
   ).createTeam({ name });
   const createdTeam = requiredMessage(result.team, "createTeam.team");
-  config.projects = [
-    ...config.projects.filter((project) => project.id !== createdTeam.id),
+  config.teams = [
+    ...config.teams.filter((project) => project.id !== createdTeam.id),
     {
       id: createdTeam.id,
       repositoryPath,
@@ -158,11 +158,11 @@ async function createTeam() {
 
 async function connectTeam() {
   const config = await loadConfig();
-  const teamId = required("--project-id");
+  const teamId = required("--team-id");
   const agentToken = required("--agent-token");
   const repositoryPath = await currentRepositoryPath();
-  config.projects = [
-    ...config.projects.filter((project) => project.id !== teamId),
+  config.teams = [
+    ...config.teams.filter((project) => project.id !== teamId),
     {
       id: teamId,
       repositoryPath,
@@ -196,7 +196,7 @@ function runVelen(commandArgs: string[]) {
   return decodeVelenEnvelope(JSON.parse(result.stdout.toString()));
 }
 
-function ensureConfiguredVelen(project?: ProjectConfig) {
+function ensureConfiguredVelen(project?: TeamConfig) {
   const configuredOrg = project?.autoHunt?.velenOrg;
   const linearEnabled = project?.autoHunt?.linear?.enabled ?? false;
   if (!configuredOrg) {
@@ -210,7 +210,7 @@ function ensureConfiguredVelen(project?: ProjectConfig) {
   }
   if (!Bun.file(velenExecutable()).size) {
     throw new Error(
-      "이 프로젝트에 설정된 Velen CLI 기능을 사용하려면 `bun install -g @wordbricks/velen`으로 CLI를 설치하세요.",
+      "이 팀에 설정된 Velen CLI 기능을 사용하려면 `bun install -g @wordbricks/velen`으로 CLI를 설치하세요.",
     );
   }
   const auth = runVelen(["auth", "whoami"]);
@@ -227,7 +227,7 @@ function ensureConfiguredVelen(project?: ProjectConfig) {
   return { auth, org, linear };
 }
 
-function configuredWorkflow(project: ProjectConfig) {
+function configuredWorkflow(project: TeamConfig) {
   const workflow = project.autoHunt?.workflow;
   if (
     !workflow ||
@@ -328,7 +328,7 @@ async function configureTeam() {
     autoHunt: nextAutoHunt,
   };
   ensureConfiguredVelen(nextProject);
-  config.projects = config.projects.map((candidate) =>
+  config.teams = config.teams.map((candidate) =>
     candidate.id === project.id ? nextProject : candidate,
   );
   await saveConfig(config);
@@ -366,12 +366,12 @@ async function configureTeam() {
 
 export type TeamDoctorDependencies = {
   loadConfiguration: () => Promise<Config>;
-  selectProject: (config: Config) => Promise<ProjectConfig>;
+  selectProject: (config: Config) => Promise<TeamConfig>;
   environmentToken: () => string | undefined;
   fetchTeamSettings: FetchRemoteTeamSettings;
   persistConfig: (config: Config) => Promise<void>;
   inspectVelen: typeof ensureConfiguredVelen;
-  resolveTeamBaseRef: (project: ProjectConfig) => string | null;
+  resolveTeamBaseRef: (project: TeamConfig) => string | null;
   writeOutput: (output: string) => void;
 };
 

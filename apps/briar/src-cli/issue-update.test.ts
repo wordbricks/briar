@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
-import type { Config, ProjectConfig } from "./config-contract";
+import type { Config, TeamConfig } from "./config-contract";
 import {
   type IssueUpdateCommandDependencies,
   updateIssueCommand,
@@ -32,13 +32,13 @@ const config = {
     preventSleepWhileRunning: false,
     browserAutomationProvider: "ego-browser",
   },
-  projects: [],
+  teams: [],
 } satisfies Config;
 
 const project = {
   id: projectId,
   repositoryPath: process.cwd(),
-} as ProjectConfig;
+} as TeamConfig;
 
 function dependencies() {
   const updates: Array<unknown> = [];

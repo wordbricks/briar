@@ -10,11 +10,7 @@ pub(super) async fn connected_project_ids(app: tauri::AppHandle) -> Result<Vec<S
             return Ok(Vec::new());
         }
         let config = read_cli_config(&config_path)?;
-        Ok(config
-            .projects
-            .into_iter()
-            .map(|project| project.id)
-            .collect())
+        Ok(config.teams.into_iter().map(|project| project.id).collect())
     })
     .await
     .map_err(|error| error.to_string())?
@@ -434,7 +430,7 @@ pub(super) fn project_worktree_root(
 ) -> Result<Option<PathBuf>, String> {
     let config = read_cli_config(config_path)?;
     let project = config
-        .projects
+        .teams
         .iter()
         .find(|project| project.id == project_id)
         .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?;
@@ -467,7 +463,7 @@ pub(super) fn project_auto_hunt_full_access(
     project_id: &str,
 ) -> Result<bool, String> {
     Ok(read_cli_config(config_path)?
-        .projects
+        .teams
         .iter()
         .find(|project| project.id == project_id)
         .and_then(|project| project.auto_hunt.as_option())
@@ -482,7 +478,7 @@ pub(super) fn project_sandbox_settings_from(
 ) -> Result<ProjectSandboxSettings, String> {
     let config = read_cli_config(config_path)?;
     let project = config
-        .projects
+        .teams
         .iter()
         .find(|project| project.id == project_id)
         .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?;
@@ -503,7 +499,7 @@ pub(super) fn update_project_sandbox_settings_at(
 ) -> Result<ProjectSandboxSettings, String> {
     let mut config = read_cli_config(config_path)?;
     let project = config
-        .projects
+        .teams
         .iter_mut()
         .find(|project| project.id == project_id)
         .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?;
@@ -519,7 +515,7 @@ pub(super) fn project_auto_hunt_uses_velen(
     project_id: &str,
 ) -> Result<bool, String> {
     Ok(read_cli_config(config_path)?
-        .projects
+        .teams
         .iter()
         .find(|project| project.id == project_id)
         .and_then(|project| project.auto_hunt.as_option())
@@ -533,7 +529,7 @@ pub(super) fn project_auto_hunt_workflow_json(
 ) -> Result<String, String> {
     let config = read_cli_config(config_path)?;
     let workflow = config
-        .projects
+        .teams
         .iter()
         .find(|project| project.id == project_id)
         .and_then(|project| project.auto_hunt.as_option())

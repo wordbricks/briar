@@ -44,10 +44,10 @@ import {
 import {
   configErrorLocations,
   decodeConfigJson,
-  decodePreProtoConfigJson,
+  decodeLegacyConfigJson,
   encodeConfigJson,
   type Config,
-  type ProjectConfig,
+  type TeamConfig,
 } from "./config-contract";
 import {
   configuredManagedComputerCredentialPath,
@@ -110,7 +110,7 @@ function providerExecutionEnvironment(
     browserEnvironment,
   );
 }
-const executionToken = (project: ProjectConfig) => {
+const executionToken = (project: TeamConfig) => {
   const token = process.env.BRIAR_WORKER_TOKEN ??
     process.env.BRIAR_AGENT_TOKEN ??
     project.agentToken;
@@ -166,7 +166,7 @@ async function loadConfig(): Promise<Config> {
           preventSleepWhileRunning: false,
           browserAutomationProvider: "agent-browser",
         },
-        projects: [],
+        teams: [],
       };
     }
     throw new Error(
@@ -182,7 +182,7 @@ async function loadConfig(): Promise<Config> {
   } catch (error) {
     let migrated: Config;
     try {
-      migrated = decodePreProtoConfigJson(contents);
+      migrated = decodeLegacyConfigJson(contents);
     } catch {
       const locations = configErrorLocations(error);
       throw new Error(
@@ -208,9 +208,11 @@ async function loadConfig(): Promise<Config> {
   };
 }
 
-// TODO(remove after every Briar 1.2.174 installation has run 1.2.179+ once):
-// Delete this one-time domain-JSON migration. Canonical ProtoJSON remains the
-// only accepted persisted contract after the installed user base is rewritten.
+// TODO(remove after every Briar 1.2.174 installation has run 1.2.179+ once,
+// and every pre-1.2.202 installation has run 1.2.202+ once for the
+// `projects` -> `teams` key rename): delete this one-time legacy migration.
+// Canonical ProtoJSON remains the only accepted persisted contract after the
+// installed user base is rewritten.
 async function migratePreProtoConfig(config: Config) {
   const backupPath = join(
     configDirectory,
@@ -442,7 +444,7 @@ const runGit: GitRunner = (gitArgs, options = {}) => {
   };
 };
 
-function worktreeSettings(project: ProjectConfig): WorktreeSettings {
+function worktreeSettings(project: TeamConfig): WorktreeSettings {
   const configured = project.autoHunt?.worktrees;
   const worktreeHome = process.env.BRIAR_WORKTREE_HOME?.trim() || homedir();
   return {
@@ -455,23 +457,23 @@ function worktreeSettings(project: ProjectConfig): WorktreeSettings {
 }
 
 /** Per-issue worktrees are the default; a project can opt out explicitly. */
-function worktreesEnabled(project: ProjectConfig): boolean {
+function worktreesEnabled(project: TeamConfig): boolean {
   return project.autoHunt?.worktrees?.enabled !== false;
 }
 
-function activeClaimWorktree(project: ProjectConfig) {
+function activeClaimWorktree(project: TeamConfig) {
   const worktree = project.activeClaim?.worktree;
   if (!worktree) {
-    throw new Error("이 프로젝트에 진행 중인 claim의 워크트리가 없습니다.");
+    throw new Error("이 팀에 진행 중인 claim의 워크트리가 없습니다.");
   }
   return worktree;
 }
 
-async function currentProject(config: Config): Promise<ProjectConfig> {
+async function currentProject(config: Config): Promise<TeamConfig> {
   const repositoryPath = await currentRepositoryPath();
   const remote = gitValue(["remote", "get-url", "origin"]);
   const commonDirectory = gitCommonDirectory(repositoryPath);
-  const matchesRepository = (candidate: ProjectConfig) => {
+  const matchesRepository = (candidate: TeamConfig) => {
     // samePath, not string equality: git reports canonical paths, so a repo or
     // worktree reached through a symlink must still match its stored project.
     if (samePath(candidate.repositoryPath, repositoryPath)) return true;
@@ -483,20 +485,20 @@ async function currentProject(config: Config): Promise<ProjectConfig> {
         samePath(commonDirectory, candidateCommonDirectory),
     );
   };
-  const requestedProjectId = process.env.BRIAR_PROJECT_ID?.trim();
+  const requestedProjectId = process.env.BRIAR_TEAM_ID?.trim();
   const project = selectProjectForApi(
-    config.projects.filter(matchesRepository),
+    config.teams.filter(matchesRepository),
     config.apiUrl,
     requestedProjectId,
   );
   if (!project) {
     if (requestedProjectId) {
       throw new Error(
-        "자동사냥이 요청한 Briar 프로젝트가 이 저장소에 연결되어 있지 않습니다.",
+        "자동사냥이 요청한 Briar 팀이 이 저장소에 연결되어 있지 않습니다.",
       );
     }
     throw new Error(
-      "연결된 Briar 프로젝트가 없습니다. Briar 앱에서 이 저장소를 연결하세요.",
+      "연결된 Briar 팀이 없습니다. Briar 앱에서 이 저장소를 연결하세요.",
     );
   }
   return project;

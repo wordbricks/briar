@@ -1004,7 +1004,7 @@ describe("worker service definitions", () => {
         briarBinary: "/bin/briar",
         workingDirectory: "/repo",
       }),
-    ).toContain(`worker --project ${projectId}`);
+    ).toContain(`worker --team ${projectId}`);
   });
 
   it("refuses platforms it cannot manage, in Korean", () => {

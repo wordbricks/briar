@@ -19,7 +19,7 @@ const strictParseOptions = {
 const SandboxHostEntry = Schema.Struct({
   dockerContext: Schema.optional(Schema.String.check(Schema.isMinLength(1))),
   host: Schema.optional(Schema.String.check(Schema.isMinLength(1))),
-  projectIds: Schema.Array(Schema.String.check(Schema.isUUID())),
+  teamIds: Schema.Array(Schema.String.check(Schema.isUUID())),
   gpus: Schema.Boolean,
   runtimeSha256: Schema.String,
   updatedAt: Schema.String,

@@ -3,7 +3,7 @@ import {
   createDetachedTranscriptSequencer,
   detachedProjectAgentPrompt,
 } from "./agent-runner";
-import type { Config, ProjectConfig } from "./config-contract";
+import type { Config, TeamConfig } from "./config-contract";
 import type { DetachedProviderTurnResult } from "./detached-provider-turn";
 import { runClaimedProjectAgentTask } from "./reply-execution";
 import type { ClaimedProjectAgentTask } from "./worker-queue-contract";
@@ -32,12 +32,12 @@ const config: Config = {
     preventSleepWhileRunning: false,
     browserAutomationProvider: "ego-browser",
   },
-  projects: [],
+  teams: [],
 };
 
-const project: ProjectConfig = {
+const project: TeamConfig = {
   id: projectId,
-  repositoryPath: "/projects/connected-checkout",
+  repositoryPath: "/teams/connected-checkout",
   agentToken: "briar_agent_test",
   apiUrl: "https://api.example.com",
   autoHunt: {

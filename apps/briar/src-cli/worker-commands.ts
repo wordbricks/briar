@@ -71,7 +71,7 @@ import {
 import {
   type Config,
   enabledAgentProviders,
-  type ProjectConfig,
+  type TeamConfig,
 } from "./config-contract";
 import {
   maintainRecordedCompletedWorktrees,
@@ -254,7 +254,7 @@ export type ProjectWorkerRegistration = {
  */
 export async function registerProjectExecutionWorker(input: {
   config: Config;
-  project: ProjectConfig;
+  project: TeamConfig;
   userToken: string;
   label: string;
   maxConcurrentSessions?: number;
@@ -292,14 +292,14 @@ export async function registerProjectExecutionWorker(input: {
   });
   const enrollment = createWorkerEnrollmentClient(config.apiUrl, input.userToken);
   let registration: Awaited<ReturnType<typeof enrollment.register>> | null = null;
-  if (config.projects.some((candidate) => candidate.executionWorker)) {
+  if (config.teams.some((candidate) => candidate.executionWorker)) {
     try {
       const binding = await enrollment.bind({
         projectId: project.id,
         deviceIdentity,
         runtime,
       });
-      const existing = config.projects.find(
+      const existing = config.teams.find(
         (candidate) => candidate.executionWorker?.deviceId === binding.deviceId,
       )?.executionWorker;
       if (existing?.token) {
@@ -328,7 +328,7 @@ export async function registerProjectExecutionWorker(input: {
   });
   const resolved = registration;
   config.workerDeviceIdentity = deviceIdentity;
-  config.projects = config.projects.map((candidate) => {
+  config.teams = config.teams.map((candidate) => {
     if (
       candidate.id !== project.id &&
       candidate.executionWorker?.deviceId !== resolved.deviceId
@@ -366,12 +366,12 @@ async function workerRegisterCommand() {
   const config = await loadConfig();
   const userToken = process.env.BRIAR_USER_TOKEN ?? config.userToken;
   if (!userToken) throw new Error("먼저 `briar login`을 실행하세요.");
-  const requestedProjectId = value("--project");
+  const requestedProjectId = value("--team");
   const project = requestedProjectId
-    ? config.projects.find((candidate) => candidate.id === requestedProjectId)
+    ? config.teams.find((candidate) => candidate.id === requestedProjectId)
     : await currentProject(config);
   if (!project) {
-    throw new Error("이 컴퓨터에 연결된 프로젝트를 찾지 못했습니다.");
+    throw new Error("이 컴퓨터에 연결된 팀을 찾지 못했습니다.");
   }
   const requestedMaxSessions = Number.parseInt(
     value("--max-sessions") ?? "",
@@ -393,12 +393,12 @@ async function workerUnregisterCommand() {
   const config = await loadConfig();
   const userToken = process.env.BRIAR_USER_TOKEN ?? config.userToken;
   if (!userToken) throw new Error("먼저 `briar login`을 실행하세요.");
-  const requestedProjectId = value("--project");
+  const requestedProjectId = value("--team");
   const project = requestedProjectId
-    ? config.projects.find((candidate) => candidate.id === requestedProjectId)
+    ? config.teams.find((candidate) => candidate.id === requestedProjectId)
     : await currentProject(config);
   if (!project?.executionWorker) {
-    throw new Error("이 프로젝트에 등록된 worker가 없습니다.");
+    throw new Error("이 팀에 등록된 worker가 없습니다.");
   }
   const requestedLifecycleReason = value("--lifecycle-reason");
   if (
@@ -422,7 +422,7 @@ async function workerUnregisterCommand() {
     // The local config can outlive a worker that was removed remotely. Treat
     // that state as already unbound so the user can register the device again.
   }
-  config.projects = config.projects.map((candidate) =>
+  config.teams = config.teams.map((candidate) =>
     candidate.id === project.id
       ? { ...candidate, executionWorker: undefined }
       : candidate,
@@ -460,7 +460,7 @@ async function persistProjectWorkflowRequirements(
   requirements: WorkflowRequirementRecord[],
 ) {
   const freshConfig = await loadConfig();
-  const freshProject = freshConfig.projects.find(
+  const freshProject = freshConfig.teams.find(
     (candidate) => candidate.id === projectId,
   );
   if (!freshProject?.autoHunt?.workflow) return;
@@ -471,7 +471,7 @@ async function persistProjectWorkflowRequirements(
       workflow: { ...freshProject.autoHunt.workflow, requirements },
     },
   };
-  freshConfig.projects = freshConfig.projects.map((candidate) =>
+  freshConfig.teams = freshConfig.teams.map((candidate) =>
     candidate.id === projectId ? updatedProject : candidate,
   );
   await saveConfig(freshConfig);
@@ -484,7 +484,7 @@ async function workerSyncLabelCommand() {
     string,
     Array<{ workerId: string; token: string }>
   >();
-  for (const project of config.projects) {
+  for (const project of config.teams) {
     const registered = project.executionWorker;
     if (!registered?.token) continue;
     const registrations = registrationsByDevice.get(registered.deviceId) ?? [];
@@ -516,7 +516,7 @@ async function workerSyncLabelCommand() {
   }
 
   if (syncedDeviceIds.size > 0) {
-    config.projects = config.projects.map((project) => {
+    config.teams = config.teams.map((project) => {
       const registered = project.executionWorker;
       if (!registered || !syncedDeviceIds.has(registered.deviceId)) {
         return project;
@@ -542,17 +542,17 @@ async function workerCommand() {
   await cleanupOrphanedOrganizationAgentWorkspaces({
     workerSessionsDirectory: join(configDirectory, "worker-sessions"),
   });
-  const projectId = value("--project");
+  const projectId = value("--team");
   const project = projectId
-    ? config.projects.find((candidate) => candidate.id === projectId)
+    ? config.teams.find((candidate) => candidate.id === projectId)
     : await currentProject(config);
   if (!project) {
-    throw new Error("이 컴퓨터에 연결된 프로젝트를 찾지 못했습니다.");
+    throw new Error("이 컴퓨터에 연결된 팀을 찾지 못했습니다.");
   }
   const registered = project.executionWorker;
   if (!registered) {
     throw new Error(
-      "이 프로젝트의 worker가 등록되지 않았습니다. `briar worker register`를 먼저 실행하세요.",
+      "이 팀의 worker가 등록되지 않았습니다. `briar worker register`를 먼저 실행하세요.",
     );
   }
   const managedCredential =

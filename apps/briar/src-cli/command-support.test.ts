@@ -26,7 +26,7 @@ const config = (): Config => ({
     preventSleepWhileRunning: false,
     browserAutomationProvider: "ego-browser",
   },
-  projects: [],
+  teams: [],
 });
 
 const loginDependencies = (

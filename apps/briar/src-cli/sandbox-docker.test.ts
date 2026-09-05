@@ -35,7 +35,7 @@ const readyReport = {
   ready: true,
   supervisorRunning: true,
   detail: "Sandbox is ready.",
-  projects: [],
+  teams: [],
   providers: {},
 };
 

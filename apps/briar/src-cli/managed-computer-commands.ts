@@ -113,7 +113,7 @@ const defaultManagedComputerSyncDependencies: ManagedComputerSyncDependencies = 
   loadCredential: loadManagedComputerCredential,
   loadAuthentication: configForManagedComputer,
   resolveProjectId: async (config) =>
-    value("--project")?.trim() || (await currentProject(config)).id,
+    value("--team")?.trim() || (await currentProject(config)).id,
   fetchTeamSettings: fetchRemoteTeamSettings,
   persistConfig: saveConfig,
   writeOutput: console.log,
@@ -131,7 +131,7 @@ export async function managedComputerSyncCommand(
     credential.apiOrigin,
   );
   const projectId = await resolved.resolveProjectId(config);
-  const project = config.projects.find((candidate) => candidate.id === projectId);
+  const project = config.teams.find((candidate) => candidate.id === projectId);
   if (!project) {
     throw new Error(
       `Briar project ${projectId} is not configured on this managed computer`,
@@ -166,7 +166,7 @@ export async function managedComputerSetupCommand() {
   ) {
     throw new Error("The requested computer does not match this enrolled device");
   }
-  const projectId = value("--project")?.trim();
+  const projectId = value("--team")?.trim();
   if (!projectId) throw new Error("--project is required");
   const repositoryInput = value("--repository")?.trim();
   if (!repositoryInput) throw new Error("--repository is required");
@@ -208,7 +208,7 @@ export async function managedComputerSetupCommand() {
     userToken,
   );
 
-  const existingProject = config.projects.find((project) => project.id === projectId);
+  const existingProject = config.teams.find((project) => project.id === projectId);
   const provider = providerFromFlag(existingProject?.llm?.provider ?? "codex");
   // `--provider` names the provider this managed computer runs on, so setup
   // adds it the way the desktop's "Add provider" button would. A headless
@@ -308,8 +308,8 @@ export async function managedComputerSetupCommand() {
     organizationId: credential.organizationId,
     credentialFile,
   };
-  config.projects = [
-    ...config.projects.filter((candidate) => candidate.id !== projectId),
+  config.teams = [
+    ...config.teams.filter((candidate) => candidate.id !== projectId),
     project,
   ];
   await saveConfig(config);

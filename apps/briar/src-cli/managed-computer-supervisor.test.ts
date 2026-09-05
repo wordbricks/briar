@@ -33,7 +33,7 @@ describe("managed computer worker supervisor", () => {
         deviceId,
         credentialFile: "/var/lib/briar/worker-credential.json",
       },
-      projects: [
+      teams: [
         {
           id: "11111111-1111-4111-8111-111111111111",
           repositoryPath: "/home/briar/one",
@@ -73,7 +73,7 @@ describe("managed computer worker supervisor", () => {
     )).toEqual([
       "/opt/briar/bin/briar",
       "worker",
-      "--project",
+      "--team",
       "11111111-1111-4111-8111-111111111111",
     ]);
     expect(() => managedWorkerProcessCommand(

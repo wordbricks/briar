@@ -22,7 +22,7 @@ import {
 import { briarIssueUrl } from "./github-pr";
 import {
   type Config,
-  type ProjectConfig,
+  type TeamConfig,
 } from "./config-contract";
 import {
   decodeIsoDateTimeWithOffset,
@@ -144,7 +144,7 @@ async function claimWork() {
     throw new Error("Worker claim omitted its durable issue payload");
   }
   const leaseExpiresAt = timestampDate(payload.leaseExpiresAt).toISOString();
-  config.projects = config.projects.map((candidate) =>
+  config.teams = config.teams.map((candidate) =>
     candidate.id === project.id
       ? {
           ...candidate,
@@ -209,7 +209,7 @@ async function claimWork() {
  */
 async function allocateClaimWorkspace(
   config: Config,
-  project: ProjectConfig,
+  project: TeamConfig,
   issue: { runId: string; sourceKey: string; title: string },
   storageDirectory = configDirectory,
 ): Promise<{
@@ -245,7 +245,7 @@ async function allocateClaimWorkspace(
       projectWorktreeRoot(worktreeSettings(project).root, project.id),
       issue.runId,
     );
-    config.projects = config.projects.map((candidate) =>
+    config.teams = config.teams.map((candidate) =>
       candidate.id === project.id && candidate.activeClaim
         ? {
             ...candidate,
@@ -313,7 +313,7 @@ async function worktreeRemove() {
     samePath(worktree.path, target),
   );
   if (!registered?.branch) {
-    throw new Error(`이 프로젝트의 워크트리가 아닙니다: ${target}`);
+    throw new Error(`이 팀의 워크트리가 아닙니다: ${target}`);
   }
   const result = removeIssueWorktree(
     runGit,
@@ -325,7 +325,7 @@ async function worktreeRemove() {
     project.activeClaim?.worktree &&
     samePath(project.activeClaim.worktree.path, registered.path)
   ) {
-    config.projects = config.projects.map((candidate) => {
+    config.teams = config.teams.map((candidate) => {
       if (candidate.id !== project.id || !candidate.activeClaim) return candidate;
       const { worktree: _removed, ...activeClaim } = candidate.activeClaim;
       return { ...candidate, activeClaim };
@@ -335,7 +335,7 @@ async function worktreeRemove() {
   console.log(JSON.stringify({ path: registered.path, branch: registered.branch, ...result }));
 }
 
-async function maintainRecordedCompletedWorktrees(project: ProjectConfig) {
+async function maintainRecordedCompletedWorktrees(project: TeamConfig) {
   const root = projectWorktreeRoot(worktreeSettings(project).root, project.id);
   const registeredWorktrees = listIssueWorktrees(runGit, project.repositoryPath, root);
   const results = [];
@@ -369,7 +369,7 @@ async function maintainRecordedCompletedWorktrees(project: ProjectConfig) {
 
 async function syncCompletedWorktreeRecordsFromDashboard(
   config: Config,
-  project: ProjectConfig,
+  project: TeamConfig,
 ): Promise<number> {
   if (!config.userToken) return 0;
   const dashboard = await createAuthenticatedConnectClient(
@@ -433,7 +433,7 @@ async function worktreeMaintain() {
     samePath(worktree.path, target),
   );
   if (!registered?.branch) {
-    throw new Error(`이 프로젝트의 워크트리가 아닙니다: ${target}`);
+    throw new Error(`이 팀의 워크트리가 아닙니다: ${target}`);
   }
   const baseRef =
     activeWorktree && samePath(activeWorktree.path, registered.path)
@@ -468,7 +468,7 @@ async function worktreeMaintain() {
     project.activeClaim?.worktree &&
     samePath(project.activeClaim.worktree.path, registered.path)
   ) {
-    config.projects = config.projects.map((candidate) => {
+    config.teams = config.teams.map((candidate) => {
       if (candidate.id !== project.id || !candidate.activeClaim) return candidate;
       const { worktree: _removed, ...activeClaim } = candidate.activeClaim;
       return { ...candidate, activeClaim };

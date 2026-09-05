@@ -57,7 +57,7 @@ const localConfig = () => decodeConfig({
     browserAutomationProvider:
       "LOCAL_BROWSER_AUTOMATION_PROVIDER_EGO_BROWSER",
   },
-  projects: [{
+  teams: [{
     id: projectId,
     repositoryPath: "/home/briar/briar",
     apiUrl,
@@ -87,7 +87,7 @@ const dependencies = (
     persistConfig,
     values: {
       loadConfiguration: async () => config,
-      selectProject: async () => config.projects[0]!,
+      selectProject: async () => config.teams[0]!,
       environmentToken: () => undefined,
       fetchTeamSettings: async () => readySettings,
       persistConfig,
@@ -119,7 +119,7 @@ describe("team doctor repository workflow sync", () => {
       },
     });
     expect(deps.persistConfig).toHaveBeenCalledOnce();
-    expect(deps.persistConfig.mock.calls[0]![0].projects[0]).toMatchObject({
+    expect(deps.persistConfig.mock.calls[0]![0].teams[0]).toMatchObject({
       repositoryPath: "/home/briar/briar",
       llm: { provider: "codex" },
       executionWorker: { workerId: "worker-1" },

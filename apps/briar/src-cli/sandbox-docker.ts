@@ -146,7 +146,7 @@ export async function inspectSandboxContainer(
   };
 }
 
-const SandboxReportProject = Schema.Struct({
+const SandboxReportTeam = Schema.Struct({
   id: Schema.String,
   registered: Schema.Boolean,
   workerId: Schema.NullOr(Schema.String),
@@ -158,7 +158,7 @@ export const SandboxReport = Schema.Struct({
   ready: Schema.Boolean,
   supervisorRunning: Schema.Boolean,
   detail: Schema.String,
-  projects: Schema.Array(SandboxReportProject),
+  teams: Schema.Array(SandboxReportTeam),
   providers: Schema.Record(Schema.String, Schema.Boolean),
 });
 export type SandboxReport = typeof SandboxReport.Type;
