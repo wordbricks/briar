@@ -1,4 +1,5 @@
 import { type ChildProcess, spawn } from "node:child_process";
+import { createConnection } from "node:net";
 import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join } from "node:path";
@@ -334,6 +335,7 @@ export async function sandboxReport(input: {
   readonly providerSignedIn?: (provider: string) => Promise<boolean>;
   readonly computerUseHealthy?: () => Promise<boolean>;
   readonly displays?: () => Promise<readonly SandboxDisplay[]>;
+  readonly primaryDisplay?: () => Promise<boolean>;
 } = {}) {
   const config = input.config ?? await loadConfig();
   const state = input.state === undefined ? await readSandboxState() : input.state;
@@ -369,6 +371,7 @@ export async function sandboxReport(input: {
   const supervisorRunning = supervisorPid !== null && processAlive(supervisorPid);
   const serviceHealthy = await (input.computerUseHealthy ?? computerUseServiceHealthy)();
   const displays = await (input.displays ?? assignedDisplays)();
+  const primaryDisplay = await (input.primaryDisplay ?? primaryDisplayListening)();
   const missing = teams.filter((project) =>
     !project.registered || !project.repositoryPresent
   );
@@ -385,7 +388,7 @@ export async function sandboxReport(input: {
     schemaVersion: SANDBOX_SCHEMA_VERSION,
     ready: state !== null && missing.length === 0 && supervisorRunning && serviceHealthy,
     supervisorRunning,
-    computerUse: { serviceHealthy, displays },
+    computerUse: { serviceHealthy, displays, primaryDisplay },
     detail,
     teams,
     providers,
@@ -554,6 +557,30 @@ export function novncCommand(tokenFile = SANDBOX_NOVNC_TOKEN_FILE) {
   ];
 }
 
+export const SANDBOX_PRIMARY_DISPLAY_INDEX = 1;
+export const SANDBOX_PRIMARY_DISPLAY_PORT = 5_900 + SANDBOX_PRIMARY_DISPLAY_INDEX;
+
+export function primaryDisplayCommand() {
+  return ["/opt/briar/bin/briar-remote-desktop"];
+}
+
+/** True when the owner's display :1 accepts VNC connections on loopback. */
+export function primaryDisplayListening(
+  port = SANDBOX_PRIMARY_DISPLAY_PORT,
+): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = createConnection({ host: "127.0.0.1", port });
+    const finish = (listening: boolean) => {
+      socket.removeAllListeners();
+      socket.destroy();
+      resolve(listening);
+    };
+    socket.setTimeout(500, () => finish(false));
+    socket.once("connect", () => finish(true));
+    socket.once("error", () => finish(false));
+  });
+}
+
 export function boxServiceCommand(environment: NodeJS.ProcessEnv = process.env) {
   const configured = environment.BRIAR_CLI?.trim();
   if (configured && isAbsolute(configured)) return [configured, "sandbox", "box-exec"];
@@ -579,6 +606,10 @@ export async function runSandboxSupervisor(directory = configDirectory) {
   const children = Promise.all([
     keepChildAlive("box_service", boxServiceCommand(), stop.signal),
     keepChildAlive("novnc", novncCommand(), stop.signal),
+    // Display :1 is the owner's desktop, always available like Grok Bot's
+    // default display and the managed computer's remote desktop; agents use
+    // :2 and above through the box service.
+    keepChildAlive("primary_display", primaryDisplayCommand(), stop.signal),
   ]);
   try {
     await runWorkerSupervisor({

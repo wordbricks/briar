@@ -434,13 +434,13 @@ export async function sandboxViewCommand() {
   if (!status.running) throw new Error(`Sandbox ${name} is not running`);
   const displays = status.report?.computerUse?.displays ?? [];
   const requested = value("--display");
+  // Prefer the display an agent is working on; otherwise open the owner's
+  // always-on desktop :1 so the sandbox can be seen even while idle.
   const displayIndex = requested !== undefined
     ? Number.parseInt(requested, 10)
-    : displays[0]?.displayIndex;
-  if (displayIndex === undefined) {
-    throw new Error(
-      "No agent holds a Computer Use display yet; rerun with --display <n> once one is assigned",
-    );
+    : displays[0]?.displayIndex ?? 1;
+  if (requested === undefined && displays.length === 0) {
+    console.error("No agent holds a Computer Use display; opening the owner desktop :1");
   }
   if (!Number.isInteger(displayIndex) || displayIndex < 1 || displayIndex > 100) {
     throw new Error("--display must be between 1 and 100");
