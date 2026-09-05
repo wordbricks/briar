@@ -302,7 +302,10 @@ commit row counts were all zero, so no private DM was imported or backfilled.
   list after Codex; a DM whose Agent runs on Claude now learns through Claude,
   and Codex remains the fallback order's first entry.
 
-Validation head and signoffs: pending.
+Validated head `15e79dfcfa70f7c3ff8a35c7bcac14323d5efb2e` passed all four
+required `ci:signoff` contexts (app-worker 161 s, d1-migrations 179 s, rust 218 s,
+security 5 s) on 2026-09-06; this docs-only note was signed off again before the
+squash merge of [#1703](https://github.com/wordbricks/briar/pull/1703).
 
 Rollback sets retrieval and indexing flags to false while leaving owner edit,
 forget, exclusion, and vector cleanup paths available. A rollback does not
