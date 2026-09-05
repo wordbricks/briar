@@ -140,12 +140,14 @@ export async function applyRemoteD1Migrations({
   migrationsDirectory = join(process.cwd(), "migrations"),
   runner = runWrangler,
   beforeMigration = runRequiredMigrationPreflight,
+  importRetryDelayMillis = defaultImportRetryDelayMillis,
   signal,
 }: {
   database?: string;
   migrationsDirectory?: string;
   runner?: WranglerRunner;
   beforeMigration?: (migrationName: string, signal?: AbortSignal) => Promise<number>;
+  importRetryDelayMillis?: number;
   signal?: AbortSignal;
 } = {}): Promise<number> {
   const initialize = await runner([
@@ -194,7 +196,84 @@ export async function applyRemoteD1Migrations({
       );
 
       console.log(`Applying remote D1 migration ${migrationName}...`);
-      const result = await runner([
+      // The import endpoint can both lose its final poll after D1 has already
+      // committed the file and return success while the server-side job never
+      // commits. Only the history INSERT, the last statement of the atomic
+      // import, proves the migration applied, so verify it after every import
+      // and retry while the record is missing.
+      const exitCode = await importWithVerification(
+        runner,
+        database,
+        importPath,
+        migrationName,
+        importRetryDelayMillis,
+        signal,
+      );
+      if (exitCode !== 0) return exitCode;
+    }
+  } finally {
+    await rm(temporaryDirectory, { recursive: true, force: true });
+  }
+
+  return 0;
+}
+
+const importVerificationAttempts = 3;
+
+const defaultImportRetryDelayMillis = 5_000;
+
+const readAppliedMigrationsWithRetry = async (
+  runner: WranglerRunner,
+  database: string,
+  retryDelayMillis: number,
+  signal?: AbortSignal,
+): Promise<{ exitCode: number; names: Set<string> }> => {
+  let history = await readAppliedMigrations(runner, database, signal);
+  for (let attempt = 1; history.exitCode !== 0 && attempt < importVerificationAttempts; attempt++) {
+    await delayMigrationRetry(retryDelayMillis, signal);
+    history = await readAppliedMigrations(runner, database, signal);
+  }
+  return history;
+};
+
+const delayMigrationRetry = (delayMillis: number, signal?: AbortSignal) =>
+  new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(makeAbortError(signal));
+      return;
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, delayMillis);
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(makeAbortError(signal));
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+
+const makeAbortError = (signal: AbortSignal) =>
+  signal.reason instanceof Error ? signal.reason : new Error("aborted");
+
+async function importWithVerification(
+  runner: WranglerRunner,
+  database: string,
+  importPath: string,
+  migrationName: string,
+  retryDelayMillis: number,
+  signal?: AbortSignal,
+): Promise<number> {
+  let lastExitCode = 0;
+  for (let attempt = 1; attempt <= importVerificationAttempts; attempt++) {
+    if (attempt > 1) {
+      console.warn(
+        `Remote D1 migration ${migrationName} was not recorded after import attempt ${attempt - 1}; retrying.`,
+      );
+      await delayMigrationRetry(retryDelayMillis, signal);
+    }
+    lastExitCode = (
+      await runner([
         "d1",
         "execute",
         database,
@@ -202,25 +281,28 @@ export async function applyRemoteD1Migrations({
         "--file",
         importPath,
         "--yes",
-      ], false, signal);
-      if (result.exitCode !== 0) {
-        // Wrangler can lose the final import polling race after D1 has already
-        // committed the file. The history INSERT is the last statement in the
-        // same atomic import, so its presence proves the migration completed.
-        const refreshedHistory = await readAppliedMigrations(runner, database, signal);
-        if (!refreshedHistory.names.has(migrationName)) {
-          return result.exitCode;
-        }
+      ], false, signal)
+    ).exitCode;
+    // Re-importing an already committed migration fails its trailing history
+    // INSERT and rolls the duplicate back, so re-reading the history is what
+    // distinguishes "committed despite a failed poll" from "never applied".
+    const refreshedHistory = await readAppliedMigrationsWithRetry(
+      runner,
+      database,
+      retryDelayMillis,
+      signal,
+    );
+    if (refreshedHistory.names.has(migrationName)) {
+      if (lastExitCode !== 0) {
         console.warn(
           `Remote D1 migration ${migrationName} was committed despite a failed final import poll.`,
         );
       }
+      return 0;
     }
-  } finally {
-    await rm(temporaryDirectory, { recursive: true, force: true });
+    if (lastExitCode !== 0) return lastExitCode;
   }
-
-  return 0;
+  return lastExitCode !== 0 ? lastExitCode : 1;
 }
 
 const main = Effect.fn("applyRemoteD1Migrations.main")(

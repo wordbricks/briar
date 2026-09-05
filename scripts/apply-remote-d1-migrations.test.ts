@@ -17,6 +17,12 @@ afterEach(async () => {
   );
 });
 
+function migrationNameFromImportedSql(sql: string): string | null {
+  return /INSERT INTO d1_migrations \(name\) VALUES \('([^']+)'\);/u.exec(
+    sql,
+  )?.[1] ?? null;
+}
+
 describe("remote D1 migration imports", () => {
   it("imports only pending migration files and then records them", async () => {
     const migrationsDirectory = await mkdtemp(join(tmpdir(), "briar-test-"));
@@ -25,19 +31,25 @@ describe("remote D1 migration imports", () => {
     await writeFile(join(migrationsDirectory, "0002_second.sql"), "SELECT 2;\n");
 
     let importedSql = "";
+    const appliedNames: string[] = [];
     const beforeMigration = vi.fn(async () => 0);
     const runner = vi.fn<WranglerRunner>(async (args, captureOutput) => {
       if (captureOutput) {
         return {
           exitCode: 0,
           stdout: JSON.stringify([
-            { success: true, results: [{ name: "0001_first.sql" }] },
+            {
+              success: true,
+              results: appliedNames.map((name) => ({ name })),
+            },
           ]),
         };
       }
       const fileIndex = args.indexOf("--file");
       if (fileIndex >= 0) {
         importedSql = await readFile(args[fileIndex + 1]!, "utf8");
+        const name = migrationNameFromImportedSql(importedSql);
+        if (name && !appliedNames.includes(name)) appliedNames.push(name);
       }
       return { exitCode: 0, stdout: "" };
     });
@@ -47,15 +59,15 @@ describe("remote D1 migration imports", () => {
         migrationsDirectory,
         runner,
         beforeMigration,
+        importRetryDelayMillis: 0,
       }),
     ).resolves.toBe(0);
     expect(importedSql).toContain("SELECT 2;");
     expect(importedSql).toContain(
       "INSERT INTO d1_migrations (name) VALUES ('0002_second.sql');",
     );
-    expect(runner).toHaveBeenCalledTimes(3);
-    expect(beforeMigration).toHaveBeenCalledOnce();
-    expect(beforeMigration).toHaveBeenCalledWith("0002_second.sql", undefined);
+    expect(beforeMigration).toHaveBeenCalledTimes(2);
+    expect(beforeMigration).toHaveBeenLastCalledWith("0002_second.sql", undefined);
   });
 
   it("recovers when the final import poll fails after D1 commits", async () => {
@@ -64,6 +76,7 @@ describe("remote D1 migration imports", () => {
     await writeFile(join(migrationsDirectory, "0001_first.sql"), "SELECT 1;\n");
 
     let historyReads = 0;
+    let imports = 0;
     const runner = vi.fn<WranglerRunner>(async (args, captureOutput) => {
       if (captureOutput) {
         historyReads += 1;
@@ -72,13 +85,14 @@ describe("remote D1 migration imports", () => {
           stdout: JSON.stringify([
             {
               success: true,
-              results: historyReads === 1
-                ? []
-                : [{ name: "0001_first.sql" }],
+              results: historyReads >= 2
+                ? [{ name: "0001_first.sql" }]
+                : [],
             },
           ]),
         };
       }
+      if (args.includes("--file")) imports += 1;
       return {
         exitCode: args.includes("--file") ? 1 : 0,
         stdout: "",
@@ -86,9 +100,67 @@ describe("remote D1 migration imports", () => {
     });
 
     await expect(
-      applyRemoteD1Migrations({ migrationsDirectory, runner }),
+      applyRemoteD1Migrations({ migrationsDirectory, runner, importRetryDelayMillis: 0 }),
     ).resolves.toBe(0);
     expect(historyReads).toBe(2);
+    expect(imports).toBe(1);
+  });
+
+  it("retries an import that returned success without committing", async () => {
+    const migrationsDirectory = await mkdtemp(join(tmpdir(), "briar-test-"));
+    temporaryDirectories.push(migrationsDirectory);
+    await writeFile(join(migrationsDirectory, "0001_first.sql"), "SELECT 1;\n");
+
+    let imports = 0;
+    let committed = false;
+    const runner = vi.fn<WranglerRunner>(async (args, captureOutput) => {
+      if (captureOutput) {
+        return {
+          exitCode: 0,
+          stdout: JSON.stringify([
+            {
+              success: true,
+              results: committed ? [{ name: "0001_first.sql" }] : [],
+            },
+          ]),
+        };
+      }
+      if (args.includes("--file")) {
+        imports += 1;
+        // The first import returns success while the server-side job silently
+        // fails; the retry commits.
+        if (imports === 2) committed = true;
+      }
+      return { exitCode: 0, stdout: "" };
+    });
+
+    await expect(
+      applyRemoteD1Migrations({ migrationsDirectory, runner, importRetryDelayMillis: 0 }),
+    ).resolves.toBe(0);
+    expect(imports).toBe(2);
+  });
+
+  it("fails after the import repeatedly returns success without committing", async () => {
+    const migrationsDirectory = await mkdtemp(join(tmpdir(), "briar-test-"));
+    temporaryDirectories.push(migrationsDirectory);
+    await writeFile(join(migrationsDirectory, "0001_first.sql"), "SELECT 1;\n");
+
+    let imports = 0;
+    const runner = vi.fn<WranglerRunner>(async (args, captureOutput) => {
+      if (captureOutput) {
+        return {
+          exitCode: 0,
+          stdout: JSON.stringify([{ success: true, results: [] }]),
+        };
+      }
+      if (args.includes("--file")) imports += 1;
+      return { exitCode: 0, stdout: "" };
+    });
+
+    await expect(
+      applyRemoteD1Migrations({ migrationsDirectory, runner, importRetryDelayMillis: 0 }),
+    ).resolves.toBe(1);
+    expect(imports).toBe(3);
   });
 
   it("preserves the import failure when the migration was not committed", async () => {
@@ -96,15 +168,21 @@ describe("remote D1 migration imports", () => {
     temporaryDirectories.push(migrationsDirectory);
     await writeFile(join(migrationsDirectory, "0001_first.sql"), "SELECT 1;\n");
 
-    const runner = vi.fn<WranglerRunner>(async (args, captureOutput) => ({
-      exitCode: !captureOutput && args.includes("--file") ? 23 : 0,
-      stdout: captureOutput
-        ? JSON.stringify([{ success: true, results: [] }])
-        : "",
-    }));
+    let imports = 0;
+    const runner = vi.fn<WranglerRunner>(async (args, captureOutput) => {
+      if (captureOutput) {
+        return {
+          exitCode: 0,
+          stdout: JSON.stringify([{ success: true, results: [] }]),
+        };
+      }
+      if (args.includes("--file")) imports += 1;
+      return { exitCode: args.includes("--file") ? 23 : 0, stdout: "" };
+    });
 
     await expect(
-      applyRemoteD1Migrations({ migrationsDirectory, runner }),
+      applyRemoteD1Migrations({ migrationsDirectory, runner, importRetryDelayMillis: 0 }),
     ).resolves.toBe(23);
+    expect(imports).toBe(1);
   });
 });
