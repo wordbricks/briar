@@ -48,4 +48,14 @@ describe("MarkdownContent", () => {
     expect(markup).toContain("href=\"https://example.com/x\"");
     expect(markup).toContain("자료");
   });
+
+  it("renders single newlines as visible line breaks", () => {
+    const markup = renderToStaticMarkup(
+      <MarkdownContent>{"first line\nsecond line"}</MarkdownContent>,
+    );
+
+    expect(markup).toContain("first line");
+    expect(markup).toContain("second line");
+    expect(markup).toMatch(/first line<br\s*\/?\s*>\s*second line/);
+  });
 });

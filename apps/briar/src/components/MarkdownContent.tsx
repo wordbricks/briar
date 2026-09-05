@@ -3,6 +3,7 @@ import ReactMarkdown, {
   type Components,
   type Options,
 } from "react-markdown";
+import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import { remarkUnderline } from "../lib/remark-underline";
 
@@ -34,7 +35,7 @@ export function MarkdownContent({
     <div className={classes}>
       <ReactMarkdown
         components={{ ...defaultComponents, ...components }}
-        remarkPlugins={[remarkGfm, remarkUnderline, ...remarkPlugins]}
+        remarkPlugins={[remarkGfm, remarkBreaks, remarkUnderline, ...remarkPlugins]}
         skipHtml
         urlTransform={urlTransform}
       >

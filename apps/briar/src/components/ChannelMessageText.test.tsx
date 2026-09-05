@@ -152,6 +152,26 @@ describe("ChannelMessageText", () => {
     expect(container.querySelector("button.channel-mention-button")).toBeNull();
   });
 
+  it("renders escaped line breaks as Markdown breaks", async () => {
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <ChannelMessageText
+          agents={[]}
+          members={[]}
+          message={{
+            ...message,
+            body: "first line\\nsecond line\\nthird line",
+          }}
+        />
+      </I18nProvider>,
+    );
+
+    const rendered = container.querySelector(".channel-message-text");
+    expect(rendered?.querySelectorAll("br")).toHaveLength(2);
+    expect(rendered?.innerHTML).not.toContain("\\n");
+  });
+
   it("renders webhook headers, mrkdwn, dividers, markdown, and rich text", async () => {
     const webhookMessage: ChannelMessage = {
       ...message,

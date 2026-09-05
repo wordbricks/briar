@@ -222,6 +222,7 @@ export function channelBodyWithImages(
 export function channelBodyWithoutImages(body: string) {
   return body
     .replace(/!\[[^\]]*\]\(briar-attachment:\/\/[0-9a-z-]+\)/giu, "")
+    .replace(/\\r\\n|\\n/gu, "\n")
     .replace(/\n{3,}/gu, "\n\n")
     .trim();
 }
