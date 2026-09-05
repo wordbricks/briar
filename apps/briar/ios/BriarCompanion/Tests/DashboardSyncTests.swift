@@ -236,7 +236,7 @@ private final class DashboardMockScenario: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         recordedCalls.append("get")
-        precondition(!request.projectID.isEmpty)
+        precondition(!request.teamID.isEmpty)
         precondition(!snapshots.isEmpty)
         return snapshots.removeFirst()
     }
@@ -247,7 +247,7 @@ private final class DashboardMockScenario: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         recordedCalls.append("sync:\(request.cursor)")
-        precondition(!request.projectID.isEmpty)
+        precondition(!request.teamID.isEmpty)
         precondition(!deltas.isEmpty)
         return deltas.removeFirst()
     }

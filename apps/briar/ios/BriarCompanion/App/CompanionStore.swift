@@ -486,7 +486,7 @@ final class DashboardStore: ObservableObject {
     ) async throws -> DashboardSnapshot {
         guard !forceSnapshot, var merged = current, var cursor = current?.cursor else {
             var request = BriarAPI_GetDashboardRequest()
-            request.projectID = coreUUIDString(projectID)
+            request.teamID = coreUUIDString(projectID)
             let response = await dashboard.getDashboard(request: request, headers: [:])
             return try DashboardSnapshot(connectMessage: response.briarValue())
         }
@@ -495,13 +495,13 @@ final class DashboardStore: ObservableObject {
                   wireCursor <= 9_007_199_254_740_991
             else { throw MobileAPIError.invalidRequest }
             var request = BriarAPI_SyncDashboardRequest()
-            request.projectID = coreUUIDString(projectID)
+            request.teamID = coreUUIDString(projectID)
             request.cursor = wireCursor
             let response = await dashboard.syncDashboard(request: request, headers: [:])
             let delta = try DashboardDelta(connectMessage: response.briarValue())
             if delta.reset {
                 var replacementRequest = BriarAPI_GetDashboardRequest()
-                replacementRequest.projectID = coreUUIDString(projectID)
+                replacementRequest.teamID = coreUUIDString(projectID)
                 let replacement = await dashboard.getDashboard(
                     request: replacementRequest,
                     headers: [:]
@@ -513,7 +513,7 @@ final class DashboardStore: ObservableObject {
             if !delta.hasMore { return merged }
         }
         var request = BriarAPI_GetDashboardRequest()
-        request.projectID = coreUUIDString(projectID)
+        request.teamID = coreUUIDString(projectID)
         let response = await dashboard.getDashboard(request: request, headers: [:])
         return try DashboardSnapshot(connectMessage: response.briarValue())
     }
@@ -603,7 +603,7 @@ final class RunDetailStore: ObservableObject {
             authoritativeReloadPending = false
             do {
                 var eventRequest = BriarAPI_ListRunEventsRequest()
-                eventRequest.projectID = coreUUIDString(projectID)
+                eventRequest.teamID = coreUUIDString(projectID)
                 eventRequest.runID = coreUUIDString(runID)
                 async let eventResponse = dashboardService.listRunEvents(
                     request: eventRequest,

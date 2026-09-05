@@ -1262,7 +1262,7 @@ final class ChannelsStore: ObservableObject {
                     throw MobileAPIError.invalidRequest
                 }
                 var dashboardRequest = BriarAPI_GetDashboardRequest()
-                dashboardRequest.projectID = coreUUIDString(projectID)
+                dashboardRequest.teamID = coreUUIDString(projectID)
                 let preflight = try DashboardSnapshot(
                     connectMessage: await dashboard.getDashboard(
                         request: dashboardRequest,
@@ -1532,7 +1532,7 @@ final class ChannelsStore: ObservableObject {
                 throw MobileAPIError.invalidRequest
             }
             var dashboardRequest = BriarAPI_GetDashboardRequest()
-            dashboardRequest.projectID = coreUUIDString(expectedProposal.projectId)
+            dashboardRequest.teamID = coreUUIDString(expectedProposal.projectId)
             let preflight = try DashboardSnapshot(
                 connectMessage: await dashboard.getDashboard(
                     request: dashboardRequest,
@@ -1586,7 +1586,7 @@ final class ChannelsStore: ObservableObject {
                       request: request
                   )
             else { throw MobileAPIError.invalidResponse }
-            dashboardRequest.projectID = coreUUIDString(response.projectId)
+            dashboardRequest.teamID = coreUUIDString(response.projectId)
             let acceptedSnapshot = try DashboardSnapshot(
                 connectMessage: await dashboard.getDashboard(
                     request: dashboardRequest,
@@ -1684,7 +1684,7 @@ final class ChannelsStore: ObservableObject {
                 throw MobileAPIError.invalidRequest
             }
             var dashboardRequest = BriarAPI_GetDashboardRequest()
-            dashboardRequest.projectID = coreUUIDString(proposal.projectId)
+            dashboardRequest.teamID = coreUUIDString(proposal.projectId)
             let snapshot = try DashboardSnapshot(
                 connectMessage: await dashboard.getDashboard(
                     request: dashboardRequest,
@@ -1759,7 +1759,7 @@ final class ChannelsStore: ObservableObject {
                 throw MobileAPIError.invalidRequest
             }
             var dashboardRequest = BriarAPI_GetDashboardRequest()
-            dashboardRequest.projectID = coreUUIDString(projectID)
+            dashboardRequest.teamID = coreUUIDString(projectID)
             let snapshot = try DashboardSnapshot(
                 connectMessage: await dashboard.getDashboard(
                     request: dashboardRequest,
@@ -1845,7 +1845,7 @@ final class ChannelsStore: ObservableObject {
                 throw MobileAPIError.invalidRequest
             }
             var dashboardRequest = BriarAPI_GetDashboardRequest()
-            dashboardRequest.projectID = coreUUIDString(expectedProposal.projectId)
+            dashboardRequest.teamID = coreUUIDString(expectedProposal.projectId)
             let preflight = try DashboardSnapshot(
                 connectMessage: await dashboard.getDashboard(
                     request: dashboardRequest,
@@ -1972,7 +1972,7 @@ final class ChannelsStore: ObservableObject {
                 throw MobileAPIError.invalidRequest
             }
             var dashboardRequest = BriarAPI_GetDashboardRequest()
-            dashboardRequest.projectID = coreUUIDString(proposal.projectId)
+            dashboardRequest.teamID = coreUUIDString(proposal.projectId)
             let snapshot = try DashboardSnapshot(
                 connectMessage: await dashboard.getDashboard(
                     request: dashboardRequest,
