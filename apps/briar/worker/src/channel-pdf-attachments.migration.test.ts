@@ -1,6 +1,5 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
-import { createChannel } from "./channels";
 import { applyD1Migrations } from "./test-helpers/d1";
 import { executeD1Sql } from "./test-helpers/d1-sql";
 
@@ -28,19 +27,26 @@ describe("channel PDF attachment migration", () => {
         'pdf-org', 'pdf-owner', 'owner', '${now}', '${now}'
       );
     `);
-    await createChannel(db, {
-      id: "pdf-channel",
-      organizationId: "pdf-org",
-      kind: "dm",
-      dmKey: "user:pdf-owner",
-      slug: "pdf-dm",
-      name: "PDF DM",
-      topic: null,
-      visibility: "private",
-      defaultProjectId: null,
-      createdByUserId: "pdf-owner",
-      createdAt: now,
-    });
+    /*
+      The schema stops at 0175 here, so the channel is seeded with the rows
+      the production `createChannel` writes rather than through it: that
+      function reads the channel back with the current catalog query, which
+      joins tables later migrations create.
+    */
+    await executeD1Sql(db, `
+      insert into briar_channels (
+        id, organization_id, kind, dm_key, slug, name, topic, visibility,
+        default_project_id, created_by_user_id, created_at, updated_at
+      ) values (
+        'pdf-channel', 'pdf-org', 'dm', 'user:pdf-owner', 'pdf-dm', 'PDF DM',
+        null, 'private', null, 'pdf-owner', '${now}', '${now}'
+      );
+      insert into briar_channel_members (
+        channel_id, user_id, role, created_at
+      ) values (
+        'pdf-channel', 'pdf-owner', 'owner', '${now}'
+      );
+    `);
     await executeD1Sql(db, `
       insert into briar_channel_messages (
         id, channel_id, parent_message_id, author_user_id, body,
