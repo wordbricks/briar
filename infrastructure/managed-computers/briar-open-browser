@@ -27,7 +27,9 @@ if [ -n "$profile_directory" ]; then
       ;;
   esac
   /usr/bin/install -d -m 0700 "$profile_directory"
-  set -- --user-data-dir="$profile_directory"
+  # The shared login store moves cookies and saved passwords between display
+  # profiles, so the encryption key must not depend on a per-session keyring.
+  set -- --user-data-dir="$profile_directory" --password-store=basic
 else
   set --
 fi

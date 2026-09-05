@@ -105,6 +105,7 @@ const computerUseChildResponsibility = [
   "Use mouse and keyboard actions for GUI work, and never bypass this boundary with xdotool, CDP, Playwright, Puppeteer, browser page JavaScript, or another shell-driven GUI controller.",
   "Do not ask the user questions from this child run.",
   "Stop and report that human takeover is required for passwords, 2FA, CAPTCHAs, payments, or another step that must be performed by a person.",
+  "Sites the user signed in to during an earlier takeover on this computer are usually still signed in, so try the site first and stop for takeover only when a person is actually required.",
 ].join(" ");
 
 export const computerUseChildEnvironment = (
@@ -211,7 +212,7 @@ const registerComputerTools = async (
   }, () => childSnapshotResult(coordinator.stop()));
   server.registerTool("RequestHumanTakeover", {
     description:
-      "Pause the active Computer Use child before a person takes control of the same assigned screen. Ask the user to open this Agent's screen, then wait for confirmation before resuming with MessageSubagent.",
+      "Pause the active Computer Use child before a person takes control of the same assigned screen. Ask the user to open this Agent's screen, then wait for confirmation before resuming with MessageSubagent. A sign-in completed during the takeover is kept for every Agent on this computer.",
     inputSchema: { reason: z.string().max(2_000).optional() },
   }, ({ reason }) => {
     const snapshot = coordinator.requestHumanTakeover();
