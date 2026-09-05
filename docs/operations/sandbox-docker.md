@@ -72,9 +72,9 @@ sandbox는 Grok Bot의 로컬 VM처럼 에이전트가 볼 수 있는 데스크�
 - Docker 호스트: Docker 24+ 데몬. 원격이면 SSH로 접근 가능해야 하고
   (`docker context`가 `ssh://`를 사용), GPU를 붙이려면 nvidia-container-toolkit이
   설치되어 있어야 한다.
-- 이미지는 `TARGETARCH`에 따라 Bun과 Node를 고르므로 amd64와 arm64 모두
-  네이티브로 빌드된다. provider runtime의 `bun.lock`에는 두 아키텍처의 optional
-  바이너리가 모두 고정되어 있다.
+- 이미지는 `TARGETARCH`에 따라 Bun, Node, OpenCode, Grok을 고르므로 amd64와
+  arm64 모두 네이티브로 빌드된다. provider runtime의 `bun.lock`에는 두
+  아키텍처의 optional 바이너리가 모두 고정되어 있다.
 
 ## GX10에 sandbox 만들기
 
@@ -91,8 +91,11 @@ briar sandbox up --name gx10 --host ssh://jay@gx10 --team <team-id> --gpus
 4. 컨테이너를 만들고 `briar sandbox supervise`를 PID 1(`--init` 뒤)로 띄운다.
 5. `docker exec -i ... briar sandbox bootstrap`에 JSON payload를 넘긴다.
    payload에는 Briar API origin, 사용자 세션 토큰, 팀별 agent token,
-   이 Mac의 global git `user.name`/`user.email`, 그리고 `~/.codex/auth.json`이
-   있으면 그 내용이 들어간다. git identity는 컨테이너에 아직 없을 때만 쓴다.
+   이 Mac의 global git `user.name`/`user.email`, 이 Mac이 추가한
+   managed-computer provider 목록, 그리고 `~/.codex/auth.json`,
+   `~/.config/opencode/opencode.json`, OpenCode `auth.json`, `~/.grok/auth.json`
+   중 있는 것들의 내용이 들어간다. 복사된 파일은 컨테이너 안에서 같은 경로에
+   0600으로 쓰인다. git identity는 컨테이너에 아직 없을 때만 쓴다.
 6. 컨테이너 안에서 팀마다 GitHub 자격 증명을 받아 저장소를 클론하고
    (`~/Briar/projects/<org>/<project>/<repo>`), 팀을 연결하고, execution
    worker로 등록한다. 워커 label은 기본 `sandbox-<name>`이다.
@@ -107,10 +110,37 @@ Docker 호스트에서 `deb.debian.org`가 느리면(GX10에서 약 170KB/s로 �
 `up`을 쓴다. 이미 있는 sandbox는 `--host`나 `--context` 없이 이름만으로
 찾는다(`~/.config/briar/sandboxes.json`에 context 이름만 기록된다).
 
+### provider CLI
+
+이미지는 관리형 컴퓨터 AMI와 같은 provider 집합을 싣는다. Claude Code, Codex,
+Velen은 provider runtime의 npm 패키지에서, OpenCode와 Grok은 `image-lock.env`에
+고정된 standalone 릴리스에서 온다. OpenCode의 npm 패키지(`opencode-ai`)는
+lifecycle script로 설치되는데 provider runtime은 `--ignore-scripts`로 돌리므로
+쓰지 않는다.
+
+- 두 바이너리 모두 amd64와 arm64 URL·SHA-256이 `image-lock.env`에 있고
+  Dockerfile이 `TARGETARCH`에 맞는 것을 받아 `sha256sum -c`로 검증한다. 해시가
+  맞지 않거나 지원하지 않는 아키텍처면 빌드가 실패한다.
+- 빌드 마지막에 managed-computer provider(`codex`, `claude`, `grok`,
+  `opencode`)의 바이너리가 `/opt/briar/bin`에 모두 있는지 확인한다. 카탈로그에
+  provider가 추가되었는데 설치 단계가 없으면 이미지 빌드와
+  `sandbox-image.test.ts`가 함께 실패한다.
+- `image-lock.env`의 버전이나 해시를 바꾸면 `bun run sandbox:generate`로 자산을
+  다시 만들어야 한다.
+
 ### provider 로그인
 
-- **Codex**: Mac의 `~/.codex/auth.json`이 그대로 복사된다. 넘기고 싶지 않으면
-  `--no-provider-auth`.
+- **Codex**: Mac의 `~/.codex/auth.json`이 그대로 복사된다.
+- **OpenCode**: Mac의 `~/.config/opencode/opencode.json`(모델 라우팅과 커스텀
+  provider 정의)과 OpenCode `auth.json`(`~/.local/share/opencode/auth.json` 등
+  `XDG_DATA_HOME` 우선 순서로 처음 발견되는 것)이 복사된다.
+- **Grok**: Mac의 `~/.grok/auth.json`이 복사된다.
+- 위 세 provider의 파일을 넘기고 싶지 않으면 `--no-provider-auth`.
+- **added provider**: 이 Mac이 추가한 provider 중 managed-computer provider인
+  것(예: Grok)이 payload에 실려 컨테이너 config의 `addedProviders`에 병합되고
+  스위치가 켜진다. Grok은 built-in이 아니라서 이 단계가 없으면 CLI가 설치되고
+  로그인이 되어 있어도 sandbox 워커가 provider로 광고하지 않는다. 자격 증명이
+  아니므로 `--no-provider-auth`에서도 보낸다.
 - **Claude Code**: macOS는 토큰을 Keychain에 두므로 복사할 파일이 없다.
   컨테이너 안에서 device 로그인을 한 번 한다.
 
@@ -118,8 +148,10 @@ Docker 호스트에서 `deb.debian.org`가 느리면(GX10에서 약 170KB/s로 �
   briar sandbox login --name gx10 --provider claude
   ```
 
-  `codex`, `grok`, `opencode`도 같은 명령으로 로그인할 수 있다.
+  `codex`, `grok`, `opencode`도 같은 명령으로 로그인할 수 있다. 복사한 파일이
+  만료되었을 때도 이 명령으로 컨테이너 안에서 다시 로그인한다.
 - 로그인 상태는 `briar sandbox status`의 `report.providers`에서 확인한다.
+  여기에는 컨테이너 config에서 enabled인 provider만 나온다.
 
 ## 일상 운영
 
@@ -154,16 +186,20 @@ briar sandbox view --name gx10        # 에이전트 화면을 브라우저 noVN
   호스트의 파일이나 `docker inspect` 출력에는 나타나지 않는다.
 - Docker 호스트 관리자는 볼륨을 읽을 수 있다. 신뢰하지 않는 호스트에는
   sandbox를 만들지 않는다.
-- 이미지는 Bun과 Node를 버전 고정으로 받지만 arm64 아카이브의 SHA는 아직
-  검증하지 않는다. 관리형 컴퓨터 AMI 수준의 공급망 검증이 필요하면
-  `image-lock.env`에 arm64 해시를 추가하고 Dockerfile 생성기를 확장한다.
+- OpenCode와 Grok은 amd64/arm64 모두 `image-lock.env`의 SHA-256으로 검증하고
+  받는다. Bun과 Node는 버전만 고정되어 있고 arm64 아카이브의 SHA는 아직
+  검증하지 않는다. 관리형 컴퓨터 AMI 수준의 공급망 검증이 필요하면 같은 방식으로
+  `image-lock.env`에 Bun/Node arm64 해시를 추가하고 생성기를 확장한다.
+- provider 파일은 payload로만 들어가고 Docker 호스트 디스크에는 남지 않는다.
+  Mac의 `opencode.json`에 인라인 API 키가 들어 있으면 그것도 컨테이너로 복사되므로,
+  넘기고 싶지 않으면 `--no-provider-auth`를 쓰고 컨테이너 안에서 로그인한다.
 
 ## 코드 구조
 
 | 파일 | 역할 |
 | --- | --- |
 | `apps/briar/src-cli/sandbox-image.ts` | Dockerfile 템플릿, 빌드 컨텍스트 스테이징, digest |
-| `apps/briar/src-cli/sandbox-runtime-assets.ts` | 생성 파일. provider runtime manifest/lock과 Bun/Node 버전 (`bun run sandbox:generate`) |
+| `apps/briar/src-cli/sandbox-runtime-assets.ts` | 생성 파일. provider runtime manifest/lock, Bun/Node 버전, OpenCode·Grok 릴리스 버전과 arch별 SHA-256 (`bun run sandbox:generate`) |
 | `apps/briar/src-cli/sandbox-docker.ts` | 호스트 쪽 Docker 커넥터 (Grok Bot 포팅) |
 | `apps/briar/src-cli/sandbox-host-config.ts` | `~/.config/briar/sandboxes.json` |
 | `apps/briar/src-cli/sandbox-bootstrap.ts` | 컨테이너 쪽 bootstrap, report, supervisor |
@@ -171,5 +207,5 @@ briar sandbox view --name gx10        # 에이전트 화면을 브라우저 noVN
 | `apps/briar/src-cli/project-repository-bootstrap.ts` | 관리형 셋업과 공유하는 클론 헬퍼 |
 
 `infrastructure/managed-computers/provider-runtime/`나 `image-lock.env`의
-Bun/Node 버전을 바꾸면 `bun run sandbox:generate`로 자산을 다시 생성해야 하며
-`bun run check`의 `sandbox:check`가 이를 강제한다.
+Bun/Node 버전, OpenCode·Grok 버전과 SHA-256을 바꾸면 `bun run sandbox:generate`로
+자산을 다시 생성해야 하며 `bun run check`의 `sandbox:check`가 이를 강제한다.

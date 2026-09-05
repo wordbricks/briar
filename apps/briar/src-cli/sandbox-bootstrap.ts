@@ -10,7 +10,9 @@ import {
 } from "@briar/contracts/gen/briar/app/v1/github_pb";
 import { requiredMessage } from "../src/lib/app-rpc/mappers";
 import {
+  agentProviders,
   managedComputerSetupProviders,
+  normalizeAddedProviders,
 } from "../src/lib/agent-provider";
 import {
   configDirectory,
@@ -18,7 +20,11 @@ import {
   loadConfig,
   saveConfig,
 } from "./command-support";
-import type { Config, TeamConfig } from "./config-contract";
+import {
+  addedAgentProviders,
+  type Config,
+  type TeamConfig,
+} from "./config-contract";
 import { createAuthenticatedConnectClient } from "./connect-client";
 import { providerAuthenticated } from "./managed-computer-setup-agent";
 import { configuredComputerUseAssignmentPath } from "./computer-use-desktop-manager";
@@ -68,6 +74,17 @@ export const SandboxBootstrapPayload = Schema.Struct({
   label: Schema.String.check(Schema.isLengthBetween(1, 100)),
   teams: Schema.Array(BootstrapTeam).check(Schema.isMinLength(1)),
   codexAuth: Schema.optional(Schema.String.check(Schema.isMinLength(2))),
+  /** `opencode.json`: model routing and custom providers, not a credential. */
+  opencodeConfig: Schema.optional(Schema.String.check(Schema.isMinLength(2))),
+  opencodeAuth: Schema.optional(Schema.String.check(Schema.isMinLength(2))),
+  grokAuth: Schema.optional(Schema.String.check(Schema.isMinLength(2))),
+  /**
+   * Providers the owner added on the Mac. A provider that is not built in —
+   * Grok, for one — reads as disabled in the container until it is on this
+   * list, so the sandbox worker would never advertise it however well the CLI
+   * is installed and signed in.
+   */
+  addedProviders: Schema.optional(Schema.Array(Schema.Literals(agentProviders))),
   gitIdentity: Schema.optional(Schema.Struct({
     name: Schema.String.check(Schema.isLengthBetween(1, 200)),
     email: Schema.String.check(Schema.isLengthBetween(3, 320)),
@@ -189,12 +206,44 @@ async function writeSandboxState(state: SandboxState, directory = configDirector
   );
 }
 
-async function writeCodexAuth(contents: string, home = homedir()) {
-  const target = join(home, ".codex", "auth.json");
+/**
+ * Copy one provider file the owner handed over. The directory is owner-only
+ * and the file is rewritten in place, so rerunning `briar sandbox up` refreshes
+ * a rotated credential without ever widening its mode.
+ */
+async function writeProviderFile(target: string, contents: string) {
   await mkdir(dirname(target), { recursive: true, mode: 0o700 });
   await writeFile(target, contents, { mode: 0o600 });
   await chmod(target, 0o600);
 }
+
+/** The XDG base directory, or its home-relative default. */
+const baseDirectory = (variable: string, home: string, fallback: string) => {
+  const configured = process.env[variable]?.trim();
+  return configured ? configured : join(home, fallback);
+};
+
+export const sandboxOpencodeConfigPath = (home = homedir()) =>
+  join(baseDirectory("XDG_CONFIG_HOME", home, ".config"), "opencode", "opencode.json");
+
+export const sandboxOpencodeAuthPath = (home = homedir()) =>
+  join(
+    baseDirectory("XDG_DATA_HOME", home, join(".local", "share")),
+    "opencode",
+    "auth.json",
+  );
+
+const writeCodexAuth = (contents: string, home = homedir()) =>
+  writeProviderFile(join(home, ".codex", "auth.json"), contents);
+
+const writeOpencodeConfig = (contents: string, home = homedir()) =>
+  writeProviderFile(sandboxOpencodeConfigPath(home), contents);
+
+const writeOpencodeAuth = (contents: string, home = homedir()) =>
+  writeProviderFile(sandboxOpencodeAuthPath(home), contents);
+
+const writeGrokAuth = (contents: string, home = homedir()) =>
+  writeProviderFile(join(home, ".grok", "auth.json"), contents);
 
 export type SandboxBootstrapDependencies = {
   readonly loadConfig: () => Promise<Config>;
@@ -206,6 +255,9 @@ export type SandboxBootstrapDependencies = {
   readonly ensureRepository: typeof ensureRepository;
   readonly registerWorker: typeof registerProjectExecutionWorker;
   readonly writeCodexAuth: (contents: string) => Promise<void>;
+  readonly writeOpencodeConfig: (contents: string) => Promise<void>;
+  readonly writeOpencodeAuth: (contents: string) => Promise<void>;
+  readonly writeGrokAuth: (contents: string) => Promise<void>;
   readonly writeGitIdentity: (
     identity: { readonly name: string; readonly email: string },
   ) => Promise<void>;
@@ -259,7 +311,10 @@ const defaultDependencies: SandboxBootstrapDependencies = {
   fetchRepositoryCredential,
   ensureRepository,
   registerWorker: registerProjectExecutionWorker,
-  writeCodexAuth,
+  writeCodexAuth: (contents) => writeCodexAuth(contents),
+  writeOpencodeConfig: (contents) => writeOpencodeConfig(contents),
+  writeOpencodeAuth: (contents) => writeOpencodeAuth(contents),
+  writeGrokAuth: (contents) => writeGrokAuth(contents),
   writeGitIdentity,
   writeState: writeSandboxState,
   registerComputer: async (input) => {
@@ -330,6 +385,28 @@ export async function runSandboxBootstrap(
   config.userToken = payload.userToken;
   if (payload.codexAuth !== undefined) {
     await dependencies.writeCodexAuth(payload.codexAuth);
+  }
+  if (payload.opencodeConfig !== undefined) {
+    await dependencies.writeOpencodeConfig(payload.opencodeConfig);
+  }
+  if (payload.opencodeAuth !== undefined) {
+    await dependencies.writeOpencodeAuth(payload.opencodeAuth);
+  }
+  if (payload.grokAuth !== undefined) {
+    await dependencies.writeGrokAuth(payload.grokAuth);
+  }
+  // A provider this container has not added stays disabled however well it is
+  // installed, so mirror the Mac's added set and switch each one on. Both
+  // steps go through the shared normalizer, which keeps the list in menu order
+  // and free of duplicates when `up` is rerun.
+  if (payload.addedProviders !== undefined) {
+    config.addedProviders = normalizeAddedProviders([
+      ...addedAgentProviders(config),
+      ...payload.addedProviders,
+    ]);
+    for (const provider of payload.addedProviders) {
+      config.agentProviders[provider] = true;
+    }
   }
   if (payload.gitIdentity !== undefined) {
     await dependencies.writeGitIdentity(payload.gitIdentity);

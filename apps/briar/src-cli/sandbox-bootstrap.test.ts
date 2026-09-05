@@ -19,6 +19,7 @@ import {
   readSandboxState,
   runSandboxBootstrap,
   runSandboxUnregister,
+  type SandboxBootstrapDependencies,
   type SandboxBootstrapPayload,
   sandboxReport,
   type SandboxState,
@@ -67,6 +68,38 @@ const payload = (): SandboxBootstrapPayload => ({
   teams: [{ id: projectId, agentToken }],
 });
 
+/**
+ * Dependencies that reach the network, the config file, or the container's
+ * home directory. Every one is stubbed so a test only has to override what it
+ * is actually asserting on.
+ */
+const bootstrapStubs = (
+  config: Config,
+): Partial<SandboxBootstrapDependencies> => ({
+  loadConfig: async () => config,
+  saveConfig: async () => undefined,
+  fetchRepositoryCredential: async (_apiUrl, project) => credential(project.id),
+  ensureRepository: async () => "/repo",
+  registerWorker: async (input) => ({
+    projectId: input.project.id,
+    organizationId,
+    deviceId: "device",
+    workerId: "worker-1",
+    label: input.label,
+    maxConcurrentSessions: 1,
+    state: "online",
+  }),
+  writeCodexAuth: async () => undefined,
+  writeOpencodeConfig: async () => undefined,
+  writeOpencodeAuth: async () => undefined,
+  writeGrokAuth: async () => undefined,
+  writeGitIdentity: async () => undefined,
+  writeState: async () => undefined,
+  computerUseHealthy: async () => true,
+  sleep: async () => undefined,
+  log: () => undefined,
+});
+
 const credential = (id: string) =>
   create(ProjectGitHubCredentialSchema, {
     projectId: id,
@@ -87,6 +120,29 @@ describe("decodeSandboxBootstrapPayload", () => {
     }));
     expect(decoded.teams).toEqual([{ id: projectId, agentToken }]);
     expect(decoded.codexAuth).toBe("{\"tokens\":{}}");
+  });
+
+  it("carries the OpenCode and Grok files and the added provider list", () => {
+    const decoded = decodeSandboxBootstrapPayload(JSON.stringify({
+      ...payload(),
+      opencodeConfig: "{\"provider\":{}}",
+      opencodeAuth: "{\"anthropic\":{}}",
+      grokAuth: "{\"session\":{}}",
+      addedProviders: ["grok", "opencode"],
+    }));
+    expect(decoded.opencodeConfig).toBe("{\"provider\":{}}");
+    expect(decoded.opencodeAuth).toBe("{\"anthropic\":{}}");
+    expect(decoded.grokAuth).toBe("{\"session\":{}}");
+    expect(decoded.addedProviders).toEqual(["grok", "opencode"]);
+  });
+
+  it("rejects a provider name the platform does not define", () => {
+    expect(() =>
+      decodeSandboxBootstrapPayload(JSON.stringify({
+        ...payload(),
+        addedProviders: ["grok", "not-a-provider"],
+      }))
+    ).toThrow();
   });
 
   it("rejects unknown fields, plain HTTP, and empty project lists", () => {
@@ -209,6 +265,69 @@ describe("runSandboxBootstrap", () => {
       repositoryPath: "/fresh",
       llm: { provider: "claude", approvalPolicy: "never" },
     });
+  });
+
+  it("copies the OpenCode and Grok files the owner handed over", async () => {
+    const config = baseConfig();
+    const written = {
+      opencodeConfig: [] as string[],
+      opencodeAuth: [] as string[],
+      grokAuth: [] as string[],
+    };
+    await runSandboxBootstrap({
+      ...payload(),
+      opencodeConfig: "{\"model\":\"anthropic/claude\"}",
+      opencodeAuth: "{\"anthropic\":{\"type\":\"oauth\"}}",
+      grokAuth: "{\"session\":{\"expiresAt\":0}}",
+    }, {
+      ...bootstrapStubs(config),
+      writeOpencodeConfig: async (contents) => {
+        written.opencodeConfig.push(contents);
+      },
+      writeOpencodeAuth: async (contents) => {
+        written.opencodeAuth.push(contents);
+      },
+      writeGrokAuth: async (contents) => {
+        written.grokAuth.push(contents);
+      },
+    });
+    expect(written).toEqual({
+      opencodeConfig: ["{\"model\":\"anthropic/claude\"}"],
+      opencodeAuth: ["{\"anthropic\":{\"type\":\"oauth\"}}"],
+      grokAuth: ["{\"session\":{\"expiresAt\":0}}"],
+    });
+  });
+
+  it("adds and enables the owner's added providers, idempotently", async () => {
+    const config = baseConfig();
+    const saved: Config[] = [];
+    const run = () =>
+      runSandboxBootstrap({ ...payload(), addedProviders: ["grok"] }, {
+        ...bootstrapStubs(config),
+        saveConfig: async (value) => {
+          saved.push(structuredClone(value));
+        },
+      });
+    await run();
+    expect(saved.at(-1)?.addedProviders).toEqual(["grok"]);
+    expect(saved.at(-1)?.agentProviders.grok).toBe(true);
+    await run();
+    expect(saved.at(-1)?.addedProviders).toEqual(["grok"]);
+    expect(saved.at(-1)?.agentProviders.grok).toBe(true);
+  });
+
+  it("leaves the added list alone when the payload omits it", async () => {
+    const config = baseConfig();
+    config.addedProviders = ["cursor"];
+    const saved: Config[] = [];
+    await runSandboxBootstrap(payload(), {
+      ...bootstrapStubs(config),
+      saveConfig: async (value) => {
+        saved.push(structuredClone(value));
+      },
+    });
+    expect(saved.at(-1)?.addedProviders).toEqual(["cursor"]);
+    expect(saved.at(-1)?.agentProviders.grok).toBe(false);
   });
 });
 

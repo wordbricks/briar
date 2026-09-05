@@ -25,8 +25,30 @@ const lockValues = Object.fromEntries(
 );
 const requiredLock = (name: string) => {
   const value = lockValues[name];
-  if (!value || !/^[0-9]+\.[0-9]+\.[0-9]+$/u.test(value)) {
-    throw new Error(`${name} must be a pinned semantic version in image-lock.env`);
+  if (value === undefined) {
+    throw new Error(`${name} is missing from image-lock.env`);
+  }
+  if (!/^[0-9]+\.[0-9]+\.[0-9]+$/u.test(value)) {
+    throw new Error(
+      `${name} must be a pinned semantic version in image-lock.env, not ${value}`,
+    );
+  }
+  return value;
+};
+/**
+ * A checksum the sandbox Dockerfile verifies a downloaded binary against. It
+ * is embedded verbatim in the build context, so an unpinned or malformed
+ * value has to fail here rather than inside `docker build`.
+ */
+const requiredSha256 = (name: string) => {
+  const value = lockValues[name];
+  if (value === undefined) {
+    throw new Error(`${name} is missing from image-lock.env`);
+  }
+  if (!/^[0-9a-f]{64}$/u.test(value)) {
+    throw new Error(
+      `${name} must be a lowercase 64-character SHA-256 in image-lock.env, not ${value}`,
+    );
   }
   return value;
 };
@@ -57,6 +79,26 @@ const desktopFiles = Object.fromEntries(
 const assets = {
   bunVersion: requiredLock("BUN_VERSION"),
   nodeVersion: requiredLock("NODE_VERSION"),
+  /**
+   * Standalone provider CLIs the sandbox image downloads directly. OpenCode
+   * ships a lifecycle-script npm package the image must not run, and Grok has
+   * no npm package at all, so both are pinned releases verified per
+   * architecture exactly like the managed-computer AMI does.
+   */
+  opencodeCli: {
+    version: requiredLock("OPENCODE_CLI_VERSION"),
+    sha256: {
+      amd64: requiredSha256("OPENCODE_CLI_LINUX_X64_SHA256"),
+      arm64: requiredSha256("OPENCODE_CLI_LINUX_ARM64_SHA256"),
+    },
+  },
+  grokCli: {
+    version: requiredLock("GROK_CLI_VERSION"),
+    sha256: {
+      amd64: requiredSha256("GROK_CLI_LINUX_X64_SHA256"),
+      arm64: requiredSha256("GROK_CLI_LINUX_AARCH64_SHA256"),
+    },
+  },
   desktopFiles,
   providerRuntimePackageJson: await readFile(
     resolve(runtimeDirectory, "package.json"),

@@ -1,6 +1,10 @@
 import { createHash } from "node:crypto";
 import { access, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import {
+  agentProviderBinaryName,
+  managedComputerSetupProviders,
+} from "../src/lib/agent-provider";
 import { sandboxRuntimeAssets } from "./sandbox-runtime-assets";
 
 /**
@@ -68,13 +72,41 @@ export const SANDBOX_DESKTOP_FILES = [
 ] as const;
 export type SandboxDesktopFile = (typeof SANDBOX_DESKTOP_FILES)[number];
 
+/**
+ * A provider CLI the image downloads as a pinned standalone release. Both
+ * Linux architectures are checksummed because the sandbox is built natively
+ * on amd64 Macs and on ARM64 hosts such as a GX10.
+ */
+export type SandboxCliRelease = {
+  readonly version: string;
+  readonly sha256: {
+    readonly amd64: string;
+    readonly arm64: string;
+  };
+};
+
 export type SandboxRuntimeAssets = {
   readonly bunVersion: string;
   readonly nodeVersion: string;
+  readonly opencodeCli: SandboxCliRelease;
+  readonly grokCli: SandboxCliRelease;
   readonly desktopFiles: Readonly<Record<SandboxDesktopFile, string>>;
   readonly providerRuntimePackageJson: string;
   readonly providerRuntimeBunLock: string;
 };
+
+/**
+ * Every managed-computer provider must resolve its binary on the sandbox's
+ * `PATH`, otherwise the in-container worker never advertises the provider and
+ * the app hides this sandbox in the designated-worker picker. The paths are
+ * derived from the provider catalog and asserted inside the image build, so a
+ * provider added to `managedComputerSetupProviders` without a matching install
+ * step fails the build instead of silently shipping.
+ */
+export const sandboxProviderBinaryPaths = (): string[] =>
+  managedComputerSetupProviders
+    .map((provider) => `${SANDBOX_RUNTIME_ROOT}/bin/${agentProviderBinaryName(provider)}`)
+    .sort();
 
 /**
  * Debian packages for the desktop session, shared with the managed-computer
@@ -104,6 +136,8 @@ FROM debian:trixie-slim
 ARG TARGETARCH
 ARG BUN_VERSION=${assets.bunVersion}
 ARG NODE_VERSION=${assets.nodeVersion}
+ARG OPENCODE_CLI_VERSION=${assets.opencodeCli.version}
+ARG GROK_CLI_VERSION=${assets.grokCli.version}
 ARG DEBIAN_MIRROR=deb.debian.org
 ENV DEBIAN_FRONTEND=noninteractive
 RUN if [ "$DEBIAN_MIRROR" != "deb.debian.org" ]; then \\
@@ -147,6 +181,37 @@ RUN set -eu; \\
     install -m 0755 "${SANDBOX_RUNTIME_ROOT}/provider/node_modules/agent-browser/bin/$browser" \\
       ${SANDBOX_RUNTIME_ROOT}/bin/agent-browser; \\
   fi
+# OpenCode and Grok ship as standalone releases, pinned and checksum-verified
+# per architecture exactly like the managed-computer AMI installs them. Neither
+# comes from npm: OpenCode's package installs through a lifecycle script the
+# provider runtime deliberately runs with --ignore-scripts, and Grok has no
+# package at all.
+RUN set -eu; \\
+  case "$TARGETARCH" in \\
+    amd64) \\
+      opencode_url="https://github.com/anomalyco/opencode/releases/download/v\${OPENCODE_CLI_VERSION}/opencode-linux-x64-baseline.tar.gz"; \\
+      opencode_sha=${assets.opencodeCli.sha256.amd64}; \\
+      grok_url="https://x.ai/cli/grok-\${GROK_CLI_VERSION}-linux-x86_64"; \\
+      grok_sha=${assets.grokCli.sha256.amd64} ;; \\
+    arm64) \\
+      opencode_url="https://github.com/anomalyco/opencode/releases/download/v\${OPENCODE_CLI_VERSION}/opencode-linux-arm64.tar.gz"; \\
+      opencode_sha=${assets.opencodeCli.sha256.arm64}; \\
+      grok_url="https://x.ai/cli/grok-\${GROK_CLI_VERSION}-linux-aarch64"; \\
+      grok_sha=${assets.grokCli.sha256.arm64} ;; \\
+    *) echo "Unsupported architecture: $TARGETARCH" >&2; exit 1 ;; \\
+  esac; \\
+  mkdir -p /tmp/briar-download; \\
+  curl -fsSL "$opencode_url" -o /tmp/briar-download/opencode.tar.gz; \\
+  printf '%s  %s\\n' "$opencode_sha" /tmp/briar-download/opencode.tar.gz | sha256sum -c -; \\
+  tar -xzf /tmp/briar-download/opencode.tar.gz -C /tmp/briar-download opencode; \\
+  install -m 0755 /tmp/briar-download/opencode ${SANDBOX_RUNTIME_ROOT}/bin/opencode; \\
+  curl -fsSL "$grok_url" -o /tmp/briar-download/grok; \\
+  printf '%s  %s\\n' "$grok_sha" /tmp/briar-download/grok | sha256sum -c -; \\
+  install -m 0755 /tmp/briar-download/grok ${SANDBOX_RUNTIME_ROOT}/bin/grok; \\
+  rm -rf /tmp/briar-download; \\
+  for provider_binary in ${sandboxProviderBinaryPaths().join(" ")}; do \\
+    test -x "$provider_binary"; \\
+  done
 # Desktop session, VNC displays, and Computer Use input executor.
 RUN apt-get update \\
   && apt-get install -y --no-install-recommends \\

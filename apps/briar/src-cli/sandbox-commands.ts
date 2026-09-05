@@ -7,6 +7,8 @@ import {
   managedComputerSetupProviders,
 } from "../src/lib/agent-provider";
 import { gitValueAt, has, loadConfig, openBrowser, value, values } from "./command-support";
+import { addedAgentProviders } from "./config-contract";
+import { opencodeAuthPaths } from "./provider-credentials";
 import {
   managedComputerProviderAuthCommand,
 } from "./managed-computer-setup-agent";
@@ -103,6 +105,23 @@ async function optionalFile(path: string) {
   }
 }
 
+/** The first of several candidate locations that holds a file. */
+async function firstFile(paths: readonly string[]) {
+  for (const path of paths) {
+    const contents = await optionalFile(path);
+    if (contents !== undefined) return contents;
+  }
+  return undefined;
+}
+
+/**
+ * A provider file worth putting in the payload. An empty or truncated file is
+ * nothing to copy, and the bootstrap payload rejects it, so drop it here
+ * instead of failing the whole `up` inside the container.
+ */
+const sendableFile = (contents: string | undefined) =>
+  contents !== undefined && contents.trim().length >= 2 ? contents : undefined;
+
 async function bootstrapPayload(input: {
   readonly name: string;
   readonly teamIds: readonly string[];
@@ -131,9 +150,31 @@ async function bootstrapPayload(input: {
     }
     return { id: project.id, agentToken: project.agentToken };
   });
-  const codexAuth = has("--no-provider-auth")
-    ? undefined
-    : await optionalFile(join(homedir(), ".codex", "auth.json"));
+  const providerAuth = !has("--no-provider-auth");
+  const codexAuth = providerAuth
+    ? sendableFile(await optionalFile(join(homedir(), ".codex", "auth.json")))
+    : undefined;
+  // OpenCode reads its model routing and any custom provider from
+  // `opencode.json` and its credential from `auth.json`; both are needed for
+  // the container to run the same models this Mac does.
+  const opencodeConfig = providerAuth
+    ? sendableFile(
+      await optionalFile(join(homedir(), ".config", "opencode", "opencode.json")),
+    )
+    : undefined;
+  const opencodeAuth = providerAuth
+    ? sendableFile(await firstFile(opencodeAuthPaths(homedir())))
+    : undefined;
+  const grokAuth = providerAuth
+    ? sendableFile(await optionalFile(join(homedir(), ".grok", "auth.json")))
+    : undefined;
+  // Not a credential: the added list only says which providers this owner uses
+  // at all. Without it a non-built-in provider such as Grok reads as disabled
+  // in the container and the sandbox worker never advertises it, so it is sent
+  // even when provider auth is withheld.
+  const managedProviders = new Set<string>(managedComputerSetupProviders);
+  const addedProviders = addedAgentProviders(config)
+    .filter((provider) => managedProviders.has(provider));
   const gitName = gitValueAt(homedir(), ["config", "--global", "--get", "user.name"]);
   const gitEmail = gitValueAt(homedir(), ["config", "--global", "--get", "user.email"]);
   return {
@@ -143,6 +184,10 @@ async function bootstrapPayload(input: {
     label: value("--label") ?? `sandbox-${input.name}`,
     teams,
     ...(codexAuth === undefined ? {} : { codexAuth }),
+    ...(opencodeConfig === undefined ? {} : { opencodeConfig }),
+    ...(opencodeAuth === undefined ? {} : { opencodeAuth }),
+    ...(grokAuth === undefined ? {} : { grokAuth }),
+    ...(addedProviders.length === 0 ? {} : { addedProviders }),
     ...(gitName && gitEmail ? { gitIdentity: { name: gitName, email: gitEmail } } : {}),
   };
 }
