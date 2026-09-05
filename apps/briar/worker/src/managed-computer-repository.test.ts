@@ -501,10 +501,12 @@ describe("managed computer repository", () => {
       (await listOrganizationManagedComputers(db, organizationId))
         .find((row) => row.id === first!.id)?.device_label,
     ).toBe("sandbox-gx10");
-    // Re-registering the same device replaces the record instead of failing.
+    // Re-registering the same device keeps the record and its id, so the
+    // relay agent connected under that id stays valid.
     const second = await register("000000000002");
-    expect(second?.id).toBe("aaaaaaaa-aaaa-4aaa-8aaa-000000000002");
-    expect(await managedComputerById(db, first!.id)).toBeNull();
+    expect(second?.id).toBe(first!.id);
+    expect(second?.state).toBe("ready");
+    expect(await managedComputerById(db, "aaaaaaaa-aaaa-4aaa-8aaa-000000000002")).toBeNull();
     // A device another user owns cannot be registered, and the existing
     // record survives the attempt.
     expect(await createSandboxManagedComputer(db, {

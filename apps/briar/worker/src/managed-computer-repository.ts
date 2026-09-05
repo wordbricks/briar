@@ -97,8 +97,8 @@ export async function sandboxManagedComputerByDevice(
  * is born `ready` with its device attached, so the remote-desktop relay and
  * the DM computer panel treat it exactly like an enrolled AWS computer. AWS
  * provisioning columns hold sandbox placeholders; every AWS lifecycle query
- * filters on `provider = 'aws'`. Re-registering the same device replaces the
- * record so a terminated history never blocks a fresh sandbox.
+ * filters on `provider = 'aws'`. Re-registering the same device refreshes the
+ * existing record in place so its id stays stable for the relay agent.
  */
 export async function createSandboxManagedComputer(
   db: D1Database,
@@ -126,16 +126,27 @@ export async function createSandboxManagedComputer(
     input.organizationId,
     input.deviceId,
   );
+  if (existing) {
+    // Keep the computer id stable across `briar sandbox up`: the relay agent
+    // inside the container and the app's open sessions both key on it.
+    await db.prepare(
+      `update briar_managed_computers
+       set state = 'ready', bootstrap_api_origin = ?, requester_user_id = ?,
+           error_code = null, error_detail = null,
+           state_updated_at = ?, updated_at = ?
+       where id = ?`,
+    ).bind(
+      input.apiOrigin,
+      input.userId,
+      input.observedAt,
+      input.observedAt,
+      existing.id,
+    ).run();
+    return sandboxManagedComputerByDevice(db, input.organizationId, input.deviceId);
+  }
   const requestId = `sandbox:${input.deviceId}`;
   const farFuture = "9999-12-31T00:00:00.000Z";
   await db.batch([
-    ...(existing
-      ? [
-        db.prepare(`delete from briar_managed_computers where id = ?`).bind(existing.id),
-        db.prepare(`delete from briar_managed_computer_entitlements where id = ?`)
-          .bind(existing.entitlement_id),
-      ]
-      : []),
     db.prepare(
       `insert into briar_managed_computer_entitlements (
          id, organization_id, requester_user_id, source, source_reference,
