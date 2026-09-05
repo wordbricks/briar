@@ -714,6 +714,23 @@ drop view if exists "briar_execution_worker_healthy_providers";
 
 drop view if exists "briar_invalid_execution_worker_runtime";
 
+-- Production held seven rows whose parent run was already gone, so
+-- re-inserting them during the rebuild fails the deferred foreign key check
+-- at commit. Every constraint on these child tables is on delete cascade,
+-- which means the schema says the rows should not exist; drop them while the
+-- parent table is still intact and every trigger is already removed.
+delete from briar_hunt_events where run_id is not null and not exists (
+  select 1 from briar_hunt_runs parent where parent.id = briar_hunt_events.run_id
+);
+
+delete from briar_issue_attachments where run_id is not null and not exists (
+  select 1 from briar_hunt_runs parent where parent.id = briar_issue_attachments.run_id
+);
+
+delete from briar_issue_subscriptions where run_id is not null and not exists (
+  select 1 from briar_hunt_runs parent where parent.id = briar_issue_subscriptions.run_id
+);
+
 create table "briar_provider_backup_agent_skill_execution_approval_audit" as select * from "briar_agent_skill_execution_approval_audit";
 
 create table "briar_provider_backup_agent_skill_execution_proposals" as select * from "briar_agent_skill_execution_proposals";

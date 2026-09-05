@@ -5,7 +5,7 @@
 -- Whenever a migration changes the schema or seeds rows, run
 -- `bun run d1:snapshot` and commit the result; `bun run d1:snapshot:check`
 -- fails in CI otherwise.
--- migrations-digest: 504b153fcb44ce2a20b24a3bc229182e224623e3735ca964bb664a6400f8b957
+-- migrations-digest: 8fc839ceba67e2c3d1db8614cdf3092c115dc9ba841b0fcfba6128a6bc241db1
 -- snapshot-digest: f68dbd149402dd21c7302f94b5532c385e90d81b5044c6d60be286d6968fb082
 -- @statement
 CREATE TABLE IF NOT EXISTS "d1_migrations"(
