@@ -1,6 +1,36 @@
 # 에이전트 간 메시지 (Agent-to-Agent Messaging)
 
-Status: 설계 확정. §8의 결정 10건을 2026-09-06에 확정했다. 작성일 2026-09-06.
+Status: implemented (0~4단계, 데스크탑). §8의 결정 10건을 2026-09-06에 확정했고 같은
+날 구현했다. 모바일(5단계)은 후속 PR. 작성일 2026-09-06.
+
+## 구현 현황
+
+| 영역 | 상태 | 위치 |
+| --- | --- | --- |
+| 계약: `agent_message` 액션, 클레임의 대상 목록·수신 메시지·hop, 앱의 relay·read_only, `ListAgentDirectMessages` | done | `packages/contracts/proto/briar/worker/v1/worker_queue.proto`, `packages/contracts/proto/briar/app/v1/channel.proto` |
+| 마이그레이션: hop·origin 컬럼, 가드 트리거, relay 테이블 | done | `apps/briar/migrations/0201_agent_message_relays.sql`, `apps/briar/worker/src/agent-message-relays.migration.test.ts` |
+| 에이전트 DM 생성·열람 권한·카탈로그 제외·relay JSON | done | `apps/briar/worker/src/channels.ts`, `apps/briar/worker/src/channel-route-access.ts` |
+| 발신 검증(hop·범위·시간당 상한)과 왕복 batch | done | `apps/briar/worker/src/worker-reply-completion-application.ts`, `apps/briar/worker/src/agent-message-targets.ts` |
+| 클레임 스냅샷(대상 목록, 수신 메시지, hop) | done | `apps/briar/worker/src/channel-reply-claim-routes.ts` |
+| 러너 프롬프트와 출력 | done | `apps/briar/src-cli/agent-runner.ts`, `apps/briar/src-cli/reply-execution.ts`, `apps/briar/src-cli/worker-queue-contract.ts` |
+| 데스크탑: relay 행, 읽기 전용 에이전트 DM, 에이전트 상세 "대화" | done | `apps/briar/src/components/ChannelRelayRow.tsx`, `Channels.tsx`, `DirectMessages.tsx`, `AgentConversationsSection.tsx`, `src/hooks/useAgentConversationChannel.ts` |
+| 서버 왕복 테스트 | done | `apps/briar/worker/src/channel-agent-message.test.ts` |
+| 모바일 iOS·Android | 후속 PR | relay 메시지는 일반 에이전트 메시지로 보이고, 읽기 전용 에이전트 DM은 열 수 없다 |
+
+구현하면서 설계와 달라진 것:
+
+- **hop 1 실패 시 A를 재개하지 않는다.** 왕복의 outbound 표식이 `failed`로 바뀌고 잡
+  오류가 기존 답글 오류 표면에 남는다(§3.2).
+- **시간당 상한 초과는 발신 완료 자체를 거절한다.** A의 잡이 `Agent message hourly
+  limit (n) reached` 오류로 실패하며 A를 다시 띄우지 않는다(§3.6).
+- **에이전트 DM 생성과 hop 잡은 `completeChannelReply`의 batch 안에서 전용 문장으로
+  만든다.** 기존 `channelAgentReplyEnqueueStatements`는 로스터 행이 미리 있어야 해서
+  dm_key 서브쿼리로 채널을 찾는 같은 batch에 넣을 수 없었다.
+- **DM 잡의 `delegationTargets`는 항상 빈 목록이다.** 1:1 DM에서는 이미 비어 있었고,
+  채널 스레드 잡은 그대로다(§3.7).
+- **읽기 전용 에이전트 DM의 실시간 갱신은 3초 폴링이다.** 카탈로그에 없는 채널을
+  델타 병합이 삭제로 취급하는 문제는 `retainWhenAbsentFromCatalog`로 우회했다.
+- **에이전트 상세의 "대화"는 접힌 disclosure다.** 펼칠 때 목록을 불러온다.
 
 ## 1. 목표 시나리오
 
