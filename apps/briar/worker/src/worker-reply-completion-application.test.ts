@@ -742,10 +742,12 @@ describe("reply completion application", () => {
     });
   });
 
-  // Phase 0 only ships the contract: the Agent-to-Agent DM, the relay rows and
-  // the hop guards do not exist yet, so the action is refused rather than
-  // half-applied. Phase 2 replaces this with the round trip.
-  it("refuses an Agent message until the round trip exists", async () => {
+  /*
+    Plan §3.7: a channel thread keeps the existing in-thread delegation, and
+    only a direct message opens an Agent-to-Agent conversation. The round trip
+    itself is covered by `channel-agent-message.test.ts`.
+  */
+  it("refuses an Agent message from a channel thread", async () => {
     const claim = await seedChannelClaim();
     const completion = completeChannelReplyInputFromProto(create(
       CompleteChannelReplyRequestSchema,
@@ -778,7 +780,7 @@ describe("reply completion application", () => {
       observedAt: at(240 + sequence),
     })).rejects.toMatchObject({
       reason: "invalid_request",
-      message: "Agent messages are not available for this reply",
+      message: "Only a direct message reply can message another Agent",
     });
   });
 

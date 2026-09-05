@@ -26,12 +26,14 @@ import {
   type ChannelMessageAttachment,
   type ChannelMessageReaction,
   type ChannelMessageReactionPerson,
+  type ChannelMessageRelay,
   type ChannelReplyStatus,
   type ChannelSkillExecutionProposal,
   type ChannelSummary,
   type ChannelThreadSubscriber,
   type ChannelVisibility,
   type ChannelWebhook,
+  channelSlugFromName,
   type DirectMessageParticipant,
 } from "../../src/lib/channels-contract";
 import { agentReplyDisplayParentMessageId } from "../../src/lib/issue-reply-decision";
@@ -512,6 +514,62 @@ const visibleToUser = `(
   )
 )`;
 
+/*
+  `AGENT_DIRECT_MESSAGE_KEY_PREFIX` is declared further down for readers; the
+  literal is repeated here because these SQL fragments are evaluated first.
+*/
+const agentDirectMessageKeyPattern = "'agents:%'";
+
+/** Agent-to-Agent conversations never belong in the sidebar catalog. */
+const notAgentDirectMessage =
+  `not (channel.kind = 'dm'
+        and channel.dm_key like ${agentDirectMessageKeyPattern})`;
+
+/**
+ * An Agent-to-Agent DM carries no `briar_channel_members` rows, so membership
+ * cannot grant it. Plan §3.5 asks instead whether the reader can reach every
+ * participating Agent: organization owners and co-owners always can, everybody
+ * else needs a `briar_project_members` row for each project-scoped
+ * participant. A conversation between Organization Agents alone is therefore
+ * readable by the whole organization. Binds the reader's user ID once.
+ */
+const agentDirectMessageVisibleToUser = `(
+  channel.kind = 'dm'
+  and channel.dm_key like ${agentDirectMessageKeyPattern}
+  and exists (
+    select 1 from briar_organization_members viewer
+    where viewer.organization_id = channel.organization_id
+      and viewer.user_id = ?
+      and (
+        viewer.role in ('owner', 'co-owner')
+        or not exists (
+          select 1 from briar_channel_agents roster
+          join briar_project_agents participant
+            on participant.id = roster.agent_id
+          where roster.channel_id = channel.id
+            and participant.project_id is not null
+            and not exists (
+              select 1 from briar_project_members project_membership
+              where project_membership.project_id = participant.project_id
+                and project_membership.organization_id =
+                  channel.organization_id
+                and project_membership.user_id = viewer.user_id
+            )
+        )
+      )
+  )
+)`;
+
+/*
+  Reading one conversation is wider than listing them: a member who has an
+  Agent-to-Agent DM open keeps receiving it. Binds the user ID twice, the
+  membership check first.
+*/
+const readableByUser = `(
+  ${visibleToUser}
+  or ${agentDirectMessageVisibleToUser}
+)`;
+
 const messageSelect = `
   select message.id, message.channel_id, message.parent_message_id,
          message.author_user_id, author.name as author_name,
@@ -703,6 +761,19 @@ export const AGENT_DIRECT_MESSAGE_KEY_PREFIX = "agents:";
 export const isAgentDirectMessageKey = (dmKey: string | null) =>
   dmKey !== null && dmKey.startsWith(AGENT_DIRECT_MESSAGE_KEY_PREFIX);
 
+/**
+ * Sorted so either Agent resolves the same conversation, and JSON encoded so
+ * the key stays unambiguous next to the `self:`, `users:` and `agent:` keys.
+ */
+export const agentDirectMessageKey = (agentId: string, otherAgentId: string) =>
+  `${AGENT_DIRECT_MESSAGE_KEY_PREFIX}${
+    JSON.stringify([agentId, otherAgentId].sort())
+  }`;
+
+export const isAgentDirectMessage = (
+  channel: Pick<ChannelRow, "kind" | "dm_key">,
+) => channel.kind === "dm" && isAgentDirectMessageKey(channel.dm_key);
+
 export const channelJson = (row: ChannelRow): ChannelSummary => ({
   id: row.id,
   organizationId: row.organization_id,
@@ -865,6 +936,7 @@ export const channelMessageJson = (
   replyAuthors: ChannelMessage["replyAuthors"] = [],
   subscribers: ChannelThreadSubscriber[] = [],
   memoryCitations: NonNullable<ChannelMessage["memoryCitations"]> = [],
+  relay: ChannelMessageRelay | null = null,
 ): ChannelMessage => ({
   id: row.id,
   channelId: row.channel_id,
@@ -895,8 +967,7 @@ export const channelMessageJson = (
   skillExecutionProposal: row.deleted_at
     ? null
     : channelSkillExecutionProposalJson(row),
-  // Phase 1 fills this from briar_channel_message_relays.
-  relay: null,
+  relay: row.deleted_at ? null : relay,
   createdAt: row.created_at,
   deletedAt: row.deleted_at,
 });
@@ -980,6 +1051,7 @@ export async function listChannels(
     .prepare(
       `${channelSelectForUser}
        where channel.organization_id = ? and ${visibleToUser}
+         and ${notAgentDirectMessage}
        order by channel.archived_at is not null, channel.name, channel.id`,
     )
     .bind(userId, userId, userId, organizationId, userId)
@@ -988,12 +1060,9 @@ export async function listChannels(
 }
 
 /**
- * The Agent-to-Agent conversations one Agent takes part in.
- *
- * These channels carry no `briar_channel_members` rows, so `visibleToUser`
- * would hide every one of them. Access is decided one level up instead: the
- * caller must already be an organization member, and §3.5 of the plan narrows
- * that further once project-scoped Agents can be reached.
+ * The Agent-to-Agent conversations one Agent takes part in, most recently
+ * active first. These channels carry no `briar_channel_members` rows, so
+ * membership cannot grant them; §3.5's project-reach rule decides instead.
  */
 export async function listAgentDirectMessages(
   db: D1Database,
@@ -1005,14 +1074,17 @@ export async function listAgentDirectMessages(
     .prepare(
       `${channelSelectForUser}
        where channel.organization_id = ? and channel.kind = 'dm'
-         and channel.dm_key like 'agents:%'
          and exists (
            select 1 from briar_channel_agents roster
            where roster.channel_id = channel.id and roster.agent_id = ?
          )
-       order by channel.updated_at desc, channel.id`,
+         and ${agentDirectMessageVisibleToUser}
+       order by coalesce((
+         select max(message.created_at) from briar_channel_messages message
+         where message.channel_id = channel.id
+       ), channel.created_at) desc, channel.id`,
     )
-    .bind(userId, userId, userId, organizationId, agentId)
+    .bind(userId, userId, userId, organizationId, agentId, userId)
     .all<ChannelRow>();
   return rows.results;
 }
@@ -1026,9 +1098,9 @@ export async function getChannel(
   return db
     .prepare(
       `${channelSelectForUser}
-       where channel.organization_id = ? and channel.id = ? and ${visibleToUser}`,
+       where channel.organization_id = ? and channel.id = ? and ${readableByUser}`,
     )
-    .bind(userId, userId, userId, organizationId, channelId, userId)
+    .bind(userId, userId, userId, organizationId, channelId, userId, userId)
     .first<ChannelRow>();
 }
 
@@ -1693,8 +1765,16 @@ async function attachMessageRelations(
     .map((row) => row.id);
   const placeholders = ids.map(() => "?").join(", ");
   const rootPlaceholders = rootIds.map(() => "?").join(", ");
-  const [citations, userMentions, agentMentions, attachments, reactions, replyAuthors, subscribers] =
-    await Promise.all([
+  const [
+    citations,
+    userMentions,
+    agentMentions,
+    attachments,
+    reactions,
+    replyAuthors,
+    subscribers,
+    relays,
+  ] = await Promise.all([
     readDmMemoryCitations(db, ids),
     db
       .prepare(
@@ -1815,6 +1895,56 @@ async function attachMessageRelations(
             user_id: string;
             created_at: string;
           }>(),
+    /*
+      The counterpart Agent is always the one on the Agent-to-Agent roster that
+      did not start the round trip, so a single rule covers both directions:
+      the outbound notice is authored by the sender and the inbound copy by the
+      answering Agent. An outbound row's state is the hop-1 job's state; an
+      answer that is already copied back is complete by definition.
+    */
+    db
+      .prepare(
+        `select relay.message_id, relay.direction, relay.peer_channel_id,
+                relay.peer_message_id, peer_agent.id as peer_agent_id,
+                peer_agent.name as peer_agent_name,
+                peer_agent.avatar as peer_agent_image,
+                case when relay.direction = 'inbound' then 'completed'
+                  else coalesce((
+                    select case hop.status
+                      when 'completed' then 'completed'
+                      when 'failed' then 'failed'
+                      else 'pending' end
+                    from briar_channel_agent_reply_jobs hop
+                    where hop.origin_reply_job_id = relay.origin_reply_job_id
+                      and hop.agent_message_hop = 1
+                    order by hop.created_at, hop.id limit 1
+                  ), 'pending') end as status
+         from briar_channel_message_relays relay
+         join briar_channel_agent_reply_jobs origin_job
+           on origin_job.id = relay.origin_reply_job_id
+         left join briar_channel_messages peer_message
+           on peer_message.id = relay.peer_message_id
+         left join briar_project_agents peer_agent on peer_agent.id = coalesce(
+           (select roster.agent_id from briar_channel_agents roster
+            where roster.channel_id = relay.peer_channel_id
+              and roster.agent_id <> origin_job.agent_id
+            limit 1),
+           case when relay.direction = 'inbound'
+             then peer_message.author_agent_id end
+         )
+         where relay.message_id in (${placeholders})`,
+      )
+      .bind(...ids)
+      .all<{
+        message_id: string;
+        direction: ChannelMessageRelay["direction"];
+        peer_channel_id: string;
+        peer_message_id: string;
+        peer_agent_id: string | null;
+        peer_agent_name: string | null;
+        peer_agent_image: string | null;
+        status: ChannelMessageRelay["status"];
+      }>(),
   ]);
   const byMessage = new Map<string, { users: string[]; agents: string[] }>();
   for (const row of rows) byMessage.set(row.id, { users: [], agents: [] });
@@ -1849,6 +1979,21 @@ async function attachMessageRelations(
     });
     subscribersByRoot.set(subscriber.root_message_id, current);
   }
+  const relaysByMessage = new Map<string, ChannelMessageRelay>();
+  for (const relay of relays.results) {
+    // A deleted counterpart Agent leaves nothing to label the row with, so the
+    // message renders as the ordinary Agent message it already is.
+    if (!relay.peer_agent_id || !relay.peer_agent_name) continue;
+    relaysByMessage.set(relay.message_id, {
+      direction: relay.direction,
+      peerChannelId: relay.peer_channel_id,
+      peerMessageId: relay.peer_message_id,
+      peerAgentId: relay.peer_agent_id,
+      peerAgentName: relay.peer_agent_name,
+      peerAgentImage: relay.peer_agent_image,
+      status: relay.status,
+    });
+  }
   return rows.map((row) =>
     channelMessageJson(
       row,
@@ -1858,6 +2003,7 @@ async function attachMessageRelations(
       replyAuthorsByMessage.get(row.id) ?? [],
       subscribersByRoot.get(row.id) ?? [],
       citations.get(row.id) ?? [],
+      relaysByMessage.get(row.id) ?? null,
     ),
   );
 }
@@ -4194,6 +4340,19 @@ export type ChannelReplyCompletionInput = {
     provider: AgentProvider;
     request: string;
   } | null;
+  /**
+   * hop 0 only: the Agent this reply writes to. The caller resolves the target
+   * against the same eligibility rule the claim used, so everything here is
+   * already checked live configuration.
+   */
+  agentMessage?: {
+    agentId: string;
+    agentName: string;
+    projectId: string | null;
+    provider: AgentProvider;
+    unavailableReason: ChannelReplyUnavailableReason | null;
+    body: string;
+  } | null;
   agentName: string;
   agentProvider: AgentProvider;
   completedAt: string;
@@ -4225,6 +4384,58 @@ export async function completeChannelReply(
     },
   );
   const delegation = input.delegation ?? null;
+  const agentMessage = input.agentMessage ?? null;
+  const artifactRequested = Boolean(
+    input.document || input.issueProposal || input.issueBatchProposal ||
+      input.executionProposal || input.skillExecutionProposal,
+  );
+  if (
+    agentMessage && (
+      job.agent_message_hop !== 0 ||
+      job.delegated_by_reply_job_id !== null ||
+      channel.kind !== "dm" ||
+      isAgentDirectMessage(channel)
+    )
+  ) {
+    throw new Error(
+      "Only a top-level direct message reply can message another Agent",
+    );
+  }
+  if (agentMessage && (delegation || artifactRequested)) {
+    throw new Error(
+      "An Agent message cannot also delegate or attach an artifact proposal",
+    );
+  }
+  /*
+    Nobody in an Agent-to-Agent DM can approve anything, so the answering turn
+    is allowed to produce prose and attachments and nothing else.
+  */
+  if (
+    job.agent_message_hop === 1 &&
+    (delegation || artifactRequested || input.memorySaveRequest)
+  ) {
+    throw new Error(
+      "An Agent-to-Agent answer can only carry a body and attachments",
+    );
+  }
+  if (job.agent_message_hop > 0 && job.origin_reply_job_id === null) {
+    throw new Error("An Agent message hop lost its origin reply");
+  }
+  const originJob = job.agent_message_hop === 1 && job.origin_reply_job_id
+    ? await getChannelAgentReplyJob(
+      db,
+      job.organization_id,
+      job.origin_reply_job_id,
+    )
+    : null;
+  if (
+    job.agent_message_hop === 1 &&
+    (!originJob || originJob.agent_message_hop !== 0 ||
+      originJob.agent_id === job.agent_id ||
+      originJob.channel_id === job.channel_id)
+  ) {
+    throw new Error("An Agent-to-Agent answer lost its origin reply");
+  }
   if (
     job.project_id !== null &&
     [
@@ -4296,6 +4507,38 @@ export async function completeChannelReply(
         delegation.provider,
       ]
     : [0, null, null, null, null, null, null];
+  /*
+    Second line of defence behind the completion application: a send only
+    applies from an untouched hop-0 turn in a conversation with a person, and
+    only towards another Agent of the same organization.
+  */
+  const agentMessageGuardSql = `and (
+         ? = 0
+         or (
+           briar_channel_agent_reply_jobs.agent_message_hop = 0
+           and briar_channel_agent_reply_jobs.delegated_by_reply_job_id is null
+           and exists (
+             select 1 from briar_channels origin_channel
+             where origin_channel.id =
+                 briar_channel_agent_reply_jobs.channel_id
+               and origin_channel.kind = 'dm'
+               and (
+                 origin_channel.dm_key is null
+                 or origin_channel.dm_key not like ${agentDirectMessageKeyPattern}
+               )
+           )
+           and exists (
+             select 1 from briar_project_agents target
+             where target.id = ?
+               and target.organization_id =
+                 briar_channel_agent_reply_jobs.organization_id
+               and target.id <> briar_channel_agent_reply_jobs.agent_id
+           )
+         )
+       )`;
+  const agentMessageGuardBindings = agentMessage
+    ? [1, agentMessage.agentId]
+    : [0, null];
   const executionGuardSql = `and (
          ? = 0
          or (
@@ -4509,6 +4752,7 @@ export async function completeChannelReply(
                )
              )
            )
+           ${agentMessageGuardSql}
            ${executionGuardSql}
            ${skillExecutionGuardSql}
            ${attachmentGuard.sql}
@@ -4527,6 +4771,7 @@ export async function completeChannelReply(
           ...(input.memorySaveRequest?.documents ?? []),
         ]),
         ...delegationGuardBindings,
+        ...agentMessageGuardBindings,
         ...executionGuardBindings,
         ...skillExecutionGuardBindings,
         ...attachmentGuard.bindings,
@@ -5170,6 +5415,368 @@ export async function completeChannelReply(
       ),
     );
   }
+  /*
+    Every statement below re-proves the completion this batch just applied, so
+    a round trip can never be half-opened: either the sending reply, the
+    Agent-to-Agent conversation, the notice and the answering job all land, or
+    none of them do.
+  */
+  const claimedCompletion = `claim.id = ? and claim.claimed_device_id = ?
+       and claim.claimed_worker_id = ? and claim.claim_token_hash = ?
+       and claim.status = 'completed' and claim.completed_at = ?`;
+  const claimedCompletionBindings = () => [
+    input.jobId,
+    input.deviceId,
+    input.workerId,
+    input.claimTokenHash,
+    input.completedAt,
+  ];
+  if (agentMessage) {
+    const peerChannelId = crypto.randomUUID();
+    const peerDmKey = agentDirectMessageKey(job.agent_id, agentMessage.agentId);
+    /*
+      Resolved by key rather than by the generated ID so a conversation another
+      round trip created in the same instant is reused instead of duplicated.
+    */
+    const peerChannelSql = `(
+      select peer.id from briar_channels peer
+      where peer.organization_id = ? and peer.kind = 'dm' and peer.dm_key = ?
+    )`;
+    const peerChannelBindings = () => [job.organization_id, peerDmKey];
+    const peerMessageId = crypto.randomUUID();
+    const noticeMessageId = crypto.randomUUID();
+    const peerSessionId = crypto.randomUUID();
+    const peerJobId = crypto.randomUUID();
+    statements.push(
+      db.prepare(
+        `insert into briar_channels (
+           id, organization_id, kind, dm_key, slug, name, topic, visibility,
+           default_project_id, created_by_user_id, created_at, updated_at
+         )
+         select ?, claim.organization_id, 'dm', ?, ?, ?, null, 'private',
+                null, null, ?, ?
+         from briar_channel_agent_reply_jobs claim
+         where ${claimedCompletion}
+         on conflict (organization_id, dm_key)
+           where kind = 'dm' and dm_key is not null
+         do nothing`,
+      ).bind(
+        peerChannelId,
+        peerDmKey,
+        channelSlugFromName(`dm-${peerChannelId}`, peerChannelId),
+        `${input.agentName}, ${agentMessage.agentName}`.slice(0, 100),
+        input.completedAt,
+        input.completedAt,
+        ...claimedCompletionBindings(),
+      ),
+      ...[job.agent_id, agentMessage.agentId].map((agentId) =>
+        db.prepare(
+          `insert into briar_channel_agents (
+             channel_id, agent_id, added_by_user_id, created_at
+           )
+           select ${peerChannelSql}, ?, null, ?
+           from briar_channel_agent_reply_jobs claim
+           where ${claimedCompletion}
+           on conflict (channel_id, agent_id) do nothing`,
+        ).bind(
+          ...peerChannelBindings(),
+          agentId,
+          input.completedAt,
+          ...claimedCompletionBindings(),
+        )
+      ),
+      db.prepare(
+        `insert into briar_channel_messages (
+           id, channel_id, parent_message_id, author_user_id, author_agent_id,
+           author_agent_name, author_agent_provider, body, created_at,
+           updated_at
+         )
+         select ?, ${peerChannelSql}, null, null, claim.agent_id, ?, ?, ?, ?, ?
+         from briar_channel_agent_reply_jobs claim
+         where ${claimedCompletion}`,
+      ).bind(
+        peerMessageId,
+        ...peerChannelBindings(),
+        input.agentName,
+        input.agentProvider,
+        agentMessage.body,
+        input.completedAt,
+        input.completedAt,
+        ...claimedCompletionBindings(),
+      ),
+      db.prepare(
+        `insert into briar_channel_message_agent_mentions (
+           message_id, agent_id, created_at
+         )
+         select ?, ?, ?
+         from briar_channel_agent_reply_jobs claim
+         where ${claimedCompletion}
+         on conflict (message_id, agent_id) do nothing`,
+      ).bind(
+        peerMessageId,
+        agentMessage.agentId,
+        input.completedAt,
+        ...claimedCompletionBindings(),
+      ),
+      /*
+        The Agent-to-Agent message is its own thread root, so this session is
+        always new: there is no earlier conversation on it to resume.
+      */
+      db.prepare(
+        `insert into briar_channel_reply_sessions (
+           id, organization_id, channel_id, thread_root_message_id,
+           project_id, agent_id, provider, model, effort,
+           owner_device_id, owner_worker_id, owner_worker_label,
+           last_activity_at, retained_until, created_at, updated_at
+         )
+         select ?, claim.organization_id, ${peerChannelSql}, ?,
+                target.project_id, target.id, target.provider, target.model,
+                target.effort, designated_worker.device_id,
+                designated_worker.id, target.designated_worker_label,
+                ?, ?, ?, ?
+         from briar_channel_agent_reply_jobs claim
+         join briar_project_agents target
+           on target.id = ?
+          and target.organization_id = claim.organization_id
+          and target.project_id is ?
+          and target.provider = ?
+         left join briar_execution_workers designated_worker
+           on designated_worker.id = target.designated_worker_id
+          and designated_worker.project_id = target.project_id
+         where ${claimedCompletion}
+         on conflict (channel_id, thread_root_message_id, agent_id)
+         do nothing`,
+      ).bind(
+        peerSessionId,
+        ...peerChannelBindings(),
+        peerMessageId,
+        input.completedAt,
+        retainedUntil,
+        input.completedAt,
+        input.completedAt,
+        agentMessage.agentId,
+        agentMessage.projectId,
+        agentMessage.provider,
+        ...claimedCompletionBindings(),
+      ),
+      db.prepare(
+        `insert into briar_channel_agent_reply_jobs (
+           id, organization_id, channel_id, project_id, agent_id, skill_id,
+           session_id, trigger_message_id, parent_message_id,
+           reply_message_id, agent_provider, status, error, completed_at,
+           agent_message_hop, origin_reply_job_id, created_at, updated_at
+         )
+         select ?, claim.organization_id, session.channel_id,
+                session.project_id, session.agent_id, null, session.id, ?, ?,
+                ?, session.provider, ?, ?, ?, 1, claim.id, ?, ?
+         from briar_channel_agent_reply_jobs claim
+         join briar_channel_reply_sessions session on session.id = ?
+         where ${claimedCompletion}
+         on conflict (channel_id, trigger_message_id, agent_id) do nothing`,
+      ).bind(
+        peerJobId,
+        peerMessageId,
+        peerMessageId,
+        crypto.randomUUID(),
+        agentMessage.unavailableReason ? "failed" : "queued",
+        agentMessage.unavailableReason ?? null,
+        agentMessage.unavailableReason ? input.completedAt : null,
+        input.completedAt,
+        input.completedAt,
+        peerSessionId,
+        ...claimedCompletionBindings(),
+      ),
+      db.prepare(
+        `insert into briar_channel_reply_session_events (
+           id, session_id, reply_job_id, event_type, reason,
+           retained_until, detail_json, occurred_at
+         )
+         select ?, session.id, job.id, 'ttl_renewed',
+                'agent_message_enqueued', ?, '{}', ?
+         from briar_channel_agent_reply_jobs job
+         join briar_channel_reply_sessions session on session.id = job.session_id
+         where job.id = ?`,
+      ).bind(
+        crypto.randomUUID(),
+        retainedUntil,
+        input.completedAt,
+        peerJobId,
+      ),
+      /*
+        The notice carries the sent text so the person can read what left the
+        conversation without opening the Agent-to-Agent DM.
+      */
+      db.prepare(
+        `insert into briar_channel_messages (
+           id, channel_id, parent_message_id, author_user_id, author_agent_id,
+           author_agent_name, author_agent_provider, body, created_at,
+           updated_at
+         )
+         select ?, claim.channel_id, ?, null, claim.agent_id, ?, ?, ?, ?, ?
+         from briar_channel_agent_reply_jobs claim
+         where ${claimedCompletion}`,
+      ).bind(
+        noticeMessageId,
+        replyParentMessageId,
+        input.agentName,
+        input.agentProvider,
+        agentMessage.body,
+        input.completedAt,
+        input.completedAt,
+        ...claimedCompletionBindings(),
+      ),
+      db.prepare(
+        `insert into briar_channel_message_relays (
+           message_id, direction, peer_channel_id, peer_message_id,
+           origin_reply_job_id, created_at
+         )
+         select ?, 'outbound', ${peerChannelSql}, ?, claim.id, ?
+         from briar_channel_agent_reply_jobs claim
+         where ${claimedCompletion}`,
+      ).bind(
+        noticeMessageId,
+        ...peerChannelBindings(),
+        peerMessageId,
+        input.completedAt,
+        ...claimedCompletionBindings(),
+      ),
+    );
+  }
+  if (job.agent_message_hop === 1 && originJob) {
+    const inboundMessageId = crypto.randomUUID();
+    const relaySessionId = crypto.randomUUID();
+    const relayJobId = crypto.randomUUID();
+    statements.push(
+      /*
+        Copied under the answering Agent's name so the person's timeline can
+        say who spoke, with the relay row carrying the link back to the
+        original message.
+      */
+      db.prepare(
+        `insert into briar_channel_messages (
+           id, channel_id, parent_message_id, author_user_id, author_agent_id,
+           author_agent_name, author_agent_provider, body, created_at,
+           updated_at
+         )
+         select ?, origin.channel_id,
+                case when origin_channel.kind = 'dm' then null
+                  else coalesce(origin.parent_message_id,
+                                origin.trigger_message_id) end,
+                null, claim.agent_id, ?, ?, ?, ?, ?
+         from briar_channel_agent_reply_jobs claim
+         join briar_channel_agent_reply_jobs origin
+           on origin.id = claim.origin_reply_job_id
+          and origin.organization_id = claim.organization_id
+          and origin.agent_message_hop = 0
+         join briar_channels origin_channel on origin_channel.id = origin.channel_id
+         where ${claimedCompletion} and claim.agent_message_hop = 1`,
+      ).bind(
+        inboundMessageId,
+        input.agentName,
+        input.agentProvider,
+        input.body,
+        input.completedAt,
+        input.completedAt,
+        ...claimedCompletionBindings(),
+      ),
+      db.prepare(
+        `insert into briar_channel_message_relays (
+           message_id, direction, peer_channel_id, peer_message_id,
+           origin_reply_job_id, created_at
+         )
+         select ?, 'inbound', claim.channel_id, claim.reply_message_id,
+                claim.origin_reply_job_id, ?
+         from briar_channel_agent_reply_jobs claim
+         where ${claimedCompletion} and claim.agent_message_hop = 1`,
+      ).bind(
+        inboundMessageId,
+        input.completedAt,
+        ...claimedCompletionBindings(),
+      ),
+      /*
+        The sending Agent picks its own thread back up: the conflict path keeps
+        the live session row, and with it the provider conversation, so the
+        relay turn continues the person's conversation instead of restarting it.
+      */
+      db.prepare(
+        `insert into briar_channel_reply_sessions (
+           id, organization_id, channel_id, thread_root_message_id,
+           project_id, agent_id, provider, model, effort,
+           owner_device_id, owner_worker_id, owner_worker_label,
+           last_activity_at, retained_until, created_at, updated_at
+         )
+         select ?, origin.organization_id, origin.channel_id,
+                origin.parent_message_id, origin.project_id, origin.agent_id,
+                origin_agent.provider, origin_agent.model, origin_agent.effort,
+                designated_worker.device_id, designated_worker.id,
+                origin_agent.designated_worker_label, ?, ?, ?, ?
+         from briar_channel_agent_reply_jobs claim
+         join briar_channel_agent_reply_jobs origin
+           on origin.id = claim.origin_reply_job_id
+         join briar_project_agents origin_agent on origin_agent.id = origin.agent_id
+         left join briar_execution_workers designated_worker
+           on designated_worker.id = origin_agent.designated_worker_id
+          and designated_worker.project_id = origin_agent.project_id
+         where ${claimedCompletion} and claim.agent_message_hop = 1
+         on conflict (channel_id, thread_root_message_id, agent_id)
+         do update set
+           last_activity_at = excluded.last_activity_at,
+           retained_until = excluded.retained_until,
+           updated_at = excluded.updated_at`,
+      ).bind(
+        relaySessionId,
+        input.completedAt,
+        retainedUntil,
+        input.completedAt,
+        input.completedAt,
+        ...claimedCompletionBindings(),
+      ),
+      db.prepare(
+        `insert into briar_channel_agent_reply_jobs (
+           id, organization_id, channel_id, project_id, agent_id, skill_id,
+           session_id, trigger_message_id, parent_message_id,
+           reply_message_id, agent_provider, status, agent_message_hop,
+           origin_reply_job_id, created_at, updated_at
+         )
+         select ?, origin.organization_id, origin.channel_id,
+                origin.project_id, origin.agent_id, null, session.id, ?,
+                origin.parent_message_id, ?, session.provider, 'queued', 2,
+                origin.id, ?, ?
+         from briar_channel_agent_reply_jobs claim
+         join briar_channel_agent_reply_jobs origin
+           on origin.id = claim.origin_reply_job_id
+         join briar_channel_reply_sessions session
+           on session.channel_id = origin.channel_id
+          and session.thread_root_message_id = origin.parent_message_id
+          and session.agent_id = origin.agent_id
+         where ${claimedCompletion} and claim.agent_message_hop = 1
+         on conflict (channel_id, trigger_message_id, agent_id) do nothing`,
+      ).bind(
+        relayJobId,
+        inboundMessageId,
+        crypto.randomUUID(),
+        input.completedAt,
+        input.completedAt,
+        ...claimedCompletionBindings(),
+      ),
+      db.prepare(
+        `insert into briar_channel_reply_session_events (
+           id, session_id, reply_job_id, event_type, reason,
+           retained_until, detail_json, occurred_at
+         )
+         select ?, session.id, job.id, 'ttl_renewed',
+                'agent_message_relay_enqueued', ?, '{}', ?
+         from briar_channel_agent_reply_jobs job
+         join briar_channel_reply_sessions session on session.id = job.session_id
+         where job.id = ?`,
+      ).bind(
+        crypto.randomUUID(),
+        retainedUntil,
+        input.completedAt,
+        relayJobId,
+      ),
+    );
+  }
   statements.push(
     db.prepare(
       `update briar_channel_reply_sessions
@@ -5780,9 +6387,9 @@ export async function loadChannelDelta(
       await db
         .prepare(
           `select channel.id from briar_channels channel
-           where channel.organization_id = ? and ${visibleToUser}`,
+           where channel.organization_id = ? and ${readableByUser}`,
         )
-        .bind(organizationId, userId)
+        .bind(organizationId, userId, userId)
         .all<{ id: string }>()
     ).results.map((row) => row.id),
   );

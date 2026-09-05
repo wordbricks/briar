@@ -11,12 +11,17 @@ import {
   hydrateAgentSkills,
 } from "./agent-skills";
 import {
+  agentMessageTargetJson,
+  listAgentMessageTargetAgents,
+} from "./agent-message-targets";
+import {
   claimNextChannelAgentReply,
   failChannelReply,
   getChannelAgentReplyJob,
   getChannelById,
   getChannelReplySession,
   getOrganizationProject,
+  isAgentDirectMessage,
   listChannelAgents,
   listChannelRootMessages,
   listChannelThreadMessages,
@@ -291,7 +296,13 @@ export async function claimNextChannelReplyWork(
     if (activeSkill && agent.project_id !== null && !skillExecutionRequest) {
       throw new HttpError(409, "Reply job lost its Skill execution request");
     }
-    const delegationTargets = agent.project_id === null
+    /*
+      The two paths split on the conversation the turn belongs to: a channel
+      thread keeps the existing in-thread delegation, a direct message opens an
+      Agent-to-Agent conversation instead. Plan §3.7 — never both at once.
+    */
+    const delegationTargets = agent.project_id === null &&
+        channel.kind !== "dm"
       ? channelAgents.flatMap((target) =>
           target.project_id
             ? [{
@@ -308,7 +319,101 @@ export async function claimNextChannelReplyWork(
             : []
         )
       : [];
-    const memoryBinding = channel.kind === "dm"
+    const agentDirectMessage = isAgentDirectMessage(channel);
+    /*
+      A hop above zero only makes sense as part of a whole round trip. Losing
+      the origin job, its conversation or the Agent-to-Agent DM would leave the
+      runner guessing who it is answering, so the claim is refused instead.
+    */
+    const originJob = job.agent_message_hop > 0
+      ? job.origin_reply_job_id
+        ? await getChannelAgentReplyJob(
+          db,
+          job.organization_id,
+          job.origin_reply_job_id,
+        )
+        : null
+      : null;
+    if (job.agent_message_hop > 0 && originJob?.agent_message_hop !== 0) {
+      throw new HttpError(409, "Agent message lost its origin reply");
+    }
+    let inboundAgentMessage: {
+      senderAgentId: string;
+      senderAgentName: string;
+      body: string;
+      originReplyJobId: string;
+    } | null = null;
+    if (originJob && job.agent_message_hop === 1) {
+      const sender = await getOrganizationAgent(
+        db,
+        job.organization_id,
+        originJob.agent_id,
+      );
+      if (
+        !agentDirectMessage || originJob.channel_id === job.channel_id ||
+        !sender || sender.id === job.agent_id || !triggerMessage ||
+        triggerMessage.author.type !== "agent" ||
+        triggerMessage.author.id !== sender.id
+      ) {
+        throw new HttpError(409, "Agent message lost its sender");
+      }
+      inboundAgentMessage = {
+        senderAgentId: sender.id,
+        senderAgentName: sender.name,
+        body: triggerMessage.body,
+        originReplyJobId: originJob.id,
+      };
+    }
+    if (originJob && job.agent_message_hop === 2) {
+      const answer = await db.prepare(
+        `select answer.agent_id, answer.channel_id, agent.name as agent_name
+         from briar_channel_agent_reply_jobs answer
+         join briar_project_agents agent on agent.id = answer.agent_id
+         where answer.origin_reply_job_id = ? and answer.agent_message_hop = 1
+         order by answer.created_at, answer.id limit 1`,
+      ).bind(originJob.id).first<{
+        agent_id: string;
+        channel_id: string;
+        agent_name: string;
+      }>();
+      const peerChannel = answer
+        ? await getChannelById(db, job.organization_id, answer.channel_id)
+        : null;
+      if (
+        job.channel_id !== originJob.channel_id || !answer || !peerChannel ||
+        !isAgentDirectMessage(peerChannel) || !triggerMessage
+      ) {
+        throw new HttpError(409, "Agent message lost its answer");
+      }
+      inboundAgentMessage = {
+        senderAgentId: answer.agent_id,
+        senderAgentName: answer.agent_name,
+        body: triggerMessage.body,
+        originReplyJobId: originJob.id,
+      };
+    }
+    /*
+      Only the turn a person started may open a conversation, and the reachable
+      Agents are the ones that person could reach themselves (plan §3.5). The
+      author is read from the row rather than the snapshot, which is windowed.
+    */
+    const triggerAuthor = job.agent_message_hop === 0 && channel.kind === "dm" &&
+        !agentDirectMessage
+      ? await db.prepare(
+        `select author_user_id from briar_channel_messages
+         where id = ? and channel_id = ?`,
+      ).bind(job.trigger_message_id, job.channel_id)
+        .first<{ author_user_id: string | null }>()
+      : null;
+    const agentMessageTargets = triggerAuthor?.author_user_id
+      ? (await listAgentMessageTargetAgents(db, {
+        organizationId: job.organization_id,
+        viewerUserId: triggerAuthor.author_user_id,
+        excludeAgentId: job.agent_id,
+      })).map(agentMessageTargetJson)
+      : [];
+    // An Agent-to-Agent DM has no owner, so it can never carry DM memory.
+    const memoryBinding = channel.kind === "dm" && !agentDirectMessage
       ? await bindDmMemoryReplyClaim(db, {
           jobId: job.id,
           claimTokenHash,
@@ -316,7 +421,7 @@ export async function claimNextChannelReplyWork(
           enabled: String(env.DM_MEMORY_RETRIEVAL_ENABLED) === "true",
         })
       : null;
-    const safeMessages = channel.kind === "dm"
+    const safeMessages = channel.kind === "dm" && !agentDirectMessage
       ? await excludeForgottenDmSources(db, channel.id, messages)
       : messages;
     const currentSession = memoryBinding
@@ -404,27 +509,9 @@ export async function claimNextChannelReplyWork(
           : null,
         delegation,
         delegationTargets,
-        /*
-          Phase 1 computes the reachable Agents and Phase 2 the inbound message
-          and the hop. Until then every claim is an ordinary hop-0 turn, and
-          the shapes are present so the proto mapper stays total.
-        */
-        agentMessageTargets:
-          [] as ReadonlyArray<{
-            agentId: string;
-            agentName: string;
-            projectId: string | null;
-            projectName: string | null;
-            responsibility: string;
-            skills: ReadonlyArray<{ id: string; name: string }>;
-          }>,
-        inboundAgentMessage: null as {
-          senderAgentId: string;
-          senderAgentName: string;
-          body: string;
-          originReplyJobId: string;
-        } | null,
-        agentMessageHop: 0,
+        agentMessageTargets,
+        inboundAgentMessage,
+        agentMessageHop: job.agent_message_hop,
         triggerAttachments: (triggerMessage?.attachments ?? []).map(
           (attachment) => ({
             id: attachment.id,
