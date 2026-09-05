@@ -39,6 +39,10 @@ const readyReport = {
   providers: {},
 };
 
+const unregisterReport = {
+  teams: [{ id: "11111111-1111-4111-8111-111111111111", workerId: "worker-1", state: "unbound" }],
+};
+
 /**
  * Minimal in-memory Docker daemon: enough of `info`, `inspect`, `image`,
  * `build`, `run`, `start`, `stop`, `rm`, `logs`, `exec`, and `context` to
@@ -49,6 +53,7 @@ function fakeDocker(initial: {
   containers?: Record<string, Container>;
   images?: string[];
   report?: () => unknown;
+  unregister?: () => unknown;
   contexts?: Record<string, string>;
 } = {}) {
   const calls: string[][] = [];
@@ -57,6 +62,7 @@ function fakeDocker(initial: {
     containers: initial.containers ?? {},
     images: new Set(initial.images ?? []),
     report: initial.report ?? (() => readyReport),
+    unregister: initial.unregister ?? (() => unregisterReport),
     contexts: initial.contexts ?? {},
   };
   const ok = (output = ""): DockerCommandResult => ({ ok: true, output });
@@ -75,6 +81,10 @@ function fakeDocker(initial: {
         : fail("No such object");
     }
     if (command === "image") {
+      if (rest[0] === "rm") {
+        const existed = state.images.delete(rest.at(-1)!);
+        return existed ? ok("Untagged") : fail("No such image");
+      }
       return state.images.has(rest.at(-1)!) ? ok("sha256:abc") : fail("No such image");
     }
     if (command === "build") {
@@ -119,6 +129,7 @@ function fakeDocker(initial: {
       const target = state.containers[rest.find((argument) => argument.startsWith("briar-sandbox-"))!];
       if (!target?.running) return fail("container not running");
       if (rest.includes("report")) return ok(JSON.stringify(state.report()));
+      if (rest.includes("unregister")) return ok(JSON.stringify(state.unregister()));
       return ok("bootstrapped");
     }
     if (command === "context") {
@@ -130,6 +141,11 @@ function fakeDocker(initial: {
       if (operation === "create" || operation === "update") {
         state.contexts[contextName!] = rest.at(-1)!.replace(/^host=/u, "");
         return ok();
+      }
+      if (operation === "rm") {
+        const existed = rest.at(-1)! in state.contexts;
+        delete state.contexts[rest.at(-1)!];
+        return existed ? ok() : fail("context not found");
       }
     }
     return fail(`unsupported: ${args.join(" ")}`);
@@ -349,20 +365,105 @@ describe("stop and remove", () => {
       containers: { [container]: { running: true, image: "other", labels: {} } },
     });
     await expect(stopSandbox(fake.docker, name)).rejects.toThrow("unowned");
-    await expect(removeSandbox(fake.docker, name, { purge: true })).rejects.toThrow("unowned");
+    await expect(removeSandbox(fake.docker, name, { purge: true, unregisterWorkers: true }))
+      .rejects.toThrow("unowned");
     expect(fake.state.containers[container]).toBeDefined();
+    expect(fake.calls.map((call) => call[0])).not.toContain("exec");
   });
 
-  it("removes the container and, with purge, the home volume", async () => {
+  it("unregisters workers before deleting the container", async () => {
     const fake = fakeDocker({
       containers: {
         [container]: { running: true, image: "briar-sandbox:x", labels: ownedLabels() },
       },
     });
-    expect(await removeSandbox(fake.docker, name, { purge: true })).toBe(true);
+    const result = await removeSandbox(fake.docker, name, { purge: false, unregisterWorkers: true });
+    expect(result.existed).toBe(true);
+    expect(result.unregistered?.teams[0]).toMatchObject({ workerId: "worker-1", state: "unbound" });
+    const commands = fake.calls.map((call) => call[0]);
+    expect(commands.indexOf("exec")).toBeLessThan(commands.indexOf("rm"));
     expect(fake.state.containers[container]).toBeUndefined();
-    expect(fake.calls.some((call) => call[0] === "volume" && call[1] === "rm")).toBe(true);
-    expect(await removeSandbox(fake.docker, name, { purge: false })).toBe(false);
+    expect(result.volumeRemoved).toBe(false);
+    expect(fake.calls.some((call) => call[0] === "volume")).toBe(false);
+  });
+
+  it("starts a stopped container so its workers can still be unregistered", async () => {
+    const fake = fakeDocker({
+      containers: {
+        [container]: { running: false, image: "briar-sandbox:x", labels: ownedLabels() },
+      },
+    });
+    const result = await removeSandbox(fake.docker, name, { purge: false, unregisterWorkers: true });
+    const commands = fake.calls.map((call) => call[0]);
+    expect(commands.indexOf("start")).toBeLessThan(commands.indexOf("exec"));
+    expect(result.unregistered?.teams).toHaveLength(1);
+  });
+
+  it("reports rather than throws when unregistration fails, and still removes the container", async () => {
+    const fake = fakeDocker({
+      containers: {
+        [container]: { running: true, image: "briar-sandbox:x", labels: ownedLabels() },
+      },
+    });
+    const failing: DockerRunner = async (args, options) =>
+      args[0] === "exec" && args.includes("unregister")
+        ? { ok: false, output: "network down" }
+        : fake.docker(args, options);
+    const result = await removeSandbox(failing, name, { purge: false, unregisterWorkers: true });
+    expect(result.unregistered).toBeNull();
+    expect(result.unregisterDetail).toContain("network down");
+    expect(fake.state.containers[container]).toBeUndefined();
+  });
+
+  it("skips unregistration when asked to keep workers", async () => {
+    const fake = fakeDocker({
+      containers: {
+        [container]: { running: true, image: "briar-sandbox:x", labels: ownedLabels() },
+      },
+    });
+    const result = await removeSandbox(fake.docker, name, { purge: false, unregisterWorkers: false });
+    expect(result.unregistered).toBeNull();
+    expect(fake.calls.map((call) => call[0])).not.toContain("exec");
+  });
+
+  it("purges the volume, image, and Briar-created context", async () => {
+    const imageTag = sandboxImageTag(runtimeSha256);
+    const fake = fakeDocker({
+      images: [imageTag],
+      contexts: { "briar-sandbox-gx10": "ssh://jay@gx10" },
+      containers: {
+        [container]: { running: true, image: imageTag, labels: ownedLabels() },
+      },
+    });
+    const result = await removeSandbox(fake.docker, name, {
+      purge: true,
+      unregisterWorkers: true,
+      imageTag,
+      dockerContext: "briar-sandbox-gx10",
+      contextRunner: fake.docker,
+    });
+    expect(result).toMatchObject({
+      existed: true,
+      volumeRemoved: true,
+      imageRemoved: true,
+      contextRemoved: true,
+    });
+    expect(fake.state.images.has(imageTag)).toBe(false);
+    expect(fake.state.contexts["briar-sandbox-gx10"]).toBeUndefined();
+    const again = await removeSandbox(fake.docker, name, { purge: false, unregisterWorkers: true });
+    expect(again.existed).toBe(false);
+    expect(again.unregistered).toBeNull();
+  });
+
+  it("refuses to delete a Docker context Briar did not create", async () => {
+    const fake = fakeDocker({ contexts: { "desktop-linux": "unix:///x" } });
+    await expect(removeSandbox(fake.docker, name, {
+      purge: true,
+      unregisterWorkers: false,
+      dockerContext: "desktop-linux",
+      contextRunner: fake.docker,
+    })).rejects.toThrow("did not create");
+    expect(fake.state.contexts["desktop-linux"]).toBe("unix:///x");
   });
 });
 

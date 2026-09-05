@@ -410,12 +410,36 @@ async function workerUnregisterCommand() {
   const lifecycleReason = requestedLifecycleReason === "managed-deprovision"
     ? "managed_deprovision"
     : "explicit_user_unlink";
+  const result = await unregisterTeamExecutionWorker({
+    config,
+    team: project,
+    userToken,
+    reason: lifecycleReason,
+  });
+  console.log(JSON.stringify(result));
+}
+
+/**
+ * Unbind this device's execution worker from `team` and drop the local
+ * credential. A worker already removed remotely counts as unbound so the
+ * device can be registered again. Shared by `briar worker unregister` and
+ * the sandbox teardown.
+ */
+export async function unregisterTeamExecutionWorker(input: {
+  config: Config;
+  team: TeamConfig;
+  userToken: string;
+  reason: "explicit_user_unlink" | "managed_deprovision";
+}) {
+  const { config, team } = input;
+  const worker = team.executionWorker;
+  if (!worker) throw new Error("이 팀에 등록된 worker가 없습니다.");
   try {
-    await createWorkerEnrollmentClient(config.apiUrl, userToken).unbind({
-      projectId: project.id,
-      workerId: project.executionWorker.workerId,
-      requestId: `worker-unlink:${project.id}:${project.executionWorker.workerId}`,
-      reason: lifecycleReason,
+    await createWorkerEnrollmentClient(config.apiUrl, input.userToken).unbind({
+      projectId: team.id,
+      workerId: worker.workerId,
+      requestId: `worker-unlink:${team.id}:${worker.workerId}`,
+      reason: input.reason,
     });
   } catch (error) {
     if (!isMissingWorkerError(error)) throw error;
@@ -423,18 +447,17 @@ async function workerUnregisterCommand() {
     // that state as already unbound so the user can register the device again.
   }
   config.teams = config.teams.map((candidate) =>
-    candidate.id === project.id
+    candidate.id === team.id
       ? { ...candidate, executionWorker: undefined }
       : candidate,
   );
   await saveConfig(config);
-  console.log(
-    JSON.stringify({
-      deviceId: project.executionWorker.deviceId,
-      projectId: project.id,
-      state: "unbound",
-    }),
-  );
+  return {
+    deviceId: worker.deviceId,
+    projectId: team.id,
+    workerId: worker.workerId,
+    state: "unbound" as const,
+  };
 }
 
 interface WorkerLabelSyncFailure {
