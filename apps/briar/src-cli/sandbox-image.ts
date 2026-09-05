@@ -28,8 +28,14 @@ const agentBundles = [
   "grok-runner.js",
   "opencode-runner.js",
   "pi-runner.js",
-  "computer-use-mcp-server.js",
 ] as const;
+
+/**
+ * The desktop app installs only the provider runners beside the CLI. The
+ * Computer Use MCP bundle is staged when present (a checkout's `dist-agent/`),
+ * but a sandbox has no display, so its absence must not block `sandbox up`.
+ */
+const optionalAgentBundles = ["computer-use-mcp-server.js"] as const;
 
 export type SandboxRuntimeAssets = {
   readonly bunVersion: string;
@@ -178,6 +184,10 @@ export async function stageSandboxBuildContext(input: {
         `Agent bundle ${bundle} is missing from ${input.agentDirectory}; run \`bun run agent:build\``,
       );
     }
+    files.set(`agent/${bundle}`, await readFile(join(input.agentDirectory, bundle)));
+  }
+  for (const bundle of optionalAgentBundles) {
+    if (!available.has(bundle)) continue;
     files.set(`agent/${bundle}`, await readFile(join(input.agentDirectory, bundle)));
   }
   const digest = createHash("sha256");

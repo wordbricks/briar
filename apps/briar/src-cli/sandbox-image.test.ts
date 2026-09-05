@@ -103,6 +103,15 @@ describe("stageSandboxBuildContext", () => {
     expect(a.runtimeSha256).not.toBe(b.runtimeSha256);
   });
 
+  it("stages the installed layout that lacks the Computer Use bundle", async () => {
+    const { cliBundlePath, agentDirectory } = await sources();
+    await rm(join(agentDirectory, "computer-use-mcp-server.js"));
+    const directory = await temporary("briar-sandbox-stage-");
+    await stageSandboxBuildContext({ directory, cliBundlePath, agentDirectory });
+    await expect(stat(join(directory, "agent", "computer-use-mcp-server.js"))).rejects.toThrow();
+    expect(await readFile(join(directory, "agent", "pi-runner.js"), "utf8")).toBe("// pi-runner.js");
+  });
+
   it("refuses to stage without every agent runner", async () => {
     const { cliBundlePath, agentDirectory } = await sources();
     await rm(join(agentDirectory, "pi-runner.js"));
