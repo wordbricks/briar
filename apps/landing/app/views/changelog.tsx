@@ -30,6 +30,18 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.200",
+        date: "2026년 9월 5일",
+        title: "원격 호스트에서 실행 워커를 돌리는 Docker 샌드박스를 더합니다",
+        summary:
+          "새 `briar sandbox` 명령으로 로컬 또는 SSH로 연결한 원격 Docker 호스트(예: ARM64 GX10) 안에서 실행 워커를 소유자 라벨이 붙은 컨테이너로 돌릴 수 있습니다. 관리형 컴퓨터 등록이나 서버 변경 없이, 컨테이너는 평범한 실행 워커로 등록됩니다.",
+        items: [
+          "`briar sandbox up --name <이름> --host ssh://user@host --project <id> [--gpus]`가 CLI 번들과 에이전트 러너, 검증된 프로바이더 런타임을 준비하고 필요할 때 `briar-sandbox:<sha12>` 이미지를 빌드한 뒤, 자격 증명이 Docker 호스트 디스크에 닿지 않도록 부트스트랩 페이로드를 `docker exec` 표준 입력으로 전달합니다.",
+          "컨테이너 안의 `bootstrap`/`report`/`supervise`가 단기 GitHub 자격 증명으로 프로젝트를 클론해 연결하고 실행 워커를 등록한 뒤, 프로젝트마다 `briar worker` 프로세스 하나씩을 계속 살려 둡니다.",
+          "`status`, `stop`, `recreate`, `rm`, `logs`, `shell`, `login`이 같은 소유권 검사를 공유해 소유하지 않은 컨테이너는 절대 건드리지 않습니다. 클론 로직과 워커 등록은 관리형 컴퓨터 설정에서 뽑아내 두 경로가 구현을 공유하도록 정리했습니다. 자세한 내용은 `docs/operations/sandbox-docker.md`에 있습니다.",
+        ],
+      },
+      {
         version: "1.2.199",
         date: "2026년 9월 5일",
         title: "삭제된 실행의 고아 행을 정리하고 관리형 런타임 패키징을 고칩니다",
@@ -1681,6 +1693,18 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.200",
+        date: "September 5, 2026",
+        title: "Add a Docker sandbox for running execution workers on remote hosts",
+        summary:
+          "A new `briar sandbox` command runs execution workers inside an owner-labelled container on a local or remote Docker host reached over SSH (for example an ARM64 GX10). No managed-computer registration or server change is involved — the container registers as an ordinary execution worker.",
+        items: [
+          "`briar sandbox up --name <name> --host ssh://user@host --project <id> [--gpus]` stages the CLI bundle, agent runners, and the reviewed provider runtime, builds `briar-sandbox:<sha12>` when missing, and pushes a bootstrap payload over `docker exec` stdin so nothing credential-bearing touches the Docker host disk.",
+          "In-container `bootstrap`/`report`/`supervise` clone each project with a short-lived GitHub credential, connect it, register an execution worker, and keep one `briar worker` per project alive.",
+          "`status`, `stop`, `recreate`, `rm`, `logs`, `shell`, `login` share the same ownership checks, so unowned containers are never touched. The clone helper and worker registration are shared with the managed-computer setup path. See `docs/operations/sandbox-docker.md` for details.",
+        ],
+      },
       {
         version: "1.2.199",
         date: "September 5, 2026",
