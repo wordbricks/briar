@@ -19,6 +19,22 @@ export const SANDBOX_RUNTIME_ROOT = "/opt/briar";
 export const SANDBOX_CLI_PATH = `${SANDBOX_RUNTIME_ROOT}/bin/briar`;
 export const SANDBOX_HOME = "/home/briar";
 export const SANDBOX_CONFIG_HOME = `${SANDBOX_HOME}/.config/briar`;
+export const DEFAULT_DEBIAN_MIRROR = "deb.debian.org";
+
+const debianMirrorPattern = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/u;
+
+/**
+ * Validate a Debian mirror host for the image build. Only a bare hostname is
+ * accepted so it can be spliced into apt sources without shell or URL tricks.
+ */
+export function debianMirror(raw: string | undefined): string {
+  const value = raw?.trim().toLowerCase() ?? DEFAULT_DEBIAN_MIRROR;
+  if (value.length === 0) return DEFAULT_DEBIAN_MIRROR;
+  if (!debianMirrorPattern.test(value)) {
+    throw new Error("Debian mirror must be a bare hostname such as ftp.kr.debian.org");
+  }
+  return value;
+}
 
 const agentBundles = [
   "agy-runner.js",
@@ -52,8 +68,12 @@ FROM debian:trixie-slim
 ARG TARGETARCH
 ARG BUN_VERSION=${assets.bunVersion}
 ARG NODE_VERSION=${assets.nodeVersion}
+ARG DEBIAN_MIRROR=deb.debian.org
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update \\
+RUN if [ "$DEBIAN_MIRROR" != "deb.debian.org" ]; then \\
+    sed -i "s|http://deb.debian.org/|http://$DEBIAN_MIRROR/|g" /etc/apt/sources.list.d/debian.sources; \\
+  fi \\
+  && apt-get update \\
   && apt-get install -y --no-install-recommends \\
     build-essential ca-certificates curl git jq libssl-dev openssh-client \\
     pkg-config procps python3 unzip xz-utils \\

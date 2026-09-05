@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  debianMirror,
   resolveSandboxRuntimeSources,
   SANDBOX_CLI_PATH,
   sandboxDockerfile,
@@ -64,6 +65,20 @@ describe("sandboxDockerfile", () => {
     expect(dockerfile).toContain("arm64) bun_arch=aarch64; node_arch=arm64");
     expect(dockerfile).toContain("amd64) bun_arch=x64; node_arch=x64");
     expect(dockerfile).toContain("agent-browser-linux-arm64");
+  });
+});
+
+describe("debianMirror", () => {
+  it("defaults, normalizes, and rejects anything but a hostname", () => {
+    expect(debianMirror(undefined)).toBe("deb.debian.org");
+    expect(debianMirror(" FTP.kr.debian.org ")).toBe("ftp.kr.debian.org");
+    expect(() => debianMirror("http://ftp.kr.debian.org")).toThrow("bare hostname");
+    expect(() => debianMirror("mirror;rm -rf /")).toThrow("bare hostname");
+  });
+
+  it("is applied to apt sources only when it differs from the default", () => {
+    expect(sandboxDockerfile()).toContain("ARG DEBIAN_MIRROR=deb.debian.org");
+    expect(sandboxDockerfile()).toContain("/etc/apt/sources.list.d/debian.sources");
   });
 });
 

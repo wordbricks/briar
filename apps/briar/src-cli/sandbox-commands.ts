@@ -31,8 +31,10 @@ import {
   stopSandbox,
 } from "./sandbox-docker";
 import {
+  DEFAULT_DEBIAN_MIRROR,
   SANDBOX_CLI_PATH,
   SANDBOX_SCHEMA_VERSION,
+  debianMirror,
   resolveSandboxRuntimeSources,
   stageSandboxBuildContext,
 } from "./sandbox-image";
@@ -162,6 +164,7 @@ export async function sandboxUpCommand() {
   const { docker, dockerContext, host } = await resolveDocker(name, entry);
   const teamIds = values("--team");
   const gpus = has("--gpus") || (entry?.gpus === true && !has("--no-gpus"));
+  const mirror = debianMirror(value("--debian-mirror") ?? entry?.debianMirror);
   const payload = await bootstrapPayload({ name, teamIds });
   const sources = await resolveSandboxRuntimeSources();
   const stagingDirectory = await mkdtemp(join(tmpdir(), "briar-sandbox-"));
@@ -181,6 +184,7 @@ export async function sandboxUpCommand() {
       runtimeSha256: context.runtimeSha256,
       buildContextDirectory: stagingDirectory,
       gpus,
+      debianMirror: mirror,
       bootstrap: () => pushBootstrap(docker, name, payload),
       log: (message) => console.error(message),
     });
@@ -189,6 +193,7 @@ export async function sandboxUpCommand() {
       ...(host ? { host } : {}),
       teamIds: payload.teams.map((project) => project.id),
       gpus,
+      ...(mirror === DEFAULT_DEBIAN_MIRROR ? {} : { debianMirror: mirror }),
       runtimeSha256: context.runtimeSha256,
       updatedAt: new Date().toISOString(),
     });

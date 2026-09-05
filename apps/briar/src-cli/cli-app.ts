@@ -829,7 +829,7 @@ const sandboxCommand = Command.make("sandbox").pipe(
       "up",
       {
         ...sandboxTargetFlags,
-        ...optionalStrings("label"),
+        ...optionalStrings("label", "debian-mirror"),
         ...repeatedStrings("team"),
         ...switches("gpus", "no-gpus", "no-provider-auth"),
       },

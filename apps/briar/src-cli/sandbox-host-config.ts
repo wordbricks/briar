@@ -21,6 +21,7 @@ const SandboxHostEntry = Schema.Struct({
   host: Schema.optional(Schema.String.check(Schema.isMinLength(1))),
   teamIds: Schema.Array(Schema.String.check(Schema.isUUID())),
   gpus: Schema.Boolean,
+  debianMirror: Schema.optional(Schema.String.check(Schema.isMinLength(1))),
   runtimeSha256: Schema.String,
   updatedAt: Schema.String,
 });
