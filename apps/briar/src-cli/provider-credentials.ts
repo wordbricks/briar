@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
+import { closeSync, openSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 /**
@@ -14,6 +16,16 @@ export const GROK_TOKEN_SKEW_MILLIS = 5 * 60_000;
 
 const COMMAND_TIMEOUT_MS = 10_000;
 const KEYCHAIN_TIMEOUT_MS = 5_000;
+
+/**
+ * Claude Code's own OAuth client, so a token Briar refreshes stays the token
+ * Claude Code reads back out of the same store.
+ */
+const CLAUDE_OAUTH_TOKEN_URL = "https://platform.claude.com/v1/oauth/token";
+const CLAUDE_OAUTH_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
+const CLAUDE_REFRESH_TIMEOUT_MS = 10_000;
+/** A crashed refresh must not lock every later one out of the store. */
+const CLAUDE_REFRESH_LOCK_STALE_MS = 30_000;
 
 export type ProviderAccountIdentity = {
   authenticated: boolean;
@@ -135,13 +147,25 @@ export async function readCodexAccountIdentity(
 export const codexAuthenticated = async (home: string) =>
   (await readCodexAccountIdentity(home)).authenticated;
 
+/**
+ * Where a Claude login was read from, so a refreshed token is written back to
+ * the same place Claude Code will read it from next.
+ */
+export type ClaudeCredentialStore =
+  | { kind: "keychain"; service: string; account: string }
+  | { kind: "file"; path: string };
+
 export type ClaudeAccountCredentials = {
   accessToken: string;
+  refreshToken: string;
   expiresAt: number | null;
   hasRefreshToken: boolean;
   refreshTokenExpiresAt: number | null;
   accountLabel: string | null;
   planType: string | null;
+  /** The stored document, so a refresh rewrites it without dropping fields. */
+  document: Record<string, unknown>;
+  store: ClaudeCredentialStore | null;
 };
 
 /**
@@ -153,16 +177,17 @@ export type ClaudeTokenState = "usable" | "stale" | "expired";
 
 export function parseClaudeAccountCredentials(
   contents: string,
+  store: ClaudeCredentialStore | null = null,
 ): ClaudeAccountCredentials | null {
+  let document: Record<string, unknown> | null = null;
   let oauth: Record<string, unknown> | null = null;
   try {
-    oauth = objectOrNull(
-      (JSON.parse(contents) as { claudeAiOauth?: unknown }).claudeAiOauth,
-    );
+    document = objectOrNull(JSON.parse(contents));
+    oauth = objectOrNull(document?.claudeAiOauth);
   } catch {
     return null;
   }
-  if (!oauth) return null;
+  if (!document || !oauth) return null;
   const rawToken = typeof oauth.accessToken === "string"
     ? oauth.accessToken
     : typeof oauth.access_token === "string"
@@ -186,6 +211,7 @@ export function parseClaudeAccountCredentials(
       : null;
   return {
     accessToken,
+    refreshToken,
     expiresAt: typeof oauth.expiresAt === "number" ? oauth.expiresAt : null,
     hasRefreshToken: refreshToken.length > 0,
     refreshTokenExpiresAt: typeof oauth.refreshTokenExpiresAt === "number"
@@ -193,6 +219,8 @@ export function parseClaudeAccountCredentials(
       : null,
     accountLabel: (emailAddress ?? email)?.trim() || null,
     planType: subscription?.trim() || null,
+    document,
+    store,
   };
 }
 
@@ -212,10 +240,12 @@ export function claudeTokenState(
 const claudeConfigDirectory = (home: string) =>
   process.env.CLAUDE_CONFIG_DIR?.trim() || join(home, ".claude");
 
+const claudeKeychainAccount = () =>
+  process.env.USER?.trim() || process.env.USERNAME?.trim() || "user";
+
 const readClaudeKeychain = (home: string) => {
   if (process.platform !== "darwin") return null;
-  const account = process.env.USER?.trim() || process.env.USERNAME?.trim() ||
-    "user";
+  const account = claudeKeychainAccount();
   const digest = createHash("sha256")
     .update(claudeConfigDirectory(home))
     .digest("hex");
@@ -230,7 +260,9 @@ const readClaudeKeychain = (home: string) => {
       ["find-generic-password", "-s", service, "-a", account, "-w"],
       { encoding: "utf8", timeout: KEYCHAIN_TIMEOUT_MS },
     );
-    if (result.status === 0 && result.stdout.trim()) return result.stdout.trim();
+    if (result.status === 0 && result.stdout.trim()) {
+      return { store: { kind: "keychain" as const, service, account }, contents: result.stdout.trim() };
+    }
   }
   return null;
 };
@@ -243,13 +275,215 @@ export async function readClaudeCredentials(
   home: string,
 ): Promise<ClaudeAccountCredentials | null> {
   const keychain = readClaudeKeychain(home);
-  if (keychain) return parseClaudeAccountCredentials(keychain);
+  if (keychain) {
+    return parseClaudeAccountCredentials(keychain.contents, keychain.store);
+  }
+  const path = join(claudeConfigDirectory(home), ".credentials.json");
   try {
-    return parseClaudeAccountCredentials(
-      await readFile(join(claudeConfigDirectory(home), ".credentials.json"), "utf8"),
-    );
+    return parseClaudeAccountCredentials(await readFile(path, "utf8"), {
+      kind: "file",
+      path,
+    });
   } catch {
     return null;
+  }
+}
+
+/** Re-read one store directly, so a refresh can see a concurrent rotation. */
+const readClaudeStore = async (
+  store: ClaudeCredentialStore,
+): Promise<ClaudeAccountCredentials | null> => {
+  if (store.kind === "file") {
+    try {
+      return parseClaudeAccountCredentials(await readFile(store.path, "utf8"), store);
+    } catch {
+      return null;
+    }
+  }
+  const result = spawnSync(
+    "/usr/bin/security",
+    ["find-generic-password", "-s", store.service, "-a", store.account, "-w"],
+    { encoding: "utf8", timeout: KEYCHAIN_TIMEOUT_MS },
+  );
+  return result.status === 0 && result.stdout.trim()
+    ? parseClaudeAccountCredentials(result.stdout.trim(), store)
+    : null;
+};
+
+const writeClaudeStore = (store: ClaudeCredentialStore, contents: string) => {
+  if (store.kind === "file") {
+    try {
+      writeFileSync(store.path, contents, { encoding: "utf8", mode: 0o600 });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  const result = spawnSync(
+    "/usr/bin/security",
+    [
+      "add-generic-password",
+      "-U",
+      "-s",
+      store.service,
+      "-a",
+      store.account,
+      "-w",
+      contents,
+    ],
+    { encoding: "utf8", timeout: KEYCHAIN_TIMEOUT_MS },
+  );
+  return result.status === 0;
+};
+
+const claudeStoreKey = (store: ClaudeCredentialStore) =>
+  store.kind === "file" ? `file:${store.path}` : `keychain:${store.service}:${store.account}`;
+
+/**
+ * Only one process may exchange a given refresh token: the provider retires
+ * the old one, so two concurrent exchanges can leave Claude Code holding a
+ * dead token and force the user to sign in again.
+ */
+const acquireClaudeRefreshLock = (store: ClaudeCredentialStore) => {
+  const digest = createHash("sha256").update(claudeStoreKey(store)).digest("hex");
+  const path = join(tmpdir(), `briar-claude-refresh-${digest.slice(0, 16)}.lock`);
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      closeSync(openSync(path, "wx"));
+      return () => {
+        try {
+          unlinkSync(path);
+        } catch {
+          // The lock is advisory; a failed cleanup is reclaimed as stale.
+        }
+      };
+    } catch {
+      try {
+        if (Date.now() - statSync(path).mtimeMs <= CLAUDE_REFRESH_LOCK_STALE_MS) {
+          return null;
+        }
+        unlinkSync(path);
+      } catch {
+        return null;
+      }
+    }
+  }
+  return null;
+};
+
+type ClaudeRefreshedTokens = {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number | null;
+  refreshTokenExpiresAt: number | null;
+  scopes: string[] | null;
+};
+
+const secondsFromNow = (value: unknown, now: number) =>
+  typeof value === "number" && Number.isFinite(value) ? now + value * 1_000 : null;
+
+export function parseClaudeRefreshResponse(
+  body: unknown,
+  now: number,
+  previousRefreshToken: string,
+): ClaudeRefreshedTokens | null {
+  const payload = objectOrNull(body);
+  const accessToken = typeof payload?.access_token === "string"
+    ? payload.access_token.trim()
+    : "";
+  if (!accessToken) return null;
+  const rotated = typeof payload?.refresh_token === "string"
+    ? payload.refresh_token.trim()
+    : "";
+  const scope = typeof payload?.scope === "string" ? payload.scope.trim() : "";
+  return {
+    accessToken,
+    // A provider that does not rotate returns no refresh token at all.
+    refreshToken: rotated || previousRefreshToken,
+    expiresAt: secondsFromNow(payload?.expires_in, now),
+    refreshTokenExpiresAt: secondsFromNow(payload?.refresh_token_expires_in, now),
+    scopes: scope ? scope.split(" ").filter(Boolean) : null,
+  };
+}
+
+/** The stored document with the refreshed tokens merged into it. */
+export function claudeDocumentWithTokens(
+  document: Record<string, unknown>,
+  tokens: ClaudeRefreshedTokens,
+) {
+  const oauth = objectOrNull(document.claudeAiOauth) ?? {};
+  return {
+    ...document,
+    claudeAiOauth: {
+      ...oauth,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      ...(tokens.expiresAt === null ? {} : { expiresAt: tokens.expiresAt }),
+      ...(tokens.refreshTokenExpiresAt === null
+        ? {}
+        : { refreshTokenExpiresAt: tokens.refreshTokenExpiresAt }),
+      ...(tokens.scopes === null ? {} : { scopes: tokens.scopes }),
+    },
+  };
+}
+
+export type ClaudeRefreshOptions = {
+  now: number;
+  timeoutMs: number;
+  fetchImpl: typeof fetch;
+};
+
+/**
+ * Trade a lapsed Claude access token for a fresh one and write it back to the
+ * store Claude Code reads. Returns null whenever the exchange cannot be made
+ * safely, so the caller keeps reporting the login it already read instead of
+ * risking the stored token.
+ */
+export async function refreshClaudeAccessToken(
+  credentials: ClaudeAccountCredentials,
+  options: Partial<ClaudeRefreshOptions> = {},
+): Promise<ClaudeAccountCredentials | null> {
+  const { store, refreshToken } = credentials;
+  if (!store || !refreshToken) return null;
+  const now = options.now ?? Date.now();
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const timeoutMs = options.timeoutMs ?? CLAUDE_REFRESH_TIMEOUT_MS;
+  const release = acquireClaudeRefreshLock(store);
+  if (!release) return null;
+  try {
+    // The exchange retires the stored refresh token, so a store Briar cannot
+    // write is never exchanged — that would sign Claude Code out.
+    if (!writeClaudeStore(store, JSON.stringify(credentials.document))) {
+      return null;
+    }
+    const response = await fetchImpl(CLAUDE_OAUTH_TOKEN_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        grant_type: "refresh_token",
+        refresh_token: refreshToken,
+        client_id: CLAUDE_OAUTH_CLIENT_ID,
+      }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!response.ok) return null;
+    const tokens = parseClaudeRefreshResponse(
+      await response.json(),
+      now,
+      refreshToken,
+    );
+    if (!tokens) return null;
+    // Claude Code may have refreshed while the exchange was in flight; its
+    // token is the live one, so the store is left exactly as it left it.
+    const current = await readClaudeStore(store);
+    if (current && current.refreshToken !== refreshToken) return current;
+    const document = claudeDocumentWithTokens(credentials.document, tokens);
+    if (!writeClaudeStore(store, JSON.stringify(document))) return null;
+    return parseClaudeAccountCredentials(JSON.stringify(document), store);
+  } catch {
+    return null;
+  } finally {
+    release();
   }
 }
 

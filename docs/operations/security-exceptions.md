@@ -17,6 +17,25 @@
   the identifier or the affected history is no longer scanned. Revoke it if
   this public identifier is ever used as an authentication credential.
 
+## Gitleaks Claude Code OAuth client identifier
+
+- Recorded: 2026-09-05
+- Review by: 2026-10-05
+- Finding: the generic API key rule flags the Claude Code OAuth client
+  identifier `9d1c250a-e61b-44d9-88ed-5944d1962f5e` in
+  `apps/briar/src-cli/provider-credentials.ts`, where Briar exchanges a lapsed
+  Claude access token for a fresh one.
+- An OAuth public client cannot keep a secret, so this identifier is public by
+  design: it ships inside the Claude Code binary and appears in every
+  authorization URL the user's browser is sent to. It authenticates nothing on
+  its own. The refresh token it accompanies is read from the user's Keychain at
+  runtime and is never stored in this repository.
+- Scope: only this exact identifier, only under the generic API key rule, and
+  only in `apps/briar/src-cli/provider-credentials.ts` or this document. All
+  three conditions must match.
+- Removal condition: remove the exception when Briar no longer refreshes Claude
+  tokens itself. Revoke it if Anthropic ever issues this client a secret.
+
 ## GHSA-w3rx-r6r6-pgpr and GHSA-5p2g-fcmc-qvqq — temporary landing build exception
 
 - Recorded: 2026-08-23

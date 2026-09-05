@@ -1,12 +1,15 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { agentProviderCatalog } from "../src/lib/agent-provider";
 import {
+  claudeDocumentWithTokens,
   claudeTokenState,
   jwtEmail,
   parseClaudeAccountCredentials,
+  parseClaudeRefreshResponse,
+  refreshClaudeAccessToken,
   parseGeminiOauthAccess,
   parseGrokAuthSession,
   parseOpencodeAuthLabel,
@@ -166,6 +169,174 @@ describe("provider usage probes", () => {
         now,
       ),
     ).toBe("expired");
+  });
+
+  it("refreshes a stale Claude token in place instead of nagging", async () => {
+    const now = 1_800_000_000_000;
+    const directory = await mkdtemp(join(tmpdir(), "briar-claude-refresh-"));
+    const path = join(directory, ".credentials.json");
+    await writeFile(
+      path,
+      JSON.stringify({
+        claudeAiOauth: {
+          accessToken: "lapsed",
+          refreshToken: "rotate-me",
+          expiresAt: now - 1_000,
+          subscriptionType: "max",
+          scopes: ["user:inference"],
+        },
+      }),
+    );
+    const store = { kind: "file" as const, path };
+    const credentials = parseClaudeAccountCredentials(
+      await readFile(path, "utf8"),
+      store,
+    )!;
+    expect(claudeTokenState(credentials, now)).toBe("stale");
+
+    const requests: Array<Record<string, unknown>> = [];
+    const refreshed = await refreshClaudeAccessToken(credentials, {
+      now,
+      fetchImpl: (async (_url, init) => {
+        requests.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+        return new Response(
+          JSON.stringify({
+            access_token: "fresh",
+            refresh_token: "rotated",
+            expires_in: 28_800,
+            refresh_token_expires_in: 2_592_000,
+          }),
+          { status: 200 },
+        );
+      }) as typeof fetch,
+    });
+
+    expect(requests[0]).toMatchObject({
+      grant_type: "refresh_token",
+      refresh_token: "rotate-me",
+    });
+    expect(refreshed?.accessToken).toBe("fresh");
+    expect(claudeTokenState(refreshed!, now)).toBe("usable");
+    // Claude Code reads the same store, so the rotated token and every field
+    // it owns must survive the write.
+    const stored = JSON.parse(await readFile(path, "utf8")) as {
+      claudeAiOauth: Record<string, unknown>;
+    };
+    expect(stored.claudeAiOauth).toMatchObject({
+      accessToken: "fresh",
+      refreshToken: "rotated",
+      expiresAt: now + 28_800_000,
+      refreshTokenExpiresAt: now + 2_592_000_000,
+      subscriptionType: "max",
+      scopes: ["user:inference"],
+    });
+    await rm(directory, { recursive: true, force: true });
+  });
+
+  it("leaves the Claude store untouched when a refresh fails", async () => {
+    const now = 1_800_000_000_000;
+    const directory = await mkdtemp(join(tmpdir(), "briar-claude-refresh-"));
+    const path = join(directory, ".credentials.json");
+    const original = JSON.stringify({
+      claudeAiOauth: {
+        accessToken: "lapsed",
+        refreshToken: "rotate-me",
+        expiresAt: now - 1_000,
+      },
+    });
+    await writeFile(path, original);
+    const credentials = parseClaudeAccountCredentials(original, {
+      kind: "file",
+      path,
+    })!;
+
+    expect(
+      await refreshClaudeAccessToken(credentials, {
+        now,
+        fetchImpl: (async (_url: unknown) =>
+          new Response('{"error":"invalid_grant"}', {
+            status: 400,
+          })) as unknown as typeof fetch,
+      }),
+    ).toBeNull();
+    expect(
+      JSON.parse(await readFile(path, "utf8")) as unknown,
+    ).toEqual(JSON.parse(original) as unknown);
+    await rm(directory, { recursive: true, force: true });
+  });
+
+  it("keeps a token Claude Code rotated first", async () => {
+    const now = 1_800_000_000_000;
+    const directory = await mkdtemp(join(tmpdir(), "briar-claude-refresh-"));
+    const path = join(directory, ".credentials.json");
+    const stale = JSON.stringify({
+      claudeAiOauth: {
+        accessToken: "lapsed",
+        refreshToken: "rotate-me",
+        expiresAt: now - 1_000,
+      },
+    });
+    await writeFile(path, stale);
+    const credentials = parseClaudeAccountCredentials(stale, {
+      kind: "file",
+      path,
+    })!;
+
+    const refreshed = await refreshClaudeAccessToken(credentials, {
+      now,
+      fetchImpl: (async (_url: unknown) => {
+        // Claude Code wrote its own refresh while the exchange was in flight.
+        await writeFile(
+          path,
+          JSON.stringify({
+            claudeAiOauth: {
+              accessToken: "claude-code-token",
+              refreshToken: "claude-code-refresh",
+              expiresAt: now + 28_800_000,
+            },
+          }),
+        );
+        return new Response(
+          JSON.stringify({ access_token: "briar-token", refresh_token: "briar-refresh" }),
+          { status: 200 },
+        );
+      }) as unknown as typeof fetch,
+    });
+
+    expect(refreshed?.accessToken).toBe("claude-code-token");
+    expect(
+      (JSON.parse(await readFile(path, "utf8")) as {
+        claudeAiOauth: { refreshToken: string };
+      }).claudeAiOauth.refreshToken,
+    ).toBe("claude-code-refresh");
+    await rm(directory, { recursive: true, force: true });
+  });
+
+  it("reads the tokens a refresh returns", () => {
+    const now = 1_800_000_000_000;
+    expect(parseClaudeRefreshResponse({ access_token: "" }, now, "old")).toBeNull();
+    // A provider that does not rotate keeps the caller's refresh token.
+    expect(
+      parseClaudeRefreshResponse({ access_token: "fresh" }, now, "old"),
+    ).toMatchObject({ refreshToken: "old", expiresAt: null });
+    expect(
+      claudeDocumentWithTokens(
+        { claudeAiOauth: { subscriptionType: "max" }, other: 1 },
+        parseClaudeRefreshResponse(
+          { access_token: "fresh", scope: "user:inference user:profile" },
+          now,
+          "old",
+        )!,
+      ),
+    ).toEqual({
+      other: 1,
+      claudeAiOauth: {
+        subscriptionType: "max",
+        accessToken: "fresh",
+        refreshToken: "old",
+        scopes: ["user:inference", "user:profile"],
+      },
+    });
   });
 
   it("asks for reauthentication only when Claude rejects the token", () => {
