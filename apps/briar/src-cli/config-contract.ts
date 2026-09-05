@@ -18,8 +18,8 @@ import {
   type LocalActiveClaimConfig,
   type LocalAutoHuntConfig,
   type LocalConfig,
-  type LocalProjectConfig,
-  type LocalProjectLlmConfig,
+  type LocalTeamConfig,
+  type LocalTeamLlmConfig,
 } from "@briar/contracts/gen/briar/local/v1/config_pb";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
@@ -238,7 +238,7 @@ const ActiveClaim = strict(Schema.Struct({
   finishedAt: Schema.mutableKey(Schema.optional(IsoDateTimeWithOffset)),
 }));
 
-export const ProjectConfig = strict(Schema.Struct({
+export const TeamConfig = strict(Schema.Struct({
   id: Schema.mutableKey(Uuid),
   repositoryPath: Schema.mutableKey(Schema.NonEmptyString),
   agentToken: Schema.mutableKey(
@@ -251,7 +251,7 @@ export const ProjectConfig = strict(Schema.Struct({
   executionWorker: Schema.mutableKey(Schema.optional(ExecutionWorkerConfig)),
   activeClaim: Schema.mutableKey(Schema.optional(ActiveClaim)),
 }));
-export type ProjectConfig = typeof ProjectConfig.Type;
+export type TeamConfig = typeof TeamConfig.Type;
 
 const ManagedComputerConfig = strict(Schema.Struct({
   managedComputerId: Schema.mutableKey(Uuid),
@@ -299,7 +299,7 @@ const AppSettings = strict(Schema.Struct({
 }));
 
 const projectHasExecutionCredential = (
-  project: ProjectConfig,
+  project: TeamConfig,
   managedComputer: typeof ManagedComputerConfig.Type | undefined,
 ) => {
   if (project.agentToken || project.executionWorker?.token) return true;
@@ -338,10 +338,10 @@ export const Config = strict(Schema.Struct({
     ),
   ),
   managedComputer: Schema.mutableKey(Schema.optional(ManagedComputerConfig)),
-  projects: Schema.mutableKey(mutableArray(ProjectConfig)),
+  teams: Schema.mutableKey(mutableArray(TeamConfig)),
 })).check(
   Schema.makeFilter((config) =>
-    config.projects.every((project) =>
+    config.teams.every((project) =>
       projectHasExecutionCredential(project, config.managedComputer)
     ) ||
     "Every project must have an agent token or an execution worker credential"
@@ -425,7 +425,7 @@ const browserAutomationProviderToProto = (
 };
 const approvalPolicyFromProto = (
   value: LocalApprovalPolicy | undefined,
-): NonNullable<ProjectConfig["llm"]>["approvalPolicy"] => {
+): NonNullable<TeamConfig["llm"]>["approvalPolicy"] => {
   switch (value) {
     case LocalApprovalPolicy.UNTRUSTED:
       return "untrusted";
@@ -435,13 +435,13 @@ const approvalPolicyFromProto = (
       return "never";
     case LocalApprovalPolicy.UNSPECIFIED:
     case undefined:
-      throw new Error("config.projects.llm.approvalPolicy is missing");
+      throw new Error("config.teams.llm.approvalPolicy is missing");
     default:
       throw new Error(`Unknown approval policy: ${value}`);
   }
 };
 const approvalPolicyToProto = (
-  value: NonNullable<ProjectConfig["llm"]>["approvalPolicy"],
+  value: NonNullable<TeamConfig["llm"]>["approvalPolicy"],
 ) => {
   switch (value) {
     case "untrusted":
@@ -454,7 +454,7 @@ const approvalPolicyToProto = (
 };
 const terminalStatusFromProto = (
   value: LocalClaimTerminalStatus | undefined,
-): NonNullable<ProjectConfig["activeClaim"]>["terminalStatus"] => {
+): NonNullable<TeamConfig["activeClaim"]>["terminalStatus"] => {
   switch (value) {
     case LocalClaimTerminalStatus.COMPLETED:
       return "completed";
@@ -467,13 +467,13 @@ const terminalStatusFromProto = (
     case undefined:
       return undefined;
     case LocalClaimTerminalStatus.UNSPECIFIED:
-      throw new Error("config.projects.activeClaim.terminalStatus is unspecified");
+      throw new Error("config.teams.activeClaim.terminalStatus is unspecified");
     default:
       throw new Error(`Unknown claim terminal status: ${value}`);
   }
 };
 const terminalStatusToProto = (
-  value: NonNullable<ProjectConfig["activeClaim"]>["terminalStatus"],
+  value: NonNullable<TeamConfig["activeClaim"]>["terminalStatus"],
 ) => {
   switch (value) {
     case "completed":
@@ -492,9 +492,9 @@ const timestampFromProto = (value: Timestamp | undefined, field: string) =>
   timestampDate(requiredMessage(value, field)).toISOString();
 const timestampToProto = (value: string) => timestampFromDate(new Date(value));
 
-const llmFromProto = (value: LocalProjectLlmConfig) => ({
+const llmFromProto = (value: LocalTeamLlmConfig) => ({
   provider: agentProviderFromProto(
-    requiredMessage(value.provider, "config.projects.llm.provider"),
+    requiredMessage(value.provider, "config.teams.llm.provider"),
   ),
   model: value.model,
   effort: value.effort,
@@ -525,7 +525,7 @@ const autoHuntFromProto = (value: LocalAutoHuntConfig) => ({
     ? undefined
     : safeNumber(
       value.githubRepositoryId,
-      "config.projects.autoHunt.githubRepositoryId",
+      "config.teams.autoHunt.githubRepositoryId",
     ),
   workflow: value.workflow === undefined
     ? undefined
@@ -537,7 +537,7 @@ const activeClaimFromProto = (value: LocalActiveClaimConfig) => ({
   token: value.token,
   leaseExpiresAt: timestampFromProto(
     value.leaseExpiresAt,
-    "config.projects.activeClaim.leaseExpiresAt",
+    "config.teams.activeClaim.leaseExpiresAt",
   ),
   worktree: value.worktree === undefined
     ? undefined
@@ -553,10 +553,10 @@ const activeClaimFromProto = (value: LocalActiveClaimConfig) => ({
     ? undefined
     : timestampFromProto(
       value.finishedAt,
-      "config.projects.activeClaim.finishedAt",
+      "config.teams.activeClaim.finishedAt",
     ),
 });
-const projectFromProto = (value: LocalProjectConfig) => ({
+const teamFromProto = (value: LocalTeamConfig) => ({
   id: value.id,
   repositoryPath: value.repositoryPath,
   agentToken: value.agentToken,
@@ -642,17 +642,17 @@ const configFromProto = (value: LocalConfig): Config => {
         organizationId: value.managedComputer.organizationId,
         credentialFile: value.managedComputer.credentialFile,
       },
-    projects: value.projects.map(projectFromProto),
+    teams: value.teams.map(teamFromProto),
   });
 };
 
-const llmToProto = (value: NonNullable<ProjectConfig["llm"]>) => ({
+const llmToProto = (value: NonNullable<TeamConfig["llm"]>) => ({
   provider: agentProviderToProto(value.provider),
   model: value.model,
   effort: value.effort,
   approvalPolicy: approvalPolicyToProto(value.approvalPolicy),
 });
-const autoHuntToProto = (value: NonNullable<ProjectConfig["autoHunt"]>) => ({
+const autoHuntToProto = (value: NonNullable<TeamConfig["autoHunt"]>) => ({
   velenOrg: value.velenOrg,
   dataSource: value.dataSource,
   worktrees: value.worktrees === undefined
@@ -681,7 +681,7 @@ const autoHuntToProto = (value: NonNullable<ProjectConfig["autoHunt"]>) => ({
     : workflowToProto(value.workflow),
 });
 const activeClaimToProto = (
-  value: NonNullable<ProjectConfig["activeClaim"]>,
+  value: NonNullable<TeamConfig["activeClaim"]>,
 ) => ({
   runId: value.runId,
   sourceKey: value.sourceKey,
@@ -701,7 +701,7 @@ const activeClaimToProto = (
     ? undefined
     : timestampToProto(value.finishedAt),
 });
-const projectToProto = (value: ProjectConfig) => ({
+const teamToProto = (value: TeamConfig) => ({
   id: value.id,
   repositoryPath: value.repositoryPath,
   agentToken: value.agentToken,
@@ -749,7 +749,7 @@ const configToProto = (input: Config): LocalConfig => {
     managedComputer: value.managedComputer === undefined
       ? undefined
       : { ...value.managedComputer },
-    projects: value.projects.map(projectToProto),
+    teams: value.teams.map(teamToProto),
   });
 };
 
@@ -757,8 +757,31 @@ export const decodeConfig = (input: unknown): Config =>
   configFromProto(fromJson(LocalConfigSchema, input as JsonValue));
 export const decodeConfigJson = (input: string): Config =>
   configFromProto(fromJsonString(LocalConfigSchema, input));
-export const decodePreProtoConfigJson = (input: string): Config =>
-  decodeDomainConfig(JSON.parse(input));
+/**
+ * Decode a config written by an older CLI. Two legacy shapes exist: the
+ * pre-ProtoJSON domain JSON, and ProtoJSON written before the Team rename,
+ * which still keeps teams under `projects`. Both are rewritten in place by the
+ * caller once decoded.
+ */
+export const decodeLegacyConfigJson = (input: string): Config => {
+  const parsed: unknown = JSON.parse(input);
+  const root = parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)
+    ? { ...(parsed as Record<string, unknown>) }
+    : parsed;
+  if (
+    root !== null && typeof root === "object" && !Array.isArray(root) &&
+    "projects" in root && !("teams" in root)
+  ) {
+    const { projects, ...rest } = root as Record<string, unknown>;
+    const renamed = { ...rest, teams: projects };
+    try {
+      return decodeConfig(renamed);
+    } catch {
+      return decodeDomainConfig(renamed);
+    }
+  }
+  return decodeDomainConfig(root);
+};
 export const encodeConfigJson = (config: Config): string =>
   `${
     toJsonString(LocalConfigSchema, configToProto(config), { prettySpaces: 2 })

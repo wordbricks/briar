@@ -628,13 +628,13 @@ pub struct LocalConfig {
         LocalManagedComputerConfig,
         ::buffa::Inline<LocalManagedComputerConfig>,
     >,
-    /// Field 8: `projects`
+    /// Field 8: `teams`
     #[serde(
-        rename = "projects",
+        rename = "teams",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
-    pub projects: ::buffa::alloc::vec::Vec<LocalProjectConfig>,
+    pub teams: ::buffa::alloc::vec::Vec<LocalTeamConfig>,
     /// Field 9: `vertex_ai`
     #[serde(
         rename = "vertexAi",
@@ -669,7 +669,7 @@ impl ::core::fmt::Debug for LocalConfig {
             .field("app_settings", &self.app_settings)
             .field("worker_device_identity", &self.worker_device_identity)
             .field("managed_computer", &self.managed_computer)
-            .field("projects", &self.projects)
+            .field("teams", &self.teams)
             .field("vertex_ai", &self.vertex_ai)
             .field("added_providers", &self.added_providers)
             .finish()
@@ -770,7 +770,7 @@ impl ::buffa::Message for LocalConfig {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
-        for v in &self.projects {
+        for v in &self.teams {
             let __slot = __cache.reserve();
             let inner_size = v.compute_size(__cache);
             __cache.set(__slot, inner_size);
@@ -840,7 +840,7 @@ impl ::buffa::Message for LocalConfig {
             );
             self.managed_computer.write_to(__cache, buf);
         }
-        for v in &self.projects {
+        for v in &self.teams {
             ::buffa::types::put_len_delimited_header(
                 8u32,
                 u64::from(__cache.consume_next()),
@@ -963,7 +963,7 @@ impl ::buffa::Message for LocalConfig {
                     ::buffa::__private::element_footprint(&elem),
                 )?;
                 ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
-                self.projects.push(elem);
+                self.teams.push(elem);
             }
             9u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -1002,7 +1002,7 @@ impl ::buffa::Message for LocalConfig {
         self.app_settings = ::buffa::MessageField::none();
         self.worker_device_identity = ::core::option::Option::None;
         self.managed_computer = ::buffa::MessageField::none();
-        self.projects.clear();
+        self.teams.clear();
         self.vertex_ai = ::buffa::MessageField::none();
         self.added_providers = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
@@ -2043,7 +2043,7 @@ pub const __LOCAL_MANAGED_COMPUTER_CONFIG_JSON_ANY: ::buffa::type_registry::Json
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct LocalProjectConfig {
+pub struct LocalTeamConfig {
     /// Field 1: `id`
     #[serde(
         rename = "id",
@@ -2087,8 +2087,8 @@ pub struct LocalProjectConfig {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub llm: ::buffa::MessageField<
-        LocalProjectLlmConfig,
-        ::buffa::Inline<LocalProjectLlmConfig>,
+        LocalTeamLlmConfig,
+        ::buffa::Inline<LocalTeamLlmConfig>,
     >,
     /// Field 7: `auto_hunt`
     #[serde(
@@ -2124,9 +2124,9 @@ pub struct LocalProjectConfig {
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for LocalProjectConfig {
+impl ::core::fmt::Debug for LocalTeamConfig {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("LocalProjectConfig")
+        f.debug_struct("LocalTeamConfig")
             .field("id", &self.id)
             .field("repository_path", &self.repository_path)
             .field("agent_token", &self.agent_token)
@@ -2139,14 +2139,14 @@ impl ::core::fmt::Debug for LocalProjectConfig {
             .finish()
     }
 }
-impl LocalProjectConfig {
+impl LocalTeamConfig {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.local.v1.LocalProjectConfig";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.local.v1.LocalTeamConfig";
 }
-impl LocalProjectConfig {
+impl LocalTeamConfig {
     #[must_use = "with_* setters return `self` by value; assign or chain the result"]
     #[inline]
     ///Sets [`Self::agent_token`] to `Some(value)`, consuming and returning `self`.
@@ -2168,14 +2168,14 @@ impl LocalProjectConfig {
         self
     }
 }
-::buffa::impl_default_instance!(LocalProjectConfig);
-impl ::buffa::MessageName for LocalProjectConfig {
+::buffa::impl_default_instance!(LocalTeamConfig);
+impl ::buffa::MessageName for LocalTeamConfig {
     const PACKAGE: &'static str = "briar.local.v1";
-    const NAME: &'static str = "LocalProjectConfig";
-    const FULL_NAME: &'static str = "briar.local.v1.LocalProjectConfig";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.local.v1.LocalProjectConfig";
+    const NAME: &'static str = "LocalTeamConfig";
+    const FULL_NAME: &'static str = "briar.local.v1.LocalTeamConfig";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.local.v1.LocalTeamConfig";
 }
-impl ::buffa::Message for LocalProjectConfig {
+impl ::buffa::Message for LocalTeamConfig {
     /// Returns the total encoded size in bytes.
     ///
     /// Accumulates in `u64` (which cannot overflow for in-memory
@@ -2416,8 +2416,8 @@ impl ::buffa::Message for LocalProjectConfig {
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for LocalProjectConfig {
-    const PROTO_FQN: &'static str = "briar.local.v1.LocalProjectConfig";
+impl ::buffa::ExtensionSet for LocalTeamConfig {
+    const PROTO_FQN: &'static str = "briar.local.v1.LocalTeamConfig";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -2425,7 +2425,7 @@ impl ::buffa::ExtensionSet for LocalProjectConfig {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for LocalProjectConfig {
+impl ::buffa::json_helpers::ProtoElemJson for LocalTeamConfig {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -2439,16 +2439,16 @@ impl ::buffa::json_helpers::ProtoElemJson for LocalProjectConfig {
     }
 }
 #[doc(hidden)]
-pub const __LOCAL_PROJECT_CONFIG_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.local.v1.LocalProjectConfig",
-    to_json: ::buffa::type_registry::any_to_json::<LocalProjectConfig>,
-    from_json: ::buffa::type_registry::any_from_json::<LocalProjectConfig>,
+pub const __LOCAL_TEAM_CONFIG_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.local.v1.LocalTeamConfig",
+    to_json: ::buffa::type_registry::any_to_json::<LocalTeamConfig>,
+    from_json: ::buffa::type_registry::any_from_json::<LocalTeamConfig>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct LocalProjectLlmConfig {
+pub struct LocalTeamLlmConfig {
     /// Field 1: `provider`
     #[serde(
         rename = "provider",
@@ -2476,9 +2476,9 @@ pub struct LocalProjectLlmConfig {
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for LocalProjectLlmConfig {
+impl ::core::fmt::Debug for LocalTeamLlmConfig {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("LocalProjectLlmConfig")
+        f.debug_struct("LocalTeamLlmConfig")
             .field("provider", &self.provider)
             .field("model", &self.model)
             .field("effort", &self.effort)
@@ -2486,14 +2486,14 @@ impl ::core::fmt::Debug for LocalProjectLlmConfig {
             .finish()
     }
 }
-impl LocalProjectLlmConfig {
+impl LocalTeamLlmConfig {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.local.v1.LocalProjectLlmConfig";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.local.v1.LocalTeamLlmConfig";
 }
-impl LocalProjectLlmConfig {
+impl LocalTeamLlmConfig {
     #[must_use = "with_* setters return `self` by value; assign or chain the result"]
     #[inline]
     ///Sets [`Self::provider`] to `Some(value)`, consuming and returning `self`.
@@ -2535,14 +2535,14 @@ impl LocalProjectLlmConfig {
         self
     }
 }
-::buffa::impl_default_instance!(LocalProjectLlmConfig);
-impl ::buffa::MessageName for LocalProjectLlmConfig {
+::buffa::impl_default_instance!(LocalTeamLlmConfig);
+impl ::buffa::MessageName for LocalTeamLlmConfig {
     const PACKAGE: &'static str = "briar.local.v1";
-    const NAME: &'static str = "LocalProjectLlmConfig";
-    const FULL_NAME: &'static str = "briar.local.v1.LocalProjectLlmConfig";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.local.v1.LocalProjectLlmConfig";
+    const NAME: &'static str = "LocalTeamLlmConfig";
+    const FULL_NAME: &'static str = "briar.local.v1.LocalTeamLlmConfig";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.local.v1.LocalTeamLlmConfig";
 }
-impl ::buffa::Message for LocalProjectLlmConfig {
+impl ::buffa::Message for LocalTeamLlmConfig {
     /// Returns the total encoded size in bytes.
     ///
     /// Accumulates in `u64` (which cannot overflow for in-memory
@@ -2655,8 +2655,8 @@ impl ::buffa::Message for LocalProjectLlmConfig {
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for LocalProjectLlmConfig {
-    const PROTO_FQN: &'static str = "briar.local.v1.LocalProjectLlmConfig";
+impl ::buffa::ExtensionSet for LocalTeamLlmConfig {
+    const PROTO_FQN: &'static str = "briar.local.v1.LocalTeamLlmConfig";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -2664,7 +2664,7 @@ impl ::buffa::ExtensionSet for LocalProjectLlmConfig {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for LocalProjectLlmConfig {
+impl ::buffa::json_helpers::ProtoElemJson for LocalTeamLlmConfig {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -2678,10 +2678,10 @@ impl ::buffa::json_helpers::ProtoElemJson for LocalProjectLlmConfig {
     }
 }
 #[doc(hidden)]
-pub const __LOCAL_PROJECT_LLM_CONFIG_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.local.v1.LocalProjectLlmConfig",
-    to_json: ::buffa::type_registry::any_to_json::<LocalProjectLlmConfig>,
-    from_json: ::buffa::type_registry::any_from_json::<LocalProjectLlmConfig>,
+pub const __LOCAL_TEAM_LLM_CONFIG_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.local.v1.LocalTeamLlmConfig",
+    to_json: ::buffa::type_registry::any_to_json::<LocalTeamLlmConfig>,
+    from_json: ::buffa::type_registry::any_from_json::<LocalTeamLlmConfig>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
@@ -8695,10 +8695,10 @@ pub mod __buffa {
             pub managed_computer: ::buffa::MessageFieldView<
                 super::super::__buffa::view::LocalManagedComputerConfigView<'a>,
             >,
-            /// Field 8: `projects`
-            pub projects: ::buffa::RepeatedView<
+            /// Field 8: `teams`
+            pub teams: ::buffa::RepeatedView<
                 'a,
-                super::super::__buffa::view::LocalProjectConfigView<'a>,
+                super::super::__buffa::view::LocalTeamConfigView<'a>,
             >,
             /// Field 9: `vertex_ai`
             pub vertex_ai: ::buffa::MessageFieldView<
@@ -8908,12 +8908,12 @@ pub mod __buffa {
                         let sub = ::buffa::types::borrow_bytes(&mut cur)?;
                         ctx.register_element_memory(
                             ::core::mem::size_of::<
-                                super::super::__buffa::view::LocalProjectConfigView,
+                                super::super::__buffa::view::LocalTeamConfigView,
                             >(),
                         )?;
-                        view.projects
+                        view.teams
                             .push(
-                                <super::super::__buffa::view::LocalProjectConfigView as ::buffa::MessageView>::decode_view_ctx(
+                                <super::super::__buffa::view::LocalTeamConfigView as ::buffa::MessageView>::decode_view_ctx(
                                     sub,
                                     __sub_ctx,
                                 )?,
@@ -8981,8 +8981,8 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
-                    projects: self
-                        .projects
+                    teams: self
+                        .teams
                         .iter()
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
@@ -9056,7 +9056,7 @@ pub mod __buffa {
                         += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                             + inner_size as u64;
                 }
-                for v in &self.projects {
+                for v in &self.teams {
                     let __slot = __cache.reserve();
                     let inner_size = v.compute_size(__cache);
                     __cache.set(__slot, inner_size);
@@ -9127,7 +9127,7 @@ pub mod __buffa {
                     );
                     self.managed_computer.write_to(__cache, buf);
                 }
-                for v in &self.projects {
+                for v in &self.teams {
                     ::buffa::types::put_len_delimited_header(
                         8u32,
                         u64::from(__cache.consume_next()),
@@ -9208,8 +9208,8 @@ pub mod __buffa {
                         __map.serialize_entry("managedComputer", __v)?;
                     }
                 }
-                if !self.projects.is_empty() {
-                    __map.serialize_entry("projects", &*self.projects)?;
+                if !self.teams.is_empty() {
+                    __map.serialize_entry("teams", &*self.teams)?;
                 }
                 {
                     if let ::core::option::Option::Some(__v) = self.vertex_ai.as_option()
@@ -9365,15 +9365,15 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().managed_computer
             }
-            /// Field 8: `projects`
+            /// Field 8: `teams`
             #[must_use]
-            pub fn projects(
+            pub fn teams(
                 &self,
             ) -> &::buffa::RepeatedView<
                 '_,
-                super::super::__buffa::view::LocalProjectConfigView<'_>,
+                super::super::__buffa::view::LocalTeamConfigView<'_>,
             > {
-                &self.0.reborrow().projects
+                &self.0.reborrow().teams
             }
             /// Field 9: `vertex_ai`
             #[must_use]
@@ -11182,7 +11182,7 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
-        pub struct LocalProjectConfigView<'a> {
+        pub struct LocalTeamConfigView<'a> {
             /// Field 1: `id`
             pub id: &'a str,
             /// Field 2: `repository_path`
@@ -11195,7 +11195,7 @@ pub mod __buffa {
             pub repository_remote: ::core::option::Option<&'a str>,
             /// Field 6: `llm`
             pub llm: ::buffa::MessageFieldView<
-                super::super::__buffa::view::LocalProjectLlmConfigView<'a>,
+                super::super::__buffa::view::LocalTeamLlmConfigView<'a>,
             >,
             /// Field 7: `auto_hunt`
             pub auto_hunt: ::buffa::MessageFieldView<
@@ -11211,8 +11211,8 @@ pub mod __buffa {
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a> for LocalProjectConfigView<'a> {
-            type Owned = super::super::LocalProjectConfig;
+        impl<'a> ::buffa::MessageView<'a> for LocalTeamConfigView<'a> {
+            type Owned = super::super::LocalTeamConfig;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -11297,7 +11297,7 @@ pub mod __buffa {
                             }
                             None => {
                                 view.llm = ::buffa::MessageFieldView::set(
-                                    <super::super::__buffa::view::LocalProjectLlmConfigView as ::buffa::MessageView>::decode_view_ctx(
+                                    <super::super::__buffa::view::LocalTeamLlmConfigView as ::buffa::MessageView>::decode_view_ctx(
                                         sub,
                                         __sub_ctx,
                                     )?,
@@ -11392,7 +11392,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::LocalProjectConfig,
+                super::super::LocalTeamConfig,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -11402,13 +11402,13 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::LocalProjectConfig,
+                super::super::LocalTeamConfig,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::LocalProjectConfig {
+                ::core::result::Result::Ok(super::super::LocalTeamConfig {
                     id: self.id.to_string(),
                     repository_path: self.repository_path.to_string(),
                     agent_token: self.agent_token.map(|s| s.to_string()),
@@ -11417,8 +11417,8 @@ pub mod __buffa {
                     llm: match self.llm.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
-                                super::super::LocalProjectLlmConfig,
-                                ::buffa::Inline<super::super::LocalProjectLlmConfig>,
+                                super::super::LocalTeamLlmConfig,
+                                ::buffa::Inline<super::super::LocalTeamLlmConfig>,
                             >::some(v.to_owned_from_source(__buffa_src)?)
                         }
                         None => ::buffa::MessageField::none(),
@@ -11458,7 +11458,7 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a> for LocalProjectConfigView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for LocalTeamConfigView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
@@ -11588,7 +11588,7 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for LocalProjectConfigView<'__a> {
+        impl<'__a> ::serde::Serialize for LocalTeamConfigView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -11640,24 +11640,24 @@ pub mod __buffa {
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for LocalProjectConfigView<'a> {
+        impl<'a> ::buffa::MessageName for LocalTeamConfigView<'a> {
             const PACKAGE: &'static str = "briar.local.v1";
-            const NAME: &'static str = "LocalProjectConfig";
-            const FULL_NAME: &'static str = "briar.local.v1.LocalProjectConfig";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.local.v1.LocalProjectConfig";
+            const NAME: &'static str = "LocalTeamConfig";
+            const FULL_NAME: &'static str = "briar.local.v1.LocalTeamConfig";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.local.v1.LocalTeamConfig";
         }
-        ::buffa::impl_default_view_instance!(LocalProjectConfigView);
-        ::buffa::impl_view_reborrow!(LocalProjectConfigView);
-        /** Self-contained, `'static` owned view of a `LocalProjectConfig` message.
+        ::buffa::impl_default_view_instance!(LocalTeamConfigView);
+        ::buffa::impl_view_reborrow!(LocalTeamConfigView);
+        /** Self-contained, `'static` owned view of a `LocalTeamConfig` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`LocalProjectConfigView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`LocalTeamConfigView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`LocalProjectConfigView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`LocalTeamConfigView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct LocalProjectConfigOwnedView(
-            ::buffa::OwnedView<LocalProjectConfigView<'static>>,
+        pub struct LocalTeamConfigOwnedView(
+            ::buffa::OwnedView<LocalTeamConfigView<'static>>,
         );
-        impl LocalProjectConfigOwnedView {
+        impl LocalTeamConfigOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -11671,7 +11671,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    LocalProjectConfigOwnedView(::buffa::OwnedView::decode(bytes)?),
+                    LocalTeamConfigOwnedView(::buffa::OwnedView::decode(bytes)?),
                 )
             }
             /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
@@ -11686,7 +11686,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    LocalProjectConfigOwnedView(
+                    LocalTeamConfigOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -11700,15 +11700,15 @@ pub mod __buffa {
             /// another [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::LocalProjectConfig,
+                msg: &super::super::LocalTeamConfig,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    LocalProjectConfigOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                    LocalTeamConfigOwnedView(::buffa::OwnedView::from_owned(msg)?),
                 )
             }
-            /// Borrow the full [`LocalProjectConfigView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`LocalTeamConfigView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &LocalProjectConfigView<'_> {
+            pub fn view(&self) -> &LocalTeamConfigView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -11719,7 +11719,7 @@ pub mod __buffa {
             /// whose contract also governs handles converted from a raw
             /// [`::buffa::OwnedView`].
             #[must_use]
-            pub fn to_owned_message(&self) -> super::super::LocalProjectConfig {
+            pub fn to_owned_message(&self) -> super::super::LocalTeamConfig {
                 self.0.to_owned_message()
             }
             /// The underlying bytes buffer.
@@ -11762,7 +11762,7 @@ pub mod __buffa {
             pub fn llm(
                 &self,
             ) -> &::buffa::MessageFieldView<
-                super::super::__buffa::view::LocalProjectLlmConfigView<'_>,
+                super::super::__buffa::view::LocalTeamLlmConfigView<'_>,
             > {
                 &self.0.reborrow().llm
             }
@@ -11794,29 +11794,29 @@ pub mod __buffa {
                 &self.0.reborrow().active_claim
             }
         }
-        impl ::core::convert::From<::buffa::OwnedView<LocalProjectConfigView<'static>>>
-        for LocalProjectConfigOwnedView {
-            fn from(inner: ::buffa::OwnedView<LocalProjectConfigView<'static>>) -> Self {
-                LocalProjectConfigOwnedView(inner)
+        impl ::core::convert::From<::buffa::OwnedView<LocalTeamConfigView<'static>>>
+        for LocalTeamConfigOwnedView {
+            fn from(inner: ::buffa::OwnedView<LocalTeamConfigView<'static>>) -> Self {
+                LocalTeamConfigOwnedView(inner)
             }
         }
-        impl ::core::convert::From<LocalProjectConfigOwnedView>
-        for ::buffa::OwnedView<LocalProjectConfigView<'static>> {
-            fn from(wrapper: LocalProjectConfigOwnedView) -> Self {
+        impl ::core::convert::From<LocalTeamConfigOwnedView>
+        for ::buffa::OwnedView<LocalTeamConfigView<'static>> {
+            fn from(wrapper: LocalTeamConfigOwnedView) -> Self {
                 wrapper.0
             }
         }
-        impl ::core::convert::AsRef<::buffa::OwnedView<LocalProjectConfigView<'static>>>
-        for LocalProjectConfigOwnedView {
-            fn as_ref(&self) -> &::buffa::OwnedView<LocalProjectConfigView<'static>> {
+        impl ::core::convert::AsRef<::buffa::OwnedView<LocalTeamConfigView<'static>>>
+        for LocalTeamConfigOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<LocalTeamConfigView<'static>> {
                 &self.0
             }
         }
-        impl ::buffa::HasMessageView for super::super::LocalProjectConfig {
-            type View<'a> = LocalProjectConfigView<'a>;
-            type ViewHandle = LocalProjectConfigOwnedView;
+        impl ::buffa::HasMessageView for super::super::LocalTeamConfig {
+            type View<'a> = LocalTeamConfigView<'a>;
+            type ViewHandle = LocalTeamConfigOwnedView;
         }
-        impl ::serde::Serialize for LocalProjectConfigOwnedView {
+        impl ::serde::Serialize for LocalTeamConfigOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -11825,7 +11825,7 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
-        pub struct LocalProjectLlmConfigView<'a> {
+        pub struct LocalTeamLlmConfigView<'a> {
             /// Field 1: `provider`
             pub provider: ::core::option::Option<
                 ::buffa::EnumValue<super::super::super::super::types::v1::AgentProvider>,
@@ -11840,8 +11840,8 @@ pub mod __buffa {
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a> for LocalProjectLlmConfigView<'a> {
-            type Owned = super::super::LocalProjectLlmConfig;
+        impl<'a> ::buffa::MessageView<'a> for LocalTeamLlmConfigView<'a> {
+            type Owned = super::super::LocalTeamLlmConfig;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -11920,7 +11920,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::LocalProjectLlmConfig,
+                super::super::LocalTeamLlmConfig,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -11930,13 +11930,13 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::LocalProjectLlmConfig,
+                super::super::LocalTeamLlmConfig,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::LocalProjectLlmConfig {
+                ::core::result::Result::Ok(super::super::LocalTeamLlmConfig {
                     provider: self.provider,
                     model: self.model.map(|s| s.to_string()),
                     effort: self.effort.map(|s| s.to_string()),
@@ -11949,7 +11949,7 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a> for LocalProjectLlmConfigView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for LocalTeamLlmConfigView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
@@ -12004,7 +12004,7 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for LocalProjectLlmConfigView<'__a> {
+        impl<'__a> ::serde::Serialize for LocalTeamLlmConfigView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -12026,24 +12026,24 @@ pub mod __buffa {
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for LocalProjectLlmConfigView<'a> {
+        impl<'a> ::buffa::MessageName for LocalTeamLlmConfigView<'a> {
             const PACKAGE: &'static str = "briar.local.v1";
-            const NAME: &'static str = "LocalProjectLlmConfig";
-            const FULL_NAME: &'static str = "briar.local.v1.LocalProjectLlmConfig";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.local.v1.LocalProjectLlmConfig";
+            const NAME: &'static str = "LocalTeamLlmConfig";
+            const FULL_NAME: &'static str = "briar.local.v1.LocalTeamLlmConfig";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.local.v1.LocalTeamLlmConfig";
         }
-        ::buffa::impl_default_view_instance!(LocalProjectLlmConfigView);
-        ::buffa::impl_view_reborrow!(LocalProjectLlmConfigView);
-        /** Self-contained, `'static` owned view of a `LocalProjectLlmConfig` message.
+        ::buffa::impl_default_view_instance!(LocalTeamLlmConfigView);
+        ::buffa::impl_view_reborrow!(LocalTeamLlmConfigView);
+        /** Self-contained, `'static` owned view of a `LocalTeamLlmConfig` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`LocalProjectLlmConfigView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`LocalTeamLlmConfigView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`LocalProjectLlmConfigView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`LocalTeamLlmConfigView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct LocalProjectLlmConfigOwnedView(
-            ::buffa::OwnedView<LocalProjectLlmConfigView<'static>>,
+        pub struct LocalTeamLlmConfigOwnedView(
+            ::buffa::OwnedView<LocalTeamLlmConfigView<'static>>,
         );
-        impl LocalProjectLlmConfigOwnedView {
+        impl LocalTeamLlmConfigOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -12057,7 +12057,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    LocalProjectLlmConfigOwnedView(::buffa::OwnedView::decode(bytes)?),
+                    LocalTeamLlmConfigOwnedView(::buffa::OwnedView::decode(bytes)?),
                 )
             }
             /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
@@ -12072,7 +12072,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    LocalProjectLlmConfigOwnedView(
+                    LocalTeamLlmConfigOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -12086,15 +12086,15 @@ pub mod __buffa {
             /// another [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::LocalProjectLlmConfig,
+                msg: &super::super::LocalTeamLlmConfig,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    LocalProjectLlmConfigOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                    LocalTeamLlmConfigOwnedView(::buffa::OwnedView::from_owned(msg)?),
                 )
             }
-            /// Borrow the full [`LocalProjectLlmConfigView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`LocalTeamLlmConfigView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &LocalProjectLlmConfigView<'_> {
+            pub fn view(&self) -> &LocalTeamLlmConfigView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -12105,7 +12105,7 @@ pub mod __buffa {
             /// whose contract also governs handles converted from a raw
             /// [`::buffa::OwnedView`].
             #[must_use]
-            pub fn to_owned_message(&self) -> super::super::LocalProjectLlmConfig {
+            pub fn to_owned_message(&self) -> super::super::LocalTeamLlmConfig {
                 self.0.to_owned_message()
             }
             /// The underlying bytes buffer.
@@ -12147,33 +12147,29 @@ pub mod __buffa {
                 self.0.reborrow().approval_policy
             }
         }
-        impl ::core::convert::From<
-            ::buffa::OwnedView<LocalProjectLlmConfigView<'static>>,
-        > for LocalProjectLlmConfigOwnedView {
-            fn from(
-                inner: ::buffa::OwnedView<LocalProjectLlmConfigView<'static>>,
-            ) -> Self {
-                LocalProjectLlmConfigOwnedView(inner)
+        impl ::core::convert::From<::buffa::OwnedView<LocalTeamLlmConfigView<'static>>>
+        for LocalTeamLlmConfigOwnedView {
+            fn from(inner: ::buffa::OwnedView<LocalTeamLlmConfigView<'static>>) -> Self {
+                LocalTeamLlmConfigOwnedView(inner)
             }
         }
-        impl ::core::convert::From<LocalProjectLlmConfigOwnedView>
-        for ::buffa::OwnedView<LocalProjectLlmConfigView<'static>> {
-            fn from(wrapper: LocalProjectLlmConfigOwnedView) -> Self {
+        impl ::core::convert::From<LocalTeamLlmConfigOwnedView>
+        for ::buffa::OwnedView<LocalTeamLlmConfigView<'static>> {
+            fn from(wrapper: LocalTeamLlmConfigOwnedView) -> Self {
                 wrapper.0
             }
         }
-        impl ::core::convert::AsRef<
-            ::buffa::OwnedView<LocalProjectLlmConfigView<'static>>,
-        > for LocalProjectLlmConfigOwnedView {
-            fn as_ref(&self) -> &::buffa::OwnedView<LocalProjectLlmConfigView<'static>> {
+        impl ::core::convert::AsRef<::buffa::OwnedView<LocalTeamLlmConfigView<'static>>>
+        for LocalTeamLlmConfigOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<LocalTeamLlmConfigView<'static>> {
                 &self.0
             }
         }
-        impl ::buffa::HasMessageView for super::super::LocalProjectLlmConfig {
-            type View<'a> = LocalProjectLlmConfigView<'a>;
-            type ViewHandle = LocalProjectLlmConfigOwnedView;
+        impl ::buffa::HasMessageView for super::super::LocalTeamLlmConfig {
+            type View<'a> = LocalTeamLlmConfigView<'a>;
+            type ViewHandle = LocalTeamLlmConfigOwnedView;
         }
-        impl ::serde::Serialize for LocalProjectLlmConfigOwnedView {
+        impl ::serde::Serialize for LocalTeamLlmConfigOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -21580,8 +21576,8 @@ pub mod __buffa {
         reg.register_json_any(super::__LOCAL_VERTEX_AI_CREDENTIAL_JSON_ANY);
         reg.register_json_any(super::__LOCAL_APP_SETTINGS_JSON_ANY);
         reg.register_json_any(super::__LOCAL_MANAGED_COMPUTER_CONFIG_JSON_ANY);
-        reg.register_json_any(super::__LOCAL_PROJECT_CONFIG_JSON_ANY);
-        reg.register_json_any(super::__LOCAL_PROJECT_LLM_CONFIG_JSON_ANY);
+        reg.register_json_any(super::__LOCAL_TEAM_CONFIG_JSON_ANY);
+        reg.register_json_any(super::__LOCAL_TEAM_LLM_CONFIG_JSON_ANY);
         reg.register_json_any(super::__LOCAL_AUTO_HUNT_CONFIG_JSON_ANY);
         reg.register_json_any(super::__LOCAL_WORKTREE_CONFIG_JSON_ANY);
         reg.register_json_any(super::__LOCAL_SANDBOX_CONFIG_JSON_ANY);
@@ -21629,13 +21625,13 @@ pub use self::__buffa::view::LocalManagedComputerConfigView;
 #[doc(inline)]
 pub use self::__buffa::view::LocalManagedComputerConfigOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::LocalProjectConfigView;
+pub use self::__buffa::view::LocalTeamConfigView;
 #[doc(inline)]
-pub use self::__buffa::view::LocalProjectConfigOwnedView;
+pub use self::__buffa::view::LocalTeamConfigOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::LocalProjectLlmConfigView;
+pub use self::__buffa::view::LocalTeamLlmConfigView;
 #[doc(inline)]
-pub use self::__buffa::view::LocalProjectLlmConfigOwnedView;
+pub use self::__buffa::view::LocalTeamLlmConfigOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::LocalAutoHuntConfigView;
 #[doc(inline)]

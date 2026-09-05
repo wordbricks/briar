@@ -54,7 +54,7 @@ import { briarIssueUrl } from "./github-pr";
 import {
   decodeConfigJson,
   type Config,
-  type ProjectConfig,
+  type TeamConfig,
 } from "./config-contract";
 import {
   type ClaimedRun,
@@ -145,7 +145,7 @@ function detachedReplyAgent(input: {
 
 async function runClaimedIssue(
   config: Config,
-  project: ProjectConfig,
+  project: TeamConfig,
   issue: ClaimedRun,
   workerToken: string,
   signal: AbortSignal,
@@ -153,7 +153,7 @@ async function runClaimedIssue(
 ) {
   const runtimeDirectory = issueWorkerSessionDirectory(configDirectory, issue);
   const runtimeConfig = structuredClone(config);
-  runtimeConfig.projects = runtimeConfig.projects.map((candidate) =>
+  runtimeConfig.teams = runtimeConfig.teams.map((candidate) =>
     candidate.id === project.id
       ? {
           ...candidate,
@@ -184,7 +184,7 @@ async function runClaimedIssue(
 
 async function runClaimedIssueInRuntime(
   config: Config,
-  project: ProjectConfig,
+  project: TeamConfig,
   issue: ClaimedRun,
   workerToken: string,
   signal: AbortSignal,
@@ -203,7 +203,7 @@ async function runClaimedIssueInRuntime(
     throw new Error("이 실행에 사용할 프로바이더가 지정되지 않았습니다.");
   }
   const activeProject =
-    config.projects.find((candidate) => candidate.id === project.id) ?? project;
+    config.teams.find((candidate) => candidate.id === project.id) ?? project;
   const executionRpc = createAuthenticatedWorkerExecutionClient(
     config.apiUrl,
     workerToken,
@@ -294,7 +294,7 @@ async function runClaimedIssueInRuntime(
     PATH: workerExecutionPath(),
     BRIAR_CLI: workerCliPath(),
     BRIAR_WORKER_TOKEN: workerToken,
-    BRIAR_PROJECT_ID: project.id,
+    BRIAR_TEAM_ID: project.id,
     BRIAR_CONFIG_HOME: runtimeDirectory,
   });
 
@@ -406,7 +406,7 @@ async function runClaimedIssueInRuntime(
         await readFile(join(runtimeDirectory, "config.json"), "utf8"),
       );
       const disposition = detachedRunDisposition(
-        runtimeConfig.projects.find((candidate) => candidate.id === project.id)
+        runtimeConfig.teams.find((candidate) => candidate.id === project.id)
           ?.activeClaim,
         issue.runId,
       );
@@ -508,7 +508,7 @@ async function runClaimedIssueInRuntime(
           const runtimeConfig = decodeConfigJson(
             await readFile(join(runtimeDirectory, "config.json"), "utf8"),
           );
-          const runtimeClaim = runtimeConfig.projects.find(
+          const runtimeClaim = runtimeConfig.teams.find(
             (candidate) => candidate.id === project.id,
           )?.activeClaim;
           if (

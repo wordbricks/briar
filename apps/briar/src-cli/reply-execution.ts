@@ -96,7 +96,7 @@ import {
 } from "./organization-agent-context";
 import {
   type Config,
-  type ProjectConfig,
+  type TeamConfig,
 } from "./config-contract";
 import {
   type ClaimedChannelReply,
@@ -124,7 +124,7 @@ import {
 
 async function runClaimedProjectAgentTask(
   config: Config,
-  project: ProjectConfig,
+  project: TeamConfig,
   task: ClaimedProjectAgentTask,
   workerToken: string,
   workerId: string,
@@ -214,7 +214,7 @@ async function runClaimedProjectAgentTask(
             PATH: workerExecutionPath(),
             BRIAR_CLI: workerCliPath(),
             BRIAR_WORKER_TOKEN: workerToken,
-            BRIAR_PROJECT_ID: project.id,
+            BRIAR_TEAM_ID: project.id,
           }),
           signal,
           onConversationId: (nextConversationId) => {
@@ -268,7 +268,7 @@ async function runClaimedProjectAgentTask(
 
 async function runClaimedIssueReply(
   config: Config,
-  project: ProjectConfig,
+  project: TeamConfig,
   issue: ClaimedIssueReply,
   workerToken: string,
   signal: AbortSignal,
@@ -476,7 +476,7 @@ async function runClaimedIssueReply(
             PATH: workerExecutionPath(),
             BRIAR_CLI: workerCliPath(),
             BRIAR_WORKER_TOKEN: workerToken,
-            BRIAR_PROJECT_ID: project.id,
+            BRIAR_TEAM_ID: project.id,
           }),
           signal,
           diagnosticContext: {
@@ -589,7 +589,7 @@ async function runClaimedIssueReply(
 
 async function failClaimedIssueReply(
   config: Config,
-  project: ProjectConfig,
+  project: TeamConfig,
   issue: ClaimedIssueReply,
   workerToken: string,
   error: unknown,
@@ -612,7 +612,7 @@ async function failClaimedIssueReply(
 
 async function runClaimedChannelReply(
   config: Config,
-  project: ProjectConfig,
+  project: TeamConfig,
   reply: ClaimedChannelReply,
   workerToken: string,
   signal: AbortSignal,
@@ -894,7 +894,7 @@ async function runClaimedChannelReply(
           PATH: workerExecutionPath(),
           BRIAR_CLI: workerCliPath(),
           BRIAR_WORKER_TOKEN: workerToken,
-          BRIAR_PROJECT_ID: project.id,
+          BRIAR_TEAM_ID: project.id,
         }),
         signal: invocationSignal,
         diagnosticContext: {
@@ -1099,7 +1099,7 @@ async function runClaimedChannelReply(
 
 async function failClaimedChannelReply(
   config: Config,
-  project: ProjectConfig,
+  project: TeamConfig,
   reply: ClaimedChannelReply,
   workerToken: string,
   error: unknown,

@@ -258,7 +258,7 @@ pub(super) fn maintain_expired_auto_hunt_worktrees(
     let config = read_cli_config(config_path)?;
     let execution_path = cli_execution_path(home)?;
     let mut errors = Vec::new();
-    for project in &config.projects {
+    for project in &config.teams {
         let project_id = project.id.clone();
         let api_url = project.api_url.clone();
         let runtime = connected_project_runtime(config_path, &project_id, home).and_then(
@@ -704,7 +704,7 @@ pub(super) async fn start_project_auto_hunt(
         let (runner, workspace) =
             connected_project_runtime(&config_path, &project_id, &home)?;
         let agent_token = read_cli_config(&config_path)?
-            .projects
+            .teams
             .into_iter()
             .find(|project| project.id == project_id)
             .map(|project| project.agent_token)

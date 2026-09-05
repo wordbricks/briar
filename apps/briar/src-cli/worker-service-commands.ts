@@ -19,11 +19,11 @@ import { createWorkerControlClient } from "./worker-control-client";
 
 async function workerStatus() {
   const config = await loadConfig();
-  const project = value("--project")
-    ? config.projects.find((candidate) => candidate.id === value("--project"))
+  const project = value("--team")
+    ? config.teams.find((candidate) => candidate.id === value("--team"))
     : await currentProject(config);
   if (!project) {
-    throw new Error("이 컴퓨터에 연결된 프로젝트를 찾지 못했습니다.");
+    throw new Error("이 컴퓨터에 연결된 팀을 찾지 못했습니다.");
   }
   const definition = serviceDefinition({
     projectId: project.id,
@@ -52,7 +52,7 @@ async function workerStatus() {
 
 async function workerRestartServices() {
   const config = await loadConfig();
-  const projects = config.projects.filter((project) => {
+  const projects = config.teams.filter((project) => {
     if (!project.executionWorker) return false;
     const definition = serviceDefinition({
       projectId: project.id,
@@ -113,7 +113,7 @@ async function workerRestartServices() {
     await Bun.sleep(500);
   }
 
-  const definitions = config.projects
+  const definitions = config.teams
     .filter((project) => Boolean(project.executionWorker))
     .map((project) =>
       serviceDefinition({
@@ -141,11 +141,11 @@ async function workerRestartServices() {
 
 async function workerService(action: "install" | "uninstall") {
   const config = await loadConfig();
-  const project = value("--project")
-    ? config.projects.find((candidate) => candidate.id === value("--project"))
+  const project = value("--team")
+    ? config.teams.find((candidate) => candidate.id === value("--team"))
     : await currentProject(config);
   if (!project) {
-    throw new Error("이 컴퓨터에 연결된 프로젝트를 찾지 못했습니다.");
+    throw new Error("이 컴퓨터에 연결된 팀을 찾지 못했습니다.");
   }
   if (action === "install" && !project.executionWorker) {
     throw new Error(

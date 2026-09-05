@@ -12,7 +12,7 @@ type ManagedWorkerChild = {
 export function managedWorkerProjectIds(config: Config) {
   const managed = config.managedComputer;
   if (!managed) return [];
-  return config.projects
+  return config.teams
     .filter((project) =>
       project.executionWorker?.deviceId === managed.deviceId &&
       project.executionWorker.organizationId === managed.organizationId
@@ -28,13 +28,13 @@ export function managedWorkerProcessCommand(
   const configured = environment.BRIAR_CLI?.trim();
   if (configured) {
     if (!isAbsolute(configured)) throw new Error("BRIAR_CLI must be absolute");
-    return [configured, "worker", "--project", projectId];
+    return [configured, "worker", "--team", projectId];
   }
   const entry = process.argv[1];
   if (!entry || !isAbsolute(entry)) {
     throw new Error("Unable to resolve the Briar CLI entry point");
   }
-  return [process.execPath, entry, "worker", "--project", projectId];
+  return [process.execPath, entry, "worker", "--team", projectId];
 }
 
 const pollInterval = () => {
@@ -111,7 +111,7 @@ export async function runWorkerSupervisor(options: WorkerSupervisorOptions) {
             env: {
               ...process.env,
               BRIAR_API_URL: config.apiUrl,
-              BRIAR_PROJECT_ID: projectId,
+              BRIAR_TEAM_ID: projectId,
               ...options.childEnvironment(config, projectId),
             },
           });

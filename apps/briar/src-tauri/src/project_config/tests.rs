@@ -249,7 +249,7 @@ fn writes_cli_connection_without_losing_non_auth_config() {
     let new_project_id = "33333333-3333-4333-8333-333333333333";
     let config = LocalConfig {
         user_token: Some("existing-user-token".to_string()),
-        projects: vec![LocalProjectConfig {
+        teams: vec![LocalTeamConfig {
             id: existing_project_id.to_string(),
             repository_path: "/existing/repository".to_string(),
             api_url: "https://old.example.com".to_string(),
@@ -305,27 +305,24 @@ fn writes_cli_connection_without_losing_non_auth_config() {
     .expect("saved config should be valid json");
     assert_eq!(saved["apiUrl"], "https://briar.example.com");
     assert!(saved["userToken"].is_null());
-    assert_eq!(saved["projects"].as_array().map(Vec::len), Some(2));
-    assert_eq!(saved["projects"][0]["autoHunt"]["linear"]["enabled"], true);
-    assert_eq!(saved["projects"][1]["apiUrl"], "https://briar.example.com");
-    assert_eq!(saved["projects"][1]["id"], new_project_id);
-    assert_eq!(saved["projects"][1]["repositoryPath"], "/new/repository");
+    assert_eq!(saved["teams"].as_array().map(Vec::len), Some(2));
+    assert_eq!(saved["teams"][0]["autoHunt"]["linear"]["enabled"], true);
+    assert_eq!(saved["teams"][1]["apiUrl"], "https://briar.example.com");
+    assert_eq!(saved["teams"][1]["id"], new_project_id);
+    assert_eq!(saved["teams"][1]["repositoryPath"], "/new/repository");
     assert_eq!(
-        saved["projects"][1]["llm"]["approvalPolicy"],
+        saved["teams"][1]["llm"]["approvalPolicy"],
         "LOCAL_APPROVAL_POLICY_NEVER"
     );
-    assert!(saved["projects"][1]["autoHunt"]["linear"]["enabled"].is_null());
+    assert!(saved["teams"][1]["autoHunt"]["linear"]["enabled"].is_null());
+    assert_eq!(saved["teams"][1]["autoHunt"]["sandbox"]["fullAccess"], true);
     assert_eq!(
-        saved["projects"][1]["autoHunt"]["sandbox"]["fullAccess"],
-        true
-    );
-    assert_eq!(
-        saved["projects"][1]["autoHunt"]["workflow"]["stages"]
+        saved["teams"][1]["autoHunt"]["workflow"]["stages"]
             .as_array()
             .map(Vec::len),
         Some(1)
     );
-    assert!(saved["projects"][1]["autoHunt"]["linearEnabled"].is_null());
+    assert!(saved["teams"][1]["autoHunt"]["linearEnabled"].is_null());
 
     fs::remove_dir_all(config_path.parent().expect("config should have a parent"))
         .expect("test config directory should be removed");
@@ -336,7 +333,7 @@ fn removes_only_the_selected_cli_connection() {
     let config_path = test_config_path("disconnect");
     let keep = "22222222-2222-4222-8222-222222222222";
     let delete = "33333333-3333-4333-8333-333333333333";
-    let project = |id: &str, path: &str, token: &str| LocalProjectConfig {
+    let project = |id: &str, path: &str, token: &str| LocalTeamConfig {
         id: id.to_string(),
         repository_path: path.to_string(),
         api_url: "https://briar.example.com".to_string(),
@@ -344,7 +341,7 @@ fn removes_only_the_selected_cli_connection() {
         ..Default::default()
     };
     let config = LocalConfig {
-        projects: vec![
+        teams: vec![
             project(keep, "/keep", "briar_agent_keep"),
             project(delete, "/delete", "briar_agent_delete"),
         ],
@@ -357,8 +354,8 @@ fn removes_only_the_selected_cli_connection() {
         &fs::read_to_string(&config_path).expect("saved config should be readable"),
     )
     .expect("saved config should be valid json");
-    assert_eq!(saved["projects"].as_array().map(Vec::len), Some(1));
-    assert_eq!(saved["projects"][0]["id"], keep);
+    assert_eq!(saved["teams"].as_array().map(Vec::len), Some(1));
+    assert_eq!(saved["teams"][0]["id"], keep);
 
     fs::remove_dir_all(config_path.parent().expect("config should have a parent"))
         .expect("test config directory should be removed");
@@ -421,13 +418,13 @@ fn stores_project_settings_as_canonical_protojson() {
         "LOCAL_BROWSER_AUTOMATION_PROVIDER_ASIDE"
     );
     assert_eq!(
-        saved["projects"][0]["llm"]["provider"],
+        saved["teams"][0]["llm"]["provider"],
         "AGENT_PROVIDER_CLAUDE"
     );
-    assert_eq!(saved["projects"][0]["llm"]["model"], "sonnet");
-    assert_eq!(saved["projects"][0]["llm"]["effort"], "high");
+    assert_eq!(saved["teams"][0]["llm"]["model"], "sonnet");
+    assert_eq!(saved["teams"][0]["llm"]["effort"], "high");
     assert_eq!(
-        saved["projects"][0]["llm"]["approvalPolicy"],
+        saved["teams"][0]["llm"]["approvalPolicy"],
         "LOCAL_APPROVAL_POLICY_ON_REQUEST"
     );
 
@@ -643,11 +640,11 @@ fn updates_the_connected_project_workflow_locally() {
     )
     .expect("saved config should be json");
     assert_eq!(
-        saved["projects"][0]["autoHunt"]["workflow"]["stages"][0]["checks"][0],
+        saved["teams"][0]["autoHunt"]["workflow"]["stages"][0]["checks"][0],
         "cargo test"
     );
     assert_eq!(
-        saved["projects"][0]["autoHunt"]["workflow"]["requirements"][0]["tool"],
+        saved["teams"][0]["autoHunt"]["workflow"]["requirements"][0]["tool"],
         "xcodebuild"
     );
     let runtime_workflow = project_auto_hunt_workflow_json(&config_path, TEST_PROJECT_ID)
@@ -691,7 +688,7 @@ fn disconnecting_velen_clears_linear_settings() {
     let config_path = test_config_path("velen-disconnect");
     config_with_cli_owned_settings(&config_path, None, None);
     let mut config = read_cli_config(&config_path).expect("config should load");
-    let auto_hunt = config.projects[0].auto_hunt.get_or_insert_default();
+    let auto_hunt = config.teams[0].auto_hunt.get_or_insert_default();
     auto_hunt.data_source = Some("postgres://wordbricks".to_string());
     auto_hunt.linear = LocalLinearConfig {
         enabled: true,
@@ -715,10 +712,10 @@ fn disconnecting_velen_clears_linear_settings() {
         &fs::read_to_string(&config_path).expect("saved config should be readable"),
     )
     .expect("saved config should be json");
-    assert!(saved["projects"][0]["autoHunt"]["velenOrg"].is_null());
-    assert!(saved["projects"][0]["autoHunt"]["dataSource"].is_null());
+    assert!(saved["teams"][0]["autoHunt"]["velenOrg"].is_null());
+    assert!(saved["teams"][0]["autoHunt"]["dataSource"].is_null());
     assert_eq!(
-        saved["projects"][0]["autoHunt"]["linear"],
+        saved["teams"][0]["autoHunt"]["linear"],
         serde_json::json!({})
     );
 
@@ -867,7 +864,7 @@ fn saving_project_settings_keeps_cli_owned_worktree_settings() {
         },
     );
     let mut config = read_cli_config(&config_path).expect("config should load");
-    config.projects[0].execution_worker = LocalExecutionWorkerConfig {
+    config.teams[0].execution_worker = LocalExecutionWorkerConfig {
         worker_id: "worker-1".to_string(),
         device_id: "22222222-2222-4222-8222-222222222222".to_string(),
         organization_id: "33333333-3333-4333-8333-333333333333".to_string(),
@@ -906,7 +903,7 @@ fn saving_project_settings_keeps_cli_owned_worktree_settings() {
 
     let saved_project = read_cli_config(&config_path)
         .expect("config should reload")
-        .projects
+        .teams
         .into_iter()
         .find(|project| project.id == TEST_PROJECT_ID)
         .expect("project should survive the app-side save");

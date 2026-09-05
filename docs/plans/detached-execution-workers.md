@@ -133,11 +133,11 @@ of truth.
 ## `briar worker`
 
 ```text
-briar worker register --project <id> [--label <text>]
-briar worker unregister --project <id>
-briar worker --project <id> [--max-issues <n>] [--once]
+briar worker register --team <id> [--label <text>]
+briar worker unregister --team <id>
+briar worker --team <id> [--max-issues <n>] [--once]
 briar worker status
-briar worker install-service [--project <id>] [--label <text>]
+briar worker install-service [--team <id>] [--label <text>]
 briar worker uninstall-service
 ```
 

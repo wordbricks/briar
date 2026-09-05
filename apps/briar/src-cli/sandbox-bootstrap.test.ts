@@ -15,7 +15,7 @@ import {
   type SandboxBootstrapPayload,
   sandboxReport,
   type SandboxState,
-  sandboxWorkerProjectIds,
+  sandboxWorkerTeamIds,
 } from "./sandbox-bootstrap";
 import { SANDBOX_SCHEMA_VERSION } from "./sandbox-image";
 
@@ -49,7 +49,7 @@ const baseConfig = (): Config => ({
     preventSleepWhileRunning: false,
     browserAutomationProvider: "agent-browser",
   },
-  projects: [],
+  teams: [],
 });
 
 const payload = (): SandboxBootstrapPayload => ({
@@ -57,7 +57,7 @@ const payload = (): SandboxBootstrapPayload => ({
   apiUrl: "https://briar.example",
   userToken,
   label: "sandbox-gx10",
-  projects: [{ id: projectId, agentToken }],
+  teams: [{ id: projectId, agentToken }],
 });
 
 const credential = (id: string) =>
@@ -78,7 +78,7 @@ describe("decodeSandboxBootstrapPayload", () => {
       ...payload(),
       codexAuth: "{\"tokens\":{}}",
     }));
-    expect(decoded.projects).toEqual([{ id: projectId, agentToken }]);
+    expect(decoded.teams).toEqual([{ id: projectId, agentToken }]);
     expect(decoded.codexAuth).toBe("{\"tokens\":{}}");
   });
 
@@ -87,11 +87,11 @@ describe("decodeSandboxBootstrapPayload", () => {
       .toThrow();
     expect(() => decodeSandboxBootstrapPayload(JSON.stringify({ ...payload(), apiUrl: "http://briar.example" })))
       .toThrow();
-    expect(() => decodeSandboxBootstrapPayload(JSON.stringify({ ...payload(), projects: [] })))
+    expect(() => decodeSandboxBootstrapPayload(JSON.stringify({ ...payload(), teams: [] })))
       .toThrow();
     expect(() => decodeSandboxBootstrapPayload(JSON.stringify({
       ...payload(),
-      projects: [{ id: projectId, agentToken: "nope" }],
+      teams: [{ id: projectId, agentToken: "nope" }],
     }))).toThrow();
   });
 });
@@ -117,7 +117,7 @@ describe("runSandboxBootstrap", () => {
         expect(apiUrl).toBe("https://briar.example");
         return credential(project.id);
       },
-      ensureRepository: async (value) => `/home/briar/Briar/projects/${value.projectId}/briar`,
+      ensureRepository: async (value) => `/home/briar/Briar/teams/${value.projectId}/briar`,
       registerWorker: async (input) => {
         registered.push(input.project.id);
         expect(input.userToken).toBe(userToken);
@@ -147,9 +147,9 @@ describe("runSandboxBootstrap", () => {
     });
     expect(config.apiUrl).toBe("https://briar.example");
     expect(config.userToken).toBe(userToken);
-    expect(config.projects).toEqual([{
+    expect(config.teams).toEqual([{
       id: projectId,
-      repositoryPath: `/home/briar/Briar/projects/${projectId}/briar`,
+      repositoryPath: `/home/briar/Briar/teams/${projectId}/briar`,
       repositoryRemote: "https://github.com/wordbricks/briar.git",
       agentToken,
       apiUrl: "https://briar.example",
@@ -161,14 +161,14 @@ describe("runSandboxBootstrap", () => {
     expect(states).toEqual([{
       schemaVersion: SANDBOX_SCHEMA_VERSION,
       label: "sandbox-gx10",
-      projectIds: [projectId],
+      teamIds: [projectId],
       bootstrappedAt: "2026-09-05T00:00:00.000Z",
     }]);
   });
 
   it("keeps existing project settings when rerun", async () => {
     const config = baseConfig();
-    config.projects = [{
+    config.teams = [{
       id: projectId,
       repositoryPath: "/stale",
       apiUrl: "https://old.example",
@@ -194,7 +194,7 @@ describe("runSandboxBootstrap", () => {
       writeState: async () => undefined,
       log: () => undefined,
     });
-    expect(config.projects[0]).toMatchObject({
+    expect(config.teams[0]).toMatchObject({
       repositoryPath: "/fresh",
       llm: { provider: "claude", approvalPolicy: "never" },
     });
@@ -204,7 +204,7 @@ describe("runSandboxBootstrap", () => {
 describe("sandboxReport", () => {
   const registeredConfig = (): Config => {
     const config = baseConfig();
-    config.projects = [{
+    config.teams = [{
       id: projectId,
       repositoryPath: "/repo",
       apiUrl: "https://briar.example",
@@ -222,7 +222,7 @@ describe("sandboxReport", () => {
   const state: SandboxState = {
     schemaVersion: SANDBOX_SCHEMA_VERSION,
     label: "sandbox-gx10",
-    projectIds: [projectId],
+    teamIds: [projectId],
     bootstrappedAt: "2026-09-05T00:00:00.000Z",
   };
 
@@ -233,10 +233,10 @@ describe("sandboxReport", () => {
       supervisorPid: null,
       providerSignedIn: async () => false,
     });
-    expect(report).toMatchObject({ ready: false, detail: "Waiting for bootstrap.", projects: [] });
+    expect(report).toMatchObject({ ready: false, detail: "Waiting for bootstrap.", teams: [] });
   });
 
-  it("is ready once projects are registered, cloned, and supervised", async () => {
+  it("is ready once teams are registered, cloned, and supervised", async () => {
     const report = await sandboxReport({
       config: registeredConfig(),
       state,
@@ -245,7 +245,7 @@ describe("sandboxReport", () => {
       providerSignedIn: async (provider) => provider === "codex",
     });
     expect(report.ready).toBe(true);
-    expect(report.projects).toEqual([{
+    expect(report.teams).toEqual([{
       id: projectId,
       registered: true,
       workerId: "worker-1",
@@ -258,7 +258,7 @@ describe("sandboxReport", () => {
   it("names the incomplete project and a missing supervisor", async () => {
     const incomplete = await sandboxReport({
       config: registeredConfig(),
-      state: { ...state, projectIds: [projectId, otherProjectId] },
+      state: { ...state, teamIds: [projectId, otherProjectId] },
       supervisorPid: process.pid,
       repositoryPresent: () => true,
       providerSignedIn: async () => true,
@@ -280,10 +280,10 @@ describe("sandboxReport", () => {
   });
 });
 
-describe("sandboxWorkerProjectIds", () => {
-  it("runs only desired projects that hold a worker registration", () => {
+describe("sandboxWorkerTeamIds", () => {
+  it("runs only desired teams that hold a worker registration", () => {
     const config = baseConfig();
-    config.projects = [
+    config.teams = [
       {
         id: projectId,
         repositoryPath: "/a",
@@ -302,11 +302,11 @@ describe("sandboxWorkerProjectIds", () => {
     const state: SandboxState = {
       schemaVersion: SANDBOX_SCHEMA_VERSION,
       label: "sandbox",
-      projectIds: [projectId, otherProjectId],
+      teamIds: [projectId, otherProjectId],
       bootstrappedAt: "2026-09-05T00:00:00.000Z",
     };
-    expect(sandboxWorkerProjectIds(config, state)).toEqual([projectId]);
-    expect(sandboxWorkerProjectIds(config, null)).toEqual([]);
+    expect(sandboxWorkerTeamIds(config, state)).toEqual([projectId]);
+    expect(sandboxWorkerTeamIds(config, null)).toEqual([]);
   });
 });
 

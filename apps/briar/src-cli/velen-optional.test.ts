@@ -44,7 +44,7 @@ async function writeCliConfig(configDirectory: string, velenOrg?: string) {
       preventSleepWhileRunning: false,
       browserAutomationProvider: "ego-browser",
     },
-    projects: [{
+    teams: [{
       id: "11111111-1111-4111-8111-111111111111",
       repositoryPath: process.cwd(),
       agentToken: "briar_agent_test",
@@ -73,7 +73,7 @@ function runCli(
     "BRIAR_AGENT_TOKEN",
     "BRIAR_API_URL",
     "BRIAR_CONFIG_HOME",
-    "BRIAR_PROJECT_ID",
+    "BRIAR_TEAM_ID",
     "BRIAR_WORKTREE_HOME",
     "BRIAR_WORKTREE_ROOT",
   ]) {
@@ -99,7 +99,7 @@ function runCli(
 }
 
 function runDoctor(home: string, configDirectory?: string, worktreeHome?: string) {
-  return runCli(home, ["project", "doctor"], configDirectory, worktreeHome);
+  return runCli(home, ["team", "doctor"], configDirectory, worktreeHome);
 }
 
 afterEach(async () => {

@@ -5,7 +5,7 @@ import { requiredMessage } from "../src/lib/app-rpc/mappers";
 import type { ProjectSettings } from "../src/types";
 import {
   type Config,
-  type ProjectConfig,
+  type TeamConfig,
 } from "./config-contract";
 import { createAuthenticatedConnectClient } from "./connect-client";
 
@@ -35,9 +35,9 @@ export const fetchRemoteTeamSettings: FetchRemoteTeamSettings = async (
 };
 
 export function projectWithRemoteSettings(
-  project: ProjectConfig,
+  project: TeamConfig,
   settings: RemoteTeamSettings,
-): ProjectConfig {
+): TeamConfig {
   return {
     ...project,
     autoHunt: {
@@ -63,7 +63,7 @@ export function configWithRemoteTeamSettings(
 ): Config {
   return {
     ...config,
-    projects: config.projects.map((project) =>
+    teams: config.teams.map((project) =>
       project.id === projectId
         ? projectWithRemoteSettings(project, settings)
         : project

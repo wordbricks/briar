@@ -58,7 +58,7 @@ describe("managed-computer sync", () => {
         organizationId: "33333333-3333-4333-8333-333333333333",
         credentialFile: "/var/lib/briar/worker-credential.json",
       },
-      projects: [{
+      teams: [{
         id: projectId,
         repositoryPath: "/home/briar/briar",
         apiUrl: apiOrigin,
@@ -109,7 +109,7 @@ describe("managed-computer sync", () => {
       projectId,
       "user-session-must-not-be-printed",
     );
-    expect(storedConfig.projects[0]).toMatchObject({
+    expect(storedConfig.teams[0]).toMatchObject({
       repositoryPath: "/home/briar/briar",
       llm: { provider: "codex" },
       executionWorker: { workerId: "worker-1" },

@@ -572,7 +572,7 @@ export async function runManagedComputerGuidedSetup(
   }
 
   const stored = await loadConfig();
-  const existingProject = stored.projects.find((project) =>
+  const existingProject = stored.teams.find((project) =>
     project.id === setupProject.id
   );
   const repositoryRemote = gitValueAt(
@@ -606,8 +606,8 @@ export async function runManagedComputerGuidedSetup(
         process.env.BRIAR_MANAGED_CREDENTIAL_FILE?.trim() ||
         "/var/lib/briar/worker-credential.json",
     },
-    projects: [
-      ...stored.projects.filter((candidate) => candidate.id !== project.id),
+    teams: [
+      ...stored.teams.filter((candidate) => candidate.id !== project.id),
       project,
     ],
   });

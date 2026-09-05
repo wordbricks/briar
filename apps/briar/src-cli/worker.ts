@@ -910,10 +910,10 @@ const workerServiceCommand = (input: WorkerServiceCommand): string[] => {
         input.runtimeBinary!,
         input.cliScript!,
         "worker",
-        "--project",
+        "--team",
         input.projectId,
       ]
-    : [input.briarBinary, "worker", "--project", input.projectId];
+    : [input.briarBinary, "worker", "--team", input.projectId];
 };
 
 const plistText = (value: string) =>

@@ -91,7 +91,7 @@ async function optionalFile(path: string) {
 
 async function bootstrapPayload(input: {
   readonly name: string;
-  readonly projectIds: readonly string[];
+  readonly teamIds: readonly string[];
 }): Promise<SandboxBootstrapPayload> {
   const config = await loadConfig();
   const userToken = process.env.BRIAR_USER_TOKEN ?? config.userToken;
@@ -99,20 +99,20 @@ async function bootstrapPayload(input: {
   if (!config.apiUrl.startsWith("https://")) {
     throw new Error("Sandboxes can only reach an HTTPS Briar API");
   }
-  const candidates = input.projectIds.length > 0
-    ? input.projectIds
-    : config.projects.map((project) => project.id);
+  const candidates = input.teamIds.length > 0
+    ? input.teamIds
+    : config.teams.map((project) => project.id);
   if (candidates.length === 0) {
-    throw new Error("이 컴퓨터에 연결된 프로젝트가 없습니다. --project 로 지정하세요.");
+    throw new Error("이 컴퓨터에 연결된 팀이 없습니다. --team 으로 지정하세요.");
   }
-  const projects = candidates.map((projectId) => {
-    const project = config.projects.find((candidate) => candidate.id === projectId);
+  const teams = candidates.map((projectId) => {
+    const project = config.teams.find((candidate) => candidate.id === projectId);
     if (!project) {
-      throw new Error(`프로젝트 ${projectId} 는 이 컴퓨터에 연결되어 있지 않습니다.`);
+      throw new Error(`팀 ${projectId} 은 이 컴퓨터에 연결되어 있지 않습니다.`);
     }
     if (!project.agentToken) {
       throw new Error(
-        `프로젝트 ${projectId} 에 agent token이 없어 sandbox로 넘길 수 없습니다.`,
+        `팀 ${projectId} 에 agent token이 없어 sandbox로 넘길 수 없습니다.`,
       );
     }
     return { id: project.id, agentToken: project.agentToken };
@@ -127,7 +127,7 @@ async function bootstrapPayload(input: {
     apiUrl: config.apiUrl,
     userToken,
     label: value("--label") ?? `sandbox-${input.name}`,
-    projects,
+    teams,
     ...(codexAuth === undefined ? {} : { codexAuth }),
     ...(gitName && gitEmail ? { gitIdentity: { name: gitName, email: gitEmail } } : {}),
   };
@@ -160,9 +160,9 @@ export async function sandboxUpCommand() {
   const name = requestedName();
   const entry = await registryEntry(name);
   const { docker, dockerContext, host } = await resolveDocker(name, entry);
-  const projectIds = values("--project");
+  const teamIds = values("--team");
   const gpus = has("--gpus") || (entry?.gpus === true && !has("--no-gpus"));
-  const payload = await bootstrapPayload({ name, projectIds });
+  const payload = await bootstrapPayload({ name, teamIds });
   const sources = await resolveSandboxRuntimeSources();
   const stagingDirectory = await mkdtemp(join(tmpdir(), "briar-sandbox-"));
   try {
@@ -187,7 +187,7 @@ export async function sandboxUpCommand() {
     await upsertSandboxHostEntry(name, {
       ...(dockerContext ? { dockerContext } : {}),
       ...(host ? { host } : {}),
-      projectIds: payload.projects.map((project) => project.id),
+      teamIds: payload.teams.map((project) => project.id),
       gpus,
       runtimeSha256: context.runtimeSha256,
       updatedAt: new Date().toISOString(),

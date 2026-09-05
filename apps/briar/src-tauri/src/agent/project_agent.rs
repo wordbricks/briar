@@ -266,7 +266,7 @@ impl AutoHuntCliEnvironment {
             &sandbox_home,
             &sandbox_config,
             &[
-                ("BRIAR_PROJECT_ID", OsStr::new(project_id)),
+                ("BRIAR_TEAM_ID", OsStr::new(project_id)),
                 ("BRIAR_API_URL", OsStr::new(api_url)),
             ],
         )?;
@@ -303,7 +303,7 @@ impl AutoHuntCliEnvironment {
             execution_path,
             environment: vec![
                 ("PATH".to_string(), execution_path_string),
-                ("BRIAR_PROJECT_ID".to_string(), project_id.to_string()),
+                ("BRIAR_TEAM_ID".to_string(), project_id.to_string()),
                 ("BRIAR_API_URL".to_string(), api_url.to_string()),
                 ("BRIAR_CLI".to_string(), briar_binary),
                 ("BRIAR_CONFIG_HOME".to_string(), briar_config_directory),
@@ -1390,7 +1390,7 @@ mod tests {
         for name in ["bun", "velen"] {
             let binary = binary_directory.join(name);
             let body = if name == "bun" {
-                "#!/bin/sh\nshift\nprintf changed > \"$HOME/.config/briar/config.json\"\nprintf '%s' \"$BRIAR_PROJECT_ID\" > \"$HOME/project-id\"\nprintf '%s' \"$BRIAR_API_URL\" > \"$HOME/api-url\"\nprintf '%s' \"$BRIAR_WORKTREE_HOME\" > \"$HOME/worktree-home\"\n"
+                "#!/bin/sh\nshift\nprintf changed > \"$HOME/.config/briar/config.json\"\nprintf '%s' \"$BRIAR_TEAM_ID\" > \"$HOME/project-id\"\nprintf '%s' \"$BRIAR_API_URL\" > \"$HOME/api-url\"\nprintf '%s' \"$BRIAR_WORKTREE_HOME\" > \"$HOME/worktree-home\"\n"
             } else {
                 "#!/bin/sh\nexit 0\n"
             };

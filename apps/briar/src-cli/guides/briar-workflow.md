@@ -36,7 +36,7 @@ a run may still claim work as described below.
 Run preflight before changing files:
 
 ```sh
-briar project doctor
+briar team doctor
 briar workflow show
 ```
 
@@ -217,7 +217,7 @@ Only mappings declared by the run workflow are required.
 
 ## Optional Velen and Linear
 
-If `briar project doctor` reports no Velen organization, skip Velen and use repository
+If `briar team doctor` reports no Velen organization, skip Velen and use repository
 evidence. When it reports an organization, use Velen as an additional context gateway:
 
 ```sh

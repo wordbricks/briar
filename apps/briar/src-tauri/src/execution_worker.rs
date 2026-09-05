@@ -6,11 +6,11 @@ fn cleanup_enabled_worker(
     run: &impl Fn(&[&str]) -> Result<String, String>,
     project_id: &str,
 ) -> Result<(), String> {
-    run(&["worker", "uninstall-service", "--project", project_id])?;
+    run(&["worker", "uninstall-service", "--team", project_id])?;
     run(&[
         "worker",
         "unregister",
-        "--project",
+        "--team",
         project_id,
         "--lifecycle-reason",
         "managed-deprovision",
@@ -40,11 +40,11 @@ fn enable_execution_worker(
     // A failed registration has not produced a local binding that can be
     // unregistered reliably. Cleanup begins only after the CLI confirms that
     // registration completed.
-    run(&["worker", "register", "--project", project_id])?;
+    run(&["worker", "register", "--team", project_id])?;
     run(&[
         "worker",
         "install-service",
-        "--project",
+        "--team",
         project_id,
         "--runtime-binary",
         bun_path,
@@ -52,7 +52,7 @@ fn enable_execution_worker(
         cli_path,
     ])
     .map_err(|cause| rollback_enabled_worker_failure(run, project_id, cause))?;
-    run(&["worker", "status", "--project", project_id])
+    run(&["worker", "status", "--team", project_id])
         .map_err(|cause| rollback_enabled_worker_failure(run, project_id, cause))?;
     Ok(())
 }
@@ -110,10 +110,10 @@ pub(super) fn configure_execution_worker(
         return enable_execution_worker(&run, &project_id, bun_path, cli_path);
     }
 
-    run(&["worker", "uninstall-service", "--project", &project_id])?;
-    run(&["worker", "unregister", "--project", &project_id])?;
+    run(&["worker", "uninstall-service", "--team", &project_id])?;
+    run(&["worker", "unregister", "--team", &project_id])?;
 
-    run(&["worker", "status", "--project", &project_id])?;
+    run(&["worker", "status", "--team", &project_id])?;
     Ok(())
 }
 
@@ -179,7 +179,7 @@ pub(super) fn inspect_execution_workers_at(
     // here can disturb a running background Worker and change its readiness.
     let config = read_cli_config(config_path)?;
     let projects = config
-        .projects
+        .teams
         .into_iter()
         .map(|project| (project.id.clone(), project))
         .collect::<BTreeMap<_, _>>();
@@ -211,7 +211,7 @@ pub(super) fn current_execution_worker_device_id_at(
 ) -> Result<Option<String>, String> {
     let config = read_cli_config(config_path)?;
     let mut device_ids = config
-        .projects
+        .teams
         .iter()
         .filter_map(|project| project.execution_worker.as_option())
         .filter(|worker| worker.organization_id == organization_id)
@@ -504,7 +504,7 @@ pub(super) fn auto_hunt_health_sync_with(
 ) -> Result<AutoHuntHealth, String> {
     let config = read_cli_config(config_path)?;
     let project = config
-        .projects
+        .teams
         .iter()
         .find(|project| project.id == project_id)
         .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?;

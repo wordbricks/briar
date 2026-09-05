@@ -49,7 +49,7 @@ import {
   decodeUuid,
   decodeWorkflowStageId,
 } from "./command-contract";
-import type { Config, ProjectConfig } from "./config-contract";
+import type { Config, TeamConfig } from "./config-contract";
 import {
   executionToken,
   values,
@@ -221,11 +221,11 @@ type IssueUpdateState = {
 
 export type IssueUpdateCommandDependencies = {
   loadConfig: () => Promise<Config>;
-  currentProject: (config: Config) => Promise<ProjectConfig>;
-  loadRun: (config: Config, project: ProjectConfig, runId: string) => Promise<IssueUpdateState | undefined>;
+  currentProject: (config: Config) => Promise<TeamConfig>;
+  loadRun: (config: Config, project: TeamConfig, runId: string) => Promise<IssueUpdateState | undefined>;
   updateRun: (
     config: Config,
-    project: ProjectConfig,
+    project: TeamConfig,
     runId: string,
     input: IssueUpdateState,
   ) => Promise<UpdateIssueResponse>;
@@ -529,7 +529,7 @@ async function addRunEvent(forcedStatus?: string) {
     const terminal = ["completed", "cancelled", "blocked", "failed"].includes(
       input.status ?? "",
     );
-    config.projects = config.projects.map((candidate) =>
+    config.teams = config.teams.map((candidate) =>
       candidate.id === project.id
         ? {
             ...candidate,
@@ -689,7 +689,7 @@ async function recoverRun(action: "retry" | "cancel") {
   if (project.activeClaim?.runId === canonicalRunId) {
     // The server released this claim while queueing the new revision. Make the
     // current provider turn stop instead of continuing with a stale token.
-    config.projects = config.projects.map((candidate) =>
+    config.teams = config.teams.map((candidate) =>
       candidate.id === project.id
         ? { ...candidate, activeClaim: undefined }
         : candidate,
@@ -720,7 +720,7 @@ async function reworkRun() {
     reason: required("--reason"),
   });
   if (project.activeClaim?.runId === canonicalRunId) {
-    config.projects = config.projects.map((candidate) =>
+    config.teams = config.teams.map((candidate) =>
       candidate.id === project.id
         ? { ...candidate, activeClaim: undefined }
         : candidate
@@ -749,7 +749,7 @@ async function resumeRun() {
     revision: positiveIntegerFlag("--revision"),
   });
   if (project.activeClaim?.runId === canonicalRunId) {
-    config.projects = config.projects.map((candidate) =>
+    config.teams = config.teams.map((candidate) =>
       candidate.id === project.id
         ? { ...candidate, activeClaim: undefined }
         : candidate,
@@ -799,7 +799,7 @@ async function transitionWorkflowStage(action: "start" | "complete") {
     result.outcome === TransitionWorkflowStageResponse_Outcome.PAUSED &&
     project.activeClaim?.runId === canonicalRunId
   ) {
-    config.projects = config.projects.map((candidate) =>
+    config.teams = config.teams.map((candidate) =>
       candidate.id === project.id
         ? { ...candidate, activeClaim: undefined }
         : candidate,

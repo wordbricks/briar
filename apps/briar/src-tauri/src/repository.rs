@@ -694,7 +694,7 @@ pub(super) fn project_repository_readiness_at(
 ) -> Result<RepositoryReadiness, String> {
     let config = read_cli_config(config_path)?;
     let project = config
-        .projects
+        .teams
         .iter()
         .find(|project| project.id == project_id)
         .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?;

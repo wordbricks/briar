@@ -51,7 +51,7 @@ function workerStatus(directory: string) {
   for (const name of [
     "BRIAR_API_URL",
     "BRIAR_CONFIG_HOME",
-    "BRIAR_PROJECT_ID",
+    "BRIAR_TEAM_ID",
   ]) {
     delete environment[name];
   }
@@ -62,7 +62,7 @@ function workerStatus(directory: string) {
       "src-cli/index.ts",
       "worker",
       "status",
-      "--project",
+      "--team",
       projectId,
     ],
     {
@@ -123,7 +123,7 @@ describe("CLI config loading", () => {
     });
     const environment = { ...process.env };
     delete environment.BRIAR_API_URL;
-    delete environment.BRIAR_PROJECT_ID;
+    delete environment.BRIAR_TEAM_ID;
     environment.BRIAR_CONFIG_HOME = directory;
 
     const result = spawnSync(
@@ -148,6 +148,36 @@ describe("CLI config loading", () => {
       JSON.parse(await readFile(join(directory, backups[0]), "utf8"))
         .appSettings.browserAutomationProvider,
     ).toBe("ego-browser");
+  });
+
+  it("renames a pre-1.2.202 ProtoJSON config from projects to teams once", async () => {
+    const directory = await configDirectory({
+      apiUrl: "https://briar.example.com",
+      ...localSettings,
+      projects: [
+        {
+          id: projectId,
+          repositoryPath: process.cwd(),
+          agentToken: "briar_agent_current",
+          apiUrl: "https://briar.example.com",
+        },
+      ],
+    });
+
+    const result = workerStatus(directory);
+
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({ projectId });
+    const canonical = JSON.parse(
+      await readFile(join(directory, "config.json"), "utf8"),
+    );
+    expect(canonical.projects).toBeUndefined();
+    expect(canonical.teams).toHaveLength(1);
+    expect(canonical.teams[0].agentToken).toBe("briar_agent_current");
+    const backups = (await readdir(directory)).filter((name) =>
+      name.startsWith("config.pre-proto-ssot-")
+    );
+    expect(backups).toHaveLength(1);
   });
 
   it("defaults browser automation to agent-browser when config is missing", async () => {
@@ -177,7 +207,7 @@ describe("CLI config loading", () => {
     const directory = await configDirectory({
       apiUrl: "https://briar.example.com",
       ...localSettings,
-      projects: [
+      teams: [
         {
           id: projectId,
           repositoryPath: process.cwd(),
@@ -207,18 +237,18 @@ describe("CLI config loading", () => {
     });
   });
 
-  it("reports an invalid config instead of pretending it has no projects", async () => {
+  it("reports an invalid config instead of pretending it has no teams", async () => {
     const directory = await configDirectory({
       apiUrl: "https://briar.example.com",
       ...localSettings,
-      projects: "invalid",
+      teams: "invalid",
     });
 
     const result = workerStatus(directory);
 
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("Briar 로컬 설정이 손상되었습니다");
-    expect(result.stderr).toContain("projects");
+    expect(result.stderr).toContain("teams");
     expect(result.stderr).not.toContain(
       "이 컴퓨터에 연결된 프로젝트를 찾지 못했습니다",
     );
@@ -236,7 +266,7 @@ describe("CLI config loading", () => {
         organizationId,
         credentialFile: "/tmp/briar-managed-credential-placeholder.json",
       },
-      projects: [],
+      teams: [],
     });
     const credentialFile = join(directory, "credential.json");
     const configFile = join(directory, "config.json");

@@ -5,8 +5,8 @@ use briar_contracts::proto::briar::{local::v1 as local_proto, types::v1 as types
 pub(super) use local_proto::LocalWorktreeConfig;
 pub(super) use local_proto::{
     LocalAddedProviders, LocalAgentProviderSettings, LocalAppSettings, LocalAutoHuntConfig,
-    LocalConfig, LocalExecutionWorkerConfig, LocalLinearConfig, LocalProjectConfig,
-    LocalProjectLlmConfig, LocalSandboxConfig, LocalVertexAiCredential,
+    LocalConfig, LocalExecutionWorkerConfig, LocalLinearConfig, LocalSandboxConfig,
+    LocalTeamConfig, LocalTeamLlmConfig, LocalVertexAiCredential,
 };
 
 const DEFAULT_API_URL: &str = "http://127.0.0.1:8787";
@@ -159,8 +159,17 @@ fn migrate_pre_protojson_local_config(contents: &str) -> Result<Option<LocalConf
             )
         });
 
+    // Configs written before the Team rename keep the execution boundary under
+    // `projects`; move it once so the strict decoder below sees `teams`.
+    if !root.contains_key("teams") {
+        if let Some(teams) = root.remove("projects") {
+            root.insert("teams".to_string(), teams);
+            changed = true;
+        }
+    }
+
     if let Some(projects) = root
-        .get_mut("projects")
+        .get_mut("teams")
         .and_then(serde_json::Value::as_array_mut)
     {
         for project in projects {
@@ -409,7 +418,7 @@ pub(super) fn validate_local_config(config: &LocalConfig) -> Result<(), String> 
         }
     }
 
-    for project in &config.projects {
+    for project in &config.teams {
         valid_uuid(&project.id, "projects.id")?;
         nonempty(&project.repository_path, "projects.repositoryPath")?;
         valid_url(&project.api_url, "projects.apiUrl")?;
@@ -607,7 +616,7 @@ pub(super) fn agent_provider_to_proto(
 }
 
 pub(super) fn project_llm_settings_from_proto(
-    value: &LocalProjectLlmConfig,
+    value: &LocalTeamLlmConfig,
 ) -> Result<agent::ProjectLlmSettings, String> {
     let provider = value
         .provider
@@ -648,13 +657,13 @@ pub(super) fn project_llm_settings_from_proto(
 
 pub(super) fn project_llm_settings_to_proto(
     value: &agent::ProjectLlmSettings,
-) -> LocalProjectLlmConfig {
+) -> LocalTeamLlmConfig {
     let approval_policy = match value.approval_policy {
         agent::ApprovalPolicy::Untrusted => local_proto::LocalApprovalPolicy::Untrusted,
         agent::ApprovalPolicy::OnRequest => local_proto::LocalApprovalPolicy::OnRequest,
         agent::ApprovalPolicy::Never => local_proto::LocalApprovalPolicy::Never,
     };
-    LocalProjectLlmConfig {
+    LocalTeamLlmConfig {
         provider: Some(agent_provider_to_proto(value.provider)),
         model: value.model.clone(),
         effort: value.effort.as_ref().map(|effort| effort.id().to_string()),
@@ -982,7 +991,7 @@ mod tests {
                 ..Default::default()
             }
             .into(),
-            projects: vec![LocalProjectConfig {
+            teams: vec![LocalTeamConfig {
                 id: "11111111-1111-4111-8111-111111111111".to_string(),
                 repository_path: "/projects/briar".to_string(),
                 api_url: "https://briar.example.com".to_string(),
@@ -1086,7 +1095,7 @@ mod tests {
         let migrated = read_cli_config(&config_path).expect("legacy config should migrate");
         assert_eq!(migrated.user_token.as_deref(), Some("preserved-user-token"));
         assert_eq!(
-            migrated.projects[0].agent_token.as_deref(),
+            migrated.teams[0].agent_token.as_deref(),
             Some("briar_agent_preserved")
         );
 
@@ -1102,23 +1111,23 @@ mod tests {
             ))
         );
         assert_eq!(
-            canonical.pointer("/projects/0/llm/provider"),
+            canonical.pointer("/teams/0/llm/provider"),
             Some(&serde_json::json!("AGENT_PROVIDER_CODEX"))
         );
         assert_eq!(
-            canonical.pointer("/projects/0/llm/approvalPolicy"),
+            canonical.pointer("/teams/0/llm/approvalPolicy"),
             Some(&serde_json::json!("LOCAL_APPROVAL_POLICY_ON_REQUEST"))
         );
         assert_eq!(
-            canonical.pointer("/projects/0/autoHunt/githubRepositoryId"),
+            canonical.pointer("/teams/0/autoHunt/githubRepositoryId"),
             Some(&serde_json::json!("9007199254740991"))
         );
         assert_eq!(
-            canonical.pointer("/projects/0/autoHunt/workflow/execution/checkpoints/0/position"),
+            canonical.pointer("/teams/0/autoHunt/workflow/execution/checkpoints/0/position"),
             Some(&serde_json::json!("POSITION_BEFORE"))
         );
         assert_eq!(
-            canonical.pointer("/projects/0/activeClaim/terminalStatus"),
+            canonical.pointer("/teams/0/activeClaim/terminalStatus"),
             Some(&serde_json::json!("LOCAL_CLAIM_TERMINAL_STATUS_COMPLETED"))
         );
 

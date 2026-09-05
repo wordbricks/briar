@@ -143,7 +143,7 @@ A project can confine writes to the assigned checkout, its linked Git metadata,
 the declared worktree root, and `/tmp`/`$TMPDIR`:
 
 ```sh
-briar project configure --disable-full-access
+briar team configure --disable-full-access
 ```
 
 This switches Codex to `workspace-write` and enables Claude's workspace
@@ -151,11 +151,11 @@ sandbox. Reads remain unrestricted: an agent can read anything the user can,
 including other repositories and dotfiles. Restore the default with:
 
 ```sh
-briar project configure --enable-full-access --i-understand-the-risk
+briar team configure --enable-full-access --i-understand-the-risk
 ```
 
 The same choice is available in Briar under **Project settings → Agent
-configuration → Filesystem access**. `briar project doctor` reports the
+configuration → Filesystem access**. `briar team doctor` reports the
 resolved value under `sandbox.fullAccess`.
 
 Auto Hunt input — issue titles, descriptions, attachments, repository content —
@@ -196,7 +196,7 @@ summary.
 ## Operating it
 
 ```sh
-briar project doctor                   # worktrees.enabled/root/branchPrefix/baseRef
+briar team doctor                   # worktrees.enabled/root/branchPrefix/baseRef
 briar worktree list                    # every worktree under this project's root
 briar worktree show                    # the active claim's worktree
 briar worktree maintain [--path <dir>] # compact outputs; completed+24h GC when clean
@@ -205,7 +205,7 @@ briar worktree remove [--path <dir>] [--force]
 ```
 
 ```sh
-briar project configure \
+briar team configure \
   --worktree-root ~/briar/workspaces --branch-prefix briar
 ```
 
