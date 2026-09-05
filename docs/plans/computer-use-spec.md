@@ -519,7 +519,8 @@ assignment record:
 - 다른 Agent가 가진 display는 빼앗지 않는다.
 - owner token이 다르면 router가 거절한다.
 - process crash 후 stale process와 lock을 확인하고 안전하게 복구한다.
-- 명시적 release에서만 desktop과 profile을 정리한다.
+- 명시적 release에서만 desktop과 profile을 정리하며, 정리 전에 display profile의 로그인
+  상태를 공유 저장소에 capture한다([computer-use-shared-browser-login.md](computer-use-shared-browser-login.md)).
 - managed computer 재부팅 후 persisted assignments에 필요한 windows를 재생성한다.
 
 browser process와 session data의 시작 방식도 Grok fixture와 비교한다. 재구성 소스에서
@@ -720,6 +721,7 @@ click, type, 결제처럼 멱등하지 않은 action batch는 transport retry를
 - Agent A와 B가 display 2, 3을 각각 받는다.
 - A의 click이 B 화면을 바꾸지 않는다.
 - 같은 Agent 재연결이 같은 display와 profile을 회수한다.
+- 한 Agent의 display에서 본 로그인이 release 뒤 다른 Agent의 display에서도 보인다.
 - 잘못된 owner token이 거절된다.
 - 같은 parent의 두 번째 child가 거절된다.
 - 다른 parent의 child들은 각 display에서 동시에 실행된다.
