@@ -170,6 +170,7 @@ export const SandboxReport = Schema.Struct({
       agentId: Schema.String,
       displayIndex: Schema.Int,
     })),
+    primaryDisplay: Schema.optional(Schema.Boolean),
   })),
   detail: Schema.String,
   teams: Schema.Array(SandboxReportTeam),

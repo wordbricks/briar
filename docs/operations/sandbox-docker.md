@@ -39,11 +39,13 @@ sandbox는 Grok Bot의 로컬 VM처럼 에이전트가 볼 수 있는 데스크�
 - **브라우저**: Linux ARM64용 Google Chrome이 없어 Chromium을 설치하고
   `/usr/bin/google-chrome-stable` 래퍼(`--no-sandbox`)로 감싼다. `briar-open-browser`와
   데스크톱 파일은 AMI와 동일하다.
+- **소유자 디스플레이 `:1`**: supervisor가 `briar-remote-desktop`으로 `:1`(loopback 5901)을
+  항상 띄운다. 에이전트가 없어도 볼 수 있는 데스크톱이며, 에이전트는 `:2` 이상을 쓴다.
 - **사용자가 보는 화면**: 컨테이너 안 websockify + noVNC가 6080에서 모든 디스플레이를
   `?token=displayN`으로 라우팅하고, Docker 호스트의 loopback(`--view-port`, 기본 6080)에만
   publish된다. `briar sandbox view --name <name> [--display N]`이 원격 호스트면 SSH 포트
   포워딩을 열고 브라우저에 noVNC 페이지를 띄운다. 디스플레이를 지정하지 않으면 현재
-  에이전트에 할당된 첫 디스플레이를 연다.
+  에이전트에 할당된 첫 디스플레이를, 없으면 소유자 디스플레이 `:1`을 연다.
 - **검증**: `briar sandbox verify --name <name>`이 컨테이너 안에서 디스플레이를 하나
   할당해 스크린샷을 찍고 해제한다. `status`의 `report.computerUse`에 box 서비스 health와
   현재 할당된 디스플레이 목록이 나온다.

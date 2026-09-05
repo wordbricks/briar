@@ -10,6 +10,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { Config } from "./config-contract";
 import {
   assignedDisplays,
+  primaryDisplayCommand,
+  primaryDisplayListening,
   decodeSandboxBootstrapPayload,
   novncCommand,
   novncTokenFileContents,
@@ -242,6 +244,7 @@ describe("sandboxReport", () => {
       providerSignedIn: async () => false,
       computerUseHealthy: async () => false,
       displays: async () => [],
+      primaryDisplay: async () => false,
     });
     expect(report).toMatchObject({ ready: false, detail: "Waiting for bootstrap.", teams: [] });
   });
@@ -255,11 +258,13 @@ describe("sandboxReport", () => {
       providerSignedIn: async (provider) => provider === "codex",
       computerUseHealthy: async () => true,
       displays: async () => [{ agentId: "agent-a", displayIndex: 2 }],
+      primaryDisplay: async () => true,
     });
     expect(report.ready).toBe(true);
     expect(report.computerUse).toEqual({
       serviceHealthy: true,
       displays: [{ agentId: "agent-a", displayIndex: 2 }],
+      primaryDisplay: true,
     });
     expect(report.teams).toEqual([{
       id: projectId,
@@ -441,5 +446,12 @@ describe("noVNC bridge", () => {
     }));
     expect(await assignedDisplays(path)).toEqual([{ agentId: "agent-a", displayIndex: 2 }]);
     expect(await assignedDisplays(join(directory, "missing.json"))).toEqual([]);
+  });
+});
+
+describe("primary display", () => {
+  it("keeps the owner desktop :1 through the managed remote-desktop script", async () => {
+    expect(primaryDisplayCommand()).toEqual(["/opt/briar/bin/briar-remote-desktop"]);
+    expect(await primaryDisplayListening(1)).toBe(false);
   });
 });
