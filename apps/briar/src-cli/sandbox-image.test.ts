@@ -118,13 +118,31 @@ describe("stageSandboxBuildContext", () => {
     expect(a.runtimeSha256).not.toBe(b.runtimeSha256);
   });
 
-  it("stages the installed layout that lacks the Computer Use bundle", async () => {
+  it("refuses to stage without the Computer Use bundle", async () => {
     const { cliBundlePath, agentDirectory } = await sources();
     await rm(join(agentDirectory, "computer-use-mcp-server.js"));
+    await expect(stageSandboxBuildContext({
+      directory: await temporary("briar-sandbox-stage-"),
+      cliBundlePath,
+      agentDirectory,
+    })).rejects.toThrow("computer-use-mcp-server.js is missing");
+  });
+
+  it("stages the desktop files as executables beside the runtime", async () => {
+    const { cliBundlePath, agentDirectory } = await sources();
     const directory = await temporary("briar-sandbox-stage-");
     await stageSandboxBuildContext({ directory, cliBundlePath, agentDirectory });
-    await expect(stat(join(directory, "agent", "computer-use-mcp-server.js"))).rejects.toThrow();
-    expect(await readFile(join(directory, "agent", "pi-runner.js"), "utf8")).toBe("// pi-runner.js");
+    expect((await stat(join(directory, "desktop", "briar-remote-desktop"))).mode & 0o111).not.toBe(0);
+    expect(await readFile(join(directory, "desktop", "briar-computer-executor.py"), "utf8"))
+      .toContain("from Xlib");
+    const dockerfile = await readFile(join(directory, "Dockerfile"), "utf8");
+    expect(dockerfile).toContain("tigervnc-standalone-server");
+    expect(dockerfile).toContain("chromium");
+    expect(dockerfile).toContain("novnc");
+    expect(dockerfile).toContain("websockify");
+    expect(dockerfile).toContain("BRIAR_COMPUTER_USE_WINDOW_SUPERVISOR=process");
+    expect(dockerfile).toContain("BRIAR_SANDBOX=1");
+    expect(dockerfile).not.toMatch(/\bsudo\b/u);
   });
 
   it("refuses to stage without every agent runner", async () => {

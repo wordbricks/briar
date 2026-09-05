@@ -41,7 +41,7 @@ import {
   FileComputerUseAssignmentStore,
 } from "./computer-use-desktop-manager";
 import { NativeComputerUseExecutor } from "./computer-use-native-executor";
-import { SystemdComputerUseWindowSupervisor } from "./computer-use-window-supervisor";
+import { computerUseWindowSupervisorFromEnvironment } from "./computer-use-window-supervisor";
 
 export const defaultBoxExecAuthTokenPath =
   "/var/lib/briar-computer-use/box-auth-token";
@@ -207,7 +207,7 @@ export class ComputerUseBoxService {
     this.forkPort = options.forkPort ?? BOX_EXEC_FORK_ROUTER_PORT;
     this.desktopManager = options.desktopManager ?? new ComputerUseDesktopManager(
       new FileComputerUseAssignmentStore(),
-      new SystemdComputerUseWindowSupervisor(),
+      computerUseWindowSupervisorFromEnvironment(),
     );
     if (options.controlledExecManager !== undefined) {
       this.controlledExecManager = options.controlledExecManager;

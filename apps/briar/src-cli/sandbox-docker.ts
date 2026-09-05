@@ -4,6 +4,7 @@ import {
   DEFAULT_DEBIAN_MIRROR,
   SANDBOX_CLI_PATH,
   SANDBOX_HOME,
+  SANDBOX_NOVNC_PORT,
   SANDBOX_SCHEMA_VERSION,
   sandboxImageTag,
 } from "./sandbox-image";
@@ -24,6 +25,8 @@ export const SANDBOX_NAME_LABEL = "com.briar.sandbox.name";
 export const SANDBOX_RUNTIME_LABEL = "com.briar.sandbox.runtime-sha256";
 export const SANDBOX_SCHEMA_LABEL = "com.briar.sandbox.schema-version";
 export const SANDBOX_GPU_LABEL = "com.briar.sandbox.gpus";
+export const SANDBOX_VIEW_PORT_LABEL = "com.briar.sandbox.view-port";
+export const DEFAULT_SANDBOX_VIEW_PORT = 6080;
 export const DEFAULT_SANDBOX_NAME = "default";
 export const SANDBOX_READY_TIMEOUT_MS = 180_000;
 
@@ -96,6 +99,7 @@ export interface SandboxInspection {
   readonly runtimeSha256: string;
   readonly schemaVersion: string;
   readonly gpus: boolean;
+  readonly viewPort: number;
 }
 
 const missingContainer: SandboxInspection = {
@@ -106,6 +110,7 @@ const missingContainer: SandboxInspection = {
   runtimeSha256: "",
   schemaVersion: "",
   gpus: false,
+  viewPort: 0,
 };
 
 const InspectedContainer = Schema.Struct({
@@ -144,6 +149,7 @@ export async function inspectSandboxContainer(
     runtimeSha256: labels[SANDBOX_RUNTIME_LABEL] ?? "",
     schemaVersion: labels[SANDBOX_SCHEMA_LABEL] ?? "",
     gpus: labels[SANDBOX_GPU_LABEL] === "1",
+    viewPort: Number.parseInt(labels[SANDBOX_VIEW_PORT_LABEL] ?? "0", 10) || 0,
   };
 }
 
@@ -158,6 +164,13 @@ export const SandboxReport = Schema.Struct({
   schemaVersion: Schema.String,
   ready: Schema.Boolean,
   supervisorRunning: Schema.Boolean,
+  computerUse: Schema.optional(Schema.Struct({
+    serviceHealthy: Schema.Boolean,
+    displays: Schema.Array(Schema.Struct({
+      agentId: Schema.String,
+      displayIndex: Schema.Int,
+    })),
+  })),
   detail: Schema.String,
   teams: Schema.Array(SandboxReportTeam),
   providers: Schema.Record(Schema.String, Schema.Boolean),
@@ -272,6 +285,8 @@ export interface EnsureSandboxInput {
   readonly runtimeSha256: string;
   readonly buildContextDirectory: string;
   readonly gpus: boolean;
+  /** Host loopback port that reaches the container's noVNC bridge. */
+  readonly viewPort?: number;
   /** Debian mirror host for the image build; defaults to deb.debian.org. */
   readonly debianMirror?: string;
   /** Push the bootstrap payload into the running container. */
@@ -311,7 +326,9 @@ export function sandboxRunArguments(input: {
   readonly runtimeSha256: string;
   readonly imageTag: string;
   readonly gpus: boolean;
+  readonly viewPort?: number;
 }): string[] {
+  const viewPort = input.viewPort ?? DEFAULT_SANDBOX_VIEW_PORT;
   return [
     "run",
     "--detach",
@@ -327,9 +344,17 @@ export function sandboxRunArguments(input: {
     `${SANDBOX_SCHEMA_LABEL}=${SANDBOX_SCHEMA_VERSION}`,
     "--label",
     `${SANDBOX_GPU_LABEL}=${input.gpus ? "1" : "0"}`,
+    "--label",
+    `${SANDBOX_VIEW_PORT_LABEL}=${viewPort}`,
+    // Like Grok Bot's local VM, the desktop view is reachable only from the
+    // Docker host's loopback; remote hosts are reached through an SSH tunnel.
+    "--publish",
+    `127.0.0.1:${viewPort}:${SANDBOX_NOVNC_PORT}`,
     "--restart",
     "unless-stopped",
     "--init",
+    "--shm-size",
+    "1g",
     "--volume",
     `${sandboxHomeVolume(input.name)}:${SANDBOX_HOME}`,
     ...(input.gpus ? ["--gpus", "all"] : []),
@@ -365,7 +390,8 @@ export async function ensureSandbox(
   const stale = inspected.exists && (
     inspected.schemaVersion !== SANDBOX_SCHEMA_VERSION ||
     inspected.runtimeSha256 !== input.runtimeSha256 ||
-    inspected.gpus !== input.gpus
+    inspected.gpus !== input.gpus ||
+    inspected.viewPort !== (input.viewPort ?? DEFAULT_SANDBOX_VIEW_PORT)
   );
   if (stale) {
     input.log?.(`Replacing ${containerName} with runtime ${input.runtimeSha256.slice(0, 12)}`);
@@ -388,6 +414,7 @@ export async function ensureSandbox(
       runtimeSha256: input.runtimeSha256,
       imageTag,
       gpus: input.gpus,
+      viewPort: input.viewPort,
     }));
     if (!created.ok) {
       throw new Error(`Could not create the sandbox: ${created.output}`);

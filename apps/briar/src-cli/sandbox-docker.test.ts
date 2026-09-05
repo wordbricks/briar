@@ -12,6 +12,7 @@ import {
   SANDBOX_OWNER_LABEL,
   SANDBOX_RUNTIME_LABEL,
   SANDBOX_SCHEMA_LABEL,
+  SANDBOX_VIEW_PORT_LABEL,
   sandboxContainerName,
   sandboxHomeVolume,
   sandboxName,
@@ -34,6 +35,7 @@ const readyReport = {
   schemaVersion: SANDBOX_SCHEMA_VERSION,
   ready: true,
   supervisorRunning: true,
+  computerUse: { serviceHealthy: true, displays: [{ agentId: "agent-a", displayIndex: 2 }] },
   detail: "Sandbox is ready.",
   teams: [],
   providers: {},
@@ -137,12 +139,13 @@ function fakeDocker(initial: {
   return { docker, calls, state };
 }
 
-const ownedLabels = (sha = runtimeSha256, gpus = "0") => ({
+const ownedLabels = (sha = runtimeSha256, gpus = "0", viewPort = "6080") => ({
   [SANDBOX_OWNER_LABEL]: "1",
   [SANDBOX_NAME_LABEL]: name,
   [SANDBOX_RUNTIME_LABEL]: sha,
   [SANDBOX_SCHEMA_LABEL]: SANDBOX_SCHEMA_VERSION,
   [SANDBOX_GPU_LABEL]: gpus,
+  [SANDBOX_VIEW_PORT_LABEL]: viewPort,
 });
 
 const ensureInput = (fake: ReturnType<typeof fakeDocker>, gpus = false) => {
@@ -174,7 +177,7 @@ describe("sandbox names", () => {
 });
 
 describe("sandbox run arguments", () => {
-  it("labels the container, mounts only the home volume, and publishes no ports", () => {
+  it("labels the container, mounts only the home volume, and publishes only the loopback view", () => {
     const args = sandboxRunArguments({
       name,
       runtimeSha256,
@@ -185,9 +188,24 @@ describe("sandbox run arguments", () => {
     expect(args).toContain(`${SANDBOX_RUNTIME_LABEL}=${runtimeSha256}`);
     expect(args).toContain(`${SANDBOX_SCHEMA_LABEL}=${SANDBOX_SCHEMA_VERSION}`);
     expect(args).toContain(`${sandboxHomeVolume(name)}:/home/briar`);
-    expect(args).not.toContain("--publish");
+    expect(args.filter((argument) => argument === "--publish")).toHaveLength(1);
+    expect(args).toContain("127.0.0.1:6080:6080");
     expect(args).not.toContain("--gpus");
     expect(args.at(-1)).toBe(sandboxImageTag(runtimeSha256));
+  });
+
+  it("publishes noVNC on the host loopback only", () => {
+    const args = sandboxRunArguments({
+      name,
+      runtimeSha256,
+      imageTag: "briar-sandbox:test",
+      gpus: false,
+      viewPort: 6090,
+    });
+    expect(args.slice(args.indexOf("--publish"), args.indexOf("--publish") + 2))
+      .toEqual(["--publish", "127.0.0.1:6090:6080"]);
+    expect(args.filter((argument) => argument === "--publish")).toHaveLength(1);
+    expect(args).toContain(`${SANDBOX_VIEW_PORT_LABEL}=6090`);
   });
 
   it("requests every GPU only when asked", () => {
@@ -298,6 +316,17 @@ describe("ensureSandbox", () => {
     await ensureSandbox(fake.docker, input);
     expect(fake.calls.map((call) => call[0])).toContain("rm");
     expect(fake.state.containers[container]?.labels[SANDBOX_GPU_LABEL]).toBe("1");
+  });
+
+  it("replaces a container when the view port changes", async () => {
+    const { input, fake } = ensureInput(fakeDocker({
+      containers: {
+        [container]: { running: true, image: "briar-sandbox:x", labels: ownedLabels(runtimeSha256, "0", "6080") },
+      },
+    }));
+    await ensureSandbox(fake.docker, { ...input, viewPort: 6091 });
+    expect(fake.calls.map((call) => call[0])).toContain("rm");
+    expect(fake.state.containers[container]?.labels[SANDBOX_VIEW_PORT_LABEL]).toBe("6091");
   });
 
   it("refuses an unowned container with the same name", async () => {

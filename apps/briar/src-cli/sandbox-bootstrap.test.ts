@@ -9,7 +9,10 @@ import {
 import { afterEach, describe, expect, it } from "vitest";
 import type { Config } from "./config-contract";
 import {
+  assignedDisplays,
   decodeSandboxBootstrapPayload,
+  novncCommand,
+  novncTokenFileContents,
   readSandboxState,
   runSandboxBootstrap,
   type SandboxBootstrapPayload,
@@ -142,6 +145,8 @@ describe("runSandboxBootstrap", () => {
       writeState: async (state) => {
         states.push(state);
       },
+      computerUseHealthy: async () => true,
+      sleep: async () => undefined,
       now: () => new Date("2026-09-05T00:00:00.000Z"),
       log: () => undefined,
     });
@@ -192,6 +197,8 @@ describe("runSandboxBootstrap", () => {
       writeCodexAuth: async () => undefined,
       writeGitIdentity: async () => undefined,
       writeState: async () => undefined,
+      computerUseHealthy: async () => true,
+      sleep: async () => undefined,
       log: () => undefined,
     });
     expect(config.teams[0]).toMatchObject({
@@ -232,6 +239,8 @@ describe("sandboxReport", () => {
       state: null,
       supervisorPid: null,
       providerSignedIn: async () => false,
+      computerUseHealthy: async () => false,
+      displays: async () => [],
     });
     expect(report).toMatchObject({ ready: false, detail: "Waiting for bootstrap.", teams: [] });
   });
@@ -243,8 +252,14 @@ describe("sandboxReport", () => {
       supervisorPid: process.pid,
       repositoryPresent: () => true,
       providerSignedIn: async (provider) => provider === "codex",
+      computerUseHealthy: async () => true,
+      displays: async () => [{ agentId: "agent-a", displayIndex: 2 }],
     });
     expect(report.ready).toBe(true);
+    expect(report.computerUse).toEqual({
+      serviceHealthy: true,
+      displays: [{ agentId: "agent-a", displayIndex: 2 }],
+    });
     expect(report.teams).toEqual([{
       id: projectId,
       registered: true,
@@ -327,5 +342,29 @@ describe("readSandboxState", () => {
       bootstrappedAt: "2026-09-05T00:00:00.000Z",
     }));
     expect((await readSandboxState(directory))?.teamIds).toEqual([projectId]);
+  });
+});
+
+describe("noVNC bridge", () => {
+  it("routes every assignable display through one websockify token file", () => {
+    const tokens = novncTokenFileContents(3);
+    expect(tokens).toBe("display1: 127.0.0.1:5901\ndisplay2: 127.0.0.1:5902\ndisplay3: 127.0.0.1:5903\n");
+    expect(novncTokenFileContents().split("\n").filter(Boolean)).toHaveLength(100);
+    const command = novncCommand("/tmp/tokens");
+    expect(command[0]).toBe("/usr/bin/websockify");
+    expect(command).toContain("TokenFile");
+    expect(command.at(-1)).toBe("0.0.0.0:6080");
+  });
+
+  it("lists assigned displays without exposing owner tokens", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "briar-sandbox-displays-"));
+    directories.push(directory);
+    const path = join(directory, "window-assignments.json");
+    await writeFile(path, JSON.stringify({
+      version: 1,
+      assignments: [{ agentId: "agent-a", displayIndex: 2, ownerToken: "secret", assignedAt: "x" }],
+    }));
+    expect(await assignedDisplays(path)).toEqual([{ agentId: "agent-a", displayIndex: 2 }]);
+    expect(await assignedDisplays(join(directory, "missing.json"))).toEqual([]);
   });
 });

@@ -1,6 +1,7 @@
+import { type ChildProcess, spawn } from "node:child_process";
 import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, isAbsolute, join } from "node:path";
 import * as Schema from "effect/Schema";
 import {
   ProjectGitHubService,
@@ -18,12 +19,13 @@ import {
 import type { Config, TeamConfig } from "./config-contract";
 import { createAuthenticatedConnectClient } from "./connect-client";
 import { providerAuthenticated } from "./managed-computer-setup-agent";
+import { configuredComputerUseAssignmentPath } from "./computer-use-desktop-manager";
 import { runWorkerSupervisor } from "./managed-computer-supervisor";
 import {
   ensureRepository,
   runSimpleCommand,
 } from "./project-repository-bootstrap";
-import { SANDBOX_SCHEMA_VERSION } from "./sandbox-image";
+import { SANDBOX_NOVNC_PORT, SANDBOX_NOVNC_TOKEN_FILE, SANDBOX_SCHEMA_VERSION } from "./sandbox-image";
 import { registerProjectExecutionWorker } from "./worker-commands";
 
 /**
@@ -151,6 +153,8 @@ export type SandboxBootstrapDependencies = {
     identity: { readonly name: string; readonly email: string },
   ) => Promise<void>;
   readonly writeState: (state: SandboxState) => Promise<void>;
+  readonly computerUseHealthy: () => Promise<boolean>;
+  readonly sleep: (milliseconds: number) => Promise<void>;
   readonly now: () => Date;
   readonly log: (message: string) => void;
 };
@@ -193,9 +197,42 @@ const defaultDependencies: SandboxBootstrapDependencies = {
   writeCodexAuth,
   writeGitIdentity,
   writeState: writeSandboxState,
+  computerUseHealthy: () => computerUseServiceHealthy(),
+  sleep: (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)),
   now: () => new Date(),
   log: (message) => console.error(message),
 };
+
+export const COMPUTER_USE_HEALTH_URL = "http://127.0.0.1:1337/healthz";
+
+/** True when the in-container Computer Use box service answers its health check. */
+export async function computerUseServiceHealthy(
+  fetchImplementation: typeof fetch = fetch,
+): Promise<boolean> {
+  try {
+    const response = await fetchImplementation(COMPUTER_USE_HEALTH_URL, {
+      signal: AbortSignal.timeout(1_000),
+    });
+    if (!response.ok) return false;
+    const health = await response.json() as Record<string, unknown>;
+    return health.ok === true && health.computerUseSupported === true;
+  } catch {
+    return false;
+  }
+}
+
+async function waitForComputerUseService(
+  healthy: () => Promise<boolean>,
+  sleep: (milliseconds: number) => Promise<void>,
+  timeoutMs: number,
+) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await healthy()) return true;
+    await sleep(1_000);
+  }
+  return false;
+}
 
 /**
  * Converge the container onto the payload: session, provider credentials,
@@ -215,6 +252,14 @@ export async function runSandboxBootstrap(
   }
   if (payload.gitIdentity !== undefined) {
     await dependencies.writeGitIdentity(payload.gitIdentity);
+  }
+  // Worker registration probes the Computer Use box service and only
+  // advertises the capability when a display can be driven, so give the
+  // supervisor a moment to bring the service up before registering.
+  if (!await waitForComputerUseService(dependencies.computerUseHealthy, dependencies.sleep, 90_000)) {
+    dependencies.log(
+      "Computer Use box service is not healthy; workers register without Computer Use",
+    );
   }
   const signal = new AbortController().signal;
   for (const project of payload.teams) {
@@ -284,6 +329,8 @@ export async function sandboxReport(input: {
   readonly supervisorPid?: number | null;
   readonly repositoryPresent?: (path: string) => boolean;
   readonly providerSignedIn?: (provider: string) => Promise<boolean>;
+  readonly computerUseHealthy?: () => Promise<boolean>;
+  readonly displays?: () => Promise<readonly SandboxDisplay[]>;
 } = {}) {
   const config = input.config ?? await loadConfig();
   const state = input.state === undefined ? await readSandboxState() : input.state;
@@ -317,6 +364,8 @@ export async function sandboxReport(input: {
     ),
   );
   const supervisorRunning = supervisorPid !== null && processAlive(supervisorPid);
+  const serviceHealthy = await (input.computerUseHealthy ?? computerUseServiceHealthy)();
+  const displays = await (input.displays ?? assignedDisplays)();
   const missing = teams.filter((project) =>
     !project.registered || !project.repositoryPresent
   );
@@ -326,15 +375,38 @@ export async function sandboxReport(input: {
       ? `Bootstrap incomplete for ${missing.map((project) => project.id).join(", ")}.`
       : !supervisorRunning
         ? "Worker supervisor is not running."
-        : "Sandbox is ready.";
+        : !serviceHealthy
+          ? "Computer Use box service is not healthy."
+          : "Sandbox is ready.";
   return {
     schemaVersion: SANDBOX_SCHEMA_VERSION,
-    ready: state !== null && missing.length === 0 && supervisorRunning,
+    ready: state !== null && missing.length === 0 && supervisorRunning && serviceHealthy,
     supervisorRunning,
+    computerUse: { serviceHealthy, displays },
     detail,
     teams,
     providers,
   };
+}
+
+export type SandboxDisplay = { readonly agentId: string; readonly displayIndex: number };
+
+/** Displays the box service currently holds for agents, without their owner tokens. */
+export async function assignedDisplays(
+  path = configuredComputerUseAssignmentPath(),
+): Promise<SandboxDisplay[]> {
+  try {
+    const parsed = JSON.parse(await readFile(path, "utf8")) as {
+      assignments?: { agentId?: unknown; displayIndex?: unknown }[];
+    };
+    return (parsed.assignments ?? []).flatMap((assignment) =>
+      typeof assignment.agentId === "string" && typeof assignment.displayIndex === "number"
+        ? [{ agentId: assignment.agentId, displayIndex: assignment.displayIndex }]
+        : []
+    );
+  } catch {
+    return [];
+  }
 }
 
 async function readSupervisorPid(directory = configDirectory) {
@@ -354,12 +426,97 @@ export function sandboxWorkerTeamIds(config: Config, state: SandboxState | null)
     .sort();
 }
 
-/** Keep one `briar worker` per bootstrapped team alive inside the container. */
+/**
+ * Keep a long-running child of the supervisor alive with exponential backoff.
+ * Used for the Computer Use box service (which owns the Xvnc displays and the
+ * loopback exec endpoints) and for the noVNC bridge that lets the owner watch
+ * those displays.
+ */
+export function keepChildAlive(
+  name: string,
+  command: readonly string[],
+  stop: AbortSignal,
+): Promise<void> {
+  return new Promise((resolve) => {
+    let child: ChildProcess | undefined;
+    let attempt = 0;
+    const launch = () => {
+      if (stop.aborted) return resolve();
+      const startedAt = Date.now();
+      child = spawn(command[0]!, command.slice(1), { stdio: "inherit", env: process.env });
+      console.log(JSON.stringify({ event: `sandbox_${name}_started`, pid: child.pid ?? null }));
+      child.once("exit", (code, signal) => {
+        child = undefined;
+        if (stop.aborted) return resolve();
+        attempt = Date.now() - startedAt >= 60_000 ? 1 : Math.min(6, attempt + 1);
+        const delayMs = Math.min(60_000, 1_000 * 2 ** (attempt - 1));
+        console.error(JSON.stringify({
+          event: `sandbox_${name}_exited`,
+          code,
+          signal,
+          restartInMs: delayMs,
+        }));
+        setTimeout(launch, delayMs);
+      });
+    };
+    stop.addEventListener("abort", () => {
+      if (child) child.kill("SIGTERM");
+      else resolve();
+    }, { once: true });
+    launch();
+  });
+}
+
+/**
+ * noVNC token routing: `?token=displayN` reaches the Xvnc server of display
+ * `:N`. Every index the desktop manager may assign is listed up front so the
+ * bridge never needs restarting when a display appears.
+ */
+export function novncTokenFileContents(maxDisplayIndex = 100): string {
+  return Array.from({ length: maxDisplayIndex }, (_, index) => index + 1)
+    .map((display) => `display${display}: 127.0.0.1:${5_900 + display}`)
+    .join("\n") + "\n";
+}
+
+export function novncCommand(tokenFile = SANDBOX_NOVNC_TOKEN_FILE) {
+  return [
+    "/usr/bin/websockify",
+    "--web",
+    "/usr/share/novnc",
+    "--token-plugin",
+    "TokenFile",
+    "--token-source",
+    tokenFile,
+    `0.0.0.0:${SANDBOX_NOVNC_PORT}`,
+  ];
+}
+
+export function boxServiceCommand(environment: NodeJS.ProcessEnv = process.env) {
+  const configured = environment.BRIAR_CLI?.trim();
+  if (configured && isAbsolute(configured)) return [configured, "sandbox", "box-exec"];
+  const entry = process.argv[1];
+  if (!entry || !isAbsolute(entry)) {
+    throw new Error("Unable to resolve the Briar CLI entry point");
+  }
+  return [process.execPath, entry, "sandbox", "box-exec"];
+}
+
+/**
+ * Keep the box service and one `briar worker` per bootstrapped team alive
+ * inside the container.
+ */
 export async function runSandboxSupervisor(directory = configDirectory) {
   await mkdir(directory, { recursive: true, mode: 0o700 });
   await writeFile(sandboxSupervisorPidPath(directory), `${process.pid}\n`, {
     mode: 0o600,
   });
+  const stop = new AbortController();
+  await mkdir(dirname(SANDBOX_NOVNC_TOKEN_FILE), { recursive: true, mode: 0o700 });
+  await writeFile(SANDBOX_NOVNC_TOKEN_FILE, novncTokenFileContents(), { mode: 0o600 });
+  const children = Promise.all([
+    keepChildAlive("box_service", boxServiceCommand(), stop.signal),
+    keepChildAlive("novnc", novncCommand(), stop.signal),
+  ]);
   try {
     await runWorkerSupervisor({
       // The state file is re-read on every reconcile so a later bootstrap
@@ -370,6 +527,8 @@ export async function runSandboxSupervisor(directory = configDirectory) {
       eventPrefix: "sandbox_worker",
     });
   } finally {
+    stop.abort();
+    await Promise.race([children, new Promise((resolve) => setTimeout(resolve, 10_000))]);
     await rm(sandboxSupervisorPidPath(directory), { force: true });
   }
 }

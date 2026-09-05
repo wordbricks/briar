@@ -31,9 +31,33 @@ const requiredLock = (name: string) => {
   return value;
 };
 
+const managedDirectory = resolve(root, "infrastructure/managed-computers");
+/**
+ * Display and Computer Use files shared with the managed-computer image. They
+ * are copied verbatim into the sandbox image so both environments run the
+ * same desktop session, browser launcher, and input executor.
+ */
+const desktopFileNames = [
+  "briar-remote-desktop",
+  "briar-computer-use-window",
+  "briar-open-browser",
+  "briar-computer-executor.py",
+  "xfce4-helpers.rc",
+  "xfce4-terminalrc",
+  "mimeapps.list",
+  "briar-google-chrome.desktop",
+  "remote-desktop-packages.txt",
+] as const;
+const desktopFiles = Object.fromEntries(
+  await Promise.all(desktopFileNames.map(async (name) =>
+    [name, await readFile(resolve(managedDirectory, name), "utf8")] as const
+  )),
+);
+
 const assets = {
   bunVersion: requiredLock("BUN_VERSION"),
   nodeVersion: requiredLock("NODE_VERSION"),
+  desktopFiles,
   providerRuntimePackageJson: await readFile(
     resolve(runtimeDirectory, "package.json"),
     "utf8",

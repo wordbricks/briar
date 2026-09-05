@@ -1293,6 +1293,11 @@ pub(super) fn install_auto_hunt_assets(
         "agent/pi-runner.js",
         "dist-agent/pi-runner.js",
     );
+    let computer_use_mcp_source = bundled_path(
+        resource_directory,
+        "agent/computer-use-mcp-server.js",
+        "dist-agent/computer-use-mcp-server.js",
+    );
     if !cli_source.is_file() || !launcher_source.is_file() {
         return Err("Briar CLI 번들을 찾지 못했습니다.".to_string());
     }
@@ -1303,6 +1308,7 @@ pub(super) fn install_auto_hunt_assets(
         || !agy_runner_source.is_file()
         || !opencode_runner_source.is_file()
         || !pi_runner_source.is_file()
+        || !computer_use_mcp_source.is_file()
     {
         return Err("Briar Agent runner 번들을 찾지 못했습니다.".to_string());
     }
@@ -1337,6 +1343,13 @@ pub(super) fn install_auto_hunt_assets(
     .map_err(|error| format!("OpenCode runner를 설치하지 못했습니다: {error}"))?;
     fs::copy(pi_runner_source, agent_directory.join("pi-runner.js"))
         .map_err(|error| format!("Pi runner를 설치하지 못했습니다: {error}"))?;
+    // The Docker sandbox stages this bundle so agents can use the sandbox
+    // display; the desktop's own workers never load it.
+    fs::copy(
+        computer_use_mcp_source,
+        agent_directory.join("computer-use-mcp-server.js"),
+    )
+    .map_err(|error| format!("Computer Use MCP 서버를 설치하지 못했습니다: {error}"))?;
     fs::write(
         library_directory.join("VERSION"),
         format!("{}\n", env!("CARGO_PKG_VERSION")),
