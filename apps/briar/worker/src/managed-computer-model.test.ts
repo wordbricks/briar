@@ -60,6 +60,7 @@ describe("managed computer retry presentation", () => {
     organization_id: "organization",
     requester_user_id: "owner",
     entitlement_id: "entitlement",
+    provider: "aws",
     state: "failed",
     aws_account_id: "123456789012",
     aws_region: "us-east-1",

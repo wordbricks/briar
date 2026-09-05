@@ -11,9 +11,11 @@ import {
   managedComputerProviderAuthCommand,
 } from "./managed-computer-setup-agent";
 import { ComputerUseBoxService } from "./computer-use-box-service";
+import { ManagedComputerRemoteSessionAgent } from "./managed-computer-remote-session-agent";
 import {
   computerUseServiceHealthy,
   decodeSandboxBootstrapPayload,
+  readSandboxRemoteAgentConfig,
   readStdin,
   runSandboxBootstrap,
   runSandboxSupervisor,
@@ -472,4 +474,25 @@ export async function sandboxViewCommand() {
   }
   console.log(url);
   openBrowser(url);
+}
+
+/**
+ * Run the remote-desktop relay agent for this sandbox (container side). It is
+ * the same agent a managed computer runs; the sandbox only differs in where
+ * its credential comes from. Without a registration yet, wait and let the
+ * supervisor retry after bootstrap writes the config.
+ */
+export async function sandboxRemoteAgentCommand() {
+  const config = await readSandboxRemoteAgentConfig();
+  if (!config) {
+    console.error("Sandbox is not registered for remote viewing yet; waiting for bootstrap");
+    await new Promise((resolve) => setTimeout(resolve, 30_000));
+    return;
+  }
+  const agent = new ManagedComputerRemoteSessionAgent(config);
+  const stop = () => agent.stop();
+  process.once("SIGTERM", stop);
+  process.once("SIGINT", stop);
+  agent.start();
+  await new Promise<never>(() => undefined);
 }

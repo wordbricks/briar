@@ -65,6 +65,8 @@ const computer = {
   organizationId: "22222222-2222-4222-8222-222222222222",
   requesterUserId: "user-one",
   state: "needs_setup" as const,
+  provider: "aws" as const,
+  label: null,
   region: "us-east-1",
   instanceId: "i-example",
   volumeId: "vol-example",

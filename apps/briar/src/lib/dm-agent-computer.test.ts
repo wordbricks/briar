@@ -7,6 +7,8 @@ const computer = (overrides: Partial<ManagedComputer> = {}): ManagedComputer => 
   organizationId: "organization-1",
   requesterUserId: "user-1",
   state: "ready",
+  provider: "aws",
+  label: null,
   region: "us-east-1",
   instanceId: "i-1",
   volumeId: "vol-1",

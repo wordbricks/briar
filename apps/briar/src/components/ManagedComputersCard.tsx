@@ -388,9 +388,13 @@ export function ManagedComputersCard({
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <Typography as="h3" variant="bodySm">
-                        {t("managedComputer.computerName", {
-                          id: computer.id.slice(0, 8),
-                        })}
+                        {computer.provider === "sandbox"
+                          ? t("managedComputer.sandboxName", {
+                            label: computer.label ?? computer.id.slice(0, 8),
+                          })
+                          : t("managedComputer.computerName", {
+                            id: computer.id.slice(0, 8),
+                          })}
                       </Typography>
                       <Badge variant={stateTone(computer.state)}>
                         {t(`managedComputer.state.${computer.state}`)}
@@ -467,7 +471,8 @@ export function ManagedComputersCard({
                       {t("managedComputer.retry")}
                     </Button>
                   ) : null}
-                  {product?.canApply && userRetirementStates.has(computer.state) ? (
+                  {computer.provider !== "sandbox" && product?.canApply &&
+                      userRetirementStates.has(computer.state) ? (
                     <Button
                       aria-label={t("managedComputer.retire", {
                         id: computer.id.slice(0, 8),

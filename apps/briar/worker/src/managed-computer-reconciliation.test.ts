@@ -12,6 +12,7 @@ const drainingComputer: ManagedComputerRow = {
   organization_id: "4fdee229-9de3-4e03-a1fd-380f46321533",
   requester_user_id: "owner",
   entitlement_id: "entitlement",
+  provider: "aws",
   state: "draining",
   aws_account_id: "496494569181",
   aws_region: "us-east-1",

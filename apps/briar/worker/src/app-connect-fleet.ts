@@ -45,8 +45,10 @@ import {
   listManagedComputersApplication,
   registerProjectExecutionWorkerApplication,
   requestExecutionWorkerUpdateApplication,
+  registerSandboxComputerApplication,
   retireManagedComputerApplication,
   retryManagedComputerApplication,
+  unregisterSandboxComputerApplication,
   terminateManagedComputerApplication,
   unbindProjectExecutionWorkerApplication,
   updateExecutionWorkerApplication,
@@ -83,6 +85,12 @@ export type AppConnectFleetInput = {
 };
 
 const decodeUuid = decodeRequestSync(UuidString);
+const decodeWorkerDeviceId = (value: string) => {
+  if (!/^[A-Za-z0-9_-]{1,200}$/u.test(value)) {
+    throw new HttpError(400, "Worker device id is invalid", "VALIDATION_FAILED");
+  }
+  return value;
+};
 const decodeDeviceId = decodeRequestSync(trimmedText(1, 128));
 
 const workerDeviceIdentity = (value: string) => {
@@ -367,6 +375,37 @@ export const createAppFleetService = (
       computers: result.computers.map(appManagedComputer),
       generatedAt: appFleetTimestamp(result.generatedAt),
     };
+  },
+
+  registerSandboxComputer: async (input) => {
+    const session = await requireSession(auth, request);
+    const label = input.label.trim();
+    if (label.length === 0 || label.length > 100) {
+      throw new HttpError(400, "Sandbox label must be 1-100 characters", "VALIDATION_FAILED");
+    }
+    const result = await withFleetErrors(registerSandboxComputerApplication({
+      db,
+      organizationId: decodeUuid(input.organizationId),
+      deviceId: decodeWorkerDeviceId(input.deviceId),
+      label,
+      userId: session.user.id,
+      apiOrigin: new URL(request.url).origin,
+      observedAt: new Date().toISOString(),
+    }));
+    return { computer: appManagedComputer(result.computer) };
+  },
+
+  unregisterSandboxComputer: async (input) => {
+    const session = await requireSession(auth, request);
+    const result = await withFleetErrors(unregisterSandboxComputerApplication({
+      db,
+      env,
+      organizationId: decodeUuid(input.organizationId),
+      deviceId: decodeWorkerDeviceId(input.deviceId),
+      userId: session.user.id,
+      observedAt: new Date().toISOString(),
+    }));
+    return { removed: result.removed };
   },
 
   getManagedComputer: async (input) => {

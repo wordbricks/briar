@@ -52,14 +52,19 @@ export async function managedComputerByDeviceId(
   ).bind(deviceId).first<ManagedComputerRow>();
 }
 
+const computerWithDeviceLabelSql = `select computer.*, device.label as device_label
+     from briar_managed_computers computer
+     left join briar_execution_worker_devices device
+       on device.id = computer.briar_device_id`;
+
 export async function organizationManagedComputer(
   db: D1Database,
   organizationId: string,
   managedComputerId: string,
 ) {
   return db.prepare(
-    `select * from briar_managed_computers
-     where id = ? and organization_id = ?`,
+    `${computerWithDeviceLabelSql}
+     where computer.id = ? and computer.organization_id = ?`,
   ).bind(managedComputerId, organizationId).first<ManagedComputerRow>();
 }
 
@@ -68,11 +73,135 @@ export async function listOrganizationManagedComputers(
   organizationId: string,
 ) {
   const result = await db.prepare(
-    `select * from briar_managed_computers
-     where organization_id = ? and state != 'terminated'
-     order by created_at desc, id`,
+    `${computerWithDeviceLabelSql}
+     where computer.organization_id = ? and computer.state != 'terminated'
+     order by computer.created_at desc, computer.id`,
   ).bind(organizationId).all<ManagedComputerRow>();
   return result.results ?? [];
+}
+
+export async function sandboxManagedComputerByDevice(
+  db: D1Database,
+  organizationId: string,
+  deviceId: string,
+) {
+  return db.prepare(
+    `${computerWithDeviceLabelSql}
+     where computer.organization_id = ? and computer.briar_device_id = ?
+       and computer.provider = 'sandbox'`,
+  ).bind(organizationId, deviceId).first<ManagedComputerRow>();
+}
+
+/**
+ * Register a Docker sandbox's worker device as a managed computer. The row
+ * is born `ready` with its device attached, so the remote-desktop relay and
+ * the DM computer panel treat it exactly like an enrolled AWS computer. AWS
+ * provisioning columns hold sandbox placeholders; every AWS lifecycle query
+ * filters on `provider = 'aws'`. Re-registering the same device replaces the
+ * record so a terminated history never blocks a fresh sandbox.
+ */
+export async function createSandboxManagedComputer(
+  db: D1Database,
+  input: {
+    managedComputerId: string;
+    entitlementId: string;
+    organizationId: string;
+    userId: string;
+    deviceId: string;
+    apiOrigin: string;
+    enrollmentNonceHash: string;
+    observedAt: string;
+  },
+) {
+  // Only the device owner may (re)register it, and that check must run
+  // before anything is deleted so a stranger cannot erase someone's record.
+  const owned = await db.prepare(
+    `select 1 as present from briar_execution_worker_devices
+     where id = ? and organization_id = ? and owner_user_id = ?`,
+  ).bind(input.deviceId, input.organizationId, input.userId)
+    .first<{ present: number }>();
+  if (owned?.present !== 1) return null;
+  const existing = await sandboxManagedComputerByDevice(
+    db,
+    input.organizationId,
+    input.deviceId,
+  );
+  const requestId = `sandbox:${input.deviceId}`;
+  const farFuture = "9999-12-31T00:00:00.000Z";
+  await db.batch([
+    ...(existing
+      ? [
+        db.prepare(`delete from briar_managed_computers where id = ?`).bind(existing.id),
+        db.prepare(`delete from briar_managed_computer_entitlements where id = ?`)
+          .bind(existing.entitlement_id),
+      ]
+      : []),
+    db.prepare(
+      `insert into briar_managed_computer_entitlements (
+         id, organization_id, requester_user_id, source, source_reference,
+         request_id, status, approved_at, expires_at, created_at, updated_at
+       ) values (?, ?, ?, 'free_promotion', ?, ?, 'approved', ?, null, ?, ?)`,
+    ).bind(
+      input.entitlementId,
+      input.organizationId,
+      input.userId,
+      requestId,
+      requestId,
+      input.observedAt,
+      input.observedAt,
+      input.observedAt,
+    ),
+    db.prepare(
+      `insert into briar_managed_computers (
+         id, organization_id, requester_user_id, entitlement_id, provider, state,
+         aws_region, aws_instance_type, aws_launch_template_id,
+         aws_launch_template_version, bootstrap_api_origin, briar_device_id,
+         provisioning_job_id, enrollment_nonce_hash, enrollment_expires_at,
+         enrollment_consumed_at, created_at, state_updated_at, expires_at,
+         updated_at
+       )
+       select ?, ?, ?, ?, 'sandbox', 'ready', 'sandbox', 'docker', 'sandbox', '0',
+              ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+       where exists (
+         select 1 from briar_execution_worker_devices
+         where id = ? and organization_id = ? and owner_user_id = ?
+       )`,
+    ).bind(
+      input.managedComputerId,
+      input.organizationId,
+      input.userId,
+      input.entitlementId,
+      input.apiOrigin,
+      input.deviceId,
+      requestId,
+      input.enrollmentNonceHash,
+      input.observedAt,
+      input.observedAt,
+      input.observedAt,
+      input.observedAt,
+      farFuture,
+      input.observedAt,
+      input.deviceId,
+      input.organizationId,
+      input.userId,
+    ),
+  ]);
+  return sandboxManagedComputerByDevice(db, input.organizationId, input.deviceId);
+}
+
+export async function deleteSandboxManagedComputer(
+  db: D1Database,
+  organizationId: string,
+  deviceId: string,
+) {
+  const existing = await sandboxManagedComputerByDevice(db, organizationId, deviceId);
+  if (!existing) return null;
+  await db.batch([
+    db.prepare(`delete from briar_managed_computers where id = ?`).bind(existing.id),
+    db.prepare(`delete from briar_managed_computer_entitlements where id = ?`)
+      .bind(existing.entitlement_id),
+  ]);
+  return existing;
 }
 
 export async function managedComputerApplicationByRequest(
@@ -102,10 +231,10 @@ export async function managedComputerCapacity(
   const row = await db.prepare(
     `select
        (select count(*) from briar_managed_computers
-        where organization_id = ? and state in (${activeStateSql}))
+        where provider = 'aws' and organization_id = ? and state in (${activeStateSql}))
           as organization_count,
        (select count(*) from briar_managed_computers
-        where state in (${activeStateSql})) as fleet_count,
+        where provider = 'aws' and state in (${activeStateSql})) as fleet_count,
        exists(
          select 1 from briar_managed_computer_promotion_redemptions
          where user_id = ? and campaign_id = ?
@@ -228,9 +357,9 @@ export async function createPromotionalManagedComputer(
          where id = ? and active = 1
        )
          and (select count(*) from briar_managed_computers
-              where organization_id = ? and state in (${activeStateSql})) < ?
+              where provider = 'aws' and organization_id = ? and state in (${activeStateSql})) < ?
          and (select count(*) from briar_managed_computers
-              where state in (${activeStateSql})) < ?
+              where provider = 'aws' and state in (${activeStateSql})) < ?
          and not exists (
            select 1 from briar_managed_computer_promotion_redemptions
            where user_id = ? and campaign_id = ?
@@ -1020,7 +1149,7 @@ export async function managedComputerWorkerHealth(
 export async function listManagedComputersForReconciliation(db: D1Database) {
   const result = await db.prepare(
     `select * from briar_managed_computers
-     where state in (${activeStateSql})
+     where provider = 'aws' and state in (${activeStateSql})
      order by created_at limit 500`,
   ).bind(...activeStates).all<ManagedComputerRow>();
   return result.results ?? [];
@@ -1031,7 +1160,7 @@ export async function listDrainingManagedComputersForReconciliation(
 ) {
   const result = await db.prepare(
     `select * from briar_managed_computers
-     where state = 'draining'
+     where provider = 'aws' and state = 'draining'
      order by drained_at, created_at limit 500`,
   ).all<ManagedComputerRow>();
   return result.results ?? [];

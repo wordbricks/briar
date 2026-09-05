@@ -174,6 +174,47 @@ public nonisolated enum BriarAPI_ManagedComputerState: SwiftProtobuf.Enum, Swift
 
 }
 
+/// Who provisions and owns the computer's lifecycle. AWS computers are
+/// provisioned by Briar; sandbox computers are Docker containers a member
+/// runs on their own hardware and registers through the CLI.
+public nonisolated enum BriarAPI_ManagedComputerProvider: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case aws // = 1
+  case sandbox // = 2
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .aws
+    case 2: self = .sandbox
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .aws: return 1
+    case .sandbox: return 2
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [BriarAPI_ManagedComputerProvider] = [
+    .unspecified,
+    .aws,
+    .sandbox,
+  ]
+
+}
+
 public nonisolated enum BriarAPI_ManagedComputerCurrency: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
@@ -1059,6 +1100,21 @@ public nonisolated struct BriarAPI_ManagedComputer: @unchecked Sendable {
   /// Clears the value of `updatedAt`. Subsequent reads from it will return its default value.
   public mutating func clearUpdatedAt() {_uniqueStorage()._updatedAt = nil}
 
+  public var provider: BriarAPI_ManagedComputerProvider {
+    get {_storage._provider}
+    set {_uniqueStorage()._provider = newValue}
+  }
+
+  /// Present for sandbox computers: the label the sandbox registered with.
+  public var label: String {
+    get {_storage._label ?? String()}
+    set {_uniqueStorage()._label = newValue}
+  }
+  /// Returns true if `label` has been explicitly set.
+  public var hasLabel: Bool {_storage._label != nil}
+  /// Clears the value of `label`. Subsequent reads from it will return its default value.
+  public mutating func clearLabel() {_uniqueStorage()._label = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -1204,6 +1260,72 @@ public nonisolated struct BriarAPI_ListManagedComputersResponse: Sendable {
   public init() {}
 
   fileprivate var _generatedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+}
+
+/// Register a Docker sandbox's execution worker device as a managed computer
+/// so its desktop can be reached through the remote-desktop relay. The caller
+/// must own the device. Re-registering the same device replaces the record.
+public nonisolated struct BriarAPI_RegisterSandboxComputerRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var organizationID: String = String()
+
+  public var deviceID: String = String()
+
+  public var label: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_RegisterSandboxComputerResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var computer: BriarAPI_ManagedComputer {
+    get {_computer ?? BriarAPI_ManagedComputer()}
+    set {_computer = newValue}
+  }
+  /// Returns true if `computer` has been explicitly set.
+  public var hasComputer: Bool {self._computer != nil}
+  /// Clears the value of `computer`. Subsequent reads from it will return its default value.
+  public mutating func clearComputer() {self._computer = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _computer: BriarAPI_ManagedComputer? = nil
+}
+
+public nonisolated struct BriarAPI_UnregisterSandboxComputerRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var organizationID: String = String()
+
+  public var deviceID: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_UnregisterSandboxComputerResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var removed: Bool = false
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
 }
 
 public nonisolated struct BriarAPI_GetManagedComputerRequest: Sendable {
@@ -1873,6 +1995,10 @@ nonisolated extension BriarAPI_ExecutionWorkerHandoffState: SwiftProtobuf._Proto
 
 nonisolated extension BriarAPI_ManagedComputerState: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0MANAGED_COMPUTER_STATE_UNSPECIFIED\0\u{1}MANAGED_COMPUTER_STATE_REQUESTED\0\u{1}MANAGED_COMPUTER_STATE_PROVISIONING\0\u{1}MANAGED_COMPUTER_STATE_BOOTSTRAPPING\0\u{1}MANAGED_COMPUTER_STATE_NEEDS_SETUP\0\u{1}MANAGED_COMPUTER_STATE_READY\0\u{1}MANAGED_COMPUTER_STATE_FAILED\0\u{1}MANAGED_COMPUTER_STATE_DRAINING\0\u{1}MANAGED_COMPUTER_STATE_STOPPED\0\u{1}MANAGED_COMPUTER_STATE_TERMINATED\0")
+}
+
+nonisolated extension BriarAPI_ManagedComputerProvider: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0MANAGED_COMPUTER_PROVIDER_UNSPECIFIED\0\u{1}MANAGED_COMPUTER_PROVIDER_AWS\0\u{1}MANAGED_COMPUTER_PROVIDER_SANDBOX\0")
 }
 
 nonisolated extension BriarAPI_ManagedComputerCurrency: SwiftProtobuf._ProtoNameProviding {
@@ -2869,7 +2995,7 @@ nonisolated extension BriarAPI_ManagedComputerError: SwiftProtobuf.Message, Swif
 
 nonisolated extension BriarAPI_ManagedComputer: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ManagedComputer"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}organization_id\0\u{3}requester_user_id\0\u{1}state\0\u{1}region\0\u{3}instance_id\0\u{3}volume_id\0\u{3}device_id\0\u{1}error\0\u{3}retry_count\0\u{3}retry_available\0\u{3}created_at\0\u{3}expires_at\0\u{3}updated_at\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}organization_id\0\u{3}requester_user_id\0\u{1}state\0\u{1}region\0\u{3}instance_id\0\u{3}volume_id\0\u{3}device_id\0\u{1}error\0\u{3}retry_count\0\u{3}retry_available\0\u{3}created_at\0\u{3}expires_at\0\u{3}updated_at\0\u{1}provider\0\u{1}label\0")
 
   fileprivate class _StorageClass {
     var _id: String = String()
@@ -2886,6 +3012,8 @@ nonisolated extension BriarAPI_ManagedComputer: SwiftProtobuf.Message, SwiftProt
     var _createdAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
     var _expiresAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
     var _updatedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _provider: BriarAPI_ManagedComputerProvider = .unspecified
+    var _label: String? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -2910,6 +3038,8 @@ nonisolated extension BriarAPI_ManagedComputer: SwiftProtobuf.Message, SwiftProt
       _createdAt = source._createdAt
       _expiresAt = source._expiresAt
       _updatedAt = source._updatedAt
+      _provider = source._provider
+      _label = source._label
     }
   }
 
@@ -2942,6 +3072,8 @@ nonisolated extension BriarAPI_ManagedComputer: SwiftProtobuf.Message, SwiftProt
         case 12: try { try decoder.decodeSingularMessageField(value: &_storage._createdAt) }()
         case 13: try { try decoder.decodeSingularMessageField(value: &_storage._expiresAt) }()
         case 14: try { try decoder.decodeSingularMessageField(value: &_storage._updatedAt) }()
+        case 15: try { try decoder.decodeSingularEnumField(value: &_storage._provider) }()
+        case 16: try { try decoder.decodeSingularStringField(value: &_storage._label) }()
         default: break
         }
       }
@@ -2996,6 +3128,12 @@ nonisolated extension BriarAPI_ManagedComputer: SwiftProtobuf.Message, SwiftProt
       try { if let v = _storage._updatedAt {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 14)
       } }()
+      if _storage._provider != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._provider, fieldNumber: 15)
+      }
+      try { if let v = _storage._label {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 16)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -3019,6 +3157,8 @@ nonisolated extension BriarAPI_ManagedComputer: SwiftProtobuf.Message, SwiftProt
         if _storage._createdAt != rhs_storage._createdAt {return false}
         if _storage._expiresAt != rhs_storage._expiresAt {return false}
         if _storage._updatedAt != rhs_storage._updatedAt {return false}
+        if _storage._provider != rhs_storage._provider {return false}
+        if _storage._label != rhs_storage._label {return false}
         return true
       }
       if !storagesAreEqual {return false}
@@ -3299,6 +3439,145 @@ nonisolated extension BriarAPI_ListManagedComputersResponse: SwiftProtobuf.Messa
   public static func ==(lhs: BriarAPI_ListManagedComputersResponse, rhs: BriarAPI_ListManagedComputersResponse) -> Bool {
     if lhs.computers != rhs.computers {return false}
     if lhs._generatedAt != rhs._generatedAt {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_RegisterSandboxComputerRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RegisterSandboxComputerRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}device_id\0\u{1}label\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.deviceID) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.label) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.organizationID.isEmpty {
+      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    }
+    if !self.deviceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.deviceID, fieldNumber: 2)
+    }
+    if !self.label.isEmpty {
+      try visitor.visitSingularStringField(value: self.label, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_RegisterSandboxComputerRequest, rhs: BriarAPI_RegisterSandboxComputerRequest) -> Bool {
+    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.deviceID != rhs.deviceID {return false}
+    if lhs.label != rhs.label {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_RegisterSandboxComputerResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RegisterSandboxComputerResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}computer\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._computer) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._computer {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_RegisterSandboxComputerResponse, rhs: BriarAPI_RegisterSandboxComputerResponse) -> Bool {
+    if lhs._computer != rhs._computer {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_UnregisterSandboxComputerRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".UnregisterSandboxComputerRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}device_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.deviceID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.organizationID.isEmpty {
+      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    }
+    if !self.deviceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.deviceID, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_UnregisterSandboxComputerRequest, rhs: BriarAPI_UnregisterSandboxComputerRequest) -> Bool {
+    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.deviceID != rhs.deviceID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_UnregisterSandboxComputerResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".UnregisterSandboxComputerResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}removed\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularBoolField(value: &self.removed) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.removed != false {
+      try visitor.visitSingularBoolField(value: self.removed, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_UnregisterSandboxComputerResponse, rhs: BriarAPI_UnregisterSandboxComputerResponse) -> Bool {
+    if lhs.removed != rhs.removed {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

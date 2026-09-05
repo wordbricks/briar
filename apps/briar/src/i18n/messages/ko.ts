@@ -2611,7 +2611,7 @@ export const ko = {
   "managedComputer.apiCosts": "모델 및 API 사용 비용은 별도입니다.",
   "managedComputer.applicationsPaused": "신규 신청 일시 중지",
   "managedComputer.adminOnly": "소유자·공동 소유자·개발자만 신청 가능",
-  "managedComputer.computerName": "관리형 컴퓨터 {id}",
+  "managedComputer.computerName": "관리형 컴퓨터 {id}", "managedComputer.sandboxName": "Sandbox {label}",
   "managedComputer.checkoutTitle": "컴퓨터 구매",
   "managedComputer.checkoutDescription": "프로모션을 적용하면 결제수단 없이 파일럿 컴퓨터 1대를 신청할 수 있습니다.",
   "managedComputer.oneRun": "동시 실행 1개",

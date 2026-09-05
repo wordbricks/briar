@@ -16,11 +16,15 @@ export const managedComputerStates = [
 
 export type ManagedComputerState = (typeof managedComputerStates)[number];
 
+export const managedComputerProviders = ["aws", "sandbox"] as const;
+export type ManagedComputerProvider = (typeof managedComputerProviders)[number];
+
 export type ManagedComputerRow = {
   id: string;
   organization_id: string;
   requester_user_id: string;
   entitlement_id: string;
+  provider: ManagedComputerProvider;
   state: ManagedComputerState;
   aws_account_id: string | null;
   aws_region: string;
@@ -47,6 +51,8 @@ export type ManagedComputerRow = {
   stopped_at: string | null;
   terminated_at: string | null;
   updated_at: string;
+  /** Joined from the worker device; only sandbox computers carry a label. */
+  device_label?: string | null;
 };
 
 export type ManagedComputerProvisioningJobRow = {
@@ -358,6 +364,8 @@ export function managedComputerJson(row: ManagedComputerRow) {
     organizationId: row.organization_id,
     requesterUserId: row.requester_user_id,
     state: row.state,
+    provider: row.provider,
+    label: row.provider === "sandbox" ? row.device_label ?? null : null,
     region: row.aws_region,
     instanceId: row.aws_instance_id,
     volumeId: row.aws_volume_id,

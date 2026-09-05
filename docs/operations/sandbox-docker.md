@@ -50,8 +50,19 @@ sandbox는 Grok Bot의 로컬 VM처럼 에이전트가 볼 수 있는 데스크�
   할당해 스크린샷을 찍고 해제한다. `status`의 `report.computerUse`에 box 서비스 health와
   현재 할당된 디스플레이 목록이 나온다.
 
-관리형 컴퓨터의 sudo 정책과 릴레이 기반 원격 데스크톱은 sandbox에 없다. 앱 안에서
-바로 보는 것은 다음 단계이며, 그때까지는 `sandbox view`의 브라우저 noVNC를 쓴다.
+- **앱에서 보기 (릴레이)**: bootstrap이 워커 등록 뒤 `RegisterSandboxComputer`로 이
+  sandbox의 워커 디바이스를 `provider = 'sandbox'`인 managed computer 레코드로 등록하고,
+  워커 credential을 `remote-agent.json`에 써 둔다. supervisor가 관리형 컴퓨터와 같은
+  `ManagedComputerRemoteSessionAgent`(`briar sandbox remote-agent`)를 띄워 Worker 릴레이에
+  outbound WSS로 붙는다. 앱은 이 레코드를 관리형 컴퓨터처럼 취급하므로, 에이전트의 지정
+  워커가 이 sandbox이고 Computer Use가 unattended면 DM 패널에 에이전트 화면이 뜨고,
+  설정의 컴퓨터 목록에는 `Sandbox <label>`로 보인다. `sandbox rm`은
+  `UnregisterSandboxComputer`로 레코드를 지운다. SSH 터널이나 LAN 노출이 필요 없다.
+- sandbox 레코드는 AWS 수명주기(프로비저닝, 만료, drain, 파일럿 용량 계산)에서 제외되며
+  앱의 은퇴/종료 버튼 대신 `briar sandbox rm`으로만 제거한다.
+
+관리형 컴퓨터의 sudo 정책은 sandbox에 없다. `sandbox view`의 브라우저 noVNC는 앱 없이
+볼 때 쓰는 보조 경로다.
 
 ## 요구 사항
 

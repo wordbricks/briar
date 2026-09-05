@@ -1319,7 +1319,7 @@ export const zh = {
   "managedComputer.apiCosts": "模型和 API 使用费用另计。",
   "managedComputer.applicationsPaused": "新申请已暂停",
   "managedComputer.adminOnly": "仅限所有者、共同所有者和开发者",
-  "managedComputer.computerName": "托管电脑 {id}",
+  "managedComputer.computerName": "托管电脑 {id}", "managedComputer.sandboxName": "沙盒 {label}",
   "managedComputer.checkoutTitle": "购买电脑",
   "managedComputer.checkoutDescription": "应用促销后，无需付款方式即可申请一台试点电脑。",
   "managedComputer.oneRun": "同时运行 1 个任务",
