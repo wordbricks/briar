@@ -150,9 +150,25 @@ async function grokModels(
   return models;
 }
 
+/**
+ * The lines of one `--help` option: the line naming it plus the wrapped
+ * description lines that follow, up to the next option.
+ */
+function helpOptionBlock(output: string, option: string): string[] {
+  const lines = output.split(/\r?\n/u);
+  const start = lines.findIndex((line) => line.includes(option));
+  if (start < 0) return [];
+  const block: string[] = [];
+  for (let index = start; index < lines.length; index += 1) {
+    if (index > start && /^\s{2}-\S/u.test(lines[index]!)) break;
+    block.push(lines[index]!);
+  }
+  return block;
+}
+
 export function parseClaudeEfforts(output: string) {
-  const line = output.split(/\r?\n/u).find((candidate) => candidate.includes("--effort"));
-  const values = line?.match(/\(([^)]+)\)/u)?.[1];
+  // The level list wraps onto the next line in recent Claude Code help output.
+  const values = helpOptionBlock(output, "--effort").join(" ").match(/\(([^)]+)\)/u)?.[1];
   return values
     ? values.split(/[|,]/u).map((value) => value.trim()).filter(Boolean).slice(0, MAX_EFFORTS).map((id) => effort(id))
     : [];
@@ -222,15 +238,14 @@ export function parseAgyModels(output: string): AgentModelCapability[] {
     .slice(0, MAX_MODELS);
 }
 
+/**
+ * Fallback for a Claude CLI that does not answer the stream-json `initialize`
+ * request with a model picker: the aliases its `--help` text quotes as
+ * examples. Prose, not a catalog, so it carries no default and no efforts.
+ */
 export function parseClaudeModels(output: string): AgentModelCapability[] {
-  const lines = output.split(/\r?\n/u);
-  const start = lines.findIndex((line) => line.includes("--model <model>"));
-  if (start < 0) return [];
-  const block: string[] = [];
-  for (let index = start; index < lines.length; index += 1) {
-    if (index > start && /^\s{2}-\S/u.test(lines[index]!)) break;
-    block.push(lines[index]!);
-  }
+  const block = helpOptionBlock(output, "--model <model>");
+  if (block.length === 0) return [];
   return [...block.join(" ").matchAll(/(?<![a-z0-9])'([a-z0-9][a-z0-9._/-]*)'/giu)]
     .map((match) => match[1]!)
     .filter((id, index, values) =>
@@ -239,6 +254,144 @@ export function parseClaudeModels(output: string): AgentModelCapability[] {
     )
     .slice(0, MAX_MODELS)
     .map((id) => ({ id, label: id, isDefault: false, defaultEffortId: null, efforts: [] }));
+}
+
+export type ClaudeModelDiscovery = {
+  models: AgentModelCapability[];
+  defaultEfforts: AgentEffortCapability[];
+};
+
+/**
+ * The model picker Claude Code returns from a stream-json `initialize` control
+ * request: the rows its interactive `/model` menu shows for this account.
+ *
+ * The picker's `default` row is not a model id but what runs when nothing is
+ * chosen, which Briar already offers as "Provider default model". It is folded
+ * into the alias row that resolves to the same wire model, which becomes the
+ * catalog default, and its effort levels become the provider defaults.
+ */
+export function parseClaudeInitializeModels(response: unknown): ClaudeModelDiscovery {
+  const rows = response && typeof response === "object" && !Array.isArray(response)
+    && Array.isArray((response as { models?: unknown }).models)
+    ? (response as { models: unknown[] }).models
+    : [];
+  type Row = {
+    id: string;
+    label: string;
+    resolvedModel: string | null;
+    efforts: AgentEffortCapability[];
+  };
+  const parsed: Row[] = [];
+  for (const raw of rows) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
+    const value = raw as Record<string, unknown>;
+    const id = typeof value.value === "string" ? value.value.trim() : "";
+    if (!id || id.length > 100 || parsed.some((row) => row.id === id)) continue;
+    const label = typeof value.displayName === "string" ? value.displayName.trim() : "";
+    const efforts = Array.isArray(value.supportedEffortLevels)
+      ? value.supportedEffortLevels
+        .flatMap((level) => typeof level === "string" && level.trim() ? [effort(level.trim())] : [])
+        .slice(0, MAX_EFFORTS)
+      : [];
+    parsed.push({
+      id,
+      label: label || id,
+      resolvedModel: typeof value.resolvedModel === "string" && value.resolvedModel.trim()
+        ? value.resolvedModel.trim()
+        : null,
+      efforts,
+    });
+  }
+  const defaultRow = parsed.find((row) => row.id === "default");
+  const defaultIndex = defaultRow?.resolvedModel
+    ? parsed.findIndex((row) => row !== defaultRow && row.resolvedModel === defaultRow.resolvedModel)
+    : -1;
+  const models = parsed
+    .filter((row) => row !== defaultRow)
+    .slice(0, MAX_MODELS)
+    .map((row) => ({
+      id: row.id,
+      label: row.label,
+      isDefault: defaultIndex >= 0 && row === parsed[defaultIndex],
+      defaultEffortId: null,
+      efforts: row.efforts,
+    }));
+  return {
+    models,
+    defaultEfforts: defaultRow?.efforts ?? models.find((model) => model.isDefault)?.efforts ?? [],
+  };
+}
+
+const CLAUDE_INITIALIZE_REQUEST_ID = "briar-provider-models";
+
+/**
+ * Ask Claude Code for its model picker over the stream-json protocol. Only the
+ * `initialize` control request is sent, so no turn runs and no tokens are
+ * spent. User settings stay unloaded so SessionStart hooks do not fire for a
+ * capability probe, and no MCP server is started; the login keychain is still
+ * read, so the list reflects the signed-in account.
+ */
+export function claudeModels(
+  binary: string,
+  home: string,
+  env: NodeJS.ProcessEnv,
+): Promise<ClaudeModelDiscovery> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(binary, [
+      "--print",
+      "--verbose",
+      "--input-format",
+      "stream-json",
+      "--output-format",
+      "stream-json",
+      "--setting-sources",
+      "",
+      "--strict-mcp-config",
+    ], { cwd: home, env, stdio: ["pipe", "pipe", "pipe"] });
+    let buffer = "";
+    let stderr = "";
+    let settled = false;
+    const timer = setTimeout(() => finish(new Error("Claude initialize timed out")), 15_000);
+    const finish = (outcome: Error | ClaudeModelDiscovery) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      child.kill();
+      if (outcome instanceof Error) reject(outcome);
+      else resolve(outcome);
+    };
+    child.stdin.on("error", () => {});
+    child.stderr.on("data", (chunk) => { stderr += String(chunk); });
+    child.on("error", finish);
+    child.on("close", (code) => {
+      finish(new Error(stderr.trim() || `Claude CLI exited (${code}) before answering initialize`));
+    });
+    child.stdout.on("data", (chunk) => {
+      buffer += String(chunk);
+      while (buffer.includes("\n")) {
+        const newline = buffer.indexOf("\n");
+        const line = buffer.slice(0, newline);
+        buffer = buffer.slice(newline + 1);
+        let message: { type?: unknown; response?: unknown };
+        try { message = JSON.parse(line); } catch { continue; }
+        if (message.type !== "control_response" || !message.response || typeof message.response !== "object") continue;
+        const envelope = message.response as { subtype?: unknown; request_id?: unknown; error?: unknown; response?: unknown };
+        if (envelope.request_id !== CLAUDE_INITIALIZE_REQUEST_ID) continue;
+        if (envelope.subtype !== "success") {
+          finish(new Error(typeof envelope.error === "string" ? envelope.error : "Claude initialize failed"));
+          return;
+        }
+        const discovered = parseClaudeInitializeModels(envelope.response);
+        finish(discovered.models.length > 0 ? discovered : new Error("Claude initialize returned no models"));
+        return;
+      }
+    });
+    child.stdin.write(`${JSON.stringify({
+      type: "control_request",
+      request_id: CLAUDE_INITIALIZE_REQUEST_ID,
+      request: { subtype: "initialize" },
+    })}\n`);
+  });
 }
 
 /**
@@ -803,9 +956,18 @@ export async function discoverWorkerProviderCapabilities(
         );
       }
       if (provider === "claude") {
-        const help = helpOutput(binary, env);
-        catalog.claude.models = parseClaudeModels(help);
-        catalog.claude.defaultEfforts = parseClaudeEfforts(help);
+        try {
+          const discovered = await claudeModels(binary, home, env);
+          catalog.claude.models = discovered.models;
+          catalog.claude.defaultEfforts = discovered.defaultEfforts;
+        } catch (error) {
+          // A CLI without the stream-json picker still quotes its aliases in
+          // --help. Report the fallback so the app can say the list is stale.
+          const help = helpOutput(binary, env);
+          catalog.claude.models = parseClaudeModels(help);
+          catalog.claude.defaultEfforts = parseClaudeEfforts(help);
+          catalog.claude.error = error instanceof Error ? error.message : String(error);
+        }
       }
     } catch (error) {
       catalog[provider].error = error instanceof Error ? error.message : String(error);
