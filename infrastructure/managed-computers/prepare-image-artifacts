@@ -90,6 +90,16 @@ install -m 0644 \
 install -m 0644 \
   "$repo_root/apps/briar/dist-cli/briar-box-exec.js" \
   "$output/briar-box-exec.js"
+# Name every provider runner the image must carry so a partial `agent:build`
+# produces a build failure here rather than an image whose Computer Use tasks
+# all fail on a missing runner bundle. The glob still ships the next provider
+# without an edit; the named check is what fails loudly when one is absent.
+for runner_name in agy claude codex cursor grok opencode pi; do
+  [[ -s "$repo_root/apps/briar/dist-agent/$runner_name-runner.js" ]] || {
+    echo "Managed computer image requires the $runner_name provider runner." >&2
+    exit 1
+  }
+done
 for runner in "$repo_root"/apps/briar/dist-agent/*-runner.js; do
   install -m 0644 "$runner" "$output/agent/$(basename -- "$runner")"
 done
