@@ -892,7 +892,7 @@ export const zh = {
   "browser.egoProjectLink": "了解 ego (lite)",
   "browser.toolSelection": "浏览器自动化工具",
   "browser.egoChoiceDescription": "使用可共享登录状态的独立 Space。",
-  "browser.agentChoiceDescription": "使用单独安装的 Chrome 运行时。",
+  "browser.agentChoiceDescription": "使用单独的 Chrome 运行时，登录状态保存在 Briar 共享状态文件中。",
   "browser.asideChoiceDescription": "通过 MCP 控制已登录的 Aside 浏览器。",
   "browser.selectEgo": "选择 ego (lite) 进行浏览器自动化",
   "browser.selectAgent": "选择 agent-browser 进行浏览器自动化",

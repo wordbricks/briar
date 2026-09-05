@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
   DeviceTokenPollResult,
 } from "../src/lib/device-authorization-client";
@@ -6,6 +6,7 @@ import { type Config } from "./config-contract";
 import {
   login,
   openBrowser,
+  providerExecutionEnvironment,
   type LoginDependencies,
 } from "./command-support";
 
@@ -85,6 +86,62 @@ const loginDependencies = (
     writeLine,
   };
 };
+
+const browserConfig = (
+  provider: Config["appSettings"]["browserAutomationProvider"],
+): Config => ({
+  ...config(),
+  appSettings: {
+    preventSleepWhileRunning: false,
+    browserAutomationProvider: provider,
+  },
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
+describe("providerExecutionEnvironment", () => {
+  it("shares the agent-browser state file only when agent-browser is selected", () => {
+    vi.stubEnv("BRIAR_AGENT_BROWSER_STATE_FILE", "");
+    vi.stubEnv("BRIAR_WORKTREE_HOME", "/Users/agent");
+
+    const shared = providerExecutionEnvironment(
+      browserConfig("agent-browser"),
+      "claude",
+      {},
+    );
+    expect(shared.BRIAR_BROWSER_AUTOMATION_PROVIDER).toBe("agent-browser");
+    expect(shared.BRIAR_AGENT_BROWSER_STATE_FILE).toBe(
+      "/Users/agent/.local/share/briar/agent-browser/shared-state.json",
+    );
+
+    for (const provider of ["ego-browser", "aside"] as const) {
+      const environment = providerExecutionEnvironment(
+        browserConfig(provider),
+        "claude",
+        {},
+      );
+      expect(environment.BRIAR_BROWSER_AUTOMATION_PROVIDER).toBe(provider);
+      expect(environment.BRIAR_AGENT_BROWSER_STATE_FILE).toBeUndefined();
+    }
+  });
+
+  it("keeps the state file path Briar already resolved for this run", () => {
+    vi.stubEnv("BRIAR_AGENT_BROWSER_STATE_FILE", "");
+    vi.stubEnv("BRIAR_WORKTREE_HOME", "/Users/agent");
+
+    const environment = providerExecutionEnvironment(
+      browserConfig("agent-browser"),
+      "claude",
+      { BRIAR_AGENT_BROWSER_STATE_FILE: "/Users/real/state.json" },
+    );
+
+    expect(environment.BRIAR_AGENT_BROWSER_STATE_FILE).toBe(
+      "/Users/real/state.json",
+    );
+  });
+});
 
 describe("openBrowser", () => {
   it.each([

@@ -986,7 +986,7 @@ export const ko = {
   "browser.egoProjectLink": "ego (lite) 살펴보기",
   "browser.toolSelection": "사용할 브라우저 자동화 도구",
   "browser.egoChoiceDescription": "로그인 상태를 공유하는 전용 Space를 사용합니다.",
-  "browser.agentChoiceDescription": "별도로 설치된 Chrome 런타임을 사용합니다.",
+  "browser.agentChoiceDescription": "별도 Chrome 런타임을 쓰고 로그인은 Briar 공유 상태 파일로 유지합니다.",
   "browser.asideChoiceDescription": "로그인된 Aside 브라우저를 MCP로 조작합니다.",
   "browser.selectEgo": "ego (lite)를 브라우저 자동화 도구로 선택",
   "browser.selectAgent": "agent-browser를 브라우저 자동화 도구로 선택",

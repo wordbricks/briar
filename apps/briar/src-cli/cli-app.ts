@@ -57,6 +57,11 @@ import {
   showSkillGuide,
 } from "./utility-commands";
 import {
+  browserStateClearCommand,
+  browserStateEnsureCommand,
+  browserStateMergeCommand,
+} from "./browser-state-commands";
+import {
   managedComputerSetupCommand,
   managedComputerStatusCommand,
   managedComputerSyncCommand,
@@ -184,6 +189,38 @@ const skillsCommand = Command.make("skills").pipe(
       },
       () => runHandler(showSkillGuide),
     ).pipe(Command.withDescription("Print a bundled skill guide")),
+  ]),
+);
+
+const browserStateCommand = Command.make("browser-state").pipe(
+  Command.withDescription(
+    "Share agent-browser login state across this machine's Briar Agents",
+  ),
+  Command.withSubcommands([
+    leaf(
+      "ensure",
+      switches("json"),
+      browserStateEnsureCommand,
+      "Create the shared agent-browser state file if needed and print its path",
+    ),
+    Command.make(
+      "merge",
+      {
+        file: Argument.string("file"),
+        ...switches("json"),
+      },
+      () => runHandler(browserStateMergeCommand),
+    ).pipe(
+      Command.withDescription(
+        "Merge a saved agent-browser state file into the shared state",
+      ),
+    ),
+    leaf(
+      "clear",
+      switches("json"),
+      browserStateClearCommand,
+      "Reset the shared agent-browser state, signing every Agent session out",
+    ),
   ]),
 );
 
@@ -915,6 +952,7 @@ export const briarCommand = Command.make("briar").pipe(
     whoamiCommand,
     versionCommand,
     skillsCommand,
+    browserStateCommand,
     teamCommand,
     connectCommand,
     issueCommand,
