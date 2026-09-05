@@ -286,6 +286,14 @@ commit row counts were all zero, so no private DM was imported or backfilled.
   `projectID` after the Project → Team contract rename (#1565). That breakage
   predates this change and is tracked separately.
 
+- Running the eval against Claude exposed a bug in the read-only Agent
+  environment: it copied `~/.claude/.credentials.json` whenever the file
+  existed and consulted the macOS Keychain only when it was absent, so a stale
+  file left from an earlier login shadowed the live Keychain credential and every
+  Claude stage failed with "Not logged in". The isolated home now prefers the
+  Keychain credential and falls back to the file, matching
+  `readClaudeCredentials`; a regression test covers the stale-file case.
+
 Validation head and signoffs: pending.
 
 Rollback sets retrieval and indexing flags to false while leaving owner edit,

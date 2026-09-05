@@ -314,19 +314,20 @@ async function prepareClaudeEnvironment(
     join(tmpdir(), "briar-claude-read-only-"),
   );
   try {
-    const copied = await copyOptionalCredential(
-      join(sourceClaudeHome, ".credentials.json"),
-      join(isolatedClaudeHome, ".credentials.json"),
-    );
-    if (!copied) {
-      const credential = keychainCredential(environment, sourceClaudeHome);
-      if (credential) {
-        await writeFile(
-          join(isolatedClaudeHome, ".credentials.json"),
-          normalizedClaudeCredential(credential),
-          { mode: 0o600 },
-        );
-      }
+    // macOS keeps the live login in the Keychain; an abandoned
+    // `.credentials.json` next to it must not shadow that login.
+    const credential = keychainCredential(environment, sourceClaudeHome);
+    if (credential) {
+      await writeFile(
+        join(isolatedClaudeHome, ".credentials.json"),
+        normalizedClaudeCredential(credential),
+        { mode: 0o600 },
+      );
+    } else {
+      await copyOptionalCredential(
+        join(sourceClaudeHome, ".credentials.json"),
+        join(isolatedClaudeHome, ".credentials.json"),
+      );
     }
   } catch (error) {
     await rm(isolatedClaudeHome, { recursive: true, force: true });
