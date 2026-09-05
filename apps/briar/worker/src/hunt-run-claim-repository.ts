@@ -85,7 +85,13 @@ export async function claimNextQueuedHuntRun(
              or (? = 1 and dispatch_mode = 'any')
              or (
                ? = 1 and dispatch_mode = 'specific'
-               and requested_worker_id = ?
+               and (
+                 requested_worker_id = ?
+                 -- The requested Worker row was deleted; its foreign key set
+                 -- the reference to null. Fall back to automatic placement
+                 -- instead of leaving the run unclaimable forever.
+                 or requested_worker_id is null
+               )
              )
            )
            and (

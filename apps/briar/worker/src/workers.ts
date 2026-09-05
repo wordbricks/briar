@@ -1525,6 +1525,36 @@ function pinnedWorkerDeleteError(pin: NonNullable<
 }
 
 /**
+ * Runs dispatched to one of this device's Workers keep `dispatch_mode =
+ * 'specific'` after the Worker row is deleted, because `requested_worker_id`
+ * only cascades to null and the claim query then matches no Worker at all.
+ * Return them to automatic placement before the delete so any eligible Worker
+ * can still pick them up; the approval reset triggers still send
+ * approval-bound queued/blocked/failed runs back to the backlog afterwards.
+ */
+async function releaseSpecificDispatchesForDevice(
+  db: D1Database,
+  input: { deviceId: string; projectId?: string | null },
+) {
+  // `meta.changes` also counts trigger writes, so count the returned rows.
+  const result = await db
+    .prepare(
+      `update briar_hunt_runs
+       set dispatch_mode = 'any'
+       where dispatch_mode = 'specific'
+         and status not in ('completed', 'cancelled')
+         and requested_worker_id in (
+           select id from briar_execution_workers
+           where device_id = ? and (? is null or project_id = ?)
+         )
+       returning id`,
+    )
+    .bind(input.deviceId, input.projectId ?? null, input.projectId ?? null)
+    .all<{ id: string }>();
+  return { result, releasedRunIds: result.results.map((row) => row.id) };
+}
+
+/**
  * Permanently remove an idle organization Worker and its project bindings.
  *
  * Disable first so a concurrent request cannot claim new work while deletion
@@ -1599,6 +1629,8 @@ export async function deleteExecutionWorker(
         "Worker has active sessions; wait for them to finish before deleting it",
       );
     }
+    const released = await releaseSpecificDispatchesForDevice(db, { deviceId });
+    metrics = addD1MutationMetrics(metrics, d1MutationMetrics([released.result]));
     const deleted = await db
       .prepare(
         `delete from briar_execution_worker_devices
@@ -1620,6 +1652,7 @@ export async function deleteExecutionWorker(
           bindingCount,
           disableRowsWritten: disabled.metrics.rowsWritten,
           deviceDeleteRowsWritten: deletionMetrics.rowsWritten,
+          releasedSpecificDispatches: released.releasedRunIds.length,
         },
       });
       return true;
@@ -1699,6 +1732,11 @@ export async function unbindExecutionWorker(
       failureRecorded = true;
       throw new WorkerConflictError(pinnedWorkerDeleteError(pinned));
     }
+    const released = await releaseSpecificDispatchesForDevice(db, {
+      deviceId,
+      projectId,
+    });
+    metrics = addD1MutationMetrics(metrics, d1MutationMetrics([released.result]));
     const deleted = await db
       .prepare(
         `delete from briar_execution_workers
@@ -1752,6 +1790,7 @@ export async function unbindExecutionWorker(
         bindingDeleteRowsWritten: bindingDeleteMetrics.rowsWritten,
         remainingBindings,
         deviceStateRowsWritten: followupMetrics.rowsWritten,
+        releasedSpecificDispatches: released.releasedRunIds.length,
       },
     });
     return true;

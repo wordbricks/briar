@@ -1999,6 +1999,7 @@ export const ko = {
   "run.retryDescription": "이전 시도의 활동 기록은 보존됩니다. 재시도하면 {count}번 시도로 새 작업이 시작됩니다.",
   "run.retry": "재시도",
   "run.resume": "승인하고 계속",
+  "run.resumeWaitingForWorker": "승인되었습니다. 작업을 이어받을 Worker를 기다리고 있습니다.",
   "run.pausedDescription": "이 단계까지 자동 실행을 마쳤습니다. 검토를 마치면 다음 워크플로우 단계를 재개하세요.",
   "run.awaitingReviewBanner": "리뷰를 기다리고 있습니다",
   "run.partialResult": "부분 작업 결과",

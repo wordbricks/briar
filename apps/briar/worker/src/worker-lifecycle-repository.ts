@@ -33,11 +33,13 @@ type WorkerHardDeleteDetail =
       bindingCount: number;
       disableRowsWritten: number;
       deviceDeleteRowsWritten: number;
+      releasedSpecificDispatches: number;
     }
   | {
       bindingDeleteRowsWritten: number;
       remainingBindings: number;
       deviceStateRowsWritten: number;
+      releasedSpecificDispatches: number;
     };
 
 type WorkerPreservedDetail =

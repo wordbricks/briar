@@ -2377,6 +2377,176 @@ describe("detached execution workers", () => {
     });
   });
 
+  it("returns a specific dispatch to automatic placement when its Worker is deleted", async () => {
+    const removed = await register("dispatch-removed");
+    const survivor = await register("dispatch-survivor");
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      queuedEvent("orphaned-dispatch", 2),
+    );
+    await dispatchHuntRun(db, projectId, projectId, {
+      runId,
+      provider: "codex",
+      model: "gpt-5.6-sol",
+      effort: "high",
+      workerId: removed.worker.id,
+      requestedByUserId: "member",
+      requestId: "33333333-aaaa-4333-8333-333333333333",
+      occurredAt: atMinute(2),
+    });
+
+    await expect(
+      deleteExecutionWorker(db, removed.device.id, atMinute(3), {
+        requestId: "worker-deprovision:dispatch-removed",
+        organizationId: projectId,
+        projectId: null,
+        workerId: null,
+        reason: "explicit_user_deprovision",
+      }),
+    ).resolves.toBe(true);
+    await expect(
+      db
+        .prepare(
+          `select status, dispatch_mode, requested_worker_id, dispatched_at is not null as dispatched
+           from briar_hunt_runs where id = ?`,
+        )
+        .bind(runId)
+        .first(),
+    ).resolves.toEqual({
+      status: "queued",
+      dispatch_mode: "any",
+      requested_worker_id: null,
+      dispatched: 1,
+    });
+    await expect(db.prepare(
+      `select detail_json from briar_execution_worker_lifecycle_events
+       where request_id = ?`,
+    ).bind("worker-deprovision:dispatch-removed").first<string>("detail_json"))
+      .resolves.toContain('"releasedSpecificDispatches":1');
+
+    const claimed = await claimNextQueuedHuntRun(db, projectId, {
+      claimTokenHash: fingerprint("dispatch-survivor-claim"),
+      claimedBy: survivor.worker.label,
+      claimedAt: atMinute(4),
+      leaseExpiresAt: leaseExpiryFrom(atMinute(4)),
+      workerId: survivor.worker.id,
+      detachedOnly: true,
+    });
+    expect(claimed).toMatchObject({
+      id: runId,
+      worker_id: survivor.worker.id,
+      requested_worker_id: null,
+      dispatch_mode: "any",
+    });
+  });
+
+  it("returns a specific dispatch to automatic placement when its project binding is unlinked", async () => {
+    const unlinked = await register("dispatch-unlinked");
+    await bindExecutionWorkerProject(db, secondProjectId, {
+      id: "worker-dispatch-unlinked-second",
+      organizationId: projectId,
+      ownerUserId: "owner",
+      deviceIdentityHash: fingerprint("dispatch-unlinked"),
+      runtime: runtimeMetadata(),
+      observedAt: atMinute(1),
+    });
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      queuedEvent("unlinked-dispatch", 2),
+    );
+    await dispatchHuntRun(db, projectId, projectId, {
+      runId,
+      provider: "codex",
+      model: "gpt-5.6-sol",
+      effort: "high",
+      workerId: unlinked.worker.id,
+      requestedByUserId: "member",
+      requestId: "55555555-aaaa-4555-8555-555555555555",
+      occurredAt: atMinute(2),
+    });
+
+    await expect(
+      unbindExecutionWorker(db, unlinked.device.id, projectId, atMinute(3), {
+        requestId: "worker-unlink:dispatch-unlinked",
+        organizationId: projectId,
+        workerId: unlinked.worker.id,
+        reason: "explicit_user_unlink",
+      }),
+    ).resolves.toBe(true);
+    await expect(
+      db
+        .prepare(
+          `select dispatch_mode, requested_worker_id from briar_hunt_runs
+           where id = ?`,
+        )
+        .bind(runId)
+        .first(),
+    ).resolves.toEqual({ dispatch_mode: "any", requested_worker_id: null });
+  });
+
+  it("claims a specific dispatch whose Worker reference was already cleared", async () => {
+    const vanished = await register("dispatch-vanished");
+    const survivor = await register("orphan-survivor");
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      queuedEvent("legacy-orphaned-dispatch", 2),
+    );
+    await dispatchHuntRun(db, projectId, projectId, {
+      runId,
+      provider: "codex",
+      model: "gpt-5.6-sol",
+      effort: "high",
+      workerId: vanished.worker.id,
+      requestedByUserId: "member",
+      requestId: "44444444-aaaa-4444-8444-444444444444",
+      occurredAt: atMinute(2),
+    });
+    // Rows written before the delete-time fallback existed: the Worker row is
+    // gone, the foreign key cleared the reference, and the run is paused at a
+    // checkpoint whose approval already requested a resume.
+    await db
+      .prepare(
+        `update briar_hunt_runs
+         set requested_worker_id = null, status = 'running',
+             stage = 'implementing', workflow_stage = 'implementing',
+             paused_at = ?, resume_requested_at = ?
+         where id = ?`,
+      )
+      .bind(atMinute(3), atMinute(4), runId)
+      .run();
+
+    const interactiveClaim = await claimNextQueuedHuntRun(db, projectId, {
+      claimTokenHash: fingerprint("interactive-orphan-claim"),
+      claimedBy: "legacy-agent",
+      claimedAt: atMinute(5),
+      leaseExpiresAt: leaseExpiryFrom(atMinute(5)),
+    });
+    expect(interactiveClaim).toBeNull();
+
+    const claimed = await claimNextQueuedHuntRun(db, projectId, {
+      claimTokenHash: fingerprint("orphan-survivor-claim"),
+      claimedBy: survivor.worker.label,
+      claimedAt: atMinute(5),
+      leaseExpiresAt: leaseExpiryFrom(atMinute(5)),
+      workerId: survivor.worker.id,
+      detachedOnly: true,
+    });
+    expect(claimed).toMatchObject({
+      id: runId,
+      status: "running",
+      stage: "implementing",
+      workflow_stage: "implementing",
+      paused_at: null,
+      resume_requested_at: atMinute(4),
+      worker_id: survivor.worker.id,
+      requested_worker_id: null,
+      dispatch_mode: "specific",
+    });
+  });
+
   it("does not claim unattended Computer Use work without provider capability", async () => {
     const registered = await register("computer-use-gate");
     const agent = await db

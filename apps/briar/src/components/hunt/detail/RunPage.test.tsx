@@ -1088,6 +1088,31 @@ describe("RunPage", () => {
     expect(nextCheckpointButton?.querySelector(".animate-spin")).toBeNull();
     await cleanup();
   });
+  it("shows that an approved resume is still waiting for a Worker", async () => {
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    const awaitingWorker: HuntRun = {
+      ...demoDashboard.runs[1],
+      status: "paused",
+      resumeRequestedAt: "2026-09-04T18:28:03.460Z",
+      workerId: null,
+      requestedWorkerId: null,
+    };
+    await renderReactTestRoot(root, <TooltipProvider>
+        <RunPage isSidebarOpen error={null} isRecovering={false} onBack={() => undefined} onCancel={async () => undefined} onLoadAttachment={async () => new Blob()} onLoadIssueMessages={async () => []} onLoadRunEvidence={async () => []} onMove={async () => undefined} onResume={async () => undefined} onRetry={async () => undefined} onSendIssueMessage={async () => {
+        throw new Error("not implemented in this test");
+      }} run={awaitingWorker} />
+      </TooltipProvider>);
+    const resumeButton = container.querySelector<HTMLButtonElement>(".paused-result-resume");
+    expect(resumeButton?.disabled).toBe(true);
+    expect(resumeButton?.querySelector(".animate-spin")).not.toBeNull();
+    const hint = container.querySelector(".paused-result-resume-hint");
+    expect(hint).not.toBeNull();
+    expect(hint?.textContent).toContain("Worker");
+    await cleanup();
+  });
+
   it("submits paused review feedback as an explicit rework request", async () => {
     const onRework = vi.fn(async () => undefined);
     const { cleanup, container, root } = createReactTestRoot({
