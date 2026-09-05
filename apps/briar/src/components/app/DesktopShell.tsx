@@ -29,6 +29,7 @@ import {
   planningProjectEditIdAtom,
   planningProjectTeamIdAtom,
   requestedOrganizationAgentIdAtom,
+  requestedTeamAgentSettingsIdAtom,
 } from "../../state/dialogs/atoms";
 import { useNavigationActions } from "../../state/navigation/actions";
 import {
@@ -99,8 +100,12 @@ export function DesktopShell({
   const setRequestedOrganizationAgentId = useAtomSet(
     requestedOrganizationAgentIdAtom,
   );
+  const setRequestedTeamAgentSettingsId = useAtomSet(
+    requestedTeamAgentSettingsIdAtom,
+  );
   const { navigateToLocation, navigateToPage, openAppSettings } =
     useNavigationActions();
+  const { selectTeam, startTeamCreation } = useTeamActions();
   const {
     createDirectMessageSection,
     createOrganizationChannel,
@@ -121,14 +126,30 @@ export function DesktopShell({
     The conversation menu's writes, bundled once so the sidebar takes the same
     object on every render. `useChannelActions` is stable for the registry's
     lifetime, and the one handler that is not an action — Edit Profile — only
-    navigates.
+    navigates and leaves the agent's id where the page it lands on reads it.
   */
   const directMessageActions = useMemo(
     () => ({
       onCreateSection: createDirectMessageSection,
       onDelete: deleteDirectMessage,
       onDeleteSection: deleteDirectMessageSection,
+      /*
+        Where the profile lives decides where this goes. A team Agent has a
+        profile editor on its team's Agents page, so the request travels with
+        the team switch and that page opens it. An organization Agent has no
+        profile editor at all; organization settings' Agents list, whose skills
+        dialog is the only editor it has, is the closest thing to one.
+      */
       onEditAgentProfile: (agentId: string) => {
+        const agent = agents.all.find((candidate) => candidate.id === agentId);
+        if (agent) {
+          setRequestedTeamAgentSettingsId(agentId);
+          selectTeam(agent.teamId);
+          setRequestedSessionId(null);
+          setRequestedRunId(null);
+          navigateToPage("agents", agent.teamId);
+          return;
+        }
         if (!activeOrganizationId) return;
         setRequestedOrganizationAgentId(agentId);
         setSettingsTarget({
@@ -148,6 +169,7 @@ export function DesktopShell({
     }),
     [
       activeOrganizationId,
+      agents.all,
       createDirectMessageSection,
       deleteDirectMessage,
       deleteDirectMessageSection,
@@ -156,15 +178,18 @@ export function DesktopShell({
       moveDirectMessageToSection,
       navigateToPage,
       renameDirectMessageSection,
+      selectTeam,
       setDirectMessageHidden,
       setDirectMessagePinned,
       setIsSidebarOpen,
       setRequestedOrganizationAgentId,
+      setRequestedRunId,
+      setRequestedSessionId,
+      setRequestedTeamAgentSettingsId,
       setSettingsTarget,
     ],
   );
   const { selectOrganization } = useOrganizationActions();
-  const { selectTeam, startTeamCreation } = useTeamActions();
   const { logout } = useSessionActions();
   const { refreshActiveTeam } = useSyncActions();
   const {

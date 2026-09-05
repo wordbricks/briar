@@ -17,7 +17,7 @@ import {
   Wrench,
   X,
 } from "lucide-react";
-import { useAtomValue } from "@effect/atom-react";
+import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { Spinner } from "./ui/spinner";
 import { useEffect, useState } from "react";
 
@@ -67,6 +67,7 @@ import {
   agentSessionAtom,
   teamRunningAgentIdsAtom,
 } from "../state/agent-sessions/atoms";
+import { requestedTeamAgentSettingsIdAtom } from "../state/dialogs/atoms";
 import { useAgentProviderModels } from "../hooks/useAgentProviderModels";
 import type {
   CreateProjectAgentInput,
@@ -223,6 +224,12 @@ export function TeamAgents({
     setIsDialogOpen(false);
   }, [agentListRequestKey, project.id]);
 
+  const requestedAgentSettingsId = useAtomValue(
+    requestedTeamAgentSettingsIdAtom,
+  );
+  const setRequestedAgentSettingsId = useAtomSet(
+    requestedTeamAgentSettingsIdAtom,
+  );
   const requestedSession = useAtomValue(
     agentSessionAtom(requestedSessionId ?? ""),
   );
@@ -238,6 +245,25 @@ export function TeamAgents({
     if (!agent) return;
     setSelectedAgent(agent);
   }, [agents, requestedSessionAgentId]);
+
+  /*
+    The DM list's "Edit Profile" navigates here and leaves the agent's id in the
+    atom; opening its editor is this page's job because the profile form is only
+    ever rendered from `settingsAgent`.
+
+    An id this team does not own is left where it is rather than cleared: the
+    request arrives with the team switch, so the list on screen for the moment
+    is still the old team's, and dropping the id would lose the editor.
+  */
+  useEffect(() => {
+    if (!requestedAgentSettingsId || agents.length === 0) return;
+    const agent = agents.find(
+      (candidate) => candidate.id === requestedAgentSettingsId,
+    );
+    if (!agent) return;
+    setRequestedAgentSettingsId(null);
+    setSettingsAgent(agent);
+  }, [agents, requestedAgentSettingsId, setRequestedAgentSettingsId]);
 
   const addAgent = async (input: CreateProjectAgentInput) => {
     setIsSubmitting(true);

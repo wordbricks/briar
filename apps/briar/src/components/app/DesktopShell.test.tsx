@@ -12,7 +12,9 @@ import { demoDashboard } from "../../lib/demo-data";
 import { createCachedTeamUsageSummaryLoader } from "../../lib/team-usage-summary";
 import { settingsNavigationLocation } from "../../lib/app-navigation";
 import { demoOrganization, demoUser } from "../../state/demo-fixtures";
+import { requestedTeamAgentSettingsIdAtom } from "../../state/dialogs/atoms";
 import { createNavigationActions } from "../../state/navigation/actions";
+import { activePageAtom } from "../../state/navigation/atoms";
 import {
   activeOrganizationIdAtom,
   organizationsAtom,
@@ -23,7 +25,8 @@ import { applySyncEvent } from "../../state/sync/apply";
 import { activeTeamIdAtom, teamsAtom } from "../../state/team/atoms";
 import { createReactTestRoot, flush, settle } from "../../test/react";
 import { createRenderCounter } from "../../test/render-count";
-import type { DashboardPayload, HuntRun } from "../../types";
+import type { ChannelSummary } from "../../lib/channels-contract";
+import type { DashboardPayload, HuntRun, ProjectAgent } from "../../types";
 import { DesktopShell, type DesktopShellProps } from "./DesktopShell";
 
 /*
@@ -86,6 +89,57 @@ const props: DesktopShellProps = {
   startProjectAgentTask: async () => "session-1",
 };
 
+/*
+  A DM with an Agent in it, and the Agent the shell's list holds for it. The
+  conversation menu offers "Edit Profile" only when a participant is an Agent,
+  and where that lands depends on whether the shell can find the Agent.
+*/
+const agent: ProjectAgent = {
+  id: "agent-1",
+  teamId: team.id,
+  name: "Atlas",
+  avatar: null,
+  codexPet: null,
+  provider: "claude",
+  model: null,
+  effort: null,
+  description: "",
+  responsibility: "Ships the release",
+  skill: "",
+  skills: [],
+  calendarColor: "#4f46e5",
+  createdAt: "2026-09-01T00:00:00.000Z",
+  updatedAt: "2026-09-01T00:00:00.000Z",
+};
+
+const agentDirectMessage: ChannelSummary = {
+  id: "dm-1",
+  organizationId: demoOrganization.id,
+  kind: "dm",
+  slug: "atlas",
+  name: "Atlas",
+  topic: null,
+  visibility: "private",
+  defaultProjectId: null,
+  archivedAt: null,
+  memberCount: 2,
+  agentCount: 1,
+  createdByUserId: demoUser.id,
+  createdAt: "2026-09-01T00:00:00.000Z",
+  updatedAt: "2026-09-01T00:00:00.000Z",
+  lastMessageAt: "2026-09-01T00:00:00.000Z",
+  lastMessagePreview: null,
+  lastReadAt: null,
+  hasUnread: false,
+  dmParticipants: [
+    { type: "user", id: demoUser.id, name: demoUser.name, image: null },
+    { type: "agent", id: agent.id, name: agent.name, image: null },
+  ],
+  pinnedAt: null,
+  sidebarSectionId: null,
+  hiddenAt: null,
+};
+
 const renderCounter = createRenderCounter();
 const TrackedShell = renderCounter.track("shell", DesktopShell);
 
@@ -135,7 +189,14 @@ const mount = async (
 };
 
 beforeEach(() => {
-  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  Object.assign(globalThis, {
+    IS_REACT_ACT_ENVIRONMENT: true,
+    ResizeObserver: class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  });
   window.localStorage.setItem("briar.locale.v1", "en");
   renderCounter.reset();
 });
@@ -196,6 +257,54 @@ describe("DesktopShell", () => {
     expect(view.container.textContent).toContain("Desktop issue edited");
     // The board read the change itself; nothing was pushed through the shell.
     renderCounter.expectRenderCounts({});
+    await view.cleanup();
+  });
+
+  it("sends Edit Profile to the agent's team page for a team agent", async () => {
+    const registry = harness();
+    applySyncEvent(registry, {
+      kind: "channel-catalog-snapshot",
+      organizationId: demoOrganization.id,
+      channels: [agentDirectMessage],
+    });
+    createNavigationActions(registry).navigateToPage("dms");
+    const { view } = await mount(registry, {
+      agents: {
+        activeTeamAgents: [agent],
+        all: [agent],
+        rememberAgent: () => undefined,
+      },
+    });
+    await settle(
+      () => view.container.querySelector(".sidebar-dm-row") !== null,
+      { description: "the DM row" },
+    );
+
+    const row = view.container.querySelector<HTMLElement>(".sidebar-dm-row")!;
+    await act(async () => {
+      row.dispatchEvent(
+        new MouseEvent("contextmenu", {
+          bubbles: true,
+          button: 2,
+          cancelable: true,
+          clientX: 120,
+          clientY: 90,
+        }),
+      );
+    });
+    const editProfile = [
+      ...document.body.querySelectorAll<HTMLElement>(
+        ".sidebar-channel-context-menu [role=menuitem]",
+      ),
+    ].find((item) => item.textContent?.includes("Edit Profile"));
+    expect(editProfile).toBeTruthy();
+    await act(async () => editProfile?.click());
+    await flush();
+
+    // The profile editor lives on the team's Agents page, not in settings.
+    expect(registry.get(requestedTeamAgentSettingsIdAtom)).toBe(agent.id);
+    expect(registry.get(activePageAtom)).toBe("agents");
+    expect(registry.get(activeTeamIdAtom)).toBe(agent.teamId);
     await view.cleanup();
   });
 
