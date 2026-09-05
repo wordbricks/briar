@@ -30,6 +30,18 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.203",
+        date: "2026년 9월 5일",
+        title: "sandbox에 항상 켜져 있는 소유자 데스크톱을 더합니다",
+        summary:
+          "Docker sandbox의 화면은 에이전트가 디스플레이를 잡고 있을 때만 존재해 작업이 없을 때는 볼 것이 없었습니다. 이제 디스플레이 :1이 항상 떠 있어 언제든 sandbox 데스크톱을 열어 볼 수 있습니다.",
+        items: [
+          "sandbox supervisor가 관리형 컴퓨터와 같은 원격 데스크톱 스크립트로 디스플레이 :1을 유지합니다. 에이전트는 계속 :2 이상을 씁니다.",
+          "briar sandbox view는 에이전트가 쓰는 디스플레이가 있으면 그것을, 없으면 소유자 데스크톱 :1을 엽니다.",
+          "briar sandbox status가 소유자 데스크톱이 살아 있는지 함께 보고합니다.",
+        ],
+      },
+      {
         version: "1.2.202",
         date: "2026년 9월 5일",
         title: "Docker sandbox에 데스크톱과 Computer Use를 더합니다",
@@ -1718,6 +1730,18 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.203",
+        date: "September 5, 2026",
+        title: "Add an always-on owner desktop to the sandbox",
+        summary:
+          "A Docker sandbox only had a screen while an agent held a display, so there was nothing to look at between runs. Display :1 now stays up, so the sandbox desktop can be opened at any time.",
+        items: [
+          "The sandbox supervisor keeps display :1 alive through the same remote-desktop script as a managed computer; agents keep using :2 and above.",
+          "briar sandbox view opens the display an agent is working on when there is one, and the owner desktop :1 otherwise.",
+          "briar sandbox status reports whether the owner desktop is listening.",
+        ],
+      },
       {
         version: "1.2.202",
         date: "September 5, 2026",
