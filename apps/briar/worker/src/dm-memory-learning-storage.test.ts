@@ -2,6 +2,7 @@ import { env } from "cloudflare:workers";
 import { createClient, createRouterTransport } from "@connectrpc/connect";
 import { WorkerQueueService } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { dmMemoryCanonicalJson } from "../../src/lib/dm-memory-canonical-json";
 import { runClaimedDmMemory } from "../../src-cli/dm-memory-learning";
 import { invokeDmLearningModel } from "../../src-cli/dm-memory-learning-model";
 import { createChannel, createChannelMessage } from "./channels";
@@ -10,14 +11,14 @@ import { claimDmLearningJob } from "./dm-memory-learning-claims";
 import { captureDmLearningInput, type DmLearningJobRow, type DmLearningSpaceRow } from "./dm-memory-learning-input";
 import { scheduleDmLearningJobs } from "./dm-memory-learning-queue";
 import { retryDmLearningJob } from "./dm-memory-learning-retry";
+import { readDmLearningStatus } from "./dm-memory-learning-status";
 import { cleanupDmLearningPayloads, reapDmLearningClaims } from "./dm-memory-learning-maintenance";
 import { reserveDmLearningModelCall, submitDmLearningProposal, submitDmLearningVerification } from "./dm-memory-learning-model-calls";
 import { countExecutionWorkerDeviceSessions } from "./workers";
 import { reconcileDmMemory } from "./dm-memory-indexing";
 import { deleteDmMemory, getDmMemory, listDmMemories, saveDmMemory, updateDmMemorySettings } from "./dm-memory-repository";
 import { createOrganizationAgent } from "./organization-agents";
-import { syntheticAgentDmLearningPolicy, syntheticDmLearningChange,
-  syntheticDmLearningPolicy } from "./test-helpers/dm-memory-learning";
+import { syntheticDmLearningChange, syntheticDmLearningPolicy } from "./test-helpers/dm-memory-learning";
 import { workerRuntimeProtoJsonFixture } from "./test-helpers/worker-runtime";
 import { createWorkerQueueService } from "./worker-connect-queue";
 
@@ -47,7 +48,8 @@ describe("durable DM learning inputs and deletion", () => {
           last_heartbeat_at, created_at, updated_at, device_id)
         values (?, ?, 'Synthetic Worker', ?, ?, 'online', 1, 'ready', ?, ?, ?, ?)`)
         .bind(workerId, projectId, "c".repeat(64), workerRuntimeProtoJsonFixture({
-          agentProvider: "claude", providers: ["claude"], dmMemoryLearning: true,
+          agentProvider: "claude", providers: ["claude", "codex"],
+          dmMemoryLearning: { protocol: 2, transports: ["agent"], providers: ["codex"] },
         }), now, now, now, deviceId),
     ]);
     await createOrganizationAgent(db, { id: agentId, organizationId, name: "Synthetic memory agent", provider: "claude",
@@ -103,7 +105,7 @@ describe("durable DM learning inputs and deletion", () => {
         .bind(jobId, spaceId, rootId, "a".repeat(64)),
       db.prepare(`insert into briar_dm_memory_model_calls(id, job_id, space_id, organization_id, claim_token_hash, stage,
         input_hash, proposal_hash, model_json, reserved_micro_usd, created_at)
-        values (?, ?, ?, ?, ?, 'proposing', ?, ?, '{}', 100, ?)`)
+        values (?, ?, ?, ?, ?, 'proposing', ?, ?, '{}', 0, ?)`)
         .bind(callId, jobId, spaceId, organizationId, "b".repeat(64), "a".repeat(64), "c".repeat(64), now),
       db.prepare(`insert into briar_dm_memory_proposals(id, job_id, space_id, input_hash, proposal_hash, proposal_json,
         normalized_json, status, created_at) values (?, ?, ?, ?, ?, ?, ?, 'proposed', ?)`)
@@ -118,17 +120,17 @@ describe("durable DM learning inputs and deletion", () => {
     await enable(f.spaceId);
     const first = await message(f.owner.channelId, "First future fact");
     await outbox(f.spaceId, "2026-09-01T00:00:15.000Z");
-    await scheduleDmLearningJobs(db, organizationId, syntheticDmLearningPolicy, "2026-09-01T00:00:14.000Z");
+    await scheduleDmLearningJobs(db, organizationId, "2026-09-01T00:00:14.000Z");
     expect(await job(f.spaceId)).toBeNull();
     const second = await message(f.owner.channelId, "Second future fact");
     await outbox(f.spaceId, "2026-09-01T00:00:29.000Z");
-    await scheduleDmLearningJobs(db, organizationId, syntheticDmLearningPolicy, "2026-09-01T00:00:15.000Z");
+    await scheduleDmLearningJobs(db, organizationId, "2026-09-01T00:00:15.000Z");
     const created = await job(f.spaceId);
     expect(created).toMatchObject({ kind: "extract", status: "pending", source_start: 0 });
     const events = (await db.prepare(`select message_id from briar_dm_memory_source_events where space_id = ? order by sequence`)
       .bind(f.spaceId).all<{ message_id: string }>()).results;
     expect(events.map((event) => event.message_id)).toEqual([first, second]);
-    await scheduleDmLearningJobs(db, organizationId, syntheticDmLearningPolicy, "2026-09-01T00:01:00.000Z");
+    await scheduleDmLearningJobs(db, organizationId, "2026-09-01T00:01:00.000Z");
     expect((await db.prepare(`select count(*) as count from briar_dm_memory_jobs where space_id = ? and kind = 'extract'`)
       .bind(f.spaceId).first<{ count: number }>())!.count).toBe(1);
   });
@@ -136,7 +138,7 @@ describe("durable DM learning inputs and deletion", () => {
     const f = await fixture(); await enable(f.spaceId);
     for (let i = 0; i < 35; i++) await message(f.owner.channelId, `Synthetic durable fact ${i}`);
     await outbox(f.spaceId, now);
-    await scheduleDmLearningJobs(db, organizationId, syntheticDmLearningPolicy, now);
+    await scheduleDmLearningJobs(db, organizationId, now);
     const pending = await job(f.spaceId);
     const space = (await db.prepare("select * from briar_dm_memory_spaces where id = ?").bind(f.spaceId).first<DmLearningSpaceRow>())!;
     const input = await captureDmLearningInput(db, pending, space, syntheticDmLearningPolicy, now);
@@ -192,7 +194,7 @@ describe("durable DM learning inputs and deletion", () => {
     const f = await fixture(); await enable(f.spaceId);
     const sourceId = await message(f.owner.channelId, "Use tables when comparing implementation options.");
     await outbox(f.spaceId, now);
-    const claim = await claimDmLearningJob(db, { organizationId, deviceId, workerId, projectId, policy: syntheticDmLearningPolicy, now });
+    const claim = await claimDmLearningJob(db, { organizationId, deviceId, workerId, projectId, now });
     expect(claim).not.toBeNull();
     if (!claim) throw new Error("Synthetic learning claim was not acquired");
     const identity = { organizationId, workerId, deviceId, jobId: claim.workId, claimTokenHash: await sha256(claim.claimToken) };
@@ -200,33 +202,70 @@ describe("durable DM learning inputs and deletion", () => {
       title: "Comparison preference", content: "The user prefers tables when comparing implementation options.",
       sourceLanguage: "en", observedAt: now, sourceRefs: [{ type: "message", id: sourceId, version: 1 }],
     })] };
-    const common = { identity, policy: syntheticDmLearningPolicy, inputHash: claim.inputHash, now };
+    const common = { identity, inputHash: claim.inputHash, now };
     return { ...f, claim, identity, proposal, common };
   }
-  it("claims Agent learning only when the Worker advertises both pinned providers", async () => {
+  const defaultRuntime = workerRuntimeProtoJsonFixture({ agentProvider: "claude", providers: ["claude", "codex"],
+    dmMemoryLearning: { protocol: 2, transports: ["agent"], providers: ["codex"] } });
+  const setRuntime = (runtimeProtoJson: string) => db
+    .prepare("update briar_execution_workers set runtime_proto_json = ? where id = ?")
+    .bind(runtimeProtoJson, workerId).run();
+  it("derives the preferred provider from the DM Agent and resolves the claim inside the verified list", async () => {
     const f = await fixture(); await enable(f.spaceId);
     await message(f.owner.channelId, "Use the connected Agent for this synthetic preference.");
     await outbox(f.spaceId, now);
-    const updateRuntime = (providers: Array<"codex" | "grok">) => db.prepare(
-      "update briar_execution_workers set runtime_proto_json = ? where id = ?",
-    ).bind(workerRuntimeProtoJsonFixture({ providers, dmMemoryLearning: {
-      protocol: 2, transports: ["agent"], providers,
-    } }), workerId).run();
-    try {
-      await updateRuntime(["codex"]);
-      expect(await claimDmLearningJob(db, { organizationId, deviceId, workerId, projectId,
-        policy: syntheticAgentDmLearningPolicy, now })).toBeNull();
-      await updateRuntime(["codex", "grok"]);
-      const claim = await claimDmLearningJob(db, { organizationId, deviceId, workerId, projectId,
-        policy: syntheticAgentDmLearningPolicy, now });
-      expect(claim?.snapshot.policy).toEqual(syntheticAgentDmLearningPolicy);
-    } finally {
-      await db.prepare("update briar_execution_workers set runtime_proto_json = ? where id = ?")
-        .bind(workerRuntimeProtoJsonFixture({ agentProvider: "claude", providers: ["claude"],
-          dmMemoryLearning: true }), workerId).run();
-    }
+    await scheduleDmLearningJobs(db, organizationId, now);
+    // The DM Agent runs on Claude, which is not verified, so the queue pins Codex.
+    const enqueued = await job(f.spaceId);
+    expect(JSON.parse(enqueued.policy_json!)).toEqual(syntheticDmLearningPolicy);
+    const claim = await claimDmLearningJob(db, { organizationId, deviceId, workerId, projectId, now });
+    expect(claim?.snapshot.policy).toEqual(syntheticDmLearningPolicy);
+    expect(JSON.parse((await job(f.spaceId)).policy_json!)).toEqual(syntheticDmLearningPolicy);
   });
-  const usage = { inputTokens: 100, outputTokens: 50, costMicroUsd: 100 };
+  it("re-resolves a job pinned to a provider this Worker does not advertise", async () => {
+    const f = await fixture(); await enable(f.spaceId);
+    await message(f.owner.channelId, "Resolve the learning provider at claim time.");
+    await outbox(f.spaceId, now);
+    await scheduleDmLearningJobs(db, organizationId, now);
+    const pinned = { ...syntheticDmLearningPolicy,
+      proposer: { ...syntheticDmLearningPolicy.proposer, provider: "grok" as const },
+      verifier: { ...syntheticDmLearningPolicy.verifier, provider: "grok" as const } };
+    const pending = await job(f.spaceId);
+    await db.prepare("update briar_dm_memory_jobs set policy_json = ? where id = ?")
+      .bind(dmMemoryCanonicalJson(pinned), pending.id).run();
+    // This Worker cannot run Grok, so the claim falls back inside the verified list.
+    const claim = await claimDmLearningJob(db, { organizationId, deviceId, workerId, projectId, now });
+    expect(claim?.workId).toBe(pending.id);
+    expect(claim?.snapshot.policy).toEqual(syntheticDmLearningPolicy);
+    expect(JSON.parse((await job(f.spaceId)).policy_json!)).toEqual(syntheticDmLearningPolicy);
+  });
+  it("refuses a Worker that advertises no verified learning provider", async () => {
+    const f = await fixture(); await enable(f.spaceId);
+    await message(f.owner.channelId, "No verified provider is connected here.");
+    await outbox(f.spaceId, now);
+    try {
+      await setRuntime(workerRuntimeProtoJsonFixture({ agentProvider: "claude", providers: ["claude"],
+        dmMemoryLearning: { protocol: 2, transports: ["agent"], providers: ["claude"] } }));
+      expect(await claimDmLearningJob(db, { organizationId, deviceId, workerId, projectId, now })).toBeNull();
+      await setRuntime(workerRuntimeProtoJsonFixture({ providers: ["codex"], dmMemoryLearning: true }));
+      expect(await claimDmLearningJob(db, { organizationId, deviceId, workerId, projectId, now })).toBeNull();
+    } finally { await setRuntime(defaultRuntime); }
+  });
+  it("reports the derived provider, its verification state and Worker availability", async () => {
+    const f = await fixture();
+    const status = await readDmLearningStatus(db, f.owner, f.spaceId, now);
+    expect(status?.configuration).toMatchObject({ agentProvider: "claude", agentProviderVerified: false,
+      workerAvailable: true, proposer: { transport: "agent", provider: "codex", model: "default" },
+      verifier: { transport: "agent", provider: "codex", model: "default" }, costTracked: false, spaceDailyCalls: 24 });
+    try {
+      await setRuntime(workerRuntimeProtoJsonFixture({ providers: ["codex"], dmMemoryLearning: true }));
+      expect((await readDmLearningStatus(db, f.owner, f.spaceId, now))?.configuration?.workerAvailable).toBe(false);
+    } finally { await setRuntime(defaultRuntime); }
+    expect((await readDmLearningStatus(db, f.owner, f.spaceId, "2026-09-01T01:00:00.000Z"))?.configuration?.workerAvailable)
+      .toBe(false);
+    expect(await readDmLearningStatus(db, f.owner, null, now)).toMatchObject({ configuration: null });
+  });
+  const usage = { inputTokens: 100, outputTokens: 50, costMicroUsd: null };
   it("reserves two calls, verifies independently, and atomically commits evidence, index work and watermark", async () => {
     const f = await claimedLearning(), proposalCall = crypto.randomUUID();
     const invocation = await reserveDmLearningModelCall(db, { ...f.common, callId: proposalCall, stage: "proposing" });
@@ -238,7 +277,7 @@ describe("durable DM learning inputs and deletion", () => {
     if (proposed.status !== "verifying") throw new Error("Synthetic proposal did not enter verification");
     const verificationCall = crypto.randomUUID();
     const verify = await reserveDmLearningModelCall(db, { ...f.common, callId: verificationCall, stage: "verifying" });
-    expect(verify.model.model).toBe("synthetic/verifier");
+    expect(verify.model).toMatchObject({ transport: "agent", provider: "codex", maxOutputTokens: 2048 });
     expect(verify.proposal).toEqual(f.proposal);
     const submitted = { ...f.common, callId: verificationCall,
       proposalId: proposed.proposalId, proposalHash: proposed.proposalHash, usage,
@@ -302,7 +341,7 @@ describe("durable DM learning inputs and deletion", () => {
     expect(await db.prepare("select proposal_json, normalized_json from briar_dm_memory_proposals where id = ?")
       .bind(callId).first()).toEqual({ proposal_json: null, normalized_json: null });
     expect(await db.prepare("select input_tokens, output_tokens, cost_micro_usd from briar_dm_memory_model_calls where id = ?")
-      .bind(callId).first()).toEqual({ input_tokens: 100, output_tokens: 50, cost_micro_usd: 100 });
+      .bind(callId).first()).toEqual({ input_tokens: 100, output_tokens: 50, cost_micro_usd: null });
   });
   it("retires expired attempts without losing the durable input interval or refunding unknown calls", async () => {
     const f = await claimedLearning(), callId = crypto.randomUUID();
@@ -318,8 +357,7 @@ describe("durable DM learning inputs and deletion", () => {
   it("runs the CLI through generated Connect RPCs and replays a lost commit acknowledgement", async () => {
     const f = await claimedLearning();
     expect(await countExecutionWorkerDeviceSessions(db, deviceId, now)).toBe(1);
-    const learningEnv = Object.assign({ DB: db }, { DM_MEMORY_LEARNING_ENABLED: String("true"),
-      DM_MEMORY_LEARNING_POLICIES: JSON.stringify({ [organizationId]: syntheticDmLearningPolicy }) }) as Env;
+    const learningEnv = { DB: db } as Env;
     let lostAcknowledgement = false;
     const rpc = createClient(WorkerQueueService, createRouterTransport((router) =>
       router.service(WorkerQueueService, createWorkerQueueService({
@@ -345,11 +383,12 @@ describe("durable DM learning inputs and deletion", () => {
         return response;
       },
     };
-    const models = vi.fn<typeof invokeDmLearningModel>().mockImplementation(async (input) => invokeDmLearningModel({ ...input,
-      fetcher: vi.fn<typeof fetch>().mockResolvedValue(Response.json({ model: input.invocation.model.model,
-        choices: [{ finish_reason: "stop", message: { content: JSON.stringify(input.invocation.stage === "proposing" ? f.proposal
-          : { approved: true, explicitRequestAuthorized: false, decisions: [{ changeId: "change-1", verdict: "supported" }] }) } }],
-        usage: { prompt_tokens: 100, completion_tokens: 50, cost: 0.0001 } })) }));
+    // The Agent transport spawns a provider process, so this stands in for the
+    // runner while still driving the real Connect RPCs and commit replay.
+    const models = vi.fn<typeof invokeDmLearningModel>().mockImplementation(async ({ invocation }) =>
+      invocation.stage === "proposing" ? { proposal: f.proposal, usage }
+        : { verification: { approved: true, explicitRequestAuthorized: false,
+          decisions: [{ changeId: "change-1", verdict: "supported" as const }] }, usage });
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date(now));
     try {
@@ -405,9 +444,8 @@ describe("durable DM learning inputs and deletion", () => {
       values (?, ?, 'explicit_request', 0, ?, ?, 0, ?, ?)`)
       .bind(crypto.randomUUID(), f.spaceId, requestSource,
         JSON.stringify([{ documentId: f.documentId, version: 1 }]), now, now).run();
-    expect(await scheduleDmLearningJobs(db, organizationId, syntheticDmLearningPolicy, now)).toBe(1);
-    const claim = await claimDmLearningJob(db, { organizationId, deviceId, workerId, projectId,
-      policy: syntheticDmLearningPolicy, now });
+    expect(await scheduleDmLearningJobs(db, organizationId, now)).toBe(1);
+    const claim = await claimDmLearningJob(db, { organizationId, deviceId, workerId, projectId, now });
     expect(claim?.snapshot.requestSource).toEqual({ type: "message", id: requestSource, version: 1 });
     expect(claim?.snapshot.documents.map((document) => document.id)).toEqual([f.documentId]);
     expect(claim?.snapshot.documents.map((document) => document.id)).not.toContain(unrelated.documentId);
@@ -418,21 +456,21 @@ describe("durable DM learning inputs and deletion", () => {
   it("retries a failed interval idempotently without resetting its model-call ceiling", async () => {
     const f = await fixture(); await enable(f.spaceId);
     await message(f.owner.channelId, "Synthetic retry source."); await outbox(f.spaceId, now);
-    expect(await scheduleDmLearningJobs(db, organizationId, syntheticDmLearningPolicy, now)).toBe(1);
+    expect(await scheduleDmLearningJobs(db, organizationId, now)).toBe(1);
     const failed = (await db.prepare(`select id from briar_dm_memory_jobs where space_id = ? and kind = 'extract'
       order by created_at desc limit 1`).bind(f.spaceId).first<{ id: string }>())!;
     await db.prepare("update briar_dm_memory_jobs set status = 'failed', calls_used = 2, error_code = 'model_unavailable' where id = ?")
       .bind(failed.id).run();
     const input = { requestId: crypto.randomUUID(), revocationEpoch: 0 };
-    expect(await retryDmLearningJob(db, f.owner, failed.id, input, syntheticDmLearningPolicy, now))
+    expect(await retryDmLearningJob(db, f.owner, failed.id, input, now))
       .toEqual({ accepted: true, replayed: false });
-    expect(await retryDmLearningJob(db, f.owner, failed.id, input, syntheticDmLearningPolicy, now))
+    expect(await retryDmLearningJob(db, f.owner, failed.id, input, now))
       .toEqual({ accepted: true, replayed: true });
     expect(await db.prepare("select status, calls_used from briar_dm_memory_jobs where id = ?").bind(failed.id).first())
       .toEqual({ status: "pending", calls_used: 2 });
     await db.prepare("update briar_dm_memory_jobs set status = 'failed', calls_used = 6 where id = ?").bind(failed.id).run();
     await expect(retryDmLearningJob(db, f.owner, failed.id,
-      { requestId: crypto.randomUUID(), revocationEpoch: 0 }, syntheticDmLearningPolicy, now))
+      { requestId: crypto.randomUUID(), revocationEpoch: 0 }, now))
       .rejects.toMatchObject({ code: "memory_retry_blocked" });
   });
   it("keeps forgetting pending until vectors of derived memories have also been removed", async () => {

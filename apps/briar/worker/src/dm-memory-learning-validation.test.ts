@@ -1,40 +1,47 @@
 import * as Schema from "effect/Schema";
 import { describe, expect, it } from "vitest";
-import { DmLearningProposal } from "../../src/lib/dm-memory-learning-contract";
-import { dmLearningCallReservation, dmLearningPolicy, supportsDmMemoryLearning } from "./dm-memory-learning-policy";
+import { DmLearningProposal, dmLearningAgentPolicy, dmLearningPreferredProvider,
+  dmMemoryLearningVerifiedProviders, resolveDmLearningProvider } from "../../src/lib/dm-memory-learning-contract";
+import { advertisedDmLearningProviders, dmLearningCallReservation, supportsDmMemoryLearning } from "./dm-memory-learning-policy";
 import { normalizeDmLearningProposal, requireDmLearningVerification } from "./dm-memory-learning-validation";
-import { syntheticAgentDmLearningPolicy, syntheticDmLearningPolicy, syntheticDmLearningSnapshot,
+import { syntheticDmLearningPolicy, syntheticDmLearningSnapshot,
   syntheticDmLearningChange } from "./test-helpers/dm-memory-learning";
 import { workerRuntimeFixture } from "./test-helpers/worker-runtime";
 
 describe("DM learning proposal and independent verifier boundaries", () => {
-  it("requires explicit configured models and budgets and charges both model phases", () => {
-    const id = crypto.randomUUID();
-    expect(dmLearningPolicy({}, id)).toBeNull();
-    expect(dmLearningPolicy({ DM_MEMORY_LEARNING_ENABLED: "true", DM_MEMORY_LEARNING_POLICIES: "{}" }, id)).toBeNull();
-    expect(dmLearningPolicy({ DM_MEMORY_LEARNING_ENABLED: "true", DM_MEMORY_LEARNING_POLICIES:
-      JSON.stringify({ [id]: syntheticDmLearningPolicy }) }, id)).toEqual(syntheticDmLearningPolicy);
+  it("derives the policy from the DM Agent and never invents a subscription cost", () => {
+    expect(dmMemoryLearningVerifiedProviders).toEqual(["codex"]);
+    expect(dmLearningPreferredProvider("codex")).toBe("codex");
+    expect(dmLearningPreferredProvider("claude")).toBe("codex");
+    expect(dmLearningAgentPolicy("codex")).toEqual(syntheticDmLearningPolicy);
+    expect(dmLearningAgentPolicy("codex")).toMatchObject({ spaceDailyCalls: 24, organizationDailyCalls: 240,
+      maxInputBytes: 131_072, spaceDailyMicroUsd: 0, organizationDailyMicroUsd: 0 });
+    expect(dmLearningAgentPolicy("codex").proposer).toMatchObject({ transport: "agent", maxOutputTokens: 4096 });
+    expect(dmLearningAgentPolicy("codex").verifier).toMatchObject({ transport: "agent", maxOutputTokens: 2048 });
     const snapshot = syntheticDmLearningSnapshot();
     const proposal = { explicitRequest: false, changes: [syntheticDmLearningChange(snapshot)] };
     const proposing = dmLearningCallReservation(snapshot.policy.proposer, JSON.stringify({ snapshot }), "proposing")!;
     const verifying = dmLearningCallReservation(snapshot.policy.verifier, JSON.stringify({ snapshot, proposal }), "verifying")!;
-    expect(proposing.reservedMicroUsd).toBeGreaterThan(0);
-    expect(verifying.reservedMicroUsd).toBeGreaterThan(0);
+    expect(proposing.reservedMicroUsd).toBe(0);
+    expect(verifying.reservedMicroUsd).toBe(0);
     expect(verifying.inputTokenCeiling).toBeGreaterThan(JSON.stringify(proposal).length);
   });
-  it("accepts connected Agent providers, rejects missing providers and records no invented subscription cost", () => {
-    const organizationId = crypto.randomUUID();
-    expect(dmLearningPolicy({ DM_MEMORY_LEARNING_ENABLED: "true", DM_MEMORY_LEARNING_POLICIES:
-      JSON.stringify({ [organizationId]: syntheticAgentDmLearningPolicy }) }, organizationId))
-      .toEqual(syntheticAgentDmLearningPolicy);
+  it("accepts only protocol-2 Workers advertising a verified Agent provider", () => {
     const capabilities = workerRuntimeFixture({ dmMemoryLearning: {
       protocol: 2, transports: ["agent"], providers: ["codex", "grok"],
     } }).capabilities;
-    expect(supportsDmMemoryLearning(capabilities, syntheticAgentDmLearningPolicy)).toBe(true);
+    expect(advertisedDmLearningProviders(capabilities)).toEqual(["codex"]);
+    expect(supportsDmMemoryLearning(capabilities)).toBe(true);
     expect(supportsDmMemoryLearning(workerRuntimeFixture({ dmMemoryLearning: {
-      protocol: 2, transports: ["agent"], providers: ["codex"],
-    } }).capabilities, syntheticAgentDmLearningPolicy)).toBe(false);
-    expect(dmLearningCallReservation(syntheticAgentDmLearningPolicy.proposer, "{}", "proposing")?.reservedMicroUsd).toBe(0);
+      protocol: 2, transports: ["agent"], providers: ["claude", "grok"],
+    } }).capabilities)).toBe(false);
+    expect(supportsDmMemoryLearning(workerRuntimeFixture({ dmMemoryLearning: {
+      protocol: 2, transports: ["openrouter"], providers: ["codex"],
+    } }).capabilities)).toBe(false);
+    expect(supportsDmMemoryLearning(workerRuntimeFixture({ dmMemoryLearning: true }).capabilities)).toBe(false);
+    expect(resolveDmLearningProvider("codex", ["codex"])).toBe("codex");
+    expect(resolveDmLearningProvider("claude", ["codex"])).toBe("codex");
+    expect(resolveDmLearningProvider("codex", [])).toBeNull();
   });
   it("separates schema validity from evidence validity and never accepts model protection", () => {
     const snapshot = syntheticDmLearningSnapshot(), change = syntheticDmLearningChange(snapshot);

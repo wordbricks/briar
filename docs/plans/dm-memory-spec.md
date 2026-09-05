@@ -2,7 +2,8 @@
 
 상태: 저장·관리 기반 PR #1497, 검색 PR #1499, DM 실행 연결 PR #1500, 자동 학습
 PR #1501이 main에 반영됐다. 명시적 기억 관리·색인·회상에 이어, 사용자가 연결한
-Agent를 재사용하는 자동 학습이 품질 gate를 통과해 제한된 조직 정책으로 활성화된다.
+Agent를 재사용하는 자동 학습이 품질 gate를 통과해 활성화됐고, 이후 조직 정책과 운영
+flag를 없애 학습 provider를 DM Agent에서 유도하는 기본 내장 기능이 됐다.
 각 DM의 자동 기억은 계속 사용자 opt-in이며 기존 대화를 백필하지 않는다.
 구현·평가·배포 기록은 [진행 문서](dm-memory-delivery.md)에 남긴다.
 
@@ -32,7 +33,8 @@ Briar DM에서 사용자와 Agent가 나눈 대화의 선호·결정·재사용�
 | 파일 | 필요한 기억을 Worker 실행 디렉터리에 제공하는 읽기용 표현. 원본이 아님 |
 | 첫 적용 범위 | 사용자 1명과 Agent 1명이 참여하는 조직 내부 DM |
 | 검색 방식 | 벡터 후보 검색 뒤 제한된 의미 관련성 검증. FTS5·BM25·키워드 혼합·점수 재정렬은 v1 제외 |
-| 자동 기억 | DM별 명시적 활성화. 과거 대화 전체의 자동 백필은 하지 않음 |
+| 자동 기억 | 기본 내장. DM별 명시적 활성화만 필요하고 과거 대화 전체의 자동 백필은 하지 않음 |
+| 학습 provider | 설정하지 않고 DM Agent에서 유도. 코드에 적힌 검증 목록 안에서만 대체 |
 | 기억 분류 | `profile`·`log`·`note`. 저장 범위·근거 신뢰도와 별도로 관리 |
 | 모델이 만든 변경 | 근거를 인용한 변경안 → 별도 검증 호출 → 서버의 원자적 반영 |
 | 사용자 보호 | 명시적으로 저장·편집한 기억은 자동 정리가 덮어쓰지 않음 |
@@ -352,18 +354,22 @@ UI에서 사용자가 확정한 본문을 그대로 저장·편집하거나 삭�
 - 미처리 근거는 메모리 내 큐의 크기 초과·재시작·실패로 버리지 않는다. 입력 예산을
   넘으면 영속 구간을 나누고 다음 작업으로 넘긴다. 재시도 때는 같은 근거 버전을 읽는다.
 
-자동 추출·정리 모델은 별도 설정이며, 본 대화의 모델을 바꾸거나 사용자 몰래
-유료 provider로 fallback하지 않는다. 설정과 예산이 없으면 자동 학습만 멈추고
-명시적으로 저장한 기억의 조회·검색은 계속 제공한다.
+자동 추출·정리 모델은 본 대화의 모델을 바꾸지 않으며, 사용자 몰래 유료 provider로
+fallback하지 않는다. 자동 학습은 기본 내장 기능이라 조직별 설정이나 운영 flag가 없다.
+학습을 처리할 Worker가 없으면 자동 학습만 멈추고 명시적으로 저장한 기억의 조회·검색은
+계속 제공한다.
 
-초기 운영 설정은 실행 Worker에서 사용자가 이미 연결한 Codex·Claude·Grok·Agy·
-OpenCode·OpenRouter·Cursor 중 조직 정책이 고른 provider를 사용한다. 각 제안·검증은
-인증에 필요한 최소 파일만 복제한 mode 0700 임시 홈과 빈 임시 작업공간에서 독립된
-새 세션으로 실행한다. 입력은 고정된 기억 snapshot JSON뿐이며 attachments, skills,
-MCP, 외부 도구, 네트워크 권한, retained conversation을 제공하지 않는다. 구조화 출력만
-받고 서버가 동일한 범위·근거·버전 검증을 다시 수행한다. 연결 상태가 없거나 provider가
-정책과 다르면 그 Worker는 job을 claim하지 않는다. 기존 직접 OpenRouter transport는
-구버전 정책 호환용으로만 유지하며 자동 fallback으로 사용하지 않는다.
+학습 provider는 설정하지 않고 유도한다. 그 DM의 Agent provider가 코드 상수
+`dmMemoryLearningVerifiedProviders`에 있으면 그대로 쓰고, 없으면 그 목록의 첫 provider를
+쓴다. 이 목록에는 `apps/briar/evals/dm-memory-learning-v1` 품질 gate를 통과한 agent
+transport provider만 넣으며 OpenRouter는 넣지 않는다. job은 enqueue 시점에 유도한 정책을
+저장하고, claim 시점에 그 Worker가 광고하는 검증된 provider로 다시 해석해 같은 batch에
+기록한다. 대체는 항상 이 검증 목록 안에서만 일어난다. 각 제안·검증은 인증에 필요한 최소
+파일만 복제한 mode 0700 임시 홈과 빈 임시 작업공간에서 독립된 새 세션으로 실행한다. 입력은
+고정된 기억 snapshot JSON뿐이며 attachments, skills, MCP, 외부 도구, 네트워크 권한,
+retained conversation을 제공하지 않는다. 구조화 출력만 받고 서버가 동일한 범위·근거·버전
+검증을 다시 수행한다. 검증된 provider를 하나도 광고하지 않는 Worker는 job을 claim하지
+않는다. 기존 직접 OpenRouter transport는 휴면 코드로만 남기고 job 실행에 쓰지 않는다.
 
 ### 6.3 정리 작업
 
@@ -384,9 +390,12 @@ MCP, 외부 도구, 네트워크 권한, retained conversation을 제공하지 �
 
 ### 6.4 작업 실행 주체
 
-- 추출·정리는 `dmMemory` capability를 광고하는 Briar execution Worker가
-  별도 memory job을 claim해 실행한다. 저장소 worktree는 필요하지 않으며
+- 추출·정리는 `dmMemory` capability와 protocol 2 학습 capability를 광고하는 Briar
+  execution Worker가 별도 memory job을 claim해 실행한다. 저장소 worktree는 필요하지 않으며
   모델에는 허용한 텍스트와 구조화 출력 계약만 제공한다.
+- claim은 job의 `policy_json`을 그 Worker가 광고하는 검증된 provider로 해석해 저장하고,
+  lease·모델 호출·commit의 모든 guard는 그 Worker가 저장된 provider를 계속 광고하는지
+  다시 확인한다. 광고가 사라지면 job은 다른 Worker로 되돌아간다.
 - 이 claim은 종료된 channel reply claim과 별개다. 만료된 reply token을
   백그라운드 쓰기 권한으로 재사용하지 않는다.
 - 원본 반영은 Briar 서버가 한다. execution Worker가 보낸 문서 변경안은

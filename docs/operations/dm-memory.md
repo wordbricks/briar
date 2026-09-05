@@ -125,11 +125,12 @@ closed on invalid output or provider failure. Brief availability does not prove
 that semantic search is ready.
 
 The current rollout sets `DM_MEMORY_INDEX_ENABLED=true`,
-`DM_MEMORY_RETRIEVAL_ENABLED=true`, `DM_MEMORY_MINIMUM_SCORE=0.5`, and
-`DM_MEMORY_LEARNING_ENABLED=true`. Learning still requires a matching
-organization policy, a protocol-2 learning Worker with the pinned providers,
-and owner opt-in for that DM. To roll back learning, set only the learning flag
-false and redeploy. To roll back recall, set retrieval and indexing false and
+`DM_MEMORY_RETRIEVAL_ENABLED=true` and `DM_MEMORY_MINIMUM_SCORE=0.5`. Learning has
+no flag and no organization policy: it is built in, and the only remaining
+prerequisites are a protocol-2 learning Worker advertising a verified provider and
+owner opt-in for that DM. Rolling learning back means changing code, so treat
+`dmMemoryLearningVerifiedProviders` as the switch and ship a revert rather than a
+variable change. To roll back recall, set retrieval and indexing false and
 redeploy. Keep cleanup and owner management available; do not delete D1 originals
 or purge registries as a flag rollback.
 
@@ -137,8 +138,24 @@ or purge registries as a flag rollback.
 
 Learning Workers advertise `dmMemoryLearning: { protocol: 2, transports,
 providers }`. The server checks both proposer and verifier against that exact
-capability before claim and commit. A protocol-1 Worker can claim only a legacy
-OpenRouter policy; it cannot receive an Agent policy.
+capability before claim and commit. A protocol-1 Worker, and any protocol-2 Worker
+without the `agent` transport or without a verified provider, claims no learning
+work at all.
+
+Nothing configures the learning provider. The queue derives it from the DM's own
+Agent: that provider when it appears in the code constant
+`dmMemoryLearningVerifiedProviders` (`apps/briar/src/lib/dm-memory-learning-contract.ts`),
+otherwise the first provider in that list. The derived policy is stored in the
+job's `policy_json` at enqueue. At claim time the server re-resolves it against
+the providers the claiming Worker advertises and writes the resolved policy in the
+same guarded batch that stores the input snapshot, so the snapshot policy and the
+row always agree. Fallback never leaves the verified list, and OpenRouter is never
+part of it: that transport is metered and would be a silent paid path. Adding a
+provider means running `bun evals/dm-memory-learning-v1/run.ts --provider <id>`
+from `apps/briar`, meeting the gate below, and extending the constant in the same
+pull request. The memory dialog on desktop, Android and iOS shows the DM Agent's
+provider, whether it is verified, and whether any Worker can currently run
+learning.
 
 An Agent stage reuses the user's existing local provider connection without
 sending its credential to Cloudflare. It copies the provider's minimal auth files
@@ -155,11 +172,12 @@ without advancing the watermark or writing a partial proposal. Subscription Agen
 calls have zero tracked micro-USD cost in the status UI, but retain per-space and
 per-organization call limits.
 
-Before enabling a new organization policy, run
-`bun evals/dm-memory-learning-v1/run.ts` from `apps/briar` with synthetic cases,
-confirm precision at least 95%, recall at least 80% and zero safety violations,
-then verify the target Worker heartbeat advertises protocol 2 and every pinned
-provider. Never use a private conversation archive for this check.
+Before adding a provider to `dmMemoryLearningVerifiedProviders`, run
+`bun evals/dm-memory-learning-v1/run.ts --provider <id>` from `apps/briar` with
+synthetic cases, confirm precision at least 95%, recall at least 80% and zero
+safety violations, then verify the target Worker heartbeat advertises protocol 2,
+the `agent` transport and that provider. Never use a private conversation archive
+for this check.
 
 Temporary memory files live outside the checkout with directory mode 0700 and
 file mode 0600. Completion/failure removes them. On a subsequent invocation,

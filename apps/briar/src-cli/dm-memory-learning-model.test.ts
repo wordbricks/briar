@@ -1,13 +1,14 @@
 import { readdir, stat } from "node:fs/promises";
 import { describe, expect, it, vi } from "vitest";
 import type { DmLearningInvocation } from "../src/lib/dm-memory-learning-contract";
-import { syntheticDmLearningChange, syntheticDmLearningSnapshot } from "../worker/src/test-helpers/dm-memory-learning";
+import { syntheticDmLearningChange, syntheticDmLearningSnapshot,
+  syntheticOpenRouterDmLearningPolicy } from "../worker/src/test-helpers/dm-memory-learning";
 import { invokeDmLearningModel } from "./dm-memory-learning-model";
 import { runDetachedProviderTurn } from "./detached-provider-turn";
 import { prepareReadOnlyAgentEnvironment } from "./read-only-agent-environment";
 
 function fixture(stage: "proposing" | "verifying" = "proposing"): DmLearningInvocation {
-  const snapshot = syntheticDmLearningSnapshot();
+  const snapshot = { ...syntheticDmLearningSnapshot(), policy: syntheticOpenRouterDmLearningPolicy };
   return { callId: crypto.randomUUID(), inputHash: "a".repeat(64), stage, snapshot,
     proposalId: stage === "verifying" ? crypto.randomUUID() : null,
     proposalHash: stage === "verifying" ? "b".repeat(64) : null,

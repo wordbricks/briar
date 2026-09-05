@@ -1,6 +1,6 @@
 import * as Schema from "effect/Schema";
 import { dmMemoryCanonicalJson } from "../../src/lib/dm-memory-canonical-json";
-import { DmLearningCommitResult, type DmLearningPolicy, type DmLearningProposal,
+import { DmLearningCommitResult, type DmLearningProposal,
   type DmLearningVerification } from "../../src/lib/dm-memory-learning-contract";
 import { dmLearningWorkerCurrentSql, type DmLearningClaimIdentity } from "./dm-memory-learning-claims";
 import { dmLearningLiveSpaceSql } from "./dm-memory-learning-input";
@@ -8,7 +8,7 @@ import { DmLearningError } from "./dm-memory-learning-validation";
 
 /** A lost acknowledgement can replay its own result, never another call's write. */
 export async function replayDmLearningCommit(db: D1Database, input: {
-  identity: DmLearningClaimIdentity; policy: DmLearningPolicy; callId: string; inputHash: string; now: string;
+  identity: DmLearningClaimIdentity; callId: string; inputHash: string; now: string;
 } & ({ proposal: DmLearningProposal } | { proposalId: string; proposalHash: string; verification: DmLearningVerification })) {
   const { identity } = input;
   const row = await db.prepare(`select applied.result_json, proposal.id as proposal_id,
@@ -24,13 +24,13 @@ export async function replayDmLearningCommit(db: D1Database, input: {
     left join briar_dm_memory_verifications verification on verification.id = call.id
     where job.id = ? and job.claimed_worker_id = ? and job.claimed_device_id = ?
       and job.lease_token_hash = ? and space.organization_id = ?
-      and job.status in ('succeeded', 'no_change') and job.input_hash = ? and job.policy_json = ?
+      and job.status in ('succeeded', 'no_change') and job.input_hash = ?
       and call.id = ? and call.claim_token_hash = job.lease_token_hash and call.status = 'completed'
       and call.stage = ? and call.input_hash = job.input_hash and ledger.payload_hash = proposal.proposal_hash
       and job.updated_at > ? and space.revocation_epoch = json_extract(applied.result_json, '$.revocationEpoch')
       and ${dmLearningLiveSpaceSql} and ${dmLearningWorkerCurrentSql}`)
     .bind(identity.jobId, identity.workerId, identity.deviceId, identity.claimTokenHash, identity.organizationId,
-      input.inputHash, dmMemoryCanonicalJson(input.policy), input.callId, "proposal" in input ? "proposing" : "verifying",
+      input.inputHash, input.callId, "proposal" in input ? "proposing" : "verifying",
       new Date(Date.parse(input.now) - 86_400_000).toISOString(), input.now)
     .first<{ result_json: string; proposal_id: string; proposal_hash: string; proposal_json: string | null;
       decisions_json: string | null; approved: number | null; request_authorized: number | null }>();

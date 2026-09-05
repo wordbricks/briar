@@ -1,6 +1,7 @@
 import { Brain, Download, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "../i18n";
+import { agentProviderLabels, agentProviders } from "../lib/agent-provider";
 import {
   dmMemoryApi, type DmMemoryClient, type DmMemoryApiScope,
 } from "../lib/api/dm-memory";
@@ -11,6 +12,12 @@ import {
 import type { DmMemoryReference } from "../lib/dm-memory-query-contract";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
+
+/** Learning provider identity is information, not a setting the owner can change. */
+const providerLabel = (provider: string) => {
+  const known = agentProviders.find((candidate) => candidate === provider);
+  return known === undefined ? provider : agentProviderLabels[known];
+};
 
 export function DmMemoryDialog({ scope, onClose, client = dmMemoryApi, initialReference }: {
   scope: DmMemoryApiScope; onClose: () => void; client?: DmMemoryClient; initialReference?: DmMemoryReference;
@@ -141,14 +148,15 @@ export function DmMemoryDialog({ scope, onClose, client = dmMemoryApi, initialRe
         <p className="text-xs text-muted-foreground">{t("memory.automaticHelp")}</p>
         {page.learning && <div className="grid gap-2 rounded-md border border-border p-3 text-xs" aria-label={t("memory.learningStatus")}>
           {page.learning.configuration && <>
-            <p className="break-words">{t("memory.learningModels")} · {page.learning.configuration.proposer.model}
-              {" / "}{page.learning.configuration.verifier.model}</p>
-            <p className="break-words">
-              {page.learning.configuration.proposer.transport === "agent" ? "Agent" : "OpenRouter"}
-              {" · "}{page.learning.configuration.proposer.provider}{" / "}
-              {page.learning.configuration.verifier.transport === "agent" ? "Agent" : "OpenRouter"}
-              {" · "}{page.learning.configuration.verifier.provider}
-            </p>
+            {page.learning.configuration.agentProviderVerified
+              ? <p className="break-words">{t("memory.learningModel")} · {t("memory.learningModelSame",
+                { provider: providerLabel(page.learning.configuration.proposer.provider) })}</p>
+              : <p className="break-words">{t("memory.learningProviderUnverified", {
+                agent: providerLabel(page.learning.configuration.agentProvider),
+                preferred: providerLabel(page.learning.configuration.proposer.provider) })}</p>}
+            {!page.learning.configuration.workerAvailable && <p className="text-destructive">
+              {t("memory.learningWorkerMissing", {
+                preferred: providerLabel(page.learning.configuration.proposer.provider) })}</p>}
             <p>{t("memory.learningCalls")} · {page.learning.callsToday} / {page.learning.configuration.spaceDailyCalls}</p>
             {page.learning.configuration.costTracked && <p>{t("memory.learningCost")} · ${(page.learning.reservedMicroUsdToday / 1_000_000).toFixed(4)}
               {" / $"}{(page.learning.configuration.spaceDailyMicroUsd / 1_000_000).toFixed(2)} USD</p>

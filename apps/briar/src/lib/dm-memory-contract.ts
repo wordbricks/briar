@@ -88,6 +88,7 @@ export const DmMemoryLearningStatus = Schema.Struct({
     verifier: Schema.Struct({ transport: Schema.Literals(["agent", "openrouter"]), model: Schema.String, provider: Schema.String }),
     costTracked: Schema.Boolean,
     spaceDailyCalls: Schema.Int, spaceDailyMicroUsd: Schema.Int,
+    agentProvider: Schema.String, agentProviderVerified: Schema.Boolean, workerAvailable: Schema.Boolean,
   })),
   callsToday: Schema.Int, reservedMicroUsdToday: Schema.Int, pendingJobs: Schema.Int, failedJobs: Schema.Int,
   retryableJob: Schema.optional(Schema.NullOr(Schema.Struct({ id, callsUsed: Schema.Int }))),

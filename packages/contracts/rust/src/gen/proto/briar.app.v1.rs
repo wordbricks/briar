@@ -58318,6 +58318,30 @@ pub struct DmMemoryLearningConfiguration {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub cost_tracked: bool,
+    /// Field 6: `agent_provider`
+    #[serde(
+        rename = "agentProvider",
+        alias = "agent_provider",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub agent_provider: ::buffa::alloc::string::String,
+    /// Field 7: `agent_provider_verified`
+    #[serde(
+        rename = "agentProviderVerified",
+        alias = "agent_provider_verified",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub agent_provider_verified: bool,
+    /// Field 8: `worker_available`
+    #[serde(
+        rename = "workerAvailable",
+        alias = "worker_available",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub worker_available: bool,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -58330,6 +58354,9 @@ impl ::core::fmt::Debug for DmMemoryLearningConfiguration {
             .field("space_daily_calls", &self.space_daily_calls)
             .field("space_daily_micro_usd", &self.space_daily_micro_usd)
             .field("cost_tracked", &self.cost_tracked)
+            .field("agent_provider", &self.agent_provider)
+            .field("agent_provider_verified", &self.agent_provider_verified)
+            .field("worker_available", &self.worker_available)
             .finish()
     }
 }
@@ -58390,6 +58417,17 @@ impl ::buffa::Message for DmMemoryLearningConfiguration {
         if self.cost_tracked {
             size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
         }
+        if !self.agent_provider.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.agent_provider) as u64;
+        }
+        if self.agent_provider_verified {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        if self.worker_available {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -58424,6 +58462,15 @@ impl ::buffa::Message for DmMemoryLearningConfiguration {
         }
         if self.cost_tracked {
             ::buffa::types::put_bool_field(5u32, self.cost_tracked, buf);
+        }
+        if !self.agent_provider.is_empty() {
+            ::buffa::types::put_string_field(6u32, &self.agent_provider, buf);
+        }
+        if self.agent_provider_verified {
+            ::buffa::types::put_bool_field(7u32, self.agent_provider_verified, buf);
+        }
+        if self.worker_available {
+            ::buffa::types::put_bool_field(8u32, self.worker_available, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -58481,6 +58528,27 @@ impl ::buffa::Message for DmMemoryLearningConfiguration {
                 )?;
                 self.cost_tracked = ::buffa::types::decode_bool(buf)?;
             }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.agent_provider, buf)?;
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.agent_provider_verified = ::buffa::types::decode_bool(buf)?;
+            }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.worker_available = ::buffa::types::decode_bool(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -58494,6 +58562,9 @@ impl ::buffa::Message for DmMemoryLearningConfiguration {
         self.space_daily_calls = 0u32;
         self.space_daily_micro_usd = 0u64;
         self.cost_tracked = false;
+        self.agent_provider.clear();
+        self.agent_provider_verified = false;
+        self.worker_available = false;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -223558,6 +223629,12 @@ pub mod __buffa {
             pub space_daily_micro_usd: u64,
             /// Field 5: `cost_tracked`
             pub cost_tracked: bool,
+            /// Field 6: `agent_provider`
+            pub agent_provider: &'a str,
+            /// Field 7: `agent_provider_verified`
+            pub agent_provider_verified: bool,
+            /// Field 8: `worker_available`
+            pub worker_available: bool,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for DmMemoryLearningConfigurationView<'a> {
@@ -223667,6 +223744,29 @@ pub mod __buffa {
                         )?;
                         view.cost_tracked = ::buffa::types::decode_bool(&mut cur)?;
                     }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.agent_provider = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.agent_provider_verified = ::buffa::types::decode_bool(
+                            &mut cur,
+                        )?;
+                    }
+                    8u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.worker_available = ::buffa::types::decode_bool(&mut cur)?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -223717,6 +223817,9 @@ pub mod __buffa {
                     space_daily_calls: self.space_daily_calls,
                     space_daily_micro_usd: self.space_daily_micro_usd,
                     cost_tracked: self.cost_tracked,
+                    agent_provider: self.agent_provider.to_string(),
+                    agent_provider_verified: self.agent_provider_verified,
+                    worker_available: self.worker_available,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -223763,6 +223866,18 @@ pub mod __buffa {
                 if self.cost_tracked {
                     size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
                 }
+                if !self.agent_provider.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.agent_provider)
+                                as u64;
+                }
+                if self.agent_provider_verified {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
+                if self.worker_available {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -223802,6 +223917,19 @@ pub mod __buffa {
                 }
                 if self.cost_tracked {
                     ::buffa::types::put_bool_field(5u32, self.cost_tracked, buf);
+                }
+                if !self.agent_provider.is_empty() {
+                    ::buffa::types::put_string_field(6u32, &self.agent_provider, buf);
+                }
+                if self.agent_provider_verified {
+                    ::buffa::types::put_bool_field(
+                        7u32,
+                        self.agent_provider_verified,
+                        buf,
+                    );
+                }
+                if self.worker_available {
+                    ::buffa::types::put_bool_field(8u32, self.worker_available, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -223858,6 +223986,19 @@ pub mod __buffa {
                 }
                 if self.cost_tracked {
                     __map.serialize_entry("costTracked", &self.cost_tracked)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.agent_provider) {
+                    __map.serialize_entry("agentProvider", self.agent_provider)?;
+                }
+                if self.agent_provider_verified {
+                    __map
+                        .serialize_entry(
+                            "agentProviderVerified",
+                            &self.agent_provider_verified,
+                        )?;
+                }
+                if self.worker_available {
+                    __map.serialize_entry("workerAvailable", &self.worker_available)?;
                 }
                 __map.end()
             }
@@ -223992,6 +224133,21 @@ pub mod __buffa {
             #[must_use]
             pub fn cost_tracked(&self) -> bool {
                 self.0.reborrow().cost_tracked
+            }
+            /// Field 6: `agent_provider`
+            #[must_use]
+            pub fn agent_provider(&self) -> &'_ str {
+                self.0.reborrow().agent_provider
+            }
+            /// Field 7: `agent_provider_verified`
+            #[must_use]
+            pub fn agent_provider_verified(&self) -> bool {
+                self.0.reborrow().agent_provider_verified
+            }
+            /// Field 8: `worker_available`
+            #[must_use]
+            pub fn worker_available(&self) -> bool {
+                self.0.reborrow().worker_available
             }
         }
         impl ::core::convert::From<

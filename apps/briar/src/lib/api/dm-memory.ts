@@ -213,6 +213,9 @@ const learningStatusFromProto = (
             configuration.spaceDailyMicroUsd,
             "dmMemoryLearning.configuration.spaceDailyMicroUsd",
           ),
+          agentProvider: configuration.agentProvider,
+          agentProviderVerified: configuration.agentProviderVerified,
+          workerAvailable: configuration.workerAvailable,
         },
     callsToday: value.callsToday,
     reservedMicroUsdToday: safeNumber(
