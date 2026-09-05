@@ -3,11 +3,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  claudeModels,
   cursorModels,
   discoverWorkerProviderCapabilities,
   parseAgyEfforts,
   parseAgyModels,
   parseClaudeEfforts,
+  parseClaudeInitializeModels,
   parseClaudeModels,
   parseCursorAvailableModelsResponse,
   parseGrokModelList,
@@ -84,6 +86,232 @@ Available models:
         { id: "xhigh", label: "xhigh" },
         { id: "max", label: "max" },
       ]);
+  });
+
+  it("reads Claude efforts whose level list wraps onto the next help line", () => {
+    expect(parseClaudeEfforts(`  --effort <level>                      Effort level for the current session
+                                        (low, medium, high, xhigh, max)
+  --environment <environment_id>        Create a new cloud session (ccpool_...).
+`)).toEqual([
+      { id: "low", label: "low" },
+      { id: "medium", label: "medium" },
+      { id: "high", label: "high" },
+      { id: "xhigh", label: "xhigh" },
+      { id: "max", label: "max" },
+    ]);
+  });
+
+  it("folds Claude's default picker row into the alias it resolves to", () => {
+    expect(parseClaudeInitializeModels({
+      models: [
+        {
+          value: "default",
+          resolvedModel: "claude-opus-5[1m]",
+          displayName: "Default (recommended)",
+          description: "Opus 5 with 1M context",
+          supportedEffortLevels: ["low", "medium", "high", "xhigh", "max"],
+        },
+        {
+          value: "opus[1m]",
+          resolvedModel: "claude-opus-5[1m]",
+          displayName: "Opus (1M context)",
+          supportedEffortLevels: ["low", "medium", "high", "xhigh", "max"],
+        },
+        {
+          value: "sonnet",
+          resolvedModel: "claude-sonnet-5",
+          displayName: "Sonnet",
+          supportedEffortLevels: ["low", "high", 7],
+        },
+        { value: "haiku", resolvedModel: "claude-haiku-4-5-20251001", displayName: "Haiku" },
+        { value: "sonnet", displayName: "duplicate" },
+        { value: "", displayName: "blank id" },
+        "not a row",
+      ],
+    })).toEqual({
+      models: [
+        {
+          id: "opus[1m]",
+          label: "Opus (1M context)",
+          isDefault: true,
+          defaultEffortId: null,
+          efforts: [
+            { id: "low", label: "low" },
+            { id: "medium", label: "medium" },
+            { id: "high", label: "high" },
+            { id: "xhigh", label: "xhigh" },
+            { id: "max", label: "max" },
+          ],
+        },
+        {
+          id: "sonnet",
+          label: "Sonnet",
+          isDefault: false,
+          defaultEffortId: null,
+          efforts: [{ id: "low", label: "low" }, { id: "high", label: "high" }],
+        },
+        { id: "haiku", label: "Haiku", isDefault: false, defaultEffortId: null, efforts: [] },
+      ],
+      defaultEfforts: [
+        { id: "low", label: "low" },
+        { id: "medium", label: "medium" },
+        { id: "high", label: "high" },
+        { id: "xhigh", label: "xhigh" },
+        { id: "max", label: "max" },
+      ],
+    });
+  });
+
+  it("leaves no Claude default when the picker's default row has no alias", () => {
+    expect(parseClaudeInitializeModels({
+      models: [
+        { value: "default", resolvedModel: "claude-opus-5[1m]", displayName: "Default" },
+        { value: "sonnet", resolvedModel: "claude-sonnet-5", displayName: "Sonnet" },
+      ],
+    })).toEqual({
+      models: [
+        { id: "sonnet", label: "Sonnet", isDefault: false, defaultEffortId: null, efforts: [] },
+      ],
+      defaultEfforts: [],
+    });
+    expect(parseClaudeInitializeModels({ models: "nope" })).toEqual({ models: [], defaultEfforts: [] });
+  });
+
+  it("discovers Claude models over the stream-json initialize handshake", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "briar-claude-capabilities-"));
+    const binary = join(directory, "claude");
+    const received = join(directory, "received.jsonl");
+    try {
+      // Answers only the stream-json protocol Briar speaks, after an
+      // unrelated event, the way Claude Code does.
+      await writeFile(
+        binary,
+        `#!/bin/sh
+case "$*" in
+  *"--input-format stream-json"*"--output-format stream-json"*) ;;
+  *) echo "unexpected arguments: $*" >&2; exit 2 ;;
+esac
+IFS= read -r line
+echo "$line" >> ${JSON.stringify(received)}
+echo '{"type":"system","subtype":"hook_started","hook_name":"SessionStart"}'
+echo '{"type":"control_response","response":{"subtype":"success","request_id":"briar-provider-models","response":{"commands":[],"models":[{"value":"default","resolvedModel":"claude-opus-5[1m]","displayName":"Default (recommended)","supportedEffortLevels":["low","high"]},{"value":"opus[1m]","resolvedModel":"claude-opus-5[1m]","displayName":"Opus (1M context)","supportedEffortLevels":["low","high"]},{"value":"haiku","resolvedModel":"claude-haiku-4-5-20251001","displayName":"Haiku"}]}}}'
+`,
+        { mode: 0o755 },
+      );
+
+      const catalog = await discoverWorkerProviderCapabilities({
+        codex: false,
+        claude: true,
+        cursor: false,
+        grok: false,
+        agy: false,
+        opencode: false,
+        openrouter: false,
+        vertex: false,
+        pi: false,
+      }, {
+        refresh: true,
+        home: directory,
+        which: (provider) => provider === "claude" ? binary : null,
+      });
+
+      expect(catalog.claude).toEqual({
+        models: [
+          {
+            id: "opus[1m]",
+            label: "Opus (1M context)",
+            isDefault: true,
+            defaultEffortId: null,
+            efforts: [{ id: "low", label: "low" }, { id: "high", label: "high" }],
+          },
+          { id: "haiku", label: "Haiku", isDefault: false, defaultEffortId: null, efforts: [] },
+        ],
+        defaultEfforts: [{ id: "low", label: "low" }, { id: "high", label: "high" }],
+        allowCustomModels: true,
+        error: null,
+      });
+      expect(JSON.parse((await readFile(received, "utf8")).trim())).toEqual({
+        type: "control_request",
+        request_id: "briar-provider-models",
+        request: { subtype: "initialize" },
+      });
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("falls back to Claude help aliases when the initialize handshake fails", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "briar-claude-fallback-"));
+    const binary = join(directory, "claude");
+    try {
+      await writeFile(
+        binary,
+        `#!/bin/sh
+if [ "$1" = "--help" ]; then
+  printf '%s' "  --effort <level>  Effort level for the current session
+                    (low, medium, high)
+  --model <model>   Provide an alias (e.g. 'opus' or 'sonnet').
+  --name <name>     Session name"
+  exit 0
+fi
+echo "error: unknown option '--setting-sources'" >&2
+exit 1
+`,
+        { mode: 0o755 },
+      );
+
+      const catalog = await discoverWorkerProviderCapabilities({
+        codex: false,
+        claude: true,
+        cursor: false,
+        grok: false,
+        agy: false,
+        opencode: false,
+        openrouter: false,
+        vertex: false,
+        pi: false,
+      }, {
+        refresh: true,
+        home: directory,
+        which: (provider) => provider === "claude" ? binary : null,
+      });
+
+      expect(catalog.claude).toEqual({
+        models: [
+          { id: "opus", label: "opus", isDefault: false, defaultEffortId: null, efforts: [] },
+          { id: "sonnet", label: "sonnet", isDefault: false, defaultEffortId: null, efforts: [] },
+        ],
+        defaultEfforts: [
+          { id: "low", label: "low" },
+          { id: "medium", label: "medium" },
+          { id: "high", label: "high" },
+        ],
+        allowCustomModels: true,
+        error: "error: unknown option '--setting-sources'",
+      });
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects when Claude answers initialize without a model picker", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "briar-claude-empty-"));
+    const binary = join(directory, "claude");
+    try {
+      await writeFile(
+        binary,
+        `#!/bin/sh
+IFS= read -r line
+echo '{"type":"control_response","response":{"subtype":"success","request_id":"briar-provider-models","response":{"commands":[]}}}'
+`,
+        { mode: 0o755 },
+      );
+      await expect(claudeModels(binary, directory, process.env)).rejects.toThrow(
+        "Claude initialize returned no models",
+      );
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 
   it("reads Antigravity models from the nested JSON command payload", () => {
