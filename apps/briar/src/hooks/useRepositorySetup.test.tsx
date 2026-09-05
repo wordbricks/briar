@@ -100,7 +100,8 @@ describe("useRepositorySetup", () => {
     await flush();
     expect(registry.get(activeTeamIdAtom)).toBe(unconnectedTeam.id);
     expect(registry.get(repositorySetupTeamIdAtom)).toBe(unconnectedTeam.id);
-    expect(registry.get(navigationLocationAtom)).toBe("lobby");
+    // Opening the dialog is not a visit: the window stays where it opened.
+    expect(registry.get(navigationLocationAtom)).toBe("dms");
     await view.cleanup();
   });
 

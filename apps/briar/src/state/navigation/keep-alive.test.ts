@@ -226,7 +226,8 @@ describe("keptPageKeysAtom", () => {
 
     navigation.resetNavigation("issues");
     navigation.navigateToPage("inbox");
-    expect(registry.get(keptPageKeysAtom)).toHaveLength(2);
+    // The DM page the window opened on, the board and the inbox.
+    expect(registry.get(keptPageKeysAtom)).toHaveLength(3);
 
     registry.set(activeOrganizationIdAtom, otherOrganization.id);
     expect(registry.get(keptPageKeysAtom)).toEqual([
@@ -240,7 +241,8 @@ describe("keptPageKeysAtom", () => {
 
     navigation.resetNavigation("issues");
     navigation.navigateToPage("channels");
-    expect(registry.get(keptPageKeysAtom)).toHaveLength(2);
+    // The DM page the window opened on, the board and the channels.
+    expect(registry.get(keptPageKeysAtom)).toHaveLength(3);
 
     registry.set(userAtom, null);
     registry.set(tokenAtom, null);

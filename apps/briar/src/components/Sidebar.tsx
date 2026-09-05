@@ -1,6 +1,7 @@
 import {
   Activity,
   Bot,
+  Briefcase,
   Building2,
   CalendarDays,
   ChevronDown,
@@ -16,7 +17,7 @@ import {
   Plus,
   Settings,
   Languages,
-  MessageCircle,
+  MessagesSquare,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { collapseLinkedAutoHuntSessions } from "../state/agent-sessions/model";
@@ -44,6 +45,7 @@ import {
   sidebarWidthMax,
   sidebarWidthMin,
 } from "../lib/sidebar-width";
+import { SidebarDirectMessages } from "./SidebarDirectMessages";
 import { TeamAgentAvatar } from "./TeamAgentAvatar";
 import { TeamIcon, teamIconComponent } from "./TeamIcon";
 import {
@@ -81,6 +83,8 @@ export function Sidebar({
   channels,
   channelsLoading = false,
   connectedTeamIds,
+  directMessages = EMPTY_CHANNELS,
+  isComposingDirectMessage = false,
   isOpen,
   onAddProject,
   onAddPlanningProject,
@@ -93,6 +97,9 @@ export function Sidebar({
   onInboxOpen,
   onMyIssuesOpen,
   onDmsOpen = () => {},
+  onWorkOpen = () => {},
+  onDirectMessageOpen = () => {},
+  onDirectMessageCompose = () => {},
   onChannelCreate,
   onChannelDelete,
   onChannelOpen,
@@ -130,6 +137,10 @@ export function Sidebar({
   channels?: ChannelSummary[];
   channelsLoading?: boolean;
   connectedTeamIds: string[] | null;
+  /** The active organization's DMs, listed while the DMs half is on. */
+  directMessages?: ChannelSummary[];
+  /** A new DM is being composed, so the list's New row is the current one. */
+  isComposingDirectMessage?: boolean;
   isOpen: boolean;
   onAddProject: () => void;
   onAddPlanningProject?: (teamId: string) => void;
@@ -141,7 +152,12 @@ export function Sidebar({
   onScheduleOpen: () => void;
   onInboxOpen: () => void;
   onMyIssuesOpen?: () => void;
+  /** The DMs half of the toggle. */
   onDmsOpen?: () => void;
+  /** The Work half of the toggle. */
+  onWorkOpen?: () => void;
+  onDirectMessageOpen?: (channelId: string) => void;
+  onDirectMessageCompose?: () => void;
   onChannelCreate?: (
     name: string,
     visibility: ChannelVisibility,
@@ -331,6 +347,9 @@ export function Sidebar({
     organizations[0] ??
     null;
   const isProjectWindow = Boolean(projectWindowProjectId);
+  // The toggle has no state of its own: the DM page is the DMs half and every
+  // other page is Work. A project window has no DMs, so it is Work throughout.
+  const sidebarMode = activePage === "dms" && !isProjectWindow ? "dms" : "work";
   const projectWindowProject = isProjectWindow
     ? projects.find((project) => project.id === projectWindowProjectId) ?? null
     : null;
@@ -541,28 +560,58 @@ export function Sidebar({
             </button>
           </div>
         )}
+        <div
+          aria-label={t("sidebar.modeToggle")}
+          className="sidebar-mode-toggle"
+          role="group"
+        >
+          <button
+            aria-label={t("sidebar.modeChats")}
+            aria-pressed={sidebarMode === "dms"}
+            className={`sidebar-mode-option${sidebarMode === "dms" ? " active" : ""}`}
+            onClick={() => {
+              if (sidebarMode !== "dms") onDmsOpen();
+            }}
+            title={t("sidebar.modeChats")}
+            type="button"
+          >
+            <MessagesSquare aria-hidden="true" size={15} strokeWidth={1.8} />
+            {sidebarMode !== "dms" && unreadDmCount > 0 ? (
+              <i
+                aria-label={t("dm.unreadCount", { count: unreadDmCount })}
+                className="sidebar-mode-unread"
+              />
+            ) : null}
+          </button>
+          <button
+            aria-label={t("sidebar.modeWork")}
+            aria-pressed={sidebarMode === "work"}
+            className={`sidebar-mode-option${sidebarMode === "work" ? " active" : ""}`}
+            onClick={() => {
+              if (sidebarMode !== "work") onWorkOpen();
+            }}
+            title={t("sidebar.modeWork")}
+            type="button"
+          >
+            <Briefcase aria-hidden="true" size={15} strokeWidth={1.8} />
+          </button>
+        </div>
         </div>
       )}
 
+      {sidebarMode === "dms" ? (
+        <SidebarDirectMessages
+          activeChannelId={activeChannelId ?? null}
+          composing={isComposingDirectMessage}
+          currentUserId={user.id}
+          directMessages={directMessages}
+          loading={channelsLoading}
+          onCompose={onDirectMessageCompose}
+          onOpen={onDirectMessageOpen}
+        />
+      ) : (
+      <>
       <nav aria-label={t("sidebar.mainMenu")} className="sidebar-primary-nav">
-        <a
-          aria-current={activePage === "dms" ? "page" : undefined}
-          className={activePage === "dms" ? "active" : ""}
-          href="#dms"
-          onClick={(event) => {
-            event.preventDefault();
-            onDmsOpen();
-          }}
-        >
-          <MessageCircle size={16} strokeWidth={1.7} />
-          <span>{t("sidebar.dms")}</span>
-          {unreadDmCount > 0 ? (
-            <i
-              aria-label={t("dm.unreadCount", { count: unreadDmCount })}
-              className="sidebar-unread-dot"
-            />
-          ) : null}
-        </a>
         <a
           aria-current={activePage === "inbox" ? "page" : undefined}
           className={activePage === "inbox" ? "active" : ""}
@@ -1219,6 +1268,8 @@ export function Sidebar({
           })}
         </div>
       </div>
+      )}
+      </>
       )}
 
       <div className="sidebar-bottom">

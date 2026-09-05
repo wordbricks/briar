@@ -2,6 +2,7 @@ import { useAtomValue } from "@effect/atom-react";
 import { useEffect } from "react";
 
 import { startDesktopChannelTransition } from "../../lib/channel-performance";
+import { sortDirectMessages } from "../../lib/direct-messages";
 import { isTeamScheduleTabEnabled } from "../../lib/team-tabs";
 import {
   channelNavigationLocation,
@@ -18,13 +19,16 @@ import {
 import {
   activeChannelIdAtom,
   activeOrganizationChannelsAtom,
+  channelCatalogCursorAtom,
+  directMessageComposeAtom,
+  organizationDirectMessagesAtom,
 } from "../channels/atoms";
 import { useOrganizationActions } from "../organization/actions";
 import {
   activeOrganizationIdAtom,
   organizationsAtom,
 } from "../organization/atoms";
-import { companionMode } from "../platform";
+import { companionMode, lockedTeamIdAtom } from "../platform";
 import { useRegistry } from "../registry";
 import { loadingAtom, userAtom } from "../session/atoms";
 import { useTeamActions } from "../team/actions";
@@ -33,6 +37,8 @@ import { useNavigationActions } from "./actions";
 import {
   activePageAtom,
   activeTeamForTabsAtom,
+  desktopActiveChannelIdAtom,
+  homeNavigationPage,
   navigationChannelIdAtom,
   navigationHistoryUserIdAtom,
   navigationLocationAtom,
@@ -46,7 +52,7 @@ import {
 /*
   What the location and the store owe each other.
 
-  Six effects, and the order they appear in is the contract. They run in one
+  Seven effects, and the order they appear in is the contract. They run in one
   hook, in this order, on purpose:
 
     1. user boundary — a different account signed in, so the visit stack from
@@ -60,12 +66,15 @@ import {
        falls back, per page kind;
     5. organization existence — the same for the organization, and otherwise
        the location's channel becomes the selected one;
-    6. schedule tab — the schedule page leaves when its team turned the tab off.
+    6. schedule tab — the schedule page leaves when its team turned the tab off;
+    7. latest DM — the DM page with no conversation open shows the latest one,
+       unless the user is composing a new conversation.
 
   Each one reads what the ones before it wrote: 3 gives 4 a team to check, 4
-  gives 5 a settled team for its channel fallback, and 6 reads the team 3 and 4
-  agreed on. Splitting them across hooks or mount points would leave that
-  ordering to React, which is why they stay together.
+  gives 5 a settled team for its channel fallback, 6 reads the team 3 and 4
+  agreed on, and 7 runs against the organization 5 settled. Splitting them
+  across hooks or mount points would leave that ordering to React, which is why
+  they stay together.
 
   Only the desktop reconciles. The companion shell navigates with its own page
   atom and never carries a location, which is what every `companionMode` guard
@@ -84,6 +93,11 @@ export function useNavigationReconciliation(): void {
   const activeOrganizationId = useAtomValue(activeOrganizationIdAtom);
   const activeChannelId = useAtomValue(activeChannelIdAtom);
   const organizationChannels = useAtomValue(activeOrganizationChannelsAtom);
+  const directMessages = useAtomValue(organizationDirectMessagesAtom);
+  const channelCatalogCursor = useAtomValue(channelCatalogCursorAtom);
+  const composingDirectMessage = useAtomValue(directMessageComposeAtom);
+  const desktopActiveChannelId = useAtomValue(desktopActiveChannelIdAtom);
+  const lockedTeamId = useAtomValue(lockedTeamIdAtom);
   const settingsTarget = useAtomValue(settingsTargetAtom);
   const activeNavigationLocation = useAtomValue(navigationLocationAtom);
   const activePage = useAtomValue(activePageAtom);
@@ -97,7 +111,8 @@ export function useNavigationReconciliation(): void {
   );
   const { markOrganizationChannelRead, selectChannel } = useChannelActions();
   const { selectOrganization } = useOrganizationActions();
-  const { replaceNavigationLocation, resetNavigation } = actions;
+  const { replaceChannelDestination, replaceNavigationLocation, resetNavigation } =
+    actions;
   const navigationUserId = user?.id ?? null;
 
   /*
@@ -122,7 +137,7 @@ export function useNavigationReconciliation(): void {
     }
     if (owner === navigationUserId) return;
     registry.set(navigationHistoryUserIdAtom, navigationUserId);
-    resetNavigation("lobby");
+    resetNavigation(homeNavigationPage);
   }, [navigationUserId, registry, resetNavigation]);
 
   // 2. The settings location and the settings target say the same thing.
@@ -360,5 +375,48 @@ export function useNavigationReconciliation(): void {
     activeTeamForTabs,
     navigationUserBoundaryChanged,
     replaceNavigationLocation,
+  ]);
+
+  // 7. The DM page never sits on nothing while there is a conversation to show:
+  //    with none open, it swaps in the latest one — without recording a visit,
+  //    so Back does not stop on the empty page. Composing a new conversation is
+  //    the one time the page is meant to show no timeline, and a catalog that
+  //    has not loaded yet has no "latest" to offer.
+  useEffect(() => {
+    if (
+      navigationUserBoundaryChanged ||
+      companionMode ||
+      lockedTeamId ||
+      activePage !== "dms" ||
+      composingDirectMessage ||
+      !activeOrganizationId ||
+      channelCatalogCursor === null ||
+      (navigationOrganizationId !== null &&
+        navigationOrganizationId !== activeOrganizationId) ||
+      directMessages.some((channel) => channel.id === desktopActiveChannelId)
+    ) {
+      return;
+    }
+    const latest = sortDirectMessages(directMessages)[0];
+    if (!latest) return;
+    replaceChannelDestination(
+      latest.id,
+      "dms",
+      activeOrganizationId,
+      navigationTeamId ?? activeTeamId,
+    );
+  }, [
+    activeOrganizationId,
+    activePage,
+    activeTeamId,
+    channelCatalogCursor,
+    composingDirectMessage,
+    desktopActiveChannelId,
+    directMessages,
+    lockedTeamId,
+    navigationOrganizationId,
+    navigationTeamId,
+    navigationUserBoundaryChanged,
+    replaceChannelDestination,
   ]);
 }

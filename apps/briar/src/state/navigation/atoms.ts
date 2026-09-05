@@ -10,14 +10,19 @@ import {
   projectIdFromNavigationLocation,
   runIdFromNavigationLocation,
   settingsTargetFromNavigationLocation,
+  type ActivePage,
   type AppNavigationLocation,
 } from "../../lib/app-navigation";
 import type { IssueDetailTab } from "../../lib/issue-detail-tab";
 import { parseWebAppIssuePath, type BriarLinkTarget } from "../../lib/issue-links";
-import { activeChannelIdAtom } from "../channels/atoms";
+import {
+  activeChannelIdAtom,
+  organizationDirectMessagesAtom,
+} from "../channels/atoms";
 import { runsByIdAtom, teamRunIdsAtom } from "../entities/runs";
 import { shallowArrayEqual } from "../entities/upsert";
-import { webMode } from "../platform";
+import { activeOrganizationIdAtom } from "../organization/atoms";
+import { lockedTeamId, webMode } from "../platform";
 import { userAtom } from "../session/atoms";
 import { activeTeamIdAtom, teamsAtom } from "../team/atoms";
 import { createNavigationHistory } from "./history";
@@ -121,15 +126,23 @@ export const pendingInboxNotificationTargetAtom =
   the page subscribes to the page, not to the shell that owns the stack.
 */
 
+/**
+ * Where a window opens, and where a fresh visit stack starts: the DM page. A
+ * project window has no DMs — it is pinned to one team — so it opens on that
+ * team's home instead.
+ */
+export const homeNavigationPage: ActivePage = lockedTeamId ? "lobby" : "dms";
+
 /** The visit stack and the position in it. */
 export const navigationHistoryAtom = Atom.make(
-  createNavigationHistory<AppNavigationLocation>("lobby"),
+  createNavigationHistory<AppNavigationLocation>(homeNavigationPage),
 ).pipe(Atom.keepAlive, Atom.withLabel("navigation/history"));
 
 /** The location on screen. */
 export const navigationLocationAtom = Atom.map(
   navigationHistoryAtom,
-  (history): AppNavigationLocation => history.entries[history.index] ?? "lobby",
+  (history): AppNavigationLocation =>
+    history.entries[history.index] ?? homeNavigationPage,
 ).pipe(Atom.keepAlive, Atom.withLabel("navigation/location"));
 
 /** Every visited location, oldest first, for the history popover. */
@@ -217,6 +230,95 @@ export const activePageAtom = Atom.map(
   navigationLocationAtom,
   pageFromNavigationLocation,
 ).pipe(Atom.keepAlive, Atom.withLabel("navigation/activePage"));
+
+/*
+  The sidebar's two halves.
+
+  The toggle at the top of the sidebar is not state of its own: the DM page is
+  the "DMs" half and every other page is the "Work" half, so a notification that
+  opens an issue lands on Work and one that opens a DM lands on DMs without
+  anybody keeping two facts in step. What the toggle does need to remember is
+  where each half was left, and the visit stack already holds that.
+*/
+
+export type SidebarMode = "dms" | "work";
+
+/** Which half of the sidebar toggle the location is on. */
+export const sidebarModeAtom = Atom.map(
+  activePageAtom,
+  (page): SidebarMode => (page === "dms" ? "dms" : "work"),
+).pipe(Atom.keepAlive, Atom.withLabel("navigation/sidebarMode"));
+
+/**
+ * The work location the Work half returns to: the most recent visit that is not
+ * a DM page and still belongs to the active organization. `null` when the stack
+ * has none, in which case the caller picks the team home.
+ *
+ * A location from another organization is skipped rather than returned, because
+ * navigating to it would switch the organization back — the reconciliation
+ * selects whatever organization a location names.
+ */
+export const lastWorkLocationAtom = Atom.make(
+  (get): AppNavigationLocation | null => {
+    const history = get(navigationHistoryAtom);
+    const organizationId = get(activeOrganizationIdAtom);
+    const teams = get(teamsAtom);
+    const inActiveOrganization = (location: AppNavigationLocation) => {
+      const locationOrganizationId =
+        organizationIdFromNavigationLocation(location);
+      if (locationOrganizationId !== null) {
+        return locationOrganizationId === organizationId;
+      }
+      const teamId = projectIdFromNavigationLocation(location);
+      if (teamId === null) return true;
+      return teams.some(
+        (team) => team.id === teamId && team.organizationId === organizationId,
+      );
+    };
+    for (let index = history.index; index >= 0; index -= 1) {
+      const location = history.entries[index];
+      if (
+        location !== undefined &&
+        pageFromNavigationLocation(location) !== "dms" &&
+        inActiveOrganization(location)
+      ) {
+        return location;
+      }
+    }
+    return null;
+  },
+).pipe(Atom.keepAlive, Atom.withLabel("navigation/lastWorkLocation"));
+
+/**
+ * The conversation the DMs half returns to: the most recent DM visit in the
+ * active organization whose conversation is still in the catalog. `null` when
+ * there is none, in which case the DM page opens on its latest conversation.
+ */
+export const lastDirectMessageChannelIdAtom = Atom.make(
+  (get): string | null => {
+    const history = get(navigationHistoryAtom);
+    const organizationId = get(activeOrganizationIdAtom);
+    const directMessages = get(organizationDirectMessagesAtom);
+    for (let index = history.index; index >= 0; index -= 1) {
+      const location = history.entries[index];
+      if (
+        location === undefined ||
+        pageFromNavigationLocation(location) !== "dms" ||
+        organizationIdFromNavigationLocation(location) !== organizationId
+      ) {
+        continue;
+      }
+      const channelId = channelIdFromNavigationLocation(location);
+      if (
+        channelId &&
+        directMessages.some((channel) => channel.id === channelId)
+      ) {
+        return channelId;
+      }
+    }
+    return null;
+  },
+).pipe(Atom.keepAlive, Atom.withLabel("navigation/lastDirectMessageChannelId"));
 
 /** The run the location names, on an issue location. */
 export const activeRunIdAtom = Atom.map(

@@ -12,6 +12,7 @@ import { ToastProvider } from "./components/ui/toast";
 import { demoDashboard } from "./lib/demo-data";
 import { initialOnboardingStorageKey } from "./lib/initial-onboarding";
 import { launchIntroStorageKey } from "./lib/launch-intro";
+import { createNavigationActions } from "./state/navigation/actions";
 import { createTestRegistry, type AtomRegistry } from "./state/registry";
 import { activeOrganizationIdAtom, organizationsAtom } from "./state/organization/atoms";
 import {
@@ -108,6 +109,9 @@ const harness = (): AtomRegistry => {
     teamId: team.id,
     payload,
   });
+  // The window opens on the DM page; what these cases measure is the board,
+  // so the harness puts the app on the team home the same way a visit would.
+  createNavigationActions(registry).navigateToPage("lobby", team.id);
   return registry;
 };
 

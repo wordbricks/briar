@@ -21,10 +21,6 @@ import {
 } from "../../lib/sidebar-width";
 import { useChannelActions } from "../../state/channels/actions";
 import {
-  activeChannelIdAtom,
-  organizationDirectMessagesAtom,
-} from "../../state/channels/atoms";
-import {
   activePlanningProjectIdAtom,
   createIssueTeamIdAtom,
   isIssueDialogOpenAtom,
@@ -34,8 +30,11 @@ import {
 } from "../../state/dialogs/atoms";
 import { useNavigationActions } from "../../state/navigation/actions";
 import {
+  activePageAtom,
   agentListRequestKeyAtom,
   issueListRequestKeyAtom,
+  lastDirectMessageChannelIdAtom,
+  lastWorkLocationAtom,
   requestedRunIdAtom,
   requestedSessionIdAtom,
   settingsTargetAtom,
@@ -44,6 +43,7 @@ import { visibleInboxUnreadCountAtom } from "../../state/inbox/atoms";
 import { useOrganizationActions } from "../../state/organization/actions";
 import { activeOrganizationIdAtom } from "../../state/organization/atoms";
 import { lockedTeamIdAtom } from "../../state/platform";
+import { useRegistry } from "../../state/registry";
 import { useSessionActions } from "../../state/session/actions";
 import { tokenAtom } from "../../state/session/atoms";
 import { useSyncActions } from "../../state/sync/actions";
@@ -61,7 +61,9 @@ import { activeTeamIdAtom, teamsAtom } from "../../state/team/atoms";
 
   Nothing this component reads moves when the user navigates. That is the point:
   a visit commits `DesktopPages` and `SidebarWithSession`, which subscribe to the
-  location, and leaves the chrome and the status bar alone.
+  location, and leaves the chrome and the status bar alone. The sidebar toggle's
+  handlers do need the location — which half was left where — so they read it
+  from the registry when clicked rather than subscribing to it.
 */
 
 export interface DesktopShellProps extends DesktopPagesProps {
@@ -74,16 +76,13 @@ export function DesktopShell({
 }: DesktopShellProps) {
   const { agents, repositorySetup } = pages;
   const runsOnDesktopTauri = isDesktopTauri();
+  const registry = useRegistry();
   const unreadInboxCount = useAtomValue(visibleInboxUnreadCountAtom);
   const token = useAtomValue(tokenAtom);
   const projects = useAtomValue(teamsAtom);
   const activeProjectId = useAtomValue(activeTeamIdAtom);
   const activeOrganizationId = useAtomValue(activeOrganizationIdAtom);
   const lockedTeamId = useAtomValue(lockedTeamIdAtom);
-  const activeChannelId = useAtomValue(activeChannelIdAtom);
-  const organizationDirectMessages = useAtomValue(
-    organizationDirectMessagesAtom,
-  );
   const setIsSidebarOpen = useAtomSet(isSidebarOpenAtom);
   const setSettingsTarget = useAtomSet(settingsTargetAtom);
   const setRequestedRunId = useAtomSet(requestedRunIdAtom);
@@ -95,12 +94,14 @@ export function DesktopShell({
   const setIsIssueDialogOpen = useAtomSet(isIssueDialogOpenAtom);
   const setPlanningProjectTeamId = useAtomSet(planningProjectTeamIdAtom);
   const setPlanningProjectEditId = useAtomSet(planningProjectEditIdAtom);
-  const { navigateToPage, openAppSettings } = useNavigationActions();
+  const { navigateToLocation, navigateToPage, openAppSettings } =
+    useNavigationActions();
   const {
     createOrganizationChannel,
     deleteOrganizationChannel,
     openOrganizationChannel,
     openOrganizationChannelSettings,
+    startDirectMessageCompose,
   } = useChannelActions();
   const { selectOrganization } = useOrganizationActions();
   const { selectTeam, startTeamCreation } = useTeamActions();
@@ -169,12 +170,20 @@ export function DesktopShell({
               : undefined
           }
           onDmsOpen={() => {
-            const directMessage = organizationDirectMessages.find(
-              (channel) => channel.id === activeChannelId,
-            ) ?? organizationDirectMessages[0];
-            if (directMessage) openOrganizationChannel(directMessage.id);
+            // Back to the conversation this half was left on; otherwise the
+            // DM page opens on its latest conversation by itself.
+            const channelId = registry.get(lastDirectMessageChannelIdAtom);
+            if (channelId) openOrganizationChannel(channelId);
             else navigateToPage("dms");
           }}
+          onWorkOpen={() => {
+            // Back to where the work half was left, or the team home.
+            const location = registry.get(lastWorkLocationAtom);
+            if (location) navigateToLocation(location);
+            else navigateToPage("lobby");
+          }}
+          onDirectMessageOpen={openOrganizationChannel}
+          onDirectMessageCompose={startDirectMessageCompose}
           onChannelCreate={
             activeOrganizationId && token
               ? createOrganizationChannel
@@ -207,10 +216,13 @@ export function DesktopShell({
             const project = projects.find(
               (candidate) => candidate.organizationId === organizationId,
             );
+            // Switching organizations keeps the sidebar on the half it was on.
+            const page =
+              registry.get(activePageAtom) === "dms" ? "dms" : "lobby";
             selectOrganization(organizationId);
             setRequestedRunId(null);
             setRequestedSessionId(null);
-            navigateToPage("lobby", project?.id ?? null);
+            navigateToPage(page, project?.id ?? null);
           }}
           onProjectChange={(projectId) => {
             setActivePlanningProjectId(null);

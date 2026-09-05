@@ -179,6 +179,16 @@ export const organizationDirectMessagesAtom = Atom.make((get) =>
   Atom.withLabel("channels/directMessages"),
 );
 
+/**
+ * The desktop DM page is composing a new conversation: the sidebar list shows
+ * no open row and the pane shows the recipient picker instead of a timeline.
+ * Selecting any channel ends it, and so does switching organizations.
+ */
+export const directMessageComposeAtom = organizationScopedAtom<boolean>(
+  false,
+  "channels/directMessageCompose",
+);
+
 /** How many direct messages carry unread activity, for the navigation badge. */
 export const unreadDirectMessageCountAtom = Atom.make(
   (get) =>

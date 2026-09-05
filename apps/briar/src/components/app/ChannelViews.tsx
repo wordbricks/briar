@@ -3,10 +3,14 @@ import type { ComponentProps } from "react";
 
 import { Channels } from "../Channels";
 import { CompanionChannels } from "../CompanionChannels";
-import { DirectMessages } from "../DirectMessages";
+import {
+  DirectMessageConversationPane,
+  DirectMessages,
+} from "../DirectMessages";
 import { useChannelActions } from "../../state/channels/actions";
 import {
   channelCatalogCursorAtom,
+  directMessageComposeAtom,
   initialChannelInviteIdAtom,
   organizationDirectMessagesAtom,
   requestedChannelIdAtom,
@@ -128,7 +132,56 @@ type DirectMessagesShellProps = Omit<
   | "token"
 >;
 
-/** The direct message view, reading the same catalog filtered to DMs. */
+type DirectMessageConversationPaneShellProps = Omit<
+  ComponentProps<typeof DirectMessageConversationPane>,
+  | "channelCatalogCursor"
+  | "channels"
+  | "composing"
+  | "currentUserId"
+  | "onChannelsChange"
+  | "onViewingChannelChange"
+  | "organizationId"
+  | "organizationName"
+  | "projects"
+  | "token"
+>;
+
+/**
+ * The desktop DM page: the open conversation at full width, or the recipient
+ * picker while a new one is being composed. Its list is the sidebar's.
+ */
+export function DirectMessageConversationPaneWithCatalog(
+  props: DirectMessageConversationPaneShellProps,
+) {
+  const organizationId = useAtomValue(activeOrganizationIdAtom);
+  const organization = useAtomValue(activeOrganizationAtom);
+  const token = useAtomValue(tokenAtom);
+  const user = useAtomValue(userAtom);
+  const channels = useAtomValue(organizationDirectMessagesAtom);
+  const channelCatalogCursor = useAtomValue(channelCatalogCursorAtom);
+  const composing = useAtomValue(directMessageComposeAtom);
+  const projects = useAtomValue(activeOrganizationTeamsAtom);
+  const { replaceOrganizationChannels, setViewingChannel } =
+    useChannelActions();
+  if (!organizationId || !token) return null;
+  return (
+    <DirectMessageConversationPane
+      {...props}
+      channelCatalogCursor={channelCatalogCursor}
+      channels={channels}
+      composing={composing}
+      currentUserId={user?.id ?? null}
+      onChannelsChange={replaceOrganizationChannels}
+      onViewingChannelChange={setViewingChannel}
+      organizationId={organizationId}
+      organizationName={organization?.name}
+      projects={projects}
+      token={token}
+    />
+  );
+}
+
+/** The companion direct message view, reading the same catalog filtered to DMs. */
 export function DirectMessagesWithCatalog(props: DirectMessagesShellProps) {
   const organizationId = useAtomValue(activeOrganizationIdAtom);
   const organization = useAtomValue(activeOrganizationAtom);

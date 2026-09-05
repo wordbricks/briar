@@ -129,7 +129,7 @@ const destination = (registry: AtomRegistry) => ({
 
 const nowhere = {
   channelId: null,
-  page: "lobby",
+  page: "dms",
   runId: null,
   teamId: null,
 };

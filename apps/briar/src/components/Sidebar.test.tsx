@@ -4,6 +4,7 @@ import { act } from "react";
 import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
+import type { ChannelSummary } from "../lib/channels-contract";
 import type { AutoHuntSession } from "../types";
 import { Sidebar } from "./Sidebar";
 import { I18nProvider } from "../i18n";
@@ -1496,3 +1497,200 @@ describe("Sidebar", () => {
   });
 });
 
+
+describe("Sidebar mode toggle", () => {
+  const directMessage = (
+    id: string,
+    name: string,
+    overrides: Partial<ChannelSummary> = {},
+  ): ChannelSummary => ({
+    ...sidebarChannel(id, name, null),
+    kind: "dm" as const,
+    visibility: "private" as const,
+    dmParticipants: [
+      { type: "user" as const, id: "user-1", name: "Jay", image: null },
+      { type: "user" as const, id: `user-${id}`, name, image: null },
+    ],
+    ...overrides,
+  });
+
+  it("puts the DMs and Work toggle in the organization row instead of a DMs link", async () => {
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(root, <Sidebar {...sidebarProps} />);
+
+    const toggle = container.querySelector<HTMLElement>(
+      ".sidebar-organization-switcher .sidebar-mode-toggle",
+    )!;
+    expect(toggle).not.toBeNull();
+    const [dms, work] = [...toggle.querySelectorAll<HTMLButtonElement>("button")];
+    expect(dms.getAttribute("aria-pressed")).toBe("false");
+    expect(work.getAttribute("aria-pressed")).toBe("true");
+    // Icon only: the label is for assistive tech and the tooltip.
+    expect(dms.textContent).toBe("");
+    expect(dms.getAttribute("aria-label")).toBe("챗");
+    expect(work.getAttribute("aria-label")).toBe("업무");
+    expect(container.querySelector('a[href="#dms"]')).toBeNull();
+    // The work navigation is on screen.
+    expect(container.querySelector(".sidebar-primary-nav")).not.toBeNull();
+    expect(container.querySelector(".sidebar-dms")).toBeNull();
+
+    await cleanup();
+  });
+
+  it("omits the toggle in a project window", async () => {
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <Sidebar {...sidebarProps} projectWindowProjectId="project-1" />,
+    );
+
+    expect(container.querySelector(".sidebar-mode-toggle")).toBeNull();
+    expect(container.querySelector(".sidebar-dms")).toBeNull();
+
+    await cleanup();
+  });
+
+  it("switches halves and shows unread DMs on the DMs half while on Work", async () => {
+    const onDmsOpen = vi.fn();
+    const onWorkOpen = vi.fn();
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <Sidebar
+        {...sidebarProps}
+        onDmsOpen={onDmsOpen}
+        onWorkOpen={onWorkOpen}
+        unreadDmCount={2}
+      />,
+    );
+
+    const [dms, work] = [
+      ...container.querySelectorAll<HTMLButtonElement>(".sidebar-mode-option"),
+    ];
+    expect(dms.querySelector(".sidebar-mode-unread")).not.toBeNull();
+
+    // The half already on does nothing; the other one navigates.
+    await act(async () => work.click());
+    expect(onWorkOpen).not.toHaveBeenCalled();
+    await act(async () => dms.click());
+    expect(onDmsOpen).toHaveBeenCalledOnce();
+
+    await cleanup();
+  });
+
+  it("lists conversations instead of the work navigation on the DMs half", async () => {
+    const onDirectMessageOpen = vi.fn();
+    const onDirectMessageCompose = vi.fn();
+    const onWorkOpen = vi.fn();
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <Sidebar
+        {...sidebarProps}
+        activeChannelId="dm-2"
+        activePage="dms"
+        directMessages={[
+          directMessage("dm-1", "Sam", {
+            lastMessageAt: "2026-09-01T09:00:00Z",
+            lastMessagePreview: "Hello",
+          }),
+          directMessage("dm-2", "Alex", {
+            lastMessageAt: "2026-09-02T09:00:00Z",
+            hasUnread: true,
+          }),
+        ]}
+        onDirectMessageCompose={onDirectMessageCompose}
+        onDirectMessageOpen={onDirectMessageOpen}
+        onWorkOpen={onWorkOpen}
+        unreadDmCount={1}
+      />,
+    );
+
+    const [dms, work] = [
+      ...container.querySelectorAll<HTMLButtonElement>(".sidebar-mode-option"),
+    ];
+    expect(dms.getAttribute("aria-pressed")).toBe("true");
+    // On the DMs half the list carries the unread marks, not the toggle.
+    expect(dms.querySelector(".sidebar-mode-unread")).toBeNull();
+    expect(container.querySelector(".sidebar-primary-nav")).toBeNull();
+    expect(container.querySelector(".sidebar-projects")).toBeNull();
+    // The account footer stays on both halves.
+    expect(container.querySelector(".user-card")).not.toBeNull();
+
+    const rows = [
+      ...container.querySelectorAll<HTMLButtonElement>(".sidebar-dm-row"),
+    ];
+    // Most recent activity first.
+    expect(rows.map((row) => row.querySelector("strong")?.textContent)).toEqual([
+      "Alex",
+      "Sam",
+    ]);
+    expect(rows[0].getAttribute("aria-current")).toBe("page");
+    expect(rows[0].querySelector(".sidebar-unread-dot")).not.toBeNull();
+    expect(rows[1].textContent).toContain("Hello");
+
+    await act(async () => rows[1].click());
+    expect(onDirectMessageOpen).toHaveBeenCalledWith("dm-1");
+
+    await act(async () =>
+      container.querySelector<HTMLButtonElement>(".sidebar-dm-compose")!.click(),
+    );
+    expect(onDirectMessageCompose).toHaveBeenCalledOnce();
+
+    await act(async () => work.click());
+    expect(onWorkOpen).toHaveBeenCalledOnce();
+
+    await cleanup();
+  });
+
+  it("marks the New row current while composing and filters by search", async () => {
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <Sidebar
+        {...sidebarProps}
+        activeChannelId="dm-1"
+        activePage="dms"
+        directMessages={[
+          directMessage("dm-1", "Sam"),
+          directMessage("dm-2", "Alex"),
+        ]}
+        isComposingDirectMessage
+      />,
+    );
+
+    expect(
+      container.querySelector(".sidebar-dm-new")?.getAttribute("aria-current"),
+    ).toBe("page");
+    expect(container.querySelector(".sidebar-dm-row[aria-current]")).toBeNull();
+
+    const search = container.querySelector<HTMLInputElement>(
+      ".sidebar-dm-search input",
+    )!;
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )!.set!;
+      setter.call(search, "al");
+      search.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(
+      [...container.querySelectorAll(".sidebar-dm-row strong")].map(
+        (name) => name.textContent,
+      ),
+    ).toEqual(["Alex"]);
+
+    await cleanup();
+  });
+});
