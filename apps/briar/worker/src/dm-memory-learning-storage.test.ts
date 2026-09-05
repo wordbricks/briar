@@ -52,7 +52,7 @@ describe("durable DM learning inputs and deletion", () => {
           dmMemoryLearning: { protocol: 2, transports: ["agent"], providers: ["codex"] },
         }), now, now, now, deviceId),
     ]);
-    await createOrganizationAgent(db, { id: agentId, organizationId, name: "Synthetic memory agent", provider: "claude",
+    await createOrganizationAgent(db, { id: agentId, organizationId, name: "Synthetic memory agent", provider: "grok",
       model: null, effort: null, responsibility: "Synthetic tests only", createdAt: now });
     await db.prepare(`insert into briar_execution_worker_credentials(device_id, token_hash, created_at) values (?, ?, ?)`)
       .bind(deviceId, await sha256(workerToken), now).run();
@@ -215,7 +215,7 @@ describe("durable DM learning inputs and deletion", () => {
     await message(f.owner.channelId, "Use the connected Agent for this synthetic preference.");
     await outbox(f.spaceId, now);
     await scheduleDmLearningJobs(db, organizationId, now);
-    // The DM Agent runs on Claude, which is not verified, so the queue pins Codex.
+    // The DM Agent runs on Grok, which is not verified, so the queue pins Codex.
     const enqueued = await job(f.spaceId);
     expect(JSON.parse(enqueued.policy_json!)).toEqual(syntheticDmLearningPolicy);
     const claim = await claimDmLearningJob(db, { organizationId, deviceId, workerId, projectId, now });
@@ -245,16 +245,24 @@ describe("durable DM learning inputs and deletion", () => {
     await outbox(f.spaceId, now);
     try {
       await setRuntime(workerRuntimeProtoJsonFixture({ agentProvider: "claude", providers: ["claude"],
-        dmMemoryLearning: { protocol: 2, transports: ["agent"], providers: ["claude"] } }));
+        dmMemoryLearning: { protocol: 2, transports: ["agent"], providers: ["grok"] } }));
       expect(await claimDmLearningJob(db, { organizationId, deviceId, workerId, projectId, now })).toBeNull();
       await setRuntime(workerRuntimeProtoJsonFixture({ providers: ["codex"], dmMemoryLearning: true }));
       expect(await claimDmLearningJob(db, { organizationId, deviceId, workerId, projectId, now })).toBeNull();
-    } finally { await setRuntime(defaultRuntime); }
+    } finally {
+      await setRuntime(defaultRuntime);
+      // Leave nothing claimable behind: a later test's claim orders same-time candidates by id.
+      await db.batch([
+        db.prepare("update briar_dm_memory_learning_outbox set settled = 1 where space_id = ?").bind(f.spaceId),
+        db.prepare(`update briar_dm_memory_jobs set status = 'cancelled', updated_at = ? where space_id = ? and status = 'pending'`)
+          .bind(now, f.spaceId),
+      ]);
+    }
   });
   it("reports the derived provider, its verification state and Worker availability", async () => {
     const f = await fixture();
     const status = await readDmLearningStatus(db, f.owner, f.spaceId, now);
-    expect(status?.configuration).toMatchObject({ agentProvider: "claude", agentProviderVerified: false,
+    expect(status?.configuration).toMatchObject({ agentProvider: "grok", agentProviderVerified: false,
       workerAvailable: true, proposer: { transport: "agent", provider: "codex", model: "default" },
       verifier: { transport: "agent", provider: "codex", model: "default" }, costTracked: false, spaceDailyCalls: 24 });
     try {

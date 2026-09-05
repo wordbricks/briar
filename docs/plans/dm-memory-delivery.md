@@ -228,7 +228,7 @@ commit row counts were all zero, so no private DM was imported or backfilled.
   `learningAvailable` and the `automaticLearning` capability are always true.
 - `dmMemoryLearningVerifiedProviders` in
   `apps/briar/src/lib/dm-memory-learning-contract.ts` is the entire allowlist and
-  currently holds `codex`. `dmLearningAgentPolicy(provider)` builds the policy
+  holds `codex` and `claude`. `dmLearningAgentPolicy(provider)` builds the policy
   from code constants and canonicalizes to exactly the JSON already stored in
   pending production jobs, so those jobs stay claimable across the deploy.
 - The queue derives each job's policy from the DM's own Agent provider
@@ -293,6 +293,14 @@ commit row counts were all zero, so no private DM was imported or backfilled.
   Claude stage failed with "Not logged in". The isolated home now prefers the
   Keychain credential and falls back to the file, matching
   `readClaudeCredentials`; a regression test covers the stale-file case.
+
+- With that fix, `bun evals/dm-memory-learning-v1/run.ts --provider claude` ran
+  the full 20 store / 20 reject set through the isolated connected Claude
+  transport on 2026-09-05: precision 1.00, recall 1.00, zero committed reject
+  cases, median latency 11.2 s and maximum 27.3 s per case. `report-claude.json`
+  stores IDs, decisions and verdicts only. Claude therefore joins the verified
+  list after Codex; a DM whose Agent runs on Claude now learns through Claude,
+  and Codex remains the fallback order's first entry.
 
 Validation head and signoffs: pending.
 

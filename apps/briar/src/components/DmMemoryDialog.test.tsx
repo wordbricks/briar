@@ -154,10 +154,10 @@ describe("DM memory management", () => {
     expect(dialog().textContent).not.toContain("No Worker can run learning right now");
     await root.cleanup();
     root = createReactTestRoot({ attachToDocument: true });
-    client.load.mockResolvedValue(learningPage({ agentProvider: "claude", agentProviderVerified: false }));
+    client.load.mockResolvedValue(learningPage({ agentProvider: "grok", agentProviderVerified: false }));
     await render();
     expect(dialog().textContent).toContain(
-      "This DM's Agent (Claude) is not verified for automatic learning yet. Learning runs on the connected Codex.");
+      "This DM's Agent (Grok) is not verified for automatic learning yet. Learning runs on the connected Codex.");
     await root.cleanup();
     root = createReactTestRoot({ attachToDocument: true });
     client.load.mockResolvedValue(learningPage({ workerAvailable: false }));

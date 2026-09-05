@@ -11,7 +11,7 @@ Run from `apps/briar` with a healthy local Codex connection:
 bun evals/dm-memory-learning-v1/run.ts
 ```
 
-Learning has no configuration: the code constant `dmMemoryLearningVerifiedProviders` in
+Learning has no configuration: the code constant `dmMemoryLearningVerifiedProviders` (currently `codex` and `claude`, each with a committed report) in
 `src/lib/dm-memory-learning-contract.ts` is the whole allowlist, and the server never falls back outside it.
 Adding a provider therefore means running this evaluation against that provider and meeting the gate below in
 the same pull request that extends the constant:

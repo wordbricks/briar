@@ -10,9 +10,10 @@ import { workerRuntimeFixture } from "./test-helpers/worker-runtime";
 
 describe("DM learning proposal and independent verifier boundaries", () => {
   it("derives the policy from the DM Agent and never invents a subscription cost", () => {
-    expect(dmMemoryLearningVerifiedProviders).toEqual(["codex"]);
+    expect(dmMemoryLearningVerifiedProviders).toEqual(["codex", "claude"]);
     expect(dmLearningPreferredProvider("codex")).toBe("codex");
-    expect(dmLearningPreferredProvider("claude")).toBe("codex");
+    expect(dmLearningPreferredProvider("claude")).toBe("claude");
+    expect(dmLearningPreferredProvider("grok")).toBe("codex");
     expect(dmLearningAgentPolicy("codex")).toEqual(syntheticDmLearningPolicy);
     expect(dmLearningAgentPolicy("codex")).toMatchObject({ spaceDailyCalls: 24, organizationDailyCalls: 240,
       maxInputBytes: 131_072, spaceDailyMicroUsd: 0, organizationDailyMicroUsd: 0 });
@@ -33,7 +34,7 @@ describe("DM learning proposal and independent verifier boundaries", () => {
     expect(advertisedDmLearningProviders(capabilities)).toEqual(["codex"]);
     expect(supportsDmMemoryLearning(capabilities)).toBe(true);
     expect(supportsDmMemoryLearning(workerRuntimeFixture({ dmMemoryLearning: {
-      protocol: 2, transports: ["agent"], providers: ["claude", "grok"],
+      protocol: 2, transports: ["agent"], providers: ["cursor", "grok"],
     } }).capabilities)).toBe(false);
     expect(supportsDmMemoryLearning(workerRuntimeFixture({ dmMemoryLearning: {
       protocol: 2, transports: ["openrouter"], providers: ["codex"],
@@ -41,6 +42,7 @@ describe("DM learning proposal and independent verifier boundaries", () => {
     expect(supportsDmMemoryLearning(workerRuntimeFixture({ dmMemoryLearning: true }).capabilities)).toBe(false);
     expect(resolveDmLearningProvider("codex", ["codex"])).toBe("codex");
     expect(resolveDmLearningProvider("claude", ["codex"])).toBe("codex");
+    expect(resolveDmLearningProvider("grok", ["claude", "codex"])).toBe("codex");
     expect(resolveDmLearningProvider("codex", [])).toBeNull();
   });
   it("separates schema validity from evidence validity and never accepts model protection", () => {

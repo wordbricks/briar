@@ -91,7 +91,7 @@ export type DmLearningPolicy = typeof DmLearningPolicy.Type;
  * Only `agent` transport providers belong here, never `openrouter`: that
  * transport is metered and would turn learning into a silent paid path.
  */
-export const dmMemoryLearningVerifiedProviders = ["codex"] as const;
+export const dmMemoryLearningVerifiedProviders = ["codex", "claude"] as const;
 export const dmMemoryLearningMaxInputBytes = 131_072;
 export const dmMemoryLearningSpaceDailyCalls = 24;
 export const dmMemoryLearningOrganizationDailyCalls = 240;
