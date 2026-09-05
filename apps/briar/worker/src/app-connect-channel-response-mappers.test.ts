@@ -1,10 +1,15 @@
 import { Code, ConnectError } from "@connectrpc/connect";
 import { describe, expect, it } from "vitest";
+import { ComputerUsePolicy } from "@briar/contracts/gen/briar/types/v1/computer_use_pb";
 import type {
+  ChannelAgentSummary,
   ChannelExecutionProposal,
   ChannelMessage,
 } from "../../src/lib/channels-contract";
-import { appChannelMessage } from "./app-connect-channel-response-mappers";
+import {
+  appChannelAgent,
+  appChannelMessage,
+} from "./app-connect-channel-response-mappers";
 
 const baseMessage = (
   overrides: Partial<ChannelMessage> = {},
@@ -172,5 +177,33 @@ describe("Channel domain to protobuf mapping", () => {
       appChannelMessage(baseMessage({ executionProposal }))
     );
 
+  });
+});
+
+describe("appChannelAgent", () => {
+  const summary = (
+    overrides: Partial<ChannelAgentSummary> = {},
+  ): ChannelAgentSummary => ({
+    agentId: "e652555e-616b-4049-a6be-bd727ed95f63",
+    name: "Growth Hacker",
+    provider: "codex",
+    model: null,
+    effort: null,
+    projectId: "4947dcf7-694e-4a0e-b702-ac9ce562b018",
+    projectName: "briar",
+    description: "",
+    responsibility: "Growth",
+    skills: [],
+    createdAt: "2026-09-05T00:00:00.000Z",
+    ...overrides,
+  } as ChannelAgentSummary);
+
+  it("carries the Computer Use policy the DM computer panel depends on", () => {
+    expect(appChannelAgent(summary({ computerUsePolicy: "unattended" })).computerUsePolicy)
+      .toBe(ComputerUsePolicy.UNATTENDED);
+    expect(appChannelAgent(summary({ computerUsePolicy: "disabled" })).computerUsePolicy)
+      .toBe(ComputerUsePolicy.DISABLED);
+    expect(appChannelAgent(summary()).computerUsePolicy)
+      .toBe(ComputerUsePolicy.UNSPECIFIED);
   });
 });

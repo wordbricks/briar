@@ -78,6 +78,7 @@ import {
   IssueExecutionDispatchSchema,
   IssueExecutionProposalSchema,
 } from "@briar/contracts/gen/briar/app/v1/issue_pb";
+import { ComputerUsePolicy } from "@briar/contracts/gen/briar/types/v1/computer_use_pb";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
 import { Code, ConnectError } from "@connectrpc/connect";
 import type { AgentProvider as DomainAgentProvider } from "../../src/lib/agent-provider";
@@ -337,7 +338,20 @@ export const appChannelAgent = (agent: ChannelAgentSummary) =>
     responsibility: agent.responsibility,
     skills: agent.skills.map(appChannelAgentSkill),
     createdAt: requiredTimestamp(agent.createdAt, "Agent creation"),
+    // The DM computer panel only offers an agent's desktop when its policy is
+    // unattended, so the roster must carry the policy, not just the agent list.
+    computerUsePolicy: agent.computerUsePolicy === undefined
+      ? ComputerUsePolicy.UNSPECIFIED
+      : channelAgentComputerUsePolicy[agent.computerUsePolicy],
   });
+
+const channelAgentComputerUsePolicy = {
+  disabled: ComputerUsePolicy.DISABLED,
+  unattended: ComputerUsePolicy.UNATTENDED,
+} as const satisfies Record<
+  NonNullable<ChannelAgentSummary["computerUsePolicy"]>,
+  ComputerUsePolicy
+>;
 
 const appBlockText = (text: ChannelBlockTextObject) => {
   switch (text.type) {
