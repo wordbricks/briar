@@ -670,6 +670,18 @@ if (sortedNames(updaterRunners) !== providerRunnerList) {
     `runtime updater must reject a release missing any provider runner: ${providerRunnerList}`,
   );
 }
+const desktopBundle = await Bun.file(
+  join(root, "apps", "briar", "src-tauri", "tauri.conf.json"),
+).json() as { bundle?: { resources?: Record<string, string> } };
+const bundledRunners = Object.keys(desktopBundle.bundle?.resources ?? {})
+  .map((source) => source.match(/^\.\.\/dist-agent\/([a-z0-9-]+)-runner\.js$/u)?.[1])
+  .filter((name) => name !== undefined);
+if (sortedNames(bundledRunners) !== providerRunnerList) {
+  fail(
+    `desktop bundle resources must carry every provider runner: ${providerRunnerList}`,
+  );
+}
+
 const updaterQa = await text(
   join(root, "scripts", "qa-managed-runtime-updater.sh"),
 );
