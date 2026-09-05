@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { AgentProvider as ProtoAgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
+import { emptyAgentProviderCapabilityCatalog } from "../../src/lib/agent-provider-contract";
 import { workerRuntimeFixture } from "./test-helpers/worker-runtime";
 import {
   MAX_STORED_WORKER_RUNTIME_BYTES,
@@ -34,14 +36,43 @@ describe("Worker runtime protobuf mapping", () => {
     ).toThrow();
   });
 
-  it("rejects incomplete or duplicate runtime catalogs", () => {
-    const runtime = workerRuntimeFixture();
+  it("reads an advertisement that predates a newly added provider", () => {
+    // A Worker that registered before `pi` shipped stored an eight-provider
+    // advertisement, and an offline one can never re-advertise. Reading it has
+    // to keep working, with the provider it predates reported unavailable.
+    const runtime = workerRuntimeFixture({ providers: ["codex"] });
     if (!runtime.capabilities) throw new Error("Fixture omitted capabilities");
-    runtime.capabilities.providerCapabilities.pop();
+    runtime.capabilities.providerCapabilities = runtime.capabilities
+      .providerCapabilities.filter((entry) =>
+        entry.provider !== ProtoAgentProvider.PI
+      );
+    runtime.providerHealth = runtime.providerHealth.filter((entry) =>
+      entry.provider !== ProtoAgentProvider.PI
+    );
 
-    expect(() => workerRuntimeMetadataFromProto(runtime)).toThrow(
+    const metadata = workerRuntimeMetadataFromProto(runtime);
+
+    expect(metadata.providers).toEqual(["codex"]);
+    expect(metadata.providerHealth.pi).toBeUndefined();
+    expect(metadata.providerCapabilities.pi).toEqual(
+      emptyAgentProviderCapabilityCatalog().pi,
+    );
+    expect(
+      workerRuntimeMetadataFromStoredProtoJson(metadata.runtimeProtoJson)
+        .providers,
+    ).toEqual(["codex"]);
+  });
+
+  it("rejects duplicate runtime catalog entries", () => {
+    const duplicateCapabilities = workerRuntimeFixture();
+    if (!duplicateCapabilities.capabilities) {
+      throw new Error("Fixture omitted capabilities");
+    }
+    duplicateCapabilities.capabilities.providerCapabilities[6] =
+      duplicateCapabilities.capabilities.providerCapabilities[0];
+    expect(() => workerRuntimeMetadataFromProto(duplicateCapabilities)).toThrow(
       new WorkerRuntimeValidationError(
-        "Worker provider capabilities must contain exactly 9 providers",
+        "Provider capability is duplicated: codex",
       ),
     );
 

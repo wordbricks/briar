@@ -6,6 +6,7 @@ import {
 } from "@briar/contracts/gen/briar/types/v1/worker_pb";
 import {
   decodeAgentProviderCapabilityCatalog,
+  emptyAgentProviderCapabilityCatalog,
   type AgentEffortCapability,
   type AgentProviderCapabilityCatalog,
 } from "../../src/lib/agent-provider-contract";
@@ -71,15 +72,21 @@ const effortCapability = (value: {
   ...(value.isDefault !== undefined ? { isDefault: value.isDefault } : {}),
 });
 
+/**
+ * A stored advertisement is written once, at the registration that produced it,
+ * and read by every deploy that follows. Adding a provider to the catalog
+ * therefore has to leave those older advertisements readable: requiring the
+ * live provider count would brick every Worker registered before the release
+ * that added it — including offline ones, which cannot re-advertise at all —
+ * and one such row would fail the whole fleet listing. Providers the
+ * advertisement predates are filled in as unavailable, the same way the client
+ * mapper fills them (`app-rpc/fleet-mappers.ts`); the Worker gains them for
+ * real on its next registration.
+ */
 const providerCapabilities = (
   capabilities: NonNullable<WorkerRuntimeAdvertisement["capabilities"]>,
 ): AgentProviderCapabilityCatalog => {
-  if (capabilities.providerCapabilities.length !== agentProviders.length) {
-    invalid(
-      `Worker provider capabilities must contain exactly ${agentProviders.length} providers`,
-    );
-  }
-  const catalog: Record<string, unknown> = {};
+  const catalog: Record<string, unknown> = emptyAgentProviderCapabilityCatalog();
   const seen = new Set<AgentProvider>();
   for (const value of capabilities.providerCapabilities) {
     const provider = workerAgentProviderFromProto(value.provider);
@@ -111,14 +118,10 @@ const providerCapabilities = (
   }
 };
 
+/** A provider an older advertisement omits is simply absent, so unavailable. */
 const providerHealth = (
   runtime: WorkerRuntimeAdvertisement,
 ): ProviderHealthMap => {
-  if (runtime.providerHealth.length !== agentProviders.length) {
-    invalid(
-      `Worker provider health must contain exactly ${agentProviders.length} providers`,
-    );
-  }
   const result: ProviderHealthMap = {};
   for (const value of runtime.providerHealth) {
     const provider = workerAgentProviderFromProto(value.provider);
