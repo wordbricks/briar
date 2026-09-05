@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { create } from "@bufbuild/protobuf";
@@ -315,5 +315,17 @@ describe("readSandboxState", () => {
     const directory = await mkdtemp(join(tmpdir(), "briar-sandbox-state-"));
     directories.push(directory);
     expect(await readSandboxState(directory)).toBeNull();
+  });
+
+  it("reads a state file written before the project-to-team rename", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "briar-sandbox-state-"));
+    directories.push(directory);
+    await writeFile(join(directory, "sandbox.json"), JSON.stringify({
+      schemaVersion: SANDBOX_SCHEMA_VERSION,
+      label: "sandbox-gx10",
+      projectIds: [projectId],
+      bootstrappedAt: "2026-09-05T00:00:00.000Z",
+    }));
+    expect((await readSandboxState(directory))?.teamIds).toEqual([projectId]);
   });
 });

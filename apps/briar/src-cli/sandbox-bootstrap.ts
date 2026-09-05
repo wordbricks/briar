@@ -90,11 +90,28 @@ export const sandboxStatePath = (directory = configDirectory) =>
 export const sandboxSupervisorPidPath = (directory = configDirectory) =>
   join(directory, "sandbox-supervisor.pid");
 
+/** State files written before the project-to-team rename used `projectIds`. */
+export function migrateLegacySandboxState(raw: string): string {
+  const parsed: unknown = JSON.parse(raw);
+  if (
+    parsed && typeof parsed === "object" && "projectIds" in parsed &&
+    !("teamIds" in parsed)
+  ) {
+    const legacy = parsed as { projectIds?: unknown; teamIds?: unknown };
+    legacy.teamIds = legacy.projectIds;
+    delete legacy.projectIds;
+    return JSON.stringify(parsed);
+  }
+  return raw;
+}
+
 export async function readSandboxState(
   directory = configDirectory,
 ): Promise<SandboxState | null> {
   try {
-    return decodeSandboxState(await readFile(sandboxStatePath(directory), "utf8"));
+    return decodeSandboxState(
+      migrateLegacySandboxState(await readFile(sandboxStatePath(directory), "utf8")),
+    );
   } catch (error) {
     if (
       error && typeof error === "object" && "code" in error &&
