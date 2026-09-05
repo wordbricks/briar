@@ -46,6 +46,24 @@ describe("sandbox host registry", () => {
     expect(await loadSandboxHostConfig(root)).toEqual({ version: 1, sandboxes: {} });
   });
 
+  it("reads a registry written before the project-to-team rename", async () => {
+    const root = await directory();
+    await writeFile(sandboxHostConfigPath(root), JSON.stringify({
+      version: 1,
+      sandboxes: {
+        gx10: {
+          dockerContext: "briar-sandbox-gx10",
+          projectIds: [projectId],
+          gpus: false,
+          runtimeSha256: "a".repeat(64),
+          updatedAt: "2026-09-05T00:00:00.000Z",
+        },
+      },
+    }));
+    const loaded = await loadSandboxHostConfig(root);
+    expect(loaded.sandboxes.gx10?.teamIds).toEqual([projectId]);
+  });
+
   it("rejects a corrupted registry instead of silently resetting it", async () => {
     const root = await directory();
     await writeFile(sandboxHostConfigPath(root), "{\"version\": 2}");

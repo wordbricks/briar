@@ -252,6 +252,17 @@ describe("ensureSandbox", () => {
     expect(fake.state.containers[container]?.labels[SANDBOX_RUNTIME_LABEL]).toBe(runtimeSha256);
   });
 
+  it("passes a non-default Debian mirror to the image build", async () => {
+    const { input, fake } = ensureInput(fakeDocker());
+    await ensureSandbox(fake.docker, { ...input, debianMirror: "ftp.kr.debian.org" });
+    const build = fake.calls.find((call) => call[0] === "build")!;
+    expect(build).toContain("--build-arg");
+    expect(build).toContain("DEBIAN_MIRROR=ftp.kr.debian.org");
+    const plain = fakeDocker();
+    await ensureSandbox(plain.docker, { ...input, debianMirror: "deb.debian.org" });
+    expect(plain.calls.find((call) => call[0] === "build")!).not.toContain("--build-arg");
+  });
+
   it("skips the build when the image already exists and restarts a stopped container", async () => {
     const { input, fake } = ensureInput(fakeDocker({
       images: [sandboxImageTag(runtimeSha256)],

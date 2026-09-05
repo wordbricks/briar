@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  debianMirror,
   resolveSandboxRuntimeSources,
   SANDBOX_CLI_PATH,
   sandboxDockerfile,
@@ -67,6 +68,20 @@ describe("sandboxDockerfile", () => {
   });
 });
 
+describe("debianMirror", () => {
+  it("defaults, normalizes, and rejects anything but a hostname", () => {
+    expect(debianMirror(undefined)).toBe("deb.debian.org");
+    expect(debianMirror(" FTP.kr.debian.org ")).toBe("ftp.kr.debian.org");
+    expect(() => debianMirror("http://ftp.kr.debian.org")).toThrow("bare hostname");
+    expect(() => debianMirror("mirror;rm -rf /")).toThrow("bare hostname");
+  });
+
+  it("is applied to apt sources only when it differs from the default", () => {
+    expect(sandboxDockerfile()).toContain("ARG DEBIAN_MIRROR=deb.debian.org");
+    expect(sandboxDockerfile()).toContain("/etc/apt/sources.list.d/debian.sources");
+  });
+});
+
 describe("stageSandboxBuildContext", () => {
   it("writes every input and derives a stable content digest", async () => {
     const { cliBundlePath, agentDirectory } = await sources();
@@ -101,6 +116,15 @@ describe("stageSandboxBuildContext", () => {
       agentDirectory: changed.agentDirectory,
     });
     expect(a.runtimeSha256).not.toBe(b.runtimeSha256);
+  });
+
+  it("stages the installed layout that lacks the Computer Use bundle", async () => {
+    const { cliBundlePath, agentDirectory } = await sources();
+    await rm(join(agentDirectory, "computer-use-mcp-server.js"));
+    const directory = await temporary("briar-sandbox-stage-");
+    await stageSandboxBuildContext({ directory, cliBundlePath, agentDirectory });
+    await expect(stat(join(directory, "agent", "computer-use-mcp-server.js"))).rejects.toThrow();
+    expect(await readFile(join(directory, "agent", "pi-runner.js"), "utf8")).toBe("// pi-runner.js");
   });
 
   it("refuses to stage without every agent runner", async () => {

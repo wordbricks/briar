@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import * as Schema from "effect/Schema";
 import {
+  DEFAULT_DEBIAN_MIRROR,
   SANDBOX_CLI_PATH,
   SANDBOX_HOME,
   SANDBOX_SCHEMA_VERSION,
@@ -271,6 +272,8 @@ export interface EnsureSandboxInput {
   readonly runtimeSha256: string;
   readonly buildContextDirectory: string;
   readonly gpus: boolean;
+  /** Debian mirror host for the image build; defaults to deb.debian.org. */
+  readonly debianMirror?: string;
   /** Push the bootstrap payload into the running container. */
   readonly bootstrap: () => Promise<void>;
   readonly sleep?: (milliseconds: number) => Promise<void>;
@@ -292,6 +295,9 @@ async function ensureSandboxImage(
     tag,
     "--label",
     `${SANDBOX_RUNTIME_LABEL}=${input.runtimeSha256}`,
+    ...(input.debianMirror && input.debianMirror !== DEFAULT_DEBIAN_MIRROR
+      ? ["--build-arg", `DEBIAN_MIRROR=${input.debianMirror}`]
+      : []),
     input.buildContextDirectory,
   ]);
   if (!built.ok) {

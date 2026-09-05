@@ -56,6 +56,10 @@ briar sandbox up --name gx10 --host ssh://jay@gx10 --team <team-id> --gpus
    worker로 등록한다. 워커 label은 기본 `sandbox-<name>`이다.
 7. `briar sandbox report`가 `ready: true`를 돌려줄 때까지 최대 3분 기다린다.
 
+Docker 호스트에서 `deb.debian.org`가 느리면(GX10에서 약 170KB/s로 측정됨)
+`--debian-mirror ftp.kr.debian.org`처럼 가까운 미러 호스트명을 주면 apt 단계가
+수십 배 빨라진다. 값은 `sandboxes.json`에 기억되어 다음 `up`에도 적용된다.
+
 `--team`을 생략하면 이 Mac에 연결된 모든 팀을 넘긴다. 다시 실행하면
 같은 단계를 멱등하게 반복하므로 팀을 추가하거나 토큰을 갱신할 때도
 `up`을 쓴다. 이미 있는 sandbox는 `--host`나 `--context` 없이 이름만으로
