@@ -2,6 +2,20 @@
 export const sandboxRuntimeAssets = {
   "bunVersion": "1.4.0",
   "nodeVersion": "22.23.2",
+  "opencodeCli": {
+    "version": "1.18.22",
+    "sha256": {
+      "amd64": "122d05c267497e1802a6b65e61318e288653b08730b79b96814e5adb626849a7",
+      "arm64": "7243e7a417d190efa1b7b0981dbf0d6c8aa78ba2fb0181ea23336fdbb51c5178"
+    }
+  },
+  "grokCli": {
+    "version": "1.0.5",
+    "sha256": {
+      "amd64": "9ba87444e1819e8f6104adbbf4676a870c204380aa5c3e1c38a926c4ea677238",
+      "arm64": "1c1fe67d7c35497fb09f44a451f57acc3787add4c9aea2c56f5c7c75dc5ffcf1"
+    }
+  },
   "desktopFiles": {
     "briar-remote-desktop": "#!/usr/bin/env bash\nset -euo pipefail\n\nif [[ \"$(id -u)\" == \"0\" ]]; then\n  echo \"briar-remote-desktop must run as the unprivileged briar user\" >&2\n  exit 1\nfi\n\ndisplay_number=\"${BRIAR_REMOTE_DISPLAY_NUMBER:-1}\"\ngeometry=\"${BRIAR_REMOTE_DISPLAY_GEOMETRY:-1280x720}\"\nrfb_port=\"${BRIAR_REMOTE_DISPLAY_PORT:-5901}\"\ndesktop_name=\"${BRIAR_REMOTE_DISPLAY_NAME:-Briar managed computer}\"\nstartup_timeout_seconds=\"${BRIAR_REMOTE_DISPLAY_STARTUP_TIMEOUT_SECONDS:-120}\"\ndisplay=\":${display_number}\"\n\nif ! [[ \"$display_number\" =~ ^[1-9][0-9]*$ ]]; then\n  echo \"BRIAR_REMOTE_DISPLAY_NUMBER must be a positive integer\" >&2\n  exit 1\nfi\nif ! [[ \"$rfb_port\" =~ ^[1-9][0-9]*$ ]] || ((rfb_port > 65535)); then\n  echo \"BRIAR_REMOTE_DISPLAY_PORT must be a valid TCP port\" >&2\n  exit 1\nfi\nif ! [[ \"$geometry\" =~ ^[1-9][0-9]*x[1-9][0-9]*$ ]]; then\n  echo \"BRIAR_REMOTE_DISPLAY_GEOMETRY must be WIDTHxHEIGHT\" >&2\n  exit 1\nfi\nif ! [[ \"$startup_timeout_seconds\" =~ ^[1-9][0-9]*$ ]]; then\n  echo \"BRIAR_REMOTE_DISPLAY_STARTUP_TIMEOUT_SECONDS must be a positive integer\" >&2\n  exit 1\nfi\n\ncleanup() {\n  if [[ -n \"${vnc_pid:-}\" ]]; then\n    kill \"$vnc_pid\" 2>/dev/null || true\n    wait \"$vnc_pid\" 2>/dev/null || true\n  fi\n}\ntrap cleanup EXIT INT TERM\n\nrm -f \"/tmp/.X${display_number}-lock\" \"/tmp/.X11-unix/X${display_number}\"\n/usr/bin/Xtigervnc \"$display\" \\\n  -localhost \\\n  -geometry \"$geometry\" \\\n  -SecurityTypes None \\\n  -rfbport \"$rfb_port\" \\\n  -desktop \"$desktop_name\" &\nvnc_pid=$!\n\nstartup_deadline=$((SECONDS + startup_timeout_seconds))\nwhile ((SECONDS < startup_deadline)); do\n  if /usr/bin/ss -ltn \"sport = :${rfb_port}\" | grep -q \"127.0.0.1:${rfb_port}\"; then\n    break\n  fi\n  if ! kill -0 \"$vnc_pid\" 2>/dev/null; then\n    wait \"$vnc_pid\"\n  fi\n  sleep 0.2\ndone\nif ! /usr/bin/ss -ltn \"sport = :${rfb_port}\" |\n  grep -q \"127.0.0.1:${rfb_port}\"; then\n  echo \"TigerVNC did not bind to loopback port ${rfb_port}\" >&2\n  exit 1\nfi\n\nexport DISPLAY=\"$display\"\nunset DBUS_SESSION_BUS_ADDRESS\nunset SESSION_MANAGER\nexec /usr/bin/dbus-run-session -- /usr/bin/xfce4-session\n",
     "briar-computer-use-window": "#!/usr/bin/env bash\nset -euo pipefail\n\ndisplay_number=\"${1:-}\"\nif ! [[ \"$display_number\" =~ ^[0-9]+$ ]] ||\n  ((display_number < 2 || display_number > 100)); then\n  echo \"Computer Use display index must be between 2 and 100\" >&2\n  exit 64\nfi\n\nexport BRIAR_REMOTE_DISPLAY_NUMBER=\"$display_number\"\nexport BRIAR_REMOTE_DISPLAY_PORT=\"$((5900 + display_number))\"\nexport BRIAR_REMOTE_DISPLAY_NAME=\"Briar Computer Use :${display_number}\"\nexport BRIAR_BROWSER_PROFILE_DIRECTORY=\"/var/lib/briar-computer-use/profiles/display-${display_number}\"\nexec /opt/briar/bin/briar-remote-desktop\n",

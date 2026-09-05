@@ -3,11 +3,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  agentProviderBinaryName,
+  managedComputerSetupProviders,
+} from "../src/lib/agent-provider";
+import {
   debianMirror,
   resolveSandboxRuntimeSources,
   SANDBOX_CLI_PATH,
+  SANDBOX_RUNTIME_ROOT,
   sandboxDockerfile,
   sandboxImageTag,
+  sandboxProviderBinaryPaths,
   stageSandboxBuildContext,
 } from "./sandbox-image";
 import { sandboxRuntimeAssets } from "./sandbox-runtime-assets";
@@ -65,6 +71,56 @@ describe("sandboxDockerfile", () => {
     expect(dockerfile).toContain("arm64) bun_arch=aarch64; node_arch=arm64");
     expect(dockerfile).toContain("amd64) bun_arch=x64; node_arch=x64");
     expect(dockerfile).toContain("agent-browser-linux-arm64");
+  });
+
+  it("installs OpenCode and Grok from the pinned releases for both architectures", () => {
+    const dockerfile = sandboxDockerfile();
+    expect(dockerfile).toContain(
+      `ARG OPENCODE_CLI_VERSION=${sandboxRuntimeAssets.opencodeCli.version}`,
+    );
+    expect(dockerfile).toContain(
+      `ARG GROK_CLI_VERSION=${sandboxRuntimeAssets.grokCli.version}`,
+    );
+    expect(dockerfile).toContain(
+      "https://github.com/anomalyco/opencode/releases/download/v${OPENCODE_CLI_VERSION}/opencode-linux-x64-baseline.tar.gz",
+    );
+    expect(dockerfile).toContain(
+      "https://github.com/anomalyco/opencode/releases/download/v${OPENCODE_CLI_VERSION}/opencode-linux-arm64.tar.gz",
+    );
+    expect(dockerfile).toContain("https://x.ai/cli/grok-${GROK_CLI_VERSION}-linux-x86_64");
+    expect(dockerfile).toContain("https://x.ai/cli/grok-${GROK_CLI_VERSION}-linux-aarch64");
+    for (
+      const sha256 of [
+        sandboxRuntimeAssets.opencodeCli.sha256.amd64,
+        sandboxRuntimeAssets.opencodeCli.sha256.arm64,
+        sandboxRuntimeAssets.grokCli.sha256.amd64,
+        sandboxRuntimeAssets.grokCli.sha256.arm64,
+      ]
+    ) {
+      expect(sha256).toMatch(/^[0-9a-f]{64}$/u);
+      expect(dockerfile).toContain(sha256);
+    }
+    expect(dockerfile).toContain("sha256sum -c -");
+    expect(dockerfile).toContain(`install -m 0755 /tmp/briar-download/opencode ${SANDBOX_RUNTIME_ROOT}/bin/opencode`);
+    expect(dockerfile).toContain(`install -m 0755 /tmp/briar-download/grok ${SANDBOX_RUNTIME_ROOT}/bin/grok`);
+    // The npm package installs through a lifecycle script the provider runtime
+    // refuses to run, so OpenCode must stay a pinned standalone binary.
+    expect(dockerfile).not.toContain("opencode-ai");
+  });
+
+  it("carries a binary for every managed-computer provider", () => {
+    const dockerfile = sandboxDockerfile();
+    for (const provider of managedComputerSetupProviders) {
+      expect(dockerfile).toContain(
+        `${SANDBOX_RUNTIME_ROOT}/bin/${agentProviderBinaryName(provider)}`,
+      );
+    }
+    expect(sandboxProviderBinaryPaths()).toEqual([
+      `${SANDBOX_RUNTIME_ROOT}/bin/claude`,
+      `${SANDBOX_RUNTIME_ROOT}/bin/codex`,
+      `${SANDBOX_RUNTIME_ROOT}/bin/grok`,
+      `${SANDBOX_RUNTIME_ROOT}/bin/opencode`,
+    ]);
   });
 });
 

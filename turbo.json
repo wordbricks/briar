@@ -103,6 +103,7 @@
     "sandbox:check": {
       "outputs": []
     },
+    "sandbox:generate": { "cache": false },
     "web:build": { "cache": false },
     "build:release": { "cache": false },
     "ios:native:project": { "cache": false },

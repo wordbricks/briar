@@ -664,7 +664,11 @@ export const agyAuthenticated = async (binary: string) => {
   return result.status === 0 && !result.error;
 };
 
-const opencodeAuthPaths = (home: string) => {
+/**
+ * Every location OpenCode may keep its credential in, most specific first.
+ * `briar sandbox up` copies the first one that exists into the container.
+ */
+export const opencodeAuthPaths = (home: string) => {
   const paths = [
     join(home, ".local", "share", "opencode", "auth.json"),
     join(home, "Library", "Application Support", "opencode", "auth.json"),
