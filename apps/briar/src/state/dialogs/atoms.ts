@@ -71,6 +71,16 @@ export const quickProcessErrorAtom = Atom.make<string | null>(null).pipe(
   Atom.withLabel("dialogs/quickProcessError"),
 );
 
+/**
+ * An organization Agent whose editor should open once the Agents settings page
+ * is on screen. The DM list's "Edit Profile" navigates to that page and leaves
+ * the id here; the page consumes it and clears it, so a later visit to the page
+ * does not reopen the editor.
+ */
+export const requestedOrganizationAgentIdAtom = Atom.make<string | null>(
+  null,
+).pipe(Atom.keepAlive, Atom.withLabel("dialogs/requestedOrganizationAgentId"));
+
 /** The team whose repository setup dialog is open. */
 export const repositorySetupTeamIdAtom = Atom.make<string | null>(null).pipe(
   Atom.keepAlive,

@@ -106,6 +106,9 @@ const channel: ChannelSummary = {
   lastReadAt: null,
   hasUnread: false,
   dmParticipants: [],
+  pinnedAt: null,
+  sidebarSectionId: null,
+  hiddenAt: null,
 };
 
 const STORED_CURSOR = 41;

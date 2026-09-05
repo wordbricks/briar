@@ -42,6 +42,9 @@ const selectedChannel: ChannelSummary = {
   lastReadAt: null,
   hasUnread: false,
   dmParticipants: [],
+  pinnedAt: null,
+  sidebarSectionId: null,
+  hiddenAt: null,
 };
 
 const secondChannel: ChannelSummary = {

@@ -41,6 +41,9 @@ const channel = (
   lastReadAt: null,
   hasUnread: false,
   dmParticipants: [],
+  pinnedAt: null,
+  sidebarSectionId: null,
+  hiddenAt: null,
   ...overrides,
 });
 

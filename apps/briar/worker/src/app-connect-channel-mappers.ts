@@ -6,6 +6,7 @@ import {
   ChannelLinkPreviewSchema,
   ChannelMemberRole,
   ChannelMemberSchema,
+  ChannelSidebarSectionSchema,
   ChannelSummarySchema,
   ChannelVisibility,
   ChannelWebhookSchema,
@@ -14,6 +15,7 @@ import {
 } from "@briar/contracts/gen/briar/app/v1/channel_pb";
 import { Code, ConnectError } from "@connectrpc/connect";
 import * as Schema from "effect/Schema";
+import type { ChannelSidebarSection } from "./channel-sidebar-repository";
 import type {
   ChannelMessageDocumentRow,
   ChannelRow,
@@ -116,6 +118,20 @@ export const appChannelSummary = (row: ChannelRow) =>
         )
       : [],
     createdByUserId: row.created_by_user_id ?? undefined,
+    pinnedAt: optionalTimestamp(row.sidebar_pinned_at, "Channel pin"),
+    sidebarSectionId: row.sidebar_section_id ?? undefined,
+    hiddenAt: optionalTimestamp(row.sidebar_hidden_at, "Channel hide"),
+  });
+
+/** One of the requesting member's own sidebar sections. */
+export const appChannelSidebarSection = (section: ChannelSidebarSection) =>
+  create(ChannelSidebarSectionSchema, {
+    id: section.id,
+    organizationId: section.organizationId,
+    name: section.name,
+    position: section.position,
+    createdAt: requiredTimestamp(section.createdAt, "Sidebar section creation"),
+    updatedAt: requiredTimestamp(section.updatedAt, "Sidebar section update"),
   });
 
 type ChannelMemberRow = Awaited<

@@ -4,7 +4,11 @@ import { RegistryContext } from "@effect/atom-react";
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { ChannelDelta, ChannelSummary } from "../../lib/channels-contract";
+import type {
+  ChannelDelta,
+  ChannelSidebarSection,
+  ChannelSummary,
+} from "../../lib/channels-contract";
 import { createReactTestRoot } from "../../test/react";
 import { organizationChannelIdsAtom } from "../entities/channels";
 import { activeOrganizationIdAtom } from "../organization/atoms";
@@ -47,6 +51,9 @@ const channel = (
   lastReadAt: null,
   hasUnread: false,
   dmParticipants: [],
+  pinnedAt: null,
+  sidebarSectionId: null,
+  hiddenAt: null,
   ...overrides,
 });
 
@@ -63,7 +70,14 @@ const emptyDelta = (cursor: number): ChannelDelta => ({
 
 /** An in-memory catalog: no network, no realtime socket, no timers of its own. */
 class CatalogServer {
-  catalogs = new Map<string, { channels: ChannelSummary[]; cursor: number }>();
+  catalogs = new Map<
+    string,
+    {
+      channels: ChannelSummary[];
+      cursor: number;
+      sidebarSections?: ChannelSidebarSection[];
+    }
+  >();
   deltas: ChannelDelta[] = [];
   listFailures = 0;
   readonly listRequests: string[] = [];
@@ -78,9 +92,9 @@ class CatalogServer {
         this.listFailures -= 1;
         throw new Error("catalog unavailable");
       }
-      return (
-        this.catalogs.get(organizationId) ?? { channels: [], cursor: 0 }
-      );
+      const catalog = this.catalogs.get(organizationId) ??
+        { channels: [], cursor: 0 };
+      return { ...catalog, sidebarSections: catalog.sidebarSections ?? [] };
     },
     loadChannelDelta: async (_token, organizationId, since) => {
       this.deltaRequests.push({ organizationId, since });

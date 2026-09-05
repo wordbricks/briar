@@ -7,6 +7,10 @@ import {
   requireChannelAccess,
 } from "./channel-route-access";
 import {
+  channelSidebarSectionJson,
+  listChannelSidebarSections,
+} from "./channel-sidebar-repository";
+import {
   decodeChannelReadInput,
   decodeDirectMessageInput,
 } from "./channel-route-decoders";
@@ -81,9 +85,17 @@ export async function listOrganizationChannels(
     () => getChannelSyncCursor(input.db, input.organizationId),
     () => listChannels(input.db, input.organizationId, input.userId),
   );
+  // The sidebar groups conversations by the member's own sections, so one
+  // catalog load carries them rather than making the list wait on a second RPC.
+  const sections = await listChannelSidebarSections(
+    input.db,
+    input.organizationId,
+    input.userId,
+  );
   return {
     channels: snapshot.channels.map(channelJson),
     cursor: snapshot.cursor,
+    sidebarSections: sections.map(channelSidebarSectionJson),
   };
 }
 

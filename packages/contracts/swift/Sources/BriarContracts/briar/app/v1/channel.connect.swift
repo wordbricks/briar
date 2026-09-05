@@ -60,6 +60,24 @@ public protocol BriarAPI_ChannelServiceClientInterface: Sendable {
     func `markChannelRead`(request: BriarAPI_MarkChannelReadRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_MarkChannelReadResponse>
 
     @available(iOS 13, *)
+    func `markChannelUnread`(request: BriarAPI_MarkChannelUnreadRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_MarkChannelUnreadResponse>
+
+    @available(iOS 13, *)
+    func `updateChannelSidebarPreference`(request: BriarAPI_UpdateChannelSidebarPreferenceRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_UpdateChannelSidebarPreferenceResponse>
+
+    @available(iOS 13, *)
+    func `listChannelSidebarSections`(request: BriarAPI_ListChannelSidebarSectionsRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_ListChannelSidebarSectionsResponse>
+
+    @available(iOS 13, *)
+    func `createChannelSidebarSection`(request: BriarAPI_CreateChannelSidebarSectionRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_CreateChannelSidebarSectionResponse>
+
+    @available(iOS 13, *)
+    func `renameChannelSidebarSection`(request: BriarAPI_RenameChannelSidebarSectionRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_RenameChannelSidebarSectionResponse>
+
+    @available(iOS 13, *)
+    func `deleteChannelSidebarSection`(request: BriarAPI_DeleteChannelSidebarSectionRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_DeleteChannelSidebarSectionResponse>
+
+    @available(iOS 13, *)
     func `listChannelMessages`(request: BriarAPI_ListChannelMessagesRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_ListChannelMessagesResponse>
 
     @available(iOS 13, *)
@@ -185,6 +203,36 @@ public final class BriarAPI_ChannelServiceClient: BriarAPI_ChannelServiceClientI
     }
 
     @available(iOS 13, *)
+    public func `markChannelUnread`(request: BriarAPI_MarkChannelUnreadRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_MarkChannelUnreadResponse> {
+        return await self.client.unary(path: "/briar.app.v1.ChannelService/MarkChannelUnread", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `updateChannelSidebarPreference`(request: BriarAPI_UpdateChannelSidebarPreferenceRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UpdateChannelSidebarPreferenceResponse> {
+        return await self.client.unary(path: "/briar.app.v1.ChannelService/UpdateChannelSidebarPreference", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `listChannelSidebarSections`(request: BriarAPI_ListChannelSidebarSectionsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ListChannelSidebarSectionsResponse> {
+        return await self.client.unary(path: "/briar.app.v1.ChannelService/ListChannelSidebarSections", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `createChannelSidebarSection`(request: BriarAPI_CreateChannelSidebarSectionRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CreateChannelSidebarSectionResponse> {
+        return await self.client.unary(path: "/briar.app.v1.ChannelService/CreateChannelSidebarSection", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `renameChannelSidebarSection`(request: BriarAPI_RenameChannelSidebarSectionRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_RenameChannelSidebarSectionResponse> {
+        return await self.client.unary(path: "/briar.app.v1.ChannelService/RenameChannelSidebarSection", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `deleteChannelSidebarSection`(request: BriarAPI_DeleteChannelSidebarSectionRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_DeleteChannelSidebarSectionResponse> {
+        return await self.client.unary(path: "/briar.app.v1.ChannelService/DeleteChannelSidebarSection", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
     public func `listChannelMessages`(request: BriarAPI_ListChannelMessagesRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ListChannelMessagesResponse> {
         return await self.client.unary(path: "/briar.app.v1.ChannelService/ListChannelMessages", idempotencyLevel: .unknown, request: request, headers: headers)
     }
@@ -262,6 +310,12 @@ public final class BriarAPI_ChannelServiceClient: BriarAPI_ChannelServiceClientI
             public static let revokeChannelWebhook = Connect.MethodSpec(name: "RevokeChannelWebhook", service: "briar.app.v1.ChannelService", type: .unary)
             public static let getChannel = Connect.MethodSpec(name: "GetChannel", service: "briar.app.v1.ChannelService", type: .unary)
             public static let markChannelRead = Connect.MethodSpec(name: "MarkChannelRead", service: "briar.app.v1.ChannelService", type: .unary)
+            public static let markChannelUnread = Connect.MethodSpec(name: "MarkChannelUnread", service: "briar.app.v1.ChannelService", type: .unary)
+            public static let updateChannelSidebarPreference = Connect.MethodSpec(name: "UpdateChannelSidebarPreference", service: "briar.app.v1.ChannelService", type: .unary)
+            public static let listChannelSidebarSections = Connect.MethodSpec(name: "ListChannelSidebarSections", service: "briar.app.v1.ChannelService", type: .unary)
+            public static let createChannelSidebarSection = Connect.MethodSpec(name: "CreateChannelSidebarSection", service: "briar.app.v1.ChannelService", type: .unary)
+            public static let renameChannelSidebarSection = Connect.MethodSpec(name: "RenameChannelSidebarSection", service: "briar.app.v1.ChannelService", type: .unary)
+            public static let deleteChannelSidebarSection = Connect.MethodSpec(name: "DeleteChannelSidebarSection", service: "briar.app.v1.ChannelService", type: .unary)
             public static let listChannelMessages = Connect.MethodSpec(name: "ListChannelMessages", service: "briar.app.v1.ChannelService", type: .unary)
             public static let prepareChannelMessageAttachments = Connect.MethodSpec(name: "PrepareChannelMessageAttachments", service: "briar.app.v1.ChannelService", type: .unary)
             public static let createChannelMessage = Connect.MethodSpec(name: "CreateChannelMessage", service: "briar.app.v1.ChannelService", type: .unary)

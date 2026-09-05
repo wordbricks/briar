@@ -18,6 +18,7 @@ import {
   type ChannelLinkPreview as ChannelLinkPreviewMessage,
   type ChannelMember as ChannelMemberMessage,
   type ChannelMessage as ChannelMessageMessage,
+  type ChannelSidebarSection as ChannelSidebarSectionMessage,
   type ChannelMessageAuthor as ChannelMessageAuthorMessage,
   type ChannelProposal as ChannelProposalMessage,
   type ChannelSummary as ChannelSummaryMessage,
@@ -68,6 +69,7 @@ import type {
   ChannelMessageDocumentContent,
   ChannelMessageProposal,
   ChannelReplyStatus,
+  ChannelSidebarSection,
   ChannelSummary,
   ChannelVisibility,
   ChannelWebhook,
@@ -190,6 +192,20 @@ export const channelSummaryFromMessage = (
   dmParticipants: value.directMessageParticipants.map(
     directMessageParticipantFromMessage,
   ),
+  pinnedAt: optionalTimestamp(value.pinnedAt),
+  sidebarSectionId: value.sidebarSectionId ?? null,
+  hiddenAt: optionalTimestamp(value.hiddenAt),
+});
+
+export const channelSidebarSectionFromMessage = (
+  value: ChannelSidebarSectionMessage,
+): ChannelSidebarSection => ({
+  id: value.id,
+  organizationId: value.organizationId,
+  name: value.name,
+  position: value.position,
+  createdAt: requiredTimestamp(value.createdAt, "sidebarSection.createdAt"),
+  updatedAt: requiredTimestamp(value.updatedAt, "sidebarSection.updatedAt"),
 });
 
 export const channelMemberFromMessage = (
@@ -768,6 +784,9 @@ export async function listChannels(token: string, organizationId: string) {
   return {
     channels: response.channels.map(channelSummaryFromMessage),
     cursor: safeNumber(response.cursor, "channels.cursor"),
+    sidebarSections: response.sidebarSections.map(
+      channelSidebarSectionFromMessage,
+    ),
   };
 }
 
@@ -1072,6 +1091,131 @@ export async function markChannelRead(
       "markChannelRead.channel",
     )),
   };
+}
+
+/**
+ * Puts the unread mark back on a conversation. The server keeps it unread until
+ * the next {@link markChannelRead}; a conversation nobody else has written in
+ * comes back unchanged, because it has nothing to be unread about.
+ */
+export async function markChannelUnread(
+  token: string,
+  organizationId: string,
+  channelId: string,
+) {
+  const client = requireChannelClient();
+  const response = await client.markChannelUnread(
+    { organizationId, channelId },
+    appCallOptions(token),
+  );
+  return {
+    channel: channelSummaryFromMessage(requiredMessage(
+      response.channel,
+      "markChannelUnread.channel",
+    )),
+  };
+}
+
+/**
+ * Moves one conversation within the caller's own sidebar. Only the fields this
+ * call carries change: `section: undefined` leaves the conversation where it
+ * is, and `section: null` moves it to Unassigned.
+ */
+export async function updateChannelSidebarPreference(
+  token: string,
+  organizationId: string,
+  channelId: string,
+  input: {
+    pinned?: boolean;
+    hidden?: boolean;
+    section?: string | null;
+  },
+) {
+  const client = requireChannelClient();
+  const response = await client.updateChannelSidebarPreference(
+    {
+      organizationId,
+      channelId,
+      pinned: input.pinned,
+      hidden: input.hidden,
+      sectionUpdate: input.section === undefined
+        ? { case: undefined }
+        : input.section === null
+        ? { case: "clearSection", value: {} }
+        : { case: "sectionId", value: input.section },
+    },
+    appCallOptions(token),
+  );
+  return {
+    channel: channelSummaryFromMessage(requiredMessage(
+      response.channel,
+      "updateChannelSidebarPreference.channel",
+    )),
+  };
+}
+
+export async function listChannelSidebarSections(
+  token: string,
+  organizationId: string,
+) {
+  const client = requireChannelClient();
+  const response = await client.listChannelSidebarSections(
+    { organizationId },
+    appCallOptions(token),
+  );
+  return { sections: response.sections.map(channelSidebarSectionFromMessage) };
+}
+
+export async function createChannelSidebarSection(
+  token: string,
+  organizationId: string,
+  name: string,
+) {
+  const client = requireChannelClient();
+  const response = await client.createChannelSidebarSection(
+    { organizationId, name },
+    appCallOptions(token),
+  );
+  return {
+    section: channelSidebarSectionFromMessage(requiredMessage(
+      response.section,
+      "createChannelSidebarSection.section",
+    )),
+    sections: response.sections.map(channelSidebarSectionFromMessage),
+  };
+}
+
+export async function renameChannelSidebarSection(
+  token: string,
+  organizationId: string,
+  sectionId: string,
+  name: string,
+) {
+  const client = requireChannelClient();
+  const response = await client.renameChannelSidebarSection(
+    { organizationId, sectionId, name },
+    appCallOptions(token),
+  );
+  return {
+    section: channelSidebarSectionFromMessage(requiredMessage(
+      response.section,
+      "renameChannelSidebarSection.section",
+    )),
+    sections: response.sections.map(channelSidebarSectionFromMessage),
+  };
+}
+
+export async function deleteChannelSidebarSection(
+  token: string,
+  organizationId: string,
+  sectionId: string,
+) {
+  const client = requireChannelClient();
+  const response = await client.deleteChannelSidebarSection(
+    { organizationId, sectionId },
+    appCallOptions(token),
+  );
+  return { sections: response.sections.map(channelSidebarSectionFromMessage) };
 }
 
 export async function listChannelMessages(

@@ -1,4 +1,5 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
+import { useMemo } from "react";
 
 import { AgentUsageStatusBar } from "../AgentUsageStatusBar";
 import { AppVersionStatus } from "../AppVersionStatus";
@@ -27,6 +28,7 @@ import {
   isSidebarOpenAtom,
   planningProjectEditIdAtom,
   planningProjectTeamIdAtom,
+  requestedOrganizationAgentIdAtom,
 } from "../../state/dialogs/atoms";
 import { useNavigationActions } from "../../state/navigation/actions";
 import {
@@ -94,15 +96,73 @@ export function DesktopShell({
   const setIsIssueDialogOpen = useAtomSet(isIssueDialogOpenAtom);
   const setPlanningProjectTeamId = useAtomSet(planningProjectTeamIdAtom);
   const setPlanningProjectEditId = useAtomSet(planningProjectEditIdAtom);
+  const setRequestedOrganizationAgentId = useAtomSet(
+    requestedOrganizationAgentIdAtom,
+  );
   const { navigateToLocation, navigateToPage, openAppSettings } =
     useNavigationActions();
   const {
+    createDirectMessageSection,
     createOrganizationChannel,
+    deleteDirectMessage,
+    deleteDirectMessageSection,
     deleteOrganizationChannel,
+    markDirectMessageUnread,
+    markOrganizationChannelRead,
+    moveDirectMessageToSection,
     openOrganizationChannel,
     openOrganizationChannelSettings,
+    renameDirectMessageSection,
+    setDirectMessageHidden,
+    setDirectMessagePinned,
     startDirectMessageCompose,
   } = useChannelActions();
+  /*
+    The conversation menu's writes, bundled once so the sidebar takes the same
+    object on every render. `useChannelActions` is stable for the registry's
+    lifetime, and the one handler that is not an action — Edit Profile — only
+    navigates.
+  */
+  const directMessageActions = useMemo(
+    () => ({
+      onCreateSection: createDirectMessageSection,
+      onDelete: deleteDirectMessage,
+      onDeleteSection: deleteDirectMessageSection,
+      onEditAgentProfile: (agentId: string) => {
+        if (!activeOrganizationId) return;
+        setRequestedOrganizationAgentId(agentId);
+        setSettingsTarget({
+          scope: "organization",
+          organizationId: activeOrganizationId,
+          section: "agents",
+        });
+        setIsSidebarOpen(true);
+        navigateToPage("settings");
+      },
+      onMarkRead: markOrganizationChannelRead,
+      onMarkUnread: markDirectMessageUnread,
+      onMoveToSection: moveDirectMessageToSection,
+      onRenameSection: renameDirectMessageSection,
+      onSetHidden: setDirectMessageHidden,
+      onSetPinned: setDirectMessagePinned,
+    }),
+    [
+      activeOrganizationId,
+      createDirectMessageSection,
+      deleteDirectMessage,
+      deleteDirectMessageSection,
+      markDirectMessageUnread,
+      markOrganizationChannelRead,
+      moveDirectMessageToSection,
+      navigateToPage,
+      renameDirectMessageSection,
+      setDirectMessageHidden,
+      setDirectMessagePinned,
+      setIsSidebarOpen,
+      setRequestedOrganizationAgentId,
+      setSettingsTarget,
+    ],
+  );
   const { selectOrganization } = useOrganizationActions();
   const { selectTeam, startTeamCreation } = useTeamActions();
   const { logout } = useSessionActions();
@@ -184,6 +244,7 @@ export function DesktopShell({
           }}
           onDirectMessageOpen={openOrganizationChannel}
           onDirectMessageCompose={startDirectMessageCompose}
+          directMessageActions={directMessageActions}
           onChannelCreate={
             activeOrganizationId && token
               ? createOrganizationChannel

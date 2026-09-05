@@ -1,6 +1,9 @@
+import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { Bot, Pencil, Plus, Trash2 } from "lucide-react";
 import { Spinner } from "./ui/spinner";
 import { useEffect, useState } from "react";
+
+import { requestedOrganizationAgentIdAtom } from "../state/dialogs/atoms";
 
 import { SettingsAlert, SettingsPageHeader } from "@/components/settings";
 import { Badge } from "@/components/ui/badge";
@@ -82,6 +85,8 @@ export function OrganizationAgentsSettings({
   const [skillSaveError, setSkillSaveError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const requestedAgentId = useAtomValue(requestedOrganizationAgentIdAtom);
+  const setRequestedAgentId = useAtomSet(requestedOrganizationAgentIdAtom);
 
   useEffect(() => {
     let cancelled = false;
@@ -205,6 +210,22 @@ export function OrganizationAgentsSettings({
       setIsSavingSkills(false);
     }
   };
+
+  /*
+    "Edit Profile" in the sidebar's conversation menu navigates here and leaves
+    the Agent it meant in the atom. The list arrives asynchronously, so the
+    request waits until the Agent is actually in it, and is cleared as soon as
+    its editor opens — a later visit to this page starts closed.
+  */
+  useEffect(() => {
+    if (!requestedAgentId) return;
+    const requested = agents.find(
+      (agent) => agent.agentId === requestedAgentId,
+    );
+    if (!requested) return;
+    setRequestedAgentId(null);
+    editSkills(requested);
+  }, [agents, requestedAgentId, setRequestedAgentId]);
 
   return (
     <>

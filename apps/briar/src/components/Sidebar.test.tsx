@@ -88,6 +88,9 @@ const sidebarChannel = (
   lastReadAt: null,
   hasUnread: false,
   dmParticipants: [],
+  pinnedAt: null,
+  sidebarSectionId: null,
+  hiddenAt: null,
 });
 
 describe("Sidebar", () => {
@@ -286,6 +289,9 @@ describe("Sidebar", () => {
             lastReadAt: null,
             hasUnread: false,
             dmParticipants: [],
+            pinnedAt: null,
+            sidebarSectionId: null,
+            hiddenAt: null,
           },
         ]}
         onChannelCreate={onChannelCreate}
@@ -1690,6 +1696,326 @@ describe("Sidebar mode toggle", () => {
         (name) => name.textContent,
       ),
     ).toEqual(["Alex"]);
+
+    await cleanup();
+  });
+});
+
+describe("Sidebar DM conversation menu", () => {
+  const directMessage = (
+    id: string,
+    name: string,
+    overrides: Partial<ChannelSummary> = {},
+  ): ChannelSummary => ({
+    ...sidebarChannel(id, name, null),
+    kind: "dm" as const,
+    visibility: "private" as const,
+    dmParticipants: [
+      { type: "user" as const, id: "user-1", name: "Jay", image: null },
+      { type: "user" as const, id: `user-${id}`, name, image: null },
+    ],
+    ...overrides,
+  });
+
+  const section = (id: string, name: string, position: number) => ({
+    id,
+    organizationId: "organization-1",
+    name,
+    position,
+    createdAt: "2026-08-01T00:00:00Z",
+    updatedAt: "2026-08-01T00:00:00Z",
+  });
+
+  const dmProps = { ...sidebarProps, activePage: "dms" as const };
+
+  const openContextMenu = async (element: HTMLElement) => {
+    await act(async () => {
+      element.dispatchEvent(
+        new MouseEvent("contextmenu", {
+          bubbles: true,
+          button: 2,
+          cancelable: true,
+          clientX: 120,
+          clientY: 90,
+        }),
+      );
+    });
+  };
+
+  const menuItem = (label: string) =>
+    [...document.body.querySelectorAll<HTMLElement>(
+      ".sidebar-channel-context-menu [role=menuitem]",
+    )].find((item) => item.textContent?.includes(label));
+
+  const rowNames = (container: HTMLElement) =>
+    [...container.querySelectorAll(".sidebar-dm-row strong")].map(
+      (name) => name.textContent,
+    );
+
+  const typeInto = async (input: HTMLInputElement, value: string) => {
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )!.set!;
+      setter.call(input, value);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  };
+
+  it("stays flat with nothing pinned and no sections", async () => {
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <Sidebar
+        {...dmProps}
+        directMessages={[
+          directMessage("dm-1", "Sam", { lastMessageAt: "2026-09-01T09:00:00Z" }),
+          directMessage("dm-2", "Alex", { lastMessageAt: "2026-09-02T09:00:00Z" }),
+        ]}
+      />,
+    );
+
+    expect(container.querySelector(".sidebar-dm-group-heading")).toBeNull();
+    expect(rowNames(container)).toEqual(["Alex", "Sam"]);
+
+    await cleanup();
+  });
+
+  it("groups pinned, then sections, then unassigned", async () => {
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <Sidebar
+        {...dmProps}
+        directMessageSections={[
+          section("section-1", "팀", 0),
+          section("section-2", "고객", 1),
+        ]}
+        directMessages={[
+          directMessage("dm-1", "Sam", {
+            lastMessageAt: "2026-09-01T09:00:00Z",
+            pinnedAt: "2026-09-01T00:00:00Z",
+          }),
+          directMessage("dm-2", "Alex", {
+            lastMessageAt: "2026-09-05T09:00:00Z",
+            pinnedAt: "2026-09-04T00:00:00Z",
+          }),
+          directMessage("dm-3", "Robin", {
+            lastMessageAt: "2026-09-03T09:00:00Z",
+            sidebarSectionId: "section-1",
+          }),
+          directMessage("dm-4", "Kim", {
+            lastMessageAt: "2026-09-02T09:00:00Z",
+          }),
+        ]}
+      />,
+    );
+
+    expect(
+      [...container.querySelectorAll(".sidebar-dm-group-heading")].map(
+        (heading) => heading.textContent,
+      ),
+    ).toEqual(["고정됨", "팀", "고객", "미할당"]);
+    // Newest pin first, then each section in position order, then the rest.
+    expect(rowNames(container)).toEqual(["Alex", "Sam", "Robin", "Kim"]);
+
+    await cleanup();
+  });
+
+  it("keeps hidden conversations out of the groups but inside search", async () => {
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <Sidebar
+        {...dmProps}
+        directMessageActions={{ onSetHidden: vi.fn() }}
+        directMessages={[
+          directMessage("dm-1", "Sam"),
+          directMessage("dm-2", "Alex", { hiddenAt: "2026-09-01T00:00:00Z" }),
+        ]}
+      />,
+    );
+
+    expect(rowNames(container)).toEqual(["Sam"]);
+
+    await typeInto(
+      container.querySelector<HTMLInputElement>(".sidebar-dm-search input")!,
+      "al",
+    );
+    expect(rowNames(container)).toEqual(["Alex"]);
+    // A hidden row offers to come back rather than to be hidden again.
+    await openContextMenu(container.querySelector<HTMLElement>(".sidebar-dm-row")!);
+    expect(menuItem("사이드바에 표시")).toBeTruthy();
+    expect(menuItem("사이드바에서 숨기기")).toBeUndefined();
+
+    await cleanup();
+  });
+
+  it("keeps the open conversation listed even when it is hidden", async () => {
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <Sidebar
+        {...dmProps}
+        activeChannelId="dm-2"
+        directMessages={[
+          directMessage("dm-1", "Sam"),
+          directMessage("dm-2", "Alex", {
+            hiddenAt: "2026-09-01T00:00:00Z",
+            lastMessageAt: "2026-09-02T09:00:00Z",
+          }),
+        ]}
+      />,
+    );
+
+    expect(rowNames(container)).toEqual(["Alex", "Sam"]);
+    expect(
+      container.querySelector(".sidebar-dm-row")?.getAttribute("aria-current"),
+    ).toBe("page");
+
+    await cleanup();
+  });
+
+  it("runs the conversation menu's actions", async () => {
+    const onSetPinned = vi.fn().mockResolvedValue(undefined);
+    const onMarkUnread = vi.fn().mockResolvedValue(undefined);
+    const onSetHidden = vi.fn().mockResolvedValue(undefined);
+    const onEditAgentProfile = vi.fn();
+    const onDelete = vi.fn().mockResolvedValue(undefined);
+    const onMoveToSection = vi.fn().mockResolvedValue(undefined);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <Sidebar
+        {...dmProps}
+        directMessageActions={{
+          onDelete,
+          onEditAgentProfile,
+          onMarkUnread,
+          onMoveToSection,
+          onSetHidden,
+          onSetPinned,
+        }}
+        directMessages={[
+          {
+            ...directMessage("dm-1", "Atlas"),
+            dmParticipants: [
+              { type: "user", id: "user-1", name: "Jay", image: null },
+              { type: "agent", id: "agent-1", name: "Atlas", image: null },
+            ],
+          },
+        ]}
+      />,
+    );
+
+    const row = container.querySelector<HTMLElement>(".sidebar-dm-row")!;
+    await openContextMenu(row);
+    const menu = document.body.querySelector<HTMLElement>(
+      ".sidebar-channel-context-menu",
+    )!;
+    expect(menu.textContent).toContain("고정");
+    expect(menu.textContent).toContain("이동");
+    expect(menu.textContent).toContain("읽지 않음으로 표시");
+    expect(menu.textContent).toContain("프로필 편집");
+    expect(menu.textContent).toContain("대화 ID 복사");
+    expect(menu.textContent).toContain("사이드바에서 숨기기");
+    expect(menu.textContent).toContain("삭제");
+
+    await act(async () => menuItem("고정")?.click());
+    expect(onSetPinned).toHaveBeenCalledWith("dm-1", true);
+
+    await openContextMenu(row);
+    await act(async () => menuItem("읽지 않음으로 표시")?.click());
+    expect(onMarkUnread).toHaveBeenCalledWith("dm-1");
+
+    await openContextMenu(row);
+    await act(async () => menuItem("프로필 편집")?.click());
+    expect(onEditAgentProfile).toHaveBeenCalledWith("agent-1");
+
+    await openContextMenu(row);
+    await act(async () => menuItem("사이드바에서 숨기기")?.click());
+    expect(onSetHidden).toHaveBeenCalledWith("dm-1", true);
+
+    await openContextMenu(row);
+    await act(async () => menuItem("삭제")?.click());
+    const dialog = document.body.querySelector<HTMLElement>(
+      ".channel-delete-dialog",
+    )!;
+    expect(dialog.textContent).toContain("‘Atlas’ 대화를 삭제할까요?");
+    const confirm = [...dialog.querySelectorAll<HTMLButtonElement>("button")]
+      .find((button) => button.textContent === "삭제");
+    await act(async () => confirm?.click());
+    expect(onDelete).toHaveBeenCalledWith("dm-1");
+
+    await cleanup();
+  });
+
+  it("moves a conversation from the Move to submenu", async () => {
+    const onMoveToSection = vi.fn().mockResolvedValue(undefined);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <Sidebar
+        {...dmProps}
+        directMessageActions={{ onMoveToSection }}
+        directMessageSections={[section("section-1", "팀", 0)]}
+        directMessages={[directMessage("dm-1", "Sam")]}
+      />,
+    );
+
+    await openContextMenu(container.querySelector<HTMLElement>(".sidebar-dm-row")!);
+    await act(async () => menuItem("이동")?.click());
+    await act(async () => menuItem("팀")?.click());
+    expect(onMoveToSection).toHaveBeenCalledWith("dm-1", "section-1");
+
+    await cleanup();
+  });
+
+  it("renames a section from its heading menu", async () => {
+    const onRenameSection = vi.fn().mockResolvedValue(undefined);
+    const onDeleteSection = vi.fn().mockResolvedValue(undefined);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <Sidebar
+        {...dmProps}
+        directMessageActions={{ onDeleteSection, onRenameSection }}
+        directMessageSections={[section("section-1", "팀", 0)]}
+        directMessages={[directMessage("dm-1", "Sam")]}
+      />,
+    );
+
+    await openContextMenu(
+      container.querySelector<HTMLElement>(".sidebar-dm-group-heading")!,
+    );
+    expect(menuItem("섹션 삭제")).toBeTruthy();
+    await act(async () => menuItem("섹션 이름 바꾸기…")?.click());
+
+    const dialog = document.body.querySelector<HTMLElement>(
+      ".sidebar-dm-section-dialog",
+    )!;
+    await typeInto(dialog.querySelector<HTMLInputElement>("input")!, "스쿼드");
+    await act(async () => {
+      dialog.querySelector<HTMLFormElement>("form")!.dispatchEvent(
+        new Event("submit", { bubbles: true, cancelable: true }),
+      );
+    });
+    expect(onRenameSection).toHaveBeenCalledWith("section-1", "스쿼드");
 
     await cleanup();
   });

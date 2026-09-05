@@ -54,6 +54,9 @@ const channel: ChannelSummary = {
   lastReadAt: null,
   hasUnread: false,
   dmParticipants: [],
+  pinnedAt: null,
+  sidebarSectionId: null,
+  hiddenAt: null,
 };
 
 const messageOf = (index: number): ChannelMessage =>

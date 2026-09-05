@@ -399,6 +399,9 @@ body { overflow: hidden; font-synthesis: none; }
 .sidebar-channel-context-menu-item svg { color:var(--sidebar-icon-accent); }
 .sidebar-channel-context-menu-item.danger svg { color:currentColor; }
 .sidebar-channel-context-menu-separator { height:1px; margin:4px 4px; background:var(--sidebar-border); }
+.sidebar-channel-context-menu-item[data-state="open"] { color:var(--sidebar-accent-foreground); background:var(--sidebar-accent); }
+.sidebar-channel-context-menu-item > span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.sidebar-channel-context-menu-chevron,.sidebar-channel-context-menu-check { flex:0 0 auto; margin-left:auto; }
 .channel-create-overlay { position:fixed; z-index:90; inset:0; background:rgba(30,31,28,.24); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px); }
 .channel-create-dialog { width:min(420px,calc(100vw - 40px)); position:fixed; z-index:91; top:50%; left:50%; padding:22px; border:1px solid rgba(55,56,51,.1); border-radius:17px; color:var(--foreground); background:color-mix(in srgb,var(--card) 98%,transparent); box-shadow:0 24px 70px rgba(30,31,28,.22); transform:translate(-50%,-50%); animation:channel-create-dialog-in .16s cubic-bezier(.2,.8,.2,1); }
 @keyframes channel-create-dialog-in { from { opacity:0; transform:translate(-50%,calc(-50% + 5px)) scale(.98); } }
@@ -458,6 +461,9 @@ body { overflow: hidden; font-synthesis: none; }
 .sidebar-dm-meta { height:100%; display:flex; flex-direction:column; align-items:flex-end; justify-content:center; gap:7px; align-self:stretch; color:var(--sidebar-foreground-muted); font-size:var(--text-2xs); }
 .sidebar-dm-meta > .sidebar-unread-dot { margin-left:0; }
 .sidebar-dm-empty { margin:22px 12px; display:flex; justify-content:center; color:var(--sidebar-foreground-muted); font-size:var(--text-sm); text-align:center; }
+.sidebar-dm-group:not(:first-of-type):empty { display:none; }
+.sidebar-dm-group-heading { margin:10px 0 2px; padding:0 8px; display:flex; align-items:center; color:var(--sidebar-foreground-muted); font-size:var(--text-2xs); font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
+.sidebar-dm-section-dialog form { display:grid; gap:8px; }
 /* The desktop DM page: the header keeps clear of the window controls while the sidebar is closed, and its list-only back button stays hidden. */
 .dm-conversation-pane .channel-header-back { display:none; }
 .dm-conversation-pane.sidebar-closed .channel-header { padding-left:var(--window-navigation-content-inset); }

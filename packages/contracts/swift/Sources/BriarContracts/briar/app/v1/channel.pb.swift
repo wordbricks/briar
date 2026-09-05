@@ -155,6 +155,10 @@ public nonisolated struct BriarAPI_ListChannelsResponse: Sendable {
 
   public var cursor: UInt64 = 0
 
+  /// The caller's own sidebar sections, so one catalog load has everything the
+  /// conversation list groups by.
+  public var sidebarSections: [BriarAPI_ChannelSidebarSection] = []
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -923,6 +927,290 @@ public nonisolated struct BriarAPI_MarkChannelReadResponse: Sendable {
   public init() {}
 
   fileprivate var _channel: BriarAPI_ChannelSummary? = nil
+}
+
+public nonisolated struct BriarAPI_MarkChannelUnreadRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var organizationID: String = String()
+
+  public var channelID: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_MarkChannelUnreadResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var channel: BriarAPI_ChannelSummary {
+    get {_channel ?? BriarAPI_ChannelSummary()}
+    set {_channel = newValue}
+  }
+  /// Returns true if `channel` has been explicitly set.
+  public var hasChannel: Bool {self._channel != nil}
+  /// Clears the value of `channel`. Subsequent reads from it will return its default value.
+  public mutating func clearChannel() {self._channel = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _channel: BriarAPI_ChannelSummary? = nil
+}
+
+/// One conversation's placement in the caller's own sidebar. Every field is
+/// optional so a menu action sends only what it changed.
+public nonisolated struct BriarAPI_UpdateChannelSidebarPreferenceRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var organizationID: String = String()
+
+  public var channelID: String = String()
+
+  public var pinned: Bool {
+    get {_pinned ?? false}
+    set {_pinned = newValue}
+  }
+  /// Returns true if `pinned` has been explicitly set.
+  public var hasPinned: Bool {self._pinned != nil}
+  /// Clears the value of `pinned`. Subsequent reads from it will return its default value.
+  public mutating func clearPinned() {self._pinned = nil}
+
+  public var hidden: Bool {
+    get {_hidden ?? false}
+    set {_hidden = newValue}
+  }
+  /// Returns true if `hidden` has been explicitly set.
+  public var hasHidden: Bool {self._hidden != nil}
+  /// Clears the value of `hidden`. Subsequent reads from it will return its default value.
+  public mutating func clearHidden() {self._hidden = nil}
+
+  public var sectionUpdate: BriarAPI_UpdateChannelSidebarPreferenceRequest.OneOf_SectionUpdate? = nil
+
+  public var clearSection_p: SwiftProtobuf.Google_Protobuf_Empty {
+    get {
+      if case .clearSection_p(let v)? = sectionUpdate {return v}
+      return SwiftProtobuf.Google_Protobuf_Empty()
+    }
+    set {sectionUpdate = .clearSection_p(newValue)}
+  }
+
+  public var sectionID: String {
+    get {
+      if case .sectionID(let v)? = sectionUpdate {return v}
+      return String()
+    }
+    set {sectionUpdate = .sectionID(newValue)}
+  }
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public nonisolated enum OneOf_SectionUpdate: Equatable, Sendable {
+    case clearSection_p(SwiftProtobuf.Google_Protobuf_Empty)
+    case sectionID(String)
+
+  }
+
+  public init() {}
+
+  fileprivate var _pinned: Bool? = nil
+  fileprivate var _hidden: Bool? = nil
+}
+
+public nonisolated struct BriarAPI_UpdateChannelSidebarPreferenceResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var channel: BriarAPI_ChannelSummary {
+    get {_channel ?? BriarAPI_ChannelSummary()}
+    set {_channel = newValue}
+  }
+  /// Returns true if `channel` has been explicitly set.
+  public var hasChannel: Bool {self._channel != nil}
+  /// Clears the value of `channel`. Subsequent reads from it will return its default value.
+  public mutating func clearChannel() {self._channel = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _channel: BriarAPI_ChannelSummary? = nil
+}
+
+public nonisolated struct BriarAPI_ChannelSidebarSection: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var id: String = String()
+
+  public var organizationID: String = String()
+
+  public var name: String = String()
+
+  public var position: UInt32 = 0
+
+  public var createdAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_createdAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_createdAt = newValue}
+  }
+  /// Returns true if `createdAt` has been explicitly set.
+  public var hasCreatedAt: Bool {self._createdAt != nil}
+  /// Clears the value of `createdAt`. Subsequent reads from it will return its default value.
+  public mutating func clearCreatedAt() {self._createdAt = nil}
+
+  public var updatedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_updatedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_updatedAt = newValue}
+  }
+  /// Returns true if `updatedAt` has been explicitly set.
+  public var hasUpdatedAt: Bool {self._updatedAt != nil}
+  /// Clears the value of `updatedAt`. Subsequent reads from it will return its default value.
+  public mutating func clearUpdatedAt() {self._updatedAt = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _createdAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+  fileprivate var _updatedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+}
+
+public nonisolated struct BriarAPI_ListChannelSidebarSectionsRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var organizationID: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_ListChannelSidebarSectionsResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var sections: [BriarAPI_ChannelSidebarSection] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_CreateChannelSidebarSectionRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var organizationID: String = String()
+
+  public var name: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+/// Section responses carry the whole list as well as the row that moved: the
+/// sidebar renders sections in position order, so it never has to merge by hand.
+public nonisolated struct BriarAPI_CreateChannelSidebarSectionResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var section: BriarAPI_ChannelSidebarSection {
+    get {_section ?? BriarAPI_ChannelSidebarSection()}
+    set {_section = newValue}
+  }
+  /// Returns true if `section` has been explicitly set.
+  public var hasSection: Bool {self._section != nil}
+  /// Clears the value of `section`. Subsequent reads from it will return its default value.
+  public mutating func clearSection() {self._section = nil}
+
+  public var sections: [BriarAPI_ChannelSidebarSection] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _section: BriarAPI_ChannelSidebarSection? = nil
+}
+
+public nonisolated struct BriarAPI_RenameChannelSidebarSectionRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var organizationID: String = String()
+
+  public var sectionID: String = String()
+
+  public var name: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_RenameChannelSidebarSectionResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var section: BriarAPI_ChannelSidebarSection {
+    get {_section ?? BriarAPI_ChannelSidebarSection()}
+    set {_section = newValue}
+  }
+  /// Returns true if `section` has been explicitly set.
+  public var hasSection: Bool {self._section != nil}
+  /// Clears the value of `section`. Subsequent reads from it will return its default value.
+  public mutating func clearSection() {self._section = nil}
+
+  public var sections: [BriarAPI_ChannelSidebarSection] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _section: BriarAPI_ChannelSidebarSection? = nil
+}
+
+public nonisolated struct BriarAPI_DeleteChannelSidebarSectionRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var organizationID: String = String()
+
+  public var sectionID: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_DeleteChannelSidebarSectionResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var sections: [BriarAPI_ChannelSidebarSection] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
 }
 
 public nonisolated struct BriarAPI_ListChannelMessagesRequest: Sendable {
@@ -1719,6 +2007,34 @@ public nonisolated struct BriarAPI_ChannelSummary: @unchecked Sendable {
   public var hasCreatedByUserID: Bool {_storage._createdByUserID != nil}
   /// Clears the value of `createdByUserID`. Subsequent reads from it will return its default value.
   public mutating func clearCreatedByUserID() {_uniqueStorage()._createdByUserID = nil}
+
+  /// The requesting user's own sidebar placement for this conversation.
+  public var pinnedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_storage._pinnedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_uniqueStorage()._pinnedAt = newValue}
+  }
+  /// Returns true if `pinnedAt` has been explicitly set.
+  public var hasPinnedAt: Bool {_storage._pinnedAt != nil}
+  /// Clears the value of `pinnedAt`. Subsequent reads from it will return its default value.
+  public mutating func clearPinnedAt() {_uniqueStorage()._pinnedAt = nil}
+
+  public var sidebarSectionID: String {
+    get {_storage._sidebarSectionID ?? String()}
+    set {_uniqueStorage()._sidebarSectionID = newValue}
+  }
+  /// Returns true if `sidebarSectionID` has been explicitly set.
+  public var hasSidebarSectionID: Bool {_storage._sidebarSectionID != nil}
+  /// Clears the value of `sidebarSectionID`. Subsequent reads from it will return its default value.
+  public mutating func clearSidebarSectionID() {_uniqueStorage()._sidebarSectionID = nil}
+
+  public var hiddenAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_storage._hiddenAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_uniqueStorage()._hiddenAt = newValue}
+  }
+  /// Returns true if `hiddenAt` has been explicitly set.
+  public var hasHiddenAt: Bool {_storage._hiddenAt != nil}
+  /// Clears the value of `hiddenAt`. Subsequent reads from it will return its default value.
+  public mutating func clearHiddenAt() {_uniqueStorage()._hiddenAt = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -2643,7 +2959,7 @@ nonisolated extension BriarAPI_ListChannelsRequest: SwiftProtobuf.Message, Swift
 
 nonisolated extension BriarAPI_ListChannelsResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ListChannelsResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}channels\0\u{1}cursor\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}channels\0\u{1}cursor\0\u{3}sidebar_sections\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2653,6 +2969,7 @@ nonisolated extension BriarAPI_ListChannelsResponse: SwiftProtobuf.Message, Swif
       switch fieldNumber {
       case 1: try { try decoder.decodeRepeatedMessageField(value: &self.channels) }()
       case 2: try { try decoder.decodeSingularUInt64Field(value: &self.cursor) }()
+      case 3: try { try decoder.decodeRepeatedMessageField(value: &self.sidebarSections) }()
       default: break
       }
     }
@@ -2665,12 +2982,16 @@ nonisolated extension BriarAPI_ListChannelsResponse: SwiftProtobuf.Message, Swif
     if self.cursor != 0 {
       try visitor.visitSingularUInt64Field(value: self.cursor, fieldNumber: 2)
     }
+    if !self.sidebarSections.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.sidebarSections, fieldNumber: 3)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: BriarAPI_ListChannelsResponse, rhs: BriarAPI_ListChannelsResponse) -> Bool {
     if lhs.channels != rhs.channels {return false}
     if lhs.cursor != rhs.cursor {return false}
+    if lhs.sidebarSections != rhs.sidebarSections {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -4122,6 +4443,528 @@ nonisolated extension BriarAPI_MarkChannelReadResponse: SwiftProtobuf.Message, S
   }
 }
 
+nonisolated extension BriarAPI_MarkChannelUnreadRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".MarkChannelUnreadRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.organizationID.isEmpty {
+      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    }
+    if !self.channelID.isEmpty {
+      try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_MarkChannelUnreadRequest, rhs: BriarAPI_MarkChannelUnreadRequest) -> Bool {
+    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.channelID != rhs.channelID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_MarkChannelUnreadResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".MarkChannelUnreadResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}channel\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._channel) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._channel {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_MarkChannelUnreadResponse, rhs: BriarAPI_MarkChannelUnreadResponse) -> Bool {
+    if lhs._channel != rhs._channel {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_UpdateChannelSidebarPreferenceRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".UpdateChannelSidebarPreferenceRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0\u{1}pinned\0\u{1}hidden\0\u{3}clear_section\0\u{3}section_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
+      case 3: try { try decoder.decodeSingularBoolField(value: &self._pinned) }()
+      case 4: try { try decoder.decodeSingularBoolField(value: &self._hidden) }()
+      case 5: try {
+        var v: SwiftProtobuf.Google_Protobuf_Empty?
+        var hadOneofValue = false
+        if let current = self.sectionUpdate {
+          hadOneofValue = true
+          if case .clearSection_p(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.sectionUpdate = .clearSection_p(v)
+        }
+      }()
+      case 6: try {
+        var v: String?
+        try decoder.decodeSingularStringField(value: &v)
+        if let v = v {
+          if self.sectionUpdate != nil {try decoder.handleConflictingOneOf()}
+          self.sectionUpdate = .sectionID(v)
+        }
+      }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.organizationID.isEmpty {
+      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    }
+    if !self.channelID.isEmpty {
+      try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 2)
+    }
+    try { if let v = self._pinned {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 3)
+    } }()
+    try { if let v = self._hidden {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 4)
+    } }()
+    switch self.sectionUpdate {
+    case .clearSection_p?: try {
+      guard case .clearSection_p(let v)? = self.sectionUpdate else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+    }()
+    case .sectionID?: try {
+      guard case .sectionID(let v)? = self.sectionUpdate else { preconditionFailure() }
+      try visitor.visitSingularStringField(value: v, fieldNumber: 6)
+    }()
+    case nil: break
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_UpdateChannelSidebarPreferenceRequest, rhs: BriarAPI_UpdateChannelSidebarPreferenceRequest) -> Bool {
+    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.channelID != rhs.channelID {return false}
+    if lhs._pinned != rhs._pinned {return false}
+    if lhs._hidden != rhs._hidden {return false}
+    if lhs.sectionUpdate != rhs.sectionUpdate {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_UpdateChannelSidebarPreferenceResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".UpdateChannelSidebarPreferenceResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}channel\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._channel) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._channel {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_UpdateChannelSidebarPreferenceResponse, rhs: BriarAPI_UpdateChannelSidebarPreferenceResponse) -> Bool {
+    if lhs._channel != rhs._channel {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_ChannelSidebarSection: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ChannelSidebarSection"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}organization_id\0\u{1}name\0\u{1}position\0\u{3}created_at\0\u{3}updated_at\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.id) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.name) }()
+      case 4: try { try decoder.decodeSingularUInt32Field(value: &self.position) }()
+      case 5: try { try decoder.decodeSingularMessageField(value: &self._createdAt) }()
+      case 6: try { try decoder.decodeSingularMessageField(value: &self._updatedAt) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.id.isEmpty {
+      try visitor.visitSingularStringField(value: self.id, fieldNumber: 1)
+    }
+    if !self.organizationID.isEmpty {
+      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 2)
+    }
+    if !self.name.isEmpty {
+      try visitor.visitSingularStringField(value: self.name, fieldNumber: 3)
+    }
+    if self.position != 0 {
+      try visitor.visitSingularUInt32Field(value: self.position, fieldNumber: 4)
+    }
+    try { if let v = self._createdAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+    } }()
+    try { if let v = self._updatedAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_ChannelSidebarSection, rhs: BriarAPI_ChannelSidebarSection) -> Bool {
+    if lhs.id != rhs.id {return false}
+    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.name != rhs.name {return false}
+    if lhs.position != rhs.position {return false}
+    if lhs._createdAt != rhs._createdAt {return false}
+    if lhs._updatedAt != rhs._updatedAt {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_ListChannelSidebarSectionsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ListChannelSidebarSectionsRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.organizationID.isEmpty {
+      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_ListChannelSidebarSectionsRequest, rhs: BriarAPI_ListChannelSidebarSectionsRequest) -> Bool {
+    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_ListChannelSidebarSectionsResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ListChannelSidebarSectionsResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}sections\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.sections) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.sections.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.sections, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_ListChannelSidebarSectionsResponse, rhs: BriarAPI_ListChannelSidebarSectionsResponse) -> Bool {
+    if lhs.sections != rhs.sections {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_CreateChannelSidebarSectionRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".CreateChannelSidebarSectionRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{1}name\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.name) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.organizationID.isEmpty {
+      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    }
+    if !self.name.isEmpty {
+      try visitor.visitSingularStringField(value: self.name, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_CreateChannelSidebarSectionRequest, rhs: BriarAPI_CreateChannelSidebarSectionRequest) -> Bool {
+    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.name != rhs.name {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_CreateChannelSidebarSectionResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".CreateChannelSidebarSectionResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}section\0\u{1}sections\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._section) }()
+      case 2: try { try decoder.decodeRepeatedMessageField(value: &self.sections) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._section {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    if !self.sections.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.sections, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_CreateChannelSidebarSectionResponse, rhs: BriarAPI_CreateChannelSidebarSectionResponse) -> Bool {
+    if lhs._section != rhs._section {return false}
+    if lhs.sections != rhs.sections {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_RenameChannelSidebarSectionRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RenameChannelSidebarSectionRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}section_id\0\u{1}name\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.sectionID) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.name) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.organizationID.isEmpty {
+      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    }
+    if !self.sectionID.isEmpty {
+      try visitor.visitSingularStringField(value: self.sectionID, fieldNumber: 2)
+    }
+    if !self.name.isEmpty {
+      try visitor.visitSingularStringField(value: self.name, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_RenameChannelSidebarSectionRequest, rhs: BriarAPI_RenameChannelSidebarSectionRequest) -> Bool {
+    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.sectionID != rhs.sectionID {return false}
+    if lhs.name != rhs.name {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_RenameChannelSidebarSectionResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RenameChannelSidebarSectionResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}section\0\u{1}sections\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._section) }()
+      case 2: try { try decoder.decodeRepeatedMessageField(value: &self.sections) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._section {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    if !self.sections.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.sections, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_RenameChannelSidebarSectionResponse, rhs: BriarAPI_RenameChannelSidebarSectionResponse) -> Bool {
+    if lhs._section != rhs._section {return false}
+    if lhs.sections != rhs.sections {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_DeleteChannelSidebarSectionRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".DeleteChannelSidebarSectionRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}section_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.sectionID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.organizationID.isEmpty {
+      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    }
+    if !self.sectionID.isEmpty {
+      try visitor.visitSingularStringField(value: self.sectionID, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_DeleteChannelSidebarSectionRequest, rhs: BriarAPI_DeleteChannelSidebarSectionRequest) -> Bool {
+    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.sectionID != rhs.sectionID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_DeleteChannelSidebarSectionResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".DeleteChannelSidebarSectionResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}sections\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.sections) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.sections.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.sections, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_DeleteChannelSidebarSectionResponse, rhs: BriarAPI_DeleteChannelSidebarSectionResponse) -> Bool {
+    if lhs.sections != rhs.sections {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
 nonisolated extension BriarAPI_ListChannelMessagesRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ListChannelMessagesRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0\u{3}parent_message_id\0\u{1}cursor\0\u{1}limit\0")
@@ -5194,7 +6037,7 @@ nonisolated extension BriarAPI_DirectMessageParticipant.Kind: SwiftProtobuf._Pro
 
 nonisolated extension BriarAPI_ChannelSummary: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ChannelSummary"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}organization_id\0\u{1}slug\0\u{1}name\0\u{1}topic\0\u{1}visibility\0\u{3}default_project_id\0\u{3}archived_at\0\u{3}member_count\0\u{3}agent_count\0\u{3}created_at\0\u{3}updated_at\0\u{1}kind\0\u{3}last_message_at\0\u{3}last_message_preview\0\u{3}last_read_at\0\u{3}has_unread\0\u{3}direct_message_participants\0\u{3}created_by_user_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}organization_id\0\u{1}slug\0\u{1}name\0\u{1}topic\0\u{1}visibility\0\u{3}default_project_id\0\u{3}archived_at\0\u{3}member_count\0\u{3}agent_count\0\u{3}created_at\0\u{3}updated_at\0\u{1}kind\0\u{3}last_message_at\0\u{3}last_message_preview\0\u{3}last_read_at\0\u{3}has_unread\0\u{3}direct_message_participants\0\u{3}created_by_user_id\0\u{3}pinned_at\0\u{3}sidebar_section_id\0\u{3}hidden_at\0")
 
   fileprivate class _StorageClass {
     var _id: String = String()
@@ -5216,6 +6059,9 @@ nonisolated extension BriarAPI_ChannelSummary: SwiftProtobuf.Message, SwiftProto
     var _hasUnread_p: Bool = false
     var _directMessageParticipants: [BriarAPI_DirectMessageParticipant] = []
     var _createdByUserID: String? = nil
+    var _pinnedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _sidebarSectionID: String? = nil
+    var _hiddenAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -5245,6 +6091,9 @@ nonisolated extension BriarAPI_ChannelSummary: SwiftProtobuf.Message, SwiftProto
       _hasUnread_p = source._hasUnread_p
       _directMessageParticipants = source._directMessageParticipants
       _createdByUserID = source._createdByUserID
+      _pinnedAt = source._pinnedAt
+      _sidebarSectionID = source._sidebarSectionID
+      _hiddenAt = source._hiddenAt
     }
   }
 
@@ -5282,6 +6131,9 @@ nonisolated extension BriarAPI_ChannelSummary: SwiftProtobuf.Message, SwiftProto
         case 17: try { try decoder.decodeSingularBoolField(value: &_storage._hasUnread_p) }()
         case 18: try { try decoder.decodeRepeatedMessageField(value: &_storage._directMessageParticipants) }()
         case 19: try { try decoder.decodeSingularStringField(value: &_storage._createdByUserID) }()
+        case 20: try { try decoder.decodeSingularMessageField(value: &_storage._pinnedAt) }()
+        case 21: try { try decoder.decodeSingularStringField(value: &_storage._sidebarSectionID) }()
+        case 22: try { try decoder.decodeSingularMessageField(value: &_storage._hiddenAt) }()
         default: break
         }
       }
@@ -5351,6 +6203,15 @@ nonisolated extension BriarAPI_ChannelSummary: SwiftProtobuf.Message, SwiftProto
       try { if let v = _storage._createdByUserID {
         try visitor.visitSingularStringField(value: v, fieldNumber: 19)
       } }()
+      try { if let v = _storage._pinnedAt {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 20)
+      } }()
+      try { if let v = _storage._sidebarSectionID {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 21)
+      } }()
+      try { if let v = _storage._hiddenAt {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 22)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -5379,6 +6240,9 @@ nonisolated extension BriarAPI_ChannelSummary: SwiftProtobuf.Message, SwiftProto
         if _storage._hasUnread_p != rhs_storage._hasUnread_p {return false}
         if _storage._directMessageParticipants != rhs_storage._directMessageParticipants {return false}
         if _storage._createdByUserID != rhs_storage._createdByUserID {return false}
+        if _storage._pinnedAt != rhs_storage._pinnedAt {return false}
+        if _storage._sidebarSectionID != rhs_storage._sidebarSectionID {return false}
+        if _storage._hiddenAt != rhs_storage._hiddenAt {return false}
         return true
       }
       if !storagesAreEqual {return false}

@@ -17,6 +17,7 @@ import { publishChannelDelta } from "./delta";
 import {
   channelCatalogCursorAtom,
   channelCatalogRetryAtom,
+  channelSidebarSectionsAtom,
   channelsLoadingAtom,
   resetChannelSelection,
 } from "./atoms";
@@ -110,6 +111,9 @@ export function useChannelCatalogSync(): void {
         cursorRef.current = result.cursor;
         Atom.batch(() => {
           registry.set(channelCatalogCursorAtom, result.cursor);
+          // The DM list groups by the member's own sections, and the catalog
+          // carries them, so the grouping is ready with the first render.
+          registry.set(channelSidebarSectionsAtom, result.sidebarSections);
           applySyncEvent(registry, {
             kind: "channel-catalog-snapshot",
             organizationId,

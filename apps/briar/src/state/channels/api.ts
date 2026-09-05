@@ -2,10 +2,15 @@ import * as Atom from "effect/unstable/reactivity/Atom";
 
 import {
   createChannel,
+  createChannelSidebarSection,
   deleteChannel,
+  deleteChannelSidebarSection,
   listChannels,
   loadChannelDelta,
   markChannelRead,
+  markChannelUnread,
+  renameChannelSidebarSection,
+  updateChannelSidebarPreference,
 } from "../../lib/api";
 import { createChannelRealtimeTransport } from "../../lib/channel-realtime";
 import type { AtomRegistry } from "../registry";
@@ -22,19 +27,30 @@ import type { AtomRegistry } from "../registry";
 export interface ChannelApi {
   readonly createChannel: typeof createChannel;
   readonly createChannelRealtimeTransport: typeof createChannelRealtimeTransport;
+  readonly createChannelSidebarSection: typeof createChannelSidebarSection;
   readonly deleteChannel: typeof deleteChannel;
+  readonly deleteChannelSidebarSection: typeof deleteChannelSidebarSection;
   readonly listChannels: typeof listChannels;
   readonly loadChannelDelta: typeof loadChannelDelta;
   readonly markChannelRead: typeof markChannelRead;
+  readonly markChannelUnread: typeof markChannelUnread;
+  readonly renameChannelSidebarSection: typeof renameChannelSidebarSection;
+  readonly updateChannelSidebarPreference:
+    typeof updateChannelSidebarPreference;
 }
 
 export const liveChannelApi: ChannelApi = {
   createChannel,
   createChannelRealtimeTransport,
+  createChannelSidebarSection,
   deleteChannel,
+  deleteChannelSidebarSection,
   listChannels,
   loadChannelDelta,
   markChannelRead,
+  markChannelUnread,
+  renameChannelSidebarSection,
+  updateChannelSidebarPreference,
 };
 
 /** Overrides layered over {@link liveChannelApi}, so a caller replaces only what it needs. */

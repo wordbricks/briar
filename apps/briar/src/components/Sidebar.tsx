@@ -30,6 +30,7 @@ import {
 import { isTeamScheduleTabEnabled } from "../lib/team-tabs";
 import type { RepositoryReadiness } from "../generated/tauri";
 import type {
+  ChannelSidebarSection,
   ChannelSummary,
   ChannelVisibility,
 } from "../lib/channels-contract";
@@ -45,7 +46,10 @@ import {
   sidebarWidthMax,
   sidebarWidthMin,
 } from "../lib/sidebar-width";
-import { SidebarDirectMessages } from "./SidebarDirectMessages";
+import {
+  SidebarDirectMessages,
+  type SidebarDirectMessageActions,
+} from "./SidebarDirectMessages";
 import { TeamAgentAvatar } from "./TeamAgentAvatar";
 import { TeamIcon, teamIconComponent } from "./TeamIcon";
 import {
@@ -72,6 +76,7 @@ type SidebarPage =
   | "settings";
 
 const EMPTY_CHANNELS: ChannelSummary[] = [];
+const EMPTY_SIDEBAR_SECTIONS: ChannelSidebarSection[] = [];
 
 export function Sidebar({
   activePage,
@@ -100,6 +105,8 @@ export function Sidebar({
   onWorkOpen = () => {},
   onDirectMessageOpen = () => {},
   onDirectMessageCompose = () => {},
+  directMessageActions,
+  directMessageSections = EMPTY_SIDEBAR_SECTIONS,
   onChannelCreate,
   onChannelDelete,
   onChannelOpen,
@@ -158,6 +165,10 @@ export function Sidebar({
   onWorkOpen?: () => void;
   onDirectMessageOpen?: (channelId: string) => void;
   onDirectMessageCompose?: () => void;
+  /** Everything the DM row and section context menus can do. */
+  directMessageActions?: SidebarDirectMessageActions;
+  /** The member's own sidebar sections, in position order. */
+  directMessageSections?: readonly ChannelSidebarSection[];
   onChannelCreate?: (
     name: string,
     visibility: ChannelVisibility,
@@ -608,6 +619,8 @@ export function Sidebar({
           loading={channelsLoading}
           onCompose={onDirectMessageCompose}
           onOpen={onDirectMessageOpen}
+          sections={directMessageSections}
+          {...directMessageActions}
         />
       ) : (
       <>

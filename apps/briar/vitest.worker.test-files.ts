@@ -23,6 +23,7 @@ export const workerD1TestFiles = [
   "worker/src/channel-agent-delegation.test.ts",
   "worker/src/channel-message-pdf.test.ts",
   "worker/src/channel-proposal-routes.test.ts",
+  "worker/src/channel-sidebar-preferences.test.ts",
   "worker/src/channels.test.ts",
   "worker/src/db.test.ts",
   "worker/src/dm-memory-learning-storage.test.ts",

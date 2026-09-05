@@ -65174,6 +65174,17 @@ pub struct ListChannelsResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub cursor: u64,
+    /// The caller's own sidebar sections, so one catalog load has everything the
+    /// conversation list groups by.
+    ///
+    /// Field 3: `sidebar_sections`
+    #[serde(
+        rename = "sidebarSections",
+        alias = "sidebar_sections",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub sidebar_sections: ::buffa::alloc::vec::Vec<ChannelSidebarSection>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -65183,6 +65194,7 @@ impl ::core::fmt::Debug for ListChannelsResponse {
         f.debug_struct("ListChannelsResponse")
             .field("channels", &self.channels)
             .field("cursor", &self.cursor)
+            .field("sidebar_sections", &self.sidebar_sections)
             .finish()
     }
 }
@@ -65224,6 +65236,14 @@ impl ::buffa::Message for ListChannelsResponse {
         if self.cursor != 0u64 {
             size += 1u64 + ::buffa::types::uint64_encoded_len(self.cursor) as u64;
         }
+        for v in &self.sidebar_sections {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -65244,6 +65264,14 @@ impl ::buffa::Message for ListChannelsResponse {
         }
         if self.cursor != 0u64 {
             ::buffa::types::put_uint64_field(2u32, self.cursor, buf);
+        }
+        for v in &self.sidebar_sections {
+            ::buffa::types::put_len_delimited_header(
+                3u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -65277,6 +65305,18 @@ impl ::buffa::Message for ListChannelsResponse {
                 )?;
                 self.cursor = ::buffa::types::decode_uint64(buf)?;
             }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.sidebar_sections.push(elem);
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -65287,6 +65327,7 @@ impl ::buffa::Message for ListChannelsResponse {
     fn clear(&mut self) {
         self.channels.clear();
         self.cursor = 0u64;
+        self.sidebar_sections.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -72163,6 +72204,2434 @@ pub const __MARK_CHANNEL_READ_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAny
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
+pub struct MarkChannelUnreadRequest {
+    /// Field 1: `organization_id`
+    #[serde(
+        rename = "organizationId",
+        alias = "organization_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub organization_id: ::buffa::alloc::string::String,
+    /// Field 2: `channel_id`
+    #[serde(
+        rename = "channelId",
+        alias = "channel_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub channel_id: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for MarkChannelUnreadRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("MarkChannelUnreadRequest")
+            .field("organization_id", &self.organization_id)
+            .field("channel_id", &self.channel_id)
+            .finish()
+    }
+}
+impl MarkChannelUnreadRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.MarkChannelUnreadRequest";
+}
+::buffa::impl_default_instance!(MarkChannelUnreadRequest);
+impl ::buffa::MessageName for MarkChannelUnreadRequest {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "MarkChannelUnreadRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.MarkChannelUnreadRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.MarkChannelUnreadRequest";
+}
+impl ::buffa::Message for MarkChannelUnreadRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.organization_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        }
+        if !self.channel_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.channel_id) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.organization_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        }
+        if !self.channel_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.channel_id, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.organization_id.clear();
+        self.channel_id.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for MarkChannelUnreadRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.MarkChannelUnreadRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for MarkChannelUnreadRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __MARK_CHANNEL_UNREAD_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.MarkChannelUnreadRequest",
+    to_json: ::buffa::type_registry::any_to_json::<MarkChannelUnreadRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<MarkChannelUnreadRequest>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct MarkChannelUnreadResponse {
+    /// Field 1: `channel`
+    #[serde(
+        rename = "channel",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub channel: ::buffa::MessageField<ChannelSummary, ::buffa::Inline<ChannelSummary>>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for MarkChannelUnreadResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("MarkChannelUnreadResponse")
+            .field("channel", &self.channel)
+            .finish()
+    }
+}
+impl MarkChannelUnreadResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.MarkChannelUnreadResponse";
+}
+::buffa::impl_default_instance!(MarkChannelUnreadResponse);
+impl ::buffa::MessageName for MarkChannelUnreadResponse {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "MarkChannelUnreadResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.MarkChannelUnreadResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.MarkChannelUnreadResponse";
+}
+impl ::buffa::Message for MarkChannelUnreadResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.channel.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.channel.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.channel.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.channel.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.channel.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.channel = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for MarkChannelUnreadResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.MarkChannelUnreadResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for MarkChannelUnreadResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __MARK_CHANNEL_UNREAD_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.MarkChannelUnreadResponse",
+    to_json: ::buffa::type_registry::any_to_json::<MarkChannelUnreadResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<MarkChannelUnreadResponse>,
+    is_wkt: false,
+};
+/// One conversation's placement in the caller's own sidebar. Every field is
+/// optional so a menu action sends only what it changed.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize)]
+#[serde(default)]
+pub struct UpdateChannelSidebarPreferenceRequest {
+    /// Field 1: `organization_id`
+    #[serde(
+        rename = "organizationId",
+        alias = "organization_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub organization_id: ::buffa::alloc::string::String,
+    /// Field 2: `channel_id`
+    #[serde(
+        rename = "channelId",
+        alias = "channel_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub channel_id: ::buffa::alloc::string::String,
+    /// Field 3: `pinned`
+    #[serde(rename = "pinned", skip_serializing_if = "::core::option::Option::is_none")]
+    pub pinned: ::core::option::Option<bool>,
+    /// Field 4: `hidden`
+    #[serde(rename = "hidden", skip_serializing_if = "::core::option::Option::is_none")]
+    pub hidden: ::core::option::Option<bool>,
+    #[serde(flatten)]
+    pub section_update: ::core::option::Option<
+        __buffa::oneof::update_channel_sidebar_preference_request::SectionUpdate,
+    >,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for UpdateChannelSidebarPreferenceRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("UpdateChannelSidebarPreferenceRequest")
+            .field("organization_id", &self.organization_id)
+            .field("channel_id", &self.channel_id)
+            .field("pinned", &self.pinned)
+            .field("hidden", &self.hidden)
+            .field("section_update", &self.section_update)
+            .finish()
+    }
+}
+impl UpdateChannelSidebarPreferenceRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateChannelSidebarPreferenceRequest";
+}
+impl UpdateChannelSidebarPreferenceRequest {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::pinned`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_pinned(mut self, value: bool) -> Self {
+        self.pinned = Some(value);
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::hidden`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_hidden(mut self, value: bool) -> Self {
+        self.hidden = Some(value);
+        self
+    }
+}
+::buffa::impl_default_instance!(UpdateChannelSidebarPreferenceRequest);
+impl ::buffa::MessageName for UpdateChannelSidebarPreferenceRequest {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "UpdateChannelSidebarPreferenceRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.UpdateChannelSidebarPreferenceRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateChannelSidebarPreferenceRequest";
+}
+impl ::buffa::Message for UpdateChannelSidebarPreferenceRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.organization_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        }
+        if !self.channel_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.channel_id) as u64;
+        }
+        if self.pinned.is_some() {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        if self.hidden.is_some() {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        if let ::core::option::Option::Some(ref v) = self.section_update {
+            match v {
+                __buffa::oneof::update_channel_sidebar_preference_request::SectionUpdate::ClearSection(
+                    x,
+                ) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                            + inner as u64;
+                }
+                __buffa::oneof::update_channel_sidebar_preference_request::SectionUpdate::SectionId(
+                    x,
+                ) => {
+                    size += 1u64 + ::buffa::types::string_encoded_len(x) as u64;
+                }
+            }
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.organization_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        }
+        if !self.channel_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
+        }
+        if let Some(v) = self.pinned {
+            ::buffa::types::put_bool_field(3u32, v, buf);
+        }
+        if let Some(v) = self.hidden {
+            ::buffa::types::put_bool_field(4u32, v, buf);
+        }
+        if let ::core::option::Option::Some(ref v) = self.section_update {
+            match v {
+                __buffa::oneof::update_channel_sidebar_preference_request::SectionUpdate::ClearSection(
+                    x,
+                ) => {
+                    ::buffa::types::put_len_delimited_header(
+                        5u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::update_channel_sidebar_preference_request::SectionUpdate::SectionId(
+                    x,
+                ) => {
+                    ::buffa::types::put_string_field(6u32, x, buf);
+                }
+            }
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.channel_id, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.pinned = ::core::option::Option::Some(
+                    ::buffa::types::decode_bool(buf)?,
+                );
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.hidden = ::core::option::Option::Some(
+                    ::buffa::types::decode_bool(buf)?,
+                );
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::update_channel_sidebar_preference_request::SectionUpdate::ClearSection(
+                        ref mut existing,
+                    ),
+                ) = self.section_update
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.section_update = ::core::option::Option::Some(
+                        __buffa::oneof::update_channel_sidebar_preference_request::SectionUpdate::ClearSection(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                self.section_update = ::core::option::Option::Some(
+                    __buffa::oneof::update_channel_sidebar_preference_request::SectionUpdate::SectionId(
+                        ::buffa::types::decode_string(buf)?,
+                    ),
+                );
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.organization_id.clear();
+        self.channel_id.clear();
+        self.pinned = ::core::option::Option::None;
+        self.hidden = ::core::option::Option::None;
+        self.section_update = ::core::option::Option::None;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for UpdateChannelSidebarPreferenceRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.UpdateChannelSidebarPreferenceRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl<'de> serde::Deserialize<'de> for UpdateChannelSidebarPreferenceRequest {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl<'de> serde::de::Visitor<'de> for _V {
+            type Value = UpdateChannelSidebarPreferenceRequest;
+            fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                f.write_str("struct UpdateChannelSidebarPreferenceRequest")
+            }
+            #[allow(clippy::field_reassign_with_default)]
+            fn visit_map<A: serde::de::MapAccess<'de>>(
+                self,
+                mut map: A,
+            ) -> ::core::result::Result<
+                UpdateChannelSidebarPreferenceRequest,
+                A::Error,
+            > {
+                let mut __f_organization_id: ::core::option::Option<
+                    ::buffa::alloc::string::String,
+                > = None;
+                let mut __f_channel_id: ::core::option::Option<
+                    ::buffa::alloc::string::String,
+                > = None;
+                let mut __f_pinned: ::core::option::Option<
+                    ::core::option::Option<bool>,
+                > = None;
+                let mut __f_hidden: ::core::option::Option<
+                    ::core::option::Option<bool>,
+                > = None;
+                let mut __oneof_section_update: ::core::option::Option<
+                    __buffa::oneof::update_channel_sidebar_preference_request::SectionUpdate,
+                > = None;
+                while let Some(key) = map.next_key::<::buffa::alloc::string::String>()? {
+                    match key.as_str() {
+                        "organizationId" | "organization_id" => {
+                            __f_organization_id = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::buffa::alloc::string::String;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::buffa::alloc::string::String,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::proto_string::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "channelId" | "channel_id" => {
+                            __f_channel_id = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::buffa::alloc::string::String;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::buffa::alloc::string::String,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::proto_string::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "pinned" => {
+                            __f_pinned = Some(
+                                map.next_value::<::core::option::Option<bool>>()?,
+                            );
+                        }
+                        "hidden" => {
+                            __f_hidden = Some(
+                                map.next_value::<::core::option::Option<bool>>()?,
+                            );
+                        }
+                        "clearSection" | "clear_section" => {
+                            let v: ::core::option::Option<
+                                ::buffa_types::google::protobuf::Empty,
+                            > = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            ::buffa_types::google::protobuf::Empty,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_section_update.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'section_update'",
+                                        ),
+                                    );
+                                }
+                                __oneof_section_update = Some(
+                                    __buffa::oneof::update_channel_sidebar_preference_request::SectionUpdate::ClearSection(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "sectionId" | "section_id" => {
+                            let v: ::core::option::Option<
+                                ::buffa::alloc::string::String,
+                            > = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            ::buffa::alloc::string::String,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_section_update.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'section_update'",
+                                        ),
+                                    );
+                                }
+                                __oneof_section_update = Some(
+                                    __buffa::oneof::update_channel_sidebar_preference_request::SectionUpdate::SectionId(
+                                        v,
+                                    ),
+                                );
+                            }
+                        }
+                        _ => {
+                            map.next_value::<serde::de::IgnoredAny>()?;
+                        }
+                    }
+                }
+                let mut __r = <UpdateChannelSidebarPreferenceRequest as ::core::default::Default>::default();
+                if let ::core::option::Option::Some(v) = __f_organization_id {
+                    __r.organization_id = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_channel_id {
+                    __r.channel_id = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_pinned {
+                    __r.pinned = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_hidden {
+                    __r.hidden = v;
+                }
+                __r.section_update = __oneof_section_update;
+                Ok(__r)
+            }
+        }
+        d.deserialize_map(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for UpdateChannelSidebarPreferenceRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __UPDATE_CHANNEL_SIDEBAR_PREFERENCE_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.UpdateChannelSidebarPreferenceRequest",
+    to_json: ::buffa::type_registry::any_to_json::<
+        UpdateChannelSidebarPreferenceRequest,
+    >,
+    from_json: ::buffa::type_registry::any_from_json::<
+        UpdateChannelSidebarPreferenceRequest,
+    >,
+    is_wkt: false,
+};
+pub mod update_channel_sidebar_preference_request {
+    #[allow(unused_imports)]
+    use super::*;
+    #[doc(inline)]
+    pub use super::__buffa::oneof::update_channel_sidebar_preference_request::SectionUpdate;
+    #[doc(inline)]
+    pub use super::__buffa::view::oneof::update_channel_sidebar_preference_request::SectionUpdate as SectionUpdateView;
+}
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct UpdateChannelSidebarPreferenceResponse {
+    /// Field 1: `channel`
+    #[serde(
+        rename = "channel",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub channel: ::buffa::MessageField<ChannelSummary, ::buffa::Inline<ChannelSummary>>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for UpdateChannelSidebarPreferenceResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("UpdateChannelSidebarPreferenceResponse")
+            .field("channel", &self.channel)
+            .finish()
+    }
+}
+impl UpdateChannelSidebarPreferenceResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateChannelSidebarPreferenceResponse";
+}
+::buffa::impl_default_instance!(UpdateChannelSidebarPreferenceResponse);
+impl ::buffa::MessageName for UpdateChannelSidebarPreferenceResponse {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "UpdateChannelSidebarPreferenceResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.UpdateChannelSidebarPreferenceResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateChannelSidebarPreferenceResponse";
+}
+impl ::buffa::Message for UpdateChannelSidebarPreferenceResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.channel.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.channel.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.channel.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.channel.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.channel.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.channel = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for UpdateChannelSidebarPreferenceResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.UpdateChannelSidebarPreferenceResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for UpdateChannelSidebarPreferenceResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __UPDATE_CHANNEL_SIDEBAR_PREFERENCE_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.UpdateChannelSidebarPreferenceResponse",
+    to_json: ::buffa::type_registry::any_to_json::<
+        UpdateChannelSidebarPreferenceResponse,
+    >,
+    from_json: ::buffa::type_registry::any_from_json::<
+        UpdateChannelSidebarPreferenceResponse,
+    >,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ChannelSidebarSection {
+    /// Field 1: `id`
+    #[serde(
+        rename = "id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub id: ::buffa::alloc::string::String,
+    /// Field 2: `organization_id`
+    #[serde(
+        rename = "organizationId",
+        alias = "organization_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub organization_id: ::buffa::alloc::string::String,
+    /// Field 3: `name`
+    #[serde(
+        rename = "name",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub name: ::buffa::alloc::string::String,
+    /// Field 4: `position`
+    #[serde(
+        rename = "position",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub position: u32,
+    /// Field 5: `created_at`
+    #[serde(
+        rename = "createdAt",
+        alias = "created_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub created_at: ::buffa::MessageField<
+        ::buffa_types::google::protobuf::Timestamp,
+        ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+    >,
+    /// Field 6: `updated_at`
+    #[serde(
+        rename = "updatedAt",
+        alias = "updated_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub updated_at: ::buffa::MessageField<
+        ::buffa_types::google::protobuf::Timestamp,
+        ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+    >,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ChannelSidebarSection {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ChannelSidebarSection")
+            .field("id", &self.id)
+            .field("organization_id", &self.organization_id)
+            .field("name", &self.name)
+            .field("position", &self.position)
+            .field("created_at", &self.created_at)
+            .field("updated_at", &self.updated_at)
+            .finish()
+    }
+}
+impl ChannelSidebarSection {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ChannelSidebarSection";
+}
+::buffa::impl_default_instance!(ChannelSidebarSection);
+impl ::buffa::MessageName for ChannelSidebarSection {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "ChannelSidebarSection";
+    const FULL_NAME: &'static str = "briar.app.v1.ChannelSidebarSection";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ChannelSidebarSection";
+}
+impl ::buffa::Message for ChannelSidebarSection {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.id) as u64;
+        }
+        if !self.organization_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        }
+        if !self.name.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
+        }
+        if self.position != 0u32 {
+            size += 1u64 + ::buffa::types::uint32_encoded_len(self.position) as u64;
+        }
+        if self.created_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.created_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if self.updated_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.updated_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.id, buf);
+        }
+        if !self.organization_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.organization_id, buf);
+        }
+        if !self.name.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.name, buf);
+        }
+        if self.position != 0u32 {
+            ::buffa::types::put_uint32_field(4u32, self.position, buf);
+        }
+        if self.created_at.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                5u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.created_at.write_to(__cache, buf);
+        }
+        if self.updated_at.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                6u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.updated_at.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.name, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.position = ::buffa::types::decode_uint32(buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.created_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.updated_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.id.clear();
+        self.organization_id.clear();
+        self.name.clear();
+        self.position = 0u32;
+        self.created_at = ::buffa::MessageField::none();
+        self.updated_at = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ChannelSidebarSection {
+    const PROTO_FQN: &'static str = "briar.app.v1.ChannelSidebarSection";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ChannelSidebarSection {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CHANNEL_SIDEBAR_SECTION_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.ChannelSidebarSection",
+    to_json: ::buffa::type_registry::any_to_json::<ChannelSidebarSection>,
+    from_json: ::buffa::type_registry::any_from_json::<ChannelSidebarSection>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ListChannelSidebarSectionsRequest {
+    /// Field 1: `organization_id`
+    #[serde(
+        rename = "organizationId",
+        alias = "organization_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub organization_id: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ListChannelSidebarSectionsRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ListChannelSidebarSectionsRequest")
+            .field("organization_id", &self.organization_id)
+            .finish()
+    }
+}
+impl ListChannelSidebarSectionsRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListChannelSidebarSectionsRequest";
+}
+::buffa::impl_default_instance!(ListChannelSidebarSectionsRequest);
+impl ::buffa::MessageName for ListChannelSidebarSectionsRequest {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "ListChannelSidebarSectionsRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.ListChannelSidebarSectionsRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListChannelSidebarSectionsRequest";
+}
+impl ::buffa::Message for ListChannelSidebarSectionsRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.organization_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.organization_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.organization_id.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ListChannelSidebarSectionsRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.ListChannelSidebarSectionsRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ListChannelSidebarSectionsRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __LIST_CHANNEL_SIDEBAR_SECTIONS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.ListChannelSidebarSectionsRequest",
+    to_json: ::buffa::type_registry::any_to_json::<ListChannelSidebarSectionsRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        ListChannelSidebarSectionsRequest,
+    >,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ListChannelSidebarSectionsResponse {
+    /// Field 1: `sections`
+    #[serde(
+        rename = "sections",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub sections: ::buffa::alloc::vec::Vec<ChannelSidebarSection>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ListChannelSidebarSectionsResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ListChannelSidebarSectionsResponse")
+            .field("sections", &self.sections)
+            .finish()
+    }
+}
+impl ListChannelSidebarSectionsResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListChannelSidebarSectionsResponse";
+}
+::buffa::impl_default_instance!(ListChannelSidebarSectionsResponse);
+impl ::buffa::MessageName for ListChannelSidebarSectionsResponse {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "ListChannelSidebarSectionsResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.ListChannelSidebarSectionsResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListChannelSidebarSectionsResponse";
+}
+impl ::buffa::Message for ListChannelSidebarSectionsResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        for v in &self.sections {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        for v in &self.sections {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.sections.push(elem);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.sections.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ListChannelSidebarSectionsResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.ListChannelSidebarSectionsResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ListChannelSidebarSectionsResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __LIST_CHANNEL_SIDEBAR_SECTIONS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.ListChannelSidebarSectionsResponse",
+    to_json: ::buffa::type_registry::any_to_json::<ListChannelSidebarSectionsResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        ListChannelSidebarSectionsResponse,
+    >,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct CreateChannelSidebarSectionRequest {
+    /// Field 1: `organization_id`
+    #[serde(
+        rename = "organizationId",
+        alias = "organization_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub organization_id: ::buffa::alloc::string::String,
+    /// Field 2: `name`
+    #[serde(
+        rename = "name",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub name: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for CreateChannelSidebarSectionRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("CreateChannelSidebarSectionRequest")
+            .field("organization_id", &self.organization_id)
+            .field("name", &self.name)
+            .finish()
+    }
+}
+impl CreateChannelSidebarSectionRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateChannelSidebarSectionRequest";
+}
+::buffa::impl_default_instance!(CreateChannelSidebarSectionRequest);
+impl ::buffa::MessageName for CreateChannelSidebarSectionRequest {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "CreateChannelSidebarSectionRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.CreateChannelSidebarSectionRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateChannelSidebarSectionRequest";
+}
+impl ::buffa::Message for CreateChannelSidebarSectionRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.organization_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        }
+        if !self.name.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.organization_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        }
+        if !self.name.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.name, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.name, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.organization_id.clear();
+        self.name.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for CreateChannelSidebarSectionRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.CreateChannelSidebarSectionRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for CreateChannelSidebarSectionRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CREATE_CHANNEL_SIDEBAR_SECTION_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.CreateChannelSidebarSectionRequest",
+    to_json: ::buffa::type_registry::any_to_json::<CreateChannelSidebarSectionRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        CreateChannelSidebarSectionRequest,
+    >,
+    is_wkt: false,
+};
+/// Section responses carry the whole list as well as the row that moved: the
+/// sidebar renders sections in position order, so it never has to merge by hand.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct CreateChannelSidebarSectionResponse {
+    /// Field 1: `section`
+    #[serde(
+        rename = "section",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub section: ::buffa::MessageField<
+        ChannelSidebarSection,
+        ::buffa::Inline<ChannelSidebarSection>,
+    >,
+    /// Field 2: `sections`
+    #[serde(
+        rename = "sections",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub sections: ::buffa::alloc::vec::Vec<ChannelSidebarSection>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for CreateChannelSidebarSectionResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("CreateChannelSidebarSectionResponse")
+            .field("section", &self.section)
+            .field("sections", &self.sections)
+            .finish()
+    }
+}
+impl CreateChannelSidebarSectionResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateChannelSidebarSectionResponse";
+}
+::buffa::impl_default_instance!(CreateChannelSidebarSectionResponse);
+impl ::buffa::MessageName for CreateChannelSidebarSectionResponse {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "CreateChannelSidebarSectionResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.CreateChannelSidebarSectionResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateChannelSidebarSectionResponse";
+}
+impl ::buffa::Message for CreateChannelSidebarSectionResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.section.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.section.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        for v in &self.sections {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.section.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.section.write_to(__cache, buf);
+        }
+        for v in &self.sections {
+            ::buffa::types::put_len_delimited_header(
+                2u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.section.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.sections.push(elem);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.section = ::buffa::MessageField::none();
+        self.sections.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for CreateChannelSidebarSectionResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.CreateChannelSidebarSectionResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for CreateChannelSidebarSectionResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CREATE_CHANNEL_SIDEBAR_SECTION_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.CreateChannelSidebarSectionResponse",
+    to_json: ::buffa::type_registry::any_to_json::<CreateChannelSidebarSectionResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        CreateChannelSidebarSectionResponse,
+    >,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct RenameChannelSidebarSectionRequest {
+    /// Field 1: `organization_id`
+    #[serde(
+        rename = "organizationId",
+        alias = "organization_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub organization_id: ::buffa::alloc::string::String,
+    /// Field 2: `section_id`
+    #[serde(
+        rename = "sectionId",
+        alias = "section_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub section_id: ::buffa::alloc::string::String,
+    /// Field 3: `name`
+    #[serde(
+        rename = "name",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub name: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for RenameChannelSidebarSectionRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("RenameChannelSidebarSectionRequest")
+            .field("organization_id", &self.organization_id)
+            .field("section_id", &self.section_id)
+            .field("name", &self.name)
+            .finish()
+    }
+}
+impl RenameChannelSidebarSectionRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.RenameChannelSidebarSectionRequest";
+}
+::buffa::impl_default_instance!(RenameChannelSidebarSectionRequest);
+impl ::buffa::MessageName for RenameChannelSidebarSectionRequest {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "RenameChannelSidebarSectionRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.RenameChannelSidebarSectionRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.RenameChannelSidebarSectionRequest";
+}
+impl ::buffa::Message for RenameChannelSidebarSectionRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.organization_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        }
+        if !self.section_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.section_id) as u64;
+        }
+        if !self.name.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.organization_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        }
+        if !self.section_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.section_id, buf);
+        }
+        if !self.name.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.name, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.section_id, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.name, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.organization_id.clear();
+        self.section_id.clear();
+        self.name.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for RenameChannelSidebarSectionRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.RenameChannelSidebarSectionRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for RenameChannelSidebarSectionRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __RENAME_CHANNEL_SIDEBAR_SECTION_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.RenameChannelSidebarSectionRequest",
+    to_json: ::buffa::type_registry::any_to_json::<RenameChannelSidebarSectionRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        RenameChannelSidebarSectionRequest,
+    >,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct RenameChannelSidebarSectionResponse {
+    /// Field 1: `section`
+    #[serde(
+        rename = "section",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub section: ::buffa::MessageField<
+        ChannelSidebarSection,
+        ::buffa::Inline<ChannelSidebarSection>,
+    >,
+    /// Field 2: `sections`
+    #[serde(
+        rename = "sections",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub sections: ::buffa::alloc::vec::Vec<ChannelSidebarSection>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for RenameChannelSidebarSectionResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("RenameChannelSidebarSectionResponse")
+            .field("section", &self.section)
+            .field("sections", &self.sections)
+            .finish()
+    }
+}
+impl RenameChannelSidebarSectionResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.RenameChannelSidebarSectionResponse";
+}
+::buffa::impl_default_instance!(RenameChannelSidebarSectionResponse);
+impl ::buffa::MessageName for RenameChannelSidebarSectionResponse {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "RenameChannelSidebarSectionResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.RenameChannelSidebarSectionResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.RenameChannelSidebarSectionResponse";
+}
+impl ::buffa::Message for RenameChannelSidebarSectionResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.section.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.section.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        for v in &self.sections {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.section.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.section.write_to(__cache, buf);
+        }
+        for v in &self.sections {
+            ::buffa::types::put_len_delimited_header(
+                2u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.section.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.sections.push(elem);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.section = ::buffa::MessageField::none();
+        self.sections.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for RenameChannelSidebarSectionResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.RenameChannelSidebarSectionResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for RenameChannelSidebarSectionResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __RENAME_CHANNEL_SIDEBAR_SECTION_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.RenameChannelSidebarSectionResponse",
+    to_json: ::buffa::type_registry::any_to_json::<RenameChannelSidebarSectionResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        RenameChannelSidebarSectionResponse,
+    >,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct DeleteChannelSidebarSectionRequest {
+    /// Field 1: `organization_id`
+    #[serde(
+        rename = "organizationId",
+        alias = "organization_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub organization_id: ::buffa::alloc::string::String,
+    /// Field 2: `section_id`
+    #[serde(
+        rename = "sectionId",
+        alias = "section_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub section_id: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for DeleteChannelSidebarSectionRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("DeleteChannelSidebarSectionRequest")
+            .field("organization_id", &self.organization_id)
+            .field("section_id", &self.section_id)
+            .finish()
+    }
+}
+impl DeleteChannelSidebarSectionRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DeleteChannelSidebarSectionRequest";
+}
+::buffa::impl_default_instance!(DeleteChannelSidebarSectionRequest);
+impl ::buffa::MessageName for DeleteChannelSidebarSectionRequest {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "DeleteChannelSidebarSectionRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.DeleteChannelSidebarSectionRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DeleteChannelSidebarSectionRequest";
+}
+impl ::buffa::Message for DeleteChannelSidebarSectionRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.organization_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        }
+        if !self.section_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.section_id) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.organization_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        }
+        if !self.section_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.section_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.section_id, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.organization_id.clear();
+        self.section_id.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for DeleteChannelSidebarSectionRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.DeleteChannelSidebarSectionRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for DeleteChannelSidebarSectionRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __DELETE_CHANNEL_SIDEBAR_SECTION_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.DeleteChannelSidebarSectionRequest",
+    to_json: ::buffa::type_registry::any_to_json::<DeleteChannelSidebarSectionRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        DeleteChannelSidebarSectionRequest,
+    >,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct DeleteChannelSidebarSectionResponse {
+    /// Field 1: `sections`
+    #[serde(
+        rename = "sections",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub sections: ::buffa::alloc::vec::Vec<ChannelSidebarSection>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for DeleteChannelSidebarSectionResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("DeleteChannelSidebarSectionResponse")
+            .field("sections", &self.sections)
+            .finish()
+    }
+}
+impl DeleteChannelSidebarSectionResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DeleteChannelSidebarSectionResponse";
+}
+::buffa::impl_default_instance!(DeleteChannelSidebarSectionResponse);
+impl ::buffa::MessageName for DeleteChannelSidebarSectionResponse {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "DeleteChannelSidebarSectionResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.DeleteChannelSidebarSectionResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DeleteChannelSidebarSectionResponse";
+}
+impl ::buffa::Message for DeleteChannelSidebarSectionResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        for v in &self.sections {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        for v in &self.sections {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.sections.push(elem);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.sections.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for DeleteChannelSidebarSectionResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.DeleteChannelSidebarSectionResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for DeleteChannelSidebarSectionResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __DELETE_CHANNEL_SIDEBAR_SECTION_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.DeleteChannelSidebarSectionResponse",
+    to_json: ::buffa::type_registry::any_to_json::<DeleteChannelSidebarSectionResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        DeleteChannelSidebarSectionResponse,
+    >,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
 pub struct ListChannelMessagesRequest {
     /// Field 1: `organization_id`
     #[serde(
@@ -77130,6 +79599,35 @@ pub struct ChannelSummary {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub created_by_user_id: ::core::option::Option<::buffa::alloc::string::String>,
+    /// The requesting user's own sidebar placement for this conversation.
+    ///
+    /// Field 20: `pinned_at`
+    #[serde(
+        rename = "pinnedAt",
+        alias = "pinned_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub pinned_at: ::buffa::MessageField<
+        ::buffa_types::google::protobuf::Timestamp,
+        ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+    >,
+    /// Field 21: `sidebar_section_id`
+    #[serde(
+        rename = "sidebarSectionId",
+        alias = "sidebar_section_id",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub sidebar_section_id: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 22: `hidden_at`
+    #[serde(
+        rename = "hiddenAt",
+        alias = "hidden_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub hidden_at: ::buffa::MessageField<
+        ::buffa_types::google::protobuf::Timestamp,
+        ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -77156,6 +79654,9 @@ impl ::core::fmt::Debug for ChannelSummary {
             .field("has_unread", &self.has_unread)
             .field("direct_message_participants", &self.direct_message_participants)
             .field("created_by_user_id", &self.created_by_user_id)
+            .field("pinned_at", &self.pinned_at)
+            .field("sidebar_section_id", &self.sidebar_section_id)
+            .field("hidden_at", &self.hidden_at)
             .finish()
     }
 }
@@ -77205,6 +79706,16 @@ impl ChannelSummary {
         value: impl Into<::buffa::alloc::string::String>,
     ) -> Self {
         self.created_by_user_id = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::sidebar_section_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_sidebar_section_id(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.sidebar_section_id = Some(value.into());
         self
     }
 }
@@ -77323,6 +79834,25 @@ impl ::buffa::Message for ChannelSummary {
         if let Some(ref v) = self.created_by_user_id {
             size += 2u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
+        if self.pinned_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.pinned_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if let Some(ref v) = self.sidebar_section_id {
+            size += 2u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if self.hidden_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.hidden_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -77425,6 +79955,25 @@ impl ::buffa::Message for ChannelSummary {
         }
         if let Some(ref v) = self.created_by_user_id {
             ::buffa::types::put_string_field(19u32, v, buf);
+        }
+        if self.pinned_at.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                20u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.pinned_at.write_to(__cache, buf);
+        }
+        if let Some(ref v) = self.sidebar_section_id {
+            ::buffa::types::put_string_field(21u32, v, buf);
+        }
+        if self.hidden_at.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                22u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.hidden_at.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -77617,6 +80166,40 @@ impl ::buffa::Message for ChannelSummary {
                     buf,
                 )?;
             }
+            20u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.pinned_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            21u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .sidebar_section_id
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            22u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.hidden_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -77644,6 +80227,9 @@ impl ::buffa::Message for ChannelSummary {
         self.has_unread = false;
         self.direct_message_participants.clear();
         self.created_by_user_id = ::core::option::Option::None;
+        self.pinned_at = ::buffa::MessageField::none();
+        self.sidebar_section_id = ::core::option::Option::None;
+        self.hidden_at = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -234849,6 +237435,14 @@ pub mod __buffa {
             >,
             /// Field 2: `cursor`
             pub cursor: u64,
+            /// The caller's own sidebar sections, so one catalog load has everything the
+            /// conversation list groups by.
+            ///
+            /// Field 3: `sidebar_sections`
+            pub sidebar_sections: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::ChannelSidebarSectionView<'a>,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ListChannelsResponseView<'a> {
@@ -234910,6 +237504,26 @@ pub mod __buffa {
                                 )?,
                             );
                     }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        ctx.register_element_memory(
+                            ::core::mem::size_of::<
+                                super::super::__buffa::view::ChannelSidebarSectionView,
+                            >(),
+                        )?;
+                        view.sidebar_sections
+                            .push(
+                                <super::super::__buffa::view::ChannelSidebarSectionView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -234945,6 +237559,11 @@ pub mod __buffa {
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
                     cursor: self.cursor,
+                    sidebar_sections: self
+                        .sidebar_sections
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -234971,6 +237590,14 @@ pub mod __buffa {
                     size
                         += 1u64 + ::buffa::types::uint64_encoded_len(self.cursor) as u64;
                 }
+                for v in &self.sidebar_sections {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -234992,6 +237619,14 @@ pub mod __buffa {
                 }
                 if self.cursor != 0u64 {
                     ::buffa::types::put_uint64_field(2u32, self.cursor, buf);
+                }
+                for v in &self.sidebar_sections {
+                    ::buffa::types::put_len_delimited_header(
+                        3u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -235023,6 +237658,9 @@ pub mod __buffa {
                             "cursor",
                             &::buffa::json_helpers::ProtoJson(&self.cursor),
                         )?;
+                }
+                if !self.sidebar_sections.is_empty() {
+                    __map.serialize_entry("sidebarSections", &*self.sidebar_sections)?;
                 }
                 __map.end()
             }
@@ -235133,6 +237771,19 @@ pub mod __buffa {
             #[must_use]
             pub fn cursor(&self) -> u64 {
                 self.0.reborrow().cursor
+            }
+            /// The caller's own sidebar sections, so one catalog load has everything the
+            /// conversation list groups by.
+            ///
+            /// Field 3: `sidebar_sections`
+            #[must_use]
+            pub fn sidebar_sections(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::ChannelSidebarSectionView<'_>,
+            > {
+                &self.0.reborrow().sidebar_sections
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<ListChannelsResponseView<'static>>>
@@ -247442,6 +250093,4538 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
+        pub struct MarkChannelUnreadRequestView<'a> {
+            /// Field 1: `organization_id`
+            pub organization_id: &'a str,
+            /// Field 2: `channel_id`
+            pub channel_id: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for MarkChannelUnreadRequestView<'a> {
+            type Owned = super::super::MarkChannelUnreadRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.channel_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::MarkChannelUnreadRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::MarkChannelUnreadRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::MarkChannelUnreadRequest {
+                    organization_id: self.organization_id.to_string(),
+                    channel_id: self.channel_id.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for MarkChannelUnreadRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.organization_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                                as u64;
+                }
+                if !self.channel_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.channel_id)
+                                as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.organization_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                }
+                if !self.channel_id.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for MarkChannelUnreadRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
+                    __map.serialize_entry("organizationId", self.organization_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.channel_id) {
+                    __map.serialize_entry("channelId", self.channel_id)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for MarkChannelUnreadRequestView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "MarkChannelUnreadRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.MarkChannelUnreadRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.MarkChannelUnreadRequest";
+        }
+        ::buffa::impl_default_view_instance!(MarkChannelUnreadRequestView);
+        ::buffa::impl_view_reborrow!(MarkChannelUnreadRequestView);
+        /** Self-contained, `'static` owned view of a `MarkChannelUnreadRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`MarkChannelUnreadRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`MarkChannelUnreadRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct MarkChannelUnreadRequestOwnedView(
+            ::buffa::OwnedView<MarkChannelUnreadRequestView<'static>>,
+        );
+        impl MarkChannelUnreadRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MarkChannelUnreadRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MarkChannelUnreadRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::MarkChannelUnreadRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MarkChannelUnreadRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`MarkChannelUnreadRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &MarkChannelUnreadRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::MarkChannelUnreadRequest {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `organization_id`
+            #[must_use]
+            pub fn organization_id(&self) -> &'_ str {
+                self.0.reborrow().organization_id
+            }
+            /// Field 2: `channel_id`
+            #[must_use]
+            pub fn channel_id(&self) -> &'_ str {
+                self.0.reborrow().channel_id
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<MarkChannelUnreadRequestView<'static>>,
+        > for MarkChannelUnreadRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<MarkChannelUnreadRequestView<'static>>,
+            ) -> Self {
+                MarkChannelUnreadRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<MarkChannelUnreadRequestOwnedView>
+        for ::buffa::OwnedView<MarkChannelUnreadRequestView<'static>> {
+            fn from(wrapper: MarkChannelUnreadRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<MarkChannelUnreadRequestView<'static>>,
+        > for MarkChannelUnreadRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<MarkChannelUnreadRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::MarkChannelUnreadRequest {
+            type View<'a> = MarkChannelUnreadRequestView<'a>;
+            type ViewHandle = MarkChannelUnreadRequestOwnedView;
+        }
+        impl ::serde::Serialize for MarkChannelUnreadRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct MarkChannelUnreadResponseView<'a> {
+            /// Field 1: `channel`
+            pub channel: ::buffa::MessageFieldView<
+                super::super::__buffa::view::ChannelSummaryView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for MarkChannelUnreadResponseView<'a> {
+            type Owned = super::super::MarkChannelUnreadResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.channel.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.channel = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::ChannelSummaryView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::MarkChannelUnreadResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::MarkChannelUnreadResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::MarkChannelUnreadResponse {
+                    channel: match self.channel.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::ChannelSummary,
+                                ::buffa::Inline<super::super::ChannelSummary>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for MarkChannelUnreadResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if self.channel.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.channel.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.channel.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.channel.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for MarkChannelUnreadResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self.channel.as_option() {
+                        __map.serialize_entry("channel", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for MarkChannelUnreadResponseView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "MarkChannelUnreadResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.MarkChannelUnreadResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.MarkChannelUnreadResponse";
+        }
+        ::buffa::impl_default_view_instance!(MarkChannelUnreadResponseView);
+        ::buffa::impl_view_reborrow!(MarkChannelUnreadResponseView);
+        /** Self-contained, `'static` owned view of a `MarkChannelUnreadResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`MarkChannelUnreadResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`MarkChannelUnreadResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct MarkChannelUnreadResponseOwnedView(
+            ::buffa::OwnedView<MarkChannelUnreadResponseView<'static>>,
+        );
+        impl MarkChannelUnreadResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MarkChannelUnreadResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MarkChannelUnreadResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::MarkChannelUnreadResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MarkChannelUnreadResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`MarkChannelUnreadResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &MarkChannelUnreadResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::MarkChannelUnreadResponse {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `channel`
+            #[must_use]
+            pub fn channel(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::ChannelSummaryView<'_>,
+            > {
+                &self.0.reborrow().channel
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<MarkChannelUnreadResponseView<'static>>,
+        > for MarkChannelUnreadResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<MarkChannelUnreadResponseView<'static>>,
+            ) -> Self {
+                MarkChannelUnreadResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<MarkChannelUnreadResponseOwnedView>
+        for ::buffa::OwnedView<MarkChannelUnreadResponseView<'static>> {
+            fn from(wrapper: MarkChannelUnreadResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<MarkChannelUnreadResponseView<'static>>,
+        > for MarkChannelUnreadResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<MarkChannelUnreadResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::MarkChannelUnreadResponse {
+            type View<'a> = MarkChannelUnreadResponseView<'a>;
+            type ViewHandle = MarkChannelUnreadResponseOwnedView;
+        }
+        impl ::serde::Serialize for MarkChannelUnreadResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// One conversation's placement in the caller's own sidebar. Every field is
+        /// optional so a menu action sends only what it changed.
+        #[derive(Clone, Debug, Default)]
+        pub struct UpdateChannelSidebarPreferenceRequestView<'a> {
+            /// Field 1: `organization_id`
+            pub organization_id: &'a str,
+            /// Field 2: `channel_id`
+            pub channel_id: &'a str,
+            /// Field 3: `pinned`
+            pub pinned: ::core::option::Option<bool>,
+            /// Field 4: `hidden`
+            pub hidden: ::core::option::Option<bool>,
+            pub section_update: ::core::option::Option<
+                super::super::__buffa::view::oneof::update_channel_sidebar_preference_request::SectionUpdate<
+                    'a,
+                >,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for UpdateChannelSidebarPreferenceRequestView<'a> {
+            type Owned = super::super::UpdateChannelSidebarPreferenceRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.channel_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.pinned = Some(::buffa::types::decode_bool(&mut cur)?);
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.hidden = Some(::buffa::types::decode_bool(&mut cur)?);
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::update_channel_sidebar_preference_request::SectionUpdate::ClearSection(
+                                ref mut existing,
+                            ),
+                        ) = view.section_update
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.section_update = Some(
+                                super::super::__buffa::view::oneof::update_channel_sidebar_preference_request::SectionUpdate::ClearSection(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <::buffa_types::google::protobuf::__buffa::view::EmptyView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.section_update = Some(
+                            super::super::__buffa::view::oneof::update_channel_sidebar_preference_request::SectionUpdate::SectionId(
+                                ::buffa::types::borrow_str(&mut cur)?,
+                            ),
+                        );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::UpdateChannelSidebarPreferenceRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::UpdateChannelSidebarPreferenceRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::UpdateChannelSidebarPreferenceRequest {
+                    organization_id: self.organization_id.to_string(),
+                    channel_id: self.channel_id.to_string(),
+                    pinned: self.pinned,
+                    hidden: self.hidden,
+                    section_update: match self.section_update.as_ref() {
+                        ::core::option::Option::Some(v) => {
+                            ::core::option::Option::Some(
+                                match v {
+                                    super::super::__buffa::view::oneof::update_channel_sidebar_preference_request::SectionUpdate::ClearSection(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::update_channel_sidebar_preference_request::SectionUpdate::ClearSection(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::update_channel_sidebar_preference_request::SectionUpdate::SectionId(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::update_channel_sidebar_preference_request::SectionUpdate::SectionId(
+                                            v.to_string(),
+                                        )
+                                    }
+                                },
+                            )
+                        }
+                        ::core::option::Option::None => ::core::option::Option::None,
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a>
+        for UpdateChannelSidebarPreferenceRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.organization_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                                as u64;
+                }
+                if !self.channel_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.channel_id)
+                                as u64;
+                }
+                if self.pinned.is_some() {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
+                if self.hidden.is_some() {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
+                if let ::core::option::Option::Some(ref v) = self.section_update {
+                    match v {
+                        super::super::__buffa::view::oneof::update_channel_sidebar_preference_request::SectionUpdate::ClearSection(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                                    + inner as u64;
+                        }
+                        super::super::__buffa::view::oneof::update_channel_sidebar_preference_request::SectionUpdate::SectionId(
+                            x,
+                        ) => {
+                            size += 1u64 + ::buffa::types::string_encoded_len(x) as u64;
+                        }
+                    }
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.organization_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                }
+                if !self.channel_id.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
+                }
+                if let Some(v) = self.pinned {
+                    ::buffa::types::put_bool_field(3u32, v, buf);
+                }
+                if let Some(v) = self.hidden {
+                    ::buffa::types::put_bool_field(4u32, v, buf);
+                }
+                if let ::core::option::Option::Some(ref v) = self.section_update {
+                    match v {
+                        super::super::__buffa::view::oneof::update_channel_sidebar_preference_request::SectionUpdate::ClearSection(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                5u32,
+                                u64::from(__cache.consume_next()),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                        super::super::__buffa::view::oneof::update_channel_sidebar_preference_request::SectionUpdate::SectionId(
+                            x,
+                        ) => {
+                            ::buffa::types::put_string_field(6u32, x, buf);
+                        }
+                    }
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize
+        for UpdateChannelSidebarPreferenceRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
+                    __map.serialize_entry("organizationId", self.organization_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.channel_id) {
+                    __map.serialize_entry("channelId", self.channel_id)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.pinned {
+                    __map.serialize_entry("pinned", &__v)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.hidden {
+                    __map.serialize_entry("hidden", &__v)?;
+                }
+                if let ::core::option::Option::Some(ref __ov) = self.section_update {
+                    match __ov {
+                        super::super::__buffa::view::oneof::update_channel_sidebar_preference_request::SectionUpdate::ClearSection(
+                            v,
+                        ) => {
+                            __map.serialize_entry("clearSection", v)?;
+                        }
+                        super::super::__buffa::view::oneof::update_channel_sidebar_preference_request::SectionUpdate::SectionId(
+                            v,
+                        ) => {
+                            __map.serialize_entry("sectionId", v)?;
+                        }
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for UpdateChannelSidebarPreferenceRequestView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "UpdateChannelSidebarPreferenceRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.UpdateChannelSidebarPreferenceRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateChannelSidebarPreferenceRequest";
+        }
+        ::buffa::impl_default_view_instance!(UpdateChannelSidebarPreferenceRequestView);
+        ::buffa::impl_view_reborrow!(UpdateChannelSidebarPreferenceRequestView);
+        /** Self-contained, `'static` owned view of a `UpdateChannelSidebarPreferenceRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`UpdateChannelSidebarPreferenceRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UpdateChannelSidebarPreferenceRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct UpdateChannelSidebarPreferenceRequestOwnedView(
+            ::buffa::OwnedView<UpdateChannelSidebarPreferenceRequestView<'static>>,
+        );
+        impl UpdateChannelSidebarPreferenceRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UpdateChannelSidebarPreferenceRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UpdateChannelSidebarPreferenceRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::UpdateChannelSidebarPreferenceRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UpdateChannelSidebarPreferenceRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`UpdateChannelSidebarPreferenceRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &UpdateChannelSidebarPreferenceRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::UpdateChannelSidebarPreferenceRequest {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `organization_id`
+            #[must_use]
+            pub fn organization_id(&self) -> &'_ str {
+                self.0.reborrow().organization_id
+            }
+            /// Field 2: `channel_id`
+            #[must_use]
+            pub fn channel_id(&self) -> &'_ str {
+                self.0.reborrow().channel_id
+            }
+            /// Field 3: `pinned`
+            #[must_use]
+            pub fn pinned(&self) -> ::core::option::Option<bool> {
+                self.0.reborrow().pinned
+            }
+            /// Field 4: `hidden`
+            #[must_use]
+            pub fn hidden(&self) -> ::core::option::Option<bool> {
+                self.0.reborrow().hidden
+            }
+            /// Oneof `section_update`.
+            #[must_use]
+            pub fn section_update(
+                &self,
+            ) -> ::core::option::Option<
+                &super::super::__buffa::view::oneof::update_channel_sidebar_preference_request::SectionUpdate<
+                    '_,
+                >,
+            > {
+                self.0.reborrow().section_update.as_ref()
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<UpdateChannelSidebarPreferenceRequestView<'static>>,
+        > for UpdateChannelSidebarPreferenceRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    UpdateChannelSidebarPreferenceRequestView<'static>,
+                >,
+            ) -> Self {
+                UpdateChannelSidebarPreferenceRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<UpdateChannelSidebarPreferenceRequestOwnedView>
+        for ::buffa::OwnedView<UpdateChannelSidebarPreferenceRequestView<'static>> {
+            fn from(wrapper: UpdateChannelSidebarPreferenceRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<UpdateChannelSidebarPreferenceRequestView<'static>>,
+        > for UpdateChannelSidebarPreferenceRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<
+                UpdateChannelSidebarPreferenceRequestView<'static>,
+            > {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::UpdateChannelSidebarPreferenceRequest {
+            type View<'a> = UpdateChannelSidebarPreferenceRequestView<'a>;
+            type ViewHandle = UpdateChannelSidebarPreferenceRequestOwnedView;
+        }
+        impl ::serde::Serialize for UpdateChannelSidebarPreferenceRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct UpdateChannelSidebarPreferenceResponseView<'a> {
+            /// Field 1: `channel`
+            pub channel: ::buffa::MessageFieldView<
+                super::super::__buffa::view::ChannelSummaryView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for UpdateChannelSidebarPreferenceResponseView<'a> {
+            type Owned = super::super::UpdateChannelSidebarPreferenceResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.channel.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.channel = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::ChannelSummaryView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::UpdateChannelSidebarPreferenceResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::UpdateChannelSidebarPreferenceResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::UpdateChannelSidebarPreferenceResponse {
+                    channel: match self.channel.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::ChannelSummary,
+                                ::buffa::Inline<super::super::ChannelSummary>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a>
+        for UpdateChannelSidebarPreferenceResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if self.channel.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.channel.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.channel.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.channel.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize
+        for UpdateChannelSidebarPreferenceResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self.channel.as_option() {
+                        __map.serialize_entry("channel", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName
+        for UpdateChannelSidebarPreferenceResponseView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "UpdateChannelSidebarPreferenceResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.UpdateChannelSidebarPreferenceResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateChannelSidebarPreferenceResponse";
+        }
+        ::buffa::impl_default_view_instance!(UpdateChannelSidebarPreferenceResponseView);
+        ::buffa::impl_view_reborrow!(UpdateChannelSidebarPreferenceResponseView);
+        /** Self-contained, `'static` owned view of a `UpdateChannelSidebarPreferenceResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`UpdateChannelSidebarPreferenceResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UpdateChannelSidebarPreferenceResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct UpdateChannelSidebarPreferenceResponseOwnedView(
+            ::buffa::OwnedView<UpdateChannelSidebarPreferenceResponseView<'static>>,
+        );
+        impl UpdateChannelSidebarPreferenceResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UpdateChannelSidebarPreferenceResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UpdateChannelSidebarPreferenceResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::UpdateChannelSidebarPreferenceResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UpdateChannelSidebarPreferenceResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`UpdateChannelSidebarPreferenceResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &UpdateChannelSidebarPreferenceResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::UpdateChannelSidebarPreferenceResponse {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `channel`
+            #[must_use]
+            pub fn channel(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::ChannelSummaryView<'_>,
+            > {
+                &self.0.reborrow().channel
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<UpdateChannelSidebarPreferenceResponseView<'static>>,
+        > for UpdateChannelSidebarPreferenceResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    UpdateChannelSidebarPreferenceResponseView<'static>,
+                >,
+            ) -> Self {
+                UpdateChannelSidebarPreferenceResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<UpdateChannelSidebarPreferenceResponseOwnedView>
+        for ::buffa::OwnedView<UpdateChannelSidebarPreferenceResponseView<'static>> {
+            fn from(wrapper: UpdateChannelSidebarPreferenceResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<UpdateChannelSidebarPreferenceResponseView<'static>>,
+        > for UpdateChannelSidebarPreferenceResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<
+                UpdateChannelSidebarPreferenceResponseView<'static>,
+            > {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::UpdateChannelSidebarPreferenceResponse {
+            type View<'a> = UpdateChannelSidebarPreferenceResponseView<'a>;
+            type ViewHandle = UpdateChannelSidebarPreferenceResponseOwnedView;
+        }
+        impl ::serde::Serialize for UpdateChannelSidebarPreferenceResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct ChannelSidebarSectionView<'a> {
+            /// Field 1: `id`
+            pub id: &'a str,
+            /// Field 2: `organization_id`
+            pub organization_id: &'a str,
+            /// Field 3: `name`
+            pub name: &'a str,
+            /// Field 4: `position`
+            pub position: u32,
+            /// Field 5: `created_at`
+            pub created_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            /// Field 6: `updated_at`
+            pub updated_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ChannelSidebarSectionView<'a> {
+            type Owned = super::super::ChannelSidebarSection;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.name = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.position = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.created_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.created_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.updated_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.updated_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ChannelSidebarSection,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ChannelSidebarSection,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ChannelSidebarSection {
+                    id: self.id.to_string(),
+                    organization_id: self.organization_id.to_string(),
+                    name: self.name.to_string(),
+                    position: self.position,
+                    created_at: match self.created_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                                ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    updated_at: match self.updated_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                                ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ChannelSidebarSectionView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.id.is_empty() {
+                    size += 1u64 + ::buffa::types::string_encoded_len(&self.id) as u64;
+                }
+                if !self.organization_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                                as u64;
+                }
+                if !self.name.is_empty() {
+                    size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
+                }
+                if self.position != 0u32 {
+                    size
+                        += 1u64
+                            + ::buffa::types::uint32_encoded_len(self.position) as u64;
+                }
+                if self.created_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.created_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                if self.updated_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.updated_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.id, buf);
+                }
+                if !self.organization_id.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.organization_id, buf);
+                }
+                if !self.name.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.name, buf);
+                }
+                if self.position != 0u32 {
+                    ::buffa::types::put_uint32_field(4u32, self.position, buf);
+                }
+                if self.created_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        5u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.created_at.write_to(__cache, buf);
+                }
+                if self.updated_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        6u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.updated_at.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ChannelSidebarSectionView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.id) {
+                    __map.serialize_entry("id", self.id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
+                    __map.serialize_entry("organizationId", self.organization_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.name) {
+                    __map.serialize_entry("name", self.name)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.position) {
+                    __map
+                        .serialize_entry(
+                            "position",
+                            &::buffa::json_helpers::ProtoJson(&self.position),
+                        )?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .created_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("createdAt", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .updated_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("updatedAt", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ChannelSidebarSectionView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "ChannelSidebarSection";
+            const FULL_NAME: &'static str = "briar.app.v1.ChannelSidebarSection";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ChannelSidebarSection";
+        }
+        ::buffa::impl_default_view_instance!(ChannelSidebarSectionView);
+        ::buffa::impl_view_reborrow!(ChannelSidebarSectionView);
+        /** Self-contained, `'static` owned view of a `ChannelSidebarSection` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ChannelSidebarSectionView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ChannelSidebarSectionView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ChannelSidebarSectionOwnedView(
+            ::buffa::OwnedView<ChannelSidebarSectionView<'static>>,
+        );
+        impl ChannelSidebarSectionOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ChannelSidebarSectionOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ChannelSidebarSectionOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ChannelSidebarSection,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ChannelSidebarSectionOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`ChannelSidebarSectionView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ChannelSidebarSectionView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::ChannelSidebarSection {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `id`
+            #[must_use]
+            pub fn id(&self) -> &'_ str {
+                self.0.reborrow().id
+            }
+            /// Field 2: `organization_id`
+            #[must_use]
+            pub fn organization_id(&self) -> &'_ str {
+                self.0.reborrow().organization_id
+            }
+            /// Field 3: `name`
+            #[must_use]
+            pub fn name(&self) -> &'_ str {
+                self.0.reborrow().name
+            }
+            /// Field 4: `position`
+            #[must_use]
+            pub fn position(&self) -> u32 {
+                self.0.reborrow().position
+            }
+            /// Field 5: `created_at`
+            #[must_use]
+            pub fn created_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().created_at
+            }
+            /// Field 6: `updated_at`
+            #[must_use]
+            pub fn updated_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().updated_at
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ChannelSidebarSectionView<'static>>,
+        > for ChannelSidebarSectionOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ChannelSidebarSectionView<'static>>,
+            ) -> Self {
+                ChannelSidebarSectionOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ChannelSidebarSectionOwnedView>
+        for ::buffa::OwnedView<ChannelSidebarSectionView<'static>> {
+            fn from(wrapper: ChannelSidebarSectionOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ChannelSidebarSectionView<'static>>,
+        > for ChannelSidebarSectionOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<ChannelSidebarSectionView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ChannelSidebarSection {
+            type View<'a> = ChannelSidebarSectionView<'a>;
+            type ViewHandle = ChannelSidebarSectionOwnedView;
+        }
+        impl ::serde::Serialize for ChannelSidebarSectionOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct ListChannelSidebarSectionsRequestView<'a> {
+            /// Field 1: `organization_id`
+            pub organization_id: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ListChannelSidebarSectionsRequestView<'a> {
+            type Owned = super::super::ListChannelSidebarSectionsRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListChannelSidebarSectionsRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ListChannelSidebarSectionsRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ListChannelSidebarSectionsRequest {
+                    organization_id: self.organization_id.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ListChannelSidebarSectionsRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.organization_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                                as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.organization_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ListChannelSidebarSectionsRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
+                    __map.serialize_entry("organizationId", self.organization_id)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ListChannelSidebarSectionsRequestView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "ListChannelSidebarSectionsRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.ListChannelSidebarSectionsRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListChannelSidebarSectionsRequest";
+        }
+        ::buffa::impl_default_view_instance!(ListChannelSidebarSectionsRequestView);
+        ::buffa::impl_view_reborrow!(ListChannelSidebarSectionsRequestView);
+        /** Self-contained, `'static` owned view of a `ListChannelSidebarSectionsRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ListChannelSidebarSectionsRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ListChannelSidebarSectionsRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ListChannelSidebarSectionsRequestOwnedView(
+            ::buffa::OwnedView<ListChannelSidebarSectionsRequestView<'static>>,
+        );
+        impl ListChannelSidebarSectionsRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListChannelSidebarSectionsRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListChannelSidebarSectionsRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ListChannelSidebarSectionsRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListChannelSidebarSectionsRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ListChannelSidebarSectionsRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ListChannelSidebarSectionsRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::ListChannelSidebarSectionsRequest {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `organization_id`
+            #[must_use]
+            pub fn organization_id(&self) -> &'_ str {
+                self.0.reborrow().organization_id
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ListChannelSidebarSectionsRequestView<'static>>,
+        > for ListChannelSidebarSectionsRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ListChannelSidebarSectionsRequestView<'static>>,
+            ) -> Self {
+                ListChannelSidebarSectionsRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ListChannelSidebarSectionsRequestOwnedView>
+        for ::buffa::OwnedView<ListChannelSidebarSectionsRequestView<'static>> {
+            fn from(wrapper: ListChannelSidebarSectionsRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ListChannelSidebarSectionsRequestView<'static>>,
+        > for ListChannelSidebarSectionsRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ListChannelSidebarSectionsRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::ListChannelSidebarSectionsRequest {
+            type View<'a> = ListChannelSidebarSectionsRequestView<'a>;
+            type ViewHandle = ListChannelSidebarSectionsRequestOwnedView;
+        }
+        impl ::serde::Serialize for ListChannelSidebarSectionsRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct ListChannelSidebarSectionsResponseView<'a> {
+            /// Field 1: `sections`
+            pub sections: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::ChannelSidebarSectionView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for ListChannelSidebarSectionsResponseView<'a> {
+            type Owned = super::super::ListChannelSidebarSectionsResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        ctx.register_element_memory(
+                            ::core::mem::size_of::<
+                                super::super::__buffa::view::ChannelSidebarSectionView,
+                            >(),
+                        )?;
+                        view.sections
+                            .push(
+                                <super::super::__buffa::view::ChannelSidebarSectionView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListChannelSidebarSectionsResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ListChannelSidebarSectionsResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ListChannelSidebarSectionsResponse {
+                    sections: self
+                        .sections
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ListChannelSidebarSectionsResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                for v in &self.sections {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                for v in &self.sections {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ListChannelSidebarSectionsResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !self.sections.is_empty() {
+                    __map.serialize_entry("sections", &*self.sections)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ListChannelSidebarSectionsResponseView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "ListChannelSidebarSectionsResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.ListChannelSidebarSectionsResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListChannelSidebarSectionsResponse";
+        }
+        ::buffa::impl_default_view_instance!(ListChannelSidebarSectionsResponseView);
+        ::buffa::impl_view_reborrow!(ListChannelSidebarSectionsResponseView);
+        /** Self-contained, `'static` owned view of a `ListChannelSidebarSectionsResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ListChannelSidebarSectionsResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ListChannelSidebarSectionsResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ListChannelSidebarSectionsResponseOwnedView(
+            ::buffa::OwnedView<ListChannelSidebarSectionsResponseView<'static>>,
+        );
+        impl ListChannelSidebarSectionsResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListChannelSidebarSectionsResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListChannelSidebarSectionsResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ListChannelSidebarSectionsResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListChannelSidebarSectionsResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ListChannelSidebarSectionsResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ListChannelSidebarSectionsResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::ListChannelSidebarSectionsResponse {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `sections`
+            #[must_use]
+            pub fn sections(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::ChannelSidebarSectionView<'_>,
+            > {
+                &self.0.reborrow().sections
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ListChannelSidebarSectionsResponseView<'static>>,
+        > for ListChannelSidebarSectionsResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    ListChannelSidebarSectionsResponseView<'static>,
+                >,
+            ) -> Self {
+                ListChannelSidebarSectionsResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ListChannelSidebarSectionsResponseOwnedView>
+        for ::buffa::OwnedView<ListChannelSidebarSectionsResponseView<'static>> {
+            fn from(wrapper: ListChannelSidebarSectionsResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ListChannelSidebarSectionsResponseView<'static>>,
+        > for ListChannelSidebarSectionsResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ListChannelSidebarSectionsResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::ListChannelSidebarSectionsResponse {
+            type View<'a> = ListChannelSidebarSectionsResponseView<'a>;
+            type ViewHandle = ListChannelSidebarSectionsResponseOwnedView;
+        }
+        impl ::serde::Serialize for ListChannelSidebarSectionsResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct CreateChannelSidebarSectionRequestView<'a> {
+            /// Field 1: `organization_id`
+            pub organization_id: &'a str,
+            /// Field 2: `name`
+            pub name: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for CreateChannelSidebarSectionRequestView<'a> {
+            type Owned = super::super::CreateChannelSidebarSectionRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.name = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CreateChannelSidebarSectionRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::CreateChannelSidebarSectionRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::CreateChannelSidebarSectionRequest {
+                    organization_id: self.organization_id.to_string(),
+                    name: self.name.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for CreateChannelSidebarSectionRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.organization_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                                as u64;
+                }
+                if !self.name.is_empty() {
+                    size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.organization_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                }
+                if !self.name.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.name, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for CreateChannelSidebarSectionRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
+                    __map.serialize_entry("organizationId", self.organization_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.name) {
+                    __map.serialize_entry("name", self.name)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for CreateChannelSidebarSectionRequestView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "CreateChannelSidebarSectionRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.CreateChannelSidebarSectionRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateChannelSidebarSectionRequest";
+        }
+        ::buffa::impl_default_view_instance!(CreateChannelSidebarSectionRequestView);
+        ::buffa::impl_view_reborrow!(CreateChannelSidebarSectionRequestView);
+        /** Self-contained, `'static` owned view of a `CreateChannelSidebarSectionRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`CreateChannelSidebarSectionRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CreateChannelSidebarSectionRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct CreateChannelSidebarSectionRequestOwnedView(
+            ::buffa::OwnedView<CreateChannelSidebarSectionRequestView<'static>>,
+        );
+        impl CreateChannelSidebarSectionRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateChannelSidebarSectionRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateChannelSidebarSectionRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::CreateChannelSidebarSectionRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateChannelSidebarSectionRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`CreateChannelSidebarSectionRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &CreateChannelSidebarSectionRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::CreateChannelSidebarSectionRequest {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `organization_id`
+            #[must_use]
+            pub fn organization_id(&self) -> &'_ str {
+                self.0.reborrow().organization_id
+            }
+            /// Field 2: `name`
+            #[must_use]
+            pub fn name(&self) -> &'_ str {
+                self.0.reborrow().name
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<CreateChannelSidebarSectionRequestView<'static>>,
+        > for CreateChannelSidebarSectionRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    CreateChannelSidebarSectionRequestView<'static>,
+                >,
+            ) -> Self {
+                CreateChannelSidebarSectionRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<CreateChannelSidebarSectionRequestOwnedView>
+        for ::buffa::OwnedView<CreateChannelSidebarSectionRequestView<'static>> {
+            fn from(wrapper: CreateChannelSidebarSectionRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<CreateChannelSidebarSectionRequestView<'static>>,
+        > for CreateChannelSidebarSectionRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<CreateChannelSidebarSectionRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::CreateChannelSidebarSectionRequest {
+            type View<'a> = CreateChannelSidebarSectionRequestView<'a>;
+            type ViewHandle = CreateChannelSidebarSectionRequestOwnedView;
+        }
+        impl ::serde::Serialize for CreateChannelSidebarSectionRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// Section responses carry the whole list as well as the row that moved: the
+        /// sidebar renders sections in position order, so it never has to merge by hand.
+        #[derive(Clone, Debug, Default)]
+        pub struct CreateChannelSidebarSectionResponseView<'a> {
+            /// Field 1: `section`
+            pub section: ::buffa::MessageFieldView<
+                super::super::__buffa::view::ChannelSidebarSectionView<'a>,
+            >,
+            /// Field 2: `sections`
+            pub sections: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::ChannelSidebarSectionView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for CreateChannelSidebarSectionResponseView<'a> {
+            type Owned = super::super::CreateChannelSidebarSectionResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.section.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.section = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::ChannelSidebarSectionView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        ctx.register_element_memory(
+                            ::core::mem::size_of::<
+                                super::super::__buffa::view::ChannelSidebarSectionView,
+                            >(),
+                        )?;
+                        view.sections
+                            .push(
+                                <super::super::__buffa::view::ChannelSidebarSectionView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CreateChannelSidebarSectionResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::CreateChannelSidebarSectionResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::CreateChannelSidebarSectionResponse {
+                    section: match self.section.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::ChannelSidebarSection,
+                                ::buffa::Inline<super::super::ChannelSidebarSection>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    sections: self
+                        .sections
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a>
+        for CreateChannelSidebarSectionResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if self.section.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.section.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                for v in &self.sections {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.section.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.section.write_to(__cache, buf);
+                }
+                for v in &self.sections {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for CreateChannelSidebarSectionResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self.section.as_option() {
+                        __map.serialize_entry("section", __v)?;
+                    }
+                }
+                if !self.sections.is_empty() {
+                    __map.serialize_entry("sections", &*self.sections)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for CreateChannelSidebarSectionResponseView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "CreateChannelSidebarSectionResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.CreateChannelSidebarSectionResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateChannelSidebarSectionResponse";
+        }
+        ::buffa::impl_default_view_instance!(CreateChannelSidebarSectionResponseView);
+        ::buffa::impl_view_reborrow!(CreateChannelSidebarSectionResponseView);
+        /** Self-contained, `'static` owned view of a `CreateChannelSidebarSectionResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`CreateChannelSidebarSectionResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CreateChannelSidebarSectionResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct CreateChannelSidebarSectionResponseOwnedView(
+            ::buffa::OwnedView<CreateChannelSidebarSectionResponseView<'static>>,
+        );
+        impl CreateChannelSidebarSectionResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateChannelSidebarSectionResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateChannelSidebarSectionResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::CreateChannelSidebarSectionResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateChannelSidebarSectionResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`CreateChannelSidebarSectionResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &CreateChannelSidebarSectionResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::CreateChannelSidebarSectionResponse {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `section`
+            #[must_use]
+            pub fn section(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::ChannelSidebarSectionView<'_>,
+            > {
+                &self.0.reborrow().section
+            }
+            /// Field 2: `sections`
+            #[must_use]
+            pub fn sections(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::ChannelSidebarSectionView<'_>,
+            > {
+                &self.0.reborrow().sections
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<CreateChannelSidebarSectionResponseView<'static>>,
+        > for CreateChannelSidebarSectionResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    CreateChannelSidebarSectionResponseView<'static>,
+                >,
+            ) -> Self {
+                CreateChannelSidebarSectionResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<CreateChannelSidebarSectionResponseOwnedView>
+        for ::buffa::OwnedView<CreateChannelSidebarSectionResponseView<'static>> {
+            fn from(wrapper: CreateChannelSidebarSectionResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<CreateChannelSidebarSectionResponseView<'static>>,
+        > for CreateChannelSidebarSectionResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<CreateChannelSidebarSectionResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::CreateChannelSidebarSectionResponse {
+            type View<'a> = CreateChannelSidebarSectionResponseView<'a>;
+            type ViewHandle = CreateChannelSidebarSectionResponseOwnedView;
+        }
+        impl ::serde::Serialize for CreateChannelSidebarSectionResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct RenameChannelSidebarSectionRequestView<'a> {
+            /// Field 1: `organization_id`
+            pub organization_id: &'a str,
+            /// Field 2: `section_id`
+            pub section_id: &'a str,
+            /// Field 3: `name`
+            pub name: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for RenameChannelSidebarSectionRequestView<'a> {
+            type Owned = super::super::RenameChannelSidebarSectionRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.section_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.name = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::RenameChannelSidebarSectionRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::RenameChannelSidebarSectionRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::RenameChannelSidebarSectionRequest {
+                    organization_id: self.organization_id.to_string(),
+                    section_id: self.section_id.to_string(),
+                    name: self.name.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for RenameChannelSidebarSectionRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.organization_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                                as u64;
+                }
+                if !self.section_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.section_id)
+                                as u64;
+                }
+                if !self.name.is_empty() {
+                    size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.organization_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                }
+                if !self.section_id.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.section_id, buf);
+                }
+                if !self.name.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.name, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for RenameChannelSidebarSectionRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
+                    __map.serialize_entry("organizationId", self.organization_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.section_id) {
+                    __map.serialize_entry("sectionId", self.section_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.name) {
+                    __map.serialize_entry("name", self.name)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for RenameChannelSidebarSectionRequestView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "RenameChannelSidebarSectionRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.RenameChannelSidebarSectionRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.RenameChannelSidebarSectionRequest";
+        }
+        ::buffa::impl_default_view_instance!(RenameChannelSidebarSectionRequestView);
+        ::buffa::impl_view_reborrow!(RenameChannelSidebarSectionRequestView);
+        /** Self-contained, `'static` owned view of a `RenameChannelSidebarSectionRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`RenameChannelSidebarSectionRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`RenameChannelSidebarSectionRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct RenameChannelSidebarSectionRequestOwnedView(
+            ::buffa::OwnedView<RenameChannelSidebarSectionRequestView<'static>>,
+        );
+        impl RenameChannelSidebarSectionRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RenameChannelSidebarSectionRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RenameChannelSidebarSectionRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::RenameChannelSidebarSectionRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RenameChannelSidebarSectionRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`RenameChannelSidebarSectionRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &RenameChannelSidebarSectionRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::RenameChannelSidebarSectionRequest {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `organization_id`
+            #[must_use]
+            pub fn organization_id(&self) -> &'_ str {
+                self.0.reborrow().organization_id
+            }
+            /// Field 2: `section_id`
+            #[must_use]
+            pub fn section_id(&self) -> &'_ str {
+                self.0.reborrow().section_id
+            }
+            /// Field 3: `name`
+            #[must_use]
+            pub fn name(&self) -> &'_ str {
+                self.0.reborrow().name
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<RenameChannelSidebarSectionRequestView<'static>>,
+        > for RenameChannelSidebarSectionRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    RenameChannelSidebarSectionRequestView<'static>,
+                >,
+            ) -> Self {
+                RenameChannelSidebarSectionRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<RenameChannelSidebarSectionRequestOwnedView>
+        for ::buffa::OwnedView<RenameChannelSidebarSectionRequestView<'static>> {
+            fn from(wrapper: RenameChannelSidebarSectionRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<RenameChannelSidebarSectionRequestView<'static>>,
+        > for RenameChannelSidebarSectionRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<RenameChannelSidebarSectionRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::RenameChannelSidebarSectionRequest {
+            type View<'a> = RenameChannelSidebarSectionRequestView<'a>;
+            type ViewHandle = RenameChannelSidebarSectionRequestOwnedView;
+        }
+        impl ::serde::Serialize for RenameChannelSidebarSectionRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct RenameChannelSidebarSectionResponseView<'a> {
+            /// Field 1: `section`
+            pub section: ::buffa::MessageFieldView<
+                super::super::__buffa::view::ChannelSidebarSectionView<'a>,
+            >,
+            /// Field 2: `sections`
+            pub sections: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::ChannelSidebarSectionView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for RenameChannelSidebarSectionResponseView<'a> {
+            type Owned = super::super::RenameChannelSidebarSectionResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.section.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.section = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::ChannelSidebarSectionView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        ctx.register_element_memory(
+                            ::core::mem::size_of::<
+                                super::super::__buffa::view::ChannelSidebarSectionView,
+                            >(),
+                        )?;
+                        view.sections
+                            .push(
+                                <super::super::__buffa::view::ChannelSidebarSectionView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::RenameChannelSidebarSectionResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::RenameChannelSidebarSectionResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::RenameChannelSidebarSectionResponse {
+                    section: match self.section.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::ChannelSidebarSection,
+                                ::buffa::Inline<super::super::ChannelSidebarSection>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    sections: self
+                        .sections
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a>
+        for RenameChannelSidebarSectionResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if self.section.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.section.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                for v in &self.sections {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.section.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.section.write_to(__cache, buf);
+                }
+                for v in &self.sections {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for RenameChannelSidebarSectionResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self.section.as_option() {
+                        __map.serialize_entry("section", __v)?;
+                    }
+                }
+                if !self.sections.is_empty() {
+                    __map.serialize_entry("sections", &*self.sections)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for RenameChannelSidebarSectionResponseView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "RenameChannelSidebarSectionResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.RenameChannelSidebarSectionResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.RenameChannelSidebarSectionResponse";
+        }
+        ::buffa::impl_default_view_instance!(RenameChannelSidebarSectionResponseView);
+        ::buffa::impl_view_reborrow!(RenameChannelSidebarSectionResponseView);
+        /** Self-contained, `'static` owned view of a `RenameChannelSidebarSectionResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`RenameChannelSidebarSectionResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`RenameChannelSidebarSectionResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct RenameChannelSidebarSectionResponseOwnedView(
+            ::buffa::OwnedView<RenameChannelSidebarSectionResponseView<'static>>,
+        );
+        impl RenameChannelSidebarSectionResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RenameChannelSidebarSectionResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RenameChannelSidebarSectionResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::RenameChannelSidebarSectionResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RenameChannelSidebarSectionResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`RenameChannelSidebarSectionResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &RenameChannelSidebarSectionResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::RenameChannelSidebarSectionResponse {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `section`
+            #[must_use]
+            pub fn section(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::ChannelSidebarSectionView<'_>,
+            > {
+                &self.0.reborrow().section
+            }
+            /// Field 2: `sections`
+            #[must_use]
+            pub fn sections(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::ChannelSidebarSectionView<'_>,
+            > {
+                &self.0.reborrow().sections
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<RenameChannelSidebarSectionResponseView<'static>>,
+        > for RenameChannelSidebarSectionResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    RenameChannelSidebarSectionResponseView<'static>,
+                >,
+            ) -> Self {
+                RenameChannelSidebarSectionResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<RenameChannelSidebarSectionResponseOwnedView>
+        for ::buffa::OwnedView<RenameChannelSidebarSectionResponseView<'static>> {
+            fn from(wrapper: RenameChannelSidebarSectionResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<RenameChannelSidebarSectionResponseView<'static>>,
+        > for RenameChannelSidebarSectionResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<RenameChannelSidebarSectionResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::RenameChannelSidebarSectionResponse {
+            type View<'a> = RenameChannelSidebarSectionResponseView<'a>;
+            type ViewHandle = RenameChannelSidebarSectionResponseOwnedView;
+        }
+        impl ::serde::Serialize for RenameChannelSidebarSectionResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct DeleteChannelSidebarSectionRequestView<'a> {
+            /// Field 1: `organization_id`
+            pub organization_id: &'a str,
+            /// Field 2: `section_id`
+            pub section_id: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for DeleteChannelSidebarSectionRequestView<'a> {
+            type Owned = super::super::DeleteChannelSidebarSectionRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.section_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DeleteChannelSidebarSectionRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::DeleteChannelSidebarSectionRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::DeleteChannelSidebarSectionRequest {
+                    organization_id: self.organization_id.to_string(),
+                    section_id: self.section_id.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for DeleteChannelSidebarSectionRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.organization_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                                as u64;
+                }
+                if !self.section_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.section_id)
+                                as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.organization_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                }
+                if !self.section_id.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.section_id, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for DeleteChannelSidebarSectionRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
+                    __map.serialize_entry("organizationId", self.organization_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.section_id) {
+                    __map.serialize_entry("sectionId", self.section_id)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for DeleteChannelSidebarSectionRequestView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "DeleteChannelSidebarSectionRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.DeleteChannelSidebarSectionRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DeleteChannelSidebarSectionRequest";
+        }
+        ::buffa::impl_default_view_instance!(DeleteChannelSidebarSectionRequestView);
+        ::buffa::impl_view_reborrow!(DeleteChannelSidebarSectionRequestView);
+        /** Self-contained, `'static` owned view of a `DeleteChannelSidebarSectionRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`DeleteChannelSidebarSectionRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`DeleteChannelSidebarSectionRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct DeleteChannelSidebarSectionRequestOwnedView(
+            ::buffa::OwnedView<DeleteChannelSidebarSectionRequestView<'static>>,
+        );
+        impl DeleteChannelSidebarSectionRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DeleteChannelSidebarSectionRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DeleteChannelSidebarSectionRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::DeleteChannelSidebarSectionRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DeleteChannelSidebarSectionRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`DeleteChannelSidebarSectionRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &DeleteChannelSidebarSectionRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::DeleteChannelSidebarSectionRequest {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `organization_id`
+            #[must_use]
+            pub fn organization_id(&self) -> &'_ str {
+                self.0.reborrow().organization_id
+            }
+            /// Field 2: `section_id`
+            #[must_use]
+            pub fn section_id(&self) -> &'_ str {
+                self.0.reborrow().section_id
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<DeleteChannelSidebarSectionRequestView<'static>>,
+        > for DeleteChannelSidebarSectionRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    DeleteChannelSidebarSectionRequestView<'static>,
+                >,
+            ) -> Self {
+                DeleteChannelSidebarSectionRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<DeleteChannelSidebarSectionRequestOwnedView>
+        for ::buffa::OwnedView<DeleteChannelSidebarSectionRequestView<'static>> {
+            fn from(wrapper: DeleteChannelSidebarSectionRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<DeleteChannelSidebarSectionRequestView<'static>>,
+        > for DeleteChannelSidebarSectionRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<DeleteChannelSidebarSectionRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::DeleteChannelSidebarSectionRequest {
+            type View<'a> = DeleteChannelSidebarSectionRequestView<'a>;
+            type ViewHandle = DeleteChannelSidebarSectionRequestOwnedView;
+        }
+        impl ::serde::Serialize for DeleteChannelSidebarSectionRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct DeleteChannelSidebarSectionResponseView<'a> {
+            /// Field 1: `sections`
+            pub sections: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::ChannelSidebarSectionView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for DeleteChannelSidebarSectionResponseView<'a> {
+            type Owned = super::super::DeleteChannelSidebarSectionResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        ctx.register_element_memory(
+                            ::core::mem::size_of::<
+                                super::super::__buffa::view::ChannelSidebarSectionView,
+                            >(),
+                        )?;
+                        view.sections
+                            .push(
+                                <super::super::__buffa::view::ChannelSidebarSectionView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DeleteChannelSidebarSectionResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::DeleteChannelSidebarSectionResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::DeleteChannelSidebarSectionResponse {
+                    sections: self
+                        .sections
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a>
+        for DeleteChannelSidebarSectionResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                for v in &self.sections {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                for v in &self.sections {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for DeleteChannelSidebarSectionResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !self.sections.is_empty() {
+                    __map.serialize_entry("sections", &*self.sections)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for DeleteChannelSidebarSectionResponseView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "DeleteChannelSidebarSectionResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.DeleteChannelSidebarSectionResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DeleteChannelSidebarSectionResponse";
+        }
+        ::buffa::impl_default_view_instance!(DeleteChannelSidebarSectionResponseView);
+        ::buffa::impl_view_reborrow!(DeleteChannelSidebarSectionResponseView);
+        /** Self-contained, `'static` owned view of a `DeleteChannelSidebarSectionResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`DeleteChannelSidebarSectionResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`DeleteChannelSidebarSectionResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct DeleteChannelSidebarSectionResponseOwnedView(
+            ::buffa::OwnedView<DeleteChannelSidebarSectionResponseView<'static>>,
+        );
+        impl DeleteChannelSidebarSectionResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DeleteChannelSidebarSectionResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DeleteChannelSidebarSectionResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::DeleteChannelSidebarSectionResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DeleteChannelSidebarSectionResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`DeleteChannelSidebarSectionResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &DeleteChannelSidebarSectionResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::DeleteChannelSidebarSectionResponse {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `sections`
+            #[must_use]
+            pub fn sections(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::ChannelSidebarSectionView<'_>,
+            > {
+                &self.0.reborrow().sections
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<DeleteChannelSidebarSectionResponseView<'static>>,
+        > for DeleteChannelSidebarSectionResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    DeleteChannelSidebarSectionResponseView<'static>,
+                >,
+            ) -> Self {
+                DeleteChannelSidebarSectionResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<DeleteChannelSidebarSectionResponseOwnedView>
+        for ::buffa::OwnedView<DeleteChannelSidebarSectionResponseView<'static>> {
+            fn from(wrapper: DeleteChannelSidebarSectionResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<DeleteChannelSidebarSectionResponseView<'static>>,
+        > for DeleteChannelSidebarSectionResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<DeleteChannelSidebarSectionResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::DeleteChannelSidebarSectionResponse {
+            type View<'a> = DeleteChannelSidebarSectionResponseView<'a>;
+            type ViewHandle = DeleteChannelSidebarSectionResponseOwnedView;
+        }
+        impl ::serde::Serialize for DeleteChannelSidebarSectionResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
         pub struct ListChannelMessagesRequestView<'a> {
             /// Field 1: `organization_id`
             pub organization_id: &'a str,
@@ -255713,6 +262896,18 @@ pub mod __buffa {
             >,
             /// Field 19: `created_by_user_id`
             pub created_by_user_id: ::core::option::Option<&'a str>,
+            /// The requesting user's own sidebar placement for this conversation.
+            ///
+            /// Field 20: `pinned_at`
+            pub pinned_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            /// Field 21: `sidebar_section_id`
+            pub sidebar_section_id: ::core::option::Option<&'a str>,
+            /// Field 22: `hidden_at`
+            pub hidden_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ChannelSummaryView<'a> {
@@ -255973,6 +263168,65 @@ pub mod __buffa {
                             ::buffa::types::borrow_str(&mut cur)?,
                         );
                     }
+                    20u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.pinned_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.pinned_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    21u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.sidebar_section_id = Some(
+                            ::buffa::types::borrow_str(&mut cur)?,
+                        );
+                    }
+                    22u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.hidden_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.hidden_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     18u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -256087,6 +263341,25 @@ pub mod __buffa {
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
                     created_by_user_id: self.created_by_user_id.map(|s| s.to_string()),
+                    pinned_at: match self.pinned_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                                ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    sidebar_section_id: self.sidebar_section_id.map(|s| s.to_string()),
+                    hidden_at: match self.hidden_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                                ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -256203,6 +263476,25 @@ pub mod __buffa {
                 if let Some(ref v) = self.created_by_user_id {
                     size += 2u64 + ::buffa::types::string_encoded_len(v) as u64;
                 }
+                if self.pinned_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.pinned_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                if let Some(ref v) = self.sidebar_section_id {
+                    size += 2u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                if self.hidden_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.hidden_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -256306,6 +263598,25 @@ pub mod __buffa {
                 }
                 if let Some(ref v) = self.created_by_user_id {
                     ::buffa::types::put_string_field(19u32, v, buf);
+                }
+                if self.pinned_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        20u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.pinned_at.write_to(__cache, buf);
+                }
+                if let Some(ref v) = self.sidebar_section_id {
+                    ::buffa::types::put_string_field(21u32, v, buf);
+                }
+                if self.hidden_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        22u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.hidden_at.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -256423,6 +263734,21 @@ pub mod __buffa {
                 }
                 if let ::core::option::Option::Some(__v) = self.created_by_user_id {
                     __map.serialize_entry("createdByUserId", __v)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.pinned_at.as_option()
+                    {
+                        __map.serialize_entry("pinnedAt", __v)?;
+                    }
+                }
+                if let ::core::option::Option::Some(__v) = self.sidebar_section_id {
+                    __map.serialize_entry("sidebarSectionId", __v)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.hidden_at.as_option()
+                    {
+                        __map.serialize_entry("hiddenAt", __v)?;
+                    }
                 }
                 __map.end()
             }
@@ -256640,6 +263966,31 @@ pub mod __buffa {
             #[must_use]
             pub fn created_by_user_id(&self) -> ::core::option::Option<&'_ str> {
                 self.0.reborrow().created_by_user_id
+            }
+            /// The requesting user's own sidebar placement for this conversation.
+            ///
+            /// Field 20: `pinned_at`
+            #[must_use]
+            pub fn pinned_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().pinned_at
+            }
+            /// Field 21: `sidebar_section_id`
+            #[must_use]
+            pub fn sidebar_section_id(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().sidebar_section_id
+            }
+            /// Field 22: `hidden_at`
+            #[must_use]
+            pub fn hidden_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().hidden_at
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<ChannelSummaryView<'static>>>
@@ -362159,6 +369510,19 @@ pub mod __buffa {
                     ),
                 }
             }
+            pub mod update_channel_sidebar_preference_request {
+                #[allow(unused_imports)]
+                use super::*;
+                #[derive(Clone, Debug)]
+                pub enum SectionUpdate<'a> {
+                    ClearSection(
+                        ::buffa::alloc::boxed::Box<
+                            ::buffa_types::google::protobuf::__buffa::view::EmptyView<'a>,
+                        >,
+                    ),
+                    SectionId(&'a str),
+                }
+            }
             pub mod channel_message_author {
                 #[allow(unused_imports)]
                 use super::*;
@@ -363504,6 +370868,41 @@ pub mod __buffa {
                 }
             }
         }
+        pub mod update_channel_sidebar_preference_request {
+            #[allow(unused_imports)]
+            use super::*;
+            #[derive(Clone, PartialEq, Debug)]
+            pub enum SectionUpdate {
+                ClearSection(
+                    ::buffa::alloc::boxed::Box<::buffa_types::google::protobuf::Empty>,
+                ),
+                SectionId(::buffa::alloc::string::String),
+            }
+            impl ::buffa::Oneof for SectionUpdate {}
+            impl From<::buffa_types::google::protobuf::Empty> for SectionUpdate {
+                fn from(v: ::buffa_types::google::protobuf::Empty) -> Self {
+                    Self::ClearSection(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl serde::Serialize for SectionUpdate {
+                fn serialize<S: serde::Serializer>(
+                    &self,
+                    s: S,
+                ) -> ::core::result::Result<S::Ok, S::Error> {
+                    use serde::ser::SerializeMap;
+                    let mut map = s.serialize_map(Some(1))?;
+                    match self {
+                        Self::ClearSection(v) => {
+                            map.serialize_entry("clearSection", v)?;
+                        }
+                        Self::SectionId(v) => {
+                            map.serialize_entry("sectionId", v)?;
+                        }
+                    }
+                    map.end()
+                }
+            }
+        }
         pub mod channel_message_author {
             #[allow(unused_imports)]
             use super::*;
@@ -364427,6 +371826,23 @@ pub mod __buffa {
         reg.register_json_any(super::__GET_CHANNEL_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__MARK_CHANNEL_READ_REQUEST_JSON_ANY);
         reg.register_json_any(super::__MARK_CHANNEL_READ_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__MARK_CHANNEL_UNREAD_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__MARK_CHANNEL_UNREAD_RESPONSE_JSON_ANY);
+        reg.register_json_any(
+            super::__UPDATE_CHANNEL_SIDEBAR_PREFERENCE_REQUEST_JSON_ANY,
+        );
+        reg.register_json_any(
+            super::__UPDATE_CHANNEL_SIDEBAR_PREFERENCE_RESPONSE_JSON_ANY,
+        );
+        reg.register_json_any(super::__CHANNEL_SIDEBAR_SECTION_JSON_ANY);
+        reg.register_json_any(super::__LIST_CHANNEL_SIDEBAR_SECTIONS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_CHANNEL_SIDEBAR_SECTIONS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__CREATE_CHANNEL_SIDEBAR_SECTION_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__CREATE_CHANNEL_SIDEBAR_SECTION_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__RENAME_CHANNEL_SIDEBAR_SECTION_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__RENAME_CHANNEL_SIDEBAR_SECTION_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__DELETE_CHANNEL_SIDEBAR_SECTION_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__DELETE_CHANNEL_SIDEBAR_SECTION_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__LIST_CHANNEL_MESSAGES_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_CHANNEL_MESSAGES_RESPONSE_JSON_ANY);
         reg.register_json_any(
@@ -365717,6 +373133,58 @@ pub use self::__buffa::view::MarkChannelReadRequestOwnedView;
 pub use self::__buffa::view::MarkChannelReadResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::MarkChannelReadResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::MarkChannelUnreadRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::MarkChannelUnreadRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::MarkChannelUnreadResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::MarkChannelUnreadResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateChannelSidebarPreferenceRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateChannelSidebarPreferenceRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateChannelSidebarPreferenceResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateChannelSidebarPreferenceResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ChannelSidebarSectionView;
+#[doc(inline)]
+pub use self::__buffa::view::ChannelSidebarSectionOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListChannelSidebarSectionsRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListChannelSidebarSectionsRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListChannelSidebarSectionsResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListChannelSidebarSectionsResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateChannelSidebarSectionRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateChannelSidebarSectionRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateChannelSidebarSectionResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateChannelSidebarSectionResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RenameChannelSidebarSectionRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::RenameChannelSidebarSectionRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RenameChannelSidebarSectionResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::RenameChannelSidebarSectionResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteChannelSidebarSectionRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteChannelSidebarSectionRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteChannelSidebarSectionResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteChannelSidebarSectionResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ListChannelMessagesRequestView;
 #[doc(inline)]
