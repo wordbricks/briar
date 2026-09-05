@@ -30,6 +30,18 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.204",
+        date: "2026년 9월 5일",
+        title: "Docker sandbox 화면을 앱에서 바로 봅니다",
+        summary:
+          "briar sandbox로 만든 컨테이너가 관리형 컴퓨터와 같은 원격 데스크톱 릴레이에 합류합니다. 에이전트의 지정 워커가 sandbox이고 Computer Use가 켜져 있으면 DM 패널에 에이전트가 보는 화면이 실시간으로 뜹니다. SSH 터널이나 네트워크 노출이 필요 없습니다.",
+        items: [
+          "sandbox up이 워커 등록 뒤 이 컴퓨터를 등록하고 릴레이 에이전트를 함께 띄웁니다. sandbox rm이 등록을 해제합니다.",
+          "설정의 컴퓨터 목록에 sandbox가 'Sandbox <이름>'으로 보이고, sandbox에는 은퇴·종료 버튼 대신 briar sandbox rm 안내가 적용됩니다.",
+          "sandbox 컴퓨터는 관리형 컴퓨터의 프로비저닝·만료·파일럿 용량 계산에서 제외됩니다.",
+        ],
+      },
+      {
         version: "1.2.203",
         date: "2026년 9월 5일",
         title: "sandbox에 항상 켜져 있는 소유자 데스크톱을 더합니다",
@@ -1730,6 +1742,18 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.204",
+        date: "September 5, 2026",
+        title: "Watch the Docker sandbox screen inside the app",
+        summary:
+          "Containers created with briar sandbox now join the same remote-desktop relay as managed computers. When an agent's designated worker is a sandbox and Computer Use is on, the DM panel shows the agent's screen live, with no SSH tunnel or exposed ports.",
+        items: [
+          "sandbox up registers the computer after worker registration and runs the relay agent alongside the workers; sandbox rm unregisters it.",
+          "The computer list in settings shows sandboxes as 'Sandbox <name>' and replaces retire and terminate controls with a briar sandbox rm hint.",
+          "Sandbox computers are excluded from managed-computer provisioning, expiry, and pilot capacity accounting.",
+        ],
+      },
       {
         version: "1.2.203",
         date: "September 5, 2026",

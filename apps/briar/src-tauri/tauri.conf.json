@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Briar",
-  "version": "1.2.203",
+  "version": "1.2.204",
   "identifier": "app.briar.desktop",
   "build": {
     "beforeDevCommand": "bun run runtime:prepare && bun run skills:generate && bun run cli:build && bun run agent:build && bun run dev",
