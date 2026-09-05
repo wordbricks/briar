@@ -77,6 +77,10 @@ grep -Fq -- '--no-first-run' /opt/briar/bin/briar-open-browser
 grep -Fq -- '--no-default-browser-check' /opt/briar/bin/briar-open-browser
 grep -Fq -- '--user-data-dir=' /opt/briar/bin/briar-open-browser
 grep -Fq -- '--password-store=basic' /opt/briar/bin/briar-open-browser
+grep -Fq -- '/var/lib/briar-computer-use/profiles/display-1|' \
+  /opt/briar/bin/briar-open-browser
+systemctl cat briar-remote-desktop.service \
+  | grep -Fq 'BRIAR_BROWSER_PROFILE_DIRECTORY=/var/lib/briar-computer-use/profiles/display-1'
 test -r /usr/share/applications/google-chrome.desktop
 grep -Fq 'Icon=google-chrome' /usr/share/applications/google-chrome.desktop
 test -x "/home/briar/Desktop/Google Chrome.desktop"

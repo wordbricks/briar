@@ -237,3 +237,49 @@ describe("resolveSandboxRuntimeSources", () => {
     await expect(resolveSandboxRuntimeSources(root)).rejects.toThrow("bun run cli:build");
   });
 });
+
+describe("embedded briar-open-browser", () => {
+  /** The launcher's `case` patterns, read out of the embedded AMI script. */
+  const profilePatterns = () => {
+    const script = sandboxRuntimeAssets.desktopFiles["briar-open-browser"];
+    const start = script.indexOf('case "$profile_directory" in');
+    const end = script.indexOf("*)", start);
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    return script
+      .slice(start, end)
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.startsWith("/"))
+      .flatMap((line) => line.replace(/\)\s*;;.*$/u, "").replace(/\\$/u, "").split("|"))
+      .map((pattern) => pattern.trim())
+      .filter((pattern) => pattern.length > 0);
+  };
+
+  /** Shell glob to RegExp, enough for the character classes the case uses. */
+  const matches = (patterns: readonly string[], path: string) =>
+    patterns.some((pattern) =>
+      new RegExp(
+        `^${
+          pattern.replaceAll(
+            /\[[^\]]+\]|[.*+?^${}()|\\]/gu,
+            (token) => token.startsWith("[") ? token : `\\${token}`,
+          )
+        }$`,
+        "u",
+      ).test(path)
+    );
+
+  it("accepts the owner display and every Agent display profile", () => {
+    const patterns = profilePatterns();
+    const profile = (name: string) => `/var/lib/briar-computer-use/profiles/${name}`;
+    expect(patterns).toContain(profile("display-1"));
+    expect(matches(patterns, profile("display-1"))).toBe(true);
+    expect(matches(patterns, profile("display-2"))).toBe(true);
+    expect(matches(patterns, profile("display-42"))).toBe(true);
+    expect(matches(patterns, profile("display-100"))).toBe(true);
+    expect(matches(patterns, profile("display-0"))).toBe(false);
+    expect(matches(patterns, profile("shared"))).toBe(false);
+    expect(matches(patterns, profile("display-1/../shared"))).toBe(false);
+  });
+});

@@ -11,6 +11,8 @@ User=briar
 Group=briar
 Environment=HOME=/home/briar
 Environment=GH_BROWSER=/opt/briar/bin/briar-open-browser
+# The owner's own sign-ins on :1 feed the shared Computer Use login store.
+Environment=BRIAR_BROWSER_PROFILE_DIRECTORY=/var/lib/briar-computer-use/profiles/display-1
 Environment=BRIAR_REMOTE_DISPLAY_PORT=5901
 Environment=BRIAR_REMOTE_DISPLAY_GEOMETRY=1280x720
 Environment=BRIAR_REMOTE_DISPLAY_STARTUP_TIMEOUT_SECONDS=120

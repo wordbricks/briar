@@ -260,11 +260,12 @@ export class ProcessComputerUseWindowSupervisor implements ComputerUseWindowSupe
  */
 export function computerUseWindowSupervisorFromEnvironment(
   environment: NodeJS.ProcessEnv = process.env,
+  options: { readonly browserLoginStore?: ComputerUseBrowserLoginStore } = {},
 ): ComputerUseWindowSupervisor {
   const configured = environment.BRIAR_COMPUTER_USE_WINDOW_SUPERVISOR?.trim();
-  if (configured === "process") return new ProcessComputerUseWindowSupervisor();
+  if (configured === "process") return new ProcessComputerUseWindowSupervisor(options);
   if (configured && configured !== "systemd") {
     throw new Error("BRIAR_COMPUTER_USE_WINDOW_SUPERVISOR must be systemd or process");
   }
-  return new SystemdComputerUseWindowSupervisor();
+  return new SystemdComputerUseWindowSupervisor(options);
 }

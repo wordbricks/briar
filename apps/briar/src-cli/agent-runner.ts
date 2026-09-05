@@ -691,6 +691,7 @@ export function detachedProviderRequest(input: {
         "Use CheckSubagent, MessageSubagent, StopSubagent, and RequestHumanTakeover to manage that child.",
         "After RequestHumanTakeover, tell the user to open this Agent's Screen and wait for confirmation that they are done. Then resume with MessageSubagent so the child begins from a fresh screenshot.",
         "Browser sign-ins on this computer are kept in a shared login store, so they are available on every Agent's screen and across turns. Check whether a site is already signed in before asking the user for another takeover.",
+        "The user can also sign in ahead of time on this computer's own screen, display :1, and that sign-in reaches every Agent here as well.",
       ].join(" ");
   const outputSchema = input.outputSchema === null || input.outputSchema === undefined
     ? undefined
