@@ -67,6 +67,8 @@ import {
 import { managedComputerEnrollCommand } from "./managed-computer-enrollment";
 import {
   sandboxBootstrapCommand,
+  sandboxBoxExecCommand,
+  sandboxComputerUseCheckCommand,
   sandboxLoginCommand,
   sandboxLogsCommand,
   sandboxRecreateCommand,
@@ -78,6 +80,8 @@ import {
   sandboxSuperviseCommand,
   sandboxUnregisterCommand,
   sandboxUpCommand,
+  sandboxVerifyCommand,
+  sandboxViewCommand,
 } from "./sandbox-commands";
 import {
   providerAddCommand,
@@ -830,7 +834,7 @@ const sandboxCommand = Command.make("sandbox").pipe(
       "up",
       {
         ...sandboxTargetFlags,
-        ...optionalStrings("label", "debian-mirror"),
+        ...optionalStrings("label", "debian-mirror", "view-port"),
         ...repeatedStrings("team"),
         ...switches("gpus", "no-gpus", "no-provider-auth"),
       },
@@ -874,7 +878,23 @@ const sandboxCommand = Command.make("sandbox").pipe(
       sandboxLoginCommand,
       "Sign a coding-agent provider in inside the sandbox",
     ),
+    leaf(
+      "view",
+      { ...sandboxTargetFlags, ...optionalStrings("display") },
+      sandboxViewCommand,
+      "Open the sandbox desktop an agent is using in your browser",
+    ),
+    leaf(
+      "verify",
+      sandboxTargetFlags,
+      sandboxVerifyCommand,
+      "Assign a Computer Use display in the sandbox and capture a screenshot",
+    ),
     leaf("bootstrap", {}, sandboxBootstrapCommand, "Apply a bootstrap payload from stdin")
+      .pipe(Command.unlisted),
+    leaf("box-exec", {}, sandboxBoxExecCommand, "Run the Computer Use box service")
+      .pipe(Command.unlisted),
+    leaf("computer-use-check", {}, sandboxComputerUseCheckCommand, "Probe a Computer Use display")
       .pipe(Command.unlisted),
     leaf("report", {}, sandboxReportCommand, "Report sandbox readiness as JSON")
       .pipe(Command.unlisted),

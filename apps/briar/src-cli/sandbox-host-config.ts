@@ -22,6 +22,7 @@ const SandboxHostEntry = Schema.Struct({
   teamIds: Schema.Array(Schema.String.check(Schema.isUUID())),
   gpus: Schema.Boolean,
   debianMirror: Schema.optional(Schema.String.check(Schema.isMinLength(1))),
+  viewPort: Schema.optional(Schema.Int.check(Schema.isBetween({ minimum: 1024, maximum: 65535 }))),
   runtimeSha256: Schema.String,
   updatedAt: Schema.String,
 });
@@ -114,11 +115,30 @@ export async function upsertSandboxHostEntry(
   }, directory);
 }
 
+/**
+ * Forget a removed sandbox's teams and runtime but keep how to reach its Docker
+ * host, so a later `sandbox up --name <name>` without `--host` recreates it on
+ * the same machine instead of silently targeting the local daemon.
+ */
 export async function removeSandboxHostEntry(
   name: string,
   directory = configDirectory,
 ) {
   const config = await loadSandboxHostConfig(directory);
-  const { [name]: _removed, ...rest } = config.sandboxes;
-  await saveSandboxHostConfig({ version: 1, sandboxes: rest }, directory);
+  const { [name]: removed, ...rest } = config.sandboxes;
+  if (removed === undefined) return;
+  const retained: SandboxHostEntry = {
+    ...(removed.dockerContext ? { dockerContext: removed.dockerContext } : {}),
+    ...(removed.host ? { host: removed.host } : {}),
+    ...(removed.debianMirror ? { debianMirror: removed.debianMirror } : {}),
+    ...(removed.viewPort ? { viewPort: removed.viewPort } : {}),
+    teamIds: [],
+    gpus: removed.gpus,
+    runtimeSha256: "",
+    updatedAt: new Date().toISOString(),
+  };
+  await saveSandboxHostConfig(
+    { version: 1, sandboxes: { ...rest, [name]: retained } },
+    directory,
+  );
 }

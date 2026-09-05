@@ -22,6 +22,35 @@
   재부트스트랩이 빠르다.
 - **동일 lifecycle.** `up`, `status`, `stop`, `recreate`, `rm`으로 관리한다.
 
+## 디스플레이와 Computer Use
+
+sandbox는 Grok Bot의 로컬 VM처럼 에이전트가 볼 수 있는 데스크톱을 갖는다.
+구조는 관리형 컴퓨터 AMI와 같고, systemd만 없다.
+
+- **디스플레이 `:N`**: 에이전트마다 `briar-computer-use-window N`이 Xtigervnc(loopback
+  `590N`)와 XFCE 세션을 띄운다. systemd 템플릿 유닛 대신 box 서비스가 자식 프로세스로
+  관리한다(`BRIAR_COMPUTER_USE_WINDOW_SUPERVISOR=process`).
+- **box 서비스**: `briar sandbox box-exec`가 1337(primary)과 1339(fork router)에서
+  `ComputerUseBoxService`를 돌린다. 워커와 `computer-use-mcp-server.js`가 여기 붙어
+  디스플레이를 할당받고 `briar-computer-executor.py`로 스크린샷·클릭·타이핑을 실행한다.
+- **워커 capability**: 이미지가 `BRIAR_SANDBOX=1`을 설정하므로 워커 등록 시 box 서비스
+  health와 canary(스크린샷)를 통과하면 Computer Use를 광고한다. bootstrap은 등록 전에
+  box 서비스가 뜰 때까지 최대 90초 기다린다.
+- **브라우저**: Linux ARM64용 Google Chrome이 없어 Chromium을 설치하고
+  `/usr/bin/google-chrome-stable` 래퍼(`--no-sandbox`)로 감싼다. `briar-open-browser`와
+  데스크톱 파일은 AMI와 동일하다.
+- **사용자가 보는 화면**: 컨테이너 안 websockify + noVNC가 6080에서 모든 디스플레이를
+  `?token=displayN`으로 라우팅하고, Docker 호스트의 loopback(`--view-port`, 기본 6080)에만
+  publish된다. `briar sandbox view --name <name> [--display N]`이 원격 호스트면 SSH 포트
+  포워딩을 열고 브라우저에 noVNC 페이지를 띄운다. 디스플레이를 지정하지 않으면 현재
+  에이전트에 할당된 첫 디스플레이를 연다.
+- **검증**: `briar sandbox verify --name <name>`이 컨테이너 안에서 디스플레이를 하나
+  할당해 스크린샷을 찍고 해제한다. `status`의 `report.computerUse`에 box 서비스 health와
+  현재 할당된 디스플레이 목록이 나온다.
+
+관리형 컴퓨터의 sudo 정책과 릴레이 기반 원격 데스크톱은 sandbox에 없다. 앱 안에서
+바로 보는 것은 다음 단계이며, 그때까지는 `sandbox view`의 브라우저 noVNC를 쓴다.
+
 ## 요구 사항
 
 - 이 Mac: `briar login`이 끝나 있고, 연결된 팀에 agent token이 있어야
@@ -89,6 +118,8 @@ briar sandbox recreate --name gx10    # 컨테이너 재시작
 briar sandbox stop --name gx10
 briar sandbox rm --name gx10          # 워커 등록 해제 + 컨테이너 제거, 볼륨은 유지
 briar sandbox rm --name gx10 --purge  # 볼륨, 이미지, Briar가 만든 Docker context까지 제거
+briar sandbox verify --name gx10      # 디스플레이 할당 + 스크린샷 canary
+briar sandbox view --name gx10        # 에이전트 화면을 브라우저 noVNC로 보기
 ```
 
 `rm`은 먼저 컨테이너 안에서 `briar sandbox unregister`를 실행해 이 sandbox가

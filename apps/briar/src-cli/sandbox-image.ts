@@ -20,6 +20,9 @@ export const SANDBOX_CLI_PATH = `${SANDBOX_RUNTIME_ROOT}/bin/briar`;
 export const SANDBOX_HOME = "/home/briar";
 export const SANDBOX_CONFIG_HOME = `${SANDBOX_HOME}/.config/briar`;
 export const DEFAULT_DEBIAN_MIRROR = "deb.debian.org";
+/** noVNC listens here inside the container; the host publishes it on loopback. */
+export const SANDBOX_NOVNC_PORT = 6080;
+export const SANDBOX_NOVNC_TOKEN_FILE = "/var/lib/briar-computer-use/novnc-tokens";
 
 const debianMirrorPattern = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/u;
 
@@ -36,6 +39,11 @@ export function debianMirror(raw: string | undefined): string {
   return value;
 }
 
+/**
+ * Every bundle the sandbox runtime needs. The Computer Use MCP server is
+ * required: the sandbox runs Xvnc displays and a box service so agents can
+ * see and drive a desktop, exactly like a managed computer.
+ */
 const agentBundles = [
   "agy-runner.js",
   "claude-runner.js",
@@ -44,21 +52,49 @@ const agentBundles = [
   "grok-runner.js",
   "opencode-runner.js",
   "pi-runner.js",
+  "computer-use-mcp-server.js",
 ] as const;
 
-/**
- * The desktop app installs only the provider runners beside the CLI. The
- * Computer Use MCP bundle is staged when present (a checkout's `dist-agent/`),
- * but a sandbox has no display, so its absence must not block `sandbox up`.
- */
-const optionalAgentBundles = ["computer-use-mcp-server.js"] as const;
+export const SANDBOX_DESKTOP_FILES = [
+  "briar-remote-desktop",
+  "briar-computer-use-window",
+  "briar-open-browser",
+  "briar-computer-executor.py",
+  "xfce4-helpers.rc",
+  "xfce4-terminalrc",
+  "mimeapps.list",
+  "briar-google-chrome.desktop",
+  "remote-desktop-packages.txt",
+] as const;
+export type SandboxDesktopFile = (typeof SANDBOX_DESKTOP_FILES)[number];
 
 export type SandboxRuntimeAssets = {
   readonly bunVersion: string;
   readonly nodeVersion: string;
+  readonly desktopFiles: Readonly<Record<SandboxDesktopFile, string>>;
   readonly providerRuntimePackageJson: string;
   readonly providerRuntimeBunLock: string;
 };
+
+/**
+ * Debian packages for the desktop session, shared with the managed-computer
+ * AMI list. The sandbox adds Chromium because Google Chrome ships no Linux
+ * ARM64 build; `briar-open-browser` keeps calling `google-chrome-stable`
+ * through a wrapper so the desktop files stay identical.
+ */
+export function sandboxDesktopPackages(
+  assets: SandboxRuntimeAssets = sandboxRuntimeAssets,
+): string[] {
+  const listed = assets.desktopFiles["remote-desktop-packages.txt"]
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !line.startsWith("#"));
+  // The sandbox never grants administrator rights, so the AMI's sudo policy
+  // package is left out.
+  return [...new Set([...listed, "chromium", "novnc", "websockify"])]
+    .filter((name) => name !== "sudo")
+    .sort();
+}
 
 export function sandboxDockerfile(
   assets: SandboxRuntimeAssets = sandboxRuntimeAssets,
@@ -111,16 +147,44 @@ RUN set -eu; \\
     install -m 0755 "${SANDBOX_RUNTIME_ROOT}/provider/node_modules/agent-browser/bin/$browser" \\
       ${SANDBOX_RUNTIME_ROOT}/bin/agent-browser; \\
   fi
+# Desktop session, VNC displays, and Computer Use input executor.
+RUN apt-get update \\
+  && apt-get install -y --no-install-recommends \\
+    ${sandboxDesktopPackages(assets).join(" ")} \\
+  && rm -rf /var/lib/apt/lists/*
 COPY briar.js ${SANDBOX_RUNTIME_ROOT}/lib/briar.js
 COPY agent ${SANDBOX_RUNTIME_ROOT}/lib/agent
 COPY briar ${SANDBOX_RUNTIME_ROOT}/bin/briar
-RUN chmod 0755 ${SANDBOX_CLI_PATH} \\
-  && useradd --create-home --shell /bin/bash --uid 1000 briar
+COPY desktop/briar-remote-desktop desktop/briar-computer-use-window desktop/briar-open-browser \\
+  ${SANDBOX_RUNTIME_ROOT}/bin/
+COPY desktop/briar-computer-executor.py ${SANDBOX_RUNTIME_ROOT}/libexec/briar-computer-executor.py
+COPY desktop/briar-google-chrome.desktop /usr/share/applications/briar-google-chrome.desktop
+COPY desktop/xfce4-helpers.rc ${SANDBOX_HOME}/.config/xfce4/helpers.rc
+COPY desktop/xfce4-terminalrc ${SANDBOX_HOME}/.config/xfce4/terminal/terminalrc
+COPY desktop/mimeapps.list ${SANDBOX_HOME}/.config/mimeapps.list
+RUN set -eu; \\
+  useradd --create-home --shell /bin/bash --uid 1000 briar; \\
+  chmod 0755 ${SANDBOX_CLI_PATH} ${SANDBOX_RUNTIME_ROOT}/bin/briar-remote-desktop \\
+    ${SANDBOX_RUNTIME_ROOT}/bin/briar-computer-use-window ${SANDBOX_RUNTIME_ROOT}/bin/briar-open-browser \\
+    ${SANDBOX_RUNTIME_ROOT}/libexec/briar-computer-executor.py; \\
+  printf '#!/bin/sh\\nexec /usr/bin/chromium --no-sandbox --disable-dev-shm-usage --disable-gpu "$@"\\n' \\
+    > /usr/bin/google-chrome-stable; \\
+  chmod 0755 /usr/bin/google-chrome-stable; \\
+  update-alternatives --install /usr/bin/x-www-browser x-www-browser /usr/bin/google-chrome-stable 200; \\
+  install -d -m 1777 /tmp/.X11-unix; \\
+  install -d -o briar -g briar -m 0700 /var/lib/briar-computer-use; \\
+  install -d -o briar -g briar -m 0755 ${SANDBOX_HOME}/Desktop; \\
+  install -o briar -g briar -m 0644 /usr/share/applications/briar-google-chrome.desktop \\
+    "${SANDBOX_HOME}/Desktop/Google Chrome.desktop"; \\
+  chown -R briar:briar ${SANDBOX_HOME}
 USER briar
 WORKDIR ${SANDBOX_HOME}
 ENV HOME=${SANDBOX_HOME} \\
   BRIAR_CLI=${SANDBOX_CLI_PATH} \\
   BRIAR_CONFIG_HOME=${SANDBOX_CONFIG_HOME} \\
+  BRIAR_SANDBOX=1 \\
+  BRIAR_COMPUTER_USE_WINDOW_SUPERVISOR=process \\
+  GH_BROWSER=${SANDBOX_RUNTIME_ROOT}/bin/briar-open-browser \\
   PATH=${SANDBOX_RUNTIME_ROOT}/bin:${SANDBOX_HOME}/.local/bin:/usr/local/bin:/usr/bin:/bin
 CMD ["${SANDBOX_CLI_PATH}", "sandbox", "supervise"]
 `;
@@ -206,9 +270,8 @@ export async function stageSandboxBuildContext(input: {
     }
     files.set(`agent/${bundle}`, await readFile(join(input.agentDirectory, bundle)));
   }
-  for (const bundle of optionalAgentBundles) {
-    if (!available.has(bundle)) continue;
-    files.set(`agent/${bundle}`, await readFile(join(input.agentDirectory, bundle)));
+  for (const name of SANDBOX_DESKTOP_FILES) {
+    files.set(`desktop/${name}`, Buffer.from(assets.desktopFiles[name], "utf8"));
   }
   const digest = createHash("sha256");
   for (const path of [...files.keys()].sort()) {
@@ -223,7 +286,8 @@ export async function stageSandboxBuildContext(input: {
   for (const [path, content] of files) {
     const target = join(input.directory, path);
     await mkdir(resolve(target, ".."), { recursive: true, mode: 0o700 });
-    await writeFile(target, content, { mode: path === "briar" ? 0o755 : 0o644 });
+    const executable = path === "briar" || path.startsWith("desktop/briar-");
+    await writeFile(target, content, { mode: executable ? 0o755 : 0o644 });
   }
   return {
     directory: input.directory,

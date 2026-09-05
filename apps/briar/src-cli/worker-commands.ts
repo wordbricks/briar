@@ -174,6 +174,15 @@ const runComputerUseCanary = async (): Promise<boolean> => {
   }
 };
 
+/** Run the Computer Use canary once, bypassing the cache; used by `briar sandbox report`. */
+export async function probeComputerUseDisplay(): Promise<boolean> {
+  try {
+    return await runComputerUseCanary();
+  } catch {
+    return false;
+  }
+}
+
 const computerUseCanaryReady = async (): Promise<boolean> => {
   const now = Date.now();
   const maxAge = computerUseCanary?.ready
@@ -202,7 +211,12 @@ const inspectComputerUseCapability = async (
   providers: ReturnType<typeof healthyWorkerProviders>,
 ): Promise<WorkerRuntimeInput["computerUse"]> => {
   const computerUseProviders = providers.filter(supportsComputerUseProvider);
-  if (!config.managedComputer || computerUseProviders.length === 0) {
+  // Only hosts that own a Computer Use box service may advertise the
+  // capability: managed computers, and Docker sandboxes (which mark
+  // themselves through their image environment).
+  const computerUseHost = config.managedComputer !== undefined
+    || process.env.BRIAR_SANDBOX === "1";
+  if (!computerUseHost || computerUseProviders.length === 0) {
     return undefined;
   }
   const mcpServerPath = [

@@ -6,11 +6,13 @@ import {
   type ManagedComputerSetupProvider,
   managedComputerSetupProviders,
 } from "../src/lib/agent-provider";
-import { gitValueAt, has, loadConfig, value, values } from "./command-support";
+import { gitValueAt, has, loadConfig, openBrowser, value, values } from "./command-support";
 import {
   managedComputerProviderAuthCommand,
 } from "./managed-computer-setup-agent";
+import { ComputerUseBoxService } from "./computer-use-box-service";
 import {
+  computerUseServiceHealthy,
   decodeSandboxBootstrapPayload,
   readStdin,
   runSandboxBootstrap,
@@ -21,6 +23,7 @@ import {
 } from "./sandbox-bootstrap";
 import {
   createDockerRunner,
+  DEFAULT_SANDBOX_VIEW_PORT,
   type DockerRunner,
   ensureDockerContext,
   ensureSandbox,
@@ -40,6 +43,7 @@ import {
   sandboxImageTag,
   stageSandboxBuildContext,
 } from "./sandbox-image";
+import { probeComputerUseDisplay } from "./worker-commands";
 import {
   loadSandboxHostConfig,
   removeSandboxHostEntry,
@@ -61,10 +65,14 @@ const requestedName = () => sandboxName(value("--name"));
 
 async function resolveDocker(name: string, entry?: SandboxHostEntry) {
   const explicitContext = value("--context");
-  const host = value("--host");
-  if (explicitContext && host) {
+  const explicitHost = value("--host");
+  if (explicitContext && explicitHost) {
     throw new Error("Use only one of --context or --host");
   }
+  // A removed sandbox keeps its host in the registry while `rm --purge`
+  // deletes the Docker context Briar created, so re-ensure the context from
+  // the host whenever no explicit routing flag is given.
+  const host = explicitHost ?? (explicitContext ? undefined : entry?.host);
   if (host) {
     const contextName = await ensureDockerContext(createDockerRunner(undefined), {
       name,
@@ -167,6 +175,7 @@ export async function sandboxUpCommand() {
   const teamIds = values("--team");
   const gpus = has("--gpus") || (entry?.gpus === true && !has("--no-gpus"));
   const mirror = debianMirror(value("--debian-mirror") ?? entry?.debianMirror);
+  const viewPort = sandboxViewPort(value("--view-port") ?? entry?.viewPort);
   const payload = await bootstrapPayload({ name, teamIds });
   const sources = await resolveSandboxRuntimeSources();
   const stagingDirectory = await mkdtemp(join(tmpdir(), "briar-sandbox-"));
@@ -187,6 +196,7 @@ export async function sandboxUpCommand() {
       buildContextDirectory: stagingDirectory,
       gpus,
       debianMirror: mirror,
+      viewPort,
       bootstrap: () => pushBootstrap(docker, name, payload),
       log: (message) => console.error(message),
     });
@@ -196,6 +206,7 @@ export async function sandboxUpCommand() {
       teamIds: payload.teams.map((project) => project.id),
       gpus,
       ...(mirror === DEFAULT_DEBIAN_MIRROR ? {} : { debianMirror: mirror }),
+      ...(viewPort === DEFAULT_SANDBOX_VIEW_PORT ? {} : { viewPort }),
       runtimeSha256: context.runtimeSha256,
       updatedAt: new Date().toISOString(),
     });
@@ -344,4 +355,121 @@ export async function sandboxReportCommand() {
 
 export function sandboxSuperviseCommand() {
   return runSandboxSupervisor();
+}
+
+/** Run the Computer Use box service in the foreground (container side). */
+export async function sandboxBoxExecCommand() {
+  const service = new ComputerUseBoxService();
+  await service.start();
+  const shutdown = async () => {
+    await service.stop();
+    process.exit(0);
+  };
+  process.once("SIGINT", () => void shutdown());
+  process.once("SIGTERM", () => void shutdown());
+  await new Promise<never>(() => undefined);
+}
+
+/**
+ * Drive a real display end to end: assign a Computer Use window, take a
+ * screenshot, and release it. Container side; `briar sandbox verify` runs it
+ * over `docker exec`.
+ */
+export async function sandboxComputerUseCheckCommand() {
+  const serviceHealthy = await computerUseServiceHealthy();
+  const displayReady = serviceHealthy ? await probeComputerUseDisplay() : false;
+  console.log(JSON.stringify({ serviceHealthy, displayReady }));
+  if (!displayReady) process.exitCode = 1;
+}
+
+/** Host side: prove the sandbox can render and capture a desktop. */
+export async function sandboxVerifyCommand() {
+  const name = requestedName();
+  const { docker } = await resolveDocker(name, await registryEntry(name));
+  const result = await docker([
+    "exec",
+    sandboxContainerName(name),
+    SANDBOX_CLI_PATH,
+    "sandbox",
+    "computer-use-check",
+  ]);
+  console.log(result.output);
+  if (!result.ok) throw new Error("Sandbox Computer Use verification failed");
+}
+
+export function sandboxViewPort(raw: string | number | undefined): number {
+  if (raw === undefined) return DEFAULT_SANDBOX_VIEW_PORT;
+  const port = typeof raw === "number" ? raw : Number.parseInt(raw, 10);
+  if (!Number.isInteger(port) || port < 1024 || port > 65535) {
+    throw new Error("--view-port must be a TCP port between 1024 and 65535");
+  }
+  return port;
+}
+
+/** Parse `user@host[:port]` out of an `ssh://` Docker endpoint for a tunnel. */
+export function sshTunnelTarget(host: string | undefined) {
+  if (!host?.startsWith("ssh://")) return null;
+  const url = new URL(host);
+  return {
+    destination: `${url.username ? `${url.username}@` : ""}${url.hostname}`,
+    port: url.port ? Number.parseInt(url.port, 10) : undefined,
+  };
+}
+
+export function sandboxViewUrl(viewPort: number, displayIndex: number) {
+  const path = encodeURIComponent(`websockify?token=display${displayIndex}`);
+  return `http://127.0.0.1:${viewPort}/vnc.html?autoconnect=1&resize=scale&path=${path}`;
+}
+
+/**
+ * Watch what an agent sees, Grok Bot style: noVNC is published on the Docker
+ * host's loopback, so a remote host is reached through an SSH port forward
+ * that lives as long as this command.
+ */
+export async function sandboxViewCommand() {
+  const name = requestedName();
+  const entry = await registryEntry(name);
+  const { docker, host } = await resolveDocker(name, entry);
+  const status = await getSandboxStatus(docker, name);
+  if (!status.running) throw new Error(`Sandbox ${name} is not running`);
+  const displays = status.report?.computerUse?.displays ?? [];
+  const requested = value("--display");
+  const displayIndex = requested !== undefined
+    ? Number.parseInt(requested, 10)
+    : displays[0]?.displayIndex;
+  if (displayIndex === undefined) {
+    throw new Error(
+      "No agent holds a Computer Use display yet; rerun with --display <n> once one is assigned",
+    );
+  }
+  if (!Number.isInteger(displayIndex) || displayIndex < 1 || displayIndex > 100) {
+    throw new Error("--display must be between 1 and 100");
+  }
+  const viewPort = sandboxViewPort(entry?.viewPort);
+  const url = sandboxViewUrl(viewPort, displayIndex);
+  const tunnel = sshTunnelTarget(host);
+  if (tunnel) {
+    console.error(`Forwarding 127.0.0.1:${viewPort} through ${tunnel.destination}; press Ctrl-C to stop`);
+    const ssh = spawn("ssh", [
+      "-N",
+      "-o",
+      "ExitOnForwardFailure=yes",
+      ...(tunnel.port ? ["-p", String(tunnel.port)] : []),
+      "-L",
+      `127.0.0.1:${viewPort}:127.0.0.1:${viewPort}`,
+      tunnel.destination,
+    ], { stdio: ["ignore", "inherit", "inherit"] });
+    await new Promise((resolve) => setTimeout(resolve, 1_500));
+    if (ssh.exitCode !== null) throw new Error("SSH port forward exited before the view opened");
+    console.error(url);
+    openBrowser(url);
+    await new Promise<void>((resolve) => {
+      ssh.once("exit", () => resolve());
+      process.once("SIGINT", () => ssh.kill("SIGTERM"));
+      process.once("SIGTERM", () => ssh.kill("SIGTERM"));
+    });
+    return;
+  }
+  console.log(url);
+  openBrowser(url);
 }
