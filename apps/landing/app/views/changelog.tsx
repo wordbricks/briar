@@ -30,6 +30,18 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.201",
+        date: "2026년 9월 5일",
+        title: "설정의 컴퓨터 목록이 비어 보이던 문제를 고칩니다",
+        summary:
+          "Vertex AI와 Pi 프로바이더가 더해지면서, 그 이전에 등록된 컴퓨터의 런타임 정보를 서버가 더 이상 읽지 못했습니다. 목록은 컴퓨터를 하나씩 변환하므로 그런 컴퓨터가 하나만 있어도 응답 전체가 실패했고, 설정 화면에는 오류 문구만 남고 연결된 컴퓨터가 하나도 보이지 않았습니다.",
+        items: [
+          "저장된 런타임 정보에 아직 없는 프로바이더는 거부하는 대신 '사용 불가'로 채워 읽습니다. 앱이 이미 쓰던 방식과 같습니다.",
+          "켜져 있는 컴퓨터는 다음 신호에서 전체 프로바이더 목록으로 스스로 갱신되고, 꺼져 있는 컴퓨터도 목록에 다시 나타납니다. 데이터 이전 작업은 필요하지 않습니다.",
+          "앞으로 프로바이더가 더해져도 이전에 등록된 컴퓨터가 목록에서 사라지지 않습니다.",
+        ],
+      },
+      {
         version: "1.2.200",
         date: "2026년 9월 5일",
         title: "원격 호스트에서 실행 워커를 돌리는 Docker 샌드박스를 더합니다",
@@ -1693,6 +1705,18 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.201",
+        date: "September 5, 2026",
+        title: "Fix the empty computer list in settings",
+        summary:
+          "Once the Vertex AI and Pi providers landed, the server could no longer read the runtime record of any computer registered before them. The list converts computers one by one, so a single such computer failed the whole response, leaving the settings screen with an error message and no connected computers at all.",
+        items: [
+          "A provider missing from a stored runtime record is now filled in as unavailable instead of rejected — the same way the app already read it.",
+          "An online computer refreshes its record with the full provider list on its next heartbeat, and an offline one shows up in the list again. No data migration is required.",
+          "Adding a provider can no longer make previously registered computers disappear from the list.",
+        ],
+      },
       {
         version: "1.2.200",
         date: "September 5, 2026",
