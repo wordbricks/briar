@@ -30,6 +30,19 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.197",
+        date: "2026년 9월 5일",
+        title: "Google Vertex AI와 Pi 코딩 에이전트를 더하고 프로바이더 추가 방식을 정리합니다",
+        summary:
+          "Gemini를 Vertex AI로 쓰는 프로바이더와 Pi 코딩 에이전트가 새로 생깁니다. 설정 화면은 기본 지원 프로바이더만 보여주고, 나머지는 '프로바이더 추가'에서 골라 넣는 방식으로 바뀝니다.",
+        items: [
+          "Google Vertex AI(Gemini) 프로바이더를 추가했습니다. 프로젝트 ID와 리전만 저장하고 인증은 머신의 Google Application Default Credentials가 담당하므로, 서비스 계정 JSON을 Briar에 맡기지 않습니다.",
+          "Pi 코딩 에이전트를 기본 지원 프로바이더로 추가했습니다. pi-acp 어댑터가 ACP로 Briar와 대화하고 그 아래에서 Pi를 띄우며, 실행하려면 머신에 pi와 pi-acp가 모두 설치되어 있어야 합니다.",
+          "프로바이더를 기본 지원(codex, claude, agy, opencode, pi)과 추가(cursor, grok, openrouter, vertex)로 나눴습니다. 기본 지원 프로바이더는 항상 설정에 있고, 나머지는 '프로바이더 추가' 섹션에서 추가하기 전까지 목록에 나오지 않습니다.",
+          "추가한 프로바이더는 펼친 상세에서 인라인 확인 후 삭제할 수 있고, 온보딩은 기본 지원 프로바이더만 요구합니다. headless 머신에서는 `briar provider add` / `briar provider remove` 명령으로 같은 동작을 합니다.",
+        ],
+      },
+      {
         version: "1.2.196",
         date: "2026년 9월 4일",
         title: "화면을 오갈 때 목록을 그대로 유지하고, 웹훅 채널의 상세 내용을 에이전트에게 전달합니다",
@@ -1656,6 +1669,19 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.197",
+        date: "September 5, 2026",
+        title: "Add Google Vertex AI and the Pi coding agent, and rework how providers get added",
+        summary:
+          "A new provider runs Gemini through Vertex AI and the Pi coding agent joins as a built-in. Settings now lists built-in providers only; everything else is added from a new 'Add provider' section.",
+        items: [
+          "Added a Google Vertex AI (Gemini) provider. Briar stores only the project ID and region — authentication is delegated to the machine's Google Application Default Credentials, so service-account JSON never reaches Briar.",
+          "Added the Pi coding agent as a built-in provider. The pi-acp adapter speaks ACP with Briar and runs Pi underneath; a machine needs both the pi and pi-acp binaries installed to execute turns.",
+          "Providers are now split into built-in (codex, claude, agy, opencode, pi) and addable (cursor, grok, openrouter, vertex). Built-in providers always appear in settings, while the rest stay hidden in a searchable 'Add provider' section with install guidance and an add button until you add them.",
+          "An added provider can be removed from its expanded detail with inline confirmation, onboarding only requires built-in providers, and headless machines get the same behavior through the new `briar provider add` / `briar provider remove` commands.",
+        ],
+      },
       {
         version: "1.2.196",
         date: "September 4, 2026",
