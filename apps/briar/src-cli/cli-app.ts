@@ -66,6 +66,19 @@ import {
 } from "./managed-computer-commands";
 import { managedComputerEnrollCommand } from "./managed-computer-enrollment";
 import {
+  sandboxBootstrapCommand,
+  sandboxLoginCommand,
+  sandboxLogsCommand,
+  sandboxRecreateCommand,
+  sandboxRemoveCommand,
+  sandboxReportCommand,
+  sandboxShellCommand,
+  sandboxStatusCommand,
+  sandboxStopCommand,
+  sandboxSuperviseCommand,
+  sandboxUpCommand,
+} from "./sandbox-commands";
+import {
   providerAddCommand,
   providerAuthCommand,
   providerModelsCommand,
@@ -850,6 +863,70 @@ const providerCommand = Command.make("provider").pipe(
   ]),
 );
 
+const sandboxTargetFlags = optionalStrings("name", "context", "host");
+
+const sandboxCommand = Command.make("sandbox").pipe(
+  Command.withDescription(
+    "Run execution workers inside an owned Docker container, locally or on a remote Docker host",
+  ),
+  Command.withSubcommands([
+    leaf(
+      "up",
+      {
+        ...sandboxTargetFlags,
+        ...optionalStrings("label"),
+        ...repeatedStrings("project"),
+        ...switches("gpus", "no-gpus", "no-provider-auth"),
+      },
+      sandboxUpCommand,
+      "Build, start, and bootstrap the sandbox for the connected projects",
+    ),
+    leaf(
+      "status",
+      sandboxTargetFlags,
+      sandboxStatusCommand,
+      "Show whether the sandbox exists, runs, and is ready",
+    ),
+    leaf("stop", sandboxTargetFlags, sandboxStopCommand, "Stop the sandbox"),
+    leaf(
+      "recreate",
+      sandboxTargetFlags,
+      sandboxRecreateCommand,
+      "Restart the sandbox container",
+    ),
+    leaf(
+      "rm",
+      { ...sandboxTargetFlags, ...switches("purge") },
+      sandboxRemoveCommand,
+      "Remove the sandbox container (and its home volume with --purge)",
+    ),
+    leaf(
+      "logs",
+      { ...sandboxTargetFlags, ...optionalStrings("tail"), ...switches("follow") },
+      sandboxLogsCommand,
+      "Show sandbox container logs",
+    ),
+    leaf(
+      "shell",
+      sandboxTargetFlags,
+      sandboxShellCommand,
+      "Open a shell inside the sandbox",
+    ),
+    leaf(
+      "login",
+      { ...sandboxTargetFlags, ...requiredStrings("provider") },
+      sandboxLoginCommand,
+      "Sign a coding-agent provider in inside the sandbox",
+    ),
+    leaf("bootstrap", {}, sandboxBootstrapCommand, "Apply a bootstrap payload from stdin")
+      .pipe(Command.unlisted),
+    leaf("report", {}, sandboxReportCommand, "Report sandbox readiness as JSON")
+      .pipe(Command.unlisted),
+    leaf("supervise", {}, sandboxSuperviseCommand, "Supervise sandbox workers")
+      .pipe(Command.unlisted),
+  ]),
+);
+
 export const briarCommand = Command.make("briar").pipe(
   Command.withDescription("Briar project and worker command-line interface"),
   Command.withSubcommands([
@@ -869,6 +946,7 @@ export const briarCommand = Command.make("briar").pipe(
     runCommand,
     workerCommandTree,
     managedComputerCommand,
+    sandboxCommand,
     mergeQueueCommand,
     githubCommand,
   ]),

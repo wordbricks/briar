@@ -47,7 +47,29 @@ const pollInterval = () => {
     : 5_000;
 };
 
-export async function managedComputerWorkerSupervisor() {
+export type WorkerSupervisorOptions = {
+  /** Project IDs whose workers this supervisor keeps alive. */
+  desiredProjectIds: (config: Config) => string[] | Promise<string[]>;
+  /** Extra environment for each worker child. */
+  childEnvironment: (config: Config, projectId: string) => NodeJS.ProcessEnv;
+  /** Event name prefix so logs distinguish managed and sandbox supervisors. */
+  eventPrefix: string;
+};
+
+const managedSupervisorOptions: WorkerSupervisorOptions = {
+  desiredProjectIds: managedWorkerProjectIds,
+  childEnvironment: (config) => ({
+    BRIAR_MANAGED_CREDENTIAL_FILE: config.managedComputer!.credentialFile,
+  }),
+  eventPrefix: "managed_worker",
+};
+
+export function managedComputerWorkerSupervisor() {
+  return runWorkerSupervisor(managedSupervisorOptions);
+}
+
+export async function runWorkerSupervisor(options: WorkerSupervisorOptions) {
+  const prefix = options.eventPrefix;
   const nodeProcess = process as NodeJS.Process;
   const children = new Map<string, ManagedWorkerChild>();
   const restartAttempts = new Map<string, number>();
@@ -62,12 +84,12 @@ export async function managedComputerWorkerSupervisor() {
     while (!stop.signal.aborted) {
       try {
         const config = await loadConfig();
-        const desired = managedWorkerProjectIds(config);
+        const desired = await options.desiredProjectIds(config);
         const desiredSet = new Set(desired);
         const desiredKey = desired.join(",");
         if (desiredKey !== previousDesired) {
           console.log(JSON.stringify({
-            event: "managed_worker_projects",
+            event: `${prefix}_projects`,
             projectCount: desired.length,
             projectIds: desired,
           }));
@@ -90,14 +112,13 @@ export async function managedComputerWorkerSupervisor() {
               ...process.env,
               BRIAR_API_URL: config.apiUrl,
               BRIAR_PROJECT_ID: projectId,
-              BRIAR_MANAGED_CREDENTIAL_FILE:
-                config.managedComputer!.credentialFile,
+              ...options.childEnvironment(config, projectId),
             },
           });
           const running = { child, startedAt: Date.now() };
           children.set(projectId, running);
           console.log(JSON.stringify({
-            event: "managed_worker_started",
+            event: `${prefix}_started`,
             projectId,
             pid: child.pid ?? null,
           }));
@@ -114,7 +135,7 @@ export async function managedComputerWorkerSupervisor() {
               Date.now() + Math.min(60_000, 1_000 * 2 ** (attempt - 1)),
             );
             console.error(JSON.stringify({
-              event: "managed_worker_exited",
+              event: `${prefix}_exited`,
               projectId,
               code,
               signal,
@@ -124,7 +145,7 @@ export async function managedComputerWorkerSupervisor() {
         }
       } catch (error) {
         console.error(JSON.stringify({
-          event: "managed_worker_reconcile_failed",
+          event: `${prefix}_reconcile_failed`,
           message: error instanceof Error ? error.message : String(error),
         }));
       }

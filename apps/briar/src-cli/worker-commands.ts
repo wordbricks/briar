@@ -68,7 +68,11 @@ import {
   openCodeUpstreamConfigured,
   providerExecutionEnvironment,
 } from "./command-support";
-import { enabledAgentProviders } from "./config-contract";
+import {
+  type Config,
+  enabledAgentProviders,
+  type ProjectConfig,
+} from "./config-contract";
 import {
   maintainRecordedCompletedWorktrees,
   syncCompletedWorktreeRecordsFromDashboard,
@@ -232,20 +236,32 @@ const inspectComputerUseCapability = async (
   };
 };
 
-async function workerRegisterCommand() {
-  const config = await loadConfig();
-  const userToken = process.env.BRIAR_USER_TOKEN ?? config.userToken;
-  if (!userToken) throw new Error("먼저 `briar login`을 실행하세요.");
-  const requestedProjectId = value("--project");
-  const project = requestedProjectId
-    ? config.projects.find((candidate) => candidate.id === requestedProjectId)
-    : await currentProject(config);
-  if (!project) {
-    throw new Error("이 컴퓨터에 연결된 프로젝트를 찾지 못했습니다.");
-  }
+export type ProjectWorkerRegistration = {
+  projectId: string;
+  organizationId: string;
+  deviceId: string;
+  workerId: string;
+  label: string;
+  maxConcurrentSessions: number;
+  state: string;
+};
+
+/**
+ * Register (or re-bind) this machine as the execution worker of `project`
+ * and persist the resulting credential in `config`. Shared by the
+ * interactive `briar worker register` command and headless bootstraps such as
+ * the Docker sandbox, which register every project in one pass.
+ */
+export async function registerProjectExecutionWorker(input: {
+  config: Config;
+  project: ProjectConfig;
+  userToken: string;
+  label: string;
+  maxConcurrentSessions?: number;
+}): Promise<ProjectWorkerRegistration> {
+  const { config, project, label } = input;
   const deviceIdentity =
     config.workerDeviceIdentity ?? createWorkerDeviceIdentity();
-  const label = value("--label") ?? defaultWorkerLabel();
   const configuredProvider = project.llm?.provider ?? "codex";
   const providerHealth = await inspectWorkerProviderHealth(
     enabledAgentProviders(config),
@@ -263,28 +279,25 @@ async function workerRegisterCommand() {
   const provider = providers.includes(configuredProvider)
     ? configuredProvider
     : (providers[0] ?? configuredProvider);
-  const requestedMaxSessions = Number.parseInt(
-    value("--max-sessions") ?? "",
-    10,
-  );
-  const enrollment = createWorkerEnrollmentClient(config.apiUrl, userToken);
+  const runtime = workerRuntime({
+    agentProvider: provider,
+    providerHealth,
+    providerCapabilities,
+    worktrees: true,
+    dmMemoryLearning: dmMemoryLearningCapability(
+      providers,
+      openCodeUpstreamConfigured(config, "openrouter"),
+    ),
+    computerUse,
+  });
+  const enrollment = createWorkerEnrollmentClient(config.apiUrl, input.userToken);
   let registration: Awaited<ReturnType<typeof enrollment.register>> | null = null;
   if (config.projects.some((candidate) => candidate.executionWorker)) {
     try {
       const binding = await enrollment.bind({
         projectId: project.id,
         deviceIdentity,
-        runtime: workerRuntime({
-          agentProvider: provider,
-          providerHealth,
-          providerCapabilities,
-          worktrees: true,
-          dmMemoryLearning: dmMemoryLearningCapability(
-            providers,
-            openCodeUpstreamConfigured(config, "openrouter"),
-          ),
-          computerUse,
-        }),
+        runtime,
       });
       const existing = config.projects.find(
         (candidate) => candidate.executionWorker?.deviceId === binding.deviceId,
@@ -307,56 +320,73 @@ async function workerRegisterCommand() {
     projectId: project.id,
     label,
     deviceIdentity,
-    runtime: workerRuntime({
-      agentProvider: provider,
-      providerHealth,
-      providerCapabilities,
-      worktrees: true,
-      dmMemoryLearning: dmMemoryLearningCapability(
-        providers,
-        openCodeUpstreamConfigured(config, "openrouter"),
-      ),
-      computerUse,
-    }),
-    ...(Number.isInteger(requestedMaxSessions) && requestedMaxSessions > 0
-      ? { maxConcurrentSessions: requestedMaxSessions }
+    runtime,
+    ...(Number.isInteger(input.maxConcurrentSessions) &&
+        (input.maxConcurrentSessions ?? 0) > 0
+      ? { maxConcurrentSessions: input.maxConcurrentSessions }
       : {}),
   });
+  const resolved = registration;
   config.workerDeviceIdentity = deviceIdentity;
   config.projects = config.projects.map((candidate) => {
     if (
       candidate.id !== project.id &&
-      candidate.executionWorker?.deviceId !== registration.deviceId
+      candidate.executionWorker?.deviceId !== resolved.deviceId
     ) {
       return candidate;
     }
     return {
       ...candidate,
       executionWorker: {
-        deviceId: registration.deviceId,
+        deviceId: resolved.deviceId,
         workerId:
           candidate.id === project.id
-            ? registration.worker.id
+            ? resolved.worker.id
             : candidate.executionWorker!.workerId,
-        organizationId: registration.organizationId,
-        token: registration.workerToken,
+        organizationId: resolved.organizationId,
+        token: resolved.workerToken,
         label,
-        maxConcurrentSessions: registration.worker.maxConcurrentSessions,
+        maxConcurrentSessions: resolved.worker.maxConcurrentSessions,
       },
     };
   });
   await saveConfig(config);
-  console.log(
-    JSON.stringify({
-      projectId: project.id,
-      organizationId: registration.organizationId,
-      deviceId: registration.deviceId,
-      workerId: registration.worker.id,
-      label,
-      maxConcurrentSessions: registration.worker.maxConcurrentSessions,
-      state: registration.worker.state,
-    }),
+  return {
+    projectId: project.id,
+    organizationId: resolved.organizationId,
+    deviceId: resolved.deviceId,
+    workerId: resolved.worker.id,
+    label,
+    maxConcurrentSessions: resolved.worker.maxConcurrentSessions,
+    state: resolved.worker.state,
+  };
+}
+
+async function workerRegisterCommand() {
+  const config = await loadConfig();
+  const userToken = process.env.BRIAR_USER_TOKEN ?? config.userToken;
+  if (!userToken) throw new Error("먼저 `briar login`을 실행하세요.");
+  const requestedProjectId = value("--project");
+  const project = requestedProjectId
+    ? config.projects.find((candidate) => candidate.id === requestedProjectId)
+    : await currentProject(config);
+  if (!project) {
+    throw new Error("이 컴퓨터에 연결된 프로젝트를 찾지 못했습니다.");
+  }
+  const requestedMaxSessions = Number.parseInt(
+    value("--max-sessions") ?? "",
+    10,
   );
+  const registration = await registerProjectExecutionWorker({
+    config,
+    project,
+    userToken,
+    label: value("--label") ?? defaultWorkerLabel(),
+    ...(Number.isInteger(requestedMaxSessions) && requestedMaxSessions > 0
+      ? { maxConcurrentSessions: requestedMaxSessions }
+      : {}),
+  });
+  console.log(JSON.stringify(registration));
 }
 
 async function workerUnregisterCommand() {
