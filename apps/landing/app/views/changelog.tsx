@@ -30,6 +30,19 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.206",
+        date: "2026년 9월 6일",
+        title: "DM 목록에서 우클릭으로 정리합니다",
+        summary:
+          "사이드바 챗 목록의 대화를 우클릭하면 고정, 섹션으로 이동, 읽지 않음 표시, 프로필 편집, 대화 ID 복사, 숨기기, 삭제를 할 수 있습니다. 고정·섹션·숨김은 내 계정에 저장되어 다른 기기에서도 같게 보입니다.",
+        items: [
+          "섹션을 만들어 대화를 묶을 수 있고, 목록은 고정 → 섹션 → 미할당 순으로 표시됩니다. 숨긴 대화는 검색으로 찾을 수 있습니다.",
+          "프로필 편집은 팀 에이전트의 프로필 편집기를 바로 열고, 삭제는 참여자 모두에게서 대화를 지웁니다.",
+          "DM 메시지의 줄바꿈이 마크다운 렌더링에서 그대로 유지됩니다.",
+          "DM 기억 자동 학습이 별도 설정 없이 대화 에이전트의 provider를 그대로 사용합니다(Codex, Claude 검증).",
+        ],
+      },
+      {
         version: "1.2.205",
         date: "2026년 9월 5일",
         title: "사이드바를 챗과 업무로 나눕니다",
@@ -1754,6 +1767,19 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.206",
+        date: "September 6, 2026",
+        title: "Right-click to organize your DMs",
+        summary:
+          "Right-click a conversation in the sidebar's DMs list to pin it, move it into a section, mark it unread, edit the Agent's profile, copy its ID, hide it, or delete it. Pins, sections and hidden state are saved to your account, so every device shows the same arrangement.",
+        items: [
+          "Create sections to group conversations; the list shows pinned first, then your sections, then the rest. Hidden conversations stay reachable through search.",
+          "Edit Profile opens a team Agent's profile editor directly, and Delete removes the conversation for every participant.",
+          "Line breaks in DM messages are preserved in the Markdown rendering.",
+          "Automatic DM memory learning needs no configuration: it uses the conversation Agent's provider (Codex and Claude verified).",
+        ],
+      },
       {
         version: "1.2.205",
         date: "September 5, 2026",
