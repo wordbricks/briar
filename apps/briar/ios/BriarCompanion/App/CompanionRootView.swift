@@ -377,7 +377,7 @@ struct CompanionRootView: View {
                 var request = BriarAPI_ResolveIssueHierarchyLocationRequest()
                 request.sourceTeamID = coreUUIDString(projectID)
                 request.runID = coreUUIDString(runID)
-                guard let location = try? await services.project
+                guard let location = try? await services.team
                     .resolveIssueHierarchyLocation(request: request, headers: [:])
                     .briarValue(),
                     let resolvedTeamID = UUID(uuidString: location.teamID),

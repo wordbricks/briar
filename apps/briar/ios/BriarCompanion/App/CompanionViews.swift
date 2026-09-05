@@ -2963,7 +2963,7 @@ struct RunDetailView: View {
         do {
             let dashboard = dashboardService
             var request = BriarAPI_GetDashboardRequest()
-            request.projectID = coreUUIDString(proposal.projectId)
+            request.teamID = coreUUIDString(proposal.projectId)
             let snapshot = try DashboardSnapshot(connectMessage: await dashboard.getDashboard(
                 request: request,
                 headers: [:]
@@ -2995,7 +2995,7 @@ struct RunDetailView: View {
         do {
             let dashboard = dashboardService
             var dashboardRequest = BriarAPI_GetDashboardRequest()
-            dashboardRequest.projectID = coreUUIDString(proposal.projectId)
+            dashboardRequest.teamID = coreUUIDString(proposal.projectId)
             let preflight = try DashboardSnapshot(connectMessage: await dashboard.getDashboard(
                 request: dashboardRequest,
                 headers: [:]
@@ -3066,7 +3066,7 @@ struct RunDetailView: View {
         do {
             let dashboard = dashboardService
             var request = BriarAPI_GetDashboardRequest()
-            request.projectID = coreUUIDString(proposal.projectId)
+            request.teamID = coreUUIDString(proposal.projectId)
             let snapshot = try DashboardSnapshot(connectMessage: await dashboard.getDashboard(
                 request: request,
                 headers: [:]
@@ -3099,7 +3099,7 @@ struct RunDetailView: View {
         do {
             let dashboard = dashboardService
             var dashboardRequest = BriarAPI_GetDashboardRequest()
-            dashboardRequest.projectID = coreUUIDString(proposal.projectId)
+            dashboardRequest.teamID = coreUUIDString(proposal.projectId)
             let preflight = try DashboardSnapshot(connectMessage: await dashboard.getDashboard(
                 request: dashboardRequest,
                 headers: [:]
