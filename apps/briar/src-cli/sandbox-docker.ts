@@ -3,6 +3,7 @@ import * as Schema from "effect/Schema";
 import {
   DEFAULT_DEBIAN_MIRROR,
   SANDBOX_CLI_PATH,
+  SANDBOX_COMPUTER_USE_ROOT,
   SANDBOX_HOME,
   SANDBOX_NOVNC_PORT,
   SANDBOX_SCHEMA_VERSION,
@@ -48,6 +49,12 @@ export function sandboxName(raw: string | undefined): string {
 export const sandboxContainerName = (name: string) => `briar-sandbox-${name}`;
 export const sandboxHomeVolume = (name: string) =>
   `briar-sandbox-${name}-home`;
+/**
+ * The Computer Use state lives outside `/home/briar`, so it needs its own
+ * volume to survive the container replacement `up` does on a runtime change.
+ */
+export const sandboxComputerUseVolume = (name: string) =>
+  `briar-sandbox-${name}-computer-use`;
 
 export interface DockerCommandResult {
   readonly ok: boolean;
@@ -359,6 +366,11 @@ export function sandboxRunArguments(input: {
     "1g",
     "--volume",
     `${sandboxHomeVolume(input.name)}:${SANDBOX_HOME}`,
+    // Browser logins and display profiles outlive the container the same way
+    // the home volume does; an empty volume inherits the image's briar-owned
+    // 0700 directory on its first mount.
+    "--volume",
+    `${sandboxComputerUseVolume(input.name)}:${SANDBOX_COMPUTER_USE_ROOT}`,
     ...(input.gpus ? ["--gpus", "all"] : []),
     input.imageTag,
   ];
@@ -538,8 +550,9 @@ export interface RemoveSandboxResult {
 
 /**
  * Tear a sandbox down completely: unbind its workers, delete the container,
- * and with `purge` also the home volume, the built image, and the Docker
- * context Briar created. Ownership is checked before anything is touched.
+ * and with `purge` also both volumes (home and Computer Use), the built image,
+ * and the Docker context Briar created. Ownership is checked before anything
+ * is touched.
  */
 export async function removeSandbox(
   docker: DockerRunner,
@@ -560,11 +573,14 @@ export async function removeSandbox(
   let imageRemoved = false;
   let contextRemoved = false;
   if (options.purge) {
-    const volume = await docker(["volume", "rm", sandboxHomeVolume(name)]);
-    if (!volume.ok && !/no such volume/iu.test(volume.output)) {
-      throw new Error(`Could not remove the sandbox volume: ${volume.output}`);
+    volumeRemoved = true;
+    for (const volumeName of [sandboxHomeVolume(name), sandboxComputerUseVolume(name)]) {
+      const volume = await docker(["volume", "rm", volumeName]);
+      if (!volume.ok && !/no such volume/iu.test(volume.output)) {
+        throw new Error(`Could not remove the sandbox volume: ${volume.output}`);
+      }
+      volumeRemoved &&= volume.ok;
     }
-    volumeRemoved = volume.ok;
     if (options.imageTag) {
       const image = await docker(["image", "rm", options.imageTag]);
       if (!image.ok && !/no such image/iu.test(image.output)) {

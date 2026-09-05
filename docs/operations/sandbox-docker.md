@@ -17,9 +17,12 @@
 - **포트 없음.** Briar 워커의 연결은 전부 outbound HTTPS라서 publish할 포트가
   없다. 자격 증명은 `docker exec` stdin으로만 전달되고 Docker 호스트 디스크에는
   남지 않는다.
-- **볼륨 하나.** `/home/briar`가 `briar-sandbox-<name>-home` 볼륨이다. 저장소
+- **볼륨 둘.** `/home/briar`가 `briar-sandbox-<name>-home` 볼륨이다. 저장소
   클론, 워커 자격 증명, provider 로그인이 여기 남아 컨테이너를 교체해도
-  재부트스트랩이 빠르다.
+  재부트스트랩이 빠르다. `/var/lib/briar-computer-use`는
+  `briar-sandbox-<name>-computer-use` 볼륨으로, 공유 브라우저 로그인 저장소와
+  디스플레이 프로필(`:1` 포함), box 서비스 토큰이 여기 남는다. 둘 다 `rm --purge`에서만
+  지워진다.
 - **동일 lifecycle.** `up`, `status`, `stop`, `recreate`, `rm`으로 관리한다.
 
 ## 디스플레이와 Computer Use
@@ -169,7 +172,7 @@ briar sandbox shell --name gx10       # 컨테이너 안 bash
 briar sandbox recreate --name gx10    # 컨테이너 재시작
 briar sandbox stop --name gx10
 briar sandbox rm --name gx10          # 워커 등록 해제 + 컨테이너 제거, 볼륨은 유지
-briar sandbox rm --name gx10 --purge  # 볼륨, 이미지, Briar가 만든 Docker context까지 제거
+briar sandbox rm --name gx10 --purge  # 두 볼륨, 이미지, Briar가 만든 Docker context까지 제거
 briar sandbox verify --name gx10      # 디스플레이 할당 + 스크린샷 canary
 briar sandbox view --name gx10        # 에이전트 화면을 브라우저 noVNC로 보기
 ```

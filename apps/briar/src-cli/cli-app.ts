@@ -57,6 +57,10 @@ import {
   showSkillGuide,
 } from "./utility-commands";
 import {
+  exportComputerUseLoginStoreCommand,
+  importComputerUseLoginStoreCommand,
+} from "./computer-use-login-store-commands";
+import {
   managedComputerSetupCommand,
   managedComputerStatusCommand,
   managedComputerSyncCommand,
@@ -687,6 +691,42 @@ const managedComputerCommand = Command.make("managed-computer").pipe(
   ]),
 );
 
+const computerUseCommand = Command.make("computer-use").pipe(
+  Command.withDescription("Manage this computer's Computer Use state"),
+  Command.withSubcommands([
+    Command.make("login-store").pipe(
+      Command.withDescription(
+        "Move the shared browser login store between computers",
+      ),
+      Command.withSubcommands([
+        leaf(
+          "export",
+          {
+            ...requiredStrings("out"),
+            ...optionalStrings("profiles-directory"),
+            ...switches("force", "json"),
+          },
+          exportComputerUseLoginStoreCommand,
+          "Export this computer's browser login state to an archive",
+        ),
+        Command.make(
+          "import",
+          {
+            file: Argument.string("file"),
+            ...optionalStrings("profiles-directory"),
+            ...switches("json"),
+          },
+          () => runHandler(importComputerUseLoginStoreCommand),
+        ).pipe(
+          Command.withDescription(
+            "Fold an exported browser login archive into this computer",
+          ),
+        ),
+      ]),
+    ),
+  ]),
+);
+
 const mergeQueueCommand = Command.make("merge-queue").pipe(
   Command.withDescription("Configure and inspect the merge queue"),
   Command.withSubcommands([
@@ -926,6 +966,7 @@ export const briarCommand = Command.make("briar").pipe(
     runCommand,
     workerCommandTree,
     managedComputerCommand,
+    computerUseCommand,
     sandboxCommand,
     mergeQueueCommand,
     githubCommand,
