@@ -21,6 +21,7 @@ import {
   activeOrganizationChannelsAtom,
   channelCatalogCursorAtom,
   directMessageComposeAtom,
+  openAgentConversationIdAtom,
   organizationDirectMessagesAtom,
 } from "../channels/atoms";
 import { useOrganizationActions } from "../organization/actions";
@@ -397,6 +398,19 @@ export function useNavigationReconciliation(): void {
     ) {
       return;
     }
+    /*
+      An Agent-to-Agent conversation is open. It is not in the catalog and
+      never will be, so "not in the list" is not news of a missing channel —
+      it is read straight from the registry because the view claims it on the
+      same commit this runs on.
+    */
+    const claimedAgentConversation = registry.get(openAgentConversationIdAtom);
+    if (
+      claimedAgentConversation !== null &&
+      claimedAgentConversation === desktopActiveChannelId
+    ) {
+      return;
+    }
     const latest = sortDirectMessages(directMessages)[0];
     if (!latest) return;
     replaceChannelDestination(
@@ -417,6 +431,7 @@ export function useNavigationReconciliation(): void {
     navigationOrganizationId,
     navigationTeamId,
     navigationUserBoundaryChanged,
+    registry,
     replaceChannelDestination,
   ]);
 }

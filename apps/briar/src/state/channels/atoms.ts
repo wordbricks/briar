@@ -181,6 +181,31 @@ export const visibleOrganizationChannelsAtom = Atom.make((get) => {
   Atom.withLabel("channels/visible"),
 );
 
+/**
+ * The Agent-to-Agent conversation the direct message page is showing, if any.
+ *
+ * It is deliberately outside the catalog, so every rule phrased as "the open
+ * channel is not in the direct message list" — the page swapping in the latest
+ * conversation, above all — would throw the reader straight back out of it.
+ * The view that holds one says so here instead.
+ */
+export const openAgentConversationIdAtom = Atom.make<string | null>(null).pipe(
+  Atom.keepAlive,
+  Atom.withLabel("channels/openAgentConversation"),
+);
+
+/**
+ * Claims one before navigating to it. The navigation reconciles on the commit
+ * the navigation lands in, and the shell's effects run ahead of the page's, so
+ * whoever sends the reader there says so first.
+ */
+export function claimOpenAgentConversation(
+  registry: AtomRegistry,
+  channelId: string | null,
+): void {
+  registry.set(openAgentConversationIdAtom, channelId);
+}
+
 /** The direct messages of the active organization. Empty in a project window. */
 export const organizationDirectMessagesAtom = Atom.make((get) =>
   get(lockedTeamIdAtom)

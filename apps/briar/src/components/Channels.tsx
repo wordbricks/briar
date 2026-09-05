@@ -41,12 +41,14 @@ import {
   type RefObject,
   type SetStateAction,
 } from "react";
+import { Badge } from "@/components/ui/badge";
 import { LoadingState } from "@/components/ui/loading-state";
 import { useI18n } from "../i18n";
 import {
   useChannelComposer,
   type ChannelSkillCommandTarget,
 } from "../hooks/useChannelComposer";
+import { useChannelMessagePolling } from "../hooks/useChannelMessagePolling";
 import { useHorizontalPaneResize } from "../hooks/useHorizontalPaneResize";
 import type { AutoHuntSession } from "../types";
 import {
@@ -76,6 +78,7 @@ import {
   type ChannelAgentSummary,
   type ChannelMember,
   type ChannelMessage,
+  type ChannelMessageRelay,
   type ChannelExecutionProposal,
   type ChannelSummary,
   type ChannelWebhook,
@@ -120,6 +123,10 @@ import {
   saveChannelThreadWidth,
 } from "../lib/channel-thread-width";
 import { ChannelMessageText } from "./ChannelMessageText";
+import {
+  ChannelRelayFromLabel,
+  ChannelRelayOutboundNotice,
+} from "./ChannelRelayRow";
 import { ChannelMessageReactions } from "./ChannelMessageReactions";
 import { ChannelDocumentPreview } from "./ChannelDocumentPreview";
 import { ChannelThreadSubscribeControls } from "./ChannelThreadSubscribeControls";
@@ -225,6 +232,13 @@ type ChannelsProps = {
     rootMessageId: string;
   } | null;
   onRequestedMessageOpen?: () => void;
+  /**
+   * A relay row was activated: open the Agent-to-Agent conversation it points
+   * at. Without it the rows still render, they simply do not link anywhere.
+   */
+  onRelayOpen?: (relay: ChannelMessageRelay) => void;
+  /** Leaves a read-only Agent conversation for wherever it was opened from. */
+  onReadOnlyBack?: () => void;
 };
 
 /** Only opened from the DM header menu, so it loads on demand. */
@@ -347,6 +361,8 @@ export function Channels({
   onInboxDetailClose,
   onInboxChannelOpen,
   onCreateAgent,
+  onRelayOpen,
+  onReadOnlyBack,
   surface = "channel",
 }: ChannelsProps) {
   const [memoryOpen, setMemoryOpen] = useState(false);
@@ -355,7 +371,9 @@ export function Channels({
   useEffect(() => {
     if (!activeChannelId) return;
     const channel = channels.find((item) => item.id === activeChannelId);
-    if (!channel?.hasUnread) return;
+    // An Agent-to-Agent conversation is nobody's inbox: it never counts as
+    // unread, so opening one must not write a read mark for it either.
+    if (!channel?.hasUnread || channel.readOnly) return;
     const lastReadAt = laterTimestamp(
       channel.lastMessageAt,
       new Date().toISOString(),
@@ -470,6 +488,12 @@ export function Channels({
   );
   const applyLoadedChannel = useCallback(
     (loadedChannel: ChannelSummary) => {
+      /*
+        A read-only Agent conversation is held by whoever opened it, not by the
+        catalog: adding it here would put it in the sidebar and its unread
+        count, which is exactly what opening it by id is meant to avoid.
+      */
+      if (loadedChannel.readOnly) return;
       onChannelsChange((current) =>
         current.some((item) => item.id === loadedChannel.id)
           ? current.map((item) =>
@@ -543,12 +567,30 @@ export function Channels({
     loadSkillExecutionProposalContext,
   } = conversationLoader;
   const loadChannelConversation = conversationLoader.loadConversation;
+  /*
+    An Agent-to-Agent conversation, which people read but never write to. The
+    whole surface follows from the channel itself rather than from a mode the
+    caller picks, so a relay row and the Agent detail page open the same view.
+  */
+  const readOnly = activeChannel?.readOnly === true;
   useChannelConversationSync({
     enabled: true,
     channelId: activeChannelId,
     includeRepliesInRoot: surface === "dm",
     onSelectedChannelRemoved: handleSelectedChannelRemoved,
     onIncomingRootMessages: handleIncomingRootMessages,
+    retainWhenAbsentFromCatalog: readOnly,
+  });
+  /*
+    The delta loop only carries what the catalog holds, and this conversation is
+    deliberately outside it, so while one is open its page is asked for on a
+    timer instead.
+  */
+  useChannelMessagePolling({
+    channelId: activeChannelId,
+    enabled: readOnly,
+    organizationId,
+    token,
   });
 
   const activeChannelName = activeChannel && surface === "dm"
@@ -1140,6 +1182,7 @@ export function Channels({
     loadExecutionProposalContext,
     loadSkillExecutionProposalContext,
     openThread: (messageId) => void openThread(messageId),
+    openRelay: (relay) => onRelayOpen?.(relay),
     removeMessage,
     selectProposalProject: setProposalProject,
     toggleReaction,
@@ -1175,6 +1218,7 @@ export function Channels({
         ),
       openThread: (messageId) =>
         latestMessageHandlers.current.openThread(messageId),
+      openRelay: (relay) => latestMessageHandlers.current.openRelay(relay),
       removeMessage: (message) =>
         latestMessageHandlers.current.removeMessage(message),
       selectProposalProject: (proposalId, projectId) =>
@@ -1207,6 +1251,7 @@ export function Channels({
       acceptingProposalId,
       agents,
       busy,
+      canOpenRelay: Boolean(onRelayOpen),
       canOpenThread: surface === "channel",
       channel: activeChannel,
       currentUserId,
@@ -1233,6 +1278,7 @@ export function Channels({
       localeTag,
       members,
       messageHandlers,
+      onRelayOpen,
       openIssue,
       projects,
       proposalProjects,
@@ -1273,9 +1319,14 @@ export function Channels({
             <header className="channel-header" data-tauri-drag-region="deep">
               {surface === "dm" ? (
                 <button
-                  aria-label={t("navigation.back")}
+                  aria-label={readOnly
+                    ? t("dm.agentConversation.back")
+                    : t("navigation.back")}
                   className="channel-header-back"
-                  onClick={() => onChannelSelect(null)}
+                  onClick={() => {
+                    if (readOnly && onReadOnlyBack) onReadOnlyBack();
+                    else onChannelSelect(null);
+                  }}
                   type="button"
                 >
                   <ChevronLeft size={18} />
@@ -1303,7 +1354,16 @@ export function Channels({
                 </div>
               )}
               <div className="channel-header-actions">
-                {surface === "dm" && <button type="button" className="channel-header-icon"
+                {readOnly ? (
+                  <Badge
+                    className="channel-readonly-badge shrink-0 gap-1"
+                    variant="secondary"
+                  >
+                    <Lock aria-hidden="true" size={11} />
+                    {t("dm.agentConversation.readOnly")}
+                  </Badge>
+                ) : null}
+                {surface === "dm" && !readOnly && <button type="button" className="channel-header-icon"
                   aria-label={t("memory.title")} title={t("memory.title")} onClick={() => setMemoryOpen(true)}>
                   <Brain size={16} aria-hidden="true" />
                 </button>}
@@ -1316,7 +1376,7 @@ export function Channels({
                 >
                   <Webhook size={16} aria-hidden="true" />
                 </button> : null}
-                <button
+                {readOnly ? null : <button
                   type="button"
                   className="channel-header-icon channel-header-members"
                   aria-label={t("channel.headerMembers", { count: participantCount })}
@@ -1324,7 +1384,7 @@ export function Channels({
                 >
                   <Users size={16} aria-hidden="true" />
                   <span>{participantCount}</span>
-                </button>
+                </button>}
                 {surface === "channel" ? <button
                   type="button"
                   className="channel-header-icon"
@@ -1364,7 +1424,9 @@ export function Channels({
               ) : (
                 <>
                   {surface === "dm" ? (
-                    <DirectMessageWelcome name={activeChannelName} />
+                    readOnly ? null : (
+                      <DirectMessageWelcome name={activeChannelName} />
+                    )
                   ) : (
                     <ChannelWelcome
                       channel={activeChannel}
@@ -1403,37 +1465,39 @@ export function Channels({
               )}
             </div>
 
-            <Composer
-              agents={agents}
-              busy={busy || channelLoading}
-              enableSkillCommands={surface === "dm"}
-              members={members}
-              currentUserId={currentUserId}
-              channelName={activeChannelName}
-              key={`channel:${organizationId}:${activeChannelId}`}
-              onInvite={() => openInvite()}
-              placeholder={
-                surface === "dm"
-                  ? t("dm.messagePlaceholder", { name: activeChannelName })
-                  : undefined
-              }
-              onSend={(body, mentions, attachments, references, selectedSkill) =>
-                void send(
-                  body,
-                  mentions,
-                  null,
-                  attachments,
-                  references,
-                  selectedSkill,
-                )
-              }
-            />
+            {readOnly ? null : (
+              <Composer
+                agents={agents}
+                busy={busy || channelLoading}
+                enableSkillCommands={surface === "dm"}
+                members={members}
+                currentUserId={currentUserId}
+                channelName={activeChannelName}
+                key={`channel:${organizationId}:${activeChannelId}`}
+                onInvite={() => openInvite()}
+                placeholder={
+                  surface === "dm"
+                    ? t("dm.messagePlaceholder", { name: activeChannelName })
+                    : undefined
+                }
+                onSend={(body, mentions, attachments, references, selectedSkill) =>
+                  void send(
+                    body,
+                    mentions,
+                    null,
+                    attachments,
+                    references,
+                    selectedSkill,
+                  )
+                }
+              />
+            )}
           </>
         ) : (
           <p className="muted channel-empty">{t("channel.selectPrompt")}</p>
         )}
         </section>
-        {surface === "dm" ? (
+        {surface === "dm" && !readOnly ? (
           <DmComputerPanel
             agents={agents}
             organizationId={organizationId}
@@ -2847,6 +2911,8 @@ export interface MessageRowHandlers
       "loadExecutionProposalContext" | "loadSkillExecutionProposalContext"
     > {
   readonly openThread: (messageId: string) => void;
+  /** Opens the Agent-to-Agent conversation a relay row points at. */
+  readonly openRelay: (relay: ChannelMessageRelay) => void;
   readonly selectProposalProject: (
     proposalId: string,
     projectId: string,
@@ -2862,6 +2928,8 @@ export interface ChannelMessageRowContext {
   readonly acceptingProposalId: string | null;
   readonly agents: ChannelAgentSummary[];
   readonly busy: boolean;
+  /** A relay row can link into the Agent-to-Agent conversation it names. */
+  readonly canOpenRelay: boolean;
   readonly canOpenThread: boolean;
   readonly channel: ChannelSummary;
   readonly currentUserId: string | null;
@@ -2914,6 +2982,7 @@ export const ChannelMessageRow = memo(function ChannelMessageRow({
         }
         agents={context.agents}
         busy={context.busy}
+        canOpenRelay={context.canOpenRelay}
         canOpenThread={context.canOpenThread}
         channel={context.channel}
         currentUserId={context.currentUserId}
@@ -2953,6 +3022,7 @@ export const MessageRow = memo(function MessageRow({
   acceptingProposal,
   decliningProposal,
   agents,
+  canOpenRelay = false,
   canOpenThread = false,
   channel,
   handlers,
@@ -2972,6 +3042,8 @@ export const MessageRow = memo(function MessageRow({
   acceptingProposal: boolean;
   decliningProposal: boolean;
   agents: ChannelAgentSummary[];
+  /** The view can navigate, so a relay row may link into its conversation. */
+  canOpenRelay?: boolean;
   /** The surface has threads, so a row may offer to open one. */
   canOpenThread?: boolean;
   channel: ChannelSummary;
@@ -3062,6 +3134,14 @@ export const MessageRow = memo(function MessageRow({
         : undefined,
     [canOpenThread, handlers, message.id],
   );
+  const relay = message.relay;
+  const onOpenRelay = useMemo(
+    () =>
+      canOpenRelay && relay
+        ? () => handlers.openRelay(relay)
+        : undefined,
+    [canOpenRelay, handlers, relay],
+  );
   const [reacting, setReacting] = useState(false);
   const isAgent = message.author.type === "agent";
   const isWebhook = message.author.type === "webhook";
@@ -3096,6 +3176,30 @@ export const MessageRow = memo(function MessageRow({
         (project) => project.id === message.executionProposal?.projectId,
       )?.name ?? message.executionProposal.projectId
     : null;
+
+  /*
+    The Agent said it would pass the request on. What it sent lives in the
+    Agent-to-Agent conversation, so the thread keeps a notice rather than a
+    bubble; the answer coming back is a bubble of its own, below.
+  */
+  if (relay?.direction === "outbound") {
+    return (
+      <div
+        aria-current={highlighted ? "true" : undefined}
+        className={`channel-message-relay-row px-6${highlighted ? " is-inbox-target bg-accent" : ""}`}
+        data-channel-message-id={message.id}
+        data-inbox-highlighted={highlighted ? "true" : undefined}
+        tabIndex={highlighted ? -1 : undefined}
+      >
+        <ChannelRelayOutboundNotice
+          body={message.body}
+          onOpen={onOpenRelay}
+          relay={relay}
+          time={formatMessageTime(message.createdAt, localeTag)}
+        />
+      </div>
+    );
+  }
 
   return (
     <article
@@ -3133,6 +3237,9 @@ export const MessageRow = memo(function MessageRow({
         ) : null}
       </div>
       <div className="channel-message-body">
+        {relay?.direction === "inbound" ? (
+          <ChannelRelayFromLabel onOpen={onOpenRelay} relay={relay} />
+        ) : null}
         <header>
           <strong>{displayName}</strong>
           {message.author.type === "webhook" ? (
@@ -3367,6 +3474,7 @@ export const MessageRow = memo(function MessageRow({
   previous.decliningProposal === next.decliningProposal &&
   previous.agents === next.agents &&
   previous.busy === next.busy &&
+  previous.canOpenRelay === next.canOpenRelay &&
   previous.channel === next.channel &&
   previous.currentUserId === next.currentUserId &&
   previous.localeTag === next.localeTag &&

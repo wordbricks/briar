@@ -56,16 +56,30 @@ const delta = (overrides: Partial<ChannelDelta> = {}): ChannelDelta => ({
   ...overrides,
 });
 
-function Harness({ channel = channelId }: { channel?: string | null }) {
+type HarnessProps = {
+  channel?: string | null;
+  onSelectedChannelRemoved?: () => void;
+  retainWhenAbsentFromCatalog?: boolean;
+};
+
+function Harness({
+  channel = channelId,
+  onSelectedChannelRemoved = () => undefined,
+  retainWhenAbsentFromCatalog,
+}: HarnessProps) {
   useChannelConversationSync({
     enabled: true,
     channelId: channel,
-    onSelectedChannelRemoved: () => undefined,
+    onSelectedChannelRemoved,
+    retainWhenAbsentFromCatalog,
   });
   return null;
 }
 
-async function renderHarness(seed?: (registry: AtomRegistry) => void) {
+async function renderHarness(
+  seed?: (registry: AtomRegistry) => void,
+  props: HarnessProps = {},
+) {
   const { cleanup, root } = createReactTestRoot({ attachToDocument: true });
   const registry = createTestRegistry([
     [tokenAtom, "token"],
@@ -77,7 +91,7 @@ async function renderHarness(seed?: (registry: AtomRegistry) => void) {
     <RegistryContext.Provider value={registry}>
       <I18nProvider>
         <ToastProvider>
-          <Harness />
+          <Harness {...props} />
         </ToastProvider>
       </I18nProvider>
     </RegistryContext.Provider>,
@@ -145,6 +159,54 @@ describe("channel conversation realtime sync", () => {
       registry.get(channelRootMessagesAtom(channelId)).map((item) => item.id),
     ).toEqual(["fresh"]);
     expect(registry.get(channelAgentRepliesAtom(channelId))).toEqual([fresh]);
+  });
+
+  /*
+    An Agent-to-Agent conversation is opened by id and the catalog never lists
+    it, so a snapshot that leaves it out says nothing about it. An explicit
+    removal still closes it.
+  */
+  it("keeps a conversation the catalog was never going to list", async () => {
+    const removed = vi.fn();
+    let registry!: AtomRegistry;
+    ({ cleanup, registry } = await renderHarness(
+      (target) => writeChannelTimeline(target, channelId, []),
+      { onSelectedChannelRemoved: removed, retainWhenAbsentFromCatalog: true },
+    ));
+
+    await publish(
+      registry,
+      delta({
+        cursor: 4,
+        reset: true,
+        channels: [testChannelSummary("other-channel")],
+        messages: [testChannelMessage("relayed")],
+      }),
+    );
+
+    expect(removed).not.toHaveBeenCalled();
+    expect(
+      registry.get(channelRootMessagesAtom(channelId)).map((item) => item.id),
+    ).toEqual(["relayed"]);
+
+    await publish(registry, delta({ cursor: 5, removedChannelIds: [channelId] }));
+    expect(removed).toHaveBeenCalledTimes(1);
+  });
+
+  it("closes a catalog channel that a reset no longer lists", async () => {
+    const removed = vi.fn();
+    let registry!: AtomRegistry;
+    ({ cleanup, registry } = await renderHarness(
+      (target) => writeChannelTimeline(target, channelId, []),
+      { onSelectedChannelRemoved: removed },
+    ));
+
+    await publish(
+      registry,
+      delta({ cursor: 4, reset: true, channels: [] }),
+    );
+
+    expect(removed).toHaveBeenCalledTimes(1);
   });
 
   it("keeps a terminal delta when an older answer arrives later", async () => {

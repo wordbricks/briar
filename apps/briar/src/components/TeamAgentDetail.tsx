@@ -35,6 +35,8 @@ import type {
   ProjectAgent,
   TeamAgentBoard,
 } from "../types";
+import { useNavigationActions } from "../state/navigation/actions";
+import { AgentConversationsSection } from "./AgentConversationsSection";
 import { ManagedComputerRemoteDesktop } from
   "./ManagedComputerRemoteDesktop";
 import { TeamAgentSessionDetail } from "./TeamAgentSessionDetail";
@@ -102,6 +104,7 @@ export function TeamAgentDetail({
 }) {
   const { t } = useI18n();
   const { toast } = useToast();
+  const { navigateToChannel } = useNavigationActions();
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
   const [remoteComputer, setRemoteComputer] = useState<ManagedComputer | null>(
@@ -204,6 +207,9 @@ export function TeamAgentDetail({
   };
 
   const isTaskStarting = isExternalStartPending || isStarting;
+  // Agent-to-Agent conversations are an organization's, so the section only
+  // shows once the board has told this page which organization it belongs to.
+  const agentOrganizationId = board?.team.organizationId ?? null;
 
   const submit = async (input: TeamAgentTaskDialogSubmit) => {
     if (isTaskStarting || !board) return;
@@ -379,6 +385,17 @@ export function TeamAgentDetail({
           projectId={board?.team.id ?? agent.teamId}
         />
       </div>
+
+      {!companionMode && token && agentOrganizationId ? (
+        <AgentConversationsSection
+          agentId={agent.id}
+          className="shrink-0 border-t border-border bg-card px-5 py-2.5"
+          onOpenConversation={(channelId) =>
+            navigateToChannel(channelId, "dms", agentOrganizationId)}
+          organizationId={agentOrganizationId}
+          token={token}
+        />
+      ) : null}
 
       <TeamAgentTaskDialog
         agent={agent}

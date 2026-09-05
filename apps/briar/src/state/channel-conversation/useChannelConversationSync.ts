@@ -44,6 +44,12 @@ export type ChannelConversationRealtimeOptions = {
   /** Direct messages render replies in the single timeline rather than a thread. */
   readonly includeRepliesInRoot?: boolean;
   readonly onSelectedChannelRemoved: () => void;
+  /**
+   * The open channel is one the catalog never carries — an Agent-to-Agent
+   * conversation opened by id — so a snapshot without it is not news of its
+   * deletion. An explicit removal still closes it.
+   */
+  readonly retainWhenAbsentFromCatalog?: boolean;
   readonly onSelectedChannelSummary?: (channel: ChannelSummary) => void;
   /** New root messages arrived, which is what decides the scroll. */
   readonly onIncomingRootMessages?: (messages: ChannelMessage[]) => void;
@@ -85,7 +91,7 @@ export function useChannelConversationSync(
       const summary = delta.channels.find((item) => item.id === channelId);
       if (
         delta.removedChannelIds.includes(channelId) ||
-        (delta.reset && !summary)
+        (delta.reset && !summary && !current.retainWhenAbsentFromCatalog)
       ) {
         loader.invalidateSurface(null, null);
         current.onSelectedChannelRemoved();

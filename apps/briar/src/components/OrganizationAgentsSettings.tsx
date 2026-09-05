@@ -45,6 +45,8 @@ import {
   agentProviderLabels,
   agentProviders,
 } from "../lib/agent-provider";
+import { useNavigationActions } from "../state/navigation/actions";
+import { AgentConversationsSection } from "./AgentConversationsSection";
 import { AgentProviderIcon } from "./AgentIcons";
 import { NativeSelect } from "./NativeSelect";
 import { ProviderSelect } from "./ProviderSelect";
@@ -68,6 +70,7 @@ export function OrganizationAgentsSettings({
   token: string;
 }) {
   const { localeTag, t } = useI18n();
+  const { navigateToChannel } = useNavigationActions();
   const [agents, setAgents] = useState<ChannelAgentSummary[]>([]);
   const [canManage, setCanManage] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -358,6 +361,14 @@ export function OrganizationAgentsSettings({
                   </Button>
                 </div>
               ) : null}
+              <AgentConversationsSection
+                agentId={agent.agentId}
+                className="border-t border-border pt-3 md:col-span-2"
+                onOpenConversation={(channelId) =>
+                  navigateToChannel(channelId, "dms", organizationId)}
+                organizationId={organizationId}
+                token={token}
+              />
             </article>
           ))}
         </section>
