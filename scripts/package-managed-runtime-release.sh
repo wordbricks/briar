@@ -50,13 +50,19 @@ for skill_name in briar-workflow browser; do
     exit 1
   }
 done
+# Every provider runner the desktop build produces must ship in the managed
+# runtime. Listing them by name fails loudly when a provider is missing while
+# letting the next provider pass through the glob without a release-host edit.
+provider_runner_names=(agy claude codex cursor grok opencode pi)
+for runner_name in "${provider_runner_names[@]}"; do
+  [[ -s "$workspace_root/apps/briar/dist-agent/$runner_name-runner.js" ]] || {
+    echo "Managed runtime requires the $runner_name provider runner." >&2
+    exit 1
+  }
+done
 shopt -s nullglob
 runner_sources=("$workspace_root"/apps/briar/dist-agent/*-runner.js)
 shopt -u nullglob
-if (( ${#runner_sources[@]} != 6 )); then
-  echo "Managed runtime requires exactly six provider runners." >&2
-  exit 1
-fi
 computer_use_mcp_source="$workspace_root/apps/briar/dist-agent/computer-use-mcp-server.js"
 [[ -s "$computer_use_mcp_source" ]] || {
   echo "Managed runtime requires the Computer Use MCP adapter." >&2
