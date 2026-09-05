@@ -35,12 +35,14 @@ import {
 } from "@connectrpc/connect";
 import { connectNodeAdapter } from "@connectrpc/connect-node";
 import * as Predicate from "effect/Predicate";
+import { FileComputerUseBrowserLoginStore } from "./computer-use-browser-login-store";
 import {
   ComputerUseDesktopManager,
   ComputerUseDesktopOwnershipError,
   FileComputerUseAssignmentStore,
 } from "./computer-use-desktop-manager";
 import { NativeComputerUseExecutor } from "./computer-use-native-executor";
+import { ComputerUsePrimaryLoginWatcher } from "./computer-use-primary-login-watcher";
 import { computerUseWindowSupervisorFromEnvironment } from "./computer-use-window-supervisor";
 
 export const defaultBoxExecAuthTokenPath =
@@ -183,6 +185,12 @@ const close = (server: Server): Promise<void> => new Promise((resolve, reject) =
   server.close((error) => error === undefined ? resolve() : reject(error));
 });
 
+/** Started with the box service and stopped with it. */
+export interface ComputerUsePrimaryLoginSource {
+  start(): void;
+  stop(): void;
+}
+
 export interface ComputerUseBoxServiceOptions {
   readonly authToken?: string;
   readonly host?: string;
@@ -190,6 +198,7 @@ export interface ComputerUseBoxServiceOptions {
   readonly forkPort?: number;
   readonly desktopManager?: ComputerUseDesktopManager;
   readonly controlledExecManager?: SimpleControlledExecManager;
+  readonly primaryLoginWatcher?: ComputerUsePrimaryLoginSource;
 }
 
 export class ComputerUseBoxService {
@@ -198,6 +207,7 @@ export class ComputerUseBoxService {
   private readonly forkPort: number;
   private readonly desktopManager: ComputerUseDesktopManager;
   private readonly controlledExecManager: SimpleControlledExecManager;
+  private readonly primaryLoginWatcher: ComputerUsePrimaryLoginSource;
   private primaryServer: Server | undefined;
   private forkServer: Server | undefined;
 
@@ -205,10 +215,15 @@ export class ComputerUseBoxService {
     this.host = options.host ?? "127.0.0.1";
     this.primaryPort = options.primaryPort ?? BOX_EXEC_PRIMARY_PORT;
     this.forkPort = options.forkPort ?? BOX_EXEC_FORK_ROUTER_PORT;
+    // One store instance so the Agent displays and the owner's display :1 go
+    // through the same mutex instead of racing each other's captures.
+    const browserLoginStore = new FileComputerUseBrowserLoginStore();
     this.desktopManager = options.desktopManager ?? new ComputerUseDesktopManager(
       new FileComputerUseAssignmentStore(),
-      computerUseWindowSupervisorFromEnvironment(),
+      computerUseWindowSupervisorFromEnvironment(process.env, { browserLoginStore }),
     );
+    this.primaryLoginWatcher = options.primaryLoginWatcher
+      ?? new ComputerUsePrimaryLoginWatcher({ store: browserLoginStore });
     if (options.controlledExecManager !== undefined) {
       this.controlledExecManager = options.controlledExecManager;
     } else {
@@ -239,6 +254,9 @@ export class ComputerUseBoxService {
       throw new BoxExecAuthTokenError("Box auth token is malformed");
     }
     await this.desktopManager.restoreAssignments();
+    // The owner may sign in on display :1 at any time; the watcher folds those
+    // logins into the shared store for every Agent display.
+    this.primaryLoginWatcher.start();
     const commonOptions = {
       interceptors: [authInterceptor(authToken)] as Interceptor[],
       readMaxBytes: BOX_EXEC_MAX_MESSAGE_BYTES,
@@ -337,11 +355,13 @@ export class ComputerUseBoxService {
       await Promise.allSettled([close(primaryServer), close(forkServer)]);
       this.primaryServer = undefined;
       this.forkServer = undefined;
+      this.primaryLoginWatcher.stop();
       throw error;
     }
   }
 
   async stop(): Promise<void> {
+    this.primaryLoginWatcher.stop();
     const servers = [this.primaryServer, this.forkServer].filter(
       (server): server is Server => server !== undefined,
     );
