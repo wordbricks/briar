@@ -31,6 +31,7 @@ import {
   createDeviceAuthorizationClient,
   type DeviceAuthorizationClient,
 } from "../src/lib/device-authorization-client";
+import { defaultSharedStatePath } from "./browser-state";
 import {
   defaultWorktreeRoot,
   samePath,
@@ -88,6 +89,20 @@ function openCodeUpstreamConfigured(config: Config, provider: AgentProvider) {
   return openCodeUpstreamCredential(config, provider) !== null;
 }
 
+/**
+ * Where this machine's Briar Agents share `agent-browser` logins. The path is
+ * absolute and rooted at the real home so a turn running under an isolated
+ * `HOME` still reaches the one shared file; an inherited value wins, because
+ * Briar already resolved the real home when it set it.
+ */
+function agentBrowserStateFile(environment: NodeJS.ProcessEnv) {
+  return (
+    environment.BRIAR_AGENT_BROWSER_STATE_FILE?.trim() ||
+    process.env.BRIAR_AGENT_BROWSER_STATE_FILE?.trim() ||
+    defaultSharedStatePath(process.env.BRIAR_WORKTREE_HOME?.trim() || homedir())
+  );
+}
+
 function providerExecutionEnvironment(
   config: Config,
   provider: AgentProvider,
@@ -97,6 +112,11 @@ function providerExecutionEnvironment(
     ...environment,
     BRIAR_BROWSER_AUTOMATION_PROVIDER:
       config.appSettings.browserAutomationProvider,
+    // ego (lite) and Aside share the user's own browser state; only
+    // agent-browser needs Briar's shared state file.
+    ...(config.appSettings.browserAutomationProvider === "agent-browser"
+      ? { BRIAR_AGENT_BROWSER_STATE_FILE: agentBrowserStateFile(environment) }
+      : {}),
     ...(config.managedComputer
       ? {
           BRIAR_MANAGED_COMPUTER_ID:
