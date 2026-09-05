@@ -616,7 +616,18 @@ const channelReplyFromProto = (
       throw new Error("Worker organization reply has inconsistent scope data");
     }
   } else if (mapped.organizationContext || mapped.delegationTargets.length > 0) {
+    // Delegation stays an Organization Agent path inside a channel thread.
+    // Agent messages are a DM feature open to both scopes, so
+    // agentMessageTargets is deliberately absent from this rule.
     throw new Error("Worker project reply has inconsistent scope data");
+  }
+  // The two paths pick different completion actions and are never offered
+  // together (plan §3.7); a claim carrying both target lists cannot say which
+  // one this reply may use.
+  if (
+    mapped.delegationTargets.length > 0 && mapped.agentMessageTargets.length > 0
+  ) {
+    throw new Error("Worker channel reply has conflicting Agent target lists");
   }
   if (
     mapped.skillExecutionTarget &&

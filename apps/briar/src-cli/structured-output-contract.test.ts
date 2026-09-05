@@ -226,6 +226,32 @@ describe("provider structured output contracts", () => {
       expect(() => contract.decode(missingAttachments)).toThrow();
     }
   });
+
+  it("encodes a lookup turn with no Agent message", () => {
+    /*
+      A lookup turn is replayed to the provider through the same codec. An
+      Agent message reappearing there would send a message the Agent never
+      chose, so both lookup cases must encode it as null.
+    */
+    const encode = Schema.encodeSync(ChannelAgentReplyProviderOutputSchema);
+
+    expect(encode({
+      case: "context",
+      requests: {
+        contextRequests: [{
+          resource: "issues",
+          projectId: "project-1",
+          detail: "summary",
+          limit: 25,
+          cursor: null,
+        }],
+      },
+    })).toMatchObject({ agentMessage: null, delegation: null, body: null });
+    expect(encode({
+      case: "memory",
+      request: { operation: "search", queries: ["metric units"] },
+    })).toMatchObject({ agentMessage: null, delegation: null, body: null });
+  });
 });
 
 describe("Claude Code provider schemas", () => {
