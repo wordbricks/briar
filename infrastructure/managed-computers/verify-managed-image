@@ -108,9 +108,12 @@ sudo -u briar -H test -w /home/briar/.codex/log
 sudo -u briar -H bash -lc 'rustup run 1.96.0 rustc --version' \
   | grep -Fq "rustc $RUST_TOOLCHAIN_VERSION "
 
-runner_count="$(find /opt/briar/lib/agent -maxdepth 1 -type f \
-  -name '*-runner.js' | wc -l)"
-test "$runner_count" = "6"
+# Require every provider runner by name instead of a total count, so adding a
+# provider cannot silently break image verification and a missing runner still
+# fails loudly.
+for runner_name in agy claude codex cursor grok opencode pi; do
+  test -s "/opt/briar/lib/agent/$runner_name-runner.js"
+done
 test -s /opt/briar/lib/agent/computer-use-mcp-server.js
 test "$(readlink -f /opt/briar/current)" = \
   "/opt/briar/releases/$briar_version"
