@@ -51,6 +51,24 @@ export async function requireChannelDeletionAccess(
   }
   const channel = await getChannelById(db, organizationId, channelId);
   if (!channel) throw new HttpError(404, "Channel not found");
+  /*
+    A direct message has no owner: everybody in it is a participant, and the
+    person who happened to start it is not more entitled to it than the person
+    who replied. Any participant may therefore delete the conversation, which
+    deletes it for everybody in it. This only adds a way through: a caller who
+    is not a participant still faces the checks below, and regular channels keep
+    the creator-or-owner rule untouched.
+  */
+  if (channel.kind === "dm") {
+    const participant = await db
+      .prepare(
+        `select 1 as present from briar_channel_members
+         where channel_id = ? and user_id = ?`,
+      )
+      .bind(channelId, userId)
+      .first<{ present: number }>();
+    if (participant) return channel;
+  }
   if (!hasOrganizationCapability(role, "conversations:write")) {
     throw new HttpError(403, "Conversation editing permission required");
   }

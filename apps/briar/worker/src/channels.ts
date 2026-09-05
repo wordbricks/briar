@@ -114,6 +114,13 @@ export type ChannelRow = {
   dm_participants_json: string | null;
   last_read_at: string | null;
   last_unread_message_at: string | null;
+  /*
+    The requesting user's own sidebar placement. Null on every worker-plane
+    query, which reads a channel without a user to read it for.
+  */
+  sidebar_pinned_at: string | null;
+  sidebar_section_id: string | null;
+  sidebar_hidden_at: string | null;
 };
 
 export type ChannelMessageRow = {
@@ -440,9 +447,17 @@ const channelSelectColumns = `
 
 const channelSelect = `${channelSelectColumns},
          null as last_read_at,
-         null as last_unread_message_at
+         null as last_unread_message_at,
+         null as sidebar_pinned_at,
+         null as sidebar_section_id,
+         null as sidebar_hidden_at
   from briar_channels channel`;
 
+/*
+  Three user-scoped binds, in the order SQLite reads them: the read state, the
+  unread author filter, then the sidebar preference join. Every call site binds
+  the user id three times before the where clause's own parameters.
+*/
 const channelSelectForUser = `${channelSelectColumns},
          (select read_state.last_read_at from briar_channel_read_states read_state
           where read_state.channel_id = channel.id and read_state.user_id = ?)
@@ -450,8 +465,13 @@ const channelSelectForUser = `${channelSelectColumns},
          (select max(message.created_at) from briar_channel_messages message
           where message.channel_id = channel.id
             and ifnull(message.author_user_id, '') != ?)
-           as last_unread_message_at
-  from briar_channels channel`;
+           as last_unread_message_at,
+         sidebar.pinned_at as sidebar_pinned_at,
+         sidebar.section_id as sidebar_section_id,
+         sidebar.hidden_at as sidebar_hidden_at
+  from briar_channels channel
+  left join briar_channel_sidebar_preferences sidebar
+    on sidebar.channel_id = channel.id and sidebar.user_id = ?`;
 
 const channelParticipantCountSql = `(
   (select count(*) from briar_channel_members
@@ -688,6 +708,9 @@ export const channelJson = (row: ChannelRow): ChannelSummary => ({
   dmParticipants: row.dm_participants_json
     ? JSON.parse(row.dm_participants_json) as DirectMessageParticipant[]
     : [],
+  pinnedAt: row.sidebar_pinned_at,
+  sidebarSectionId: row.sidebar_section_id,
+  hiddenAt: row.sidebar_hidden_at,
 });
 
 export const channelReplyJson = (
@@ -939,7 +962,7 @@ export async function listChannels(
        where channel.organization_id = ? and ${visibleToUser}
        order by channel.archived_at is not null, channel.name, channel.id`,
     )
-    .bind(userId, userId, organizationId, userId)
+    .bind(userId, userId, userId, organizationId, userId)
     .all<ChannelRow>();
   return rows.results;
 }
@@ -955,7 +978,7 @@ export async function getChannel(
       `${channelSelectForUser}
        where channel.organization_id = ? and channel.id = ? and ${visibleToUser}`,
     )
-    .bind(userId, userId, organizationId, channelId, userId)
+    .bind(userId, userId, userId, organizationId, channelId, userId)
     .first<ChannelRow>();
 }
 
@@ -1142,7 +1165,7 @@ export async function getDirectMessageByKey(
        where channel.organization_id = ? and channel.kind = 'dm'
          and channel.dm_key = ? and ${visibleToUser}`,
     )
-    .bind(userId, userId, organizationId, dmKey, userId)
+    .bind(userId, userId, userId, organizationId, dmKey, userId)
     .first<ChannelRow>();
 }
 
@@ -5759,7 +5782,7 @@ export async function loadChannelDelta(
             `${channelSelectForUser} where channel.organization_id = ?
              and channel.id in (${[...channelIds].map(() => "?").join(", ")})`,
           )
-          .bind(userId, userId, organizationId, ...channelIds)
+          .bind(userId, userId, userId, organizationId, ...channelIds)
           .all<ChannelRow>()
       ).results
     : [];

@@ -53,6 +53,18 @@ open class BriarAPI_ChannelServiceClientMock: BriarAPI_ChannelServiceClientInter
     public var mockAsyncGetChannel = { (_: BriarAPI_GetChannelRequest) -> ResponseMessage<BriarAPI_GetChannelResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `markChannelRead()`.
     public var mockAsyncMarkChannelRead = { (_: BriarAPI_MarkChannelReadRequest) -> ResponseMessage<BriarAPI_MarkChannelReadResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `markChannelUnread()`.
+    public var mockAsyncMarkChannelUnread = { (_: BriarAPI_MarkChannelUnreadRequest) -> ResponseMessage<BriarAPI_MarkChannelUnreadResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `updateChannelSidebarPreference()`.
+    public var mockAsyncUpdateChannelSidebarPreference = { (_: BriarAPI_UpdateChannelSidebarPreferenceRequest) -> ResponseMessage<BriarAPI_UpdateChannelSidebarPreferenceResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `listChannelSidebarSections()`.
+    public var mockAsyncListChannelSidebarSections = { (_: BriarAPI_ListChannelSidebarSectionsRequest) -> ResponseMessage<BriarAPI_ListChannelSidebarSectionsResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `createChannelSidebarSection()`.
+    public var mockAsyncCreateChannelSidebarSection = { (_: BriarAPI_CreateChannelSidebarSectionRequest) -> ResponseMessage<BriarAPI_CreateChannelSidebarSectionResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `renameChannelSidebarSection()`.
+    public var mockAsyncRenameChannelSidebarSection = { (_: BriarAPI_RenameChannelSidebarSectionRequest) -> ResponseMessage<BriarAPI_RenameChannelSidebarSectionResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `deleteChannelSidebarSection()`.
+    public var mockAsyncDeleteChannelSidebarSection = { (_: BriarAPI_DeleteChannelSidebarSectionRequest) -> ResponseMessage<BriarAPI_DeleteChannelSidebarSectionResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `listChannelMessages()`.
     public var mockAsyncListChannelMessages = { (_: BriarAPI_ListChannelMessagesRequest) -> ResponseMessage<BriarAPI_ListChannelMessagesResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `prepareChannelMessageAttachments()`.
@@ -142,6 +154,30 @@ open class BriarAPI_ChannelServiceClientMock: BriarAPI_ChannelServiceClientInter
 
     open func `markChannelRead`(request: BriarAPI_MarkChannelReadRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_MarkChannelReadResponse> {
         return self.mockAsyncMarkChannelRead(request)
+    }
+
+    open func `markChannelUnread`(request: BriarAPI_MarkChannelUnreadRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_MarkChannelUnreadResponse> {
+        return self.mockAsyncMarkChannelUnread(request)
+    }
+
+    open func `updateChannelSidebarPreference`(request: BriarAPI_UpdateChannelSidebarPreferenceRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UpdateChannelSidebarPreferenceResponse> {
+        return self.mockAsyncUpdateChannelSidebarPreference(request)
+    }
+
+    open func `listChannelSidebarSections`(request: BriarAPI_ListChannelSidebarSectionsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ListChannelSidebarSectionsResponse> {
+        return self.mockAsyncListChannelSidebarSections(request)
+    }
+
+    open func `createChannelSidebarSection`(request: BriarAPI_CreateChannelSidebarSectionRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CreateChannelSidebarSectionResponse> {
+        return self.mockAsyncCreateChannelSidebarSection(request)
+    }
+
+    open func `renameChannelSidebarSection`(request: BriarAPI_RenameChannelSidebarSectionRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_RenameChannelSidebarSectionResponse> {
+        return self.mockAsyncRenameChannelSidebarSection(request)
+    }
+
+    open func `deleteChannelSidebarSection`(request: BriarAPI_DeleteChannelSidebarSectionRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_DeleteChannelSidebarSectionResponse> {
+        return self.mockAsyncDeleteChannelSidebarSection(request)
     }
 
     open func `listChannelMessages`(request: BriarAPI_ListChannelMessagesRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ListChannelMessagesResponse> {

@@ -294,6 +294,9 @@ export const appChannelSummaryJson = (channel: ChannelSummary) => {
       appDirectMessageParticipant,
     ),
     createdByUserId: channel.createdByUserId ?? undefined,
+    pinnedAt: optionalTimestamp(channel.pinnedAt, "channel pin"),
+    sidebarSectionId: channel.sidebarSectionId ?? undefined,
+    hiddenAt: optionalTimestamp(channel.hiddenAt, "channel hide"),
   });
 };
 

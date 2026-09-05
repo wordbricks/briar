@@ -31,6 +31,17 @@ import {
   getChannelMessageDocumentApplication,
 } from "./channel-content-application";
 import {
+  createChannelSidebarSectionApplication,
+  deleteChannelSidebarSectionApplication,
+  listChannelSidebarSectionsApplication,
+  markChannelUnreadApplication,
+  renameChannelSidebarSectionApplication,
+  updateChannelSidebarPreferenceApplication,
+} from "./channel-sidebar-application";
+import type {
+  ChannelSidebarPreferenceUpdate,
+} from "./channel-sidebar-repository";
+import {
   createOrganizationChannelMessage,
   deleteOrganizationChannelMessage,
   listOrganizationChannelMessages,
@@ -92,6 +103,7 @@ import {
   appChannelDocumentContent,
   appChannelLinkPreview,
   appChannelMember,
+  appChannelSidebarSection,
   appChannelSummary,
   appChannelWebhook,
 } from "./app-connect-channel-mappers";
@@ -148,6 +160,13 @@ export type AppConnectChannelServices = {
   readonly listChannels: typeof listOrganizationChannels;
   readonly listMessages: typeof listOrganizationChannelMessages;
   readonly markRead: typeof markOrganizationChannelRead;
+  readonly markUnread: typeof markChannelUnreadApplication;
+  readonly updateSidebarPreference:
+    typeof updateChannelSidebarPreferenceApplication;
+  readonly listSidebarSections: typeof listChannelSidebarSectionsApplication;
+  readonly createSidebarSection: typeof createChannelSidebarSectionApplication;
+  readonly renameSidebarSection: typeof renameChannelSidebarSectionApplication;
+  readonly deleteSidebarSection: typeof deleteChannelSidebarSectionApplication;
   readonly requireSession: typeof requireSession;
   readonly setThreadSubscription:
     typeof setOrganizationChannelThreadSubscription;
@@ -180,6 +199,12 @@ export const appConnectChannelServices: AppConnectChannelServices = {
   listChannels: listOrganizationChannels,
   listMessages: listOrganizationChannelMessages,
   markRead: markOrganizationChannelRead,
+  markUnread: markChannelUnreadApplication,
+  updateSidebarPreference: updateChannelSidebarPreferenceApplication,
+  listSidebarSections: listChannelSidebarSectionsApplication,
+  createSidebarSection: createChannelSidebarSectionApplication,
+  renameSidebarSection: renameChannelSidebarSectionApplication,
+  deleteSidebarSection: deleteChannelSidebarSectionApplication,
   requireSession,
   setThreadSubscription: setOrganizationChannelThreadSubscription,
   syncChannels: syncOrganizationChannels,
@@ -227,6 +252,29 @@ const domainMembershipChange = (
   }
 };
 
+/*
+  A sidebar menu action sends only the field it changed, so an absent `pinned`,
+  `hidden` or `section_update` means "leave this as it is" rather than "clear
+  it". The `clear_section` arm is how Unassigned is expressed, since a oneof
+  cannot carry an explicit null string.
+*/
+const domainSidebarPreferenceUpdate = (request: {
+  readonly pinned?: boolean;
+  readonly hidden?: boolean;
+  readonly sectionUpdate: {
+    readonly case: "clearSection" | "sectionId" | undefined;
+    readonly value?: unknown;
+  };
+}): ChannelSidebarPreferenceUpdate => ({
+  pinned: request.pinned,
+  hidden: request.hidden,
+  section: request.sectionUpdate.case === "clearSection"
+    ? { case: "clear" }
+    : request.sectionUpdate.case === "sectionId"
+    ? { case: "set", sectionId: canonicalUuid(String(request.sectionUpdate.value)) }
+    : undefined,
+});
+
 const approvalJson = (approval: {
   provider: AgentProvider;
   model?: string;
@@ -271,6 +319,7 @@ const createAppChannelService = (
     return create(ChannelService.method.listChannels.output, {
       channels: result.channels.map(appChannelSummaryJson),
       cursor: BigInt(result.cursor),
+      sidebarSections: result.sidebarSections.map(appChannelSidebarSection),
     });
   },
 
@@ -604,6 +653,93 @@ const createAppChannelService = (
     scheduleChannelMutation(input, request.organizationId);
     return create(ChannelService.method.markChannelRead.output, {
       channel: appChannelSummaryJson(result.channel),
+    });
+  },
+
+  markChannelUnread: async (request) => {
+    const session = await services.requireSession(input.auth, input.request);
+    const organizationId = canonicalUuid(request.organizationId);
+    const result = await services.markUnread({
+      db: input.db,
+      organizationId,
+      channelId: canonicalUuid(request.channelId),
+      userId: session.user.id,
+    });
+    scheduleChannelMutation(input, organizationId);
+    return create(ChannelService.method.markChannelUnread.output, {
+      channel: appChannelSummaryJson(result.channel),
+    });
+  },
+
+  updateChannelSidebarPreference: async (request) => {
+    const session = await services.requireSession(input.auth, input.request);
+    const organizationId = canonicalUuid(request.organizationId);
+    const result = await services.updateSidebarPreference({
+      db: input.db,
+      organizationId,
+      channelId: canonicalUuid(request.channelId),
+      userId: session.user.id,
+      update: domainSidebarPreferenceUpdate(request),
+    });
+    scheduleChannelMutation(input, organizationId);
+    return create(ChannelService.method.updateChannelSidebarPreference.output, {
+      channel: appChannelSummaryJson(result.channel),
+    });
+  },
+
+  listChannelSidebarSections: async (request) => {
+    const session = await services.requireSession(input.auth, input.request);
+    const result = await services.listSidebarSections({
+      db: input.db,
+      organizationId: canonicalUuid(request.organizationId),
+      userId: session.user.id,
+    });
+    return create(ChannelService.method.listChannelSidebarSections.output, {
+      sections: result.sections.map(appChannelSidebarSection),
+    });
+  },
+
+  createChannelSidebarSection: async (request) => {
+    const session = await services.requireSession(input.auth, input.request);
+    const result = await services.createSidebarSection({
+      db: input.db,
+      organizationId: canonicalUuid(request.organizationId),
+      userId: session.user.id,
+      name: request.name,
+    });
+    return create(ChannelService.method.createChannelSidebarSection.output, {
+      section: appChannelSidebarSection(result.section),
+      sections: result.sections.map(appChannelSidebarSection),
+    });
+  },
+
+  renameChannelSidebarSection: async (request) => {
+    const session = await services.requireSession(input.auth, input.request);
+    const result = await services.renameSidebarSection({
+      db: input.db,
+      organizationId: canonicalUuid(request.organizationId),
+      userId: session.user.id,
+      sectionId: canonicalUuid(request.sectionId),
+      name: request.name,
+    });
+    return create(ChannelService.method.renameChannelSidebarSection.output, {
+      section: appChannelSidebarSection(result.section),
+      sections: result.sections.map(appChannelSidebarSection),
+    });
+  },
+
+  deleteChannelSidebarSection: async (request) => {
+    const session = await services.requireSession(input.auth, input.request);
+    const organizationId = canonicalUuid(request.organizationId);
+    const result = await services.deleteSidebarSection({
+      db: input.db,
+      organizationId,
+      userId: session.user.id,
+      sectionId: canonicalUuid(request.sectionId),
+    });
+    scheduleChannelMutation(input, organizationId);
+    return create(ChannelService.method.deleteChannelSidebarSection.output, {
+      sections: result.sections.map(appChannelSidebarSection),
     });
   },
 

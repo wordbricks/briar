@@ -99,6 +99,9 @@ const channel = (overrides: Partial<ChannelSummary> = {}): ChannelSummary => ({
   lastReadAt: null,
   hasUnread: false,
   dmParticipants: [],
+  pinnedAt: null,
+  sidebarSectionId: null,
+  hiddenAt: null,
   ...overrides,
 });
 

@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import type { ActivePage, ChannelNavigationPage } from "../../lib/app-navigation";
-import type { ChannelSummary } from "../../lib/channels-contract";
+import type {
+  ChannelSidebarSection,
+  ChannelSummary,
+} from "../../lib/channels-contract";
 import { activeOrganizationIdAtom } from "../organization/atoms";
 import { lockedTeamIdAtom } from "../platform";
 import { createTestRegistry, type AtomRegistry } from "../registry";
@@ -15,6 +18,7 @@ import {
 import {
   activeChannelIdAtom,
   activeOrganizationChannelsAtom,
+  channelSidebarSectionsAtom,
   directMessageComposeAtom,
   initialChannelInviteIdAtom,
   requestedChannelMessageAtom,
@@ -46,14 +50,99 @@ const channel = (
   lastReadAt: null,
   hasUnread: false,
   dmParticipants: [],
+  pinnedAt: null,
+  sidebarSectionId: null,
+  hiddenAt: null,
+  ...overrides,
+});
+
+const section = (
+  id: string,
+  overrides: Partial<ChannelSidebarSection> = {},
+): ChannelSidebarSection => ({
+  id,
+  organizationId: "org-a",
+  name: id,
+  position: 0,
+  createdAt: "2026-01-01T00:00:00.000Z",
+  updatedAt: "2026-01-01T00:00:00.000Z",
   ...overrides,
 });
 
 class ChannelServer {
   readonly reads: { channelId: string; lastReadAt?: string }[] = [];
   readonly deleted: string[] = [];
+  readonly unread: string[] = [];
+  readonly preferences: {
+    channelId: string;
+    pinned?: boolean;
+    hidden?: boolean;
+    section?: string | null;
+  }[] = [];
+  readonly sectionWrites: string[] = [];
+  sections: ChannelSidebarSection[] = [];
+  /** What the server hands back for a preference write, keyed by channel. */
+  readonly preferenceResults = new Map<string, ChannelSummary>();
 
   readonly api: Partial<ChannelApi> = {
+    markChannelUnread: async (
+      _token: string,
+      _organizationId: string,
+      channelId: string,
+    ) => {
+      this.unread.push(channelId);
+      return { channel: channel(channelId, { hasUnread: true }) };
+    },
+    updateChannelSidebarPreference: async (
+      _token: string,
+      _organizationId: string,
+      channelId: string,
+      input: { pinned?: boolean; hidden?: boolean; section?: string | null },
+    ) => {
+      this.preferences.push({ channelId, ...input });
+      return {
+        channel: this.preferenceResults.get(channelId) ??
+          channel(channelId, {
+            pinnedAt: input.pinned ? "2026-03-01T00:00:00.000Z" : null,
+            hiddenAt: input.hidden ? "2026-03-01T00:00:00.000Z" : null,
+            sidebarSectionId: input.section ?? null,
+          }),
+      };
+    },
+    createChannelSidebarSection: async (
+      _token: string,
+      _organizationId: string,
+      name: string,
+    ) => {
+      this.sectionWrites.push(`create:${name}`);
+      const created = section(name);
+      this.sections = [...this.sections, created];
+      return { section: created, sections: this.sections };
+    },
+    renameChannelSidebarSection: async (
+      _token: string,
+      _organizationId: string,
+      sectionId: string,
+      name: string,
+    ) => {
+      this.sectionWrites.push(`rename:${sectionId}:${name}`);
+      this.sections = this.sections.map((entry) =>
+        entry.id === sectionId ? { ...entry, name } : entry,
+      );
+      return {
+        section: section(sectionId, { name }),
+        sections: this.sections,
+      };
+    },
+    deleteChannelSidebarSection: async (
+      _token: string,
+      _organizationId: string,
+      sectionId: string,
+    ) => {
+      this.sectionWrites.push(`delete:${sectionId}`);
+      this.sections = this.sections.filter((entry) => entry.id !== sectionId);
+      return { sections: this.sections };
+    },
     markChannelRead: async (
       _token: string,
       _organizationId: string,
@@ -287,5 +376,116 @@ describe("channel actions", () => {
     expect(registry.get(activeOrganizationChannelsAtom)[0]?.hasUnread).toBe(
       false,
     );
+  });
+});
+
+describe("direct message sidebar actions", () => {
+  const conversation = (id: string, overrides: Partial<ChannelSummary> = {}) =>
+    channel(id, { kind: "dm", visibility: "private", ...overrides });
+
+  it("pins, hides and files a conversation from the server's answer", async () => {
+    const { actions, registry, server } = harness([conversation("dm-1")]);
+
+    await actions.setDirectMessagePinned("dm-1", true);
+    expect(server.preferences).toEqual([{ channelId: "dm-1", pinned: true }]);
+    expect(registry.get(activeOrganizationChannelsAtom)[0]?.pinnedAt).not
+      .toBeNull();
+
+    await actions.setDirectMessageHidden("dm-1", true);
+    expect(server.preferences.at(-1)).toEqual({
+      channelId: "dm-1",
+      hidden: true,
+    });
+    expect(registry.get(activeOrganizationChannelsAtom)[0]?.hiddenAt).not
+      .toBeNull();
+
+    await actions.moveDirectMessageToSection("dm-1", "section-1");
+    expect(server.preferences.at(-1)).toEqual({
+      channelId: "dm-1",
+      section: "section-1",
+    });
+    expect(
+      registry.get(activeOrganizationChannelsAtom)[0]?.sidebarSectionId,
+    ).toBe("section-1");
+
+    // Unassigned is an explicit null rather than an omitted field, so the
+    // server can tell "move to no section" from "leave the section alone".
+    await actions.moveDirectMessageToSection("dm-1", null);
+    expect(server.preferences.at(-1)).toEqual({
+      channelId: "dm-1",
+      section: null,
+    });
+  });
+
+  it("creates a section, renames it and unfiles its conversations on delete", async () => {
+    const { actions, registry, server } = harness([
+      conversation("dm-1", { sidebarSectionId: "Team" }),
+      conversation("dm-2"),
+    ]);
+
+    const created = await actions.createDirectMessageSection("Team");
+    expect(created.id).toBe("Team");
+    expect(registry.get(channelSidebarSectionsAtom).map((item) => item.id))
+      .toEqual(["Team"]);
+
+    await actions.renameDirectMessageSection("Team", "Squad");
+    expect(registry.get(channelSidebarSectionsAtom)[0]?.name).toBe("Squad");
+
+    await actions.deleteDirectMessageSection("Team");
+    expect(server.sectionWrites).toEqual([
+      "create:Team",
+      "rename:Team:Squad",
+      "delete:Team",
+    ]);
+    expect(registry.get(channelSidebarSectionsAtom)).toEqual([]);
+    // The conversation that was filed there is Unassigned now.
+    expect(
+      registry
+        .get(activeOrganizationChannelsAtom)
+        .map((item) => item.sidebarSectionId),
+    ).toEqual([null, null]);
+  });
+
+  it("marks a conversation unread from the server's answer", async () => {
+    const { actions, registry, server } = harness([conversation("dm-1")]);
+
+    await actions.markDirectMessageUnread("dm-1");
+
+    expect(server.unread).toEqual(["dm-1"]);
+    expect(registry.get(activeOrganizationChannelsAtom)[0]?.hasUnread).toBe(
+      true,
+    );
+  });
+
+  it("returns to the DM page after deleting the conversation on screen", async () => {
+    const { actions, navigations, registry, server } = harness([
+      conversation("dm-1"),
+      conversation("dm-2"),
+    ]);
+    registry.set(activeChannelIdAtom, "dm-1");
+
+    await actions.deleteDirectMessage("dm-1");
+
+    expect(server.deleted).toEqual(["dm-1"]);
+    expect(
+      registry.get(activeOrganizationChannelsAtom).map((item) => item.id),
+    ).toEqual(["dm-2"]);
+    expect(registry.get(activeChannelIdAtom)).toBeNull();
+    // The DM page opens the next conversation by itself, so the lobby is the
+    // wrong place to land.
+    expect(navigations.pages).toEqual(["dms"]);
+  });
+
+  it("stays put when deleting a conversation that is not on screen", async () => {
+    const { actions, navigations, registry } = harness([
+      conversation("dm-1"),
+      conversation("dm-2"),
+    ]);
+    registry.set(activeChannelIdAtom, "dm-2");
+
+    await actions.deleteDirectMessage("dm-1");
+
+    expect(registry.get(activeChannelIdAtom)).toBe("dm-2");
+    expect(navigations.pages).toEqual([]);
   });
 });

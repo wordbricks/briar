@@ -199,6 +199,9 @@ describe("app Channel Connect adapter", () => {
       dm_participants_json: null,
       last_read_at: null,
       last_unread_message_at: null,
+      sidebar_pinned_at: null,
+      sidebar_section_id: null,
+      sidebar_hidden_at: null,
     });
     const { client, flushBackgroundTasks } = createChannelClient({
       createChannel,

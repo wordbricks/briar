@@ -560,7 +560,32 @@ export type ChannelSummary = {
   lastReadAt: string | null;
   hasUnread: boolean;
   dmParticipants: DirectMessageParticipant[];
+  /*
+    Where the requesting user put this conversation in their own sidebar. It is
+    per user rather than per channel, so two people in the same DM pin, file and
+    hide it independently.
+  */
+  pinnedAt: string | null;
+  sidebarSectionId: string | null;
+  hiddenAt: string | null;
 };
+
+/** One of the user's own sidebar groups, within one organization. */
+export type ChannelSidebarSection = {
+  id: string;
+  organizationId: string;
+  name: string;
+  position: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/** The longest a sidebar section name may be, matching the D1 check. */
+export const channelSidebarSectionNameMaxLength = 60;
+
+export const channelSidebarSectionNameSchema = Schema.Trim.check(
+  Schema.isLengthBetween(1, channelSidebarSectionNameMaxLength),
+);
 
 export type DirectMessageParticipant = {
   type: "user" | "agent";

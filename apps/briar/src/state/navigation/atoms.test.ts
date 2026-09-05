@@ -384,6 +384,9 @@ describe("sidebar halves", () => {
       { type: "user", id: user.id, name: user.name, image: null },
       { type: "user", id: "user-2", name: "Sam", image: null },
     ],
+    pinnedAt: null,
+    sidebarSectionId: null,
+    hiddenAt: null,
   });
   const withOrganization = () =>
     createTestRegistry([

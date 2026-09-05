@@ -93,6 +93,9 @@ const channel: ChannelSummary = {
   lastReadAt: null,
   hasUnread: false,
   dmParticipants: [],
+  pinnedAt: null,
+  sidebarSectionId: null,
+  hiddenAt: null,
 };
 
 const payloadOf = (team: Project, cursor: number): DashboardPayload => ({

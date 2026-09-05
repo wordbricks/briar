@@ -5,8 +5,8 @@
 -- Whenever a migration changes the schema or seeds rows, run
 -- `bun run d1:snapshot` and commit the result; `bun run d1:snapshot:check`
 -- fails in CI otherwise.
--- migrations-digest: e5f6538286c2dc63af599139f3b800c3687fb84f431986e8c55d12f1bf47a9a3
--- snapshot-digest: 3e9b2002371b03462ffcf19e527fc42baf4c8f0c61f4f4bf8259cbb2425e3119
+-- migrations-digest: 72629cf59da1a98798ac423ba2bceb5f0675af384a85760888054bb60660f98d
+-- snapshot-digest: e022baee079bf31f654cd36881b0c9795fde4ed0a31a6abcd7fa6c3db0bfa6ef
 -- @statement
 CREATE TABLE IF NOT EXISTS "d1_migrations"(
 		id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -3575,6 +3575,28 @@ CREATE TABLE briar_run_usage_records (
   primary key (execution_id, usage_key)
 );
 -- @statement
+CREATE TABLE briar_channel_sidebar_sections (
+  id text primary key not null,
+  organization_id text not null
+    references briar_organizations (id) on delete cascade,
+  user_id text not null references "user" (id) on delete cascade,
+  name text not null check (length(trim(name)) between 1 and 60),
+  position integer not null,
+  created_at text not null,
+  updated_at text not null
+);
+-- @statement
+CREATE TABLE briar_channel_sidebar_preferences (
+  user_id text not null references "user" (id) on delete cascade,
+  channel_id text not null references briar_channels (id) on delete cascade,
+  pinned_at text,
+  section_id text
+    references briar_channel_sidebar_sections (id) on delete set null,
+  hidden_at text,
+  updated_at text not null,
+  primary key (user_id, channel_id)
+);
+-- @statement
 INSERT INTO "briar_managed_computer_campaigns" ("id","code_key","name","active","created_at","updated_at") VALUES('getbriar-pilot','getbriar-pilot','GETBRIAR managed computer pilot',1,'2026-08-21T00:00:00.000Z','2026-08-21T00:00:00.000Z');
 -- @statement
 INSERT INTO "briar_managed_computer_campaigns" ("id","code_key","name","active","created_at","updated_at") VALUES('getbriar-jay-1','getbriar-jay-1','Managed computer pilot Jay slot 1',1,'2026-08-25T00:00:00.000Z','2026-08-25T00:00:00.000Z');
@@ -4806,6 +4828,15 @@ CREATE INDEX briar_channel_message_attachments_channel_idx
 -- @statement
 CREATE INDEX briar_managed_computers_provider_idx
   on briar_managed_computers (provider, state);
+-- @statement
+CREATE INDEX briar_channel_sidebar_sections_user_idx
+  on briar_channel_sidebar_sections (user_id, organization_id, position);
+-- @statement
+CREATE INDEX briar_channel_sidebar_preferences_channel_idx
+  on briar_channel_sidebar_preferences (channel_id);
+-- @statement
+CREATE INDEX briar_channel_sidebar_preferences_section_idx
+  on briar_channel_sidebar_preferences (section_id);
 -- @statement
 CREATE TRIGGER briar_dashboard_settings_update_sync
 after update on briar_project_settings BEGIN

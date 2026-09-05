@@ -8,6 +8,7 @@ import "briar/app/v1/issue.proto";
 import "briar/app/v1/dm_memory.proto";
 import "briar/types/v1/provider.proto";
 import "briar/types/v1/upload.proto";
+import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
 
 option swift_prefix = "BriarAPI_";
@@ -29,6 +30,12 @@ service ChannelService {
   rpc RevokeChannelWebhook(RevokeChannelWebhookRequest) returns (RevokeChannelWebhookResponse);
   rpc GetChannel(GetChannelRequest) returns (GetChannelResponse);
   rpc MarkChannelRead(MarkChannelReadRequest) returns (MarkChannelReadResponse);
+  rpc MarkChannelUnread(MarkChannelUnreadRequest) returns (MarkChannelUnreadResponse);
+  rpc UpdateChannelSidebarPreference(UpdateChannelSidebarPreferenceRequest) returns (UpdateChannelSidebarPreferenceResponse);
+  rpc ListChannelSidebarSections(ListChannelSidebarSectionsRequest) returns (ListChannelSidebarSectionsResponse);
+  rpc CreateChannelSidebarSection(CreateChannelSidebarSectionRequest) returns (CreateChannelSidebarSectionResponse);
+  rpc RenameChannelSidebarSection(RenameChannelSidebarSectionRequest) returns (RenameChannelSidebarSectionResponse);
+  rpc DeleteChannelSidebarSection(DeleteChannelSidebarSectionRequest) returns (DeleteChannelSidebarSectionResponse);
   rpc ListChannelMessages(ListChannelMessagesRequest) returns (ListChannelMessagesResponse);
   rpc PrepareChannelMessageAttachments(PrepareChannelMessageAttachmentsRequest) returns (PrepareChannelMessageAttachmentsResponse);
   rpc CreateChannelMessage(CreateChannelMessageRequest) returns (CreateChannelMessageResponse);
@@ -50,6 +57,9 @@ message ListChannelsRequest {
 message ListChannelsResponse {
   repeated ChannelSummary channels = 1;
   uint64 cursor = 2;
+  // The caller's own sidebar sections, so one catalog load has everything the
+  // conversation list groups by.
+  repeated ChannelSidebarSection sidebar_sections = 3;
 }
 
 message SyncChannelsRequest {
@@ -245,6 +255,81 @@ message MarkChannelReadRequest {
 
 message MarkChannelReadResponse {
   ChannelSummary channel = 1;
+}
+
+message MarkChannelUnreadRequest {
+  string organization_id = 1;
+  string channel_id = 2;
+}
+
+message MarkChannelUnreadResponse {
+  ChannelSummary channel = 1;
+}
+
+// One conversation's placement in the caller's own sidebar. Every field is
+// optional so a menu action sends only what it changed.
+message UpdateChannelSidebarPreferenceRequest {
+  string organization_id = 1;
+  string channel_id = 2;
+  optional bool pinned = 3;
+  optional bool hidden = 4;
+  oneof section_update {
+    google.protobuf.Empty clear_section = 5;
+    string section_id = 6;
+  }
+}
+
+message UpdateChannelSidebarPreferenceResponse {
+  ChannelSummary channel = 1;
+}
+
+message ChannelSidebarSection {
+  string id = 1;
+  string organization_id = 2;
+  string name = 3;
+  uint32 position = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+message ListChannelSidebarSectionsRequest {
+  string organization_id = 1;
+}
+
+message ListChannelSidebarSectionsResponse {
+  repeated ChannelSidebarSection sections = 1;
+}
+
+message CreateChannelSidebarSectionRequest {
+  string organization_id = 1;
+  string name = 2;
+}
+
+// Section responses carry the whole list as well as the row that moved: the
+// sidebar renders sections in position order, so it never has to merge by hand.
+message CreateChannelSidebarSectionResponse {
+  ChannelSidebarSection section = 1;
+  repeated ChannelSidebarSection sections = 2;
+}
+
+message RenameChannelSidebarSectionRequest {
+  string organization_id = 1;
+  string section_id = 2;
+  string name = 3;
+}
+
+message RenameChannelSidebarSectionResponse {
+  ChannelSidebarSection section = 1;
+  repeated ChannelSidebarSection sections = 2;
+}
+
+message DeleteChannelSidebarSectionRequest {
+  string organization_id = 1;
+  string section_id = 2;
+}
+
+message DeleteChannelSidebarSectionResponse {
+  repeated ChannelSidebarSection sections = 1;
 }
 
 message ListChannelMessagesRequest {
@@ -462,6 +547,10 @@ message ChannelSummary {
   bool has_unread = 17;
   repeated DirectMessageParticipant direct_message_participants = 18;
   optional string created_by_user_id = 19;
+  // The requesting user's own sidebar placement for this conversation.
+  optional google.protobuf.Timestamp pinned_at = 20;
+  optional string sidebar_section_id = 21;
+  optional google.protobuf.Timestamp hidden_at = 22;
 }
 
 message ChannelMember {

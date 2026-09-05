@@ -13713,6 +13713,74 @@ pub type OwnedMarkChannelReadRequestView = ::buffa::view::OwnedView<
 pub type OwnedMarkChannelReadResponseView = ::buffa::view::OwnedView<
     crate::proto::briar::app::v1::__buffa::view::MarkChannelReadResponseView<'static>,
 >;
+///Shorthand for `OwnedView<MarkChannelUnreadRequestView<'static>>`.
+pub type OwnedMarkChannelUnreadRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::MarkChannelUnreadRequestView<'static>,
+>;
+///Shorthand for `OwnedView<MarkChannelUnreadResponseView<'static>>`.
+pub type OwnedMarkChannelUnreadResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::MarkChannelUnreadResponseView<'static>,
+>;
+///Shorthand for `OwnedView<UpdateChannelSidebarPreferenceRequestView<'static>>`.
+pub type OwnedUpdateChannelSidebarPreferenceRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateChannelSidebarPreferenceRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<UpdateChannelSidebarPreferenceResponseView<'static>>`.
+pub type OwnedUpdateChannelSidebarPreferenceResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateChannelSidebarPreferenceResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ListChannelSidebarSectionsRequestView<'static>>`.
+pub type OwnedListChannelSidebarSectionsRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ListChannelSidebarSectionsRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ListChannelSidebarSectionsResponseView<'static>>`.
+pub type OwnedListChannelSidebarSectionsResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ListChannelSidebarSectionsResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<CreateChannelSidebarSectionRequestView<'static>>`.
+pub type OwnedCreateChannelSidebarSectionRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CreateChannelSidebarSectionRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<CreateChannelSidebarSectionResponseView<'static>>`.
+pub type OwnedCreateChannelSidebarSectionResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CreateChannelSidebarSectionResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<RenameChannelSidebarSectionRequestView<'static>>`.
+pub type OwnedRenameChannelSidebarSectionRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::RenameChannelSidebarSectionRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<RenameChannelSidebarSectionResponseView<'static>>`.
+pub type OwnedRenameChannelSidebarSectionResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::RenameChannelSidebarSectionResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<DeleteChannelSidebarSectionRequestView<'static>>`.
+pub type OwnedDeleteChannelSidebarSectionRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::DeleteChannelSidebarSectionRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<DeleteChannelSidebarSectionResponseView<'static>>`.
+pub type OwnedDeleteChannelSidebarSectionResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::DeleteChannelSidebarSectionResponseView<
+        'static,
+    >,
+>;
 ///Shorthand for `OwnedView<ListChannelMessagesRequestView<'static>>`.
 pub type OwnedListChannelMessagesRequestView = ::buffa::view::OwnedView<
     crate::proto::briar::app::v1::__buffa::view::ListChannelMessagesRequestView<'static>,
@@ -14409,6 +14477,250 @@ for ::buffa::view::OwnedView<
         )
     }
 }
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::MarkChannelUnreadResponse>
+for crate::proto::briar::app::v1::__buffa::view::MarkChannelUnreadResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::MarkChannelUnreadResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::MarkChannelUnreadResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::UpdateChannelSidebarPreferenceResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::UpdateChannelSidebarPreferenceResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::UpdateChannelSidebarPreferenceResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateChannelSidebarPreferenceResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::ListChannelSidebarSectionsResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::ListChannelSidebarSectionsResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::ListChannelSidebarSectionsResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ListChannelSidebarSectionsResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::CreateChannelSidebarSectionResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::CreateChannelSidebarSectionResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::CreateChannelSidebarSectionResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CreateChannelSidebarSectionResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::RenameChannelSidebarSectionResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::RenameChannelSidebarSectionResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::RenameChannelSidebarSectionResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::RenameChannelSidebarSectionResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::DeleteChannelSidebarSectionResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::DeleteChannelSidebarSectionResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::DeleteChannelSidebarSectionResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::DeleteChannelSidebarSectionResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
 impl ::connectrpc::Encodable<crate::proto::briar::app::v1::ListChannelMessagesResponse>
 for crate::proto::briar::app::v1::__buffa::view::ListChannelMessagesResponseView<'_> {
     fn encode(
@@ -14977,6 +15289,42 @@ pub const CHANNEL_SERVICE_MARK_CHANNEL_READ_SPEC: ::connectrpc::Spec = ::connect
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `MarkChannelUnread` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const CHANNEL_SERVICE_MARK_CHANNEL_UNREAD_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.ChannelService/MarkChannelUnread",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `UpdateChannelSidebarPreference` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const CHANNEL_SERVICE_UPDATE_CHANNEL_SIDEBAR_PREFERENCE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.ChannelService/UpdateChannelSidebarPreference",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `ListChannelSidebarSections` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const CHANNEL_SERVICE_LIST_CHANNEL_SIDEBAR_SECTIONS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.ChannelService/ListChannelSidebarSections",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `CreateChannelSidebarSection` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const CHANNEL_SERVICE_CREATE_CHANNEL_SIDEBAR_SECTION_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.ChannelService/CreateChannelSidebarSection",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `RenameChannelSidebarSection` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const CHANNEL_SERVICE_RENAME_CHANNEL_SIDEBAR_SECTION_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.ChannelService/RenameChannelSidebarSection",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `DeleteChannelSidebarSection` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const CHANNEL_SERVICE_DELETE_CHANNEL_SIDEBAR_SECTION_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.ChannelService/DeleteChannelSidebarSection",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Static [`Spec`](::connectrpc::Spec) for the `ListChannelMessages` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const CHANNEL_SERVICE_LIST_CHANNEL_MESSAGES_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/briar.app.v1.ChannelService/ListChannelMessages",
@@ -15465,6 +15813,144 @@ pub trait ChannelService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::briar::app::v1::MarkChannelReadResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the MarkChannelUnread RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn mark_channel_unread<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::MarkChannelUnreadRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::MarkChannelUnreadResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the UpdateChannelSidebarPreference RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn update_channel_sidebar_preference<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::UpdateChannelSidebarPreferenceRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::UpdateChannelSidebarPreferenceResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the ListChannelSidebarSections RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn list_channel_sidebar_sections<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::ListChannelSidebarSectionsRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::ListChannelSidebarSectionsResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the CreateChannelSidebarSection RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn create_channel_sidebar_section<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::CreateChannelSidebarSectionRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::CreateChannelSidebarSectionResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the RenameChannelSidebarSection RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn rename_channel_sidebar_section<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::RenameChannelSidebarSectionRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::RenameChannelSidebarSectionResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the DeleteChannelSidebarSection RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn delete_channel_sidebar_section<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::DeleteChannelSidebarSectionRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::DeleteChannelSidebarSectionResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -16242,6 +16728,180 @@ impl<S: ChannelService> ChannelServiceExt for S {
             .with_spec(CHANNEL_SERVICE_MARK_CHANNEL_READ_SPEC)
             .route_view(
                 CHANNEL_SERVICE_SERVICE_NAME,
+                "MarkChannelUnread",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::MarkChannelUnreadRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::MarkChannelUnreadRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.mark_channel_unread(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::MarkChannelUnreadResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(CHANNEL_SERVICE_MARK_CHANNEL_UNREAD_SPEC)
+            .route_view(
+                CHANNEL_SERVICE_SERVICE_NAME,
+                "UpdateChannelSidebarPreference",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::UpdateChannelSidebarPreferenceRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::UpdateChannelSidebarPreferenceRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.update_channel_sidebar_preference(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::UpdateChannelSidebarPreferenceResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(CHANNEL_SERVICE_UPDATE_CHANNEL_SIDEBAR_PREFERENCE_SPEC)
+            .route_view(
+                CHANNEL_SERVICE_SERVICE_NAME,
+                "ListChannelSidebarSections",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::ListChannelSidebarSectionsRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::ListChannelSidebarSectionsRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.list_channel_sidebar_sections(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::ListChannelSidebarSectionsResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(CHANNEL_SERVICE_LIST_CHANNEL_SIDEBAR_SECTIONS_SPEC)
+            .route_view(
+                CHANNEL_SERVICE_SERVICE_NAME,
+                "CreateChannelSidebarSection",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::CreateChannelSidebarSectionRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::CreateChannelSidebarSectionRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.create_channel_sidebar_section(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::CreateChannelSidebarSectionResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(CHANNEL_SERVICE_CREATE_CHANNEL_SIDEBAR_SECTION_SPEC)
+            .route_view(
+                CHANNEL_SERVICE_SERVICE_NAME,
+                "RenameChannelSidebarSection",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::RenameChannelSidebarSectionRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::RenameChannelSidebarSectionRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.rename_channel_sidebar_section(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::RenameChannelSidebarSectionResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(CHANNEL_SERVICE_RENAME_CHANNEL_SIDEBAR_SECTION_SPEC)
+            .route_view(
+                CHANNEL_SERVICE_SERVICE_NAME,
+                "DeleteChannelSidebarSection",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::DeleteChannelSidebarSectionRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::DeleteChannelSidebarSectionRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.delete_channel_sidebar_section(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::DeleteChannelSidebarSectionResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(CHANNEL_SERVICE_DELETE_CHANNEL_SIDEBAR_SECTION_SPEC)
+            .route_view(
+                CHANNEL_SERVICE_SERVICE_NAME,
                 "ListChannelMessages",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
@@ -16738,6 +17398,44 @@ impl<T: ChannelService> ::connectrpc::Dispatcher for ChannelServiceServer<T> {
                         .with_spec(CHANNEL_SERVICE_MARK_CHANNEL_READ_SPEC),
                 )
             }
+            "MarkChannelUnread" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(CHANNEL_SERVICE_MARK_CHANNEL_UNREAD_SPEC),
+                )
+            }
+            "UpdateChannelSidebarPreference" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(
+                            CHANNEL_SERVICE_UPDATE_CHANNEL_SIDEBAR_PREFERENCE_SPEC,
+                        ),
+                )
+            }
+            "ListChannelSidebarSections" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(CHANNEL_SERVICE_LIST_CHANNEL_SIDEBAR_SECTIONS_SPEC),
+                )
+            }
+            "CreateChannelSidebarSection" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(CHANNEL_SERVICE_CREATE_CHANNEL_SIDEBAR_SECTION_SPEC),
+                )
+            }
+            "RenameChannelSidebarSection" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(CHANNEL_SERVICE_RENAME_CHANNEL_SIDEBAR_SECTION_SPEC),
+                )
+            }
+            "DeleteChannelSidebarSection" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(CHANNEL_SERVICE_DELETE_CHANNEL_SIDEBAR_SECTION_SPEC),
+                )
+            }
             "ListChannelMessages" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
@@ -17180,6 +17878,138 @@ impl<T: ChannelService> ::connectrpc::Dispatcher for ChannelServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::briar::app::v1::MarkChannelReadResponse,
+                        >(format)
+                })
+            }
+            "MarkChannelUnread" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::MarkChannelUnreadRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::MarkChannelUnreadRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::MarkChannelUnreadRequest,
+                    >::from_parts(&req, &body);
+                    svc.mark_channel_unread(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::MarkChannelUnreadResponse,
+                        >(format)
+                })
+            }
+            "UpdateChannelSidebarPreference" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::UpdateChannelSidebarPreferenceRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::UpdateChannelSidebarPreferenceRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::UpdateChannelSidebarPreferenceRequest,
+                    >::from_parts(&req, &body);
+                    svc.update_channel_sidebar_preference(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::UpdateChannelSidebarPreferenceResponse,
+                        >(format)
+                })
+            }
+            "ListChannelSidebarSections" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::ListChannelSidebarSectionsRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::ListChannelSidebarSectionsRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::ListChannelSidebarSectionsRequest,
+                    >::from_parts(&req, &body);
+                    svc.list_channel_sidebar_sections(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::ListChannelSidebarSectionsResponse,
+                        >(format)
+                })
+            }
+            "CreateChannelSidebarSection" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::CreateChannelSidebarSectionRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::CreateChannelSidebarSectionRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::CreateChannelSidebarSectionRequest,
+                    >::from_parts(&req, &body);
+                    svc.create_channel_sidebar_section(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::CreateChannelSidebarSectionResponse,
+                        >(format)
+                })
+            }
+            "RenameChannelSidebarSection" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::RenameChannelSidebarSectionRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::RenameChannelSidebarSectionRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::RenameChannelSidebarSectionRequest,
+                    >::from_parts(&req, &body);
+                    svc.rename_channel_sidebar_section(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::RenameChannelSidebarSectionResponse,
+                        >(format)
+                })
+            }
+            "DeleteChannelSidebarSection" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::DeleteChannelSidebarSectionRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::DeleteChannelSidebarSectionRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::DeleteChannelSidebarSectionRequest,
+                    >::from_parts(&req, &body);
+                    svc.delete_channel_sidebar_section(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::DeleteChannelSidebarSectionResponse,
                         >(format)
                 })
             }
@@ -18291,6 +19121,276 @@ where
                 &self.transport,
                 &self.config,
                 CHANNEL_SERVICE_MARK_CHANNEL_READ_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the MarkChannelUnread RPC. Sends a request to /briar.app.v1.ChannelService/MarkChannelUnread.
+    pub async fn mark_channel_unread(
+        &self,
+        request: crate::proto::briar::app::v1::MarkChannelUnreadRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::MarkChannelUnreadResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.mark_channel_unread_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the MarkChannelUnread RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn mark_channel_unread_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::MarkChannelUnreadRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::MarkChannelUnreadResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                CHANNEL_SERVICE_MARK_CHANNEL_UNREAD_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the UpdateChannelSidebarPreference RPC. Sends a request to /briar.app.v1.ChannelService/UpdateChannelSidebarPreference.
+    pub async fn update_channel_sidebar_preference(
+        &self,
+        request: crate::proto::briar::app::v1::UpdateChannelSidebarPreferenceRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::UpdateChannelSidebarPreferenceResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.update_channel_sidebar_preference_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the UpdateChannelSidebarPreference RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn update_channel_sidebar_preference_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::UpdateChannelSidebarPreferenceRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::UpdateChannelSidebarPreferenceResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                CHANNEL_SERVICE_UPDATE_CHANNEL_SIDEBAR_PREFERENCE_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ListChannelSidebarSections RPC. Sends a request to /briar.app.v1.ChannelService/ListChannelSidebarSections.
+    pub async fn list_channel_sidebar_sections(
+        &self,
+        request: crate::proto::briar::app::v1::ListChannelSidebarSectionsRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::ListChannelSidebarSectionsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.list_channel_sidebar_sections_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ListChannelSidebarSections RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_channel_sidebar_sections_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::ListChannelSidebarSectionsRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::ListChannelSidebarSectionsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                CHANNEL_SERVICE_LIST_CHANNEL_SIDEBAR_SECTIONS_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the CreateChannelSidebarSection RPC. Sends a request to /briar.app.v1.ChannelService/CreateChannelSidebarSection.
+    pub async fn create_channel_sidebar_section(
+        &self,
+        request: crate::proto::briar::app::v1::CreateChannelSidebarSectionRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::CreateChannelSidebarSectionResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.create_channel_sidebar_section_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the CreateChannelSidebarSection RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn create_channel_sidebar_section_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::CreateChannelSidebarSectionRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::CreateChannelSidebarSectionResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                CHANNEL_SERVICE_CREATE_CHANNEL_SIDEBAR_SECTION_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the RenameChannelSidebarSection RPC. Sends a request to /briar.app.v1.ChannelService/RenameChannelSidebarSection.
+    pub async fn rename_channel_sidebar_section(
+        &self,
+        request: crate::proto::briar::app::v1::RenameChannelSidebarSectionRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::RenameChannelSidebarSectionResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.rename_channel_sidebar_section_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the RenameChannelSidebarSection RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn rename_channel_sidebar_section_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::RenameChannelSidebarSectionRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::RenameChannelSidebarSectionResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                CHANNEL_SERVICE_RENAME_CHANNEL_SIDEBAR_SECTION_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the DeleteChannelSidebarSection RPC. Sends a request to /briar.app.v1.ChannelService/DeleteChannelSidebarSection.
+    pub async fn delete_channel_sidebar_section(
+        &self,
+        request: crate::proto::briar::app::v1::DeleteChannelSidebarSectionRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::DeleteChannelSidebarSectionResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.delete_channel_sidebar_section_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the DeleteChannelSidebarSection RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn delete_channel_sidebar_section_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::DeleteChannelSidebarSectionRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::DeleteChannelSidebarSectionResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                CHANNEL_SERVICE_DELETE_CHANNEL_SIDEBAR_SECTION_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,

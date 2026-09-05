@@ -110,6 +110,9 @@ const channelOf = (id: string): ChannelSummary => ({
   lastReadAt: null,
   hasUnread: false,
   dmParticipants: [],
+  pinnedAt: null,
+  sidebarSectionId: null,
+  hiddenAt: null,
 });
 
 const seedChannels = (registry: AtomRegistry, channels: ChannelSummary[]) => {

@@ -71,6 +71,28 @@ export const quickProcessErrorAtom = Atom.make<string | null>(null).pipe(
   Atom.withLabel("dialogs/quickProcessError"),
 );
 
+/**
+ * A team Agent whose profile editor should open once that team's Agents page is
+ * on screen. The DM list's "Edit Profile" navigates to the page and leaves the
+ * id here; the page consumes it and clears it, so a later visit does not reopen
+ * the editor. It is left alone while the requested agent is not in the list the
+ * page is showing, because the team may still be switching under it.
+ */
+export const requestedTeamAgentSettingsIdAtom = Atom.make<string | null>(
+  null,
+).pipe(Atom.keepAlive, Atom.withLabel("dialogs/requestedTeamAgentSettingsId"));
+
+/**
+ * An organization Agent whose editor should open once the Agents settings page
+ * is on screen. Organization Agents have no profile editor, so "Edit Profile"
+ * falls back to that page's skills dialog and leaves the id here; the page
+ * consumes it and clears it, so a later visit to the page does not reopen the
+ * editor.
+ */
+export const requestedOrganizationAgentIdAtom = Atom.make<string | null>(
+  null,
+).pipe(Atom.keepAlive, Atom.withLabel("dialogs/requestedOrganizationAgentId"));
+
 /** The team whose repository setup dialog is open. */
 export const repositorySetupTeamIdAtom = Atom.make<string | null>(null).pipe(
   Atom.keepAlive,

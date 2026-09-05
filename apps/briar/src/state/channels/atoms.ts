@@ -1,6 +1,9 @@
 import * as Atom from "effect/unstable/reactivity/Atom";
 
-import type { ChannelSummary } from "../../lib/channels-contract";
+import type {
+  ChannelSidebarSection,
+  ChannelSummary,
+} from "../../lib/channels-contract";
 import { organizationChannelsAtom } from "../entities/channels";
 import { shallowArrayEqual } from "../entities/upsert";
 import { activeOrganizationIdAtom } from "../organization/atoms";
@@ -62,6 +65,18 @@ function organizationScopedAtom<A>(
     },
   ).pipe(Atom.keepAlive, Atom.withLabel(label));
 }
+
+/** The shared empty list every "no sections yet" branch returns. */
+const noSidebarSections: ChannelSidebarSection[] = [];
+
+/**
+ * The caller's own sidebar sections for the active organization, in position
+ * order. They arrive with the catalog and are replaced by whatever a section
+ * RPC returns, so the list never has to merge one section into the others.
+ */
+export const channelSidebarSectionsAtom = organizationScopedAtom<
+  ChannelSidebarSection[]
+>(noSidebarSections, "channels/sidebarSections");
 
 /** The channel the app considers open, within the active organization. */
 export const activeChannelIdAtom = organizationScopedAtom<string | null>(
