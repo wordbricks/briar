@@ -494,5 +494,16 @@ export async function sandboxRemoteAgentCommand() {
   process.once("SIGTERM", stop);
   process.once("SIGINT", stop);
   agent.start();
-  await new Promise<never>(() => undefined);
+  // A later bootstrap may rewrite the relay config (new credential or
+  // computer id). Exit so the supervisor restarts the agent with it.
+  const loaded = JSON.stringify(config);
+  for (;;) {
+    await new Promise((resolve) => setTimeout(resolve, 10_000));
+    const current = await readSandboxRemoteAgentConfig().catch(() => null);
+    if (current === null || JSON.stringify(current) !== loaded) {
+      console.error("Sandbox relay config changed; restarting the remote agent");
+      agent.stop();
+      return;
+    }
+  }
 }
