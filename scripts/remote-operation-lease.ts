@@ -1,4 +1,5 @@
 import * as Effect from "effect/Effect";
+import * as Schedule from "effect/Schedule";
 import * as Schema from "effect/Schema";
 
 import type { WranglerRunner } from "./apply-remote-d1-migrations";
@@ -283,8 +284,24 @@ export const withRemoteOperationLease = Effect.fn("withRemoteOperationLease")(
     return yield* Effect.acquireUseRelease(
       acquire(validated),
       (lease) => {
+        // A D1 import makes the database unavailable to serve queries, and a
+        // lease command issued inside that window fails with a transient
+        // internal error. Retrying keeps the lease alive across long imports;
+        // only a genuinely lost lease may interrupt the protected operation.
         const heartbeat = Effect.sleep(validated.heartbeatMillis).pipe(
-          Effect.andThen(renew(validated, lease)),
+          Effect.andThen(renew(validated, lease).pipe(
+            Effect.retry({
+              schedule: Schedule.min([
+                Schedule.spaced("10 seconds"),
+                Schedule.recurs(11),
+              ]),
+              while: (error) => error._tag === "RemoteLeaseCommandError",
+            }),
+            Effect.catchIf(
+              (error) => error._tag === "RemoteLeaseCommandError",
+              (error) => Effect.logWarning(error.message),
+            ),
+          )),
           Effect.forever,
         );
         const use = Effect.tryPromise({
