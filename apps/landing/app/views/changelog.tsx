@@ -30,6 +30,19 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.207",
+        date: "2026년 9월 6일",
+        title: "삭제된 Worker에 런이 더 이상 멈추지 않습니다",
+        summary:
+          "특정 Worker에 배정된 런은 그 Worker가 삭제되면 영원히 멈춰 있었습니다. 이제 그런 런은 자동으로 다른 사용 가능한 Worker로 넘어가고, 런 페이지는 승인된 재개가 Worker를 기다리고 있을 때 이를 알려줍니다.",
+        items: [
+          "특정 Worker에 배정된 런은 그 Worker가 삭제(재등록, 등록 해제, 연결 해제)되어도 더 이상 멈추지 않고 자동으로 다른 사용 가능한 Worker로 넘어갑니다.",
+          "승인된 재개가 Worker를 기다리고 있을 때 런 페이지가 원인 없는 스피너 대신 안내 문구를 보여줍니다.",
+          "DM에서 에이전트가 응답을 준비하는 동안 인라인 타이핑 표시 대신 자리 표시 행이 보입니다.",
+          "sandbox 이미지에 OpenCode와 Grok이 포함되어, sandbox up 실행 시 기존 인증 정보가 자동으로 복사됩니다.",
+        ],
+      },
+      {
         version: "1.2.206",
         date: "2026년 9월 6일",
         title: "DM 목록에서 우클릭으로 정리합니다",
@@ -1767,6 +1780,19 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.207",
+        date: "September 6, 2026",
+        title: "Runs no longer get stuck on a deleted Worker",
+        summary:
+          "A run dispatched to a specific Worker could get stuck forever once that Worker was deleted. Runs like that now fall back to any available Worker automatically, and the run page tells you when an approved resume is still waiting for one.",
+        items: [
+          "A run assigned to a specific Worker that's later deleted (re-registered, unregistered, or unlinked) now falls back to any available Worker instead of sitting unclaimable forever.",
+          "The run page shows a clear hint when an approved resume is waiting for a Worker, instead of a spinner with no explanation.",
+          "DMs show a placeholder row for the agent instead of an inline typing strip while it's getting ready to respond.",
+          "OpenCode and Grok are now available in the sandbox image, with your existing auth copied automatically when you run sandbox up.",
+        ],
+      },
       {
         version: "1.2.206",
         date: "September 6, 2026",
