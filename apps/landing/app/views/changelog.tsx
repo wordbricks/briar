@@ -30,6 +30,18 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.205",
+        date: "2026년 9월 5일",
+        title: "사이드바를 챗과 업무로 나눕니다",
+        summary:
+          "조직 이름 옆의 토글로 챗(DM)과 업무를 오갑니다. 챗에서는 사이드바가 DM 대화 목록이 되고 오른쪽 전체가 대화 하나에 쓰입니다. 앱은 이제 최근 DM으로 시작합니다.",
+        items: [
+          "업무 토글은 마지막에 보던 업무 화면으로, 챗 토글은 마지막에 보던 대화로 돌아갑니다. 알림이나 링크로 이슈나 DM을 열면 해당 모드로 자동 전환됩니다.",
+          "새 메시지 버튼은 오른쪽에 수신자 선택 화면을 띄우고, 대화를 고르면 닫힙니다. 읽지 않은 DM은 업무 모드에서 챗 토글에 점으로 표시됩니다.",
+          "채널 응답에 에이전트의 Computer Use 정책이 빠져 있어, 지정 워커가 있어도 DM 컴퓨터 패널이 뜨지 않던 문제를 고칩니다.",
+        ],
+      },
+      {
         version: "1.2.204",
         date: "2026년 9월 5일",
         title: "Docker sandbox 화면을 앱에서 바로 봅니다",
@@ -1742,6 +1754,18 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.205",
+        date: "September 5, 2026",
+        title: "The sidebar splits into DMs and Work",
+        summary:
+          "A toggle beside the organization name switches between DMs and Work. On DMs the sidebar becomes the conversation list and the whole page shows one conversation. The app now opens on your latest DM.",
+        items: [
+          "Work returns to the last work screen you were on and DMs to the last conversation; notifications and links that open an issue or a DM switch halves by themselves.",
+          "New message opens the recipient picker on the right and closes once you pick a conversation. Unread DMs show as a dot on the DMs toggle while you are on Work.",
+          "Fix channel responses missing the agent's Computer Use policy, so the DM computer panel never appeared even for an eligible designated worker.",
+        ],
+      },
       {
         version: "1.2.204",
         date: "September 5, 2026",
